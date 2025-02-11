@@ -1,0 +1,64 @@
+[project]
+name = "tooling-atr-experiment"
+version = "0.0.1"
+description = "Some experiments with ATR"
+authors = [
+  { name = "Sean B. Palmer" }
+]
+readme = "README.md"
+requires-python = "==3.13.*"
+dependencies = [
+  "alembic>=1.14.1,<2.0.0",
+  "asfquart",
+  "cryptography>=44.0.0",
+  "hypercorn>=0.17.3",
+  "sqlmodel>=0.0.22",
+]
+
+[dependency-groups]
+dev = [
+  "black>=25.1.0",
+  "pre-commit>=2.20.0",
+  "pyright>=1.1.393",
+  "ruff>=0.9.4"
+]
+
+# Other configuration
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.group.dev.dependencies]
+black = ">=25.1.0"
+pre-commit = ">=2.20.0"
+pyright = ">=1.1.393"
+ruff = ">=0.9.4"
+
+[tool.poetry.group.main.dependencies]
+alembic = ">=1.14.1,<2.0.0"
+asfquart = { path = "./asfquart", develop = true }
+cryptography = ">=44.0.0"
+hypercorn = ">=0.17.3"
+sqlmodel = ">=0.0.22"
+
+[tool.pyright]
+include = ["atr"]
+exclude = ["**/node_modules", "**/__pycache__", ".venv*", "asfquart"]
+ignore = []
+defineConstant = { DEBUG = true }
+stubPath = "typestubs"
+reportMissingImports = "error"
+reportMissingTypeStubs = false
+pythonVersion = "3.13"
+executionEnvironments = [
+  { root = ".", pythonVersion = "3.13" }
+]
+
+[tool.ruff]
+lint.select = ["E", "W", "F", "C90"]
+lint.ignore = []
+line-length = 120
+exclude = ["asfquart"]
+
+[tool.uv.sources]
+asfquart = { path = "./asfquart", editable = true }

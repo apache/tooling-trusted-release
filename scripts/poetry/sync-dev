@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+_python="$(which python3)"
+poetry env use "${1:-$_python}"
+poetry sync
+cat <<EOF > .vscode/settings.json
+{
+  "makefile.configureOnOpen": false,
+  "python.analysis.extraPaths": ["$(poetry env info --path)/lib/python3.13/site-packages"],
+  "python.defaultInterpreterPath": "\${workspaceFolder}/$(poetry env info --path)/bin/python3"
+}
+EOF

@@ -1,0 +1,54 @@
+body { 
+    font-family: sans-serif; 
+    margin: 2em;
+    line-height: 1.6;
+}
+
+h1 { 
+    color: #303284;
+}
+
+.pmc-list { 
+    list-style: none; 
+    padding: 0;
+    max-width: 1200px;
+}
+
+.pmc-item {
+    padding: 1.5em;
+    margin: 0.75em 0;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pmc-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.pmc-name { 
+    font-weight: bold;
+    font-size: 1.2em;
+    color: #303284;
+    margin-bottom: 0.5em;
+}
+
+.pmc-stats { 
+    color: #666;
+    display: flex;
+    gap: 1.5em;
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    display: flex;
+    gap: 0.5em;
+}
+
+.intro {
+    max-width: 800px;
+    color: #555;
+} 

@@ -1,0 +1,10 @@
+*.pyc
+.env
+.ruff_cache/
+.venv-poetry/
+.venv-uv/
+__pycache__/
+scripts/both/
+scripts/uv/
+state/
+uv.lock

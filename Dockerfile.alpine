@@ -1,0 +1,25 @@
+FROM python:3.13.2-alpine3.21
+
+ARG SCRIPTS=scripts/poetry
+ENV SCRIPTS=${SCRIPTS}
+
+# gcompat is required for ruff to work
+# nodejs is required for pyright to work
+RUN apk update && apk add --no-cache \
+    file \
+    gcompat \
+    git \
+    make \
+    nix \
+    nodejs \
+    uv
+
+ENV PYTHONUNBUFFERED=1
+RUN pip3 install setuptools wheel pip-tools poetry
+WORKDIR /opt/atr
+COPY . /opt/atr
+RUN rm -rf .venv-*
+RUN make sync PYTHON="$(which python3)"
+RUN make certs
+EXPOSE 8080
+CMD ["make", "serve"]

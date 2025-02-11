@@ -1,0 +1,7 @@
+foo: bar
+bar:
+  - baz
+  - blorp
+  - bleep
+number: 42
+gnomes: true

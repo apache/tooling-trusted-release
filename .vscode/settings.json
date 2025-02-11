@@ -1,0 +1,5 @@
+{
+  "makefile.configureOnOpen": false,
+  "python.analysis.extraPaths": [".venv-poetry/tooling-atr-experiment-8lIg-9vn-py3.13/lib/python3.13/site-packages"],
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv-poetry/tooling-atr-experiment-8lIg-9vn-py3.13/bin/python3"
+}

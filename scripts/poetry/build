@@ -1,0 +1,5 @@
+#!/bin/sh
+# Just to check that the containers build successfully
+set -eu
+docker build -t tooling-atr-experiment -f Dockerfile.alpine .
+docker build -t tooling-atr-experiment -f Dockerfile.ubuntu .

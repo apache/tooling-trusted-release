@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Apache Trusted Releases</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='root.css') }}">
+</head>
+<body>
+  <h1>Apache Trusted Releases</h1>
+  <p class="intro">Welcome to the Apache Trusted Release platform. Below are the current Apache PMCs and their releases:</p>
+  
+  <ul class="pmc-list">
+  {% for pmc in pmcs %}
+    <li class="pmc-item">
+      <div class="pmc-name">{{ pmc.project_name }}</div>
+      <div class="pmc-stats">
+        <span class="stat-item">
+          <span>PMC Members:</span>
+          <strong>{{ pmc.pmc_members|length }}</strong>
+        </span>
+        <span class="stat-item">
+          <span>Committers:</span>
+          <strong>{{ pmc.committers|length }}</strong>
+        </span>
+        <span class="stat-item">
+          <span>Release Managers:</span>
+          <strong>{{ pmc.release_managers|length }}</strong>
+        </span>
+      </div>
+    </li>
+  {% endfor %}
+  </ul>
+</body>
+</html> 

@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+_python="$(which python3)"
+poetry env use "${1:-$_python}"
+poetry update
