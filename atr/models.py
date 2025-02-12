@@ -118,10 +118,28 @@ class VoteEntry(BaseModel):
     end: datetime.datetime
 
 
+class ReleaseStage(str, Enum):
+    BUILD = "build"
+    CANDIDATE = "candidate"
+    CURRENT = "current"
+    ARCHIVED = "archived"
+
+
+class ReleasePhase(str, Enum):
+    EVALUATE_CLAIMS = "evaluate_claims"
+    DISTRIBUTE_TEST = "distribute_test"
+    VOTE = "vote"
+    DISTRIBUTE = "distribute"
+    ANNOUNCE = "announce"
+    RELEASED = "released"
+    FAILED = "failed"
+    ARCHIVED = "archived"
+
+
 class Release(SQLModel, table=True):
     storage_key: str = Field(primary_key=True)
-    stage: str
-    phase: str
+    stage: ReleaseStage
+    phase: ReleasePhase
 
     # Many-to-one: A release belongs to one PMC, a PMC can have multiple releases
     pmc_id: Optional[int] = Field(default=None, foreign_key="pmc.id")
