@@ -27,18 +27,15 @@ repos:
         entry: ruff check --fix
         language: system
         types: [python]
-        exclude: ^asfquart/
 
       - id: ruff-format
         name: Ruff Formatter
         entry: ruff format --force-exclude
         language: system
         types: [python]
-        exclude: ^asfquart/
 
       - id: pyright
         name: Pyright Type Check
         entry: pyright
         language: system
         types: [python]
-        exclude: ^asfquart/
