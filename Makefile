@@ -1,7 +1,7 @@
 .PHONY: build certs check docs report serve sync
 
 MANAGER ?= poetry
-PYTHON ?= /usr/bin/python3
+PYTHON ?= $(which python3)
 SCRIPTS ?= scripts/$(MANAGER)
 
 build:
