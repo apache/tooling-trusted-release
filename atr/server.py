@@ -37,6 +37,8 @@ def register_routes() -> str:
 
 
 def create_app() -> QuartApp:
+    if asfquart.construct is ...:
+        raise ValueError("asfquart.construct is not set")
     app = asfquart.construct(__name__)
 
     @app.before_serving

@@ -14,7 +14,7 @@ CERT_PATH = os.path.join(STATE_DIR, "cert.pem")
 KEY_PATH = os.path.join(STATE_DIR, "key.pem")
 
 
-def generate_self_signed_cert():
+def generate_self_signed_cert() -> None:
     # Ensure the state directory exists
     os.makedirs(STATE_DIR, exist_ok=True)
 

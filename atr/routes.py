@@ -27,6 +27,9 @@ from sqlalchemy.exc import IntegrityError
 from asfquart import APP
 from .models import PMC
 
+if APP is ...:
+    raise ValueError("APP is not set")
+
 
 @APP.route("/")
 async def root() -> str:

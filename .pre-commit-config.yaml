@@ -1,35 +1,42 @@
 exclude: '^(asfquart)'
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
-      - id: check-toml
-      - id: check-yaml
-      - id: end-of-file-fixer
-      - id: mixed-line-ending
-      - id: trailing-whitespace
-  - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.5.5
-    hooks:
-      - id: insert-license
-        name: Add license for all Python files
-        files: ^atr/.*\.py$|^atr/.*\.pyi$
-        args:
-          - --comment-style
-          - "|#|"
-          - --license-filepath
-          - LICENSE-template.txt
-          - --fuzzy-match-generates-todo
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.6
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
-  - repo: local
-    hooks:
-      - id: pyright
-        name: Pyright Type Check
-        entry: pyright
-        language: system
-        types: [python]
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+  hooks:
+    - id: check-toml
+    - id: check-yaml
+    - id: end-of-file-fixer
+    - id: mixed-line-ending
+    - id: trailing-whitespace
+- repo: https://github.com/Lucas-C/pre-commit-hooks
+  rev: v1.5.5
+  hooks:
+    - id: insert-license
+      name: Add license for all Python files
+      files: ^atr/.*\.py$|^atr/.*\.pyi$
+      args:
+        - --comment-style
+        - "|#|"
+        - --license-filepath
+        - LICENSE-template.txt
+        - --fuzzy-match-generates-todo
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.9.6
+  hooks:
+    - id: ruff
+      args: [--fix]
+    - id: ruff-format
+- repo: local
+  hooks:
+    - id: mypy
+      name: Mypy Type Check
+      entry: mypy
+      language: system
+      types: [python]
+      args:
+        - --config-file=pyproject.toml
+    - id: pyright
+      name: Pyright Type Check
+      entry: pyright
+      language: system
+      types: [python]

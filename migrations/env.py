@@ -66,11 +66,11 @@ def run_migrations_online() -> None:
     # Cast to the correct type for type checker
     configuration = cast(Dict[str, Any], configuration)
 
-    # Add SQLite-specific connect args
-    configuration["sqlalchemy.connect_args"] = {
-        "check_same_thread": False,
-        "timeout": 30,
-    }
+    # # Add SQLite-specific connect args
+    # configuration["sqlalchemy.connect_args"] = {
+    #     "check_same_thread": False,
+    #     "timeout": 30,
+    # }
 
     connectable = engine_from_config(
         configuration,

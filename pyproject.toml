@@ -18,9 +18,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  "mypy>=1.15.0",
   "pre-commit>=2.20.0",
   "pyright>=1.1.393",
-  "ruff>=0.9.4"
+  "ruff>=0.9.4",
 ]
 
 # Other configuration
@@ -32,6 +33,7 @@ package-mode = false
 pre-commit = ">=2.20.0"
 pyright = ">=1.1.393"
 ruff = ">=0.9.4"
+mypy = "^1.15.0"
 
 [tool.poetry.group.main.dependencies]
 alembic = "~=1.14"
@@ -61,3 +63,23 @@ exclude = ["asfquart"]
 
 [tool.uv.sources]
 asfquart = { path = "./asfquart", editable = true }
+
+[tool.mypy]
+python_version = "3.13"
+exclude = ["asfquart"]
+mypy_path = "typestubs"
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+no_implicit_optional = true
+strict_optional = true
+warn_redundant_casts = true
+warn_return_any = true
+# warn_unreachable = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = "asfquart.*"
+ignore_errors = true
