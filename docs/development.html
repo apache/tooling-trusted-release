@@ -1,0 +1,12 @@
+<h1>Development</h1>
+<p>You will need to have a working <a href="https://www.python.org/downloads/release/python-3132/">Python 3.13</a> installation, <a href="https://python-poetry.org/docs/#installation">Poetry</a>, and a POSIX compliant <code>make</code>. To optionally build the HTML documentation files you will also need <a href="https://github.com/commonmark/cmark">cmark</a>.</p>
+<p>Ensure that you have the pre-commit hook installed:</p>
+<pre><code class="language-shell">make sync PYTHON=&quot;$(which python3)&quot;
+poetry run pre-commit install
+</code></pre>
+<p>To run the project, use the following commands:</p>
+<pre><code class="language-shell">make sync PYTHON=&quot;$(which python3)&quot;
+make certs
+make serve
+</code></pre>
+<p>The website will be available at <a href="https://127.0.0.1:8080/">https://127.0.0.1:8080/</a> using a self-signed certificate.</p>

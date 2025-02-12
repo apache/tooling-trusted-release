@@ -1,4 +1,4 @@
-.PHONY: build certs check report run sync
+.PHONY: build certs check docs report serve sync
 
 MANAGER ?= poetry
 PYTHON ?= /usr/bin/python3
@@ -12,6 +12,11 @@ certs:
 
 check:
 	$(SCRIPTS)/run pre-commit run --all-files
+
+docs:
+	for fn in docs/*.md; \
+	do cmark "$$fn" > "$${fn%.md}.html"; \
+	done
 
 report:
 	@echo SCRIPTS = $(SCRIPTS)

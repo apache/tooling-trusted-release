@@ -11,3 +11,7 @@ This experimental code is therefore published with no guarantee of stability, se
 ## Purpose
 
 This code is intended to one day help ASF Tooling to test internal ideas for the [Apache Trusted Release](https://github.com/apache/tooling-docs/blob/main/apache-trusted-release/requirements.md) platform. In its early phase it consists only of, essentially, an empty Python [asfquart](https://github.com/apache/infrastructure-asfquart) project.
+
+## License
+
+This project is licensed under the [Apache License 2.0](LICENSE).
