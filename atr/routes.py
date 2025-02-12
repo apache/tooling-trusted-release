@@ -55,7 +55,8 @@ async def pmc_create_arg(project_name: str) -> dict:
             session.refresh(pmc)
         except IntegrityError:
             raise ASFQuartException(
-                f"PMC with name '{project_name}' already exists", errorcode=409  # HTTP 409 Conflict
+                f"PMC with name '{project_name}' already exists",
+                errorcode=409,  # HTTP 409 Conflict
             )
 
         # Convert to dict for response

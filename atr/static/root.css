@@ -1,15 +1,15 @@
-body { 
-    font-family: sans-serif; 
+body {
+    font-family: sans-serif;
     margin: 2em;
     line-height: 1.6;
 }
 
-h1 { 
+h1 {
     color: #303284;
 }
 
-.pmc-list { 
-    list-style: none; 
+.pmc-list {
+    list-style: none;
     padding: 0;
     max-width: 1200px;
 }
@@ -29,14 +29,14 @@ h1 {
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
-.pmc-name { 
+.pmc-name {
     font-weight: bold;
     font-size: 1.2em;
     color: #303284;
     margin-bottom: 0.5em;
 }
 
-.pmc-stats { 
+.pmc-stats {
     color: #666;
     display: flex;
     gap: 1.5em;
@@ -51,4 +51,4 @@ h1 {
 .intro {
     max-width: 800px;
     color: #555;
-} 
+}
