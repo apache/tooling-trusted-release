@@ -126,12 +126,16 @@ class ReleaseStage(str, Enum):
 
 
 class ReleasePhase(str, Enum):
+    RELEASE_CANDIDATE = "release_candidate"
     EVALUATE_CLAIMS = "evaluate_claims"
     DISTRIBUTE_TEST = "distribute_test"
     VOTE = "vote"
+    PASSES = "passes"
+    RELEASE = "release"
     DISTRIBUTE = "distribute"
-    ANNOUNCE = "announce"
+    ANNOUNCE_RELEASE = "announce_release"
     RELEASED = "released"
+    MIGRATION = "migration"
     FAILED = "failed"
     ARCHIVED = "archived"
 
