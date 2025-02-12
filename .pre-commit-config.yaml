@@ -20,20 +20,14 @@ repos:
           - --license-filepath
           - LICENSE-template.txt
           - --fuzzy-match-generates-todo
-  - repo: local
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.6
     hooks:
       - id: ruff
-        name: Ruff Linter
-        entry: ruff check --fix
-        language: system
-        types: [python]
-
+        args: [--fix]
       - id: ruff-format
-        name: Ruff Formatter
-        entry: ruff format --force-exclude
-        language: system
-        types: [python]
-
+  - repo: local
+    hooks:
       - id: pyright
         name: Pyright Type Check
         entry: pyright
