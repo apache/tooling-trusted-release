@@ -1,0 +1,3 @@
+#!/bin/sh
+_python="$(which python3)"
+UV_PROJECT_ENVIRONMENT=.venv-uv exec uv lock --python "${1:-$_python}" --upgrade

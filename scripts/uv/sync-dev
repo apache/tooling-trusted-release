@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+UV_PROJECT_ENVIRONMENT=.venv-uv uv sync --python "$1"
+UV_PROJECT_ENVIRONMENT=.venv-uv uv sync --python "$1" --reinstall-package asfquart

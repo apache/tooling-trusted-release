@@ -5,7 +5,4 @@
 .venv-uv/
 .vscode/
 __pycache__/
-scripts/both/
-scripts/uv/
 state/
-uv.lock
