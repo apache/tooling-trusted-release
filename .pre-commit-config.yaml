@@ -13,16 +13,16 @@ repos:
           - --fuzzy-match-generates-todo
   - repo: local
     hooks:
-      - id: black
-        name: Black Code Formatter
-        entry: black --line-length 120
+      - id: ruff
+        name: Ruff Linter
+        entry: ruff check --fix
         language: system
         types: [python]
         exclude: ^asfquart/
 
-      - id: ruff
-        name: Ruff Linter
-        entry: ruff check --fix
+      - id: ruff-format
+        name: Ruff Formatter
+        entry: ruff format --force-exclude
         language: system
         types: [python]
         exclude: ^asfquart/
