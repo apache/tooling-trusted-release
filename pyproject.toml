@@ -3,16 +3,17 @@ name = "tooling-atr-experiment"
 version = "0.0.1"
 description = "Some experiments with ATR"
 authors = [
-  { name = "Sean B. Palmer" }
+  { name = "ASF Tooling", email = "dev@tooling.apache.org" }
 ]
+license = "Apache-2.0"
 readme = "README.md"
-requires-python = "==3.13.*"
+requires-python = "~=3.13"
 dependencies = [
-  "alembic>=1.14.1,<2.0.0",
+  "alembic~=1.14",
   "asfquart",
-  "cryptography>=44.0.0",
-  "hypercorn>=0.17.3",
-  "sqlmodel>=0.0.22",
+  "cryptography~=44.0",
+  "hypercorn~=0.17",
+  "sqlmodel~=0.0",
 ]
 
 [dependency-groups]
@@ -35,11 +36,11 @@ pyright = ">=1.1.393"
 ruff = ">=0.9.4"
 
 [tool.poetry.group.main.dependencies]
-alembic = ">=1.14.1,<2.0.0"
+alembic = "~=1.14"
 asfquart = { path = "./asfquart", develop = true }
-cryptography = ">=44.0.0"
-hypercorn = ">=0.17.3"
-sqlmodel = ">=0.0.22"
+cryptography = "~=44.0"
+hypercorn = "~=0.17"
+sqlmodel = "~=0.0"
 
 [tool.pyright]
 include = ["atr"]
