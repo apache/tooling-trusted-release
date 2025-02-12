@@ -1,4 +1,16 @@
 repos:
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.5
+    hooks:
+      - id: insert-license
+        name: Add license for all Python files
+        files: ^atr/.*\.py$|^atr/.*\.pyi$
+        args:
+          - --comment-style
+          - "|#|"
+          - --license-filepath
+          - LICENSE-template.txt
+          - --fuzzy-match-generates-todo
   - repo: local
     hooks:
       - id: black
