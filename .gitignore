@@ -3,6 +3,7 @@
 .ruff_cache/
 .venv-poetry/
 .venv-uv/
+.vscode/
 __pycache__/
 scripts/both/
 scripts/uv/
