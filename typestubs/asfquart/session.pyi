@@ -7,6 +7,19 @@ import typing
 """ASFQuart - User session methods and decorators"""
 
 class ClientSession(dict):
+    uid: str | None
+    dn: str | None
+    fullname: str | None
+    email: str
+    isMember: bool
+    isChair: bool
+    isRoot: bool
+    committees: list[str]
+    projects: list[str]
+    mfa: bool
+    isRole: bool
+    metadata: dict
+
     def __init__(self, raw_data: dict) -> None:
         """Initializes a client session from a raw dict. ClientSession is a subclassed dict, so that
         we can send it to quart in a format it can render."""
