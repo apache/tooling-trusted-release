@@ -4,9 +4,11 @@
 
 **IMPORTANT!**
 
+**Please do not file issues, bugs, or feature requests if you are not a member of ASF Tooling as such submissions will not be handled through our normal support channels.**
+
 This repository contains experimental code developed by the Tooling team at the Apache Software Foundation (ASF). Please be aware that this code is provided solely for exploration and experimentation by ASF Tooling. It is not part of any officially maintained or supported ASF project, and is not intended to be used in any other projects. It does not indicate choices which may be made by the ASF Tooling in future for official products.
 
-This experimental code is therefore published with no guarantee of stability, security, backward compatibility, or ongoing maintenance. ASF Tooling does not provide any form of support for this code. Please do not file issues, bugs, or feature requests if you are not a member of ASF Tooling as such submissions will not be handled through our normal support channels.
+This experimental code is therefore published with no guarantee of stability, security, backward compatibility, or ongoing maintenance. ASF Tooling does not provide any form of support for this code.
 
 ## Purpose
 
