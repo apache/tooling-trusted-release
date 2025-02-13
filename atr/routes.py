@@ -64,30 +64,26 @@ def compute_sha512(file_path: Path) -> str:
     return sha512.hexdigest()
 
 
-async def save_file_by_hash(file, base_dir: Path) -> Tuple[Path, str]:
-    """
-    Save a file using its SHA3-256 hash as the filename.
-    Returns the path where the file was saved and its hash.
-    """
-    # FileStorage.read() returns bytes directly, no need to await
-    data = file.read()
-    file_hash = compute_sha3_256(data)
-
-    # Create path with hash as filename
-    path = base_dir / file_hash
-    path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Only write if file doesn't exist
-    # If it does exist, it'll be the same content anyway
-    if not path.exists():
-        path.write_bytes(data)
-
-    return path, file_hash
+@APP.route("/")
+async def root() -> str:
+    "Main PMC directory page."
+    return """\
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>ATR</title>
+</head>
+<body>
+    <h1>Apache Trusted Releases</h1>
+</body>
+</html>
+"""
 
 
 @APP.route("/add-release-candidate", methods=["GET", "POST"])
 @require(R.committer)
-async def add_release_candidate() -> str:
+async def root_add_release_candidate() -> str:
     "Add a release candidate to the database."
     session = await session_read()
     if session is None:
@@ -178,10 +174,10 @@ async def add_release_candidate() -> str:
     )
 
 
-@APP.route("/admin/data-browser")
-@APP.route("/admin/data-browser/<model>")
+@APP.route("/admin/database")
+@APP.route("/admin/database/<model>")
 @require(R.committer)
-async def admin_data_browser(model: str = "PMC") -> str:
+async def root_admin_database(model: str = "PMC") -> str:
     "Browse all records in the database."
     session = await session_read()
     if session is None:
@@ -231,7 +227,8 @@ async def admin_data_browser(model: str = "PMC") -> str:
 
 
 @APP.route("/admin/update-pmcs", methods=["GET", "POST"])
-async def admin_update_pmcs() -> str:
+@require(R.committer)
+async def root_admin_update_pmcs() -> str:
     "Update PMCs from remote, authoritative committee-info.json."
     # Check authentication
     session = await session_read()
@@ -307,8 +304,42 @@ async def admin_update_pmcs() -> str:
     return await render_template("update-pmcs.html")
 
 
+@APP.get("/database/debug")
+async def root_database_debug() -> str:
+    """Debug information about the database."""
+    with Session(current_app.config["engine"]) as session:
+        statement = select(PMC)
+        pmcs = session.exec(statement).all()
+        return f"Database using {current_app.config['DATA_MODELS_FILE']} has {len(pmcs)} PMCs"
+
+
+@APP.route("/pages")
+async def root_pages() -> str:
+    "List all pages on the website."
+    return await render_template("pages.html")
+
+
+@APP.route("/pmc/<project_name>")
+async def root_pmc_arg(project_name: str) -> dict:
+    "Get a specific PMC by project name."
+    with Session(current_app.config["engine"]) as session:
+        statement = select(PMC).where(PMC.project_name == project_name)
+        pmc = session.exec(statement).first()
+
+        if not pmc:
+            raise ASFQuartException("PMC not found", errorcode=404)
+
+        return {
+            "id": pmc.id,
+            "project_name": pmc.project_name,
+            "pmc_members": pmc.pmc_members,
+            "committers": pmc.committers,
+            "release_managers": pmc.release_managers,
+        }
+
+
 @APP.route("/pmc/create/<project_name>")
-async def pmc_create_arg(project_name: str) -> dict:
+async def root_pmc_create_arg(project_name: str) -> dict:
     "Create a new PMC with some sample data."
     pmc = PMC(
         project_name=project_name,
@@ -338,8 +369,18 @@ async def pmc_create_arg(project_name: str) -> dict:
         }
 
 
+@APP.route("/pmc/directory")
+async def root_pmc_directory() -> str:
+    "Main PMC directory page."
+    with Session(current_app.config["engine"]) as session:
+        # Get all PMCs and their latest releases
+        statement = select(PMC)
+        pmcs = session.exec(statement).all()
+        return await render_template("pmc-directory.html", pmcs=pmcs)
+
+
 @APP.route("/pmc/list")
-async def pmc_list() -> List[dict]:
+async def root_pmc_list() -> List[dict]:
     "List all PMCs in the database."
     with Session(current_app.config["engine"]) as session:
         statement = select(PMC)
@@ -357,38 +398,15 @@ async def pmc_list() -> List[dict]:
         ]
 
 
-@APP.route("/pmc/<project_name>")
-async def pmc_arg(project_name: str) -> dict:
-    "Get a specific PMC by project name."
-    with Session(current_app.config["engine"]) as session:
-        statement = select(PMC).where(PMC.project_name == project_name)
-        pmc = session.exec(statement).first()
-
-        if not pmc:
-            raise ASFQuartException("PMC not found", errorcode=404)
-
-        return {
-            "id": pmc.id,
-            "project_name": pmc.project_name,
-            "pmc_members": pmc.pmc_members,
-            "committers": pmc.committers,
-            "release_managers": pmc.release_managers,
-        }
-
-
-@APP.route("/")
-async def root() -> str:
-    "Main PMC directory page."
-    with Session(current_app.config["engine"]) as session:
-        # Get all PMCs and their latest releases
-        statement = select(PMC)
-        pmcs = session.exec(statement).all()
-        return await render_template("root.html", pmcs=pmcs)
+@APP.route("/secret")
+@require(R.committer)
+async def root_secret() -> str:
+    return "Secret stuff!"
 
 
 @APP.route("/user/uploads")
 @require(R.committer)
-async def user_uploads() -> str:
+async def root_user_uploads() -> str:
     "Show all release candidates uploaded by the current user."
     session = await session_read()
     if session is None:
@@ -410,3 +428,24 @@ async def user_uploads() -> str:
                 user_releases.append(r)
 
         return await render_template("user-uploads.html", releases=user_releases)
+
+
+async def save_file_by_hash(file, base_dir: Path) -> Tuple[Path, str]:
+    """
+    Save a file using its SHA3-256 hash as the filename.
+    Returns the path where the file was saved and its hash.
+    """
+    # FileStorage.read() returns bytes directly, no need to await
+    data = file.read()
+    file_hash = compute_sha3_256(data)
+
+    # Create path with hash as filename
+    path = base_dir / file_hash
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Only write if file doesn't exist
+    # If it does exist, it'll be the same content anyway
+    if not path.exists():
+        path.write_bytes(data)
+
+    return path, file_hash

@@ -20,13 +20,12 @@
 import os
 
 import asfquart
-from asfquart.auth import Requirements as R, require
 from asfquart.base import QuartApp
-from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel import SQLModel, create_engine
 from alembic import command
 from alembic.config import Config
 
-from .models import PMC, __file__ as data_models_file
+from .models import __file__ as data_models_file
 
 
 def register_routes() -> str:
@@ -42,7 +41,7 @@ def create_app() -> QuartApp:
     app = asfquart.construct(__name__)
 
     @app.before_serving
-    async def create_database():
+    async def create_database() -> None:
         # Get the project root directory (where alembic.ini is)
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -57,6 +56,7 @@ def create_app() -> QuartApp:
         release_storage = os.path.join(state_dir, "releases")
         os.makedirs(release_storage, exist_ok=True)
         app.config["RELEASE_STORAGE_DIR"] = release_storage
+        app.config["DATA_MODELS_FILE"] = data_models_file
 
         sqlite_url = "sqlite:///./atr.db"
         engine = create_engine(
@@ -91,23 +91,11 @@ def create_app() -> QuartApp:
 
         # Create any tables that might be missing
         SQLModel.metadata.create_all(engine)
+
         app.config["engine"] = engine
 
-    @app.route("/secret")
-    @require(R.committer)
-    async def secret() -> str:
-        return "Secret stuff!"
-
-    @app.get("/database/debug")
-    async def database_debug() -> str:
-        """Debug information about the database."""
-        with Session(app.config["engine"]) as session:
-            statement = select(PMC)
-            pmcs = session.exec(statement).all()
-            return f"Database using {data_models_file} has {len(pmcs)} PMCs"
-
     @app.after_serving
-    async def shutdown():
+    async def shutdown() -> None:
         app.background_tasks.clear()
 
     register_routes()

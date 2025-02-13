@@ -99,5 +99,5 @@ format_js = true
 max_line_length = 120
 use_gitignore = true
 preserve_blank_lines = true
-ignore = "H006,H031"  # Ignore img alt and meta description warnings
+ignore = "H006,H031"
 include = "atr/templates"

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <meta name="description" content="List of all pages and endpoints in ATR." />
+    <title>ATR | Pages</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='root.css') }}" />
+    <style>
+        .endpoint-list {
+            margin: 2rem 0;
+        }
+
+        .endpoint-group {
+            margin-bottom: 2rem;
+        }
+
+        .endpoint {
+            border: 1px solid #ddd;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+        }
+
+        .endpoint h3 {
+            margin: 0 0 0.5rem 0;
+        }
+
+        .endpoint-meta {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 0.5rem;
+        }
+
+        .endpoint-description {
+            margin-bottom: 0.5rem;
+        }
+
+        .access-requirement {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 2px;
+            font-size: 0.8em;
+            background: #f5f5f5;
+        }
+
+        .access-requirement.committer {
+            background: #e6f3ff;
+            border: 1px solid #cce5ff;
+        }
+
+        .access-requirement.admin {
+            background: #ffeeba;
+            border: 1px solid #f5d88c;
+        }
+
+        .access-requirement.public {
+            background: #e6ffe6;
+            border: 1px solid #ccebcc;
+        }
+    </style>
+  </head>
+  <body>
+    <h1>ATR Pages</h1>
+    <p class="intro">A complete list of all pages and endpoints available in ATR.</p>
+
+    <div class="endpoint-list">
+      <div class="endpoint-group">
+        <h2>Main Pages</h2>
+
+        <div class="endpoint">
+          <h3>
+            <a href="{{ url_for('root') }}">/</a>
+          </h3>
+          <div class="endpoint-description">Simple welcome page with Apache Trusted Releases title.</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement public">Public</span>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <h3>
+            <a href="{{ url_for('root_pages') }}">/pages</a>
+          </h3>
+          <div class="endpoint-description">List of all pages on the website (this page).</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement public">Public</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint-group">
+        <h2>PMC Management</h2>
+
+        <div class="endpoint">
+          <h3>
+            <a href="{{ url_for('root_pmc_directory') }}">/pmc/directory</a>
+          </h3>
+          <div class="endpoint-description">Main PMC directory page with all PMCs and their latest releases.</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement public">Public</span>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <h3>
+            <a href="{{ url_for('root_pmc_list') }}">/pmc/list</a>
+          </h3>
+          <div class="endpoint-description">List all PMCs in the database (JSON format).</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement public">Public</span>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <h3>/pmc/&lt;project_name&gt;</h3>
+          <div class="endpoint-description">Get details for a specific PMC (JSON format).</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement public">Public</span>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <h3>/pmc/create/&lt;project_name&gt;</h3>
+          <div class="endpoint-description">Create a new PMC with sample data (JSON format).</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement public">Public</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint-group">
+        <h2>Release Management</h2>
+
+        <div class="endpoint">
+          <h3>
+            <a href="{{ url_for('root_add_release_candidate') }}">/add-release-candidate</a>
+          </h3>
+          <div class="endpoint-description">Add a release candidate to the database.</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement committer">Committer</span>
+            <br />
+            Additional requirement: Must be PMC member of the target project
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <h3>
+            <a href="{{ url_for('root_user_uploads') }}">/user/uploads</a>
+          </h3>
+          <div class="endpoint-description">Show all release candidates uploaded by the current user.</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement committer">Committer</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint-group">
+        <h2>Administration</h2>
+
+        <div class="endpoint">
+          <h3>
+            <a href="{{ url_for('root_admin_database') }}">/admin/database</a>
+          </h3>
+          <div class="endpoint-description">Browse all records in the database.</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement committer">Committer</span>
+            <span class="access-requirement admin">Admin</span>
+            <br />
+            Additional requirement: Must be in ALLOWED_USERS list
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <h3>
+            <a href="{{ url_for('root_admin_update_pmcs') }}">/admin/update-pmcs</a>
+          </h3>
+          <div class="endpoint-description">Update PMCs from remote, authoritative committee-info.json.</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement committer">Committer</span>
+            <span class="access-requirement admin">Admin</span>
+            <br />
+            Additional requirement: Must be in ALLOWED_USERS list
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint-group">
+        <h2>Debug/Testing</h2>
+
+        <div class="endpoint">
+          <h3>
+            <a href="{{ url_for('root_secret') }}">/secret</a>
+          </h3>
+          <div class="endpoint-description">Test endpoint for authentication.</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement committer">Committer</span>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <h3>
+            <a href="{{ url_for('root_database_debug') }}">/database/debug</a>
+          </h3>
+          <div class="endpoint-description">Debug information about the database.</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement public">Public</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
