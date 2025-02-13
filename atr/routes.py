@@ -36,6 +36,8 @@ from .models import PMC, Release, ReleaseStage, ReleasePhase, Package
 if APP is ...:
     raise ValueError("APP is not set")
 
+ALLOWED_USERS = {"cwells", "fluxo", "gmcdonald", "humbedooh", "sbp", "tn", "wave"}
+
 
 def compute_sha3_256(file_data: bytes) -> str:
     "Compute SHA3-256 hash of file data."
@@ -172,9 +174,6 @@ async def admin_update_pmcs() -> str:
     session = await session_read()
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
-
-    # List of users allowed to update PMCs
-    ALLOWED_USERS = {"cwells", "fluxo", "gmcdonald", "humbedooh", "sbp", "tn", "wave"}
 
     if session.uid not in ALLOWED_USERS:
         raise ASFQuartException("You are not authorized to update PMCs", errorcode=403)
@@ -322,3 +321,29 @@ async def root() -> str:
         statement = select(PMC)
         pmcs = session.exec(statement).all()
         return await render_template("root.html", pmcs=pmcs)
+
+
+@APP.route("/user/uploads")
+@require(R.committer)
+async def user_uploads() -> str:
+    "Show all release candidates uploaded by the current user."
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    with Session(current_app.config["engine"]) as db_session:
+        # Get all releases where the user is a PMC member of the associated PMC
+        # TODO: We don't actually record who uploaded the release candidate
+        # We should probably add that information!
+        statement = select(Release).join(PMC).where(Release.stage == ReleaseStage.CANDIDATE)
+        releases = db_session.exec(statement).all()
+
+        # Filter to only show releases for PMCs where the user is a member
+        user_releases = []
+        for r in releases:
+            if r.pmc is None:
+                continue
+            if session.uid in r.pmc.pmc_members:
+                user_releases.append(r)
+
+        return await render_template("user-uploads.html", releases=user_releases)
