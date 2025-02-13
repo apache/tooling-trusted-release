@@ -15,7 +15,7 @@ At present, asfquart features the following auth requirements:
 These requirements can be passed to the `asfquart.auth.require` decorator to create a list of requirements 
 that must pass in order to make use of the endpoint.
 
-By default, requirements are implictly in the `all_of` category, meaning they are AND'ed together.
+By default, requirements are implicitly in the `all_of` category, meaning they are AND'ed together.
 You can also OR requirements by using the `any_of` flag instead:
 
 ~~~python
