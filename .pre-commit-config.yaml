@@ -20,6 +20,22 @@ repos:
         - --license-filepath
         - LICENSE-template.txt
         - --fuzzy-match-generates-todo
+- repo: https://github.com/Riverside-Healthcare/djLint
+  rev: v1.36.4
+  hooks:
+    - id: djlint
+      files: "atr/templates/.*\\.html$"
+      types_or: ['html']
+      args:
+        - --profile=jinja
+        - --lint
+    - id: djlint
+      name: Format HTML templates
+      files: "atr/templates/.*\\.html$"
+      types_or: ['html']
+      args:
+        - --profile=jinja
+        - --reformat
 - repo: local
   hooks:
     - id: ruff

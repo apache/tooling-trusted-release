@@ -19,6 +19,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  "djlint>=1.36.4",
   "mypy>=1.15.0",
   "pre-commit>=2.20.0",
   "pyright>=1.1.393",
@@ -31,10 +32,11 @@ dev = [
 package-mode = false
 
 [tool.poetry.group.dev.dependencies]
+djlint = "^1.36.4"
+mypy = "^1.15.0"
 pre-commit = ">=2.20.0"
 pyright = ">=1.1.393"
 ruff = ">=0.9.4"
-mypy = "^1.15.0"
 
 [tool.poetry.group.main.dependencies]
 alembic = "~=1.14"
@@ -85,3 +87,17 @@ warn_unused_ignores = true
 [[tool.mypy.overrides]]
 module = "asfquart.*"
 ignore_errors = true
+
+[tool.djlint]
+profile = "jinja"
+extension = "html"
+indent = 2
+blank_line_after_tag = "load,extends,include,html"
+close_void_tags = true
+format_css = true
+format_js = true
+max_line_length = 120
+use_gitignore = true
+preserve_blank_lines = true
+ignore = "H006,H031"  # Ignore img alt and meta description warnings
+include = "atr/templates"
