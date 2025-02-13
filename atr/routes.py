@@ -31,7 +31,18 @@ from sqlmodel import Session, select
 from sqlalchemy.exc import IntegrityError
 import httpx
 
-from .models import PMC, Release, ReleaseStage, ReleasePhase, Package
+from .models import (
+    DistributionChannel,
+    PMC,
+    PMCKeyLink,
+    Package,
+    ProductLine,
+    PublicSigningKey,
+    Release,
+    ReleasePhase,
+    ReleaseStage,
+    VotePolicy,
+)
 
 if APP is ...:
     raise ValueError("APP is not set")
@@ -165,6 +176,58 @@ async def add_release_candidate() -> str:
         pmc_memberships=session.committees,
         committer_projects=session.projects,
     )
+
+
+@APP.route("/admin/data-browser")
+@APP.route("/admin/data-browser/<model>")
+@require(R.committer)
+async def admin_data_browser(model: str = "PMC") -> str:
+    "Browse all records in the database."
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    if session.uid not in ALLOWED_USERS:
+        raise ASFQuartException("You are not authorized to browse data", errorcode=403)
+
+    # Map of model names to their classes
+    models = {
+        "PMC": PMC,
+        "Release": Release,
+        "Package": Package,
+        "VotePolicy": VotePolicy,
+        "ProductLine": ProductLine,
+        "DistributionChannel": DistributionChannel,
+        "PublicSigningKey": PublicSigningKey,
+        "PMCKeyLink": PMCKeyLink,
+    }
+
+    if model not in models:
+        # Default to PMC if invalid model specified
+        model = "PMC"
+
+    with Session(current_app.config["engine"]) as db_session:
+        # Get all records for the selected model
+        statement = select(models[model])
+        records = db_session.exec(statement).all()
+
+        # Convert records to dictionaries for JSON serialization
+        records_dict = []
+        for record in records:
+            if hasattr(record, "dict"):
+                record_dict = record.dict()
+            else:
+                # Fallback for models without dict() method
+                record_dict = {
+                    "id": getattr(record, "id", None),
+                    "storage_key": getattr(record, "storage_key", None),
+                }
+                for key in record.__dict__:
+                    if not key.startswith("_"):
+                        record_dict[key] = getattr(record, key)
+            records_dict.append(record_dict)
+
+        return await render_template("data-browser.html", models=list(models.keys()), model=model, records=records_dict)
 
 
 @APP.route("/admin/update-pmcs", methods=["GET", "POST"])
