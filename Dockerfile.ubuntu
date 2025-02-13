@@ -1,6 +1,8 @@
 # We can't use 24.10 because deadsnakes does not yet support it
 FROM ubuntu:24.04
 
+ARG BIND=127.0.0.1:8080
+ENV BIND=${BIND}
 ARG SCRIPTS=scripts/poetry
 ENV SCRIPTS=${SCRIPTS}
 
@@ -22,4 +24,4 @@ RUN rm -rf .venv-*
 RUN make sync PYTHON="$(find /usr/bin -name python3.13 | head -n 1)"
 RUN make certs
 EXPOSE 8080
-CMD ["make", "serve"]
+CMD ["sh", "-c", "make serve BIND=${BIND}"]

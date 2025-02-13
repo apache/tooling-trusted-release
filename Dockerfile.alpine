@@ -1,5 +1,7 @@
 FROM python:3.13.2-alpine3.21
 
+ARG BIND=127.0.0.1:8080
+ENV BIND=${BIND}
 ARG SCRIPTS=scripts/poetry
 ENV SCRIPTS=${SCRIPTS}
 
@@ -22,4 +24,4 @@ RUN rm -rf .venv-*
 RUN make sync PYTHON="$(which python3)"
 RUN make certs
 EXPOSE 8080
-CMD ["make", "serve"]
+CMD ["sh", "-c", "make serve BIND=${BIND}"]
