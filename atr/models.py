@@ -120,10 +120,15 @@ class DistributionChannel(SQLModel, table=True):
     product_line: Optional[ProductLine] = Relationship(back_populates="distribution_channels")
 
 
-class Package(BaseModel):
+class Package(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
     file: str
     signature: str
     checksum: str
+
+    # Many-to-one: A package belongs to one release
+    release_key: Optional[str] = Field(default=None, foreign_key="release.storage_key")
+    release: Optional["Release"] = Relationship(back_populates="packages")
 
 
 class VoteEntry(BaseModel):
@@ -172,7 +177,8 @@ class Release(SQLModel, table=True):
 
     package_managers: List[str] = Field(default_factory=list, sa_column=Column(JSON))
     version: str
-    packages: List[Package] = Field(default_factory=list, sa_column=Column(JSON))
+    # One-to-many: A release can have multiple packages
+    packages: List[Package] = Relationship(back_populates="release")
     sboms: List[str] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Many-to-one: A release can have one vote policy, a vote policy can be used by multiple releases

@@ -5,7 +5,7 @@ body {
 }
 
 h1 {
-    color: #303284;
+    color: #036;
 }
 
 .pmc-list {
@@ -32,7 +32,7 @@ h1 {
 .pmc-name {
     font-weight: bold;
     font-size: 1.2em;
-    color: #303284;
+    color: #036;
     margin-bottom: 0.5em;
 }
 

@@ -53,6 +53,11 @@ def create_app() -> QuartApp:
         os.chdir(state_dir)
         print(f"Working directory changed to: {os.getcwd()}")
 
+        # Set up release storage directory
+        release_storage = os.path.join(state_dir, "releases")
+        os.makedirs(release_storage, exist_ok=True)
+        app.config["RELEASE_STORAGE_DIR"] = release_storage
+
         sqlite_url = "sqlite:///./atr.db"
         engine = create_engine(
             sqlite_url,

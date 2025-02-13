@@ -76,12 +76,19 @@
     </div>
 
     <div class="form-group">
-      <label for="release_file">Release Candidate Archive:</label>
-      <input type="file" id="release_file" name="release_file" required
+      <label for="release_artifact">Release Candidate Archive:</label>
+      <input type="file" id="release_artifact" name="release_artifact" required
              accept="application/gzip,application/x-gzip,application/x-tar,application/zip,application/java-archive,.tar.gz,.tgz,.zip,.jar"
-             aria-describedby="file-help">
-      <span id="file-help">Upload the release candidate archive (tar.gz, zip, or jar)</span>
-      <!-- TODO: What file names should we support here? Just any file name?-->
+             aria-describedby="artifact-help">
+      <span id="artifact-help">Upload the release candidate archive (tar.gz, zip, or jar)</span>
+    </div>
+
+    <div class="form-group">
+      <label for="release_signature">Detached GPG Signature:</label>
+      <input type="file" id="release_signature" name="release_signature" required
+             accept="application/pgp-signature,.asc"
+             aria-describedby="signature-help">
+      <span id="signature-help">Upload the detached GPG signature (.asc) file for the release candidate</span>
     </div>
 
     <button type="submit" {% if not pmc_memberships %}disabled{% endif %}>

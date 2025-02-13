@@ -17,7 +17,10 @@
 
 "routes.py"
 
-from typing import List
+import hashlib
+import json
+from pathlib import Path
+from typing import List, Tuple
 
 from asfquart import APP
 from asfquart.auth import Requirements as R, require
@@ -26,11 +29,47 @@ from asfquart.session import read as session_read
 from quart import current_app, render_template, request
 from sqlmodel import Session, select
 from sqlalchemy.exc import IntegrityError
+import httpx
 
-from .models import PMC
+from .models import PMC, Release, ReleaseStage, ReleasePhase, Package
 
 if APP is ...:
     raise ValueError("APP is not set")
+
+
+def compute_sha3_256(file_data: bytes) -> str:
+    "Compute SHA3-256 hash of file data."
+    return hashlib.sha3_256(file_data).hexdigest()
+
+
+def compute_sha512(file_path: Path) -> str:
+    "Compute SHA-512 hash of a file."
+    sha512 = hashlib.sha512()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            sha512.update(chunk)
+    return sha512.hexdigest()
+
+
+async def save_file_by_hash(file, base_dir: Path) -> Tuple[Path, str]:
+    """
+    Save a file using its SHA3-256 hash as the filename.
+    Returns the path where the file was saved and its hash.
+    """
+    # FileStorage.read() returns bytes directly, no need to await
+    data = file.read()
+    file_hash = compute_sha3_256(data)
+
+    # Create path with hash as filename
+    path = base_dir / file_hash
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Only write if file doesn't exist
+    # If it does exist, it'll be the same content anyway
+    if not path.exists():
+        path.write_bytes(data)
+
+    return path, file_hash
 
 
 @APP.route("/add-release-candidate", methods=["GET", "POST"])
@@ -43,10 +82,7 @@ async def add_release_candidate() -> str:
 
     # For POST requests, handle the file upload
     if request.method == "POST":
-        # We'll implement the actual file handling later
-        # For now just return a message about what we would do
         form = await request.form
-        files = await request.files
 
         project_name = form.get("project_name")
         if not project_name:
@@ -58,12 +94,67 @@ async def add_release_candidate() -> str:
                 f"You must be a PMC member of {project_name} to submit a release candidate", errorcode=403
             )
 
-        release_file = files.get("release_file")
-        if not release_file:
-            raise ASFQuartException("Release file is required", errorcode=400)
+        # Get all uploaded files
+        files = await request.files
 
-        # TODO: Implement actual file handling
-        return f"Would process release candidate for {project_name} from file {release_file.filename}"
+        # Get the release artifact and signature files
+        artifact_file = files.get("release_artifact")
+        signature_file = files.get("release_signature")
+
+        if not artifact_file:
+            raise ASFQuartException("Release artifact file is required", errorcode=400)
+        if not signature_file:
+            raise ASFQuartException("Detached GPG signature file is required", errorcode=400)
+        if not signature_file.filename.endswith(".asc"):
+            # TODO: Could also check that it's artifact name + ".asc"
+            # And at least warn if it's not
+            raise ASFQuartException("Signature file must have .asc extension", errorcode=400)
+
+        # Save files using their hashes as filenames
+        storage_dir = Path(current_app.config["RELEASE_STORAGE_DIR"]) / project_name
+        artifact_path, artifact_hash = await save_file_by_hash(artifact_file, storage_dir)
+        # TODO: Do we need to do anything with the signature hash?
+        # These should be identical, but path might be absolute?
+        # TODO: Need to check, ideally. Could have a data browser
+        signature_path, _ = await save_file_by_hash(signature_file, storage_dir)
+
+        # Compute SHA-512 checksum of the artifact for the package record
+        # We're using SHA-3-256 for the filename, so we need to use SHA-3-512 for the checksum
+        checksum_512 = compute_sha512(artifact_path)
+
+        # Store in database
+        with Session(current_app.config["engine"]) as db_session:
+            # Get PMC
+            statement = select(PMC).where(PMC.project_name == project_name)
+            pmc = db_session.exec(statement).first()
+            if not pmc:
+                raise ASFQuartException("PMC not found", errorcode=404)
+
+            # Create release record using artifact hash as storage key
+            # At some point this presumably won't work, because we can have many artifacts
+            # But meanwhile it's fine
+            # TODO: Extract version from filename or add to form
+            release = Release(
+                storage_key=artifact_hash,
+                stage=ReleaseStage.CANDIDATE,
+                phase=ReleasePhase.RELEASE_CANDIDATE,
+                pmc_id=pmc.id,
+                version="",
+            )
+            db_session.add(release)
+
+            # Create package record
+            package = Package(
+                file=str(artifact_path.relative_to(current_app.config["RELEASE_STORAGE_DIR"])),
+                signature=str(signature_path.relative_to(current_app.config["RELEASE_STORAGE_DIR"])),
+                checksum=checksum_512,
+                release_key=release.storage_key,
+            )
+            db_session.add(package)
+
+            db_session.commit()
+
+            return f"Successfully uploaded release candidate for {project_name}"
 
     # For GET requests, show the form
     return await render_template(
@@ -72,6 +163,86 @@ async def add_release_candidate() -> str:
         pmc_memberships=session.committees,
         committer_projects=session.projects,
     )
+
+
+@APP.route("/admin/update-pmcs", methods=["GET", "POST"])
+async def admin_update_pmcs() -> str:
+    "Update PMCs from remote, authoritative committee-info.json."
+    # Check authentication
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    # List of users allowed to update PMCs
+    ALLOWED_USERS = {"cwells", "fluxo", "gmcdonald", "humbedooh", "sbp", "tn", "wave"}
+
+    if session.uid not in ALLOWED_USERS:
+        raise ASFQuartException("You are not authorized to update PMCs", errorcode=403)
+
+    if request.method == "POST":
+        # TODO: We should probably lift this branch
+        # Or have the "GET" in a branch, and then we can happy path this POST branch
+        # Fetch committee-info.json from Whimsy
+        WHIMSY_URL = "https://whimsy.apache.org/public/committee-info.json"
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(WHIMSY_URL)
+                response.raise_for_status()
+                data = response.json()
+            except (httpx.RequestError, json.JSONDecodeError) as e:
+                raise ASFQuartException(f"Failed to fetch committee data: {str(e)}", errorcode=500)
+
+        committees = data.get("committees", {})
+        updated_count = 0
+
+        with Session(current_app.config["engine"]) as db_session:
+            for committee_id, info in committees.items():
+                # Skip non-PMC committees
+                if not info.get("pmc", False):
+                    continue
+
+                # Get or create PMC
+                statement = select(PMC).where(PMC.project_name == committee_id)
+                pmc = db_session.exec(statement).first()
+                if not pmc:
+                    pmc = PMC(project_name=committee_id)
+                    db_session.add(pmc)
+
+                # Update PMC data
+                roster = info.get("roster", {})
+                # All roster members are PMC members
+                pmc.pmc_members = list(roster.keys())
+                # All PMC members are also committers
+                pmc.committers = list(roster.keys())
+
+                # Mark chairs as release managers
+                # TODO: Who else is a release manager? How do we know?
+                chairs = [m["id"] for m in info.get("chairs", [])]
+                pmc.release_managers = chairs
+
+                updated_count += 1
+
+            # Add special entry for Tooling PMC
+            # Not clear why, but it's not in the Whimsy data
+            statement = select(PMC).where(PMC.project_name == "tooling")
+            tooling_pmc = db_session.exec(statement).first()
+            if not tooling_pmc:
+                tooling_pmc = PMC(project_name="tooling")
+                db_session.add(tooling_pmc)
+                updated_count += 1
+
+            # Update Tooling PMC data
+            # Could put this in the "if not tooling_pmc" block, perhaps
+            tooling_pmc.pmc_members = ["wave", "tn", "sbp"]
+            tooling_pmc.committers = ["wave", "tn", "sbp"]
+            tooling_pmc.release_managers = ["wave"]
+
+            db_session.commit()
+
+        return f"Successfully updated {updated_count} PMCs from Whimsy"
+
+    # For GET requests, show the update form
+    return await render_template("update-pmcs.html")
 
 
 @APP.route("/pmc/create/<project_name>")
