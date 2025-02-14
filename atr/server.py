@@ -47,6 +47,10 @@ def create_app() -> QuartApp:
         raise ValueError("asfquart.construct is not set")
     app = asfquart.construct(__name__)
 
+    @app.context_processor
+    async def app_wide():
+        return {"current_user": await asfquart.session.read()}
+
     @app.before_serving
     async def create_database() -> None:
         # Get the project root directory (where alembic.ini is)
