@@ -22,7 +22,7 @@ from io import BufferedReader
 import json
 import pprint
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional, Dict, Any, cast
 import datetime
 import asyncio
 
@@ -31,10 +31,13 @@ from asfquart.auth import Requirements as R, require
 from asfquart.base import ASFQuartException
 from asfquart.session import read as session_read, ClientSession
 from quart import current_app, render_template, request
-from sqlmodel import Session, select
+from sqlmodel import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.attributes import InstrumentedAttribute
 import httpx
 import gnupg
+from sqlalchemy.orm import selectinload
 
 from .models import (
     DistributionChannel,
@@ -137,36 +140,36 @@ async def root_add_release_candidate() -> str:
         checksum_512 = compute_sha512(artifact_path)
 
         # Store in database
-        with Session(current_app.config["engine"]) as db_session:
-            # Get PMC
-            statement = select(PMC).where(PMC.project_name == project_name)
-            pmc = db_session.exec(statement).first()
-            if not pmc:
-                raise ASFQuartException("PMC not found", errorcode=404)
+        async_session = current_app.config["async_session"]
+        async with async_session() as db_session:
+            async with db_session.begin():
+                # Get PMC
+                statement = select(PMC).where(PMC.project_name == project_name)
+                pmc = (await db_session.execute(statement)).scalar_one_or_none()
+                if not pmc:
+                    raise ASFQuartException("PMC not found", errorcode=404)
 
-            # Create release record using artifact hash as storage key
-            # At some point this presumably won't work, because we can have many artifacts
-            # But meanwhile it's fine
-            # TODO: Extract version from filename or add to form
-            release = Release(
-                storage_key=artifact_hash,
-                stage=ReleaseStage.CANDIDATE,
-                phase=ReleasePhase.RELEASE_CANDIDATE,
-                pmc_id=pmc.id,
-                version="",
-            )
-            db_session.add(release)
+                # Create release record using artifact hash as storage key
+                # At some point this presumably won't work, because we can have many artifacts
+                # But meanwhile it's fine
+                # TODO: Extract version from filename or add to form
+                release = Release(
+                    storage_key=artifact_hash,
+                    stage=ReleaseStage.CANDIDATE,
+                    phase=ReleasePhase.RELEASE_CANDIDATE,
+                    pmc_id=pmc.id,
+                    version="",
+                )
+                db_session.add(release)
 
-            # Create package record
-            package = Package(
-                file=str(artifact_path.relative_to(current_app.config["RELEASE_STORAGE_DIR"])),
-                signature=str(signature_path.relative_to(current_app.config["RELEASE_STORAGE_DIR"])),
-                checksum=checksum_512,
-                release_key=release.storage_key,
-            )
-            db_session.add(package)
-
-            db_session.commit()
+                # Create package record
+                package = Package(
+                    file=str(artifact_path.relative_to(current_app.config["RELEASE_STORAGE_DIR"])),
+                    signature=str(signature_path.relative_to(current_app.config["RELEASE_STORAGE_DIR"])),
+                    checksum=checksum_512,
+                    release_key=release.storage_key,
+                )
+                db_session.add(package)
 
             return f"Successfully uploaded release candidate for {project_name}"
 
@@ -207,10 +210,11 @@ async def root_admin_database(model: str = "PMC") -> str:
         # Default to PMC if invalid model specified
         model = "PMC"
 
-    with Session(current_app.config["engine"]) as db_session:
+    async_session = current_app.config["async_session"]
+    async with async_session() as db_session:
         # Get all records for the selected model
         statement = select(models[model])
-        records = db_session.exec(statement).all()
+        records = (await db_session.execute(statement)).scalars().all()
 
         # Convert records to dictionaries for JSON serialization
         records_dict = []
@@ -244,8 +248,6 @@ async def root_admin_update_pmcs() -> str:
         raise ASFQuartException("You are not authorized to update PMCs", errorcode=403)
 
     if request.method == "POST":
-        # TODO: We should probably lift this branch
-        # Or have the "GET" in a branch, and then we can happy path this POST branch
         # Fetch committee-info.json from Whimsy
         WHIMSY_URL = "https://whimsy.apache.org/public/committee-info.json"
         async with httpx.AsyncClient() as client:
@@ -259,49 +261,49 @@ async def root_admin_update_pmcs() -> str:
         committees = data.get("committees", {})
         updated_count = 0
 
-        with Session(current_app.config["engine"]) as db_session:
-            for committee_id, info in committees.items():
-                # Skip non-PMC committees
-                if not info.get("pmc", False):
-                    continue
+        async_session = current_app.config["async_session"]
+        async with async_session() as db_session:
+            async with db_session.begin():
+                for committee_id, info in committees.items():
+                    # Skip non-PMC committees
+                    if not info.get("pmc", False):
+                        continue
 
-                # Get or create PMC
-                statement = select(PMC).where(PMC.project_name == committee_id)
-                pmc = db_session.exec(statement).first()
-                if not pmc:
-                    pmc = PMC(project_name=committee_id)
-                    db_session.add(pmc)
+                    # Get or create PMC
+                    statement = select(PMC).where(PMC.project_name == committee_id)
+                    pmc = (await db_session.execute(statement)).scalar_one_or_none()
+                    if not pmc:
+                        pmc = PMC(project_name=committee_id)
+                        db_session.add(pmc)
 
-                # Update PMC data
-                roster = info.get("roster", {})
-                # All roster members are PMC members
-                pmc.pmc_members = list(roster.keys())
-                # All PMC members are also committers
-                pmc.committers = list(roster.keys())
+                    # Update PMC data
+                    roster = info.get("roster", {})
+                    # All roster members are PMC members
+                    pmc.pmc_members = list(roster.keys())
+                    # All PMC members are also committers
+                    pmc.committers = list(roster.keys())
 
-                # Mark chairs as release managers
-                # TODO: Who else is a release manager? How do we know?
-                chairs = [m["id"] for m in info.get("chairs", [])]
-                pmc.release_managers = chairs
+                    # Mark chairs as release managers
+                    # TODO: Who else is a release manager? How do we know?
+                    chairs = [m["id"] for m in info.get("chairs", [])]
+                    pmc.release_managers = chairs
 
-                updated_count += 1
+                    updated_count += 1
 
-            # Add special entry for Tooling PMC
-            # Not clear why, but it's not in the Whimsy data
-            statement = select(PMC).where(PMC.project_name == "tooling")
-            tooling_pmc = db_session.exec(statement).first()
-            if not tooling_pmc:
-                tooling_pmc = PMC(project_name="tooling")
-                db_session.add(tooling_pmc)
-                updated_count += 1
+                # Add special entry for Tooling PMC
+                # Not clear why, but it's not in the Whimsy data
+                statement = select(PMC).where(PMC.project_name == "tooling")
+                tooling_pmc = (await db_session.execute(statement)).scalar_one_or_none()
+                if not tooling_pmc:
+                    tooling_pmc = PMC(project_name="tooling")
+                    db_session.add(tooling_pmc)
+                    updated_count += 1
 
-            # Update Tooling PMC data
-            # Could put this in the "if not tooling_pmc" block, perhaps
-            tooling_pmc.pmc_members = ["wave", "tn", "sbp"]
-            tooling_pmc.committers = ["wave", "tn", "sbp"]
-            tooling_pmc.release_managers = ["wave"]
-
-            db_session.commit()
+                # Update Tooling PMC data
+                # Could put this in the "if not tooling_pmc" block, perhaps
+                tooling_pmc.pmc_members = ["wave", "tn", "sbp"]
+                tooling_pmc.committers = ["wave", "tn", "sbp"]
+                tooling_pmc.release_managers = ["wave"]
 
         return f"Successfully updated {updated_count} PMCs from Whimsy"
 
@@ -312,9 +314,10 @@ async def root_admin_update_pmcs() -> str:
 @APP.get("/database/debug")
 async def root_database_debug() -> str:
     """Debug information about the database."""
-    with Session(current_app.config["engine"]) as session:
+    async_session = current_app.config["async_session"]
+    async with async_session() as db_session:
         statement = select(PMC)
-        pmcs = session.exec(statement).all()
+        pmcs = (await db_session.execute(statement)).scalars().all()
         return f"Database using {current_app.config['DATA_MODELS_FILE']} has {len(pmcs)} PMCs"
 
 
@@ -326,10 +329,13 @@ async def root_release_signatures_verify(release_key: str) -> str:
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    with Session(current_app.config["engine"]) as db_session:
+    async_session = current_app.config["async_session"]
+    async with async_session() as db_session:
         # Get the release and its packages
-        statement = select(Release).where(Release.storage_key == release_key)
-        release = db_session.exec(statement).first()
+        release_packages = selectinload(cast(InstrumentedAttribute[List[Package]], Release.packages))
+        release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
+        statement = select(Release).options(release_packages, release_pmc).where(Release.storage_key == release_key)
+        release = (await db_session.execute(statement)).scalar_one_or_none()
         if not release:
             raise ASFQuartException("Release not found", errorcode=404)
 
@@ -368,9 +374,10 @@ async def root_pages() -> str:
 @APP.route("/pmc/<project_name>")
 async def root_pmc_arg(project_name: str) -> dict:
     "Get a specific PMC by project name."
-    with Session(current_app.config["engine"]) as session:
+    async_session = current_app.config["async_session"]
+    async with async_session() as db_session:
         statement = select(PMC).where(PMC.project_name == project_name)
-        pmc = session.exec(statement).first()
+        pmc = (await db_session.execute(statement)).scalar_one_or_none()
 
         if not pmc:
             raise ASFQuartException("PMC not found", errorcode=404)
@@ -394,16 +401,16 @@ async def root_pmc_create_arg(project_name: str) -> dict:
         release_managers=["alice"],
     )
 
-    with Session(current_app.config["engine"]) as session:
-        try:
-            session.add(pmc)
-            session.commit()
-            session.refresh(pmc)
-        except IntegrityError:
-            raise ASFQuartException(
-                f"PMC with name '{project_name}' already exists",
-                errorcode=409,  # HTTP 409 Conflict
-            )
+    async_session = current_app.config["async_session"]
+    async with async_session() as db_session:
+        async with db_session.begin():
+            try:
+                db_session.add(pmc)
+            except IntegrityError:
+                raise ASFQuartException(
+                    f"PMC with name '{project_name}' already exists",
+                    errorcode=409,  # HTTP 409 Conflict
+                )
 
         # Convert to dict for response
         return {
@@ -418,19 +425,21 @@ async def root_pmc_create_arg(project_name: str) -> dict:
 @APP.route("/pmc/directory")
 async def root_pmc_directory() -> str:
     "Main PMC directory page."
-    with Session(current_app.config["engine"]) as session:
+    async_session = current_app.config["async_session"]
+    async with async_session() as db_session:
         # Get all PMCs and their latest releases
         statement = select(PMC)
-        pmcs = session.exec(statement).all()
+        pmcs = (await db_session.execute(statement)).scalars().all()
         return await render_template("pmc-directory.html", pmcs=pmcs)
 
 
 @APP.route("/pmc/list")
 async def root_pmc_list() -> List[dict]:
     "List all PMCs in the database."
-    with Session(current_app.config["engine"]) as session:
+    async_session = current_app.config["async_session"]
+    async with async_session() as db_session:
         statement = select(PMC)
-        pmcs = session.exec(statement).all()
+        pmcs = (await db_session.execute(statement)).scalars().all()
 
         return [
             {
@@ -463,9 +472,10 @@ async def root_user_keys_add() -> str:
     user_keys = []
 
     # Get all existing keys for the user
-    with Session(current_app.config["engine"]) as db_session:
+    async_session = current_app.config["async_session"]
+    async with async_session() as db_session:
         statement = select(PublicSigningKey).where(PublicSigningKey.user_id == session.uid)
-        user_keys = db_session.exec(statement).all()
+        user_keys = (await db_session.execute(statement)).scalars().all()
 
     if request.method == "POST":
         form = await request.form
@@ -493,18 +503,19 @@ async def root_user_keys_delete() -> str:
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    with Session(current_app.config["engine"]) as db_session:
-        # Get all keys for the user
-        # TODO: Might be clearer if user_id were "asf_id"
-        # But then we'd also want session.uid to be session.asf_id instead
-        statement = select(PublicSigningKey).where(PublicSigningKey.user_id == session.uid)
-        keys = db_session.exec(statement).all()
-        count = len(keys)
+    async_session = current_app.config["async_session"]
+    async with async_session() as db_session:
+        async with db_session.begin():
+            # Get all keys for the user
+            # TODO: Might be clearer if user_id were "asf_id"
+            # But then we'd also want session.uid to be session.asf_id instead
+            statement = select(PublicSigningKey).where(PublicSigningKey.user_id == session.uid)
+            keys = (await db_session.execute(statement)).scalars().all()
+            count = len(keys)
 
-        # Delete all keys
-        for key in keys:
-            db_session.delete(key)
-        db_session.commit()
+            # Delete all keys
+            for key in keys:
+                await db_session.delete(key)
 
         return f"Deleted {count} keys"
 
@@ -517,12 +528,20 @@ async def root_user_uploads() -> str:
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    with Session(current_app.config["engine"]) as db_session:
+    async_session = current_app.config["async_session"]
+    async with async_session() as db_session:
         # Get all releases where the user is a PMC member of the associated PMC
         # TODO: We don't actually record who uploaded the release candidate
         # We should probably add that information!
-        statement = select(Release).join(PMC).where(Release.stage == ReleaseStage.CANDIDATE)
-        releases = db_session.exec(statement).all()
+        release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
+        release_packages = selectinload(cast(InstrumentedAttribute[List[Package]], Release.packages))
+        statement = (
+            select(Release)
+            .options(release_pmc, release_packages)
+            .join(PMC)
+            .where(Release.stage == ReleaseStage.CANDIDATE)
+        )
+        releases = (await db_session.execute(statement)).scalars().all()
 
         # Filter to only show releases for PMCs where the user is a member
         user_releases = []
@@ -585,16 +604,17 @@ async def user_keys_add(session: ClientSession, public_key: str) -> Tuple[str, O
         return ("Key is not long enough; must be at least 2048 bits", None)
 
     # Store key in database
-    with Session(current_app.config["engine"]) as db_session:
+    async_session = current_app.config["async_session"]
+    async with async_session() as db_session:
         return await user_keys_add_session(session, public_key, key, db_session)
 
 
 async def user_keys_add_session(
-    session: ClientSession, public_key: str, key: dict, db_session: Session
+    session: ClientSession, public_key: str, key: dict, db_session: AsyncSession
 ) -> Tuple[str, Optional[dict]]:
     # Check if key already exists
     statement = select(PublicSigningKey).where(PublicSigningKey.user_id == session.uid)
-    existing_key = db_session.exec(statement).first()
+    existing_key = (await db_session.execute(statement)).scalar_one_or_none()
 
     if existing_key:
         # TODO: We should allow more than one key per user
@@ -603,33 +623,28 @@ async def user_keys_add_session(
     if not session.uid:
         return ("You must be signed in to add a key", None)
 
-    # Create new key record
-    key_record = PublicSigningKey(
-        user_id=session.uid,
-        public_key=public_key,
-        key_type=key.get("type", "unknown"),
-        expiration=datetime.datetime.fromtimestamp(int(key["expires"]))
-        if key.get("expires")
-        else datetime.datetime.max,
-    )
-    db_session.add(key_record)
+    async with db_session.begin():
+        # Create new key record
+        key_record = PublicSigningKey(
+            user_id=session.uid,
+            public_key=public_key,
+            key_type=key.get("type", "unknown"),
+            expiration=datetime.datetime.fromtimestamp(int(key["expires"]))
+            if key.get("expires")
+            else datetime.datetime.max,
+        )
+        db_session.add(key_record)
 
-    # Link key to user's PMCs
-    for pmc_name in session.committees:
-        statement = select(PMC).where(PMC.project_name == pmc_name)
-        pmc = db_session.exec(statement).first()
-        if pmc and pmc.id and session.uid:
-            link = PMCKeyLink(pmc_id=pmc.id, key_user_id=session.uid)
-            db_session.add(link)
-        else:
-            # TODO: Log? Add to "error"?
-            continue
-
-    try:
-        db_session.commit()
-    except IntegrityError:
-        db_session.rollback()
-        return ("Failed to save key", None)
+        # Link key to user's PMCs
+        for pmc_name in session.committees:
+            statement = select(PMC).where(PMC.project_name == pmc_name)
+            pmc = (await db_session.execute(statement)).scalar_one_or_none()
+            if pmc and pmc.id and session.uid:
+                link = PMCKeyLink(pmc_id=pmc.id, key_user_id=session.uid)
+                db_session.add(link)
+            else:
+                # TODO: Log? Add to "error"?
+                continue
 
     return (
         "",

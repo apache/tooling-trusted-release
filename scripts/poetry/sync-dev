@@ -4,8 +4,8 @@ _python="$(which python3)"
 poetry env use "${1:-$_python}"
 poetry lock
 poetry sync
-if [ -d ".vscode" ]; then
-cat <<EOF > .vscode/settings.json
+if test -d ".vscode"
+then cat <<EOF > .vscode/settings.json
 {
   "makefile.configureOnOpen": false,
   "python.analysis.extraPaths": ["$(poetry env info --path)/lib/python3.13/site-packages"],

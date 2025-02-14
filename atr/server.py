@@ -20,12 +20,19 @@
 import os
 
 import asfquart
+import asfquart.generics
 from asfquart.base import QuartApp
-from sqlmodel import SQLModel, create_engine
+from sqlmodel import SQLModel
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from alembic import command
 from alembic.config import Config
+from sqlalchemy.sql import text
 
 from .models import __file__ as data_models_file
+
+# Avoid OIDC
+asfquart.generics.OAUTH_URL_INIT = "https://oauth.apache.org/auth?state=%s&redirect_uri=%s"
+asfquart.generics.OAUTH_URL_CALLBACK = "https://oauth.apache.org/token?code=%s"
 
 
 def register_routes() -> str:
@@ -58,8 +65,9 @@ def create_app() -> QuartApp:
         app.config["RELEASE_STORAGE_DIR"] = release_storage
         app.config["DATA_MODELS_FILE"] = data_models_file
 
-        sqlite_url = "sqlite:///./atr.db"
-        engine = create_engine(
+        # Use aiosqlite for async SQLite access
+        sqlite_url = "sqlite+aiosqlite:///./atr.db"
+        engine = create_async_engine(
             sqlite_url,
             connect_args={
                 "check_same_thread": False,
@@ -67,14 +75,18 @@ def create_app() -> QuartApp:
             },
         )
 
+        # Create async session factory
+        async_session = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+        app.config["async_session"] = async_session
+
         # Set SQLite pragmas for better performance
         # Use 64 MB for the cache_size, and 5000ms for busy_timeout
-        with engine.connect() as conn:
-            conn.exec_driver_sql("PRAGMA journal_mode=WAL")
-            conn.exec_driver_sql("PRAGMA synchronous=NORMAL")
-            conn.exec_driver_sql("PRAGMA cache_size=-64000")
-            conn.exec_driver_sql("PRAGMA foreign_keys=ON")
-            conn.exec_driver_sql("PRAGMA busy_timeout=5000")
+        async with engine.begin() as conn:
+            await conn.execute(text("PRAGMA journal_mode=WAL"))
+            await conn.execute(text("PRAGMA synchronous=NORMAL"))
+            await conn.execute(text("PRAGMA cache_size=-64000"))
+            await conn.execute(text("PRAGMA foreign_keys=ON"))
+            await conn.execute(text("PRAGMA busy_timeout=5000"))
 
         # Run any pending migrations
         # In dev we'd do this first:
@@ -90,7 +102,8 @@ def create_app() -> QuartApp:
         command.upgrade(alembic_cfg, "head")
 
         # Create any tables that might be missing
-        SQLModel.metadata.create_all(engine)
+        async with engine.begin() as conn:
+            await conn.run_sync(SQLModel.metadata.create_all)
 
         app.config["engine"] = engine
 

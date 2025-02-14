@@ -9,9 +9,11 @@ license = "Apache-2.0"
 readme = "README.md"
 requires-python = "~=3.13"
 dependencies = [
+  "aiosqlite>=0.21.0,<0.22.0",
   "alembic~=1.14",
   "asfquart", # TODO: convert asfquart from a source dependency to pypi or git dependency
   "cryptography~=44.0",
+  "greenlet>=3.1.1,<4.0.0",
   "httpx~=0.27",
   "hypercorn~=0.17",
   "python-gnupg~=0.5",
@@ -40,6 +42,7 @@ package-mode = false
 # so we only need to enrich the dependencies with the source location of asfquart
 [tool.poetry.dependencies]
 asfquart = { path = "./asfquart", develop = true }
+python = "~=3.13"
 
 [tool.poetry.group.dev.dependencies]
 djlint = "^1.36.4"
