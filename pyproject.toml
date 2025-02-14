@@ -9,6 +9,7 @@ license = "Apache-2.0"
 readme = "README.md"
 requires-python = "~=3.13"
 dependencies = [
+  "aiofiles>=24.1.0,<25.0.0",
   "aiosqlite>=0.21.0,<0.22.0",
   "alembic~=1.14",
   "asfquart", # TODO: convert asfquart from a source dependency to pypi or git dependency
@@ -27,6 +28,7 @@ dev = [
   "pre-commit>=2.20.0",
   "pyright>=1.1.393",
   "ruff>=0.9.4",
+  "types-aiofiles>=24.1.0.20241221,<25.0.0.0",
 ]
 
 # Other configuration
@@ -50,7 +52,7 @@ mypy = "^1.15.0"
 pre-commit = ">=2.20.0"
 pyright = ">=1.1.393"
 ruff = ">=0.9.4"
-
+types-aiofiles = ">=24.1.0.20241221,<25.0.0.0"
 # UV specific configuration
 
 [tool.uv.sources]
