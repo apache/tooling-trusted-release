@@ -99,7 +99,6 @@ def setup_oauth(app, uri=DEFAULT_OAUTH_URI, workflow_timeout: int = 900):
                     status=200,
                     response=f"""
                     Successfully signed in! Welcome, {oauth_data["uid"]}
-                    <script>window.location.href = '{redirect_uri}';</script>
                     """,
                 )
             else:  # Just spit out existing session if it's there
