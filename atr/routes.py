@@ -18,10 +18,11 @@
 "routes.py"
 
 import hashlib
+from io import BufferedReader
 import json
 import pprint
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 import datetime
 import asyncio
 
@@ -317,6 +318,47 @@ async def root_database_debug() -> str:
         return f"Database using {current_app.config['DATA_MODELS_FILE']} has {len(pmcs)} PMCs"
 
 
+@APP.route("/release/signatures/verify/<release_key>")
+@require(R.committer)
+async def root_release_signatures_verify(release_key: str) -> str:
+    """Verify the GPG signatures for all packages in a release candidate."""
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    with Session(current_app.config["engine"]) as db_session:
+        # Get the release and its packages
+        statement = select(Release).where(Release.storage_key == release_key)
+        release = db_session.exec(statement).first()
+        if not release:
+            raise ASFQuartException("Release not found", errorcode=404)
+
+        # Verify each package's signature
+        verification_results = []
+        storage_dir = Path(current_app.config["RELEASE_STORAGE_DIR"])
+
+        for package in release.packages:
+            result = {"file": package.file}
+
+            artifact_path = storage_dir / package.file
+            signature_path = storage_dir / package.signature
+
+            if not artifact_path.exists():
+                result["error"] = "Package artifact file not found"
+            elif not signature_path.exists():
+                result["error"] = "Package signature file not found"
+            else:
+                # Verify the signature
+                result = await verify_gpg_signature(artifact_path, signature_path)
+                result["file"] = package.file
+
+            verification_results.append(result)
+
+        return await render_template(
+            "release-signature-verify.html", release=release, verification_results=verification_results
+        )
+
+
 @APP.route("/pages")
 async def root_pages() -> str:
     "List all pages on the website."
@@ -600,3 +642,59 @@ async def user_keys_add_session(
             "data": pprint.pformat(key),
         },
     )
+
+
+async def verify_gpg_signature(artifact_path: Path, signature_path: Path) -> Dict[str, Any]:
+    """
+    Verify a GPG signature for a release artifact.
+    Returns a dictionary with verification results and debug information.
+    """
+    gpg = gnupg.GPG()
+    try:
+        with open(signature_path, "rb") as sig_file:
+            return await verify_gpg_signature_file(gpg, sig_file, artifact_path)
+    except Exception as e:
+        return {
+            "verified": False,
+            "error": str(e),
+            "status": "Verification failed",
+            "debug_info": {"exception_type": type(e).__name__, "exception_message": str(e)},
+        }
+
+
+async def verify_gpg_signature_file(gpg: gnupg.GPG, sig_file: BufferedReader, artifact_path: Path) -> Dict[str, Any]:
+    # Run the blocking GPG verification in a thread
+    verified = await asyncio.to_thread(gpg.verify_file, sig_file, str(artifact_path))
+
+    # Collect all available information for debugging
+    debug_info = {
+        "key_id": verified.key_id or "Not available",
+        "fingerprint": verified.fingerprint or "Not available",
+        "pubkey_fingerprint": verified.pubkey_fingerprint or "Not available",
+        "creation_date": verified.creation_date or "Not available",
+        "timestamp": verified.timestamp or "Not available",
+        "username": verified.username or "Not available",
+        "status": verified.status or "Not available",
+        "valid": bool(verified),
+        "trust_level": verified.trust_level if hasattr(verified, "trust_level") else "Not available",
+        "trust_text": verified.trust_text if hasattr(verified, "trust_text") else "Not available",
+        "stderr": verified.stderr if hasattr(verified, "stderr") else "Not available",
+    }
+
+    if not verified:
+        return {
+            "verified": False,
+            "error": "No valid signature found",
+            "status": "Invalid signature",
+            "debug_info": debug_info,
+        }
+
+    return {
+        "verified": True,
+        "key_id": verified.key_id,
+        "timestamp": verified.timestamp,
+        "username": verified.username or "Unknown",
+        "email": verified.pubkey_fingerprint or "Unknown",
+        "status": "Valid signature",
+        "debug_info": debug_info,
+    }

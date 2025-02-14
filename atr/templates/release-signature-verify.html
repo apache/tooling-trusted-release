@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <meta name="description" content="Verify release candidate signatures." />
+    <title>ATR | Verify Release Signatures</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='root.css') }}" />
+    <style>
+        .release-info {
+            margin-bottom: 2rem;
+        }
+
+        .package-list {
+            margin: 1rem 0;
+        }
+
+        .package {
+            border: 1px solid #ddd;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+
+        .package-info {
+            margin-bottom: 1rem;
+        }
+
+        .verification-status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 4px;
+            background: #f5f5f5;
+        }
+
+        .navigation {
+            margin-top: 2rem;
+        }
+
+        .navigation a {
+            margin-right: 1rem;
+        }
+
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .status.success {
+            color: #28a745;
+        }
+
+        .status.failure {
+            color: #dc3545;
+        }
+
+        .signature-details {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 4px;
+            background: #f5f5f5;
+        }
+
+        .debug-info {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 4px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+
+        .debug-info h3 {
+            margin-top: 0;
+            color: #666;
+        }
+
+        .debug-info dl {
+            margin: 0;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.5rem 1rem;
+        }
+
+        .debug-info dt {
+            font-weight: bold;
+            color: #666;
+        }
+
+        .debug-info dd {
+            margin: 0;
+            word-break: break-all;
+        }
+
+        pre.stderr {
+            background: #f8f9fa;
+            padding: 0.5rem;
+            border-radius: 2px;
+            overflow-x: auto;
+            margin: 0.5rem 0;
+            white-space: pre-wrap;
+        }
+    </style>
+  </head>
+  <body>
+    <h1>Verify Release Signatures</h1>
+
+    <div class="release-info">
+      <h2>{{ release.pmc.project_name }}</h2>
+      <p>
+        Stage: {{ release.stage.value }}
+        •
+        Phase: {{ release.phase.value }}
+      </p>
+    </div>
+
+    <div class="package-list">
+      {% for result in verification_results %}
+        <div class="package">
+          <div class="package-info">
+            <div>File: {{ result.file }}</div>
+          </div>
+
+          <div class="verification-status">
+            {% if result.error %}
+              <p class="error">Error: {{ result.error }}</p>
+            {% else %}
+              <p class="status {% if result.verified %}success{% else %}failure{% endif %}">Status: {{ result.status }}</p>
+              {% if result.verified %}
+                <div class="signature-details">
+                  <p>Key ID: {{ result.key_id }}</p>
+                  <p>Signed by: {{ result.username }} &lt;{{ result.email }}&gt;</p>
+                  <p>Timestamp: {{ result.timestamp }}</p>
+                </div>
+              {% endif %}
+            {% endif %}
+
+            {% if result.debug_info %}
+              <div class="debug-info">
+                <h3>Debug Information</h3>
+                <dl>
+                  {% for key, value in result.debug_info.items() %}
+                    <dt>{{ key }}</dt>
+                    <dd>
+                      {% if key == 'stderr' and value != 'Not available' %}
+                        <pre class="stderr">{{ value }}</pre>
+                      {% else %}
+                        {{ value }}
+                      {% endif %}
+                    </dd>
+                  {% endfor %}
+                </dl>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="navigation">
+      <a href="{{ url_for('root_user_uploads') }}">Back to Your Uploads</a>
+      <a href="{{ url_for('root_pages') }}">Return to Main Page</a>
+    </div>
+  </body>
+</html>

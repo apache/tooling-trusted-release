@@ -69,6 +69,9 @@
                   <div>File: {{ package.file }}</div>
                   <div>Signature: {{ package.signature }}</div>
                   <div>Checksum (SHA-512): {{ package.checksum }}</div>
+                  <p class="package-actions">
+                    <a href="{{ url_for('root_release_signatures_verify', release_key=release.storage_key) }}">Verify Signatures</a>
+                  </p>
                 </div>
               {% endfor %}
             </div>
