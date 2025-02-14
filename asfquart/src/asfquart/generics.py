@@ -16,6 +16,7 @@ OAUTH_URL_INIT = "https://oauth.apache.org/auth-oidc?state=%s&redirect_uri=%s"
 OAUTH_URL_CALLBACK = "https://oauth.apache.org/token-oidc?code=%s"
 DEFAULT_OAUTH_URI = "/auth"
 
+
 def setup_oauth(app, uri=DEFAULT_OAUTH_URI, workflow_timeout: int = 900):
     """Sets up a generic ASF OAuth endpoint for the given app. The default URI is /auth, and the
     default workflow timeout is 900 seconds (15 min), within which the OAuth login must
@@ -37,6 +38,9 @@ def setup_oauth(app, uri=DEFAULT_OAUTH_URI, workflow_timeout: int = 900):
     async def oauth_endpoint():
         # Init oauth login
         login_uri = quart.request.args.get("login")
+        if login_uri and login_uri.endswith("?"):
+            # for some reason I don't understand, quart keep adding a '?' to the uri
+            login_uri = login_uri.removeprefix("?")
         logout_uri = quart.request.args.get("logout")
         if login_uri or quart.request.query_string == b"login":
             state = secrets.token_hex(16)
@@ -79,14 +83,23 @@ def setup_oauth(app, uri=DEFAULT_OAUTH_URI, workflow_timeout: int = 900):
                     assert rv.status == 200, "Could not verify oauth response."
                     oauth_data = await rv.json()
                     asfquart.session.write(oauth_data)
-                # if redirect_uri:  # if called with /auth=login=/foo, redirect to /foo
-                #     return quart.redirect(redirect_uri)
+                if redirect_uri:  # if called with /auth=login=/foo, redirect to /foo
+                    # if the session cookies are set with SameSite=strict,
+                    # a redirect will remove them, thus we do a redirect in JS
+                    # see: https://bugzilla.mozilla.org/show_bug.cgi?id=1465402
+                    return quart.Response(
+                        status=200,
+                        response=f"""
+                        <script>window.location.href = '{redirect_uri}';</script>
+                        """,
+                    )
+                    # return quart.redirect(redirect_uri)
                 # Otherwise, just say hi
                 return quart.Response(
                     status=200,
                     response=f"""
-                    Successfully signed in! Welcome, {oauth_data['uid']}
-                    <script>window.location.href = '/add-release-candidate';</script>
+                    Successfully signed in! Welcome, {oauth_data["uid"]}
+                    <script>window.location.href = '{redirect_uri}';</script>
                     """,
                 )
             else:  # Just spit out existing session if it's there
