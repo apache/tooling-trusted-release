@@ -58,6 +58,13 @@
             background: #e6ffe6;
             border: 1px solid #ccebcc;
         }
+
+        .access-requirement.warning {
+            background: #ffe6e6;
+            border: 1px solid #ffcccc;
+            color: #cc0000;
+            font-weight: bold;
+        }
     </style>
   </head>
   <body>
@@ -151,6 +158,32 @@
           <div class="endpoint-description">Show all release candidates uploaded by the current user.</div>
           <div class="endpoint-meta">
             Access: <span class="access-requirement committer">Committer</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="endpoint-group">
+        <h2>User Management</h2>
+
+        <div class="endpoint">
+          <h3>
+            <a href="{{ url_for('root_user_keys_add') }}">/user/keys/add</a>
+          </h3>
+          <div class="endpoint-description">Add a GPG public key to your account for signing releases.</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement committer">Committer</span>
+          </div>
+        </div>
+
+        <div class="endpoint">
+          <h3>
+            <a href="{{ url_for('root_user_keys_delete') }}">/user/keys/delete</a>
+          </h3>
+          <div class="endpoint-description">Debug endpoint to delete all GPG keys associated with your account.</div>
+          <div class="endpoint-meta">
+            Access: <span class="access-requirement committer">Committer</span>
+            <br />
+            <span class="access-requirement warning">Warning: This is a debug endpoint that immediately deletes all your keys without confirmation!</span>
           </div>
         </div>
       </div>

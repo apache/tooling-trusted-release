@@ -19,17 +19,21 @@
 
 import hashlib
 import json
+import pprint
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional
+import datetime
+import asyncio
 
 from asfquart import APP
 from asfquart.auth import Requirements as R, require
 from asfquart.base import ASFQuartException
-from asfquart.session import read as session_read
+from asfquart.session import read as session_read, ClientSession
 from quart import current_app, render_template, request
 from sqlmodel import Session, select
 from sqlalchemy.exc import IntegrityError
 import httpx
+import gnupg
 
 from .models import (
     DistributionChannel,
@@ -404,6 +408,65 @@ async def root_secret() -> str:
     return "Secret stuff!"
 
 
+@APP.route("/user/keys/add", methods=["GET", "POST"])
+@require(R.committer)
+async def root_user_keys_add() -> str:
+    "Add a new GPG key to the user's account."
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    error = None
+    key_info = None
+    user_keys = []
+
+    # Get all existing keys for the user
+    with Session(current_app.config["engine"]) as db_session:
+        statement = select(PublicSigningKey).where(PublicSigningKey.user_id == session.uid)
+        user_keys = db_session.exec(statement).all()
+
+    if request.method == "POST":
+        form = await request.form
+        public_key = form.get("public_key")
+        if not public_key:
+            # Shouldn't happen, so we can raise an exception
+            raise ASFQuartException("Public key is required", errorcode=400)
+        error, key_info = await user_keys_add(session, public_key)
+
+    return await render_template(
+        "user-keys-add.html",
+        asf_id=session.uid,
+        pmc_memberships=session.committees,
+        error=error,
+        key_info=key_info,
+        user_keys=user_keys,
+    )
+
+
+@APP.route("/user/keys/delete")
+@require(R.committer)
+async def root_user_keys_delete() -> str:
+    "Debug endpoint to delete all of a user's keys."
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    with Session(current_app.config["engine"]) as db_session:
+        # Get all keys for the user
+        # TODO: Might be clearer if user_id were "asf_id"
+        # But then we'd also want session.uid to be session.asf_id instead
+        statement = select(PublicSigningKey).where(PublicSigningKey.user_id == session.uid)
+        keys = db_session.exec(statement).all()
+        count = len(keys)
+
+        # Delete all keys
+        for key in keys:
+            db_session.delete(key)
+        db_session.commit()
+
+        return f"Deleted {count} keys"
+
+
 @APP.route("/user/uploads")
 @require(R.committer)
 async def root_user_uploads() -> str:
@@ -449,3 +512,91 @@ async def save_file_by_hash(file, base_dir: Path) -> Tuple[Path, str]:
         path.write_bytes(data)
 
     return path, file_hash
+
+
+async def user_keys_add(session: ClientSession, public_key: str) -> Tuple[str, Optional[dict]]:
+    if not public_key:
+        return ("Public key is required", None)
+
+    # Import the key into GPG to validate and extract info
+    # TODO: We'll just assume for now that gnupg.GPG() doesn't need to be async
+    gpg = gnupg.GPG()
+    import_result = await asyncio.to_thread(gpg.import_keys, public_key)
+
+    if not import_result.fingerprints:
+        return ("Invalid public key format", None)
+
+    fingerprint = import_result.fingerprints[0]
+    # Get key details
+    # We could probably use import_result instead
+    # But this way it shows that they've really been imported
+    keys = await asyncio.to_thread(gpg.list_keys)
+    # Then we have the properties listed here:
+    # https://gnupg.readthedocs.io/en/latest/#listing-keys
+    # Note that "fingerprint" is not listed there, but we have it anyway...
+    key = next((k for k in keys if k["fingerprint"] == fingerprint), None)
+    if not key:
+        return ("Failed to import key", None)
+    if (key.get("algo") == "1") and (int(key.get("length", "0")) < 2048):
+        # https://infra.apache.org/release-signing.html#note
+        # Says that keys must be at least 2048 bits
+        return ("Key is not long enough; must be at least 2048 bits", None)
+
+    # Store key in database
+    with Session(current_app.config["engine"]) as db_session:
+        return await user_keys_add_session(session, public_key, key, db_session)
+
+
+async def user_keys_add_session(
+    session: ClientSession, public_key: str, key: dict, db_session: Session
+) -> Tuple[str, Optional[dict]]:
+    # Check if key already exists
+    statement = select(PublicSigningKey).where(PublicSigningKey.user_id == session.uid)
+    existing_key = db_session.exec(statement).first()
+
+    if existing_key:
+        # TODO: We should allow more than one key per user
+        return ("You already have a key registered", None)
+
+    if not session.uid:
+        return ("You must be signed in to add a key", None)
+
+    # Create new key record
+    key_record = PublicSigningKey(
+        user_id=session.uid,
+        public_key=public_key,
+        key_type=key.get("type", "unknown"),
+        expiration=datetime.datetime.fromtimestamp(int(key["expires"]))
+        if key.get("expires")
+        else datetime.datetime.max,
+    )
+    db_session.add(key_record)
+
+    # Link key to user's PMCs
+    for pmc_name in session.committees:
+        statement = select(PMC).where(PMC.project_name == pmc_name)
+        pmc = db_session.exec(statement).first()
+        if pmc and pmc.id and session.uid:
+            link = PMCKeyLink(pmc_id=pmc.id, key_user_id=session.uid)
+            db_session.add(link)
+        else:
+            # TODO: Log? Add to "error"?
+            continue
+
+    try:
+        db_session.commit()
+    except IntegrityError:
+        db_session.rollback()
+        return ("Failed to save key", None)
+
+    return (
+        "",
+        {
+            "key_id": key["keyid"],
+            "fingerprint": key["fingerprint"],
+            "user_id": key["uids"][0] if key.get("uids") else "Unknown",
+            "creation_date": datetime.datetime.fromtimestamp(int(key["date"])),
+            "expiration_date": datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
+            "data": pprint.pformat(key),
+        },
+    )
