@@ -4,6 +4,7 @@ _python="$(which python3)"
 poetry env use "${1:-$_python}"
 poetry lock
 poetry sync
+if [ -d ".vscode" ]; then
 cat <<EOF > .vscode/settings.json
 {
   "makefile.configureOnOpen": false,
@@ -11,3 +12,4 @@ cat <<EOF > .vscode/settings.json
   "python.defaultInterpreterPath": "\${workspaceFolder}/$(poetry env info --path)/bin/python3"
 }
 EOF
+fi

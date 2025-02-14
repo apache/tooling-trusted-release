@@ -29,3 +29,6 @@ serve:
 
 sync:
 	$(SCRIPTS)/sync $(PYTHON)
+
+sync-dev:
+	$(SCRIPTS)/sync-dev $(PYTHON)
