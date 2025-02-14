@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = "~=3.13"
 dependencies = [
   "alembic~=1.14",
-  "asfquart",
+  "asfquart", # TODO: convert asfquart from a source dependency to pypi or git dependency
   "cryptography~=44.0",
   "httpx~=0.27",
   "hypercorn~=0.17",
@@ -29,8 +29,17 @@ dev = [
 
 # Other configuration
 
+# Poetry specific config
+
 [tool.poetry]
 package-mode = false
+
+# When both project.dependencies and tool.poetry.dependencies are specified,
+# project.dependencies are used for metadata when building the project,
+# tool.poetry.dependencies is only used to enrich project.dependencies for locking.
+# so we only need to enrich the dependencies with the source location of asfquart
+[tool.poetry.dependencies]
+asfquart = { path = "./asfquart", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 djlint = "^1.36.4"
@@ -39,14 +48,12 @@ pre-commit = ">=2.20.0"
 pyright = ">=1.1.393"
 ruff = ">=0.9.4"
 
-[tool.poetry.group.main.dependencies]
-alembic = "~=1.14"
-asfquart = { path = "./asfquart", develop = true }
-cryptography = "~=44.0"
-httpx = "~=0.27"
-hypercorn = "~=0.17"
-python-gnupg = "~=0.5"
-sqlmodel = "~=0.0"
+# UV specific configuration
+
+[tool.uv.sources]
+asfquart = { path = "./asfquart", editable = true }
+
+# Additional tools
 
 [tool.pyright]
 include = ["atr"]
@@ -66,9 +73,6 @@ lint.select = ["E", "W", "F", "C90"]
 lint.ignore = []
 line-length = 120
 exclude = ["asfquart"]
-
-[tool.uv.sources]
-asfquart = { path = "./asfquart", editable = true }
 
 [tool.mypy]
 python_version = "3.13"
