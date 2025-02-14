@@ -84,7 +84,10 @@ def setup_oauth(app, uri=DEFAULT_OAUTH_URI, workflow_timeout: int = 900):
                 # Otherwise, just say hi
                 return quart.Response(
                     status=200,
-                    response=f"Successfully logged in! Welcome, {oauth_data['uid']}\n",
+                    response=f"""
+                    Successfully signed in! Welcome, {oauth_data['uid']}
+                    <script>window.location.href = '/add-release-candidate';</script>
+                    """,
                 )
             else:  # Just spit out existing session if it's there
                 client_session = await asfquart.session.read()
