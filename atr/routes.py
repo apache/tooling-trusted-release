@@ -173,19 +173,8 @@ def compute_sha512(file_path: Path) -> str:
 
 @APP.route("/")
 async def root() -> str:
-    "Main PMC directory page."
-    return """\
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>ATR</title>
-</head>
-<body>
-    <h1>Apache Trusted Releases</h1>
-</body>
-</html>
-"""
+    """Main page."""
+    return await render_template("index.html")
 
 
 @APP.route("/add-release-candidate", methods=["GET", "POST"])
