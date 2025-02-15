@@ -39,7 +39,7 @@ def setup_oauth(app, uri=DEFAULT_OAUTH_URI, workflow_timeout: int = 900):
         # Init oauth login
         login_uri = quart.request.args.get("login")
         if login_uri and login_uri.endswith("?"):
-            # for some reason I don't understand, quart keep adding a '?' to the uri
+            # for some reason I don't understand, quart keeps adding a '?' to the uri
             login_uri = login_uri.removeprefix("?")
         logout_uri = quart.request.args.get("logout")
         if login_uri or quart.request.query_string == b"login":
@@ -84,16 +84,14 @@ def setup_oauth(app, uri=DEFAULT_OAUTH_URI, workflow_timeout: int = 900):
                     oauth_data = await rv.json()
                     asfquart.session.write(oauth_data)
                 if redirect_uri:  # if called with /auth=login=/foo, redirect to /foo
-                    # if the session cookies are set with SameSite=strict,
-                    # a redirect will remove them, thus we do a redirect in JS
-                    # see: https://bugzilla.mozilla.org/show_bug.cgi?id=1465402
+                    # If SameSite is set, we cannot redirect with a 30x response, as that may invalidate the set-cookie
+                    # instead, we issue a 200 Okay with a Refresh header, instructing the browser to immediately go
+                    # someplace else. This counts as a samesite request.
                     return quart.Response(
                         status=200,
-                        response=f"""
-                        <script>window.location.href = '{redirect_uri}';</script>
-                        """,
+                        response=f"Successfully logged in! Welcome, {oauth_data['uid']}\n",
+                        headers={"Refresh": f"0; url={redirect_uri}"},
                     )
-                    # return quart.redirect(redirect_uri)
                 # Otherwise, just say hi
                 return quart.Response(
                     status=200,
