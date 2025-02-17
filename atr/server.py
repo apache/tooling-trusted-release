@@ -29,6 +29,7 @@ import asfquart
 import asfquart.generics
 import asfquart.session
 from asfquart.base import QuartApp
+from atr.blueprints import register_blueprints
 
 from .models import __file__ as data_models_file
 
@@ -115,12 +116,15 @@ def create_app() -> QuartApp:
             await conn.run_sync(SQLModel.metadata.create_all)
 
         app.config["engine"] = engine
+        # TODO: apply this only for debug
+        app.config["TEMPLATES_AUTO_RELOAD"] = True
 
     @app.after_serving
     async def shutdown() -> None:
         app.background_tasks.clear()
 
     register_routes()
+    register_blueprints(app)
 
     return app
 

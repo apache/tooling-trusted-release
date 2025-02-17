@@ -83,7 +83,7 @@
         <h3>
           <a href="{{ url_for('root') }}">/</a>
         </h3>
-        <div class="endpoint-description">Simple welcome page with Apache Trusted Releases title.</div>
+        <div class="endpoint-description">Main welcome page.</div>
         <div class="endpoint-meta">
           Access: <span class="access-requirement public">Public</span>
         </div>
@@ -126,14 +126,6 @@
       <div class="endpoint">
         <h3>/pmc/&lt;project_name&gt;</h3>
         <div class="endpoint-description">Get details for a specific PMC (JSON format).</div>
-        <div class="endpoint-meta">
-          Access: <span class="access-requirement public">Public</span>
-        </div>
-      </div>
-
-      <div class="endpoint">
-        <h3>/pmc/create/&lt;project_name&gt;</h3>
-        <div class="endpoint-description">Create a new PMC with sample data (JSON format).</div>
         <div class="endpoint-meta">
           Access: <span class="access-requirement public">Public</span>
         </div>
@@ -191,11 +183,11 @@
         <h3>
           <a href="{{ url_for('root_user_keys_delete') }}">/user/keys/delete</a>
         </h3>
-        <div class="endpoint-description">Debug endpoint to delete all GPG keys associated with your account.</div>
+        <div class="endpoint-description">Delete all GPG keys associated with your account.</div>
         <div class="endpoint-meta">
           Access: <span class="access-requirement committer">Committer</span>
           <br />
-          <span class="access-requirement warning">Warning: This is a debug endpoint that immediately deletes all your keys without confirmation!</span>
+          <span class="access-requirement warning">Warning: This will delete all your keys without confirmation!</span>
         </div>
       </div>
     </div>
@@ -205,7 +197,7 @@
 
       <div class="endpoint">
         <h3>
-          <a href="{{ url_for('root_admin_database') }}">/admin/database</a>
+          <a href="{{ url_for('secret_blueprint.secret_data') }}">/secret/data</a>
         </h3>
         <div class="endpoint-description">Browse all records in the database.</div>
         <div class="endpoint-meta">
@@ -218,7 +210,7 @@
 
       <div class="endpoint">
         <h3>
-          <a href="{{ url_for('root_admin_update_pmcs') }}">/admin/update-pmcs</a>
+          <a href="{{ url_for('secret_blueprint.secret_pmcs_update') }}">/secret/pmcs/update</a>
         </h3>
         <div class="endpoint-description">Update PMCs from remote, authoritative committee-info.json.</div>
         <div class="endpoint-meta">
@@ -226,30 +218,6 @@
           <span class="access-requirement admin">Admin</span>
           <br />
           Additional requirement: Must be in ALLOWED_USERS list
-        </div>
-      </div>
-    </div>
-
-    <div class="endpoint-group">
-      <h2>Debug/Testing</h2>
-
-      <div class="endpoint">
-        <h3>
-          <a href="{{ url_for('root_secret') }}">/secret</a>
-        </h3>
-        <div class="endpoint-description">Test endpoint for authentication.</div>
-        <div class="endpoint-meta">
-          Access: <span class="access-requirement committer">Committer</span>
-        </div>
-      </div>
-
-      <div class="endpoint">
-        <h3>
-          <a href="{{ url_for('root_database_debug') }}">/database/debug</a>
-        </h3>
-        <div class="endpoint-description">Debug information about the database.</div>
-        <div class="endpoint-meta">
-          Access: <span class="access-requirement public">Public</span>
         </div>
       </div>
     </div>

@@ -66,7 +66,7 @@ ul { padding-left: 1rem; }
 
 label { font-weight: 500; border-bottom: 1px dashed #d1d2d3; padding-bottom: 0.5rem; }
 
-form { background-color: #ffe; border: 1px solid #ddb; padding: 1rem; border-radius: 0.5rem; }
+form.striking { background-color: #ffe; border: 1px solid #ddb; padding: 1rem; border-radius: 0.5rem; }
 
 footer {
   padding: 2rem;
