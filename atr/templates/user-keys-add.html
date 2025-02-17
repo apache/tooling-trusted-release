@@ -1,222 +1,211 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-    <meta name="description" content="Add a GPG public key to your account." />
-    <title>ATR | Add GPG Key</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='root.css') }}" />
-    <style>
-        .form-group {
-            margin-bottom: 1rem;
-        }
+{% extends "layouts/base.html" %}
 
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-        }
+{% block title %}
+  Add signing key ~ ATR
+{% endblock title %}
 
-        .error-message {
-            color: #dc3545;
-            margin-top: 0.25rem;
-        }
+{% block description %}
+  Add a GPG public key to your account.
+{% endblock description %}
 
-        input,
-        textarea {
-            font-family: monospace;
-            padding: 0.5rem;
-        }
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .form-group {
+          margin-bottom: 1rem;
+      }
 
-        textarea {
-            width: 100%;
-            min-height: 200px;
-        }
+      .form-group label {
+          display: block;
+          margin-bottom: 0.5rem;
+      }
 
-        .key-info {
-            margin-top: 1rem;
-            padding: 1rem;
-            background: #f8f9fa;
-            border-radius: 4px;
-        }
+      .error-message {
+          color: #dc3545;
+          margin-top: 0.25rem;
+      }
 
-        .key-info h3 {
-            margin-top: 0;
-        }
+      .key-info {
+          margin-top: 1rem;
+          padding: 1rem;
+          background: #f8f9fa;
+          border-radius: 4px;
+      }
 
-        .key-info dl {
-            margin: 0;
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 0.5rem 1rem;
-        }
+      .key-info h3 {
+          margin-top: 0;
+      }
 
-        .key-info dt {
-            font-weight: bold;
-        }
+      .key-info dl {
+          margin: 0;
+          display: grid;
+          grid-template-columns: auto 1fr;
+          gap: 0.5rem 1rem;
+      }
 
-        .key-info dd {
-            margin: 0;
-        }
+      .key-info dt {
+          font-weight: bold;
+      }
 
-        button {
-            margin-top: 1rem;
-            padding: 0.5rem 1rem;
-        }
+      .key-info dd {
+          margin: 0;
+      }
 
-        .navigation {
-            margin-top: 2rem;
-        }
+      .navigation {
+          margin-top: 2rem;
+      }
 
-        .success-message {
-            color: #28a745;
-            margin: 1rem 0;
-            padding: 1rem;
-            background: #d4edda;
-            border-radius: 4px;
-        }
+      .success-message {
+          color: #28a745;
+          margin: 1rem 0;
+          padding: 1rem;
+          background: #d4edda;
+          border-radius: 4px;
+      }
 
-        .existing-keys {
-            margin: 2rem 0;
-            padding: 1rem;
-            background: #f8f9fa;
-            border-radius: 4px;
-        }
+      .existing-keys {
+          margin: 2rem 0;
+          padding: 1rem;
+          background: #f8f9fa;
+          border-radius: 4px;
+      }
 
-        .keys-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
-        }
+      .keys-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+          gap: 1rem;
+          margin-top: 1rem;
+      }
 
-        .key-card {
-            padding: 1rem;
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-        }
+      .key-card {
+          padding: 1rem;
+          background: white;
+          border: 1px solid #dee2e6;
+          border-radius: 4px;
+      }
 
-        .key-card h3 {
-            margin-top: 0;
-            margin-bottom: 1rem;
-        }
+      .key-card h3 {
+          margin-top: 0;
+          margin-bottom: 1rem;
+      }
 
-        .delete-key-form {
-            margin-top: 1rem;
-        }
+      .delete-key-form {
+          margin-top: 1rem;
+      }
 
-        .delete-button {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-        }
+      .delete-button {
+          background: #dc3545;
+          color: white;
+          border: none;
+          padding: 0.5rem 1rem;
+          border-radius: 4px;
+          cursor: pointer;
+      }
 
-        .delete-button:hover {
-            background: #c82333;
-        }
-    </style>
-  </head>
-  <body>
-    <h1>Add GPG Public Key</h1>
-    <p class="intro">Add your GPG public key to use for signing release artifacts.</p>
+      .delete-button:hover {
+          background: #c82333;
+      }
+  </style>
+{% endblock stylesheets %}
 
-    <div class="user-info">
-      <p>
-        Welcome, <strong>{{ asf_id }}</strong>! You are authenticated as an ASF committer.
-      </p>
+{% block content %}
+  <h1>Add signing key</h1>
+  <p class="intro">Add your GPG public key to use for signing release artifacts.</p>
+
+  <div class="user-info">
+    <p>
+      Welcome, <strong>{{ asf_id }}</strong>! You are authenticated as an ASF committer.
+    </p>
+  </div>
+
+  {% if key_info %}
+    <h2>Key results</h2>
+    <div class="key-info">
+      <h3>Success: Added Key</h3>
+      <dl>
+        <dt>Key ID</dt>
+        <dd>
+          {{ key_info.key_id }}
+        </dd>
+        <dt>Fingerprint</dt>
+        <dd>
+          {{ key_info.fingerprint }}
+        </dd>
+        <dt>User ID</dt>
+        <dd>
+          {{ key_info.user_id }}
+        </dd>
+        <dt>Created</dt>
+        <dd>
+          {{ key_info.creation_date }}
+        </dd>
+        <dt>Expires</dt>
+        <dd>
+          {{ key_info.expiration_date or 'Never' }}
+        </dd>
+        <dt>Key Data</dt>
+        <dd>
+          <pre>{{ key_info.data }}</pre>
+        </dd>
+      </dl>
+    </div>
+  {% endif %}
+
+  {% if error %}
+    <div class="error-message">
+      <h2>Error: Did Not Add Key</h2>
+      <p>{{ error }}</p>
+    </div>
+  {% endif %}
+
+  {% if success %}
+    <div class="success-message">
+      <h2>Success</h2>
+      <p>{{ success }}</p>
+    </div>
+  {% endif %}
+
+  {% if user_keys %}
+    <div class="existing-keys">
+      <h2>Your Existing Keys</h2>
+      <div class="keys-grid">
+        {% for key in user_keys %}
+          <div class="key-card">
+            <h3>Key Details</h3>
+            <dl>
+              <dt>Key Type</dt>
+              <dd>
+                {{ key.key_type }}
+              </dd>
+              <dt>Expires</dt>
+              <dd>
+                {{ key.expiration.strftime("%Y-%m-%d %H:%M:%S") if key.expiration else 'Never' }}
+              </dd>
+            </dl>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <form method="post">
+    <div class="form-group">
+      <label for="public_key">Public Key:</label>
+      <textarea id="public_key"
+                name="public_key"
+                required
+                placeholder="Paste your GPG public key here (in ASCII-armored format)"
+                aria-describedby="key-help"></textarea>
+      <small id="key-help">
+        Your public key should be in ASCII-armored format, starting with "-----BEGIN PGP PUBLIC KEY BLOCK-----"
+      </small>
     </div>
 
-    {% if key_info %}
-      <div class="key-info">
-        <h3>Success: Added Key</h3>
-        <dl>
-          <dt>Key ID</dt>
-          <dd>
-            {{ key_info.key_id }}
-          </dd>
-          <dt>Fingerprint</dt>
-          <dd>
-            {{ key_info.fingerprint }}
-          </dd>
-          <dt>User ID</dt>
-          <dd>
-            {{ key_info.user_id }}
-          </dd>
-          <dt>Created</dt>
-          <dd>
-            {{ key_info.creation_date }}
-          </dd>
-          <dt>Expires</dt>
-          <dd>
-            {{ key_info.expiration_date or 'Never' }}
-          </dd>
-          <dt>Key Data</dt>
-          <dd>
-            <pre>{{ key_info.data }}</pre>
-          </dd>
-        </dl>
-      </div>
-    {% endif %}
+    <button type="submit">Add Key</button>
+  </form>
 
-    {% if error %}
-      <div class="error-message">
-        <h2>Error: Did Not Add Key</h2>
-        <p>{{ error }}</p>
-      </div>
-    {% endif %}
-
-    {% if success %}
-      <div class="success-message">
-        <h2>Success</h2>
-        <p>{{ success }}</p>
-      </div>
-    {% endif %}
-
-    {% if user_keys %}
-      <div class="existing-keys">
-        <h2>Your Existing Keys</h2>
-        <div class="keys-grid">
-          {% for key in user_keys %}
-            <div class="key-card">
-              <h3>Key Details</h3>
-              <dl>
-                <dt>Key Type</dt>
-                <dd>
-                  {{ key.key_type }}
-                </dd>
-                <dt>Expires</dt>
-                <dd>
-                  {{ key.expiration.strftime("%Y-%m-%d %H:%M:%S") if key.expiration else 'Never' }}
-                </dd>
-              </dl>
-            </div>
-          {% endfor %}
-        </div>
-      </div>
-    {% endif %}
-
-    <form method="post">
-      <div class="form-group">
-        <label for="public_key">Public Key:</label>
-        <textarea id="public_key"
-                  name="public_key"
-                  required
-                  placeholder="Paste your GPG public key here (in ASCII-armored format)"
-                  aria-describedby="key-help"></textarea>
-        <small id="key-help">
-          Your public key should be in ASCII-armored format, starting with "-----BEGIN PGP PUBLIC KEY BLOCK-----"
-        </small>
-      </div>
-
-      <button type="submit">Add Key</button>
-    </form>
-
-    <div class="navigation">
-      <a href="{{ url_for('root_user_uploads') }}">Back to Your Uploads</a>
-      <a href="{{ url_for('root_pages') }}">Return to Main Page</a>
-    </div>
-  </body>
-</html>
+  <div class="navigation">
+    <a href="{{ url_for('root_user_uploads') }}">Back to Your Uploads</a>
+    <a href="{{ url_for('root_pages') }}">Return to Main Page</a>
+  </div>
+{% endblock content %}

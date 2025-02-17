@@ -44,11 +44,11 @@ h1, h2, h3 {
 
 aside h1 {
     font-size: 3rem;
-    line-height: 1.15;
+    line-height: 1.1;
     text-align: center;
 }
 
-aside h1 span {
+aside h1 span.rest {
     color: #777;
 }
 
@@ -58,7 +58,15 @@ aside h1 span {
 }
 
 h1 { margin-bottom: 2rem; }
-h2, h3, p, ul { margin-bottom: 1rem; }
+h2 { border-bottom: 1px solid #d1d2d3; padding-bottom: 0.5rem;
+    margin-top: 2.5rem; margin-bottom: 1.5rem; }
+h3, p, ul { margin-bottom: 1rem; }
+
+ul { padding-left: 1rem; }
+
+label { font-weight: 500; border-bottom: 1px dashed #d1d2d3; padding-bottom: 0.5rem; }
+
+form { background-color: #ffe; border: 1px solid #ddb; padding: 1rem; border-radius: 0.5rem; }
 
 footer {
   padding: 2rem;
@@ -66,7 +74,39 @@ footer {
   font-size: 15px;
   margin: 2rem;
   color: #333;
+  font-variation-settings: "opsz" 14;
+  border-radius: 0.5rem;
 }
+
+footer a { color: #333; font-weight: 425; }
+footer a:visited { color: #333; font-weight: 425; }
+
+button {
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    background: #036;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  button:hover {
+    background: #047;
+  }
+
+
+  input,
+  textarea {
+    font-family: monospace;
+    padding: 0.5rem;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 200px;
+  }
 
 .wrapper {
     min-height: 100vh;

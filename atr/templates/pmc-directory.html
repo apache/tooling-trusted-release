@@ -1,37 +1,95 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  ATR | PMC Directory
+  Project Management Committees ~ ATR
 {% endblock title %}
+
 {% block description %}
   List of all PMCs and their latest releases.
 {% endblock description %}
 
-{% block content %}
-  <h1>Directory of PMCs</h1>
-  <p class="intro">
-    Welcome to the Apache Trusted Release platform. Below are the current Apache PMCs and their releases:
-  </p>
+{% block head_extra %}
+  <style>
+      .pmc-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+          gap: 1.5rem;
+          margin: 2rem 0;
+      }
 
-  <ul class="pmc-list">
+      .pmc-card {
+          background: white;
+          border: 1px solid #e0e0e0;
+          border-radius: 8px;
+          padding: 1.5rem;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .pmc-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .pmc-name {
+          font-size: 1.5rem;
+          font-weight: 500;
+          color: #333;
+          margin-bottom: 1rem;
+      }
+
+      .pmc-stats {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+          gap: 1rem;
+      }
+
+      .stat-item {
+          background: #f8f9fa;
+          padding: 0.75rem;
+          border-radius: 6px;
+          text-align: center;
+      }
+
+      .stat-label {
+          display: block;
+          color: #666;
+          font-size: 0.9rem;
+          margin-bottom: 0.25rem;
+      }
+
+      .stat-value {
+          display: block;
+          font-weight: 500;
+          font-size: 1.25rem;
+          color: #333;
+      }
+  </style>
+{% endblock head_extra %}
+
+{% block content %}
+  <h1>Project Management Committees</h1>
+  <p class="intro">Current Apache PMCs and their releases:</p>
+
+  <div class="pmc-grid">
     {% for pmc in pmcs %}
-      <li class="pmc-item">
+      <div class="pmc-card">
         <div class="pmc-name">{{ pmc.project_name }}</div>
         <div class="pmc-stats">
-          <span class="stat-item">
-            <span>PMC Members:</span>
-            <strong>{{ pmc.pmc_members|length }}</strong>
-          </span>
-          <span class="stat-item">
-            <span>Committers:</span>
-            <strong>{{ pmc.committers|length }}</strong>
-          </span>
-          <span class="stat-item">
-            <span>Release Managers:</span>
-            <strong>{{ pmc.release_managers|length }}</strong>
-          </span>
+          <div class="stat-item">
+            <span class="stat-label">PMC Members</span>
+            <span class="stat-value">{{ pmc.pmc_members|length }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Committers</span>
+            <span class="stat-value">{{ pmc.committers|length }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Release Managers</span>
+            <span class="stat-value">{{ pmc.release_managers|length }}</span>
+          </div>
         </div>
-      </li>
+      </div>
     {% endfor %}
-  </ul>
+  </div>
 {% endblock content %}

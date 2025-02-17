@@ -1,7 +1,7 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  ATR | Add Release Candidate
+  Add Release Candidate ~ ATR
 {% endblock title %}
 
 {% block description %}
@@ -11,18 +11,27 @@
 {% block stylesheets %}
   {{ super() }}
   <style>
-      .form-group {
-          margin-bottom: 1rem;
+      .form-table {
+          width: 100%;
+          border-collapse: separate;
+          border-spacing: 0 1rem;
       }
 
-      .form-group label {
-          display: block;
-          margin-bottom: 0.5rem;
+      .form-table th {
+          width: 200px;
+          text-align: right;
+          padding-right: 1rem;
+          vertical-align: top;
+          font-weight: 500;
       }
 
-      .error-message {
-          color: #dc3545;
-          margin-top: 0.25rem;
+      .form-table td {
+          vertical-align: top;
+      }
+
+      .form-table label {
+          border-bottom: none;
+          padding-bottom: 0;
       }
 
       select,
@@ -31,13 +40,20 @@
           margin-bottom: 0.5rem;
       }
 
-      small {
+      .help-text {
           color: #666;
+          font-size: 0.9em;
+          display: block;
+          margin-top: 0.25rem;
+      }
+
+      .error-message {
+          color: #dc3545;
+          margin-top: 0.25rem;
       }
 
       button {
           margin-top: 1rem;
-          padding: 0.5rem 1rem;
       }
 
       button:disabled {
@@ -48,63 +64,87 @@
 {% endblock stylesheets %}
 
 {% block content %}
-  <h1>Add Release Candidate</h1>
+  <h1>Add release candidate</h1>
   <p class="intro">On this page, you can add a release candidate to the database.</p>
 
   <div class="user-info">
+    <h2>Your account information</h2>
     <p>
       Welcome, <strong>{{ asf_id }}</strong>! You are authenticated as an ASF committer.
     </p>
 
     {% if pmc_memberships %}
-      <h3>Your PMC Memberships:</h3>
+      <h3>PMC memberships</h3>
       <ul>
         {% for pmc in pmc_memberships %}<li>{{ pmc }}</li>{% endfor %}
       </ul>
     {% endif %}
 
     {% if committer_projects %}
-      <h3>Your Committer Access:</h3>
+      <h3>Committer access</h3>
       <ul>
         {% for project in committer_projects %}<li>{{ project }}</li>{% endfor %}
       </ul>
     {% endif %}
   </div>
 
+  <h2>Select files</h2>
+
   <form method="post" enctype="multipart/form-data">
-    <div class="form-group">
-      <label for="project_name">Project:</label>
-      <select id="project_name" name="project_name" required>
-        <option value="">Select a project...</option>
-        {% for pmc in pmc_memberships %}<option value="{{ pmc }}">{{ pmc }}</option>{% endfor %}
-      </select>
-      {% if not pmc_memberships %}
-        <p class="error-message">You must be a PMC member to submit a release candidate.</p>
-      {% endif %}
-    </div>
+    <table class="form-table">
+      <tbody>
+        <tr>
+          <th>
+            <label for="project_name">Project:</label>
+          </th>
+          <td>
+            <select id="project_name" name="project_name" required>
+              <option value="">Select a project...</option>
+              {% for pmc in pmc_memberships %}<option value="{{ pmc }}">{{ pmc }}</option>{% endfor %}
+            </select>
+            {% if not pmc_memberships %}
+              <p class="error-message">You must be a PMC member to submit a release candidate.</p>
+            {% endif %}
+          </td>
+        </tr>
 
-    <div class="form-group">
-      <label for="release_artifact">Release Candidate Archive:</label>
-      <input type="file"
-             id="release_artifact"
-             name="release_artifact"
-             required
-             accept="application/gzip,application/x-gzip,application/x-tar,application/zip,application/java-archive,.tar.gz,.tgz,.zip,.jar"
-             aria-describedby="artifact-help" />
-      <span id="artifact-help">Upload the release candidate archive (tar.gz, zip, or jar)</span>
-    </div>
+        <tr>
+          <th>
+            <label for="release_artifact">Release Candidate Archive:</label>
+          </th>
+          <td>
+            <input type="file"
+                   id="release_artifact"
+                   name="release_artifact"
+                   required
+                   accept="application/gzip,application/x-gzip,application/x-tar,application/zip,application/java-archive,.tar.gz,.tgz,.zip,.jar"
+                   aria-describedby="artifact-help" />
+            <span id="artifact-help" class="help-text">Upload the release candidate archive (tar.gz, zip, or jar)</span>
+          </td>
+        </tr>
 
-    <div class="form-group">
-      <label for="release_signature">Detached GPG Signature:</label>
-      <input type="file"
-             id="release_signature"
-             name="release_signature"
-             required
-             accept="application/pgp-signature,.asc"
-             aria-describedby="signature-help" />
-      <span id="signature-help">Upload the detached GPG signature (.asc) file for the release candidate</span>
-    </div>
+        <tr>
+          <th>
+            <label for="release_signature">Detached GPG Signature:</label>
+          </th>
+          <td>
+            <input type="file"
+                   id="release_signature"
+                   name="release_signature"
+                   required
+                   accept="application/pgp-signature,.asc"
+                   aria-describedby="signature-help" />
+            <span id="signature-help" class="help-text">Upload the detached GPG signature (.asc) file for the release candidate</span>
+          </td>
+        </tr>
 
-    <button type="submit" {% if not pmc_memberships %}disabled{% endif %}>Submit Release Candidate</button>
+        <tr>
+          <td></td>
+          <td>
+            <button type="submit" {% if not pmc_memberships %}disabled{% endif %}>Submit Release Candidate</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </form>
 {% endblock content %}
