@@ -40,8 +40,7 @@ from sqlmodel import select
 from werkzeug.datastructures import FileStorage
 
 from asfquart import APP
-from asfquart.auth import Requirements as R
-from asfquart.auth import require
+from asfquart.auth import Requirements, require
 from asfquart.base import ASFQuartException
 from asfquart.session import ClientSession
 from asfquart.session import read as session_read
@@ -166,7 +165,7 @@ async def ephemeral_gpg_home():
 
 
 @APP.route("/add-release-candidate", methods=["GET", "POST"])
-@require(R.committer)
+@require(Requirements.committer)
 async def root_add_release_candidate() -> str:
     """Add a release candidate to the database."""
     session = await session_read()
@@ -187,7 +186,7 @@ async def root_add_release_candidate() -> str:
 
 
 @APP.route("/release/signatures/verify/<release_key>")
-@require(R.committer)
+@require(Requirements.committer)
 async def root_release_signatures_verify(release_key: str) -> str:
     """Verify the GPG signatures for all packages in a release candidate."""
     session = await session_read()
@@ -315,7 +314,7 @@ async def root_pmc_list() -> list[dict]:
 
 
 @APP.route("/user/keys/add", methods=["GET", "POST"])
-@require(R.committer)
+@require(Requirements.committer)
 async def root_user_keys_add() -> str:
     """Add a new GPG key to the user's account."""
     session = await session_read()
@@ -350,7 +349,7 @@ async def root_user_keys_add() -> str:
 
 
 @APP.route("/user/keys/delete")
-@require(R.committer)
+@require(Requirements.committer)
 async def root_user_keys_delete() -> str:
     """Debug endpoint to delete all of a user's keys."""
     session = await session_read()
@@ -374,7 +373,7 @@ async def root_user_keys_delete() -> str:
 
 
 @APP.route("/user/uploads")
-@require(R.committer)
+@require(Requirements.committer)
 async def root_user_uploads() -> str:
     """Show all release candidates uploaded by the current user."""
     session = await session_read()

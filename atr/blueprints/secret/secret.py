@@ -37,6 +37,8 @@ from atr.db.service import get_pmcs
 
 from . import blueprint
 
+_WHIMSY_COMMITTEE_URL = "https://whimsy.apache.org/public/committee-info.json"
+
 
 @blueprint.route("/data")
 @blueprint.route("/data/<model>")
@@ -90,14 +92,13 @@ async def secret_pmcs_update() -> str:
 
     if request.method == "POST":
         # Fetch committee-info.json from Whimsy
-        WHIMSY_URL = "https://whimsy.apache.org/public/committee-info.json"
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.get(WHIMSY_URL)
+                response = await client.get(_WHIMSY_COMMITTEE_URL)
                 response.raise_for_status()
                 data = response.json()
             except (httpx.RequestError, json.JSONDecodeError) as e:
-                raise ASFQuartException(f"Failed to fetch committee data: {str(e)}", errorcode=500)
+                raise ASFQuartException(f"Failed to fetch committee data: {e!s}", errorcode=500)
 
         committees = data.get("committees", {})
         updated_count = 0

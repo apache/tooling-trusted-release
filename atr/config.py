@@ -33,15 +33,17 @@ class AppConfig:
     # Use aiosqlite for async SQLite access
     SQLITE_URL = config("SQLITE_URL", default="sqlite+aiosqlite:///./atr.db")
 
-    ADMIN_USERS = {
-        "cwells",
-        "fluxo",
-        "gmcdonald",
-        "humbedooh",
-        "sbp",
-        "tn",
-        "wave",
-    }
+    ADMIN_USERS = frozenset(
+        {
+            "cwells",
+            "fluxo",
+            "gmcdonald",
+            "humbedooh",
+            "sbp",
+            "tn",
+            "wave",
+        }
+    )
 
 
 class ProductionConfig(AppConfig):

@@ -76,7 +76,18 @@ executionEnvironments = [
 ]
 
 [tool.ruff]
-lint.select = ["I", "E", "W", "F", "C90", "UP"]
+lint.select = [
+  "I",   # isort
+  "E",
+  "W",
+  "F",
+  "N",   # pep8-naming
+  "RUF", # ruff-checks
+  "C90",
+  "TID", # flake8-tidy-imports
+  "TCH", # flake8-type-checking
+  "UP"   # pyupgrade
+]
 lint.ignore = []
 line-length = 120
 exclude = ["asfquart"]
