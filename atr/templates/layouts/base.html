@@ -11,27 +11,36 @@
     </title>
     {% block stylesheets %}
       <link rel="stylesheet"
-            href="{{ url_for('static', filename='css/bootstrap.min.css') }}" />
+            href="{{ url_for('static', filename='css/normalize.css') }}" />
       <link rel="stylesheet"
-            href="{{ url_for('static', filename='css/fontawesome.all.min.css') }}" />
-      <link rel="stylesheet"
-            href="{{ url_for('static', filename='css/root.css') }}" />
+            href="{{ url_for('static', filename='css/atr.css') }}" />
     {% endblock stylesheets %}
   </head>
   <body class="{%- block body_class -%}{%- endblock body_class -%}">
     <div class="wrapper">
-      {% include "includes/navigation.html" %}
+      <div class="ribbon"></div>
+      <div class="content">
+        <input type="checkbox" id="nav-toggle" class="nav-toggle" />
+        <label for="nav-toggle" class="hamburger" aria-label="Menu">
+          <span class="hamburger-line"></span>
+          <span class="hamburger-line"></span>
+          <span class="hamburger-line"></span>
+        </label>
 
-      {% block content %}
-      {% endblock content %}
-      {% include "includes/footer.html" %}
+        {% include "includes/sidebar.html" %}
 
+        <div class="main-container">
+          <main class="main-content">
+            {% block content %}
+            {% endblock content %}
+          </main>
+          {% include "includes/footer.html" %}
+
+        </div>
+      </div>
     </div>
 
     {% block javascripts %}
-      <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
-
     {% endblock javascripts %}
-
   </body>
 </html>

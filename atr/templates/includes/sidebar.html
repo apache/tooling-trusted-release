@@ -1,0 +1,44 @@
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <a href="{{ url_for('root') }}" class="site-title">
+      <h1>
+        A<span>pache</span>
+        <br />
+        T<span>rusted</span>
+        <br />
+        R<span>elease</span>
+      </h1>
+    </a>
+  </div>
+  <div class="user-section">
+    {% if current_user %}
+      <div class="user-info">
+        <span>{{ current_user.fullname }}</span>
+        (<code>{{ current_user.uid }}</code>)
+      </div>
+      <a href="#"
+         onclick="location.href='/auth?logout=' + window.location.pathname;"
+         class="logout-link">Logout</a>
+    {% else %}
+      <a href="#"
+         onclick="location.href='/auth?login=' + window.location.pathname;"
+         class="login-link">Login</a>
+    {% endif %}
+  </div>
+  <nav>
+    <ul>
+      <li>
+        <a href="{{ url_for('root') }}"
+           {% if request.endpoint == 'root' %}class="active"{% endif %}>Home</a>
+      </li>
+      <li>
+        <a href="{{ url_for('root_pages') }}"
+           {% if request.endpoint == 'root_pages' %}class="active"{% endif %}>Pages</a>
+      </li>
+      <li>
+        <a href="{{ url_for('root_pmc_directory') }}"
+           {% if request.endpoint == 'root_pmc_directory' %}class="active"{% endif %}>PMC Directory</a>
+      </li>
+    </ul>
+  </nav>
+</aside>

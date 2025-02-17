@@ -52,3 +52,7 @@ h1 {
     max-width: 800px;
     color: #555;
 }
+
+.ribbon {
+    background: linear-gradient(90deg, #282661 0%, #662f8f 20%, #9e2165 40%, #cb2138 60%, #ea7826 80%, #f7ae18 100%);
+}
