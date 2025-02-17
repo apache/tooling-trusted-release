@@ -27,7 +27,7 @@ body {
     font-weight: 425;
 }
 
-input, textarea, button {
+input, textarea, button, select, option {
     font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
     font-size: 17px;
     line-height: 24px;
@@ -52,6 +52,10 @@ aside h1 span.rest {
     color: #777;
 }
 
+aside h3 {
+    margin-top: 1.5rem;
+}
+
 .site-title {
     text-decoration: none;
     color: inherit;
@@ -67,6 +71,16 @@ ul { padding-left: 1rem; }
 label { font-weight: 500; border-bottom: 1px dashed #d1d2d3; padding-bottom: 0.5rem; }
 
 form.striking { background-color: #ffe; border: 1px solid #ddb; padding: 1rem; border-radius: 0.5rem; }
+
+.hex {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.9em;
+    background: #fff;
+    padding: 0.25rem 0.5rem;
+    border-radius: 2px;
+    border: 1px solid #e0e0e0;
+    word-break: break-all;
+}
 
 footer {
   padding: 2rem;

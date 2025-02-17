@@ -26,6 +26,7 @@
     {% endif %}
   </div>
   <nav>
+    <h3>Main pages</h3>
     <ul>
       <li>
         <a href="{{ url_for('root') }}"
@@ -40,5 +41,45 @@
            {% if request.endpoint == 'root_pmc_directory' %}class="active"{% endif %}>PMC Directory</a>
       </li>
     </ul>
+
+    {% if current_user %}
+      <h3>Release management</h3>
+      <ul>
+        <li>
+          <a href="{{ url_for('root_add_release_candidate') }}"
+             {% if request.endpoint == 'root_add_release_candidate' %}class="active"{% endif %}>Add Release Candidate</a>
+        </li>
+        <li>
+          <a href="{{ url_for('root_user_uploads') }}"
+             {% if request.endpoint == 'root_user_uploads' %}class="active"{% endif %}>Your Uploads</a>
+        </li>
+      </ul>
+
+      <h3>User management</h3>
+      <ul>
+        <li>
+          <a href="{{ url_for('root_user_keys_add') }}"
+             {% if request.endpoint == 'root_user_keys_add' %}class="active"{% endif %}>Add Signing Key</a>
+        </li>
+        <li>
+          <a href="{{ url_for('root_user_keys_delete') }}"
+             {% if request.endpoint == 'root_user_keys_delete' %}class="active"{% endif %}>Delete Keys</a>
+        </li>
+      </ul>
+
+      {% if current_user.uid in ['cwells', 'fluxo', 'gmcdonald', 'humbedooh', 'sbp', 'tn', 'wave'] %}
+        <h3>Administration</h3>
+        <ul>
+          <li>
+            <a href="{{ url_for('secret_blueprint.secret_data') }}"
+               {% if request.endpoint == 'secret_blueprint.secret_data' %}class="active"{% endif %}>Browse Database</a>
+          </li>
+          <li>
+            <a href="{{ url_for('secret_blueprint.secret_pmcs_update') }}"
+               {% if request.endpoint == 'secret_blueprint.secret_pmcs_update' %}class="active"{% endif %}>Update PMCs</a>
+          </li>
+        </ul>
+      {% endif %}
+    {% endif %}
   </nav>
 </aside>

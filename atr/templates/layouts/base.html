@@ -14,6 +14,15 @@
             href="{{ url_for('static', filename='css/normalize.css') }}" />
       <link rel="stylesheet"
             href="{{ url_for('static', filename='css/atr.css') }}" />
+      <style>
+          .warning-banner {
+              border: 2px solid #dc3545;
+              background: #fcc;
+              padding: 1rem;
+              margin: 0 0 2rem 0;
+              border-radius: 4px;
+          }
+      </style>
     {% endblock stylesheets %}
     {% block head_extra %}
     {% endblock head_extra %}
@@ -33,6 +42,9 @@
 
         <div class="main-container">
           <main class="main-content">
+            <div class="warning-banner">
+              <strong>Pre-release Software:</strong> ATR is under active development and not yet officially released. Use at your own risk.
+            </div>
             {% block content %}
             {% endblock content %}
           </main>

@@ -161,8 +161,14 @@
     {% endfor %}
   </div>
 
+  <h2>Navigation</h2>
+
   <div class="navigation">
-    <a href="{{ url_for('root_user_uploads') }}">Back to Your Uploads</a>
-    <a href="{{ url_for('root_pages') }}">Return to Main Page</a>
+    <p>
+      <a href="{{ url_for('root_user_uploads') }}">Back to Your Uploads</a>
+    </p>
+    <p>
+      <a href="{{ url_for('root_pages') }}">Return to Main Page</a>
+    </p>
   </div>
 {% endblock content %}

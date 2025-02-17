@@ -6,7 +6,36 @@
 
 {% block content %}
   <h1>Apache Trusted Release</h1>
+
   <p>
-    Welcome to the Apache Trusted Release (ATR) platform. This system is used to manage the release of Apache projects.
+    ATR is a release management platform for <a href="https://www.apache.org">Apache Software Foundation</a> projects. It provides a standardized workflow for PMC members to submit, verify, and track release candidates.
   </p>
+
+  <h2>Key Features</h2>
+  <ul>
+    <li>Automated PMC roster synchronization with Whimsy</li>
+    <li>Release candidate tracking and state management</li>
+    <li>Secure key management for release managers</li>
+    <li>Signature verification for release artifacts</li>
+  </ul>
+
+  <h2>Getting Started</h2>
+  <p>
+    To submit a release candidate, you must be a PMC member of the target project. First, <a href="{{ url_for('root_user_keys_add') }}">add your signing key</a>, then <a href="{{ url_for('root_add_release_candidate') }}">upload your release candidate</a>.
+  </p>
+
+  <h2>Documentation</h2>
+  <ul>
+    <li>
+      <a href="{{ url_for('root_pages') }}">Available endpoints and access requirements</a>
+    </li>
+    <li>
+      <a href="{{ url_for('root_pmc_directory') }}">PMC directory and release manager assignments</a>
+    </li>
+    {% if current_user %}
+      <li>
+        <a href="{{ url_for('root_user_uploads') }}">Track your uploaded release candidates</a>
+      </li>
+    {% endif %}
+  </ul>
 {% endblock content %}

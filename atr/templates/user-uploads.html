@@ -45,6 +45,10 @@
           border-radius: 2px;
       }
 
+      .package div {
+          margin-bottom: 0.25rem;
+      }
+
       .no-releases {
           color: #666;
           font-style: italic;
@@ -71,9 +75,15 @@
           <div class="package-list">
             {% for package in release.packages %}
               <div class="package">
-                <div>File: {{ package.file }}</div>
-                <div>Signature: {{ package.signature }}</div>
-                <div>Checksum (SHA-512): {{ package.checksum }}</div>
+                <div>
+                  File: <span class="hex">{{ package.file }}</span>
+                </div>
+                <div>
+                  Signature: <span class="hex">{{ package.signature }}</span>
+                </div>
+                <div>
+                  Checksum (SHA-512): <span class="hex">{{ package.checksum }}</span>
+                </div>
                 <p class="package-actions">
                   <a href="{{ url_for('root_release_signatures_verify', release_key=release.storage_key) }}">Verify Signatures</a>
                 </p>
