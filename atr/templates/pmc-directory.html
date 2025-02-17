@@ -1,33 +1,37 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} Apache Trusted Releases | PMC Directory {% endblock %}
-{% block description %}Directory of all PMCs{% endblock %}
+{% block title %}
+  ATR | PMC Directory
+{% endblock title %}
+{% block description %}
+  List of all PMCs and their latest releases.
+{% endblock description %}
 
 {% block content %}
- <h1>Directory of PMCs</h1>
-<p class="intro">
-  Welcome to the Apache Trusted Release platform. Below are the current Apache PMCs and their releases:
-</p>
+  <h1>Directory of PMCs</h1>
+  <p class="intro">
+    Welcome to the Apache Trusted Release platform. Below are the current Apache PMCs and their releases:
+  </p>
 
-<ul class="pmc-list">
-  {% for pmc in pmcs %}
-  <li class="pmc-item">
-    <div class="pmc-name">{{ pmc.project_name }}</div>
-    <div class="pmc-stats">
-      <span class="stat-item">
-        <span>PMC Members:</span>
-        <strong>{{ pmc.pmc_members|length }}</strong>
-      </span>
-      <span class="stat-item">
-        <span>Committers:</span>
-        <strong>{{ pmc.committers|length }}</strong>
-      </span>
-      <span class="stat-item">
-        <span>Release Managers:</span>
-        <strong>{{ pmc.release_managers|length }}</strong>
-      </span>
-    </div>
-  </li>
-  {% endfor %}
-</ul>
+  <ul class="pmc-list">
+    {% for pmc in pmcs %}
+      <li class="pmc-item">
+        <div class="pmc-name">{{ pmc.project_name }}</div>
+        <div class="pmc-stats">
+          <span class="stat-item">
+            <span>PMC Members:</span>
+            <strong>{{ pmc.pmc_members|length }}</strong>
+          </span>
+          <span class="stat-item">
+            <span>Committers:</span>
+            <strong>{{ pmc.committers|length }}</strong>
+          </span>
+          <span class="stat-item">
+            <span>Release Managers:</span>
+            <strong>{{ pmc.release_managers|length }}</strong>
+          </span>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
 {% endblock content %}

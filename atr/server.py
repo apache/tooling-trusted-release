@@ -21,6 +21,7 @@ import os
 
 import asfquart
 import asfquart.generics
+import asfquart.session
 from asfquart.base import QuartApp
 from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
