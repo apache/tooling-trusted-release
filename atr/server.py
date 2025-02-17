@@ -19,15 +19,16 @@
 
 import os
 
+from alembic import command
+from alembic.config import Config
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.sql import text
+from sqlmodel import SQLModel
+
 import asfquart
 import asfquart.generics
 import asfquart.session
 from asfquart.base import QuartApp
-from sqlmodel import SQLModel
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from alembic import command
-from alembic.config import Config
-from sqlalchemy.sql import text
 
 from .models import __file__ as data_models_file
 

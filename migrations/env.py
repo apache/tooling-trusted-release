@@ -1,9 +1,8 @@
 from logging.config import fileConfig
-from typing import Any, Dict, cast
+from typing import Any, cast
 
-from sqlalchemy import engine_from_config, pool
 from alembic import context
-
+from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
 # this is the Alembic Config object, which provides
@@ -47,7 +46,7 @@ def run_migrations_online() -> None:
     configuration = config.get_section(config.config_ini_section)
     if configuration is None:
         configuration = {}
-    configuration = cast(Dict[str, Any], configuration)
+    configuration = cast(dict[str, Any], configuration)
     configuration["sqlalchemy.url"] = sync_url
 
     connectable = engine_from_config(

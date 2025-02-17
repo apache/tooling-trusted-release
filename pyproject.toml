@@ -74,7 +74,7 @@ executionEnvironments = [
 ]
 
 [tool.ruff]
-lint.select = ["E", "W", "F", "C90"]
+lint.select = ["I", "E", "W", "F", "C90", "UP"]
 lint.ignore = []
 line-length = 120
 exclude = ["asfquart"]

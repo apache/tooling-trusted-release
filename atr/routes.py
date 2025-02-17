@@ -25,33 +25,34 @@ import pprint
 import secrets
 import shutil
 import tempfile
-
 from contextlib import asynccontextmanager
 from io import BufferedReader
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, cast
 
 import aiofiles
 import aiofiles.os
 import gnupg
 import httpx
-
-from asfquart import APP
-from asfquart.auth import Requirements as R, require
-from asfquart.base import ASFQuartException
-from asfquart.session import read as session_read, ClientSession
-from quart import current_app, render_template, request, Request
-from sqlmodel import select
+from quart import Request, current_app, render_template, request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import InstrumentedAttribute
+from sqlmodel import select
 from werkzeug.datastructures import FileStorage
 
+from asfquart import APP
+from asfquart.auth import Requirements as R
+from asfquart.auth import require
+from asfquart.base import ASFQuartException
+from asfquart.session import ClientSession
+from asfquart.session import read as session_read
+
 from .models import (
-    DistributionChannel,
     PMC,
-    PMCKeyLink,
+    DistributionChannel,
     Package,
+    PMCKeyLink,
     ProductLine,
     PublicSigningKey,
     Release,
@@ -348,10 +349,10 @@ async def root_release_signatures_verify(release_key: str) -> str:
     async_session = current_app.config["async_session"]
     async with async_session() as db_session:
         # Get the release and its packages, and PMC with its keys
-        release_packages = selectinload(cast(InstrumentedAttribute[List[Package]], Release.packages))
+        release_packages = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages))
         release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
         pmc_keys_loader = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc)).selectinload(
-            cast(InstrumentedAttribute[List[PublicSigningKey]], PMC.public_signing_keys)
+            cast(InstrumentedAttribute[list[PublicSigningKey]], PMC.public_signing_keys)
         )
 
         # For now, for debugging, we'll just get all keys in the database
@@ -465,7 +466,7 @@ async def root_pmc_directory() -> str:
 
 
 @APP.route("/pmc/list")
-async def root_pmc_list() -> List[dict]:
+async def root_pmc_list() -> list[dict]:
     "List all PMCs in the database."
     async_session = current_app.config["async_session"]
     async with async_session() as db_session:
@@ -565,7 +566,7 @@ async def root_user_uploads() -> str:
         # TODO: We don't actually record who uploaded the release candidate
         # We should probably add that information!
         release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
-        release_packages = selectinload(cast(InstrumentedAttribute[List[Package]], Release.packages))
+        release_packages = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages))
         statement = (
             select(Release)
             .options(release_pmc, release_packages)
@@ -623,7 +624,7 @@ async def save_file_by_hash(base_dir: Path, file: FileStorage) -> str:
         raise e
 
 
-async def user_keys_add(session: ClientSession, public_key: str) -> Tuple[str, Optional[dict]]:
+async def user_keys_add(session: ClientSession, public_key: str) -> tuple[str, dict | None]:
     if not public_key:
         return ("Public key is required", None)
 
@@ -661,7 +662,7 @@ async def user_keys_add(session: ClientSession, public_key: str) -> Tuple[str, O
 
 async def user_keys_add_session(
     session: ClientSession, public_key: str, key: dict, db_session: AsyncSession
-) -> Tuple[str, Optional[dict]]:
+) -> tuple[str, dict | None]:
     # Check if key already exists
     statement = select(PublicSigningKey).where(PublicSigningKey.user_id == session.uid)
 
@@ -709,7 +710,7 @@ async def user_keys_add_session(
     )
 
 
-async def verify_gpg_signature(artifact_path: Path, signature_path: Path, public_keys: List[str]) -> Dict[str, Any]:
+async def verify_gpg_signature(artifact_path: Path, signature_path: Path, public_keys: list[str]) -> dict[str, Any]:
     """
     Verify a GPG signature for a release artifact.
     Returns a dictionary with verification results and debug information.
@@ -727,8 +728,8 @@ async def verify_gpg_signature(artifact_path: Path, signature_path: Path, public
 
 
 async def verify_gpg_signature_file(
-    sig_file: BufferedReader, artifact_path: Path, public_keys: List[str]
-) -> Dict[str, Any]:
+    sig_file: BufferedReader, artifact_path: Path, public_keys: list[str]
+) -> dict[str, Any]:
     # Run the blocking GPG verification in a thread
     async with ephemeral_gpg_home() as gpg_home:
         gpg = gnupg.GPG(gnupghome=gpg_home)
