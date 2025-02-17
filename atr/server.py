@@ -15,23 +15,20 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"server.py"
+"""server.py"""
 
+import logging
 import os
 
-from alembic import command
-from alembic.config import Config
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.sql import text
-from sqlmodel import SQLModel
+from decouple import config
 
 import asfquart
 import asfquart.generics
 import asfquart.session
 from asfquart.base import QuartApp
 from atr.blueprints import register_blueprints
-
-from .models import __file__ as data_models_file
+from atr.config import AppConfig, config_dict
+from atr.db import create_database
 
 # Avoid OIDC
 asfquart.generics.OAUTH_URL_INIT = "https://oauth.apache.org/auth?state=%s&redirect_uri=%s"
@@ -45,98 +42,66 @@ def register_routes() -> str:
     return routes.__name__
 
 
-def create_app() -> QuartApp:
+def create_app(app_config: type[AppConfig]) -> QuartApp:
     if asfquart.construct is ...:
         raise ValueError("asfquart.construct is not set")
     app = asfquart.construct(__name__)
+    app.config.from_object(app_config)
 
     # # Configure static folder path before changing working directory
     # app.static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+
+    create_database(app)
+    register_routes()
+    register_blueprints(app)
 
     @app.context_processor
     async def app_wide():
         return {"current_user": await asfquart.session.read()}
 
-    @app.before_serving
-    async def create_database() -> None:
-        # Get the project root directory (where alembic.ini is)
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-        # Change working directory to "./state"
-        state_dir = os.path.join(project_root, "state")
-        if not os.path.isdir(state_dir):
-            raise RuntimeError(f"State directory not found: {state_dir}")
-        os.chdir(state_dir)
-        print(f"Working directory changed to: {os.getcwd()}")
-
-        # Set up release storage directory
-        release_storage = os.path.join(state_dir, "releases")
-        os.makedirs(release_storage, exist_ok=True)
-        app.config["RELEASE_STORAGE_DIR"] = release_storage
-        app.config["DATA_MODELS_FILE"] = data_models_file
-
-        # Use aiosqlite for async SQLite access
-        sqlite_url = "sqlite+aiosqlite:///./atr.db"
-        engine = create_async_engine(
-            sqlite_url,
-            connect_args={
-                "check_same_thread": False,
-                "timeout": 30,
-            },
-        )
-
-        # Create async session factory
-        async_session = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
-        app.config["async_session"] = async_session
-
-        # Set SQLite pragmas for better performance
-        # Use 64 MB for the cache_size, and 5000ms for busy_timeout
-        async with engine.begin() as conn:
-            await conn.execute(text("PRAGMA journal_mode=WAL"))
-            await conn.execute(text("PRAGMA synchronous=NORMAL"))
-            await conn.execute(text("PRAGMA cache_size=-64000"))
-            await conn.execute(text("PRAGMA foreign_keys=ON"))
-            await conn.execute(text("PRAGMA busy_timeout=5000"))
-
-        # Run any pending migrations
-        # In dev we'd do this first:
-        # poetry run alembic revision --autogenerate -m "description"
-        # Then review the generated migration in migrations/versions/ and commit it
-        alembic_ini_path = os.path.join(project_root, "alembic.ini")
-        alembic_cfg = Config(alembic_ini_path)
-        # Override the migrations directory location to use project root
-        # TODO: Is it possible to set this in alembic.ini?
-        alembic_cfg.set_main_option("script_location", os.path.join(project_root, "migrations"))
-        # Set the database URL in the config
-        alembic_cfg.set_main_option("sqlalchemy.url", sqlite_url)
-        command.upgrade(alembic_cfg, "head")
-
-        # Create any tables that might be missing
-        async with engine.begin() as conn:
-            await conn.run_sync(SQLModel.metadata.create_all)
-
-        app.config["engine"] = engine
-        # TODO: apply this only for debug
-        app.config["TEMPLATES_AUTO_RELOAD"] = True
-
     @app.after_serving
     async def shutdown() -> None:
         app.background_tasks.clear()
 
-    register_routes()
-    register_blueprints(app)
-
     return app
 
 
+# WARNING: Don't run with debug turned on in production!
+DEBUG: bool = config("DEBUG", default=True, cast=bool)
+
+# Determine which configuration to use
+config_mode = "Debug" if DEBUG else "Production"
+
+try:
+    app_config = config_dict[config_mode]
+except KeyError:
+    exit("Error: Invalid <config_mode>. Expected values [Debug, Production] ")
+
+if not os.path.isdir(app_config.STATE_DIR):
+    raise RuntimeError(f"State directory not found: {app_config.STATE_DIR}")
+os.chdir(app_config.STATE_DIR)
+print(f"Working directory changed to: {os.getcwd()}")
+
+os.makedirs(app_config.RELEASE_STORAGE_DIR, exist_ok=True)
+
+app = create_app(app_config)
+
+logging.basicConfig(
+    format="[%(asctime)s.%(msecs)03d  ] [%(process)d] [%(levelname)s] %(message)s",
+    level=logging.INFO,
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+if DEBUG:
+    app.logger.info("DEBUG        = " + str(DEBUG))
+    app.logger.info("ENVIRONMENT  = " + config_mode)
+    app.logger.info("STATE_DIR    = " + app_config.STATE_DIR)
+
+
 def main() -> None:
-    "Quart debug server"
-    app = create_app()
+    """Quart debug server"""
     app.run(port=8080, ssl_keyfile="key.pem", ssl_certfile="cert.pem")
 
 
-app = None
 if __name__ == "__main__":
     main()
-else:
-    app = create_app()

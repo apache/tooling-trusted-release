@@ -1931,6 +1931,18 @@ pytest = ">=6.2.5"
 dev = ["pre-commit", "pytest-asyncio", "tox"]
 
 [[package]]
+name = "python-decouple"
+version = "3.8"
+description = "Strict separation of settings from code."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "python-decouple-3.8.tar.gz", hash = "sha256:ba6e2657d4f376ecc46f77a3a615e058d93ba5e465c01bbe57289bfb7cce680f"},
+    {file = "python_decouple-3.8-py3-none-any.whl", hash = "sha256:d0d45340815b25f4de59c974b855bb38d03151d81b037d9e3f463b0c9f8cbd66"},
+]
+
+[[package]]
 name = "python-gnupg"
 version = "0.5.4"
 description = "A wrapper for the Gnu Privacy Guard (GPG or GnuPG)"
@@ -2635,4 +2647,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = "~=3.13"
-content-hash = "83ebf1f0e0465eb2fdd013705e58ed06d047baa560bdfd0196d327ba015f30d1"
+content-hash = "b0037bd47d793570a6513cf1b5d6303920af3aa7470c3a79525fb5ab1ad133d6"

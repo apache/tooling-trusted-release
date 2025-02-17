@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"routes.py"
+"""routes.py"""
 
 import asyncio
 import datetime
@@ -32,7 +32,7 @@ from typing import Any, cast
 import aiofiles
 import aiofiles.os
 import gnupg
-from quart import Request, current_app, render_template, request
+from quart import Request, render_template, request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import InstrumentedAttribute
@@ -45,8 +45,7 @@ from asfquart.auth import require
 from asfquart.base import ASFQuartException
 from asfquart.session import ClientSession
 from asfquart.session import read as session_read
-
-from .models import (
+from atr.db.models import (
     PMC,
     Package,
     PMCKeyLink,
@@ -56,10 +55,24 @@ from .models import (
     ReleaseStage,
 )
 
+from .db import get_session
+from .db.service import get_pmc_by_name, get_pmcs
+from .util import compute_sha512, get_release_storage_dir
+
 if APP is ...:
     raise ValueError("APP is not set")
 
-ALLOWED_USERS = {"cwells", "fluxo", "gmcdonald", "humbedooh", "sbp", "tn", "wave"}
+
+@APP.route("/")
+async def root() -> str:
+    """Main page."""
+    return await render_template("index.html")
+
+
+@APP.route("/pages")
+async def root_pages() -> str:
+    """List all pages on the website."""
+    return await render_template("pages.html")
 
 
 async def add_release_candidate_post(session: ClientSession, request: Request) -> str:
@@ -92,7 +105,7 @@ async def add_release_candidate_post(session: ClientSession, request: Request) -
         raise ASFQuartException("Signature file must have .asc extension", errorcode=400)
 
     # Save files using their hashes as filenames
-    uploads_path = Path(current_app.config["RELEASE_STORAGE_DIR"])
+    uploads_path = Path(get_release_storage_dir())
     artifact_hash = await save_file_by_hash(uploads_path, artifact_file)
     # TODO: Do we need to do anything with the signature hash?
     # These should be identical, but path might be absolute?
@@ -106,8 +119,7 @@ async def add_release_candidate_post(session: ClientSession, request: Request) -
     checksum_512 = compute_sha512(uploads_path / artifact_hash)
 
     # Store in database
-    async_session = current_app.config["async_session"]
-    async with async_session() as db_session:
+    async with get_session() as db_session:
         async with db_session.begin():
             # Get PMC
             statement = select(PMC).where(PMC.project_name == project_name)
@@ -153,30 +165,10 @@ async def ephemeral_gpg_home():
         await asyncio.to_thread(shutil.rmtree, temp_dir)
 
 
-def compute_sha3_256(file_data: bytes) -> str:
-    "Compute SHA3-256 hash of file data."
-    return hashlib.sha3_256(file_data).hexdigest()
-
-
-def compute_sha512(file_path: Path) -> str:
-    "Compute SHA-512 hash of a file."
-    sha512 = hashlib.sha512()
-    with open(file_path, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            sha512.update(chunk)
-    return sha512.hexdigest()
-
-
-@APP.route("/")
-async def root() -> str:
-    """Main page."""
-    return await render_template("index.html")
-
-
 @APP.route("/add-release-candidate", methods=["GET", "POST"])
 @require(R.committer)
 async def root_add_release_candidate() -> str:
-    "Add a release candidate to the database."
+    """Add a release candidate to the database."""
     session = await session_read()
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
@@ -202,8 +194,7 @@ async def root_release_signatures_verify(release_key: str) -> str:
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    async_session = current_app.config["async_session"]
-    async with async_session() as db_session:
+    async with get_session() as db_session:
         # Get the release and its packages, and PMC with its keys
         release_packages = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages))
         release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
@@ -229,7 +220,7 @@ async def root_release_signatures_verify(release_key: str) -> str:
 
         # Verify each package's signature
         verification_results = []
-        storage_dir = Path(current_app.config["RELEASE_STORAGE_DIR"])
+        storage_dir = Path(get_release_storage_dir())
 
         for package in release.packages:
             result = {"file": package.file}
@@ -253,30 +244,20 @@ async def root_release_signatures_verify(release_key: str) -> str:
         )
 
 
-@APP.route("/pages")
-async def root_pages() -> str:
-    "List all pages on the website."
-    return await render_template("pages.html")
-
-
 @APP.route("/pmc/<project_name>")
 async def root_pmc_arg(project_name: str) -> dict:
-    "Get a specific PMC by project name."
-    async_session = current_app.config["async_session"]
-    async with async_session() as db_session:
-        statement = select(PMC).where(PMC.project_name == project_name)
-        pmc = (await db_session.execute(statement)).scalar_one_or_none()
+    """Get a specific PMC by project name."""
+    pmc = await get_pmc_by_name(project_name)
+    if not pmc:
+        raise ASFQuartException("PMC not found", errorcode=404)
 
-        if not pmc:
-            raise ASFQuartException("PMC not found", errorcode=404)
-
-        return {
-            "id": pmc.id,
-            "project_name": pmc.project_name,
-            "pmc_members": pmc.pmc_members,
-            "committers": pmc.committers,
-            "release_managers": pmc.release_managers,
-        }
+    return {
+        "id": pmc.id,
+        "project_name": pmc.project_name,
+        "pmc_members": pmc.pmc_members,
+        "committers": pmc.committers,
+        "release_managers": pmc.release_managers,
+    }
 
 
 # @APP.route("/pmc/create/<project_name>")
@@ -289,8 +270,7 @@ async def root_pmc_arg(project_name: str) -> dict:
 #         release_managers=["alice"],
 #     )
 
-#     async_session = current_app.config["async_session"]
-#     async with async_session() as db_session:
+#     async with get_session() as db_session:
 #         async with db_session.begin():
 #             try:
 #                 db_session.add(pmc)
@@ -312,39 +292,32 @@ async def root_pmc_arg(project_name: str) -> dict:
 
 @APP.route("/pmc/directory")
 async def root_pmc_directory() -> str:
-    "Main PMC directory page."
-    async_session = current_app.config["async_session"]
-    async with async_session() as db_session:
-        # Get all PMCs and their latest releases
-        statement = select(PMC)
-        pmcs = (await db_session.execute(statement)).scalars().all()
-        return await render_template("pmc-directory.html", pmcs=pmcs)
+    """Main PMC directory page."""
+    pmcs = await get_pmcs()
+    return await render_template("pmc-directory.html", pmcs=pmcs)
 
 
 @APP.route("/pmc/list")
 async def root_pmc_list() -> list[dict]:
-    "List all PMCs in the database."
-    async_session = current_app.config["async_session"]
-    async with async_session() as db_session:
-        statement = select(PMC)
-        pmcs = (await db_session.execute(statement)).scalars().all()
+    """List all PMCs in the database."""
+    pmcs = await get_pmcs()
 
-        return [
-            {
-                "id": pmc.id,
-                "project_name": pmc.project_name,
-                "pmc_members": pmc.pmc_members,
-                "committers": pmc.committers,
-                "release_managers": pmc.release_managers,
-            }
-            for pmc in pmcs
-        ]
+    return [
+        {
+            "id": pmc.id,
+            "project_name": pmc.project_name,
+            "pmc_members": pmc.pmc_members,
+            "committers": pmc.committers,
+            "release_managers": pmc.release_managers,
+        }
+        for pmc in pmcs
+    ]
 
 
 @APP.route("/user/keys/add", methods=["GET", "POST"])
 @require(R.committer)
 async def root_user_keys_add() -> str:
-    "Add a new GPG key to the user's account."
+    """Add a new GPG key to the user's account."""
     session = await session_read()
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
@@ -354,8 +327,7 @@ async def root_user_keys_add() -> str:
     user_keys = []
 
     # Get all existing keys for the user
-    async_session = current_app.config["async_session"]
-    async with async_session() as db_session:
+    async with get_session() as db_session:
         statement = select(PublicSigningKey).where(PublicSigningKey.user_id == session.uid)
         user_keys = (await db_session.execute(statement)).scalars().all()
 
@@ -380,13 +352,12 @@ async def root_user_keys_add() -> str:
 @APP.route("/user/keys/delete")
 @require(R.committer)
 async def root_user_keys_delete() -> str:
-    "Debug endpoint to delete all of a user's keys."
+    """Debug endpoint to delete all of a user's keys."""
     session = await session_read()
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    async_session = current_app.config["async_session"]
-    async with async_session() as db_session:
+    async with get_session() as db_session:
         async with db_session.begin():
             # Get all keys for the user
             # TODO: Might be clearer if user_id were "asf_id"
@@ -405,13 +376,12 @@ async def root_user_keys_delete() -> str:
 @APP.route("/user/uploads")
 @require(R.committer)
 async def root_user_uploads() -> str:
-    "Show all release candidates uploaded by the current user."
+    """Show all release candidates uploaded by the current user."""
     session = await session_read()
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    async_session = current_app.config["async_session"]
-    async with async_session() as db_session:
+    async with get_session() as db_session:
         # Get all releases where the user is a PMC member of the associated PMC
         # TODO: We don't actually record who uploaded the release candidate
         # We should probably add that information!
@@ -505,8 +475,7 @@ async def user_keys_add(session: ClientSession, public_key: str) -> tuple[str, d
         return ("Key is not long enough; must be at least 2048 bits", None)
 
     # Store key in database
-    async_session = current_app.config["async_session"]
-    async with async_session() as db_session:
+    async with get_session() as db_session:
         return await user_keys_add_session(session, public_key, key, db_session)
 
 

@@ -15,26 +15,31 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from quart import Blueprint
+import hashlib
+from functools import cache
+from pathlib import Path
 
-from asfquart.auth import Requirements as R
-from asfquart.auth import require
-from asfquart.base import ASFQuartException
-from asfquart.session import read as session_read
-from atr.util import get_admin_users
-
-blueprint = Blueprint("secret_blueprint", __name__, url_prefix="/secret")
+from quart import current_app
 
 
-@blueprint.before_request
-async def before_request_func() -> None:
-    @require(R.committer)
-    async def check_logged_in() -> None:
-        session = await session_read()
-        if session is None:
-            raise ASFQuartException("Not authenticated", errorcode=401)
+@cache
+def get_admin_users() -> set[str]:
+    return set(current_app.config["ADMIN_USERS"])
 
-        if session.uid not in get_admin_users():
-            raise ASFQuartException("You are not authorized to access the admin interface", errorcode=403)
 
-    await check_logged_in()
+def get_release_storage_dir() -> str:
+    return str(current_app.config["RELEASE_STORAGE_DIR"])
+
+
+def compute_sha3_256(file_data: bytes) -> str:
+    """Compute SHA3-256 hash of file data."""
+    return hashlib.sha3_256(file_data).hexdigest()
+
+
+def compute_sha512(file_path: Path) -> str:
+    """Compute SHA-512 hash of a file."""
+    sha512 = hashlib.sha512()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            sha512.update(chunk)
+    return sha512.hexdigest()

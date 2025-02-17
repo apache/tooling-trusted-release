@@ -15,26 +15,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from quart import Blueprint
+from collections.abc import Sequence
 
-from asfquart.auth import Requirements as R
-from asfquart.auth import require
-from asfquart.base import ASFQuartException
-from asfquart.session import read as session_read
-from atr.util import get_admin_users
+from sqlmodel import select
 
-blueprint = Blueprint("secret_blueprint", __name__, url_prefix="/secret")
+from atr.db.models import PMC
+
+from . import get_session
 
 
-@blueprint.before_request
-async def before_request_func() -> None:
-    @require(R.committer)
-    async def check_logged_in() -> None:
-        session = await session_read()
-        if session is None:
-            raise ASFQuartException("Not authenticated", errorcode=401)
+async def get_pmc_by_name(project_name: str) -> PMC | None:
+    async with get_session() as db_session:
+        statement = select(PMC).where(PMC.project_name == project_name)
+        pmc = (await db_session.execute(statement)).scalar_one_or_none()
+        return pmc
 
-        if session.uid not in get_admin_users():
-            raise ASFQuartException("You are not authorized to access the admin interface", errorcode=403)
 
-    await check_logged_in()
+async def get_pmcs() -> Sequence[PMC]:
+    async with get_session() as db_session:
+        # Get all PMCs and their latest releases
+        statement = select(PMC)
+        pmcs = (await db_session.execute(statement)).scalars().all()
+        return pmcs

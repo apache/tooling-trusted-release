@@ -22,8 +22,8 @@ from quart import current_app, render_template, request
 from sqlmodel import select
 
 from asfquart.base import ASFQuartException
-
-from ...models import (
+from atr.db import get_session
+from atr.db.models import (
     PMC,
     DistributionChannel,
     Package,
@@ -33,13 +33,15 @@ from ...models import (
     Release,
     VotePolicy,
 )
+from atr.db.service import get_pmcs
+
 from . import blueprint
 
 
 @blueprint.route("/data")
 @blueprint.route("/data/<model>")
 async def secret_data(model: str = "PMC") -> str:
-    "Browse all records in the database."
+    """Browse all records in the database."""
 
     # Map of model names to their classes
     models = {
@@ -54,11 +56,9 @@ async def secret_data(model: str = "PMC") -> str:
     }
 
     if model not in models:
-        # Default to PMC if invalid model specified
-        model = "PMC"
+        raise ASFQuartException(f"Model type '{model}' not found", 404)
 
-    async_session = current_app.config["async_session"]
-    async with async_session() as db_session:
+    async with get_session() as db_session:
         # Get all records for the selected model
         statement = select(models[model])
         records = (await db_session.execute(statement)).scalars().all()
@@ -79,12 +79,14 @@ async def secret_data(model: str = "PMC") -> str:
                         record_dict[key] = getattr(record, key)
             records_dict.append(record_dict)
 
-        return await render_template("data-browser.html", models=list(models.keys()), model=model, records=records_dict)
+        return await render_template(
+            "secret/data-browser.html", models=list(models.keys()), model=model, records=records_dict
+        )
 
 
 @blueprint.route("/pmcs/update", methods=["GET", "POST"])
 async def secret_pmcs_update() -> str:
-    "Update PMCs from remote, authoritative committee-info.json."
+    """Update PMCs from remote, authoritative committee-info.json."""
 
     if request.method == "POST":
         # Fetch committee-info.json from Whimsy
@@ -100,8 +102,7 @@ async def secret_pmcs_update() -> str:
         committees = data.get("committees", {})
         updated_count = 0
 
-        async_session = current_app.config["async_session"]
-        async with async_session() as db_session:
+        async with get_session() as db_session:
             async with db_session.begin():
                 for committee_id, info in committees.items():
                     # Skip non-PMC committees
@@ -147,14 +148,11 @@ async def secret_pmcs_update() -> str:
         return f"Successfully updated {updated_count} PMCs from Whimsy"
 
     # For GET requests, show the update form
-    return await render_template("update-pmcs.html")
+    return await render_template("secret/update-pmcs.html")
 
 
 @blueprint.route("/debug/database")
 async def secret_debug_database() -> str:
     """Debug information about the database."""
-    async_session = current_app.config["async_session"]
-    async with async_session() as db_session:
-        statement = select(PMC)
-        pmcs = (await db_session.execute(statement)).scalars().all()
-        return f"Database using {current_app.config['DATA_MODELS_FILE']} has {len(pmcs)} PMCs"
+    pmcs = await get_pmcs()
+    return f"Database using {current_app.config['DATA_MODELS_FILE']} has {len(pmcs)} PMCs"
