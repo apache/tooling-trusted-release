@@ -19,8 +19,11 @@
 
 import logging
 import os
+from collections.abc import Iterable
 
 from decouple import config
+from quart_schema import OpenAPIProvider, QuartSchema
+from werkzeug.routing import Rule
 
 import asfquart
 import asfquart.generics
@@ -35,6 +38,13 @@ asfquart.generics.OAUTH_URL_INIT = "https://oauth.apache.org/auth?state=%s&redir
 asfquart.generics.OAUTH_URL_CALLBACK = "https://oauth.apache.org/token?code=%s"
 
 
+class ApiOnlyOpenAPIProvider(OpenAPIProvider):
+    def generate_rules(self) -> Iterable[Rule]:
+        for rule in super().generate_rules():
+            if rule.rule.startswith("/api"):
+                yield rule
+
+
 def register_routes() -> str:
     from . import routes
 
@@ -47,6 +57,13 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
         raise ValueError("asfquart.construct is not set")
     app = asfquart.construct(__name__)
     app.config.from_object(app_config)
+
+    QuartSchema(
+        app,
+        openapi_provider_class=ApiOnlyOpenAPIProvider,
+        swagger_ui_path="/api/docs",
+        openapi_path="/api/openapi.json",
+    )
 
     # # Configure static folder path before changing working directory
     # app.static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")

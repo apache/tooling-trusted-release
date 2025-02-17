@@ -15,18 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from importlib import import_module
-from importlib.util import find_spec
+from collections.abc import Mapping
+from typing import Any
 
-from asfquart.base import QuartApp
+from atr.db.service import get_pmc_by_name
 
-_BLUEPRINT_MODULES = ["api", "secret"]
+from . import blueprint
 
 
-def register_blueprints(app: QuartApp) -> None:
-    for routes_name in _BLUEPRINT_MODULES:
-        routes_fqn = f"atr.blueprints.{routes_name}.{routes_name}"
-        spec = find_spec(routes_fqn)
-        if spec is not None:
-            module = import_module(routes_fqn)
-            app.register_blueprint(module.blueprint)
+@blueprint.route("/pmc/<project_name>")
+async def api_pmc(project_name: str) -> tuple[Mapping[str, Any], int]:
+    pmc = await get_pmc_by_name(project_name)
+    if pmc:
+        return pmc.model_dump(), 200
+    else:
+        return {}, 404

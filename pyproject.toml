@@ -19,7 +19,8 @@ dependencies = [
   "hypercorn~=0.17",
   "python-gnupg~=0.5",
   "sqlmodel~=0.0",
-  "python-decouple~=3.8"
+  "python-decouple~=3.8",
+  "quart-schema~=0.21"
 ]
 
 [dependency-groups]
