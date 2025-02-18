@@ -97,7 +97,12 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
 
     @app.context_processor
     async def app_wide():
-        return {"current_user": await asfquart.session.read()}
+        from atr.util import is_admin
+
+        return {
+            "current_user": await asfquart.session.read(),
+            "is_admin": is_admin,
+        }
 
     @app.after_serving
     async def shutdown() -> None:

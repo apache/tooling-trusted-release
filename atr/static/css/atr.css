@@ -72,16 +72,6 @@ label { font-weight: 500; border-bottom: 1px dashed #d1d2d3; padding-bottom: 0.5
 
 form.striking { background-color: #ffe; border: 1px solid #ddb; padding: 1rem; border-radius: 0.5rem; }
 
-.hex {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 0.9em;
-    background: #fff;
-    padding: 0.25rem 0.5rem;
-    border-radius: 2px;
-    border: 1px solid #e0e0e0;
-    word-break: break-all;
-}
-
 footer {
   padding: 2rem;
   background: #eee;
@@ -104,23 +94,37 @@ button {
     border-radius: 4px;
     cursor: pointer;
     font-weight: 500;
-  }
+}
 
-  button:hover {
+button:hover {
     background: #047;
-  }
+}
 
-
-  input,
-  textarea {
+input,
+textarea {
     font-family: monospace;
     padding: 0.5rem;
-  }
+}
 
-  textarea {
+textarea {
     width: 100%;
     min-height: 200px;
-  }
+}
+
+span.warning {
+    color: #c00;
+    font-weight: 550;
+}
+
+.hex {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.9em;
+    background: #fff;
+    padding: 0.25rem 0.5rem;
+    border-radius: 2px;
+    border: 1px solid #e0e0e0;
+    word-break: break-all;
+}
 
 .wrapper {
     min-height: 100vh;

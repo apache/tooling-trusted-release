@@ -27,6 +27,13 @@ def get_admin_users() -> set[str]:
     return set(current_app.config["ADMIN_USERS"])
 
 
+def is_admin(user_id: str | None) -> bool:
+    """Check if a user is an admin."""
+    if user_id is None:
+        return False
+    return user_id in get_admin_users()
+
+
 def get_release_storage_dir() -> str:
     return str(current_app.config["RELEASE_STORAGE_DIR"])
 
