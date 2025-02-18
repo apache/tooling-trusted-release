@@ -71,6 +71,11 @@
   <h1>Project Management Committees</h1>
   <p class="intro">Current Apache PMCs and their releases:</p>
 
+  <input type="text"
+         id="pmc-filter"
+         onkeydown="if (event.key == 'Enter'){ filter() }" />
+  <button type="button" onclick="filter()">Filter</button>
+
   <div class="pmc-grid">
     {% for pmc in pmcs %}
       <div class="pmc-card">
@@ -93,3 +98,23 @@
     {% endfor %}
   </div>
 {% endblock content %}
+
+{% block javascripts %}
+  super()
+  <script>
+      function filter() {
+          e = document.getElementById("pmc-filter");
+          pmc_filter = e.value;
+          cards = document.getElementsByClassName("pmc-card");
+          for (let card of cards) {
+              name_element = card.getElementsByClassName("pmc-name");
+              name = name_element[0].innerHTML;
+              if (pmc_filter && !name.startsWith(pmc_filter)) {
+                  card.hidden = true;
+              } else {
+                  card.hidden = false;
+              }
+          }
+      }
+  </script>
+{% endblock javascripts %}
