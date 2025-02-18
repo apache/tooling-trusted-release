@@ -103,16 +103,20 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
     async def shutdown() -> None:
         app.background_tasks.clear()
 
+    # Configure logging
     logging.basicConfig(
         format="[%(asctime)s.%(msecs)03d  ] [%(process)d] [%(levelname)s] %(message)s",
         level=logging.INFO,
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    if DEBUG:
-        app.logger.info("DEBUG        = " + str(DEBUG))
-        app.logger.info("ENVIRONMENT  = " + config_mode)
-        app.logger.info("STATE_DIR    = " + app_config.STATE_DIR)
+    # Only log in the worker process
+    @app.before_serving
+    async def log_debug_info() -> None:
+        if DEBUG:
+            app.logger.info("DEBUG        = " + str(DEBUG))
+            app.logger.info("ENVIRONMENT  = " + config_mode)
+            app.logger.info("STATE_DIR    = " + app_config.STATE_DIR)
 
     return app
 
