@@ -1,0 +1,21 @@
+{
+  "extends": "stylelint-config-standard",
+  "rules": {
+    "alpha-value-notation": "percentage",
+    "color-function-notation": "modern",
+    "color-hex-length": "long",
+    "declaration-block-single-line-max-declarations": 1,
+    "font-family-name-quotes": "always-unless-keyword",
+    "function-url-quotes": "always",
+    "hue-degree-notation": "angle",
+    "import-notation": "url",
+    "keyframe-selector-notation": "percentage",
+    "lightness-notation": "percentage",
+    "media-feature-range-notation": "context",
+    "no-descending-specificity": true,
+    "no-duplicate-selectors": true,
+    "selector-not-notation": "simple",
+    "selector-pseudo-element-colon-notation": "double",
+    "value-keyword-case": "lower"
+  }
+}

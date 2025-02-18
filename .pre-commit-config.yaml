@@ -37,6 +37,15 @@ repos:
       args:
         - --profile=jinja
         - --reformat
+- repo: https://github.com/thibaudcolas/pre-commit-stylelint
+  rev: v16.14.1
+  hooks:
+    - id: stylelint
+      additional_dependencies: ['stylelint@16.14.1', 'stylelint-config-standard@37.0.0']
+      files: "atr/static/css/.*\\.css$"
+      exclude: "atr/static/css/bootstrap\\.min\\.css$|atr/static/css/fontawesome\\.all\\.min\\.css$|atr/static/css/normalize\\.css$"
+      types_or: ['css']
+      args: ['--fix']
 - repo: local
   hooks:
     - id: ruff

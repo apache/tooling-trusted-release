@@ -15,9 +15,11 @@
           margin-bottom: 1rem;
       }
 
+      /* TODO: Consider moving this to atr.css */
       .form-group label {
-          display: block;
-          margin-bottom: 0.5rem;
+          display: inline-block;
+          margin-bottom: 1rem;
+          padding: 0;
       }
 
       .error-message {
@@ -64,8 +66,8 @@
       }
 
       .existing-keys {
-          margin: 2rem 0;
-          padding: 1rem;
+          margin-bottom: 2rem;
+          padding: 1rem 2rem 2rem 2rem;
           background: #f8f9fa;
           border-radius: 4px;
       }
@@ -166,8 +168,8 @@
   {% endif %}
 
   {% if user_keys %}
+    <h2>Your Existing Keys</h2>
     <div class="existing-keys">
-      <h2>Your Existing Keys</h2>
       <div class="keys-grid">
         {% for key in user_keys %}
           <div class="key-card">

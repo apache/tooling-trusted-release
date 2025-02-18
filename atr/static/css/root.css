@@ -5,7 +5,7 @@ body {
 }
 
 h1 {
-    color: #036;
+    color: #003366;
 }
 
 .pmc-list {
@@ -17,27 +17,27 @@ h1 {
 .pmc-item {
     padding: 1.5em;
     margin: 0.75em 0;
-    border: 1px solid #ddd;
+    border: 1px solid #dddddd;
     border-radius: 8px;
-    background: #fff;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    background: #ffffff;
+    box-shadow: 0 2px 4px rgb(0 0 0 / 5%);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .pmc-item:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 8px rgb(0 0 0 / 10%);
 }
 
 .pmc-name {
     font-weight: bold;
     font-size: 1.2em;
-    color: #036;
+    color: #003366;
     margin-bottom: 0.5em;
 }
 
 .pmc-stats {
-    color: #666;
+    color: #666666;
     display: flex;
     gap: 1.5em;
     flex-wrap: wrap;
@@ -50,7 +50,7 @@ h1 {
 
 .intro {
     max-width: 800px;
-    color: #555;
+    color: #555555;
 }
 
 .ribbon {
