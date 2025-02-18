@@ -351,7 +351,8 @@ async def root_user_keys_add() -> str:
 
     # Get all existing keys for the user
     async with get_session() as db_session:
-        statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
+        pmcs_loader = selectinload(cast(InstrumentedAttribute[list[PMC]], PublicSigningKey.pmcs))
+        statement = select(PublicSigningKey).options(pmcs_loader).where(PublicSigningKey.apache_uid == session.uid)
         user_keys = (await db_session.execute(statement)).scalars().all()
 
     if request.method == "POST":
@@ -360,7 +361,34 @@ async def root_user_keys_add() -> str:
         if not public_key:
             # Shouldn't happen, so we can raise an exception
             raise ASFQuartException("Public key is required", errorcode=400)
-        error, key_info = await user_keys_add(session, public_key)
+
+        # Get selected PMCs from form
+        selected_pmcs = form.getlist("selected_pmcs")
+        if not selected_pmcs:
+            return await render_template(
+                "user-keys-add.html",
+                asf_id=session.uid,
+                pmc_memberships=session.committees,
+                error="You must select at least one PMC",
+                key_info=None,
+                user_keys=user_keys,
+                algorithms=algorithms,
+            )
+
+        # Ensure that the selected PMCs are ones of which the user is actually a member
+        invalid_pmcs = [pmc for pmc in selected_pmcs if pmc not in session.committees]
+        if invalid_pmcs:
+            return await render_template(
+                "user-keys-add.html",
+                asf_id=session.uid,
+                pmc_memberships=session.committees,
+                error=f"Invalid PMC selection: {', '.join(invalid_pmcs)}",
+                key_info=None,
+                user_keys=user_keys,
+                algorithms=algorithms,
+            )
+
+        error, key_info = await user_keys_add(session, public_key, selected_pmcs)
 
     return await render_template(
         "user-keys-add.html",
@@ -467,7 +495,7 @@ async def save_file_by_hash(base_dir: Path, file: FileStorage) -> str:
         raise e
 
 
-async def user_keys_add(session: ClientSession, public_key: str) -> tuple[str, dict | None]:
+async def user_keys_add(session: ClientSession, public_key: str, selected_pmcs: list[str]) -> tuple[str, dict | None]:
     if not public_key:
         return ("Public key is required", None)
 
@@ -500,11 +528,15 @@ async def user_keys_add(session: ClientSession, public_key: str) -> tuple[str, d
 
     # Store key in database
     async with get_session() as db_session:
-        return await user_keys_add_session(session, public_key, key, db_session)
+        return await user_keys_add_session(session, public_key, key, selected_pmcs, db_session)
 
 
 async def user_keys_add_session(
-    session: ClientSession, public_key: str, key: dict, db_session: AsyncSession
+    session: ClientSession,
+    public_key: str,
+    key: dict,
+    selected_pmcs: list[str],
+    db_session: AsyncSession,
 ) -> tuple[str, dict | None]:
     # Check if key already exists
     statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
@@ -532,8 +564,8 @@ async def user_keys_add_session(
         )
         db_session.add(key_record)
 
-        # Link key to user's PMCs
-        for pmc_name in session.committees:
+        # Link key to selected PMCs
+        for pmc_name in selected_pmcs:
             statement = select(PMC).where(PMC.project_name == pmc_name)
             pmc = (await db_session.execute(statement)).scalar_one_or_none()
             if pmc and pmc.id:

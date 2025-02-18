@@ -116,6 +116,31 @@
       .delete-button:hover {
           background: #c82333;
       }
+
+      .pmc-checkboxes {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 0.5rem;
+          margin-top: 0.5rem;
+          margin-bottom: 0.5rem;
+      }
+
+      .checkbox-item {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+      }
+
+      .checkbox-item label {
+          border-bottom: none;
+          margin-bottom: 0;
+          font-weight: normal;
+      }
+
+      .checkbox-item input[type="checkbox"] {
+          width: 1rem;
+          height: 1rem;
+      }
   </style>
 {% endblock stylesheets %}
 
@@ -204,6 +229,16 @@
                   <th>User ID</th>
                   <td>{{ key.declared_uid or 'Not specified' }}</td>
                 </tr>
+                <tr>
+                  <th>Associated PMCs</th>
+                  <td>
+                    {% if key.pmcs %}
+                      {{ key.pmcs|map(attribute='project_name') |join(', ') }}
+                    {% else %}
+                      No PMCs associated
+                    {% endif %}
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -224,6 +259,29 @@
         Your public key should be in ASCII-armored format, starting with "-----BEGIN PGP PUBLIC KEY BLOCK-----"
       </small>
     </div>
+
+    {% if pmc_memberships %}
+      <div class="form-group">
+        <label>Associate with PMCs:</label>
+        <div class="pmc-checkboxes">
+          {% for pmc in pmc_memberships %}
+            <div class="checkbox-item">
+              <input type="checkbox"
+                     id="pmc_{{ pmc }}"
+                     name="selected_pmcs"
+                     value="{{ pmc }}"
+                     required />
+              <label for="pmc_{{ pmc }}">{{ pmc }}</label>
+            </div>
+          {% endfor %}
+        </div>
+        <small>You must associate your key with at least one PMC of which you are a member.</small>
+      </div>
+    {% else %}
+      <div class="error-message">
+        <p>You must be a member of at least one PMC to add a signing key.</p>
+      </div>
+    {% endif %}
 
     <button type="submit">Add Key</button>
   </form>
