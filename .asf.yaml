@@ -1,7 +1,7 @@
 meta:
   nextgen: true
 github:
-  del_branch_on_merge: true
+  del_branch_on_merge: true # test
   enabled_merge_buttons:
     squash:  true
     squash_commit_message: PR_TITLE
