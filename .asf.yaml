@@ -4,6 +4,6 @@ github:
   del_branch_on_merge: true
   enabled_merge_buttons:
     squash:  true
-    squash_commit_message: PR_TITLE
+    squash_commit_message: DEFAULT
     merge:   false
     rebase:  true
