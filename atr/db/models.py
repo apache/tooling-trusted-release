@@ -37,14 +37,27 @@ class UserRole(str, Enum):
 
 class PMCKeyLink(SQLModel, table=True):
     pmc_id: int = Field(foreign_key="pmc.id", primary_key=True)
-    key_user_id: str = Field(foreign_key="publicsigningkey.user_id", primary_key=True)
+    key_fingerprint: str = Field(foreign_key="publicsigningkey.fingerprint", primary_key=True)
 
 
 class PublicSigningKey(SQLModel, table=True):
-    user_id: str = Field(primary_key=True)
-    public_key: str
-    key_type: str
-    expiration: datetime.datetime
+    # The fingerprint must be stored as lowercase hex
+    fingerprint: str = Field(primary_key=True, unique=True)
+    # The algorithm is an RFC 4880 algorithm ID
+    algorithm: int
+    # Key length in bits
+    length: int
+    # Creation date
+    created: datetime.datetime
+    # Expiration date
+    expires: datetime.datetime | None
+    # The UID declared in the key
+    declared_uid: str | None
+    # The UID used by Apache
+    apache_uid: str
+    # The ASCII armored key
+    ascii_armored_key: str
+    # The PMCs that use this key
     pmcs: list["PMC"] = Relationship(back_populates="public_signing_keys", link_model=PMCKeyLink)
 
 

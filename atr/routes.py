@@ -25,9 +25,8 @@ import secrets
 import shutil
 import tempfile
 from contextlib import asynccontextmanager
-from io import BufferedReader
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, BinaryIO, cast
 
 import aiofiles
 import aiofiles.os
@@ -60,6 +59,31 @@ from .util import compute_sha512, get_release_storage_dir
 
 if APP is ...:
     raise ValueError("APP is not set")
+
+# |         1 | RSA (Encrypt or Sign) [HAC]                        |
+# |         2 | RSA Encrypt-Only [HAC]                             |
+# |         3 | RSA Sign-Only [HAC]                                |
+# |        16 | Elgamal (Encrypt-Only) [ELGAMAL] [HAC]             |
+# |        17 | DSA (Digital Signature Algorithm) [FIPS186] [HAC]  |
+# |        18 | ECDH public key algorithm                          |
+# |        19 | ECDSA public key algorithm [FIPS186]               |
+# |        20 | Reserved (formerly Elgamal Encrypt or Sign)        |
+# |        21 | Reserved for Diffie-Hellman                        |
+# |           | (X9.42, as defined for IETF-S/MIME)                |
+# |        22 | EdDSA [I-D.irtf-cfrg-eddsa]                        |
+# - https://lists.gnupg.org/pipermail/gnupg-devel/2017-April/032762.html
+# TODO: (Obviously we should move this, but where to?)
+algorithms = {
+    1: "RSA",
+    2: "RSA",
+    3: "RSA",
+    16: "Elgamal",
+    17: "DSA",
+    18: "ECDH",
+    19: "ECDSA",
+    21: "Diffie-Hellman",
+    22: "EdDSA",
+}
 
 
 @APP.route("/")
@@ -203,7 +227,7 @@ async def root_release_signatures_verify(release_key: str) -> str:
 
         # For now, for debugging, we'll just get all keys in the database
         statement = select(PublicSigningKey)
-        all_public_keys = (await db_session.execute(statement)).scalars().all()
+        all_signing_keys = (await db_session.execute(statement)).scalars().all()
 
         statement = (
             select(Release)
@@ -214,8 +238,8 @@ async def root_release_signatures_verify(release_key: str) -> str:
         if not release:
             raise ASFQuartException("Release not found", errorcode=404)
 
-        # Get all public keys associated with the PMC
-        pmc_keys = [key.public_key for key in all_public_keys]
+        # Get all ASCII-armored keys associated with the PMC
+        ascii_armored_keys = [key.ascii_armored_key for key in all_signing_keys]
 
         # Verify each package's signature
         verification_results = []
@@ -233,7 +257,7 @@ async def root_release_signatures_verify(release_key: str) -> str:
                 result["error"] = "Package signature file not found"
             else:
                 # Verify the signature
-                result = await verify_gpg_signature(artifact_path, signature_path, pmc_keys)
+                result = await verify_gpg_signature(artifact_path, signature_path, ascii_armored_keys)
                 result["file"] = package.file
 
             verification_results.append(result)
@@ -327,7 +351,7 @@ async def root_user_keys_add() -> str:
 
     # Get all existing keys for the user
     async with get_session() as db_session:
-        statement = select(PublicSigningKey).where(PublicSigningKey.user_id == session.uid)
+        statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
         user_keys = (await db_session.execute(statement)).scalars().all()
 
     if request.method == "POST":
@@ -345,6 +369,7 @@ async def root_user_keys_add() -> str:
         error=error,
         key_info=key_info,
         user_keys=user_keys,
+        algorithms=algorithms,
     )
 
 
@@ -359,9 +384,8 @@ async def root_user_keys_delete() -> str:
     async with get_session() as db_session:
         async with db_session.begin():
             # Get all keys for the user
-            # TODO: Might be clearer if user_id were "asf_id"
-            # But then we'd also want session.uid to be session.asf_id instead
-            statement = select(PublicSigningKey).where(PublicSigningKey.user_id == session.uid)
+            # TODO: Use session.apache_uid instead of session.uid?
+            statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
             keys = (await db_session.execute(statement)).scalars().all()
             count = len(keys)
 
@@ -456,7 +480,8 @@ async def user_keys_add(session: ClientSession, public_key: str) -> tuple[str, d
         if not import_result.fingerprints:
             return ("Invalid public key format", None)
 
-        fingerprint = import_result.fingerprints[0]
+        fingerprint = import_result.fingerprints[0].lower()
+        # APP.logger.info("Import result: %s", vars(import_result))
         # Get key details
         # We could probably use import_result instead
         # But this way it shows that they've really been imported
@@ -465,7 +490,7 @@ async def user_keys_add(session: ClientSession, public_key: str) -> tuple[str, d
     # Then we have the properties listed here:
     # https://gnupg.readthedocs.io/en/latest/#listing-keys
     # Note that "fingerprint" is not listed there, but we have it anyway...
-    key = next((k for k in keys if k["fingerprint"] == fingerprint), None)
+    key = next((k for k in keys if k["fingerprint"].lower() == fingerprint), None)
     if not key:
         return ("Failed to import key", None)
     if (key.get("algo") == "1") and (int(key.get("length", "0")) < 2048):
@@ -482,7 +507,7 @@ async def user_keys_add_session(
     session: ClientSession, public_key: str, key: dict, db_session: AsyncSession
 ) -> tuple[str, dict | None]:
     # Check if key already exists
-    statement = select(PublicSigningKey).where(PublicSigningKey.user_id == session.uid)
+    statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
 
     # # If uncommented, this will prevent a user from adding a second key
     # existing_key = (await db_session.execute(statement)).scalar_one_or_none()
@@ -492,15 +517,18 @@ async def user_keys_add_session(
     if not session.uid:
         return ("You must be signed in to add a key", None)
 
+    uids = key.get("uids")
     async with db_session.begin():
         # Create new key record
         key_record = PublicSigningKey(
-            user_id=session.uid,
-            public_key=public_key,
-            key_type=key.get("type", "unknown"),
-            expiration=datetime.datetime.fromtimestamp(int(key["expires"]))
-            if key.get("expires")
-            else datetime.datetime.max,
+            fingerprint=key["fingerprint"].lower(),
+            algorithm=int(key["algo"]),
+            length=int(key.get("length", "0")),
+            created=datetime.datetime.fromtimestamp(int(key["date"])),
+            expires=datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
+            declared_uid=uids[0] if uids else None,
+            apache_uid=session.uid,
+            ascii_armored_key=public_key,
         )
         db_session.add(key_record)
 
@@ -508,8 +536,8 @@ async def user_keys_add_session(
         for pmc_name in session.committees:
             statement = select(PMC).where(PMC.project_name == pmc_name)
             pmc = (await db_session.execute(statement)).scalar_one_or_none()
-            if pmc and pmc.id and session.uid:
-                link = PMCKeyLink(pmc_id=pmc.id, key_user_id=session.uid)
+            if pmc and pmc.id:
+                link = PMCKeyLink(pmc_id=pmc.id, key_fingerprint=key_record.fingerprint)
                 db_session.add(link)
             else:
                 # TODO: Log? Add to "error"?
@@ -519,7 +547,7 @@ async def user_keys_add_session(
         "",
         {
             "key_id": key["keyid"],
-            "fingerprint": key["fingerprint"],
+            "fingerprint": key["fingerprint"].lower(),
             "user_id": key["uids"][0] if key.get("uids") else "Unknown",
             "creation_date": datetime.datetime.fromtimestamp(int(key["date"])),
             "expiration_date": datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
@@ -546,26 +574,25 @@ async def verify_gpg_signature(artifact_path: Path, signature_path: Path, public
 
 
 async def verify_gpg_signature_file(
-    sig_file: BufferedReader, artifact_path: Path, public_keys: list[str]
+    sig_file: BinaryIO, artifact_path: Path, ascii_armored_keys: list[str]
 ) -> dict[str, Any]:
-    # Run the blocking GPG verification in a thread
+    """Verify a GPG signature for a file."""
     async with ephemeral_gpg_home() as gpg_home:
         gpg = gnupg.GPG(gnupghome=gpg_home)
 
-        # Import all PMC public keys
-        for key in public_keys:
+        # Import all PMC public signing keys
+        for key in ascii_armored_keys:
             import_result = await asyncio.to_thread(gpg.import_keys, key)
             if not import_result.fingerprints:
                 # TODO: Log warning about invalid key?
                 continue
-
         verified = await asyncio.to_thread(gpg.verify_file, sig_file, str(artifact_path))
 
     # Collect all available information for debugging
     debug_info = {
         "key_id": verified.key_id or "Not available",
-        "fingerprint": verified.fingerprint or "Not available",
-        "pubkey_fingerprint": verified.pubkey_fingerprint or "Not available",
+        "fingerprint": verified.fingerprint.lower() or "Not available",
+        "pubkey_fingerprint": verified.pubkey_fingerprint.lower() or "Not available",
         "creation_date": verified.creation_date or "Not available",
         "timestamp": verified.timestamp or "Not available",
         "username": verified.username or "Not available",
@@ -574,7 +601,7 @@ async def verify_gpg_signature_file(
         "trust_level": verified.trust_level if hasattr(verified, "trust_level") else "Not available",
         "trust_text": verified.trust_text if hasattr(verified, "trust_text") else "Not available",
         "stderr": verified.stderr if hasattr(verified, "stderr") else "Not available",
-        "num_pmc_keys": len(public_keys),
+        "num_pmc_keys": len(ascii_armored_keys),
     }
 
     if not verified:
@@ -590,7 +617,7 @@ async def verify_gpg_signature_file(
         "key_id": verified.key_id,
         "timestamp": verified.timestamp,
         "username": verified.username or "Unknown",
-        "email": verified.pubkey_fingerprint or "Unknown",
+        "email": verified.pubkey_fingerprint.lower() or "Unknown",
         "status": "Valid signature",
         "debug_info": debug_info,
     }

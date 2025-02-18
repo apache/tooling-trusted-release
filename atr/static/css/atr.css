@@ -61,6 +61,38 @@ label {
     cursor: pointer;
 }
 
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+table th {
+    text-align: left;
+    padding: 0.5rem;
+    font-weight: 500;
+    width: 30%;
+    color: #333333;
+}
+
+table td {
+    padding: 0.5rem;
+
+    /* Almost all of our tables have data in them */
+
+    /* Not sure if we should keep it this way, but it seems pretty good */
+    font-family: ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas", monospace;
+    font-size: 0.9em;
+}
+
+table tr {
+    /* This doesn't always work; not clear why */
+    border-bottom: 1px solid #c1c2c3;
+}
+
+table tr:last-child {
+    border-bottom: none;
+}
+
 aside h1 {
     font-size: 3rem;
     line-height: 1.1;

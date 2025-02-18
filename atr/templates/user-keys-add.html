@@ -74,16 +74,25 @@
 
       .keys-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-          gap: 1rem;
-          margin-top: 1rem;
+          /* This just messes up resizing */
+          /* grid-template-columns: repeat(auto-fill, minmax(800px, 1fr)); */
+          gap: 1.5rem;
       }
 
       .key-card {
-          padding: 1rem;
           background: white;
-          border: 1px solid #dee2e6;
+          border: 1px solid #d1d2d3;
           border-radius: 4px;
+          overflow: hidden;
+          padding: 1rem;
+      }
+
+      .key-card table {
+          margin: 0;
+      }
+
+      .key-card td {
+          word-break: break-all;
       }
 
       .key-card h3 {
@@ -173,17 +182,30 @@
       <div class="keys-grid">
         {% for key in user_keys %}
           <div class="key-card">
-            <h3>Key Details</h3>
-            <dl>
-              <dt>Key Type</dt>
-              <dd>
-                {{ key.key_type }}
-              </dd>
-              <dt>Expires</dt>
-              <dd>
-                {{ key.expiration.strftime("%Y-%m-%d %H:%M:%S") if key.expiration else 'Never' }}
-              </dd>
-            </dl>
+            <table>
+              <tbody>
+                <tr>
+                  <th>Fingerprint</th>
+                  <td>{{ key.fingerprint }}</td>
+                </tr>
+                <tr>
+                  <th>Key Type</th>
+                  <td>{{ algorithms[key.algorithm] }} ({{ key.length }} bits)</td>
+                </tr>
+                <tr>
+                  <th>Created</th>
+                  <td>{{ key.created.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                </tr>
+                <tr>
+                  <th>Expires</th>
+                  <td>{{ key.expires.strftime("%Y-%m-%d %H:%M:%S") if key.expires else 'Never' }}</td>
+                </tr>
+                <tr>
+                  <th>User ID</th>
+                  <td>{{ key.declared_uid or 'Not specified' }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         {% endfor %}
       </div>
