@@ -31,7 +31,7 @@ from typing import Any, BinaryIO, cast
 import aiofiles
 import aiofiles.os
 import gnupg
-from quart import Request, redirect, render_template, request, url_for
+from quart import Request, flash, redirect, render_template, request, url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import InstrumentedAttribute
@@ -133,14 +133,14 @@ async def release_attach_post(session: ClientSession, request: Request) -> Respo
         # Check for duplicate artifact or signature in a single query
         statement = select(Package).where(
             Package.release_key == release_key,
-            (Package.id_sha3 == artifact_sha3) | (Package.signature_sha3 == signature_sha3),
+            (Package.artifact_sha3 == artifact_sha3) | (Package.signature_sha3 == signature_sha3),
         )
         duplicate = (await db_session.execute(statement)).first()
 
         if duplicate:
             package = duplicate[0]
-            # TODO: Perhaps we should call the id_sha3 field artifact_sha3 instead
-            if package.id_sha3 == artifact_sha3:
+            # TODO: This logic should be improved
+            if package.artifact_sha3 == artifact_sha3:
                 raise ASFQuartException("This release artifact has already been uploaded", errorcode=400)
             else:
                 raise ASFQuartException("This signature file has already been uploaded", errorcode=400)
@@ -152,7 +152,7 @@ async def release_attach_post(session: ClientSession, request: Request) -> Respo
     async with get_session() as db_session:
         async with db_session.begin():
             package = Package(
-                id_sha3=artifact_sha3,
+                artifact_sha3=artifact_sha3,
                 filename=artifact_file.filename,
                 signature_sha3=signature_sha3,
                 sha512=sha512,
@@ -291,7 +291,7 @@ async def root_candidate_create() -> Response | str:
 @APP.route("/candidate/signatures/verify/<release_key>")
 @require(Requirements.committer)
 async def root_candidate_signatures_verify(release_key: str) -> str:
-    """Verify the GPG signatures for all packages in a release candidate."""
+    """Verify the signatures for all packages in a release candidate."""
     session = await session_read()
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
@@ -325,9 +325,9 @@ async def root_candidate_signatures_verify(release_key: str) -> str:
         storage_dir = Path(get_release_storage_dir())
 
         for package in release.packages:
-            result = {"file": package.id_sha3}
+            result = {"file": package.artifact_sha3}
 
-            artifact_path = storage_dir / package.id_sha3
+            artifact_path = storage_dir / package.artifact_sha3
             signature_path = storage_dir / package.signature_sha3
 
             if not artifact_path.exists():
@@ -337,7 +337,7 @@ async def root_candidate_signatures_verify(release_key: str) -> str:
             else:
                 # Verify the signature
                 result = await verify_gpg_signature(artifact_path, signature_path, ascii_armored_keys)
-                result["file"] = package.id_sha3
+                result["file"] = package.artifact_sha3
 
             verification_results.append(result)
 
@@ -419,7 +419,7 @@ async def root_pmc_list() -> list[dict]:
 @APP.route("/keys/review")
 @require(Requirements.committer)
 async def root_keys_review() -> str:
-    """Show all GPG keys associated with the user's account."""
+    """Show all keys associated with the user's account."""
     session = await session_read()
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
@@ -430,18 +430,56 @@ async def root_keys_review() -> str:
         statement = select(PublicSigningKey).options(pmcs_loader).where(PublicSigningKey.apache_uid == session.uid)
         user_keys = (await db_session.execute(statement)).scalars().all()
 
+    status_message = request.args.get("status_message")
+    status_type = request.args.get("status_type")
+
     return await render_template(
         "keys-review.html",
         asf_id=session.uid,
         user_keys=user_keys,
         algorithms=algorithms,
+        status_message=status_message,
+        status_type=status_type,
     )
+
+
+@APP.route("/keys/delete", methods=["POST"])
+@require(Requirements.committer)
+async def root_keys_delete() -> Response:
+    """Delete a public signing key from the user's account."""
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    form = await request.form
+    fingerprint = form.get("fingerprint")
+    if not fingerprint:
+        await flash("No key fingerprint provided", "error")
+        return redirect(url_for("root_keys_review"))
+
+    async with get_session() as db_session:
+        async with db_session.begin():
+            # Get the key and verify ownership
+            statement = select(PublicSigningKey).where(
+                PublicSigningKey.fingerprint == fingerprint, PublicSigningKey.apache_uid == session.uid
+            )
+            key = (await db_session.execute(statement)).scalar_one_or_none()
+
+            if not key:
+                await flash("Key not found or not owned by you", "error")
+                return redirect(url_for("root_keys_review"))
+
+            # Delete the key
+            await db_session.delete(key)
+
+    await flash("Key deleted successfully", "success")
+    return redirect(url_for("root_keys_review"))
 
 
 @APP.route("/keys/add", methods=["GET", "POST"])
 @require(Requirements.committer)
 async def root_keys_add() -> str:
-    """Add a new GPG key to the user's account."""
+    """Add a new public signing key to the user's account."""
     session = await session_read()
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
@@ -495,29 +533,6 @@ async def root_keys_add() -> str:
         algorithms=algorithms,
         committer_projects=session.projects,
     )
-
-
-@APP.route("/user/keys/delete")
-@require(Requirements.committer)
-async def root_user_keys_delete() -> str:
-    """Debug endpoint to delete all of a user's keys."""
-    session = await session_read()
-    if session is None:
-        raise ASFQuartException("Not authenticated", errorcode=401)
-
-    async with get_session() as db_session:
-        async with db_session.begin():
-            # Get all keys for the user
-            # TODO: Use session.apache_uid instead of session.uid?
-            statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
-            keys = (await db_session.execute(statement)).scalars().all()
-            count = len(keys)
-
-            # Delete all keys
-            for key in keys:
-                await db_session.delete(key)
-
-        return f"Deleted {count} keys"
 
 
 @APP.route("/candidate/review")

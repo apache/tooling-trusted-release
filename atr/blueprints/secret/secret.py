@@ -18,10 +18,12 @@
 import json
 
 import httpx
-from quart import current_app, render_template, request
+from quart import current_app, flash, redirect, render_template, request, url_for
 from sqlmodel import select
+from werkzeug.wrappers.response import Response
 
 from asfquart.base import ASFQuartException
+from asfquart.session import read as session_read
 from atr.db import get_session
 from atr.db.models import (
     PMC,
@@ -87,7 +89,7 @@ async def secret_data(model: str = "PMC") -> str:
 
 
 @blueprint.route("/pmcs/update", methods=["GET", "POST"])
-async def secret_pmcs_update() -> str:
+async def secret_pmcs_update() -> str | Response:
     """Update PMCs from remote, authoritative committee-info.json."""
 
     if request.method == "POST":
@@ -98,55 +100,61 @@ async def secret_pmcs_update() -> str:
                 response.raise_for_status()
                 data = response.json()
             except (httpx.RequestError, json.JSONDecodeError) as e:
-                raise ASFQuartException(f"Failed to fetch committee data: {e!s}", errorcode=500)
+                await flash(f"Failed to fetch committee data: {e!s}", "error")
+                return redirect(url_for("secret_blueprint.secret_pmcs_update"))
 
         committees = data.get("committees", {})
         updated_count = 0
 
-        async with get_session() as db_session:
-            async with db_session.begin():
-                for committee_id, info in committees.items():
-                    # Skip non-PMC committees
-                    if not info.get("pmc", False):
-                        continue
+        try:
+            async with get_session() as db_session:
+                async with db_session.begin():
+                    for committee_id, info in committees.items():
+                        # Skip non-PMC committees
+                        if not info.get("pmc", False):
+                            continue
 
-                    # Get or create PMC
-                    statement = select(PMC).where(PMC.project_name == committee_id)
-                    pmc = (await db_session.execute(statement)).scalar_one_or_none()
-                    if not pmc:
-                        pmc = PMC(project_name=committee_id)
-                        db_session.add(pmc)
+                        # Get or create PMC
+                        statement = select(PMC).where(PMC.project_name == committee_id)
+                        pmc = (await db_session.execute(statement)).scalar_one_or_none()
+                        if not pmc:
+                            pmc = PMC(project_name=committee_id)
+                            db_session.add(pmc)
 
-                    # Update PMC data
-                    roster = info.get("roster", {})
-                    # TODO: Here we say that roster == pmc_members == committers
-                    # We ought to do this more accurately instead
-                    pmc.pmc_members = list(roster.keys())
-                    pmc.committers = list(roster.keys())
+                        # Update PMC data
+                        roster = info.get("roster", {})
+                        # TODO: Here we say that roster == pmc_members == committers
+                        # We ought to do this more accurately instead
+                        pmc.pmc_members = list(roster.keys())
+                        pmc.committers = list(roster.keys())
 
-                    # Mark chairs as release managers
-                    # TODO: Who else is a release manager? How do we know?
-                    chairs = [m["id"] for m in info.get("chairs", [])]
-                    pmc.release_managers = chairs
+                        # Mark chairs as release managers
+                        # TODO: Who else is a release manager? How do we know?
+                        chairs = [m["id"] for m in info.get("chairs", [])]
+                        pmc.release_managers = chairs
 
-                    updated_count += 1
+                        updated_count += 1
 
-                # Add special entry for Tooling PMC
-                # Not clear why, but it's not in the Whimsy data
-                statement = select(PMC).where(PMC.project_name == "tooling")
-                tooling_pmc = (await db_session.execute(statement)).scalar_one_or_none()
-                if not tooling_pmc:
-                    tooling_pmc = PMC(project_name="tooling")
-                    db_session.add(tooling_pmc)
-                    updated_count += 1
+                    # Add special entry for Tooling PMC
+                    # Not clear why, but it's not in the Whimsy data
+                    statement = select(PMC).where(PMC.project_name == "tooling")
+                    tooling_pmc = (await db_session.execute(statement)).scalar_one_or_none()
+                    if not tooling_pmc:
+                        tooling_pmc = PMC(project_name="tooling")
+                        db_session.add(tooling_pmc)
+                        updated_count += 1
 
-                # Update Tooling PMC data
-                # Could put this in the "if not tooling_pmc" block, perhaps
-                tooling_pmc.pmc_members = ["wave", "tn", "sbp"]
-                tooling_pmc.committers = ["wave", "tn", "sbp"]
-                tooling_pmc.release_managers = ["wave"]
+                    # Update Tooling PMC data
+                    # Could put this in the "if not tooling_pmc" block, perhaps
+                    tooling_pmc.pmc_members = ["wave", "tn", "sbp"]
+                    tooling_pmc.committers = ["wave", "tn", "sbp"]
+                    tooling_pmc.release_managers = ["wave"]
 
-        return f"Successfully updated {updated_count} PMCs from Whimsy"
+            await flash(f"Successfully updated {updated_count} PMCs from Whimsy", "success")
+        except Exception as e:
+            await flash(f"Failed to update PMCs: {e!s}", "error")
+
+        return redirect(url_for("secret_blueprint.secret_pmcs_update"))
 
     # For GET requests, show the update form
     return await render_template("secret/update-pmcs.html")
@@ -157,3 +165,25 @@ async def secret_debug_database() -> str:
     """Debug information about the database."""
     pmcs = await get_pmcs()
     return f"Database using {current_app.config['DATA_MODELS_FILE']} has {len(pmcs)} PMCs"
+
+
+@blueprint.route("/keys/delete-all")
+async def secret_keys_delete_all() -> str:
+    """Debug endpoint to delete all of a user's keys."""
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    async with get_session() as db_session:
+        async with db_session.begin():
+            # Get all keys for the user
+            # TODO: Use session.apache_uid instead of session.uid?
+            statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
+            keys = (await db_session.execute(statement)).scalars().all()
+            count = len(keys)
+
+            # Delete all keys
+            for key in keys:
+                await db_session.delete(key)
+
+        return f"Deleted {count} keys"

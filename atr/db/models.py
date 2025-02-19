@@ -135,7 +135,8 @@ class DistributionChannel(SQLModel, table=True):
 
 class Package(SQLModel, table=True):
     # The SHA3-256 hash of the file, used as filename in storage
-    id_sha3: str = Field(primary_key=True)
+    # TODO: We should discuss making this unique
+    artifact_sha3: str = Field(primary_key=True)
     # Original filename from uploader
     filename: str
     # SHA-512 hash of the file

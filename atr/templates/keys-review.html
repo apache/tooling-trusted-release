@@ -72,6 +72,38 @@
           background: #d4edda;
           border-radius: 4px;
       }
+
+      .key-details {
+          margin-top: 1rem;
+          padding: 1rem;
+          background: #f8f9fa;
+          border-radius: 4px;
+      }
+
+      .key-details summary {
+          font-weight: bold;
+          cursor: pointer;
+      }
+
+      .key-details pre {
+          margin-top: 1rem;
+          white-space: pre-wrap;
+      }
+
+      .status-message {
+          margin-top: 2rem;
+          padding: 1rem;
+          background: #f8f9fa;
+          border-radius: 4px;
+      }
+
+      .status-message.success {
+          background: #d4edda;
+      }
+
+      .status-message.error {
+          background: #f8d7da;
+      }
   </style>
 {% endblock stylesheets %}
 
@@ -85,12 +117,11 @@
     </p>
   </div>
 
-  {% if success %}
-    <div class="success-message">
-      <h2>Success</h2>
-      <p>{{ success }}</p>
-    </div>
-  {% endif %}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}<div class="status-message {{ category }}">{{ message }}</div>{% endfor %}
+    {% endif %}
+  {% endwith %}
 
   {% if user_keys %}
     <div class="existing-keys">
@@ -131,11 +162,30 @@
                 </tr>
               </tbody>
             </table>
+
+            <!-- TODO: We could link to a downloadable version of the key instead -->
+            <details class="key-details">
+              <summary>View whole key</summary>
+              <pre class="key-text">{{ key.ascii_armored_key }}</pre>
+            </details>
+
+            <form method="post"
+                  action="{{ url_for('root_keys_delete') }}"
+                  class="delete-key-form">
+              <input type="hidden" name="fingerprint" value="{{ key.fingerprint }}" />
+              <button type="submit" class="delete-button">Delete key</button>
+            </form>
           </div>
         {% endfor %}
       </div>
     </div>
   {% else %}
-    <p>You haven't added any signing keys yet.</p>
+    <h2>Keys</h2>
+    <p>
+      <strong>You haven't added any signing keys yet.</strong>
+    </p>
+    <p>
+      <a href="{{ url_for('root_keys_add') }}">Add a key</a>
+    </p>
   {% endif %}
 {% endblock content %}

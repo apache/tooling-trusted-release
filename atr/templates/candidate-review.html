@@ -122,20 +122,20 @@
             </tr>
           {% endif %}
           <tr>
-            <th>Original Filename</th>
+            <th>Artifact Filename</th>
             <td>{{ package.filename }}</td>
           </tr>
           <tr>
-            <th>File Hash (SHA3)</th>
-            <td>{{ package.id_sha3 }}</td>
+            <th>Artifact Hash (SHA3-256)</th>
+            <td>{{ package.artifact_sha3 }}</td>
           </tr>
           <tr>
-            <th>Signature Hash (SHA3)</th>
-            <td>{{ package.signature_sha3 }}</td>
-          </tr>
-          <tr>
-            <th>SHA-512</th>
+            <th>Artifact Hash (SHA-512)</th>
             <td>{{ package.sha512 }}</td>
+          </tr>
+          <tr>
+            <th>Signature Hash (SHA3-256)</th>
+            <td>{{ package.signature_sha3 }}</td>
           </tr>
           <tr>
             <th>Uploaded</th>

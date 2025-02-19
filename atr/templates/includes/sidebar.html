@@ -66,11 +66,6 @@
           <a href="{{ url_for('root_keys_add') }}"
              {% if request.endpoint == 'root_keys_add' %}class="active"{% endif %}>Add signing key</a>
         </li>
-        <li>
-          <a href="{{ url_for('root_user_keys_delete') }}"
-             {% if request.endpoint == 'root_user_keys_delete' %}class="active"{% endif %}>Delete keys</a>
-          <span class="warning">(!)</span>
-        </li>
       </ul>
 
       {% if is_admin(current_user.uid) %}
