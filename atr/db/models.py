@@ -22,7 +22,7 @@ from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel
-from sqlalchemy import JSON, Column
+from sqlalchemy import JSON, CheckConstraint, Column, Index
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -182,6 +182,53 @@ class ReleasePhase(str, Enum):
     MIGRATION = "migration"
     FAILED = "failed"
     ARCHIVED = "archived"
+
+
+class TaskStatus(str, Enum):
+    """Status of a task in the task queue."""
+
+    QUEUED = "queued"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class Task(SQLModel, table=True):
+    """A task in the task queue."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    task_type: str
+    task_args: str = Field(sa_column=Column(JSON))
+    status: TaskStatus = Field(default=TaskStatus.QUEUED, index=True)
+    added: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC), index=True)
+    started: datetime.datetime | None = None
+    completed: datetime.datetime | None = None
+    pid: int | None = None
+    error: str | None = None
+
+    # Create an index on status and added for efficient task claiming
+    __table_args__ = (
+        Index("ix_task_status_added", "status", "added"),
+        # Ensure valid status transitions:
+        # - QUEUED can transition to ACTIVE
+        # - ACTIVE can transition to COMPLETED or FAILED
+        # - COMPLETED and FAILED are terminal states
+        CheckConstraint(
+            """
+            (
+                -- Initial state is always valid
+                status = 'QUEUED'
+                -- QUEUED -> ACTIVE requires setting started time and pid
+                OR (status = 'ACTIVE' AND started IS NOT NULL AND pid IS NOT NULL)
+                -- ACTIVE -> COMPLETED requires setting completed time
+                OR (status = 'COMPLETED' AND completed IS NOT NULL)
+                -- ACTIVE -> FAILED requires setting completed time and error
+                OR (status = 'FAILED' AND completed IS NOT NULL AND error IS NOT NULL)
+            )
+            """,
+            name="valid_task_status_transitions",
+        ),
+    )
 
 
 class Release(SQLModel, table=True):
