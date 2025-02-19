@@ -1,0 +1,159 @@
+<h1>Implementation plan</h1>
+<p>This is a rough plan of immediate tasks. The priority of these tasks may change, and we may add or drop tasks as appropriate using a reactive development style.</p>
+<h2>UX improvements</h2>
+<ol>
+<li>
+<p>Enhance RC display</p>
+<ul>
+<li>Replace raw file hashes with the original filenames in the UI</li>
+<li>Add file size and upload timestamp</li>
+<li>Improve the layout of file listings</li>
+<li>Show validation status indicators</li>
+</ul>
+</li>
+<li>
+<p>Improve key management interface</p>
+<ul>
+<li>Add key expiration warnings</li>
+<li>Display which PMCs are using each key</li>
+<li>Improve key selection during RC creation</li>
+</ul>
+</li>
+<li>
+<p>Release status dashboard</p>
+<ul>
+<li>Add progress indicators for release phases</li>
+<li>Show current blockers and required actions</li>
+<li>Add quick actions for release managers</li>
+</ul>
+</li>
+</ol>
+<p>Advanced tasks, possibly deferred</p>
+<ul>
+<li>Implement a key revocation workflow</li>
+<li>Add developer RC download buttons with clear verification instructions</li>
+<li>Check RC file naming conventions</li>
+<li>Display vote status and timeline</li>
+</ul>
+<h2>Task scheduler</h2>
+<p>We aim to work on the task scheduler in parallel with the UX improvements above. Artifact validation and the release status dashboard are dependent on tasks, which are managed by the task scheduler.</p>
+<ol>
+<li>
+<p>Task runner workers</p>
+<ul>
+<li>Implement worker process with RLIMIT controls for CPU and RAM</li>
+<li>Add disk usage tracking through API and psutil polling</li>
+<li>Add rollback or reporting for failed tasks</li>
+<li>Ensure idempotent operations where possible</li>
+<li>Implement safe handling for compressed asset expansion</li>
+<li>Test external tool use</li>
+</ul>
+</li>
+<li>
+<p>Orchestrating scheduler and resource management</p>
+<ul>
+<li>Implement process-based task isolation</li>
+<li>Create task table in sqlite database</li>
+<li>Add task queue management</li>
+<li>Track and limit disk usage per task in the scheduler</li>
+</ul>
+</li>
+</ol>
+<p>Advanced tasks, possibly deferred</p>
+<ul>
+<li>Check fair scheduling across cores</li>
+<li>Add task monitoring and reporting</li>
+</ul>
+<h2>Basic RC validation</h2>
+<p>These tasks are dependent on the task scheduler above.</p>
+<ol>
+<li>
+<p>Basic artifact validation</p>
+<ul>
+<li>Implement basic structure validation (archives, signatures)</li>
+</ul>
+</li>
+<li>
+<p>License compliance</p>
+<ul>
+<li>Verify LICENSE and NOTICE files exist and are placed correctly</li>
+<li>Check for Apache License headers in source files</li>
+<li>Basic RAT integration for license header validation</li>
+</ul>
+</li>
+<li>
+<p>SBOM integration</p>
+<ul>
+<li>Generate a basic SBOM for release artifacts</li>
+<li>Store SBOMs with release metadata</li>
+<li>Add SBOM management options to UI</li>
+</ul>
+</li>
+</ol>
+<h2>Advanced RC validation</h2>
+<ol>
+<li>
+<p>Dependency analysis</p>
+<ul>
+<li>Parse and validate dependency licenses</li>
+<li>Check for prohibited licenses</li>
+<li>Generate dependency reports</li>
+<li>Flag dependency vulnerabilities</li>
+</ul>
+</li>
+<li>
+<p>Distribution channel integration</p>
+<ul>
+<li>Add PyPI distribution support</li>
+<li>Implement Maven Central publishing</li>
+<li>Add Docker Hub integration</li>
+<li>Support test distribution channels</li>
+</ul>
+</li>
+<li>
+<p>Reproducible build verification</p>
+<ul>
+<li>Track builds of binary artifacts from source release</li>
+<li>Compare built artifacts with the provided binaries</li>
+<li>Give a detailed report of the build and the differences</li>
+</ul>
+</li>
+</ol>
+<h2>Process automation</h2>
+<p>These are long term implementation requirements.</p>
+<ol>
+<li>
+<p>Vote management</p>
+<ul>
+<li>Automate vote thread creation</li>
+<li>Track votes and calculate results</li>
+<li>Generate vote summaries</li>
+<li>Handle binding vs non-binding votes</li>
+</ul>
+</li>
+<li>
+<p>Release announcement</p>
+<ul>
+<li>Template-based announcement generation with all required metadata</li>
+<li>Support customisation by PMCs</li>
+<li>Automate mailing list distribution</li>
+</ul>
+</li>
+<li>
+<p>GitHub integration</p>
+<ul>
+<li>Support GHA-based release uploads</li>
+<li>Add release tagging integration</li>
+<li>Support automated PR creation</li>
+<li>Implement security checks for GHA workflows</li>
+</ul>
+</li>
+</ol>
+<h2>Success metrics</h2>
+<ul>
+<li>Increased number of PMCs using the platform</li>
+<li>Reduction in release process duration</li>
+<li>Decreased number of failed release votes</li>
+<li>Improved compliance with ASF release policies</li>
+<li>Reduced manual intervention in release process</li>
+</ul>
