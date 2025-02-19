@@ -39,28 +39,32 @@
     </ul>
 
     {% if current_user %}
-      <h3>Release management</h3>
+      <h3>Candidate management</h3>
       <ul>
         <li>
-          <a href="{{ url_for('root_release_create') }}"
-             {% if request.endpoint == 'root_release_create' %}class="active"{% endif %}>Create release candidate</a>
+          <a href="{{ url_for('root_candidate_create') }}"
+             {% if request.endpoint == 'root_candidate_create' %}class="active"{% endif %}>Create candidate</a>
         </li>
         <!-- TODO: Don't show this if the user doesn't have any release candidates? -->
         <li>
-          <a href="{{ url_for('root_release_attach') }}"
-             {% if request.endpoint == 'root_release_attach' %}class="active"{% endif %}>Attach package artifacts</a>
+          <a href="{{ url_for('root_candidate_attach') }}"
+             {% if request.endpoint == 'root_candidate_attach' %}class="active"{% endif %}>Attach artifacts</a>
         </li>
         <li>
-          <a href="{{ url_for('root_user_uploads') }}"
-             {% if request.endpoint == 'root_user_uploads' %}class="active"{% endif %}>Your release candidates</a>
+          <a href="{{ url_for('root_candidate_review') }}"
+             {% if request.endpoint == 'root_candidate_review' %}class="active"{% endif %}>Review candidates</a>
         </li>
       </ul>
 
       <h3>User management</h3>
       <ul>
         <li>
-          <a href="{{ url_for('root_user_keys_add') }}"
-             {% if request.endpoint == 'root_user_keys_add' %}class="active"{% endif %}>Add signing key</a>
+          <a href="{{ url_for('root_keys_review') }}"
+             {% if request.endpoint == 'root_keys_review' %}class="active"{% endif %}>Your signing keys</a>
+        </li>
+        <li>
+          <a href="{{ url_for('root_keys_add') }}"
+             {% if request.endpoint == 'root_keys_add' %}class="active"{% endif %}>Add signing key</a>
         </li>
         <li>
           <a href="{{ url_for('root_user_keys_delete') }}"

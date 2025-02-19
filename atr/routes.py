@@ -125,28 +125,44 @@ async def release_attach_post(session: ClientSession, request: Request) -> Respo
 
     # Save files using their hashes as filenames
     uploads_path = Path(get_release_storage_dir())
-    artifact_hash = await save_file_by_hash(uploads_path, artifact_file)
-    # TODO: Do we need to do anything with the signature hash?
-    # These should be identical, but path might be absolute?
-    # TODO: Need to check, ideally. Could have a data browser
-    signature_hash = await save_file_by_hash(uploads_path, signature_file)
+    artifact_sha3 = await save_file_by_hash(uploads_path, artifact_file)
+    signature_sha3 = await save_file_by_hash(uploads_path, signature_file)
 
-    # Compute SHA-512 checksum of the artifact for the package record
-    checksum_512 = compute_sha512(uploads_path / artifact_hash)
+    # Check if these files are already attached to this release
+    async with get_session() as db_session:
+        # Check for duplicate artifact or signature in a single query
+        statement = select(Package).where(
+            Package.release_key == release_key,
+            (Package.id_sha3 == artifact_sha3) | (Package.signature_sha3 == signature_sha3),
+        )
+        duplicate = (await db_session.execute(statement)).first()
+
+        if duplicate:
+            package = duplicate[0]
+            # TODO: Perhaps we should call the id_sha3 field artifact_sha3 instead
+            if package.id_sha3 == artifact_sha3:
+                raise ASFQuartException("This release artifact has already been uploaded", errorcode=400)
+            else:
+                raise ASFQuartException("This signature file has already been uploaded", errorcode=400)
+
+        # Compute SHA-512 of the artifact for the package record
+        sha512 = compute_sha512(uploads_path / artifact_sha3)
 
     # Create the package record in the database
     async with get_session() as db_session:
         async with db_session.begin():
             package = Package(
-                file=artifact_hash,
-                signature=signature_hash,
-                checksum=checksum_512,
+                id_sha3=artifact_sha3,
+                filename=artifact_file.filename,
+                signature_sha3=signature_sha3,
+                sha512=sha512,
                 release_key=release_key,
+                uploaded=datetime.datetime.now(datetime.UTC),
             )
             db_session.add(package)
 
-    # Redirect to the user's uploads page
-    return redirect(url_for("root_user_uploads"))
+    # Redirect to the release candidate review page
+    return redirect(url_for("root_candidate_review"))
 
 
 async def release_create_post(session: ClientSession, request: Request) -> Response:
@@ -193,6 +209,7 @@ async def release_create_post(session: ClientSession, request: Request) -> Respo
                 phase=ReleasePhase.RELEASE_CANDIDATE,
                 pmc_id=pmc.id,
                 version=version,
+                created=datetime.datetime.now(datetime.UTC),
             )
             db_session.add(release)
 
@@ -202,7 +219,7 @@ async def release_create_post(session: ClientSession, request: Request) -> Respo
 
     # Redirect to the attach artifacts page with the storage token
     # We should possibly have a results, or list of releases, page instead
-    return redirect(url_for("root_release_attach", storage_key=storage_token))
+    return redirect(url_for("root_candidate_attach", storage_key=storage_token))
 
 
 @APP.route("/")
@@ -211,15 +228,9 @@ async def root() -> str:
     return await render_template("index.html")
 
 
-@APP.route("/pages")
-async def root_pages() -> str:
-    """List all pages on the website."""
-    return await render_template("pages.html")
-
-
-@APP.route("/release/attach", methods=["GET", "POST"])
+@APP.route("/candidate/attach", methods=["GET", "POST"])
 @require(Requirements.committer)
-async def root_release_attach() -> Response | str:
+async def root_candidate_attach() -> Response | str:
     """Attach package artifacts to an existing release."""
     session = await session_read()
     if session is None:
@@ -249,16 +260,16 @@ async def root_release_attach() -> Response | str:
 
     # For GET requests, show the form
     return await render_template(
-        "release-attach.html",
+        "candidate-attach.html",
         asf_id=session.uid,
         releases=user_releases,
         selected_release=storage_key,
     )
 
 
-@APP.route("/release/create", methods=["GET", "POST"])
+@APP.route("/candidate/create", methods=["GET", "POST"])
 @require(Requirements.committer)
-async def root_release_create() -> Response | str:
+async def root_candidate_create() -> Response | str:
     """Create a new release in the database."""
     session = await session_read()
     if session is None:
@@ -270,16 +281,16 @@ async def root_release_create() -> Response | str:
 
     # For GET requests, show the form
     return await render_template(
-        "release-create.html",
+        "candidate-create.html",
         asf_id=session.uid,
         pmc_memberships=session.committees,
         committer_projects=session.projects,
     )
 
 
-@APP.route("/release/signatures/verify/<release_key>")
+@APP.route("/candidate/signatures/verify/<release_key>")
 @require(Requirements.committer)
-async def root_release_signatures_verify(release_key: str) -> str:
+async def root_candidate_signatures_verify(release_key: str) -> str:
     """Verify the GPG signatures for all packages in a release candidate."""
     session = await session_read()
     if session is None:
@@ -314,10 +325,10 @@ async def root_release_signatures_verify(release_key: str) -> str:
         storage_dir = Path(get_release_storage_dir())
 
         for package in release.packages:
-            result = {"file": package.file}
+            result = {"file": package.id_sha3}
 
-            artifact_path = storage_dir / package.file
-            signature_path = storage_dir / package.signature
+            artifact_path = storage_dir / package.id_sha3
+            signature_path = storage_dir / package.signature_sha3
 
             if not artifact_path.exists():
                 result["error"] = "Package artifact file not found"
@@ -326,12 +337,12 @@ async def root_release_signatures_verify(release_key: str) -> str:
             else:
                 # Verify the signature
                 result = await verify_gpg_signature(artifact_path, signature_path, ascii_armored_keys)
-                result["file"] = package.file
+                result["file"] = package.id_sha3
 
             verification_results.append(result)
 
         return await render_template(
-            "release-signature-verify.html", release=release, verification_results=verification_results
+            "candidate-signature-verify.html", release=release, verification_results=verification_results
         )
 
 
@@ -405,9 +416,31 @@ async def root_pmc_list() -> list[dict]:
     ]
 
 
-@APP.route("/user/keys/add", methods=["GET", "POST"])
+@APP.route("/keys/review")
 @require(Requirements.committer)
-async def root_user_keys_add() -> str:
+async def root_keys_review() -> str:
+    """Show all GPG keys associated with the user's account."""
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    # Get all existing keys for the user
+    async with get_session() as db_session:
+        pmcs_loader = selectinload(cast(InstrumentedAttribute[list[PMC]], PublicSigningKey.pmcs))
+        statement = select(PublicSigningKey).options(pmcs_loader).where(PublicSigningKey.apache_uid == session.uid)
+        user_keys = (await db_session.execute(statement)).scalars().all()
+
+    return await render_template(
+        "keys-review.html",
+        asf_id=session.uid,
+        user_keys=user_keys,
+        algorithms=algorithms,
+    )
+
+
+@APP.route("/keys/add", methods=["GET", "POST"])
+@require(Requirements.committer)
+async def root_keys_add() -> str:
     """Add a new GPG key to the user's account."""
     session = await session_read()
     if session is None:
@@ -415,13 +448,6 @@ async def root_user_keys_add() -> str:
 
     error = None
     key_info = None
-    user_keys = []
-
-    # Get all existing keys for the user
-    async with get_session() as db_session:
-        pmcs_loader = selectinload(cast(InstrumentedAttribute[list[PMC]], PublicSigningKey.pmcs))
-        statement = select(PublicSigningKey).options(pmcs_loader).where(PublicSigningKey.apache_uid == session.uid)
-        user_keys = (await db_session.execute(statement)).scalars().all()
 
     if request.method == "POST":
         form = await request.form
@@ -434,26 +460,26 @@ async def root_user_keys_add() -> str:
         selected_pmcs = form.getlist("selected_pmcs")
         if not selected_pmcs:
             return await render_template(
-                "user-keys-add.html",
+                "keys-add.html",
                 asf_id=session.uid,
                 pmc_memberships=session.committees,
                 error="You must select at least one PMC",
                 key_info=None,
-                user_keys=user_keys,
                 algorithms=algorithms,
                 committer_projects=session.projects,
             )
 
         # Ensure that the selected PMCs are ones of which the user is actually a member
-        invalid_pmcs = [pmc for pmc in selected_pmcs if pmc not in session.committees]
+        invalid_pmcs = [
+            pmc for pmc in selected_pmcs if (pmc not in session.committees) and (pmc not in session.projects)
+        ]
         if invalid_pmcs:
             return await render_template(
-                "user-keys-add.html",
+                "keys-add.html",
                 asf_id=session.uid,
                 pmc_memberships=session.committees,
                 error=f"Invalid PMC selection: {', '.join(invalid_pmcs)}",
                 key_info=None,
-                user_keys=user_keys,
                 algorithms=algorithms,
                 committer_projects=session.projects,
             )
@@ -461,12 +487,11 @@ async def root_user_keys_add() -> str:
         error, key_info = await user_keys_add(session, public_key, selected_pmcs)
 
     return await render_template(
-        "user-keys-add.html",
+        "keys-add.html",
         asf_id=session.uid,
         pmc_memberships=session.committees,
         error=error,
         key_info=key_info,
-        user_keys=user_keys,
         algorithms=algorithms,
         committer_projects=session.projects,
     )
@@ -495,10 +520,10 @@ async def root_user_keys_delete() -> str:
         return f"Deleted {count} keys"
 
 
-@APP.route("/user/uploads")
+@APP.route("/candidate/review")
 @require(Requirements.committer)
-async def root_user_uploads() -> str:
-    """Show all release candidates uploaded by the current user."""
+async def root_candidate_review() -> str:
+    """Show all release candidates to which the user has access."""
     session = await session_read()
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
@@ -525,7 +550,7 @@ async def root_user_uploads() -> str:
             if session.uid in r.pmc.pmc_members:
                 user_releases.append(r)
 
-        return await render_template("user-uploads.html", releases=user_releases)
+        return await render_template("candidate-review.html", releases=user_releases)
 
 
 async def save_file_by_hash(base_dir: Path, file: FileStorage) -> str:
@@ -579,7 +604,9 @@ async def user_keys_add(session: ClientSession, public_key: str, selected_pmcs: 
         if not import_result.fingerprints:
             return ("Invalid public key format", None)
 
-        fingerprint = import_result.fingerprints[0].lower()
+        fingerprint = import_result.fingerprints[0]
+        if fingerprint is not None:
+            fingerprint = fingerprint.lower()
         # APP.logger.info("Import result: %s", vars(import_result))
         # Get key details
         # We could probably use import_result instead
@@ -589,7 +616,7 @@ async def user_keys_add(session: ClientSession, public_key: str, selected_pmcs: 
     # Then we have the properties listed here:
     # https://gnupg.readthedocs.io/en/latest/#listing-keys
     # Note that "fingerprint" is not listed there, but we have it anyway...
-    key = next((k for k in keys if k["fingerprint"].lower() == fingerprint), None)
+    key = next((k for k in keys if (k["fingerprint"] is not None) and (k["fingerprint"].lower() == fingerprint)), None)
     if not key:
         return ("Failed to import key", None)
     if (key.get("algo") == "1") and (int(key.get("length", "0")) < 2048):
@@ -620,11 +647,15 @@ async def user_keys_add_session(
     if not session.uid:
         return ("You must be signed in to add a key", None)
 
+    fingerprint = key.get("fingerprint")
+    if not isinstance(fingerprint, str):
+        return ("Invalid key fingerprint", None)
+    fingerprint = fingerprint.lower()
     uids = key.get("uids")
     async with db_session.begin():
         # Create new key record
         key_record = PublicSigningKey(
-            fingerprint=key["fingerprint"].lower(),
+            fingerprint=fingerprint,
             algorithm=int(key["algo"]),
             length=int(key.get("length", "0")),
             created=datetime.datetime.fromtimestamp(int(key["date"])),
@@ -650,7 +681,7 @@ async def user_keys_add_session(
         "",
         {
             "key_id": key["keyid"],
-            "fingerprint": key["fingerprint"].lower(),
+            "fingerprint": key["fingerprint"].lower() if key.get("fingerprint") else "Unknown",
             "user_id": key["uids"][0] if key.get("uids") else "Unknown",
             "creation_date": datetime.datetime.fromtimestamp(int(key["date"])),
             "expiration_date": datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
@@ -694,8 +725,8 @@ async def verify_gpg_signature_file(
     # Collect all available information for debugging
     debug_info = {
         "key_id": verified.key_id or "Not available",
-        "fingerprint": verified.fingerprint.lower() or "Not available",
-        "pubkey_fingerprint": verified.pubkey_fingerprint.lower() or "Not available",
+        "fingerprint": verified.fingerprint.lower() if verified.fingerprint else "Not available",
+        "pubkey_fingerprint": verified.pubkey_fingerprint.lower() if verified.pubkey_fingerprint else "Not available",
         "creation_date": verified.creation_date or "Not available",
         "timestamp": verified.timestamp or "Not available",
         "username": verified.username or "Not available",

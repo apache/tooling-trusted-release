@@ -23,14 +23,12 @@ from atr.db.models import __file__ as data_models_file
 
 
 class AppConfig:
-    # Get the project root directory (where alembic.ini is)
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     STATE_DIR = os.path.join(PROJECT_ROOT, "state")
 
     RELEASE_STORAGE_DIR = os.path.join(STATE_DIR, "releases")
     DATA_MODELS_FILE = data_models_file
 
-    # Use aiosqlite for async SQLite access
     SQLITE_URL = config("SQLITE_URL", default="sqlite+aiosqlite:///./atr.db")
 
     ADMIN_USERS = frozenset(

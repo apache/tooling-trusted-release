@@ -17,7 +17,7 @@
 
 import os
 
-from alembic import command
+# from alembic import command
 from alembic.config import Config
 from quart import current_app
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -66,7 +66,7 @@ def create_database(app: QuartApp) -> None:
         alembic_cfg.set_main_option("script_location", os.path.join(project_root, "migrations"))
         # Set the database URL in the config
         alembic_cfg.set_main_option("sqlalchemy.url", sqlite_url)
-        command.upgrade(alembic_cfg, "head")
+        # command.upgrade(alembic_cfg, "head")
 
         # Create any tables that might be missing
         async with engine.begin() as conn:

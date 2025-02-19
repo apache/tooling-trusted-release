@@ -1,0 +1,141 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Your signing keys ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Review your signing keys.
+{% endblock description %}
+
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .existing-keys {
+          margin-bottom: 2rem;
+          padding: 1rem 2rem 2rem 2rem;
+          background: #f8f9fa;
+          border-radius: 4px;
+      }
+
+      .keys-grid {
+          display: grid;
+          gap: 1.5rem;
+      }
+
+      .key-card {
+          background: white;
+          border: 1px solid #d1d2d3;
+          border-radius: 4px;
+          overflow: hidden;
+          padding: 1rem;
+      }
+
+      .key-card table {
+          margin: 0;
+      }
+
+      .key-card td {
+          word-break: break-all;
+      }
+
+      .key-card h3 {
+          margin-top: 0;
+          margin-bottom: 1rem;
+      }
+
+      .delete-key-form {
+          margin-top: 1rem;
+      }
+
+      .delete-button {
+          background: #dc3545;
+          color: white;
+          border: none;
+          padding: 0.5rem 1rem;
+          border-radius: 4px;
+          cursor: pointer;
+      }
+
+      .delete-button:hover {
+          background: #c82333;
+      }
+
+      .navigation {
+          margin-top: 2rem;
+      }
+
+      .success-message {
+          color: #28a745;
+          margin: 1rem 0;
+          padding: 1rem;
+          background: #d4edda;
+          border-radius: 4px;
+      }
+  </style>
+{% endblock stylesheets %}
+
+{% block content %}
+  <h1>Your signing keys</h1>
+  <p class="intro">Review your public keys used for signing release artifacts.</p>
+
+  <div class="user-info">
+    <p>
+      Welcome, <strong>{{ asf_id }}</strong>! You are authenticated as an ASF committer.
+    </p>
+  </div>
+
+  {% if success %}
+    <div class="success-message">
+      <h2>Success</h2>
+      <p>{{ success }}</p>
+    </div>
+  {% endif %}
+
+  {% if user_keys %}
+    <div class="existing-keys">
+      <div class="keys-grid">
+        {% for key in user_keys %}
+          <div class="key-card">
+            <table>
+              <tbody>
+                <tr>
+                  <th>Fingerprint</th>
+                  <td>{{ key.fingerprint }}</td>
+                </tr>
+                <tr>
+                  <th>Key Type</th>
+                  <td>{{ algorithms[key.algorithm] }} ({{ key.length }} bits)</td>
+                </tr>
+                <tr>
+                  <th>Created</th>
+                  <td>{{ key.created.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                </tr>
+                <tr>
+                  <th>Expires</th>
+                  <td>{{ key.expires.strftime("%Y-%m-%d %H:%M:%S") if key.expires else 'Never' }}</td>
+                </tr>
+                <tr>
+                  <th>User ID</th>
+                  <td>{{ key.declared_uid or 'Not specified' }}</td>
+                </tr>
+                <tr>
+                  <th>Associated projects</th>
+                  <td>
+                    {% if key.pmcs %}
+                      {{ key.pmcs|map(attribute='project_name') |join(', ') }}
+                    {% else %}
+                      No projects associated
+                    {% endif %}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% else %}
+    <p>You haven't added any signing keys yet.</p>
+  {% endif %}
+{% endblock content %}

@@ -64,7 +64,8 @@
 {% block content %}
   <h1>Attach package artifacts</h1>
   <p class="intro">
-    Welcome, <strong>{{ asf_id }}</strong>! Use this form to attach package artifacts to an existing release candidate.
+    Welcome, <strong>{{ asf_id }}</strong>! Use this form to attach package artifacts
+    to an existing release candidate.
   </p>
 
   <form method="post" enctype="multipart/form-data" class="striking">
@@ -84,7 +85,12 @@
                 </option>
               {% endfor %}
             </select>
-            {% if not releases %}<p class="error-message">No releases found that you can attach artifacts to.</p>{% endif %}
+            {% if not releases %}
+              <p class="error-message">
+                No releases found that you can
+                attach artifacts to.
+              </p>
+            {% endif %}
           </td>
         </tr>
 

@@ -11,7 +11,7 @@
 {% block stylesheets %}
   {{ super() }}
   <style>
-      .release-info {
+      .candidate-info {
           margin-bottom: 2rem;
       }
 
@@ -37,6 +37,10 @@
           background: #f5f5f5;
       }
 
+      .verification-status .status {
+          font-weight: bold;
+      }
+
       .navigation {
           margin-top: 2rem;
       }
@@ -51,7 +55,7 @@
       }
 
       .status.success {
-          color: #28a745;
+          color: #219f3f;
       }
 
       .status.failure {
@@ -73,9 +77,20 @@
           border: 1px solid #dee2e6;
       }
 
-      .debug-info h3 {
-          margin-top: 0;
+      .debug-info summary {
           color: #666;
+          font-weight: bold;
+          cursor: pointer;
+          padding-bottom: 0.5rem;
+      }
+
+      .debug-info summary:hover {
+          color: #333;
+      }
+
+      .debug-info[open] summary {
+          border-bottom: 1px solid #dee2e6;
+          margin-bottom: 1rem;
       }
 
       .debug-info dl {
@@ -95,9 +110,38 @@
           word-break: break-all;
       }
 
+      .candidate-header {
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          padding: 1rem;
+          margin-bottom: 1rem;
+          background-color: #f8f8f8;
+      }
+
+      .candidate-header h3 {
+          margin: 0 0 0.5rem 0;
+      }
+
+      .candidate-meta {
+          color: #666;
+          font-size: 0.9em;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 1rem;
+      }
+
+      .candidate-meta-item::after {
+          content: "•";
+          margin-left: 1rem;
+          color: #ccc;
+      }
+
+      .candidate-meta-item:last-child::after {
+          content: none;
+      }
+
       pre.stderr {
           background: #f8f9fa;
-          padding: 0.5rem;
           border-radius: 2px;
           overflow-x: auto;
           margin: 0.5rem 0;
@@ -109,13 +153,14 @@
 {% block content %}
   <h1>Verify release signatures</h1>
 
-  <div class="release-info">
-    <h2>{{ release.pmc.project_name }}</h2>
-    <p>
-      Stage: {{ release.stage.value }}
-      •
-      Phase: {{ release.phase.value }}
-    </p>
+  <div class="candidate-header">
+    <h3>{{ release.pmc.project_name }}</h3>
+    <div class="candidate-meta">
+      <span class="candidate-meta-item">Version: {{ release.version }}</span>
+      <span class="candidate-meta-item">Stage: {{ release.stage.value }}</span>
+      <span class="candidate-meta-item">Phase: {{ release.phase.value }}</span>
+      <span class="candidate-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M UTC") }}</span>
+    </div>
   </div>
 
   <div class="package-list">
@@ -140,8 +185,8 @@
           {% endif %}
 
           {% if result.debug_info %}
-            <div class="debug-info">
-              <h3>Debug Information</h3>
+            <details class="debug-info">
+              <summary>Debug Information</summary>
               <dl>
                 {% for key, value in result.debug_info.items() %}
                   <dt>{{ key }}</dt>
@@ -154,21 +199,10 @@
                   </dd>
                 {% endfor %}
               </dl>
-            </div>
+            </details>
           {% endif %}
         </div>
       </div>
     {% endfor %}
-  </div>
-
-  <h2>Navigation</h2>
-
-  <div class="navigation">
-    <p>
-      <a href="{{ url_for('root_user_uploads') }}">Back to Your Uploads</a>
-    </p>
-    <p>
-      <a href="{{ url_for('root_pages') }}">Return to Main Page</a>
-    </p>
   </div>
 {% endblock content %}

@@ -8,7 +8,9 @@
   <h1>Apache Trusted Release</h1>
 
   <p>
-    ATR is a release management platform for <a href="https://www.apache.org">Apache Software Foundation</a> projects. It provides a standardized workflow for PMC members to submit, verify, and track release candidates.
+    ATR is a release management platform for <a href="https://www.apache.org">Apache Software
+    Foundation</a> projects. It provides a standardized workflow for PMC members to submit,
+    verify, and track release candidates.
   </p>
 
   <h2>Key Features</h2>
@@ -21,20 +23,17 @@
 
   <h2>Getting Started</h2>
   <p>
-    To submit a release candidate, you must be a PMC member of the target project. First, <a href="{{ url_for('root_user_keys_add') }}">add your signing key</a>, then <a href="{{ url_for('root_release_create') }}">create a release candidate</a>.
+    To submit a release candidate, you must be a PMC member of the target project. First, <a href="{{ url_for('root_keys_add') }}">add your signing key</a>, then <a href="{{ url_for('root_candidate_create') }}">create a release candidate</a>.
   </p>
 
   <h2>Documentation</h2>
   <ul>
     <li>
-      <a href="{{ url_for('root_pages') }}">Available endpoints and access requirements</a>
-    </li>
-    <li>
       <a href="{{ url_for('root_pmc_directory') }}">PMC directory and release manager assignments</a>
     </li>
     {% if current_user %}
       <li>
-        <a href="{{ url_for('root_user_uploads') }}">Track your uploaded release candidates</a>
+        <a href="{{ url_for('root_candidate_review') }}">Track your release candidates</a>
       </li>
     {% endif %}
   </ul>

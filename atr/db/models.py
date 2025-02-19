@@ -134,10 +134,16 @@ class DistributionChannel(SQLModel, table=True):
 
 
 class Package(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    file: str
-    signature: str
-    checksum: str
+    # The SHA3-256 hash of the file, used as filename in storage
+    id_sha3: str = Field(primary_key=True)
+    # Original filename from uploader
+    filename: str
+    # SHA-512 hash of the file
+    sha512: str
+    # The signature file
+    signature_sha3: str
+    # Uploaded timestamp
+    uploaded: datetime.datetime
 
     # Many-to-one: A package belongs to one release
     release_key: str | None = Field(default=None, foreign_key="release.storage_key")
@@ -179,6 +185,7 @@ class Release(SQLModel, table=True):
     storage_key: str = Field(primary_key=True)
     stage: ReleaseStage
     phase: ReleasePhase
+    created: datetime.datetime
 
     # Many-to-one: A release belongs to one PMC, a PMC can have multiple releases
     pmc_id: int | None = Field(default=None, foreign_key="pmc.id")

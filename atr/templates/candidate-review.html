@@ -1,0 +1,163 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Release candidates ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Release candidates to which you have access.
+{% endblock description %}
+
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .candidate-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 1rem 0;
+      }
+
+      .candidate-table th,
+      .candidate-table td {
+          padding: 0.75rem;
+          text-align: left;
+          border: 1px solid #ddd;
+      }
+
+      .candidate-table th {
+          background-color: #f5f5f5;
+          font-weight: 600;
+          width: 200px;
+      }
+
+      .candidate-table tr:hover {
+          background-color: #f8f8f8;
+      }
+
+      .candidate-meta {
+          color: #666;
+          font-size: 0.9em;
+      }
+
+      .no-releases {
+          color: #666;
+          font-style: italic;
+      }
+
+      .verify-link {
+          display: inline-block;
+          padding: 0.5rem 1rem;
+          background: #003366;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 500;
+          text-decoration: none;
+      }
+
+      .verify-link:hover {
+          background: #004477;
+          color: white;
+      }
+
+      .package-separator {
+          height: 2rem;
+          background-color: #f5f5f5;
+      }
+
+      .candidate-header {
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          padding: 1rem;
+          margin-bottom: 1rem;
+          background-color: #f8f8f8;
+      }
+
+      .candidate-header h3 {
+          margin: 0 0 0.5rem 0;
+      }
+
+      .candidate-meta {
+          color: #666;
+          font-size: 0.9em;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 1rem;
+      }
+
+      .candidate-meta-item::after {
+          content: "•";
+          margin-left: 1rem;
+          color: #ccc;
+      }
+
+      .candidate-meta-item:last-child::after {
+          content: none;
+      }
+  </style>
+{% endblock stylesheets %}
+
+{% block content %}
+  <h1>Release candidates</h1>
+  <p class="intro">Here are all the release candidates to which you have access.</p>
+
+  {% if releases %}
+    {% for release in releases %}
+      <div class="candidate-header">
+        <h3>{{ release.pmc.project_name }}</h3>
+        <div class="candidate-meta">
+          <span class="candidate-meta-item">Version: {{ release.version }}</span>
+          <span class="candidate-meta-item">Stage: {{ release.stage.value }}</span>
+          <span class="candidate-meta-item">Phase: {{ release.phase.value }}</span>
+          <span class="candidate-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M UTC") }}</span>
+        </div>
+      </div>
+
+      <table class="candidate-table">
+        {% for package in release.packages %}
+          {% if not loop.first %}
+            <tr class="package-separator">
+              <td colspan="2"></td>
+            </tr>
+          {% endif %}
+          <tr>
+            <th>Original Filename</th>
+            <td>{{ package.filename }}</td>
+          </tr>
+          <tr>
+            <th>File Hash (SHA3)</th>
+            <td>{{ package.id_sha3 }}</td>
+          </tr>
+          <tr>
+            <th>Signature Hash (SHA3)</th>
+            <td>{{ package.signature_sha3 }}</td>
+          </tr>
+          <tr>
+            <th>SHA-512</th>
+            <td>{{ package.sha512 }}</td>
+          </tr>
+          <tr>
+            <th>Uploaded</th>
+            <td>{{ package.uploaded.strftime("%Y-%m-%d %H:%M UTC") }}</td>
+          </tr>
+          <tr>
+            <th>Actions</th>
+            <td class="prose">
+              <a class="verify-link"
+                 href="{{ url_for('root_candidate_signatures_verify', release_key=release.storage_key) }}">
+                Verify Signatures
+              </a>
+            </td>
+          </tr>
+        {% endfor %}
+      </table>
+    {% endfor %}
+  {% else %}
+    <p class="no-releases">You haven't created any releases yet.</p>
+  {% endif %}
+
+  <p>
+    <a href="{{ url_for('root_candidate_create') }}">Create a release candidate</a>
+  </p>
+{% endblock content %}
