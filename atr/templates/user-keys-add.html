@@ -230,12 +230,12 @@
                   <td>{{ key.declared_uid or 'Not specified' }}</td>
                 </tr>
                 <tr>
-                  <th>Associated PMCs</th>
+                  <th>Associated projects</th>
                   <td>
                     {% if key.pmcs %}
                       {{ key.pmcs|map(attribute='project_name') |join(', ') }}
                     {% else %}
-                      No PMCs associated
+                      No projects associated
                     {% endif %}
                   </td>
                 </tr>
@@ -262,9 +262,9 @@
 
     {% if pmc_memberships %}
       <div class="form-group">
-        <label>Associate with PMCs:</label>
+        <label>Associate with projects:</label>
         <div class="pmc-checkboxes">
-          {% for pmc in pmc_memberships %}
+          {% for pmc in (pmc_memberships + committer_projects)|unique|sort %}
             <div class="checkbox-item">
               <input type="checkbox"
                      id="pmc_{{ pmc }}"

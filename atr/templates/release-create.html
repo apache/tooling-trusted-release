@@ -1,0 +1,125 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Create release candidate ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Create a new release candidate.
+{% endblock description %}
+
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .form-table {
+          width: 100%;
+      }
+
+      .form-table th {
+          width: 200px;
+          text-align: right;
+          padding-right: 1rem;
+          vertical-align: top;
+          font-weight: 500;
+      }
+
+      .form-table td {
+          vertical-align: top;
+      }
+
+      .form-table label {
+          border-bottom: none;
+          padding-bottom: 0;
+      }
+
+      select,
+      input[type="file"] {
+          display: block;
+          margin-bottom: 0.5rem;
+      }
+
+      .help-text {
+          color: #666;
+          font-size: 0.9em;
+          display: block;
+          margin-top: 0.25rem;
+      }
+
+      .error-message {
+          color: #dc3545;
+          margin-top: 0.25rem;
+      }
+
+      button {
+          margin-top: 1rem;
+      }
+
+      button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+      }
+  </style>
+{% endblock stylesheets %}
+
+{% block content %}
+  <h1>Create release candidate</h1>
+  <p class="intro">
+    Welcome, <strong>{{ asf_id }}</strong>! Use this form to create a new release candidate for
+    your project. You can create a new release candidate for any project of which you are a release
+    manager. Release managers at the ASF must be either PMC members or committers.
+  </p>
+  <p>
+    ATR will guide you through the process of turning your release candidate into a final release,
+    providing tools and automation to help during each step of the workflow.
+  </p>
+
+  <form method="post" enctype="multipart/form-data" class="striking">
+    <table class="form-table">
+      <tbody>
+        <tr>
+          <th>
+            <label for="project_name">Project:</label>
+          </th>
+          <td>
+            <select id="project_name" name="project_name" required>
+              <option value="">Select a project...</option>
+              {% for project in (pmc_memberships + committer_projects)|unique|sort %}
+                <option value="{{ project }}">{{ project }}</option>
+              {% endfor %}
+            </select>
+            {% if not pmc_memberships and not committer_projects %}
+              <p class="error-message">You must be a PMC member or committer to submit a release candidate.</p>
+            {% endif %}
+          </td>
+        </tr>
+
+        <tr>
+          <th>
+            <label for="version">Version:</label>
+          </th>
+          <td>
+            <input type="text" id="version" name="version" required />
+          </td>
+        </tr>
+
+        <tr>
+          <th>
+            <label for="product_name">Product name:</label>
+          </th>
+          <td>
+            <!-- TODO: Add a dropdown for the product name, plus "add new product" -->
+            <input type="text" id="product_name" name="product_name" required />
+          </td>
+        </tr>
+
+        <tr>
+          <td></td>
+          <td>
+            <button type="submit"
+                    {% if not pmc_memberships and not committer_projects %}disabled{% endif %}>Create release</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </form>
+{% endblock content %}

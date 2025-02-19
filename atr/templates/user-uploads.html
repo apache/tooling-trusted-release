@@ -1,11 +1,11 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Your uploads ~ ATR
+  Release candidates ~ ATR
 {% endblock title %}
 
 {% block description %}
-  Your uploaded release candidates.
+  Release candidates to which you have access.
 {% endblock description %}
 
 {% block stylesheets %}
@@ -57,8 +57,8 @@
 {% endblock stylesheets %}
 
 {% block content %}
-  <h1>Your uploads</h1>
-  <p class="intro">Here are all the release candidates you've uploaded.</p>
+  <h1>Release candidates</h1>
+  <p class="intro">Here are all the release candidates to which you have access.</p>
 
   {% if releases %}
     <div class="release-list">
@@ -94,10 +94,10 @@
       {% endfor %}
     </div>
   {% else %}
-    <p class="no-releases">You haven't uploaded any release candidates yet.</p>
+    <p class="no-releases">You haven't created any releases yet.</p>
   {% endif %}
 
   <p>
-    <a href="{{ url_for('root_add_release_candidate') }}">Upload a new release candidate</a>
+    <a href="{{ url_for('root_release_create') }}">Create a release candidate</a>
   </p>
 {% endblock content %}

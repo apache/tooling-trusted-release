@@ -31,12 +31,13 @@ from typing import Any, BinaryIO, cast
 import aiofiles
 import aiofiles.os
 import gnupg
-from quart import Request, render_template, request
+from quart import Request, redirect, render_template, request, url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlmodel import select
 from werkzeug.datastructures import FileStorage
+from werkzeug.wrappers.response import Response
 
 from asfquart import APP
 from asfquart.auth import Requirements, require
@@ -86,30 +87,25 @@ algorithms = {
 }
 
 
-@APP.route("/")
-async def root() -> str:
-    """Main page."""
-    return await render_template("index.html")
+@asynccontextmanager
+async def ephemeral_gpg_home():
+    """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
+    temp_dir = await asyncio.to_thread(tempfile.mkdtemp, prefix="gpg-")
+    try:
+        yield temp_dir
+    finally:
+        await asyncio.to_thread(shutil.rmtree, temp_dir)
 
 
-@APP.route("/pages")
-async def root_pages() -> str:
-    """List all pages on the website."""
-    return await render_template("pages.html")
-
-
-async def add_release_candidate_post(session: ClientSession, request: Request) -> str:
+async def release_attach_post(session: ClientSession, request: Request) -> Response:
+    """Handle POST request for attaching package artifacts to a release."""
     form = await request.form
 
-    project_name = form.get("project_name")
-    if not project_name:
-        raise ASFQuartException("Project name is required", errorcode=400)
+    # TODO: Check that the submitter is a committer of the project
 
-    # Verify user is a PMC member of the project
-    if project_name not in session.committees:
-        raise ASFQuartException(
-            f"You must be a PMC member of {project_name} to submit a release candidate", errorcode=403
-        )
+    release_key = form.get("release_key")
+    if not release_key:
+        raise ASFQuartException("Release key is required", errorcode=400)
 
     # Get all uploaded files
     files = await request.files
@@ -135,74 +131,146 @@ async def add_release_candidate_post(session: ClientSession, request: Request) -
     # TODO: Need to check, ideally. Could have a data browser
     signature_hash = await save_file_by_hash(uploads_path, signature_file)
 
-    # Generate a 128-bit random token for the release storage key
-    storage_token = secrets.token_hex(16)
-
     # Compute SHA-512 checksum of the artifact for the package record
     checksum_512 = compute_sha512(uploads_path / artifact_hash)
 
-    # Store in database
+    # Create the package record in the database
     async with get_session() as db_session:
         async with db_session.begin():
-            # Get PMC
+            package = Package(
+                file=artifact_hash,
+                signature=signature_hash,
+                checksum=checksum_512,
+                release_key=release_key,
+            )
+            db_session.add(package)
+
+    # Redirect to the user's uploads page
+    return redirect(url_for("root_user_uploads"))
+
+
+async def release_create_post(session: ClientSession, request: Request) -> Response:
+    """Handle POST request for creating a new release."""
+    form = await request.form
+
+    project_name = form.get("project_name")
+    if not project_name:
+        raise ASFQuartException("Project name is required", errorcode=400)
+
+    version = form.get("version")
+    if not version:
+        raise ASFQuartException("Version is required", errorcode=400)
+
+    product_name = form.get("product_name")
+    if not product_name:
+        raise ASFQuartException("Product name is required", errorcode=400)
+
+    # Verify user is a PMC member or committer of the project
+    if project_name not in session.committees and project_name not in session.projects:
+        raise ASFQuartException(
+            f"You must be a PMC member or committer of {project_name} to submit a release candidate", errorcode=403
+        )
+
+    # Generate a 128-bit random token for the release storage key
+    # TODO: Perhaps we should call this the release_id instead
+    storage_token = secrets.token_hex(16)
+
+    # Create the release record in the database
+    async with get_session() as db_session:
+        async with db_session.begin():
             statement = select(PMC).where(PMC.project_name == project_name)
             pmc = (await db_session.execute(statement)).scalar_one_or_none()
             if not pmc:
+                APP.logger.error(f"PMC not found for project {project_name}")
+                APP.logger.debug(f"Available committees: {session.committees}")
+                APP.logger.debug(f"Available projects: {session.projects}")
                 raise ASFQuartException("PMC not found", errorcode=404)
 
-            # Create release record using random token as storage key
-            # TODO: Extract version from filename or add to form
+            # Create release record
             release = Release(
                 storage_key=storage_token,
                 stage=ReleaseStage.CANDIDATE,
                 phase=ReleasePhase.RELEASE_CANDIDATE,
                 pmc_id=pmc.id,
-                version="TODO",
+                version=version,
             )
             db_session.add(release)
 
-            # Create package record
-            package = Package(
-                file=artifact_hash,
-                signature=signature_hash,
-                checksum=checksum_512,
-                release_key=release.storage_key,
-            )
-            db_session.add(package)
+            # TODO: Create or link to product line
+            # For now, we'll just create releases without product lines
+            # What sort of role do product lines play in our UX?
 
-        return f"Successfully uploaded release candidate for {project_name}"
+    # Redirect to the attach artifacts page with the storage token
+    # We should possibly have a results, or list of releases, page instead
+    return redirect(url_for("root_release_attach", storage_key=storage_token))
 
 
-@asynccontextmanager
-async def ephemeral_gpg_home():
-    """
-    Create a temporary directory for an isolated GnuPG home, and clean it up on exit.
-    This is done asynchronously to avoid blocking the event loop.
-    """
-    # Create a temporary directory off-thread.
-    temp_dir = await asyncio.to_thread(tempfile.mkdtemp, prefix="gnupg-")
-    try:
-        yield temp_dir
-    finally:
-        # Remove the directory off-thread as well.
-        await asyncio.to_thread(shutil.rmtree, temp_dir)
+@APP.route("/")
+async def root() -> str:
+    """Main page."""
+    return await render_template("index.html")
 
 
-@APP.route("/add-release-candidate", methods=["GET", "POST"])
+@APP.route("/pages")
+async def root_pages() -> str:
+    """List all pages on the website."""
+    return await render_template("pages.html")
+
+
+@APP.route("/release/attach", methods=["GET", "POST"])
 @require(Requirements.committer)
-async def root_add_release_candidate() -> str:
-    """Add a release candidate to the database."""
+async def root_release_attach() -> Response | str:
+    """Attach package artifacts to an existing release."""
     session = await session_read()
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
     # For POST requests, handle the file upload
     if request.method == "POST":
-        return await add_release_candidate_post(session, request)
+        return await release_attach_post(session, request)
+
+    # Get the storage_key from the query parameters (if redirected from create)
+    storage_key = request.args.get("storage_key")
+
+    # Get all releases where the user is a PMC member or committer of the associated PMC
+    async with get_session() as db_session:
+        release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
+        statement = select(Release).options(release_pmc).join(PMC).where(Release.stage == ReleaseStage.CANDIDATE)
+        releases = (await db_session.execute(statement)).scalars().all()
+
+        # Filter to only show releases for PMCs where the user is a member or committer
+        # Can we do this in sqlmodel using JSON container operators?
+        user_releases = []
+        for r in releases:
+            if r.pmc is None:
+                continue
+            if session.uid in r.pmc.pmc_members or session.uid in r.pmc.committers:
+                user_releases.append(r)
 
     # For GET requests, show the form
     return await render_template(
-        "add-release-candidate.html",
+        "release-attach.html",
+        asf_id=session.uid,
+        releases=user_releases,
+        selected_release=storage_key,
+    )
+
+
+@APP.route("/release/create", methods=["GET", "POST"])
+@require(Requirements.committer)
+async def root_release_create() -> Response | str:
+    """Create a new release in the database."""
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    # For POST requests, handle the release creation
+    if request.method == "POST":
+        return await release_create_post(session, request)
+
+    # For GET requests, show the form
+    return await render_template(
+        "release-create.html",
         asf_id=session.uid,
         pmc_memberships=session.committees,
         committer_projects=session.projects,
@@ -373,6 +441,7 @@ async def root_user_keys_add() -> str:
                 key_info=None,
                 user_keys=user_keys,
                 algorithms=algorithms,
+                committer_projects=session.projects,
             )
 
         # Ensure that the selected PMCs are ones of which the user is actually a member
@@ -386,6 +455,7 @@ async def root_user_keys_add() -> str:
                 key_info=None,
                 user_keys=user_keys,
                 algorithms=algorithms,
+                committer_projects=session.projects,
             )
 
         error, key_info = await user_keys_add(session, public_key, selected_pmcs)
@@ -398,6 +468,7 @@ async def root_user_keys_add() -> str:
         key_info=key_info,
         user_keys=user_keys,
         algorithms=algorithms,
+        committer_projects=session.projects,
     )
 
 

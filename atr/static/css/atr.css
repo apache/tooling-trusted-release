@@ -50,7 +50,7 @@ h2 {
     margin-top: 2.5rem;
     margin-bottom: 1.5rem;
 }
-h3, p, ul { margin-bottom: 1rem; }
+h3, p, ul, form { margin-bottom: 1rem; }
 
 ul { padding-left: 1rem; }
 
@@ -156,7 +156,7 @@ textarea {
 
 form.striking {
     background-color: #ffffee;
-    border: 1px solid #ddddbb;
+    border: 2px solid #ddddbb;
     padding: 1rem;
     border-radius: 0.5rem;
 }

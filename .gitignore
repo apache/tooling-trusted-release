@@ -1,11 +1,12 @@
 *.pyc
 .DS_Store
 .env
+.mypy_cache/
+.pytest_cache/
 .ruff_cache/
 .venv-poetry/
 .venv-uv/
 .vscode/
 __pycache__/
-state/
-
 apptoken.txt
+state/

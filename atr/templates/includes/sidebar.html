@@ -30,15 +30,11 @@
     <ul>
       <li>
         <a href="{{ url_for('root') }}"
-           {% if request.endpoint == 'root' %}class="active"{% endif %}>Home</a>
-      </li>
-      <li>
-        <a href="{{ url_for('root_pages') }}"
-           {% if request.endpoint == 'root_pages' %}class="active"{% endif %}>Pages</a>
+           {% if request.endpoint == 'root' %}class="active"{% endif %}>About ATR</a>
       </li>
       <li>
         <a href="{{ url_for('root_pmc_directory') }}"
-           {% if request.endpoint == 'root_pmc_directory' %}class="active"{% endif %}>PMCs</a>
+           {% if request.endpoint == 'root_pmc_directory' %}class="active"{% endif %}>Projects</a>
       </li>
     </ul>
 
@@ -46,12 +42,17 @@
       <h3>Release management</h3>
       <ul>
         <li>
-          <a href="{{ url_for('root_add_release_candidate') }}"
-             {% if request.endpoint == 'root_add_release_candidate' %}class="active"{% endif %}>Add release candidate</a>
+          <a href="{{ url_for('root_release_create') }}"
+             {% if request.endpoint == 'root_release_create' %}class="active"{% endif %}>Create release candidate</a>
+        </li>
+        <!-- TODO: Don't show this if the user doesn't have any release candidates? -->
+        <li>
+          <a href="{{ url_for('root_release_attach') }}"
+             {% if request.endpoint == 'root_release_attach' %}class="active"{% endif %}>Attach package artifacts</a>
         </li>
         <li>
           <a href="{{ url_for('root_user_uploads') }}"
-             {% if request.endpoint == 'root_user_uploads' %}class="active"{% endif %}>Your uploads</a>
+             {% if request.endpoint == 'root_user_uploads' %}class="active"{% endif %}>Your release candidates</a>
         </li>
       </ul>
 

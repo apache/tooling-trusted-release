@@ -1,405 +1,349 @@
-
-
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-
-    <meta property="og:url" content="https://classic.yarnpkg.com/en/package/" />
-    <meta property="og:site_name" content="Yarn"/>
-    <meta property="og:title" content="Yarn" />
-    <meta property="og:image" content="https://classic.yarnpkg.com/assets/og_image.png" />
-    <meta property="og:description" content="Fast, reliable, and secure dependency management." />
-
-    <title>Yarn</title>
-    <meta name="description" content="Fast, reliable, and secure dependency management.">
-
-    <link rel="canonical" href="https://classic.yarnpkg.com/lang/en/package/">
-    <link rel="icon" href="/favicon.ico" type="image/x-icon">
-
-    <link rel="search" href="/opensearch.xml" type="application/opensearchdescription+xml" title="Yarn">
-
-
-    <link rel="stylesheet" href="/css/main.css?t=2024-11-25T15:06:54+00:00">
-    <meta name="google-site-verification" content="DIcCyEkVaGHm864NWzItnt2n6Gg7hz3l47RBIRyxvcQ" />
-  </head>
-  <body>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div class="news-container">
-  <a class="news-overlay" href="https://yarnpkg.com/getting-started/migration"></a>
-
-  <div class="news-inner">
-    <div class="news-line">
-      <span class="news-highlight">Important:</span> This documentation covers Yarn 1 (Classic).
-    </div>
-    <div class="news-line">
-      For Yarn 2+ docs and migration guide, see yarnpkg.com.
-    </div>
-  </div>
-</div>
-
-
-
-
-<nav class="navbar navbar-static-top navbar-light">
-  <div class="container">
-    <a href="/en/">
-      <svg class="logo navbar-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1154.8 518">
-  <defs>
-    <path id="main" d="
-      M718.6 257.8c-8 27.6-20.8 47.6-35.2 63.6V181c0-9.6-8.4-17.6-21.6-17.6-5.6 0-10.4 2.8-10.4 6.8 0 2.8 1.6 5.2 1.6 12.8v64.4c-4.8 28-16.8 54-32.8 54-11.6 0-18.4-11.6-18.4-33.2 0-33.6 4.4-51.2 11.6-80.8 1.6-6 13.2-22-6.4-22-21.2 0-18.4 8-21.2 14.8 0 0-13.4 47.6-13.4 90 0 34.8 14.6 57.6 41.4 57.6 17.2 0 29.6-11.6 39.2-27.6V351c-26.4 23.2-49.6 43.6-49.6 84 0 25.6 16 46 38.4 46 20.4 0 41.6-14.8 41.6-56.8V355c21.6-18.8 44.8-42.4 58.4-88.8.4-1.6.4-3.6.4-4 0-7.6-7.6-16.4-14-16.4-4 0-7.2 3.6-9.6 12zm-76.8 198c-6.4 0-10.4-9.6-10.4-22 0-24 8.8-39.2 21.6-52.4v42.8c0 7.6 1.6 31.6-11.2 31.6z
-      M833.4 301c-9.6 0-13.6-9.6-13.6-18.4v-66c0-9.6-8.4-17.6-21.6-17.6-5.6 0-10.4 2.8-10.4 6.8 0 2.8 1.6 5.2 1.6 12.8v61.6C785 291.4 777.8 301 767 301c-14 0-22.8-12-22.8-32.8 0-57.6 35.6-83.6 66-83.6 4 0 8 .8 11.6.8 4 0 5.2-2.4 5.2-9.2 0-10.4-7.6-16.8-18.4-16.8-48.8 0-95.2 40.8-95.2 107.6 0 34 16.4 60.4 47.6 60.4 15.2 0 26.4-7.2 34.4-16.4 6 9.6 16.8 16.4 30.8 16.4 34.4 0 50.4-36 57.2-62.4.4-1.6.4-2.4.4-2.8 0-7.6-7.6-16.4-14-16.4-4 0-8 3.6-9.6 12-3.6 17.6-10.8 43.2-26.8 43.2z
-      M949 327.4c34.4 0 50-36 57.2-62.4 0-.8.4-1.6.4-2.8 0-7.6-7.6-16.4-14-16.4-4 0-8 3.6-9.6 12-3.6 17.6-10.4 43.2-28.8 43.2-10.8 0-16-10.4-16-21.6 0-40 18-87.2 18-92 1.6-9.2-14.4-22.4-19.2-22.4h-20.8c-4 0-8 0-21.2-1.6-4.4-16.4-15.6-21.2-25.2-21.2-10.4 0-20 7.2-20 18.4 0 11.6 7.2 20 17.2 25.6-.4 20.4-2 53.6-6.4 69.6-3.6 13.6 17.2 28 22.4 11.2 7.2-23.2 9.6-58 10-73.6h34.8c-12.8 34.4-20 62.8-20 88.4 0 35.2 22.4 45.6 41.2 45.6z
-      M984.6 309.8c0 14.8 11.2 17.6 19.2 17.6 11.6 0 11.2-9.6 11.2-17.2v-58.4c2.8-31.6 27.6-66 39.2-66 7.6 0 8.4 10.4 8.4 22.8v81.2c0 20.4 12.4 37.6 33.6 37.6 34.4 0 51.4-36 58.2-62.4.4-1.6.4-2.4.4-2.8 0-7.6-7.6-16.4-14-16.4-4 0-8 3.6-9.6 12-3.6 17.6-11.8 43.2-27.8 43.2-10.4 0-10.4-14.8-10.4-18.4v-82.8c0-18.4-6.4-40.4-33.2-40.4-19.6 0-34 17.2-44.8 39.6v-18c0-9.6-8.4-17.6-21.6-17.6-5.6 0-10.4 2.8-10.4 6.8 0 2.8 1.6 5.2 1.6 12.8v126.8z
-      M259 0c143 0 259 116 259 259S402 518 259 518 0 402 0 259 116 0 259 0z"/>
-  </defs>
-
-  <use class="logo-primary" xlink:href="#main" x="0" y="0"/>
-
-  <path class="logo-secondary" d="M435.2 337.5c-1.8-14.2-13.8-24-29.2-23.8-23 .3-42.3 12.2-55.1 20.1-5 3.1-9.3 5.4-13 7.1.8-11.6.1-26.8-5.9-43.5-7.3-20-17.1-32.3-24.1-39.4 8.1-11.8 19.2-29 24.4-55.6 4.5-22.7 3.1-58-7.2-77.8-2.1-4-5.6-6.9-10-8.1-1.8-.5-5.2-1.5-11.9.4C293.1 96 289.6 93.8 286.9 92c-5.6-3.6-12.2-4.4-18.4-2.1-8.3 3-15.4 11-22.1 25.2-1 2.1-1.9 4.1-2.7 6.1-12.7.9-32.7 5.5-49.6 23.8-2.1 2.3-6.2 4-10.5 5.6h.1c-8.8 3.1-12.8 10.3-17.7 23.3-6.8 18.2.2 36.1 7.1 47.7-9.4 8.4-21.9 21.8-28.5 37.5-8.2 19.4-9.1 38.4-8.8 48.7-7 7.4-17.8 21.3-19 36.9-1.6 21.8 6.3 36.6 9.8 42 1 1.6 2.1 2.9 3.3 4.2-.4 2.7-.5 5.6.1 8.6 1.3 7 5.7 12.7 12.4 16.3 13.2 7 31.6 10 45.8 2.9 5.1 5.4 14.4 10.6 31.3 10.6h1c4.3 0 58.9-2.9 74.8-6.8 7.1-1.7 12-4.7 15.2-7.4 10.2-3.2 38.4-12.8 65-30 18.8-12.2 25.3-14.8 39.3-18.2 13.6-3.3 22.1-15.7 20.4-29.4zm-23.8 14.7c-16 3.8-24.1 7.3-43.9 20.2-30.9 20-64.7 29.3-64.7 29.3s-2.8 4.2-10.9 6.1c-14 3.4-66.7 6.3-71.5 6.4-12.9.1-20.8-3.3-23-8.6-6.7-16 9.6-23 9.6-23s-3.6-2.2-5.7-4.2c-1.9-1.9-3.9-5.7-4.5-4.3-2.5 6.1-3.8 21-10.5 27.7-9.2 9.3-26.6 6.2-36.9.8-11.3-6 .8-20.1.8-20.1s-6.1 3.6-11-3.8c-4.4-6.8-8.5-18.4-7.4-32.7 1.2-16.3 19.4-32.1 19.4-32.1s-3.2-24.1 7.3-48.8c9.5-22.5 35.1-40.6 35.1-40.6s-21.5-23.8-13.5-45.2c5.2-14 7.3-13.9 9-14.5 6-2.3 11.8-4.8 16.1-9.5 21.5-23.2 48.9-18.8 48.9-18.8s13-39.5 25-31.8c3.7 2.4 17 32 17 32s14.2-8.3 15.8-5.2c8.6 16.7 9.6 48.6 5.8 68-6.4 32-22.4 49.2-28.8 60-1.5 2.5 17.2 10.4 29 43.1 10.9 29.9 1.2 55 2.9 57.8.3.5.4.7.4.7s12.5 1 37.6-14.5c13.4-8.3 29.3-17.6 47.4-17.8 17.5-.3 18.4 20.2 5.2 23.4z"/>
-</svg>
-
-      <span class="sr-only">Yarn</span>
-    </a>
-
-    <div class="clearfix hidden-lg-up">
-      <button class="navbar-toggler hidden-lg-up float-right" type="button" data-toggle="collapse" data-target="#navbar" aria-controls="exCollapsingNavbar2"
-        aria-expanded="false" aria-label="Toggle navigation"></button>
-    </div>
-
-    <div class="collapse navbar-toggleable-md" id="navbar">
-      <ul class="nav navbar-nav">
-        <li class="nav-item">
-          <a class="nav-link" href="/en/docs/getting-started">Getting Started</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/en/docs">Docs</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/en/packages">Packages</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/blog">Blog</a>
-        </li>
-      </ul>
-
-      <ul class="nav navbar-nav navbar-nav-right float-lg-right">
-
-        <li class="nav-item dropdown">
-          <a id="dropdownNavLanguage" class="nav-link dropdown-toggle" role="button" href="#" data-toggle="dropdown" aria-haspopup="true"
-            aria-expanded="false">
-            <svg class="language navbar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-  <path d="M19.753 10.909c-.624-1.707-2.366-2.726-4.661-2.726-.09 0-.176.002-.262.006l-.016-2.063 3.525-.607c.115-.019.133-.119.109-.231-.023-.111-.167-.883-.188-.976-.027-.131-.102-.127-.207-.109-.104.018-3.25.461-3.25.461l-.013-2.078c-.001-.125-.069-.158-.194-.156l-1.025.016c-.105.002-.164.049-.162.148l.033 2.307s-3.061.527-3.144.543c-.084.014-.17.053-.151.143.019.09.19 1.094.208 1.172.018.08.072.129.188.107l2.924-.504.035 2.018c-1.077.281-1.801.824-2.256 1.303-.768.807-1.207 1.887-1.207 2.963 0 1.586.971 2.529 2.328 2.695 3.162.387 5.119-3.06 5.769-4.715 1.097 1.506.256 4.354-2.094 5.98-.043.029-.098.129-.033.207l.619.756c.08.096.206.059.256.023 2.51-1.73 3.661-4.515 2.869-6.683zm-7.386 3.188c-.966-.121-.944-.914-.944-1.453 0-.773.327-1.58.876-2.156a3.21 3.21 0 0 1 1.229-.799l.082 4.277a2.773 2.773 0 0 1-1.243.131zm2.427-.553l.046-4.109c.084-.004.166-.01.252-.01.773 0 1.494.145 1.885.361.391.217-1.023 2.713-2.183 3.758zm-8.95-7.668a.196.196 0 0 0-.196-.145h-1.95a.194.194 0 0 0-.194.144L.008 16.916c-.017.051-.011.076.062.076h1.733c.075 0 .099-.023.114-.072l1.008-3.318h3.496l1.008 3.318c.016.049.039.072.113.072h1.734c.072 0 .078-.025.062-.076-.014-.05-3.083-9.741-3.494-11.04zm-2.618 6.318l1.447-5.25 1.447 5.25H3.226z"/>
-</svg>
- English
-            </a>
-            <div class="dropdown-menu" aria-labelledby="dropdownNavLanguage" id="dropdownNavLanguageMenu">
-
-              <a href="/en/package" class="dropdown-item active"
-                data-lang="en">
-                English
-                </a>
-
-              <a href="/es-ES/package" class="dropdown-item"
-                data-lang="es">
-                Español
-                </a>
-
-              <a href="/fr/package" class="dropdown-item"
-                data-lang="fr">
-                Français
-                </a>
-
-              <a href="/id-ID/package" class="dropdown-item"
-                data-lang="id">
-                Bahasa Indonesia
-                </a>
-
-              <a href="/ja/package" class="dropdown-item"
-                data-lang="ja">
-                日本語
-                </a>
-
-              <a href="/pt-BR/package" class="dropdown-item"
-                data-lang="pt-br">
-                Português (Brasil)
-                </a>
-
-              <a href="/ru/package" class="dropdown-item"
-                data-lang="ru">
-                Русский
-                </a>
-
-              <a href="/tr/package" class="dropdown-item"
-                data-lang="tr">
-                Türkçe
-                </a>
-
-              <a href="/uk/package" class="dropdown-item"
-                data-lang="uk">
-                Українська
-                </a>
-
-              <a href="/zh-Hans/package" class="dropdown-item"
-                data-lang="zh-cn">
-                中文
-                </a>
-
-              <a href="/zh-Hant/package" class="dropdown-item"
-                data-lang="zh-hk">
-                繁體中文
-                </a>
-
-            </div>
-        </li>
-
-
-        <li class="nav-item">
-          <a class="nav-link" href="https://discord.gg/yarnpkg">
-            <svg class="discord navbar-icon" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="discord-svg" fill="none" viewBox="0 0 71 55">
-  <title id="discord-svg">Discord</title>
-<path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978ZM23.7259 37.3253C20.2276 37.3253 17.3451 34.1136 17.3451 30.1693C17.3451 26.225 20.1717 23.0133 23.7259 23.0133C27.308 23.0133 30.1626 26.2532 30.1066 30.1693C30.1066 34.1136 27.28 37.3253 23.7259 37.3253ZM47.3178 37.3253C43.8196 37.3253 40.9371 34.1136 40.9371 30.1693C40.9371 26.225 43.7636 23.0133 47.3178 23.0133C50.9 23.0133 53.7545 26.2532 53.6986 30.1693C53.6986 34.1136 50.9 37.3253 47.3178 37.3253Z"/>
-</svg>
-
-            <span class="sr-only">Discord</span>
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="https://twitter.com/yarnpkg">
-            <svg class="twitter navbar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 203.1" role="img" aria-labelledby="twitter-svg">
-  <title id="twitter-svg">Twitter</title>
-  <path d="M78.6 203.1c94.3 0 145.9-78.2 145.9-145.9 0-2.2 0-4.4-.1-6.6 10-7.3 18.7-16.3 25.6-26.5-9.4 4.1-19.3 6.9-29.5 8.1 10.7-6.4 18.7-16.5 22.5-28.4-10.1 6-21.1 10.2-32.6 12.4C191-4.5 158.5-5.5 137.8 14c-13.3 12.5-19 31.2-14.8 49C81.9 60.9 43.4 41.4 17.4 9.4 3.8 32.8 10.7 62.8 33.3 77.8c-8.2-.2-16.1-2.4-23.3-6.4v.6c0 24.4 17.2 45.4 41.2 50.3-7.6 2.1-15.5 2.4-23.2.9 6.7 20.9 26 35.2 47.9 35.6-18.2 14.3-40.6 22-63.7 22-4.1 0-8.2-.3-12.2-.7 23.5 15.1 50.7 23 78.6 23"/>
-</svg>
-
-            <span class="sr-only">Twitter</span>
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="https://www.facebook.com/yarnpkg">
-            <svg class="facebook navbar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 266.9 266.9" role="img" aria-labelledby="facebook-svg">
-  <title id="facebook-svg">Facebook</title>
-  <path d="M252.2 0H14.7C6.6 0 0 6.6 0 14.7v237.4c0 8.1 6.6 14.7 14.7 14.7h127.8V163.5h-34.8v-40.3h34.8V93.6c0-34.5 21.1-53.2 51.8-53.2 14.7 0 27.4 1.1 31.1 1.6v36h-21.3c-16.7 0-20 7.9-20 19.6v25.7H224l-5.2 40.3h-34.7V267h68c8.1 0 14.7-6.6 14.7-14.7V14.7c.1-8.1-6.5-14.7-14.6-14.7z"/>
-</svg>
-
-            <span class="sr-only">Facebook</span>
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="https://github.com/yarnpkg">
-            <svg class="github navbar-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32.6 31.8" role="img" aria-labelledby="github-svg">
-  <title id="github-svg">GitHub</title>
-  <path d="M16.3 0C7.3 0 0 7.3 0 16.3c0 7.2 4.7 13.3 11.1 15.5.8.1 1.1-.4 1.1-.8v-2.8c-4.5 1-5.5-2.2-5.5-2.2-.7-1.9-1.8-2.4-1.8-2.4-1.5-1 .1-1 .1-1 1.6.1 2.5 1.7 2.5 1.7 1.5 2.5 3.8 1.8 4.7 1.4.1-1.1.6-1.8 1-2.2-3.6-.4-7.4-1.8-7.4-8.1 0-1.8.6-3.2 1.7-4.4-.1-.3-.7-2 .2-4.2 0 0 1.4-.4 4.5 1.7 1.3-.4 2.7-.5 4.1-.5 1.4 0 2.8.2 4.1.5 3.1-2.1 4.5-1.7 4.5-1.7.9 2.2.3 3.9.2 4.3 1 1.1 1.7 2.6 1.7 4.4 0 6.3-3.8 7.6-7.4 8 .6.5 1.1 1.5 1.1 3V31c0 .4.3.9 1.1.8 6.5-2.2 11.1-8.3 11.1-15.5C32.6 7.3 25.3 0 16.3 0z"/>
-</svg>
-
-            <span class="sr-only">GitHub</span>
-          </a>
-        </li>
-      </ul>
-    </div>
-  </div>
-</nav>
-
-    <div id="search">
-      <!-- Here to avoid flash of unstyled content on page load -->
-      <div class="ais-InstantSearch-root full-searchbox">
-        <form novalidate="" class="ais-SearchBox">
-          <div role="search" class="ais-SearchBox-form"></div>
-        </form>
-      </div>
-    </div>
-    <main>
-
-
-<div class="hero">
-  <div class="container">
-    <h1 class="hero-text display-4">Package detail</h1>
-  </div>
-</div>
-
-<div class="container">
-
-<div id="pkg-detail">
-  <div data-reactroot="" class="details row">
-    <section class="details-main col-lg-8">
-      <header class="details-main--header">
-        <h2 class="details-main--title d-inline-block m-2">…</h2>
-        <div class="details-main--info d-inline-block m-2"><a class="ais-Hit-ownerLink" href=""><img width="20" height="20" class="ais-Hit-ownerAvatar" src="https://res.cloudinary.com/hilnmyskv/image/fetch/w_40,h_40,f_auto,q_80,fl_lossy/https://avatars3.githubusercontent.com/u/22247014?v=3&amp;s=200"><!-- react-text: 8 --><!-- /react-text --></a>
-          <span
-            class="ais-Hit-popular null" title="0 downloads in the last 30 days">0</span>
-            <!-- react-empty: 10 -->
-            <!-- react-empty: 11 --><span class="ais-Hit-version"></span></div>
-        <div>
-          <p class="m-2 lead">…</p>
-        </div>
-        <!-- react-empty: 15 -->
-      </header>
-      <section id="readme" class="details-doc">
-        <h3 class="details-doc--title details-doc--title__readme py-1"><a href="#readme">readme</a></h3>
-      </section>
-    </section>
-    <aside class="details-side col-lg-4">
-      <article class="details-side--links">
-        <div class="detail-links">
-          <div target="_blank" rel="noopener noreferrer" class="details-links--link details-links--link__yarn"><img src="/assets/search/ico-yarn.svg" alt="">
-            <div class="copyable">
-              <div class="copyable--content"><span><a href="https://yarn.pm/…"><!-- react-text: 28 -->yarn.pm/<!-- /react-text --><!-- react-text: 29 -->…<!-- /react-text --></a></span></div>
-              <button
-                class="copyable--button user-select-none"><img src="/assets/detail/ico-copy-default.svg" alt="" class="copyable--button__img">
-                <!-- react-text: 32 -->copy
-                <!-- /react-text -->
-                </button>
-            </div>
-          </div><a target="_blank" rel="noopener noreferrer" href="https://github.com//" class="details-links--link details-links--link__github"><img src="/assets/search/ico-github.svg" alt=""><!-- react-text: 35 -->/<!-- /react-text --></a>
-          <a
-            target="_blank" rel="noopener noreferrer" href="https://www.npmjs.com/package/…" class="details-links--link details-links--link__npm"><img src="/assets/search/ico-npm.svg" alt="">
-            <!-- react-text: 38 -->…
-            <!-- /react-text -->
-            </a>
-        </div>
-      </article>
-      <article class="details-side--copy">
-        <h1>Use it</h1>
-        <div class="copyable"><code class="copyable--content"><!-- react-text: 43 -->$ <!-- /react-text --><span><!-- react-text: 45 -->yarn add <!-- /react-text --><!-- react-text: 46 -->…<!-- /react-text --></span></code>
-          <button
-            class="copyable--button user-select-none"><img src="/assets/detail/ico-copy-default.svg" alt="" class="copyable--button__img">
-            <!-- react-text: 49 -->copy
-            <!-- /react-text -->
-            </button>
-        </div>
-        <div><a class="details-side--runkit" href="https://runkit.com/npm/…" target="_blank" rel="noopener noreferrer">Try in RunKit</a>
-          <!-- react-text: 52 -->·
-          <!-- /react-text --><a href="#">Browse Files</a></div>
-      </article>
-      <article class="details-side--cdns">
-        <h1>CDNs</h1>
-        <dl></dl>
-      </article>
-      <article class="details-side--popularity">
-        <h1>Popularity</h1>
-        <dl></dl>
-      </article>
-      <!-- react-text: 57 -->
-      <!-- /react-text -->
-      <article class="details-side--usage">
-        <h1>Usage</h1>
-        <dl>
-          <div class="d-flex justify-items-between w-100"><img src="/assets/detail/ico-dependencies.svg" alt="">
-            <dt>Dependencies</dt><span class="dotted flex-grow"></span>
-            <dd>0</dd>
-          </div>
-          <div class="d-flex justify-items-between w-100"><img src="/assets/detail/ico-devdependencies.svg" alt="">
-            <dt>DevDependencies</dt><span class="dotted flex-grow"></span>
-            <dd>0</dd>
-          </div>
-          <div class="d-flex justify-items-between w-100"><img src="/assets/detail/ico-package-json.svg" alt="">
-            <dt>Packages</dt><span class="dotted flex-grow"></span>
-            <dd><a target="_blank" rel="noopener noreferrer" href="https://github.com///tree/master/package.json">see package.json</a></dd>
-          </div>
-        </dl>
-      </article>
-      <article class="details-side--versions">
-        <h1>Versions</h1>
-        <dl></dl>
-      </article>
-      <article class="details-side--contributors">
-        <h1>Contributors</h1>
-        <ul class="list-unstyled m-2">
-          <li class="mb-1">
-            <a class="ais-Hit-ownerLink" href=""><img width="20" height="20" class="ais-Hit-ownerAvatar" src="https://res.cloudinary.com/hilnmyskv/image/fetch/w_40,h_40,f_auto,q_80,fl_lossy/https://avatars3.githubusercontent.com/u/22247014?v=3&amp;s=200">
-            <!-- react-text: 86 -->
-            <!-- /react-text -->
-            </a>
-          </li>
-        </ul>
-      </article>
-    </aside>
-  </div>
-</div>
-
-</div>
-</main>
-
-
-
-<hr class="footer-divider">
-
-<div class="container">
-  <footer class="footer">
-    <div class="footer-left">
-      <span class="footer-item">Yarn</span>
-      <span class="footer-item"><a href="https://github.com/yarnpkg/yarn/blob/master/LICENSE">Distributed under BSD License</a></span>
-      <span class="footer-item"><a href="/en/org/code-of-conduct">Code of Conduct</a></span>
-    </div>
-
-    <div class="footer-right">
-
-
-
-        <span class="footer-item"><a href="https://github.com/yarnpkg/website/edit/master/lang/en/package.html">Edit this page</a></span>
-
-    </div>
-  </footer>
-</div>
-<script>
-  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-
-  ga('create', 'UA-85522875-1', 'auto');
-  ga('send', 'pageview');
-</script>
-
-
-
-<script>
-  var i18n_default = {"search_placeholder":"Search packages (i.e. babel, webpack, react…)","search_by_algolia":"Search by Algolia","search_by_read_more":"read how it works","no_package_found":"No package {name} was found","no_results_docsearch":"Were you looking for something in the {documentation_link}?","documentation":"documentation","downloads_in_last_30_days":"{count} downloads in the last 30 days","npm_page_for":"npm page for {name}","repository_of":"{provider} repository of {name}","npm":"npm","github":"GitHub","gitlab":"GitLab","bitbucket":"Bitbucket","homepage":"Homepage","deprecated":"deprecated","result_stats":"found {number_packages} packages in {time_search}ms","time_ago":"{time_distance} ago","last_updated":"last updated {update_date}","detail":{"over_a_year_ago":"over a year ago","less_than_a_week_ago":"less than a week ago","one_week_ago":"one week ago","weeks_ago":"{count} weeks ago","activity":"Activity","commits_last_three_months":"Commits last 3 months","last_commit":"Last commit","loading":"Loading...","use_it":"Use it","try_in_runkit":"Try in RunKit","back_to_details":"Back to Details","browse_files":"Browse Files","cdns":"CDNs","contributors":"Contributors","display_full_readme":"Display full readme","display_full_changelog":"Display full changelog","files_error":"Could not load file listing: {error}","files_header":"Files in {name}","collapse":"Collapse","readme":"readme","no_readme_found":"no readme found 😢","changelog":"changelog","popularity":"Popularity","github_stargazers":"GitHub stargazers","gitlab_stargazers":"GitLab stargazers","downloads_last_30_days":"Downloads last 30 days","jsdelivr_hits":"jsDelivr last 30 days","dependents":"Dependents","usage":"Usage","dependencies":"Dependencies","devdependencies":"DevDependencies","packages":"Packages","see_package_json":"see package.json","tags":"Tags","versions":"Versions","display_all":"Display all","hide":"Hide","bundlesize":"Size in browser","bundlesize_text":"size: {size}, gzip: {gzip}","not_found":{"whoa":"Whoa, {package_name} does not exist yet","yours":"But that means it is now yours!","make":"Make your package"}}};
-  window.i18n = {"search_placeholder":"Search packages (i.e. babel, webpack, react…)","search_by_algolia":"Search by Algolia","search_by_read_more":"read how it works","no_package_found":"No package {name} was found","no_results_docsearch":"Were you looking for something in the {documentation_link}?","documentation":"documentation","downloads_in_last_30_days":"{count} downloads in the last 30 days","npm_page_for":"npm page for {name}","repository_of":"{provider} repository of {name}","npm":"npm","github":"GitHub","gitlab":"GitLab","bitbucket":"Bitbucket","homepage":"Homepage","deprecated":"deprecated","result_stats":"found {number_packages} packages in {time_search}ms","time_ago":"{time_distance} ago","last_updated":"last updated {update_date}","detail":{"over_a_year_ago":"over a year ago","less_than_a_week_ago":"less than a week ago","one_week_ago":"one week ago","weeks_ago":"{count} weeks ago","activity":"Activity","commits_last_three_months":"Commits last 3 months","last_commit":"Last commit","loading":"Loading...","use_it":"Use it","try_in_runkit":"Try in RunKit","back_to_details":"Back to Details","browse_files":"Browse Files","cdns":"CDNs","contributors":"Contributors","display_full_readme":"Display full readme","display_full_changelog":"Display full changelog","files_error":"Could not load file listing: {error}","files_header":"Files in {name}","collapse":"Collapse","readme":"readme","no_readme_found":"no readme found 😢","changelog":"changelog","popularity":"Popularity","github_stargazers":"GitHub stargazers","gitlab_stargazers":"GitLab stargazers","downloads_last_30_days":"Downloads last 30 days","jsdelivr_hits":"jsDelivr last 30 days","dependents":"Dependents","usage":"Usage","dependencies":"Dependencies","devdependencies":"DevDependencies","packages":"Packages","see_package_json":"see package.json","tags":"Tags","versions":"Versions","display_all":"Display all","hide":"Hide","bundlesize":"Size in browser","bundlesize_text":"size: {size}, gzip: {gzip}","not_found":{"whoa":"Whoa, {package_name} does not exist yet","yours":"But that means it is now yours!","make":"Make your package"}}} || {};
-  window.i18n.url_base = "/en";
-  window.i18n.active_language = "en";
-
-  // give defaults
-  function copyDefaults(from, to) {
-    for (var key in from) {
-      if (from[key] !== null && typeof from[key] === 'object') {
-        copyDefaults(from[key], to[key] || (to[key] = {}));
-        continue;
-      }
-      if (to.hasOwnProperty(key) === false || to[key] === null) {
-        to[key] = from[key];
-      }
-    }
-  }
-
-  copyDefaults(i18n_default, window.i18n);
-</script>
-
-    <script src="/js/build/vendor.bb983233e26fd3fd2fe3.js"></script>
-    <script src="/js/build/common.2a29ed27bfa751cd6609.js"></script>
-
-
-      <script src="/js/build/package.302c84e81c9aeae765da.js"></script>
-
-  </body>
-</html>
+/*! normalize.css v8.0.1 | MIT License | github.com/necolas/normalize.css */
+
+/* Document
+   ========================================================================== */
+
+/**
+ * 1. Correct the line height in all browsers.
+ * 2. Prevent adjustments of font size after orientation changes in iOS.
+ */
+
+html {
+  line-height: 1.15; /* 1 */
+  -webkit-text-size-adjust: 100%; /* 2 */
+}
+
+/* Sections
+   ========================================================================== */
+
+/**
+ * Remove the margin in all browsers.
+ */
+
+body {
+  margin: 0;
+}
+
+/**
+ * Render the `main` element consistently in IE.
+ */
+
+main {
+  display: block;
+}
+
+/**
+ * Correct the font size and margin on `h1` elements within `section` and
+ * `article` contexts in Chrome, Firefox, and Safari.
+ */
+
+h1 {
+  font-size: 2em;
+  margin: 0.67em 0;
+}
+
+/* Grouping content
+   ========================================================================== */
+
+/**
+ * 1. Add the correct box sizing in Firefox.
+ * 2. Show the overflow in Edge and IE.
+ */
+
+hr {
+  box-sizing: content-box; /* 1 */
+  height: 0; /* 1 */
+  overflow: visible; /* 2 */
+}
+
+/**
+ * 1. Correct the inheritance and scaling of font size in all browsers.
+ * 2. Correct the odd `em` font sizing in all browsers.
+ */
+
+pre {
+  font-family: monospace, monospace; /* 1 */
+  font-size: 1em; /* 2 */
+}
+
+/* Text-level semantics
+   ========================================================================== */
+
+/**
+ * Remove the gray background on active links in IE 10.
+ */
+
+a {
+  background-color: transparent;
+}
+
+/**
+ * 1. Remove the bottom border in Chrome 57-
+ * 2. Add the correct text decoration in Chrome, Edge, IE, Opera, and Safari.
+ */
+
+abbr[title] {
+  border-bottom: none; /* 1 */
+  text-decoration: underline; /* 2 */
+  text-decoration: underline dotted; /* 2 */
+}
+
+/**
+ * Add the correct font weight in Chrome, Edge, and Safari.
+ */
+
+b,
+strong {
+  font-weight: bolder;
+}
+
+/**
+ * 1. Correct the inheritance and scaling of font size in all browsers.
+ * 2. Correct the odd `em` font sizing in all browsers.
+ */
+
+code,
+kbd,
+samp {
+  font-family: monospace, monospace; /* 1 */
+  font-size: 1em; /* 2 */
+}
+
+/**
+ * Add the correct font size in all browsers.
+ */
+
+small {
+  font-size: 80%;
+}
+
+/**
+ * Prevent `sub` and `sup` elements from affecting the line height in
+ * all browsers.
+ */
+
+sub,
+sup {
+  font-size: 75%;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+
+sub {
+  bottom: -0.25em;
+}
+
+sup {
+  top: -0.5em;
+}
+
+/* Embedded content
+   ========================================================================== */
+
+/**
+ * Remove the border on images inside links in IE 10.
+ */
+
+img {
+  border-style: none;
+}
+
+/* Forms
+   ========================================================================== */
+
+/**
+ * 1. Change the font styles in all browsers.
+ * 2. Remove the margin in Firefox and Safari.
+ */
+
+button,
+input,
+optgroup,
+select,
+textarea {
+  font-family: inherit; /* 1 */
+  font-size: 100%; /* 1 */
+  line-height: 1.15; /* 1 */
+  margin: 0; /* 2 */
+}
+
+/**
+ * Show the overflow in IE.
+ * 1. Show the overflow in Edge.
+ */
+
+button,
+input { /* 1 */
+  overflow: visible;
+}
+
+/**
+ * Remove the inheritance of text transform in Edge, Firefox, and IE.
+ * 1. Remove the inheritance of text transform in Firefox.
+ */
+
+button,
+select { /* 1 */
+  text-transform: none;
+}
+
+/**
+ * Correct the inability to style clickable types in iOS and Safari.
+ */
+
+button,
+[type="button"],
+[type="reset"],
+[type="submit"] {
+  -webkit-appearance: button;
+}
+
+/**
+ * Remove the inner border and padding in Firefox.
+ */
+
+button::-moz-focus-inner,
+[type="button"]::-moz-focus-inner,
+[type="reset"]::-moz-focus-inner,
+[type="submit"]::-moz-focus-inner {
+  border-style: none;
+  padding: 0;
+}
+
+/**
+ * Restore the focus styles unset by the previous rule.
+ */
+
+button:-moz-focusring,
+[type="button"]:-moz-focusring,
+[type="reset"]:-moz-focusring,
+[type="submit"]:-moz-focusring {
+  outline: 1px dotted ButtonText;
+}
+
+/**
+ * Correct the padding in Firefox.
+ */
+
+fieldset {
+  padding: 0.35em 0.75em 0.625em;
+}
+
+/**
+ * 1. Correct the text wrapping in Edge and IE.
+ * 2. Correct the color inheritance from `fieldset` elements in IE.
+ * 3. Remove the padding so developers are not caught out when they zero out
+ *    `fieldset` elements in all browsers.
+ */
+
+legend {
+  box-sizing: border-box; /* 1 */
+  color: inherit; /* 2 */
+  display: table; /* 1 */
+  max-width: 100%; /* 1 */
+  padding: 0; /* 3 */
+  white-space: normal; /* 1 */
+}
+
+/**
+ * Add the correct vertical alignment in Chrome, Firefox, and Opera.
+ */
+
+progress {
+  vertical-align: baseline;
+}
+
+/**
+ * Remove the default vertical scrollbar in IE 10+.
+ */
+
+textarea {
+  overflow: auto;
+}
+
+/**
+ * 1. Add the correct box sizing in IE 10.
+ * 2. Remove the padding in IE 10.
+ */
+
+[type="checkbox"],
+[type="radio"] {
+  box-sizing: border-box; /* 1 */
+  padding: 0; /* 2 */
+}
+
+/**
+ * Correct the cursor style of increment and decrement buttons in Chrome.
+ */
+
+[type="number"]::-webkit-inner-spin-button,
+[type="number"]::-webkit-outer-spin-button {
+  height: auto;
+}
+
+/**
+ * 1. Correct the odd appearance in Chrome and Safari.
+ * 2. Correct the outline style in Safari.
+ */
+
+[type="search"] {
+  -webkit-appearance: textfield; /* 1 */
+  outline-offset: -2px; /* 2 */
+}
+
+/**
+ * Remove the inner padding in Chrome and Safari on macOS.
+ */
+
+[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+}
+
+/**
+ * 1. Correct the inability to style clickable types in iOS and Safari.
+ * 2. Change font properties to `inherit` in Safari.
+ */
+
+::-webkit-file-upload-button {
+  -webkit-appearance: button; /* 1 */
+  font: inherit; /* 2 */
+}
+
+/* Interactive
+   ========================================================================== */
+
+/*
+ * Add the correct display in Edge, IE 10+, and Firefox.
+ */
+
+details {
+  display: block;
+}
+
+/*
+ * Add the correct display in all browsers.
+ */
+
+summary {
+  display: list-item;
+}
+
+/* Misc
+   ========================================================================== */
+
+/**
+ * Add the correct display in IE 10+.
+ */
+
+template {
+  display: none;
+}
+
+/**
+ * Add the correct display in IE 10.
+ */
+
+[hidden] {
+  display: none;
+}

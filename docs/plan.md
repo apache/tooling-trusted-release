@@ -5,6 +5,7 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
 ## UX improvements
 
 1. Enhance RC display
+   - Add the option to upload package artifacts without signatures
    - Replace raw file hashes with the original filenames in the UI
    - Add file size and upload timestamp
    - Improve the layout of file listings
@@ -25,6 +26,7 @@ Advanced tasks, possibly deferred
    - Add developer RC download buttons with clear verification instructions
    - Check RC file naming conventions
    - Display vote status and timeline
+   - Add ability to sign artifact hashes on the platform using JS
 
 ## Task scheduler
 
@@ -67,22 +69,22 @@ These tasks are dependent on the task scheduler above.
 
 ## Advanced RC validation
 
-1. Dependency analysis
+1. Reproducible build verification
+   - Accept upload of binary artifact builds
+   - Compare built built artifacts with any existing provided binary artifacts
+   - Give a detailed report of differences between user provided builds
+
+2. Dependency analysis
    - Parse and validate dependency licenses
    - Check for prohibited licenses
    - Generate dependency reports
    - Flag dependency vulnerabilities
 
-2. Distribution channel integration
+3. Distribution channel integration
    - Add PyPI distribution support
    - Implement Maven Central publishing
    - Add Docker Hub integration
    - Support test distribution channels
-
-3. Reproducible build verification
-   - Track builds of binary artifacts from source release
-   - Compare built artifacts with the provided binaries
-   - Give a detailed report of the build and the differences
 
 ## Process automation
 
