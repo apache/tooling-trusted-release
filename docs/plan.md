@@ -5,16 +5,15 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
 ## UX improvements
 
 1. Enhance RC display
-   - Add the option to upload package artifacts without signatures
-   - Replace raw file hashes with the original filenames in the UI
-   - Add file size and upload timestamp
-   - Improve the layout of file listings
+   - [DONE] Augment raw file hashes with the original filenames in the UI
+   - [DONE] Add file size and upload timestamp
+   - [DONE] Improve the layout of file listings
+   - Potentially add the option to upload package artifacts without signatures
    - Show validation status indicators
 
 2. Improve key management interface
+   - [DONE] Display which PMCs are using each key
    - Add key expiration warnings
-   - Display which PMCs are using each key
-   - Improve key selection during RC creation
 
 3. Release status dashboard
    - Add progress indicators for release phases

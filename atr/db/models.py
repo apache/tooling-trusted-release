@@ -145,6 +145,8 @@ class Package(SQLModel, table=True):
     signature_sha3: str
     # Uploaded timestamp
     uploaded: datetime.datetime
+    # The size of the file in bytes
+    bytes_size: int
 
     # Many-to-one: A package belongs to one release
     release_key: str | None = Field(default=None, foreign_key="release.storage_key")

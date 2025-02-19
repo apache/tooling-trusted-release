@@ -125,8 +125,8 @@ async def release_attach_post(session: ClientSession, request: Request) -> Respo
 
     # Save files using their hashes as filenames
     uploads_path = Path(get_release_storage_dir())
-    artifact_sha3 = await save_file_by_hash(uploads_path, artifact_file)
-    signature_sha3 = await save_file_by_hash(uploads_path, signature_file)
+    artifact_sha3, artifact_size = await save_file_by_hash(uploads_path, artifact_file)
+    signature_sha3, _ = await save_file_by_hash(uploads_path, signature_file)
 
     # Check if these files are already attached to this release
     async with get_session() as db_session:
@@ -158,6 +158,7 @@ async def release_attach_post(session: ClientSession, request: Request) -> Respo
                 sha512=sha512,
                 release_key=release_key,
                 uploaded=datetime.datetime.now(datetime.UTC),
+                bytes_size=artifact_size,
             )
             db_session.add(package)
 
@@ -568,12 +569,13 @@ async def root_candidate_review() -> str:
         return await render_template("candidate-review.html", releases=user_releases)
 
 
-async def save_file_by_hash(base_dir: Path, file: FileStorage) -> str:
+async def save_file_by_hash(base_dir: Path, file: FileStorage) -> tuple[str, int]:
     """
     Save a file using its SHA3-256 hash as the filename.
-    Returns the path where the file was saved and its hash.
+    Returns the hash and size in bytes of the saved file.
     """
     sha3 = hashlib.sha3_256()
+    total_bytes = 0
 
     # Create temporary file to stream to while computing hash
     temp_path = base_dir / f"temp-{secrets.token_hex(8)}"
@@ -586,6 +588,7 @@ async def save_file_by_hash(base_dir: Path, file: FileStorage) -> str:
                 if not chunk:
                     break
                 sha3.update(chunk)
+                total_bytes += len(chunk)
                 await f.write(chunk)
 
         file_hash = sha3.hexdigest()
@@ -599,7 +602,7 @@ async def save_file_by_hash(base_dir: Path, file: FileStorage) -> str:
             # If file already exists, just remove the temp file
             await aiofiles.os.remove(temp_path)
 
-        return file_hash
+        return file_hash, total_bytes
     except Exception as e:
         if await aiofiles.os.path.exists(temp_path):
             await aiofiles.os.remove(temp_path)

@@ -5,18 +5,18 @@
 <li>
 <p>Enhance RC display</p>
 <ul>
-<li>Replace raw file hashes with the original filenames in the UI</li>
-<li>Add file size and upload timestamp</li>
-<li>Improve the layout of file listings</li>
+<li>[DONE] Augment raw file hashes with the original filenames in the UI</li>
+<li>[DONE] Add file size and upload timestamp</li>
+<li>[DONE] Improve the layout of file listings</li>
+<li>Potentially add the option to upload package artifacts without signatures</li>
 <li>Show validation status indicators</li>
 </ul>
 </li>
 <li>
 <p>Improve key management interface</p>
 <ul>
+<li>[DONE] Display which PMCs are using each key</li>
 <li>Add key expiration warnings</li>
-<li>Display which PMCs are using each key</li>
-<li>Improve key selection during RC creation</li>
 </ul>
 </li>
 <li>
@@ -34,6 +34,7 @@
 <li>Add developer RC download buttons with clear verification instructions</li>
 <li>Check RC file naming conventions</li>
 <li>Display vote status and timeline</li>
+<li>Add ability to sign artifact hashes on the platform using JS</li>
 </ul>
 <h2>Task scheduler</h2>
 <p>We aim to work on the task scheduler in parallel with the UX improvements above. Artifact validation and the release status dashboard are dependent on tasks, which are managed by the task scheduler.</p>
@@ -93,6 +94,14 @@
 <h2>Advanced RC validation</h2>
 <ol>
 <li>
+<p>Reproducible build verification</p>
+<ul>
+<li>Accept upload of binary artifact builds</li>
+<li>Compare built built artifacts with any existing provided binary artifacts</li>
+<li>Give a detailed report of differences between user provided builds</li>
+</ul>
+</li>
+<li>
 <p>Dependency analysis</p>
 <ul>
 <li>Parse and validate dependency licenses</li>
@@ -108,14 +117,6 @@
 <li>Implement Maven Central publishing</li>
 <li>Add Docker Hub integration</li>
 <li>Support test distribution channels</li>
-</ul>
-</li>
-<li>
-<p>Reproducible build verification</p>
-<ul>
-<li>Track builds of binary artifacts from source release</li>
-<li>Compare built artifacts with the provided binaries</li>
-<li>Give a detailed report of the build and the differences</li>
 </ul>
 </li>
 </ol>
