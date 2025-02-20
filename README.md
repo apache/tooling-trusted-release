@@ -1,5 +1,8 @@
 # Tooling ATR Experiments
 
+<a href="https://github.com/apache/tooling-atr-experiments/actions/workflows/build.yml?query=branch%3Amain"><img alt="Build & Tests" src="https://github.com/apache/tooling-atr-experiments/actions/workflows/build.yml/badge.svg?branch=main" /></a>
+<a href="https://github.com/apache/tooling-atr-experiments/blob/main/LICENSE"><img alt="Apache License" src="https://img.shields.io/github/license/apache/tooling-atr-experiments" /></a>
+
 ## Disclaimers
 
 **IMPORTANT!**
