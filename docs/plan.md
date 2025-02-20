@@ -10,12 +10,13 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
    - [DONE] Allow extra types of artifact, such as reproducible binary and convenience binary
    - [DONE] Differentiate between podling PPMCs and top level PMCs
    - [DONE] Allow package deletion
+   - Allow RCs to be deleted
 
 2. Enhance RC display
    - [DONE] Augment raw file hashes with the original filenames in the UI
    - [DONE] Add file size and upload timestamp
    - [DONE] Improve the layout of file listings
-   - Show KB, MB, or GB units for file sizes
+   - [DONE] Show KB, MB, or GB units for file sizes
    - Add a standard artifact naming pattern based on the project and product
    - Potentially add the option to upload package artifacts without signatures
    - Show validation status indicators

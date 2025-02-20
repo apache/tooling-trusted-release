@@ -636,6 +636,25 @@ async def root_keys_add() -> str:
     )
 
 
+def format_file_size(size_in_bytes: int) -> str:
+    """Format a file size with appropriate units and comma-separated digits."""
+    # Format the raw bytes with commas
+    formatted_bytes = f"{size_in_bytes:,}"
+
+    # Calculate the appropriate unit
+    if size_in_bytes >= 1_000_000_000:
+        size_in_gb = size_in_bytes // 1_000_000_000
+        return f"{size_in_gb:,} GB ({formatted_bytes} bytes)"
+    elif size_in_bytes >= 1_000_000:
+        size_in_mb = size_in_bytes // 1_000_000
+        return f"{size_in_mb:,} MB ({formatted_bytes} bytes)"
+    elif size_in_bytes >= 1_000:
+        size_in_kb = size_in_bytes // 1_000
+        return f"{size_in_kb:,} KB ({formatted_bytes} bytes)"
+    else:
+        return f"{formatted_bytes} bytes"
+
+
 @APP.route("/candidate/review")
 @require(Requirements.committer)
 async def root_candidate_review() -> str:
@@ -668,7 +687,7 @@ async def root_candidate_review() -> str:
             if session.uid in r.pmc.pmc_members or session.uid in r.pmc.committers:
                 user_releases.append(r)
 
-        return await render_template("candidate-review.html", releases=user_releases)
+        return await render_template("candidate-review.html", releases=user_releases, format_file_size=format_file_size)
 
 
 async def delete_package_files(package: Package, uploads_path: Path) -> None:
