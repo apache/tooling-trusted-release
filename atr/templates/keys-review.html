@@ -104,6 +104,37 @@
       .status-message.error {
           background: #f8d7da;
       }
+
+      .expiry-warning {
+          color: #e67e22;
+          font-weight: bold;
+      }
+
+      .expiry-error {
+          color: #e74c3c;
+          font-weight: bold;
+      }
+
+      .notice-badge {
+          display: inline-block;
+          padding: 0.25rem 0.5rem;
+          border-radius: 3px;
+          font-size: 0.8em;
+          margin-left: 0.5rem;
+          font-weight: 500;
+      }
+
+      .notice-badge.warning {
+          background-color: #fff3cd;
+          color: #856404;
+          border: 1px solid #ffeeba;
+      }
+
+      .notice-badge.error {
+          background-color: #f8d7da;
+          color: #721c24;
+          border: 1px solid #f5c6cb;
+      }
   </style>
 {% endblock stylesheets %}
 
@@ -144,7 +175,26 @@
                 </tr>
                 <tr>
                   <th>Expires</th>
-                  <td>{{ key.expires.strftime("%Y-%m-%d %H:%M:%S") if key.expires else 'Never' }}</td>
+                  <td>
+                    {% if key.expires %}
+                      {% set days_until_expiry = (key.expires - now).days %}
+                      {% if days_until_expiry < 0 %}
+                        <span class="expiry-error">
+                          {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
+                          <span class="notice-badge error">Expired</span>
+                        </span>
+                      {% elif days_until_expiry <= 30 %}
+                        <span class="expiry-warning">
+                          {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
+                          <span class="notice-badge warning">Expires in {{ days_until_expiry }} days</span>
+                        </span>
+                      {% else %}
+                        {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
+                      {% endif %}
+                    {% else %}
+                      Never
+                    {% endif %}
+                  </td>
                 </tr>
                 <tr>
                   <th>User ID</th>

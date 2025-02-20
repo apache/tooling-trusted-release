@@ -167,7 +167,9 @@
     {% for result in verification_results %}
       <div class="package">
         <div class="package-info">
-          <div>File: {{ result.file }}</div>
+          <div>
+            <strong>File:</strong> {{ result.filename }}
+          </div>
         </div>
 
         <div class="verification-status">
@@ -177,9 +179,15 @@
             <p class="status {% if result.verified %}success{% else %}failure{% endif %}">Status: {{ result.status }}</p>
             {% if result.verified %}
               <div class="signature-details">
-                <p>Key ID: {{ result.key_id }}</p>
-                <p>Signed by: {{ result.username }} &lt;{{ result.email }}&gt;</p>
-                <p>Timestamp: {{ result.timestamp }}</p>
+                <p>
+                  <strong>Key ID:</strong> {{ result.key_id }}
+                </p>
+                <p>
+                  <strong>Signed by:</strong> {{ result.username }} &lt;{{ result.email }}&gt;
+                </p>
+                <p>
+                  <strong>Timestamp:</strong> {{ result.timestamp }}
+                </p>
               </div>
             {% endif %}
           {% endif %}

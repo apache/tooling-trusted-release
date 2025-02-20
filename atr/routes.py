@@ -442,7 +442,7 @@ async def root_candidate_signatures_verify(release_key: str) -> str:
         storage_dir = Path(get_release_storage_dir())
 
         for package in release.packages:
-            result = {"file": package.artifact_sha3}
+            result = {"file": package.artifact_sha3, "filename": package.filename}
 
             artifact_path = storage_dir / package.artifact_sha3
             if package.signature_sha3 is None:
@@ -460,6 +460,7 @@ async def root_candidate_signatures_verify(release_key: str) -> str:
                 # Verify the signature
                 result = await verify_gpg_signature(artifact_path, signature_path, ascii_armored_keys)
                 result["file"] = package.artifact_sha3
+                result["filename"] = package.filename
 
             verification_results.append(result)
 
@@ -562,6 +563,7 @@ async def root_keys_review() -> str:
         algorithms=algorithms,
         status_message=status_message,
         status_type=status_type,
+        now=datetime.datetime.now(datetime.UTC),
     )
 
 
@@ -609,6 +611,15 @@ async def root_keys_add() -> str:
     error = None
     key_info = None
 
+    # Get PMC objects for all projects the user is a member of
+    async with get_session() as db_session:
+        from sqlalchemy.sql.expression import ColumnElement
+
+        project_list = session.committees + session.projects
+        project_name = cast(ColumnElement[str], PMC.project_name)
+        statement = select(PMC).where(project_name.in_(project_list))
+        user_pmcs = (await db_session.execute(statement)).scalars().all()
+
     if request.method == "POST":
         form = await request.form
         public_key = form.get("public_key")
@@ -622,11 +633,10 @@ async def root_keys_add() -> str:
             return await render_template(
                 "keys-add.html",
                 asf_id=session.uid,
-                pmc_memberships=session.committees,
+                user_pmcs=user_pmcs,
                 error="You must select at least one PMC",
                 key_info=None,
                 algorithms=algorithms,
-                committer_projects=session.projects,
             )
 
         # Ensure that the selected PMCs are ones of which the user is actually a member
@@ -637,11 +647,10 @@ async def root_keys_add() -> str:
             return await render_template(
                 "keys-add.html",
                 asf_id=session.uid,
-                pmc_memberships=session.committees,
+                user_pmcs=user_pmcs,
                 error=f"Invalid PMC selection: {', '.join(invalid_pmcs)}",
                 key_info=None,
                 algorithms=algorithms,
-                committer_projects=session.projects,
             )
 
         error, key_info = await user_keys_add(session, public_key, selected_pmcs)
@@ -649,11 +658,10 @@ async def root_keys_add() -> str:
     return await render_template(
         "keys-add.html",
         asf_id=session.uid,
-        pmc_memberships=session.committees,
+        user_pmcs=user_pmcs,
         error=error,
         key_info=key_info,
         algorithms=algorithms,
-        committer_projects=session.projects,
     )
 
 

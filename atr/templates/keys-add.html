@@ -146,17 +146,17 @@
       </small>
     </div>
 
-    {% if pmc_memberships %}
+    {% if user_pmcs %}
       <div class="form-group">
         <label>Associate with projects:</label>
         <div class="pmc-checkboxes">
-          {% for pmc in (pmc_memberships + committer_projects)|unique|sort %}
+          {% for pmc in user_pmcs|sort(attribute='project_name') %}
             <div class="checkbox-item">
               <input type="checkbox"
-                     id="pmc_{{ pmc }}"
+                     id="pmc_{{ pmc.project_name }}"
                      name="selected_pmcs"
-                     value="{{ pmc }}" />
-              <label for="pmc_{{ pmc }}">{{ pmc }}</label>
+                     value="{{ pmc.project_name }}" />
+              <label for="pmc_{{ pmc.project_name }}">{{ pmc.display_name }}</label>
             </div>
           {% endfor %}
         </div>

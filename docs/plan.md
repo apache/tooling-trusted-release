@@ -10,21 +10,21 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
    - [DONE] Allow extra types of artifact, such as reproducible binary and convenience binary
    - [DONE] Differentiate between podling PPMCs and top level PMCs
    - [DONE] Allow package deletion
-   - Allow RCs to be deleted
+   - [DONE] Allow RCs to be deleted
 
 2. Enhance RC display
    - [DONE] Augment raw file hashes with the original filenames in the UI
    - [DONE] Add file size and upload timestamp
    - [DONE] Improve the layout of file listings
    - [DONE] Show KB, MB, or GB units for file sizes
-   - Add a standard artifact naming pattern based on the project and product
-   - Potentially add the option to upload package artifacts without signatures
+   - [DONE] Add a standard artifact naming pattern based on the project and product
+   - [DONE] Potentially add the option to upload package artifacts without signatures
    - Show validation status indicators
    - Add developer RC download buttons with clear verification instructions
 
 3. Improve key management interface
    - [DONE] Display which PMCs are using each key
-   - Add key expiration warnings
+   - [DONE] Add key expiration warnings
    - Fix reported problem with adding keys
    - Add debugging output error messages for when key addition fails
    - Allow adding keys from a KEYS file
@@ -60,6 +60,16 @@ We aim to work on the task scheduler in parallel with the UX improvements above.
 Advanced tasks, possibly deferred
    - Check fair scheduling across cores
    - Add task monitoring and reporting
+
+## Site improvements
+
+1. Ensure that performance is optimal and debugging is easy
+   - Add page load timing metrics to a log
+   - Add a basic metrics dashboard
+   - Ensure that all errors are caught and logged or displayed
+
+2. Increase the linting and type checking
+   - Potentially add blockbuster
 
 ## Basic RC validation
 
