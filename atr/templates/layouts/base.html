@@ -45,6 +45,8 @@
             <div class="warning-banner">
               <strong>Pre-release Software:</strong> ATR is actively being developed. You cannot make releases.
             </div>
+            {% from "macros/flash.html" import render_flash_messages %}
+            {{ render_flash_messages() }}
             {% block content %}
             {% endblock content %}
           </main>
