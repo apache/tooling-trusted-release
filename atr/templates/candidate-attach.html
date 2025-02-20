@@ -82,6 +82,23 @@
           border: 1px solid #c3e6cb;
           color: #155724;
       }
+
+      .radio-group {
+          margin-bottom: 0.5rem;
+      }
+
+      .radio-group div {
+          margin: 0.5rem 0;
+      }
+
+      .radio-group label {
+          margin-left: 0.5rem;
+          cursor: pointer;
+      }
+
+      .radio-group input[type="radio"] {
+          cursor: pointer;
+      }
   </style>
 {% endblock stylesheets %}
 
@@ -94,7 +111,12 @@
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-      {% for category, message in messages %}<div class="flash-message flash-{{ category }}">{{ message }}</div>{% endfor %}
+      {% for category, message in messages %}
+        <div class="flash-message flash-{{ category }}">
+          {% if category == 'error' %}<strong>Error:</strong>{% endif %}
+          {{ message }}
+        </div>
+      {% endfor %}
     {% endif %}
   {% endwith %}
 
@@ -136,6 +158,31 @@
                    accept="application/gzip,application/x-gzip,application/x-tar,application/zip,application/java-archive,.tar.gz,.tgz,.zip,.jar"
                    aria-describedby="artifact-help" />
             <span id="artifact-help" class="help-text">Upload the release candidate archive (tar.gz, zip, or jar)</span>
+          </td>
+        </tr>
+
+        <tr>
+          <th>
+            <label>Artifact Type:</label>
+          </th>
+          <td>
+            <div class="radio-group">
+              <div>
+                <input type="radio" id="source" name="artifact_type" value="source" required />
+                <label for="source">Source archive</label>
+              </div>
+              <div>
+                <input type="radio" id="binary" name="artifact_type" value="binary" />
+                <label for="binary">Binary archive</label>
+              </div>
+              <div>
+                <input type="radio"
+                       id="reproducible"
+                       name="artifact_type"
+                       value="reproducible" />
+                <label for="reproducible">Reproducible binary archive</label>
+              </div>
+            </div>
           </td>
         </tr>
 

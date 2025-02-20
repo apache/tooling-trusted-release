@@ -5,10 +5,11 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
 ## UX improvements
 
 1. Improve RC workflow
-   - Allow upload of checksum file alongside artifacts and signatures
-   - Add a checkbox to choose the RC artifact type
-   - Allow extra types of artifact, such as reproducible binary and convenience binary
+   - [DONE] Allow upload of checksum file alongside artifacts and signatures
+   - [DONE] Add a form field to choose the RC artifact type
+   - [DONE] Allow extra types of artifact, such as reproducible binary and convenience binary
    - Differentiate between podling PPMCs and top level PMCs
+   - Allow package deletion
 
 2. Enhance RC display
    - [DONE] Augment raw file hashes with the original filenames in the UI

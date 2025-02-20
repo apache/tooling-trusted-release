@@ -99,52 +99,23 @@ async def ephemeral_gpg_home():
 
 async def release_attach_post(session: ClientSession, request: Request) -> Response:
     """Handle POST request for attaching package artifacts to a release."""
-
-    async def flash_error_and_redirect(message: str) -> Response:
-        await flash(message, "error")
-        return redirect(url_for("root_candidate_attach"))
-
-    form = await request.form
-
-    # TODO: Check that the submitter is a committer of the project
-
-    release_key = form.get("release_key")
-    if not release_key:
-        return await flash_error_and_redirect("Release key is required")
-
-    # Get all uploaded files
-    files = await request.files
-
-    # Get the release artifact, checksum, and signature files
-    artifact_file = files.get("release_artifact")
-    checksum_file = files.get("release_checksum")
-    signature_file = files.get("release_signature")
-    if not isinstance(artifact_file, FileStorage):
-        return await flash_error_and_redirect("Release artifact file is required")
+    res = await release_attach_post_validate(request)
+    # Not particularly elegant
+    if isinstance(res, Response):
+        return res
+    release_key, artifact_file, checksum_file, signature_file, artifact_type = res
+    # This must come here to appease the type checker
     if artifact_file.filename is None:
-        return await flash_error_and_redirect("Release artifact filename is required")
-    if checksum_file is not None and not isinstance(checksum_file, FileStorage):
-        return await flash_error_and_redirect("Problem with checksum file")
-    if signature_file is not None and not isinstance(signature_file, FileStorage):
-        return await flash_error_and_redirect("Problem with signature file")
+        await flash("Release artifact filename is required", "error")
+        return redirect(url_for("root_candidate_attach"))
 
     # Save files and create package record in one transaction
     async with get_session() as db_session:
         async with db_session.begin():
-            # First check for duplicates
-            statement = select(Package).where(
-                Package.release_key == release_key,
-                Package.filename == artifact_file.filename,
-            )
-            duplicate = (await db_session.execute(statement)).first()
-
-            if duplicate:
-                return await flash_error_and_redirect("This release artifact has already been uploaded")
-
             # Process and save the files
             try:
-                ok, artifact_sha3, artifact_size, artifact_sha512, signature_sha3 = await release_attach_post_helper(
-                    artifact_file, checksum_file, signature_file
+                ok, artifact_sha3, artifact_size, artifact_sha512, signature_sha3 = await release_attach_post_session(
+                    db_session, release_key, artifact_file, checksum_file, signature_file
                 )
                 if not ok:
                     # The flash error is already set by the helper
@@ -153,6 +124,7 @@ async def release_attach_post(session: ClientSession, request: Request) -> Respo
                 # Create the package record
                 package = Package(
                     artifact_sha3=artifact_sha3,
+                    artifact_type=artifact_type,
                     filename=artifact_file.filename,
                     signature_sha3=signature_sha3,
                     sha512=artifact_sha512,
@@ -163,16 +135,69 @@ async def release_attach_post(session: ClientSession, request: Request) -> Respo
                 db_session.add(package)
 
             except Exception as e:
-                return await flash_error_and_redirect(f"Error processing files: {e!s}")
+                await flash(f"Error processing files: {e!s}", "error")
+                return redirect(url_for("root_candidate_attach"))
 
     # Otherwise redirect to review page
     return redirect(url_for("root_candidate_review"))
 
 
-async def release_attach_post_helper(
-    artifact_file: FileStorage, checksum_file: FileStorage | None, signature_file: FileStorage | None
+async def release_attach_post_validate(
+    request: Request,
+) -> Response | tuple[str, FileStorage, FileStorage | None, FileStorage | None, str]:
+    async def flash_error_and_redirect(message: str) -> Response:
+        await flash(message, "error")
+        return redirect(url_for("root_candidate_attach"))
+
+    form = await request.form
+
+    # TODO: Check that the submitter is a committer of the project
+
+    release_key = form.get("release_key")
+    if (not release_key) or (not isinstance(release_key, str)):
+        return await flash_error_and_redirect("Release key is required")
+
+    # Get all uploaded files
+    files = await request.files
+    artifact_file = files.get("release_artifact")
+    checksum_file = files.get("release_checksum")
+    signature_file = files.get("release_signature")
+    if not isinstance(artifact_file, FileStorage):
+        return await flash_error_and_redirect("Release artifact file is required")
+    if checksum_file is not None and not isinstance(checksum_file, FileStorage):
+        return await flash_error_and_redirect("Problem with checksum file")
+    if signature_file is not None and not isinstance(signature_file, FileStorage):
+        return await flash_error_and_redirect("Problem with signature file")
+
+    # Get and validate artifact type
+    artifact_type = form.get("artifact_type")
+    if (not artifact_type) or (not isinstance(artifact_type, str)):
+        return await flash_error_and_redirect("Artifact type is required")
+    if artifact_type not in ["source", "binary", "reproducible"]:
+        return await flash_error_and_redirect("Invalid artifact type")
+
+    return release_key, artifact_file, checksum_file, signature_file, artifact_type
+
+
+async def release_attach_post_session(
+    db_session: AsyncSession,
+    release_key: str,
+    artifact_file: FileStorage,
+    checksum_file: FileStorage | None,
+    signature_file: FileStorage | None,
 ) -> tuple[bool, str, int, str, str | None]:
     """Helper function for release_attach_post."""
+    # First check for duplicates
+    statement = select(Package).where(
+        Package.release_key == release_key,
+        Package.filename == artifact_file.filename,
+    )
+    duplicate = (await db_session.execute(statement)).first()
+
+    if duplicate:
+        await flash("This release artifact has already been uploaded", "error")
+        return False, "", 0, "", None
+
     # Save files using their hashes as filenames
     uploads_path = Path(get_release_storage_dir())
     try:

@@ -137,6 +137,8 @@ class Package(SQLModel, table=True):
     # The SHA3-256 hash of the file, used as filename in storage
     # TODO: We should discuss making this unique
     artifact_sha3: str = Field(primary_key=True)
+    # The type of artifact (source, binary, reproducible binary)
+    artifact_type: str
     # Original filename from uploader
     filename: str
     # SHA-512 hash of the file
