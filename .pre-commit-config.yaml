@@ -14,7 +14,7 @@ repos:
   hooks:
     - id: insert-license
       name: Add license for all Python files
-      files: ^atr/.*\.py$|^atr/.*\.pyi$
+      files: ^(atr|tests)/(.*\.py$|.*\.pyi)$
       args:
         - --comment-style
         - "|#|"
