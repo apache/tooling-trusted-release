@@ -26,6 +26,7 @@ from werkzeug.wrappers.response import Response
 
 from asfquart.base import ASFQuartException
 from asfquart.session import read as session_read
+from atr.apache import get_apache_project_data
 from atr.db import get_session
 from atr.db.models import (
     PMC,
@@ -99,44 +100,38 @@ async def secret_pmcs_update() -> str | Response:
 
     if request.method == "POST":
         # Fetch committee-info.json from Whimsy
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.get(_WHIMSY_COMMITTEE_URL)
-                response.raise_for_status()
-                data = response.json()
-            except (httpx.RequestError, json.JSONDecodeError) as e:
-                await flash(f"Failed to fetch committee data: {e!s}", "error")
-                return redirect(url_for("secret_blueprint.secret_pmcs_update"))
+        try:
+            apache_projects = await get_apache_project_data()
+        except (httpx.RequestError, json.JSONDecodeError) as e:
+            await flash(f"Failed to fetch committee data: {e!s}", "error")
+            return redirect(url_for("secret_blueprint.secret_pmcs_update"))
 
-        committees = data.get("committees", {})
         updated_count = 0
 
         try:
             async with get_session() as db_session:
                 async with db_session.begin():
-                    for committee_id, info in committees.items():
+                    for project in apache_projects.projects:
+                        name = project.name
                         # Skip non-PMC committees
-                        if not info.get("pmc", False):
+                        if not project.pmc:
                             continue
 
                         # Get or create PMC
-                        statement = select(PMC).where(PMC.project_name == committee_id)
+                        statement = select(PMC).where(PMC.project_name == name)
                         pmc = (await db_session.execute(statement)).scalar_one_or_none()
                         if not pmc:
-                            pmc = PMC(project_name=committee_id)
+                            pmc = PMC(project_name=name)
                             db_session.add(pmc)
 
                         # Update PMC data
-                        roster = info.get("roster", {})
-                        # TODO: Here we say that roster == pmc_members == committers
-                        # We ought to do this more accurately instead
-                        pmc.pmc_members = list(roster.keys())
-                        pmc.committers = list(roster.keys())
+                        pmc.pmc_members = project.owners
+                        pmc.committers = project.members
 
                         # Mark chairs as release managers
                         # TODO: Who else is a release manager? How do we know?
-                        chairs = [m["id"] for m in info.get("chairs", [])]
-                        pmc.release_managers = chairs
+                        #       lets assume for now that all owners are also release managers
+                        pmc.release_managers = project.owners
 
                         updated_count += 1
 

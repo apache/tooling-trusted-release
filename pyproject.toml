@@ -72,7 +72,14 @@ asfquart = { path = "./asfquart", editable = true }
 
 [tool.pyright]
 include = ["atr"]
-exclude = ["**/node_modules", "**/__pycache__", ".venv*", "asfquart", "tests"]
+exclude = [
+  "**/node_modules",
+  "**/__pycache__",
+  ".venv*",
+  "asfquart",
+  "tests",
+  "atr/util.py"
+]
 ignore = []
 defineConstant = { DEBUG = true }
 stubPath = "typestubs"
@@ -99,6 +106,9 @@ lint.select = [
 lint.ignore = []
 line-length = 120
 exclude = ["asfquart"]
+
+[tool.ruff.lint.per-file-ignores]
+"atr/apache.py" = ["N815"]
 
 [tool.mypy]
 python_version = "3.13"
