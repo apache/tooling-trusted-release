@@ -671,6 +671,86 @@ async def root_candidate_review() -> str:
         return await render_template("candidate-review.html", releases=user_releases)
 
 
+async def delete_package_files(package: Package, uploads_path: Path) -> None:
+    """Delete the artifact and signature files associated with a package."""
+    if package.artifact_sha3:
+        artifact_path = uploads_path / package.artifact_sha3
+        if await aiofiles.os.path.exists(artifact_path):
+            await aiofiles.os.remove(artifact_path)
+
+    if package.signature_sha3:
+        signature_path = uploads_path / package.signature_sha3
+        if await aiofiles.os.path.exists(signature_path):
+            await aiofiles.os.remove(signature_path)
+
+
+async def validate_package_deletion(
+    db_session: AsyncSession, artifact_sha3: str, release_key: str, session_uid: str
+) -> Package:
+    """Validate package deletion request and return the package if valid."""
+    # Get the package and its associated release
+    if Package.release is None:
+        raise FlashError("Package has no associated release")
+    if Release.pmc is None:
+        raise FlashError("Release has no associated PMC")
+
+    pkg_release = cast(InstrumentedAttribute[Release], Package.release)
+    rel_pmc = cast(InstrumentedAttribute[PMC], Release.pmc)
+    statement = (
+        select(Package)
+        .options(selectinload(pkg_release).selectinload(rel_pmc))
+        .where(Package.artifact_sha3 == artifact_sha3)
+    )
+    result = await db_session.execute(statement)
+    package = result.scalar_one_or_none()
+
+    if not package:
+        raise FlashError("Package not found")
+
+    if package.release_key != release_key:
+        raise FlashError("Invalid release key")
+
+    # Check permissions
+    if package.release and package.release.pmc:
+        if session_uid not in package.release.pmc.pmc_members and session_uid not in package.release.pmc.committers:
+            raise FlashError("You don't have permission to delete this package")
+
+    return package
+
+
+@APP.route("/package/delete", methods=["POST"])
+@require(Requirements.committer)
+async def root_package_delete() -> Response:
+    """Delete a package from a release candidate."""
+    session = await session_read()
+    if (session is None) or (session.uid is None):
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    form = await request.form
+    artifact_sha3 = form.get("artifact_sha3")
+    release_key = form.get("release_key")
+
+    if not artifact_sha3 or not release_key:
+        await flash("Missing required parameters", "error")
+        return redirect(url_for("root_candidate_review"))
+
+    async with get_session() as db_session:
+        async with db_session.begin():
+            try:
+                package = await validate_package_deletion(db_session, artifact_sha3, release_key, session.uid)
+                await delete_package_files(package, Path(get_release_storage_dir()))
+                await db_session.delete(package)
+            except FlashError as e:
+                await flash(str(e), "error")
+                return redirect(url_for("root_candidate_review"))
+            except Exception as e:
+                await flash(f"Error deleting files: {e!s}", "error")
+                return redirect(url_for("root_candidate_review"))
+
+    await flash("Package deleted successfully", "success")
+    return redirect(url_for("root_candidate_review"))
+
+
 async def save_file_by_hash(base_dir: Path, file: FileStorage) -> tuple[str, int]:
     """
     Save a file using its SHA3-256 hash as the filename.
