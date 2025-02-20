@@ -80,6 +80,8 @@ class VotePolicy(SQLModel, table=True):
 class PMC(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     project_name: str = Field(unique=True)
+    # True if this is an incubator podling with a PPMC, otherwise False
+    is_podling: bool = Field(default=False)
 
     # One-to-many: A PMC can have multiple product lines, each product line belongs to one PMC
     product_lines: list["ProductLine"] = Relationship(back_populates="pmc")
@@ -97,6 +99,13 @@ class PMC(SQLModel, table=True):
 
     # One-to-many: A PMC can have multiple releases
     releases: list["Release"] = Relationship(back_populates="pmc")
+
+    @property
+    def display_name(self) -> str:
+        """Get the display name for the PMC/PPMC."""
+        if self.is_podling:
+            return f"{self.project_name} (podling)"
+        return self.project_name
 
 
 class ProductLine(SQLModel, table=True):

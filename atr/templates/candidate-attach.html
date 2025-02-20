@@ -133,7 +133,7 @@
               {% for release in releases %}
                 <option value="{{ release.storage_key }}"
                         {% if release.storage_key == selected_release %}selected{% endif %}>
-                  {{ release.pmc.project_name }} - {{ release.version }}
+                  {{ release.pmc.display_name }} - {{ release.version }}
                 </option>
               {% endfor %}
             </select>
@@ -168,7 +168,12 @@
           <td>
             <div class="radio-group">
               <div>
-                <input type="radio" id="source" name="artifact_type" value="source" required />
+                <input type="radio"
+                       id="source"
+                       name="artifact_type"
+                       value="source"
+                       required
+                       checked />
                 <label for="source">Source archive</label>
               </div>
               <div>

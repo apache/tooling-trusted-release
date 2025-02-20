@@ -26,7 +26,7 @@ from werkzeug.wrappers.response import Response
 
 from asfquart.base import ASFQuartException
 from asfquart.session import read as session_read
-from atr.apache import get_apache_project_data
+from atr.apache import ApacheProjects, get_apache_project_data
 from atr.db import get_session
 from atr.db.models import (
     PMC,
@@ -45,6 +45,11 @@ from atr.db.service import get_pmcs
 from . import blueprint
 
 _WHIMSY_COMMITTEE_URL = "https://whimsy.apache.org/public/committee-info.json"
+_PROJECT_PODLINGS_URL = "https://projects.apache.org/json/foundation/podlings.json"
+_PROJECT_GROUPS_URL = "https://projects.apache.org/json/foundation/groups.json"
+
+
+class FlashError(RuntimeError): ...
 
 
 @blueprint.route("/data")
@@ -96,14 +101,12 @@ async def secret_data(model: str = "PMC") -> str:
 
 @blueprint.route("/pmcs/update", methods=["GET", "POST"])
 async def secret_pmcs_update() -> str | Response:
-    """Update PMCs from remote, authoritative committee-info.json."""
-
+    """Update PMCs and podlings from remote data."""
     if request.method == "POST":
-        # Fetch committee-info.json from Whimsy
         try:
-            apache_projects = await get_apache_project_data()
-        except (httpx.RequestError, json.JSONDecodeError) as e:
-            await flash(f"Failed to fetch committee data: {e!s}", "error")
+            apache_projects, podlings_data, groups_data = await secret_pmcs_update_data()
+        except FlashError as e:
+            await flash(f"{e!s}", "error")
             return redirect(url_for("secret_blueprint.secret_pmcs_update"))
 
         updated_count = 0
@@ -111,6 +114,7 @@ async def secret_pmcs_update() -> str | Response:
         try:
             async with get_session() as db_session:
                 async with db_session.begin():
+                    # First update PMCs
                     for project in apache_projects.projects:
                         name = project.name
                         # Skip non-PMC committees
@@ -124,14 +128,32 @@ async def secret_pmcs_update() -> str | Response:
                             pmc = PMC(project_name=name)
                             db_session.add(pmc)
 
-                        # Update PMC data
-                        pmc.pmc_members = project.owners
-                        pmc.committers = project.members
+                        # Update PMC data from groups.json
+                        pmc.pmc_members = groups_data.get(f"{name}-pmc", [])
+                        pmc.committers = groups_data.get(name, [])
+                        pmc.is_podling = False  # Ensure this is set for PMCs
 
-                        # Mark chairs as release managers
-                        # TODO: Who else is a release manager? How do we know?
-                        #       lets assume for now that all owners are also release managers
-                        pmc.release_managers = project.owners
+                        # For release managers, use PMC members for now
+                        # TODO: Consider a more sophisticated way to determine release managers
+                        pmc.release_managers = pmc.pmc_members
+
+                        updated_count += 1
+
+                    # Then add PPMCs (podlings)
+                    for podling_name, podling_data in podlings_data.items():
+                        # Get or create PPMC
+                        statement = select(PMC).where(PMC.project_name == podling_name)
+                        ppmc = (await db_session.execute(statement)).scalar_one_or_none()
+                        if not ppmc:
+                            ppmc = PMC(project_name=podling_name)
+                            db_session.add(ppmc)
+
+                        # Update PPMC data from groups.json
+                        ppmc.is_podling = True
+                        ppmc.pmc_members = groups_data.get(f"{podling_name}-pmc", [])
+                        ppmc.committers = groups_data.get(podling_name, [])
+                        # Use PPMC members as release managers
+                        ppmc.release_managers = ppmc.pmc_members
 
                         updated_count += 1
 
@@ -149,15 +171,47 @@ async def secret_pmcs_update() -> str | Response:
                     tooling_pmc.pmc_members = ["wave", "tn", "sbp"]
                     tooling_pmc.committers = ["wave", "tn", "sbp"]
                     tooling_pmc.release_managers = ["wave"]
+                    tooling_pmc.is_podling = False
 
-            await flash(f"Successfully updated {updated_count} PMCs from Whimsy", "success")
+            await flash(
+                f"Successfully updated {updated_count} projects (PMCs and PPMCs) with membership data", "success"
+            )
         except Exception as e:
-            await flash(f"Failed to update PMCs: {e!s}", "error")
+            await flash(f"Failed to update projects: {e!s}", "error")
 
         return redirect(url_for("secret_blueprint.secret_pmcs_update"))
 
     # For GET requests, show the update form
     return await render_template("secret/update-pmcs.html")
+
+
+async def secret_pmcs_update_data() -> tuple[ApacheProjects, dict, dict]:
+    """Fetch and update PMCs and podlings from remote data."""
+    # Fetch committee-info.json from whimsy.apache.org
+    try:
+        apache_projects = await get_apache_project_data()
+    except (httpx.RequestError, json.JSONDecodeError) as e:
+        raise FlashError(f"Failed to fetch committee data: {e!s}")
+
+    # Fetch podlings data from projects.apache.org
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(_PROJECT_PODLINGS_URL)
+            response.raise_for_status()
+            podlings_data = response.json()
+    except (httpx.RequestError, json.JSONDecodeError) as e:
+        raise FlashError(f"Failed to fetch podling data: {e!s}")
+
+    # Fetch groups data from projects.apache.org
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(_PROJECT_GROUPS_URL)
+            response.raise_for_status()
+            groups_data = response.json()
+    except (httpx.RequestError, json.JSONDecodeError) as e:
+        raise FlashError(f"Failed to fetch groups data: {e!s}")
+
+    return apache_projects, podlings_data, groups_data
 
 
 @blueprint.route("/debug/database")

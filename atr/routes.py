@@ -87,6 +87,9 @@ algorithms = {
 }
 
 
+class FlashError(RuntimeError): ...
+
+
 @asynccontextmanager
 async def ephemeral_gpg_home():
     """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
@@ -99,11 +102,13 @@ async def ephemeral_gpg_home():
 
 async def release_attach_post(session: ClientSession, request: Request) -> Response:
     """Handle POST request for attaching package artifacts to a release."""
-    res = await release_attach_post_validate(request)
-    # Not particularly elegant
-    if isinstance(res, Response):
-        return res
-    release_key, artifact_file, checksum_file, signature_file, artifact_type = res
+    try:
+        release_key, artifact_file, checksum_file, signature_file, artifact_type = await release_attach_post_validate(
+            request
+        )
+    except FlashError as e:
+        await flash(f"{e!s}", "error")
+        return redirect(url_for("root_candidate_attach"))
     # This must come here to appease the type checker
     if artifact_file.filename is None:
         await flash("Release artifact filename is required", "error")
@@ -114,11 +119,12 @@ async def release_attach_post(session: ClientSession, request: Request) -> Respo
         async with db_session.begin():
             # Process and save the files
             try:
-                ok, artifact_sha3, artifact_size, artifact_sha512, signature_sha3 = await release_attach_post_session(
-                    db_session, release_key, artifact_file, checksum_file, signature_file
-                )
-                if not ok:
-                    # The flash error is already set by the helper
+                try:
+                    artifact_sha3, artifact_size, artifact_sha512, signature_sha3 = await release_attach_post_session(
+                        db_session, release_key, artifact_file, checksum_file, signature_file
+                    )
+                except FlashError as e:
+                    await flash(f"{e!s}", "error")
                     return redirect(url_for("root_candidate_attach"))
 
                 # Create the package record
@@ -144,18 +150,14 @@ async def release_attach_post(session: ClientSession, request: Request) -> Respo
 
 async def release_attach_post_validate(
     request: Request,
-) -> Response | tuple[str, FileStorage, FileStorage | None, FileStorage | None, str]:
-    async def flash_error_and_redirect(message: str) -> Response:
-        await flash(message, "error")
-        return redirect(url_for("root_candidate_attach"))
-
+) -> tuple[str, FileStorage, FileStorage | None, FileStorage | None, str]:
     form = await request.form
 
     # TODO: Check that the submitter is a committer of the project
 
     release_key = form.get("release_key")
     if (not release_key) or (not isinstance(release_key, str)):
-        return await flash_error_and_redirect("Release key is required")
+        raise FlashError("Release key is required")
 
     # Get all uploaded files
     files = await request.files
@@ -163,20 +165,38 @@ async def release_attach_post_validate(
     checksum_file = files.get("release_checksum")
     signature_file = files.get("release_signature")
     if not isinstance(artifact_file, FileStorage):
-        return await flash_error_and_redirect("Release artifact file is required")
+        raise FlashError("Release artifact file is required")
     if checksum_file is not None and not isinstance(checksum_file, FileStorage):
-        return await flash_error_and_redirect("Problem with checksum file")
+        raise FlashError("Problem with checksum file")
     if signature_file is not None and not isinstance(signature_file, FileStorage):
-        return await flash_error_and_redirect("Problem with signature file")
+        raise FlashError("Problem with signature file")
 
     # Get and validate artifact type
     artifact_type = form.get("artifact_type")
     if (not artifact_type) or (not isinstance(artifact_type, str)):
-        return await flash_error_and_redirect("Artifact type is required")
+        raise FlashError("Artifact type is required")
     if artifact_type not in ["source", "binary", "reproducible"]:
-        return await flash_error_and_redirect("Invalid artifact type")
+        raise FlashError("Invalid artifact type")
 
     return release_key, artifact_file, checksum_file, signature_file, artifact_type
+
+
+async def get_artifact_info(
+    db_session: AsyncSession, uploads_path: Path, artifact_file: FileStorage
+) -> tuple[str, str, int]:
+    # In a separate function to appease the complexity checker
+    artifact_sha3, artifact_size = await save_file_by_hash(uploads_path, artifact_file)
+
+    # Check for duplicates by artifact_sha3 before proceeding
+    statement = select(Package).where(Package.artifact_sha3 == artifact_sha3)
+    duplicate = (await db_session.execute(statement)).first()
+    if duplicate:
+        # Remove the saved file since we won't be using it
+        await aiofiles.os.remove(uploads_path / artifact_sha3)
+        raise FlashError("This exact file has already been uploaded to another release")
+
+    # Compute SHA-512 of the artifact for the package record
+    return artifact_sha3, compute_sha512(uploads_path / artifact_sha3), artifact_size
 
 
 async def release_attach_post_session(
@@ -185,9 +205,10 @@ async def release_attach_post_session(
     artifact_file: FileStorage,
     checksum_file: FileStorage | None,
     signature_file: FileStorage | None,
-) -> tuple[bool, str, int, str, str | None]:
+) -> tuple[str, int, str, str | None]:
     """Helper function for release_attach_post."""
-    # First check for duplicates
+
+    # First check for duplicates by filename
     statement = select(Package).where(
         Package.release_key == release_key,
         Package.filename == artifact_file.filename,
@@ -195,18 +216,14 @@ async def release_attach_post_session(
     duplicate = (await db_session.execute(statement)).first()
 
     if duplicate:
-        await flash("This release artifact has already been uploaded", "error")
-        return False, "", 0, "", None
+        raise FlashError("This release artifact has already been uploaded")
 
     # Save files using their hashes as filenames
     uploads_path = Path(get_release_storage_dir())
     try:
-        artifact_sha3, artifact_size = await save_file_by_hash(uploads_path, artifact_file)
-        # Compute SHA-512 of the artifact for the package record
-        artifact_sha512 = compute_sha512(uploads_path / artifact_sha3)
+        artifact_sha3, artifact_sha512, artifact_size = await get_artifact_info(db_session, uploads_path, artifact_file)
     except Exception as e:
-        await flash(f"Error saving artifact file: {e!s}", "error")
-        return False, "", 0, "", None
+        raise FlashError(f"Error saving artifact file: {e!s}")
     # Note: "error" is not permitted past this point
     # Because we don't want to roll back saving the artifact
 
@@ -233,7 +250,7 @@ async def release_attach_post_session(
         except Exception as e:
             await flash(f"Warning: Could not save signature file: {e!s}", "warning")
 
-    return True, artifact_sha3, artifact_size, artifact_sha512, signature_sha3
+    return artifact_sha3, artifact_size, artifact_sha512, signature_sha3
 
 
 async def release_create_post(session: ClientSession, request: Request) -> Response:
@@ -244,24 +261,15 @@ async def release_create_post(session: ClientSession, request: Request) -> Respo
     if not project_name:
         raise ASFQuartException("Project name is required", errorcode=400)
 
-    version = form.get("version")
-    if not version:
-        raise ASFQuartException("Version is required", errorcode=400)
-
     product_name = form.get("product_name")
     if not product_name:
         raise ASFQuartException("Product name is required", errorcode=400)
 
-    # Verify user is a PMC member or committer of the project
-    if project_name not in session.committees and project_name not in session.projects:
-        raise ASFQuartException(
-            f"You must be a PMC member or committer of {project_name} to submit a release candidate", errorcode=403
-        )
+    version = form.get("version")
+    if not version:
+        raise ASFQuartException("Version is required", errorcode=400)
 
-    # Generate a 128-bit random token for the release storage key
-    # TODO: Perhaps we should call this the release_id instead
-    storage_token = secrets.token_hex(16)
-
+    # TODO: Forbid creating a release with an existing project, product, and version
     # Create the release record in the database
     async with get_session() as db_session:
         async with db_session.begin():
@@ -273,9 +281,21 @@ async def release_create_post(session: ClientSession, request: Request) -> Respo
                 APP.logger.debug(f"Available projects: {session.projects}")
                 raise ASFQuartException("PMC not found", errorcode=404)
 
+            # Verify user is a PMC member or committer of the project
+            # We use pmc.display_name, so this must come within the transaction
+            if project_name not in session.committees and project_name not in session.projects:
+                raise ASFQuartException(
+                    f"You must be a PMC member or committer of {pmc.display_name} to submit a release candidate",
+                    errorcode=403,
+                )
+
+            # Generate a 128-bit random token for the release storage key
+            # TODO: Perhaps we should call this the release_key instead
+            storage_key = secrets.token_hex(16)
+
             # Create release record
             release = Release(
-                storage_key=storage_token,
+                storage_key=storage_key,
                 stage=ReleaseStage.CANDIDATE,
                 phase=ReleasePhase.RELEASE_CANDIDATE,
                 pmc_id=pmc.id,
@@ -284,13 +304,8 @@ async def release_create_post(session: ClientSession, request: Request) -> Respo
             )
             db_session.add(release)
 
-            # TODO: Create or link to product line
-            # For now, we'll just create releases without product lines
-            # What sort of role do product lines play in our UX?
-
     # Redirect to the attach artifacts page with the storage token
-    # We should possibly have a results, or list of releases, page instead
-    return redirect(url_for("root_candidate_attach", storage_key=storage_token))
+    return redirect(url_for("root_candidate_attach", storage_key=storage_key))
 
 
 @APP.route("/")
@@ -316,16 +331,18 @@ async def root_candidate_attach() -> Response | str:
 
     # Get all releases where the user is a PMC member or committer of the associated PMC
     async with get_session() as db_session:
+        # TODO: This duplicates code in root_candidate_review
         release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
         statement = select(Release).options(release_pmc).join(PMC).where(Release.stage == ReleaseStage.CANDIDATE)
         releases = (await db_session.execute(statement)).scalars().all()
 
-        # Filter to only show releases for PMCs where the user is a member or committer
+        # Filter to only show releases for PMCs or PPMCs where the user is a member or committer
         # Can we do this in sqlmodel using JSON container operators?
         user_releases = []
         for r in releases:
             if r.pmc is None:
                 continue
+            # For PPMCs the "members" are stored in the committers field
             if session.uid in r.pmc.pmc_members or session.uid in r.pmc.committers:
                 user_releases.append(r)
 
@@ -350,12 +367,20 @@ async def root_candidate_create() -> Response | str:
     if request.method == "POST":
         return await release_create_post(session, request)
 
+    # Get PMC objects for all projects the user is a member of
+    async with get_session() as db_session:
+        from sqlalchemy.sql.expression import ColumnElement
+
+        project_list = session.committees + session.projects
+        project_name: ColumnElement[str] = cast(ColumnElement[str], PMC.project_name)
+        statement = select(PMC).where(project_name.in_(project_list))
+        user_pmcs = (await db_session.execute(statement)).scalars().all()
+
     # For GET requests, show the form
     return await render_template(
         "candidate-create.html",
         asf_id=session.uid,
-        pmc_memberships=session.committees,
-        committer_projects=session.projects,
+        user_pmcs=user_pmcs,
     )
 
 
@@ -620,9 +645,10 @@ async def root_candidate_review() -> str:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
     async with get_session() as db_session:
-        # Get all releases where the user is a PMC member of the associated PMC
+        # Get all releases where the user is a PMC member or committer
         # TODO: We don't actually record who uploaded the release candidate
         # We should probably add that information!
+        # TODO: This duplicates code in root_candidate_attach
         release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
         release_packages = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages))
         statement = (
@@ -633,12 +659,13 @@ async def root_candidate_review() -> str:
         )
         releases = (await db_session.execute(statement)).scalars().all()
 
-        # Filter to only show releases for PMCs where the user is a member
+        # Filter to only show releases for PMCs or PPMCs where the user is a member or committer
         user_releases = []
         for r in releases:
             if r.pmc is None:
                 continue
-            if session.uid in r.pmc.pmc_members:
+            # For PPMCs the "members" are stored in the committers field
+            if session.uid in r.pmc.pmc_members or session.uid in r.pmc.committers:
                 user_releases.append(r)
 
         return await render_template("candidate-review.html", releases=user_releases)

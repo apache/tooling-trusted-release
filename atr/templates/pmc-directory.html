@@ -1,11 +1,11 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Project Management Committees ~ ATR
+  Project directory ~ ATR
 {% endblock title %}
 
 {% block description %}
-  List of all PMCs and their latest releases.
+  List of all ASF projects and their latest releases.
 {% endblock description %}
 
 {% block head_extra %}
@@ -68,8 +68,8 @@
 {% endblock head_extra %}
 
 {% block content %}
-  <h1>Project Management Committees</h1>
-  <p class="intro">Current Apache PMCs and their releases:</p>
+  <h1>Project directory</h1>
+  <p class="intro">Current ASF projects and their releases:</p>
 
   <input type="text"
          id="pmc-filter"
@@ -79,7 +79,7 @@
   <div class="pmc-grid">
     {% for pmc in pmcs %}
       <div class="pmc-card">
-        <div class="pmc-name">{{ pmc.project_name }}</div>
+        <div class="pmc-name">{{ pmc.display_name }}</div>
         <div class="pmc-stats">
           <div class="stat-item">
             <span class="stat-label">PMC Members</span>

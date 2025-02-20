@@ -83,11 +83,11 @@
           <td>
             <select id="project_name" name="project_name" required>
               <option value="">Select a project...</option>
-              {% for project in (pmc_memberships + committer_projects)|unique|sort %}
-                <option value="{{ project }}">{{ project }}</option>
+              {% for pmc in user_pmcs|sort(attribute='project_name') %}
+                <option value="{{ pmc.project_name }}">{{ pmc.display_name }}</option>
               {% endfor %}
             </select>
-            {% if not pmc_memberships and not committer_projects %}
+            {% if not user_pmcs %}
               <p class="error-message">You must be a PMC member or committer to submit a release candidate.</p>
             {% endif %}
           </td>
@@ -115,8 +115,7 @@
         <tr>
           <td></td>
           <td>
-            <button type="submit"
-                    {% if not pmc_memberships and not committer_projects %}disabled{% endif %}>Create release</button>
+            <button type="submit" {% if not user_pmcs %}disabled{% endif %}>Create release</button>
           </td>
         </tr>
       </tbody>
