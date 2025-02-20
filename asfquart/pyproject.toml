@@ -1,23 +1,29 @@
 [tool.poetry]
 name = "asfquart"
-version = "0.1.9"
+version = "0.1.10"
 authors = ["ASF Infrastructure <users@infra.apache.org>"]
 license = "Apache-2.0"
 readme = "README.md"
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3"
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 description = "ASF Quart Framework"
+repository = "https://github.com/apache/infrastructure-asfquart"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4"
 aiohttp = "^3.9.2"
 PyYAML = "^6.0.1"
-pytest = "7.2.0"
-pytest-cov = "^4.0.0"
-pytest-asyncio = "^0.20.3"
-pytest-mock = "^3.10.0"
 quart = "^0.20.0"
 ezt = "~1.1"
 asfpy = "~0.52"
@@ -25,6 +31,23 @@ easydict = "~1.13"
 exceptiongroup = { version = ">=1.1.0", python = "<3.11" }
 watchfiles = "~0.24.0"
 
+[tool.poetry.group.test.dependencies]
+pytest = "7.2.0"
+pytest-cov = "^4.0.0"
+pytest-asyncio = "^0.20.3"
+pytest-mock = "^3.10.0"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+minversion = "7.2"
+testpaths  = ["tests"]
+pythonpath = ["src"]
+python_files = "*.py"
+markers = [
+    "config: Configuration parsing tests",
+    "session: Client session management tests",
+    "auth: Authentication/Authorization tests"
+]

@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 
-import sys
-sys.path.extend(('src', '../src',))  # Depending on where unit tests are run from, path may differ
-
 import pathlib
 
 import pytest
@@ -23,4 +20,6 @@ async def test_config_static():
         assert isinstance(yml, dict), "Config YAML is not a dict!"
 
     # Async test
-    await config_callback(TEST_CONFIG_FILENAME)
+    # the decorator @asfquart.config.static wraps the function to an async method
+    # suppress inspections as they fail to recognize that
+    await config_callback(TEST_CONFIG_FILENAME)  # noqa

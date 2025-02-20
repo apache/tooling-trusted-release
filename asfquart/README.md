@@ -1,6 +1,9 @@
 # asfquart - a Quart framework for the ASF
-![Unit Tests](https://github.com/apache/infrastructure-asfquart/actions/workflows/unit-tests.yml/badge.svg)
-  
+<a href="https://pypi.org/project/asfquart"><img alt="PyPI" src="https://img.shields.io/pypi/v/asfquart.svg?color=blue&maxAge=600" /></a>
+<a href="https://pypi.org/project/asfquart"><img alt="PyPI - Python Versions" src="https://img.shields.io/pypi/pyversions/asfquart.svg?maxAge=600" /></a>
+<a href="https://github.com/apache/infrastructure-asfquart/actions/workflows/unit-tests.yml?query=branch%3Amain"><img alt="Unit Tests" src="https://github.com/apache/infrastructure-asfquart/actions/workflows/unit-tests.yml/badge.svg?branch=main" /></a>
+<a href="https://github.com/apache/infrastructure-asfquart/blob/main/LICENSE"><img alt="Apache License" src="https://img.shields.io/github/license/apache/infrastructure-asfquart" /></a>
+
 This is a [Quart](https://github.com/pallets/quart/) framework for ASF web applications.
 
 On top of Quart, this package layers a lot of functionality, much of which is specific to
@@ -18,12 +21,12 @@ asfquart adds the following items to basic quart:
 * LDAP group testing for authz
 * long-running tasks and their lifecycle management
 
-Current users of asfquart:
+Current (known, public) users of asfquart:
 
-* Board Agenda tool
-* Infrastructure's Reporting Dashboard
-* personal/home project of gstein
-* ??
+* [Board Agenda Tool](https://github.com/apache/infrastructure-agenda/)
+* [Infrastructure's Reporting Dashboard](https://github.com/apache/infrastructure-reporting-dashboard)
+* [ASF Self Serve Portal](https://github.com/apache/infrastructure-selfserve-portal)
+
 
 Future users of asfquart:
 
@@ -59,4 +62,12 @@ def my_app():
 if __name__ == "__main__":
     my_app()
 
+~~~
+
+## Running unit tests for asfquart
+
+To run manually, use the following commands from the root dir of this repo:
+
+~~~shell
+poetry run pytest
 ~~~

@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
 
-import sys
-sys.path.extend(
-    (
-        "src",
-        "../src",
-    )
-)  # Depending on where unit tests are run from, path may differ
-
 import time
 
 import pytest
@@ -48,7 +40,6 @@ async def test_auth_basics():
         @asfquart.auth.require(any_of={R.member, print})
         async def requires_bad_thingy():
             pass
-
 
 
 @pytest.mark.asyncio
