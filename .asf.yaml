@@ -7,3 +7,17 @@ github:
     squash_commit_message: DEFAULT
     merge:   false
     rebase:  true
+  custom_subjects:
+    new_pr: "[PR] {title} ({repository})"
+    close_pr: "Re: [PR] {title} ({repository})"
+    comment_pr: "Re: [PR] {title} ({repository})"
+    merge_pr: "Re: [PR] {title} ({repository})"
+    new_issue: "[I] {title} ({repository})"
+    comment_issue: "Re: [I] {title} ({repository})"
+    close_issue: "Re: [I] {title} ({repository})"
+    catchall: "[GH] {title} ({repository})"
+
+notifications:
+  commits:      commits@tooling.apache.org
+  issues:       dev@tooling.apache.org
+  pullrequests: dev@tooling.apache.org
