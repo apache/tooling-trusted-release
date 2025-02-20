@@ -58,6 +58,30 @@
           opacity: 0.5;
           cursor: not-allowed;
       }
+
+      .flash-message {
+          padding: 1rem;
+          margin-bottom: 1rem;
+          border-radius: 4px;
+      }
+
+      .flash-warning {
+          background-color: #fff3cd;
+          border: 1px solid #ffeeba;
+          color: #856404;
+      }
+
+      .flash-error {
+          background-color: #f8d7da;
+          border: 1px solid #f5c6cb;
+          color: #721c24;
+      }
+
+      .flash-success {
+          background-color: #d4edda;
+          border: 1px solid #c3e6cb;
+          color: #155724;
+      }
   </style>
 {% endblock stylesheets %}
 
@@ -67,6 +91,12 @@
     Welcome, <strong>{{ asf_id }}</strong>! Use this form to attach package artifacts
     to an existing release candidate.
   </p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}<div class="flash-message flash-{{ category }}">{{ message }}</div>{% endfor %}
+    {% endif %}
+  {% endwith %}
 
   <form method="post" enctype="multipart/form-data" class="striking">
     <table class="form-table">
@@ -111,16 +141,29 @@
 
         <tr>
           <th>
+            <label for="release_checksum">SHA-512 Checksum File:</label>
+          </th>
+          <td>
+            <input type="file"
+                   id="release_checksum"
+                   name="release_checksum"
+                   accept=".sha512,.sha,.txt"
+                   aria-describedby="checksum-help" />
+            <span id="checksum-help" class="help-text">Optional: Upload the SHA-512 checksum file for verification</span>
+          </td>
+        </tr>
+
+        <tr>
+          <th>
             <label for="release_signature">Detached GPG Signature:</label>
           </th>
           <td>
             <input type="file"
                    id="release_signature"
                    name="release_signature"
-                   required
                    accept="application/pgp-signature,.asc"
                    aria-describedby="signature-help" />
-            <span id="signature-help" class="help-text">Upload the detached GPG signature (.asc) file for the release candidate</span>
+            <span id="signature-help" class="help-text">Optional: Upload the detached GPG signature (.asc) file</span>
           </td>
         </tr>
 

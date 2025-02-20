@@ -99,71 +99,116 @@ async def ephemeral_gpg_home():
 
 async def release_attach_post(session: ClientSession, request: Request) -> Response:
     """Handle POST request for attaching package artifacts to a release."""
+
+    async def flash_error_and_redirect(message: str) -> Response:
+        await flash(message, "error")
+        return redirect(url_for("root_candidate_attach"))
+
     form = await request.form
 
     # TODO: Check that the submitter is a committer of the project
 
     release_key = form.get("release_key")
     if not release_key:
-        raise ASFQuartException("Release key is required", errorcode=400)
+        return await flash_error_and_redirect("Release key is required")
 
     # Get all uploaded files
     files = await request.files
 
-    # Get the release artifact and signature files
+    # Get the release artifact, checksum, and signature files
     artifact_file = files.get("release_artifact")
+    checksum_file = files.get("release_checksum")
     signature_file = files.get("release_signature")
+    if not isinstance(artifact_file, FileStorage):
+        return await flash_error_and_redirect("Release artifact file is required")
+    if artifact_file.filename is None:
+        return await flash_error_and_redirect("Release artifact filename is required")
+    if checksum_file is not None and not isinstance(checksum_file, FileStorage):
+        return await flash_error_and_redirect("Problem with checksum file")
+    if signature_file is not None and not isinstance(signature_file, FileStorage):
+        return await flash_error_and_redirect("Problem with signature file")
 
-    if not artifact_file:
-        raise ASFQuartException("Release artifact file is required", errorcode=400)
-    if not signature_file:
-        raise ASFQuartException("Detached GPG signature file is required", errorcode=400)
-    if not signature_file.filename.endswith(".asc"):
-        # TODO: Could also check that it's artifact name + ".asc"
-        # And at least warn if it's not
-        raise ASFQuartException("Signature file must have .asc extension", errorcode=400)
-
-    # Save files using their hashes as filenames
-    uploads_path = Path(get_release_storage_dir())
-    artifact_sha3, artifact_size = await save_file_by_hash(uploads_path, artifact_file)
-    signature_sha3, _ = await save_file_by_hash(uploads_path, signature_file)
-
-    # Check if these files are already attached to this release
-    async with get_session() as db_session:
-        # Check for duplicate artifact or signature in a single query
-        statement = select(Package).where(
-            Package.release_key == release_key,
-            (Package.artifact_sha3 == artifact_sha3) | (Package.signature_sha3 == signature_sha3),
-        )
-        duplicate = (await db_session.execute(statement)).first()
-
-        if duplicate:
-            package = duplicate[0]
-            # TODO: This logic should be improved
-            if package.artifact_sha3 == artifact_sha3:
-                raise ASFQuartException("This release artifact has already been uploaded", errorcode=400)
-            else:
-                raise ASFQuartException("This signature file has already been uploaded", errorcode=400)
-
-        # Compute SHA-512 of the artifact for the package record
-        sha512 = compute_sha512(uploads_path / artifact_sha3)
-
-    # Create the package record in the database
+    # Save files and create package record in one transaction
     async with get_session() as db_session:
         async with db_session.begin():
-            package = Package(
-                artifact_sha3=artifact_sha3,
-                filename=artifact_file.filename,
-                signature_sha3=signature_sha3,
-                sha512=sha512,
-                release_key=release_key,
-                uploaded=datetime.datetime.now(datetime.UTC),
-                bytes_size=artifact_size,
+            # First check for duplicates
+            statement = select(Package).where(
+                Package.release_key == release_key,
+                Package.filename == artifact_file.filename,
             )
-            db_session.add(package)
+            duplicate = (await db_session.execute(statement)).first()
 
-    # Redirect to the release candidate review page
+            if duplicate:
+                return await flash_error_and_redirect("This release artifact has already been uploaded")
+
+            # Process and save the files
+            try:
+                ok, artifact_sha3, artifact_size, artifact_sha512, signature_sha3 = await release_attach_post_helper(
+                    artifact_file, checksum_file, signature_file
+                )
+                if not ok:
+                    # The flash error is already set by the helper
+                    return redirect(url_for("root_candidate_attach"))
+
+                # Create the package record
+                package = Package(
+                    artifact_sha3=artifact_sha3,
+                    filename=artifact_file.filename,
+                    signature_sha3=signature_sha3,
+                    sha512=artifact_sha512,
+                    release_key=release_key,
+                    uploaded=datetime.datetime.now(datetime.UTC),
+                    bytes_size=artifact_size,
+                )
+                db_session.add(package)
+
+            except Exception as e:
+                return await flash_error_and_redirect(f"Error processing files: {e!s}")
+
+    # Otherwise redirect to review page
     return redirect(url_for("root_candidate_review"))
+
+
+async def release_attach_post_helper(
+    artifact_file: FileStorage, checksum_file: FileStorage | None, signature_file: FileStorage | None
+) -> tuple[bool, str, int, str, str | None]:
+    """Helper function for release_attach_post."""
+    # Save files using their hashes as filenames
+    uploads_path = Path(get_release_storage_dir())
+    try:
+        artifact_sha3, artifact_size = await save_file_by_hash(uploads_path, artifact_file)
+        # Compute SHA-512 of the artifact for the package record
+        artifact_sha512 = compute_sha512(uploads_path / artifact_sha3)
+    except Exception as e:
+        await flash(f"Error saving artifact file: {e!s}", "error")
+        return False, "", 0, "", None
+    # Note: "error" is not permitted past this point
+    # Because we don't want to roll back saving the artifact
+
+    # Validate checksum file if provided
+    if checksum_file:
+        try:
+            # Read only the number of bytes required for the checksum
+            bytes_required: int = len(artifact_sha512)
+            checksum_content = checksum_file.read(bytes_required).decode().strip()
+            if checksum_content.lower() != artifact_sha512.lower():
+                await flash("Warning: Provided checksum does not match computed SHA-512", "warning")
+        except UnicodeDecodeError:
+            await flash("Warning: Could not read checksum file as text", "warning")
+        except Exception as e:
+            await flash(f"Warning: Error validating checksum file: {e!s}", "warning")
+
+    # Process signature file if provided
+    signature_sha3 = None
+    if signature_file and signature_file.filename:
+        if not signature_file.filename.endswith(".asc"):
+            await flash("Warning: Signature file should have .asc extension", "warning")
+        try:
+            signature_sha3, _ = await save_file_by_hash(uploads_path, signature_file)
+        except Exception as e:
+            await flash(f"Warning: Could not save signature file: {e!s}", "warning")
+
+    return True, artifact_sha3, artifact_size, artifact_sha512, signature_sha3
 
 
 async def release_create_post(session: ClientSession, request: Request) -> Response:
@@ -329,6 +374,11 @@ async def root_candidate_signatures_verify(release_key: str) -> str:
             result = {"file": package.artifact_sha3}
 
             artifact_path = storage_dir / package.artifact_sha3
+            if package.signature_sha3 is None:
+                result["error"] = "No signature file provided"
+                verification_results.append(result)
+                continue
+
             signature_path = storage_dir / package.signature_sha3
 
             if not artifact_path.exists():

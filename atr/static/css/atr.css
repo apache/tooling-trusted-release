@@ -35,6 +35,10 @@ input, textarea, button, select, option {
     font-weight: 425;
 }
 
+select, input[type="file"] {
+    padding: 6px 12px;
+}
+
 a { font-weight: 450; }
 
 h1, h2, h3 {

@@ -142,7 +142,7 @@ class Package(SQLModel, table=True):
     # SHA-512 hash of the file
     sha512: str
     # The signature file
-    signature_sha3: str
+    signature_sha3: str | None = None
     # Uploaded timestamp
     uploaded: datetime.datetime
     # The size of the file in bytes
