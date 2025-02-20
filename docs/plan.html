@@ -3,13 +3,25 @@
 <h2>UX improvements</h2>
 <ol>
 <li>
+<p>Improve RC workflow</p>
+<ul>
+<li>Allow upload of checksum file alongside artifacts and signatures</li>
+<li>Add a checkbox to choose the RC artifact type</li>
+<li>Allow extra types of artifact, such as reproducible binary and convenience binary</li>
+<li>Differentiate between podling PPMCs and top level PMCs</li>
+</ul>
+</li>
+<li>
 <p>Enhance RC display</p>
 <ul>
 <li>[DONE] Augment raw file hashes with the original filenames in the UI</li>
 <li>[DONE] Add file size and upload timestamp</li>
 <li>[DONE] Improve the layout of file listings</li>
+<li>Show KB, MB, or GB units for file sizes</li>
+<li>Add a standard artifact naming pattern based on the project and product</li>
 <li>Potentially add the option to upload package artifacts without signatures</li>
 <li>Show validation status indicators</li>
+<li>Add developer RC download buttons with clear verification instructions</li>
 </ul>
 </li>
 <li>
@@ -17,6 +29,9 @@
 <ul>
 <li>[DONE] Display which PMCs are using each key</li>
 <li>Add key expiration warnings</li>
+<li>Fix reported problem with adding keys</li>
+<li>Add debugging output error messages for when key addition fails</li>
+<li>Allow adding keys from a KEYS file</li>
 </ul>
 </li>
 <li>
@@ -31,9 +46,7 @@
 <p>Advanced tasks, possibly deferred</p>
 <ul>
 <li>Implement a key revocation workflow</li>
-<li>Add developer RC download buttons with clear verification instructions</li>
 <li>Check RC file naming conventions</li>
-<li>Display vote status and timeline</li>
 <li>Add ability to sign artifact hashes on the platform using JS</li>
 </ul>
 <h2>Task scheduler</h2>
@@ -130,6 +143,7 @@
 <li>Track votes and calculate results</li>
 <li>Generate vote summaries</li>
 <li>Handle binding vs non-binding votes</li>
+<li>Display vote status and timeline</li>
 </ul>
 </li>
 <li>

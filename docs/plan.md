@@ -4,27 +4,37 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
 
 ## UX improvements
 
-1. Enhance RC display
+1. Improve RC workflow
+   - Allow upload of checksum file alongside artifacts and signatures
+   - Add a checkbox to choose the RC artifact type
+   - Allow extra types of artifact, such as reproducible binary and convenience binary
+   - Differentiate between podling PPMCs and top level PMCs
+
+2. Enhance RC display
    - [DONE] Augment raw file hashes with the original filenames in the UI
    - [DONE] Add file size and upload timestamp
    - [DONE] Improve the layout of file listings
+   - Show KB, MB, or GB units for file sizes
+   - Add a standard artifact naming pattern based on the project and product
    - Potentially add the option to upload package artifacts without signatures
    - Show validation status indicators
+   - Add developer RC download buttons with clear verification instructions
 
-2. Improve key management interface
+3. Improve key management interface
    - [DONE] Display which PMCs are using each key
    - Add key expiration warnings
+   - Fix reported problem with adding keys
+   - Add debugging output error messages for when key addition fails
+   - Allow adding keys from a KEYS file
 
-3. Release status dashboard
+4. Release status dashboard
    - Add progress indicators for release phases
    - Show current blockers and required actions
    - Add quick actions for release managers
 
 Advanced tasks, possibly deferred
    - Implement a key revocation workflow
-   - Add developer RC download buttons with clear verification instructions
    - Check RC file naming conventions
-   - Display vote status and timeline
    - Add ability to sign artifact hashes on the platform using JS
 
 ## Task scheduler
@@ -94,6 +104,7 @@ These are long term implementation requirements.
    - Track votes and calculate results
    - Generate vote summaries
    - Handle binding vs non-binding votes
+   - Display vote status and timeline
 
 2. Release announcement
    - Template-based announcement generation with all required metadata
