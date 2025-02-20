@@ -17,10 +17,10 @@
 
 import json
 
-from atr.apache import ApacheProjects
+from atr.apache import CommitteeInfo, CommitteeRetired, LDAPProjects
 
 
-def test_model():
+def test_ldap_projects_model():
     json_data = """
 {
   "lastTimestamp": "20250219115218Z",
@@ -44,8 +44,84 @@ def test_model():
     }
   }
 }"""
-    projects = ApacheProjects.model_validate(json.loads(json_data))
+    projects = LDAPProjects.model_validate(json.loads(json_data))
 
     assert projects is not None
     assert projects.project_count == 1
     assert projects.projects[0].name == "tooling"
+
+
+def test_committee_info_model():
+    json_data = """
+{
+  "last_updated": "2025-02-19 21:57:21 UTC",
+  "committee_count": 1,
+  "pmc_count": 1,
+  "committees": {
+    "tooling": {
+      "display_name": "Tooling",
+      "site": "http://tooling.apache.org/",
+      "description": "tools, tools, tools",
+      "mail_list": "tooling",
+      "established": "01/2025",
+      "report": [
+        "January",
+        "April",
+        "July",
+        "October"
+      ],
+      "chair": {
+        "wave": {
+          "name": "Dave Fisher"
+        }
+      },
+      "roster_count": 3,
+      "roster": {
+        "wave": {
+          "name": "Dave Fisher",
+          "date": "2025-01-01"
+        },
+        "sbp": {
+          "name": "Sean B. Palmer",
+          "date": "2025-02-01"
+        },
+        "tn": {
+          "name": "Thomas Neidhart",
+          "date": "2025-03-01"
+        }
+      },
+      "pmc": true
+    }
+  }
+}"""
+    committees = CommitteeInfo.model_validate(json.loads(json_data))
+
+    assert committees is not None
+    assert committees.pmc_count == 1
+
+    tooling = committees.committees[0]
+    assert tooling.name == "tooling"
+    assert len(tooling.roster) == 3
+    assert "tn" in map(lambda x: x.id, tooling.roster)
+
+
+def test_committee_retired_model():
+    json_data = """
+{
+  "last_updated": "2025-02-19 21:57:21 UTC",
+  "retired_count": 1,
+  "retired": {
+    "abdera": {
+      "display_name": "Abdera",
+      "description": "blablabla",
+      "retired": "2017-03"
+    }
+  }
+}"""
+    retired_committees = CommitteeRetired.model_validate(json.loads(json_data))
+
+    assert retired_committees is not None
+    assert retired_committees.retired_count == 1
+
+    pmc = retired_committees.retired[0]
+    assert pmc.name == "abdera"

@@ -71,8 +71,8 @@ def _get_dict_to_list_inner_type_adapter(source_type: Any, key: str) -> TypeAdap
     assert (other_fields := {k: v for k, v in fields.items() if k != key})  # noqa: RUF018
 
     model_name = f"{cls.__name__}Inner"
-    inner_model = create_model(model_name, **{k: (Any, v) for k, v in other_fields.items()})  # type: ignore
-    return TypeAdapter(dict[Annotated[Any, key_field], inner_model])  # type: ignore
+    inner_model = create_model(model_name, **{k: (v.annotation, v) for k, v in other_fields.items()})  # type: ignore
+    return TypeAdapter(dict[Annotated[str, key_field], inner_model])  # type: ignore
 
 
 def _get_dict_to_list_validator(inner_adapter: TypeAdapter[dict[Any, Any]], key: str) -> Any:

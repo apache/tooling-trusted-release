@@ -26,7 +26,7 @@ from werkzeug.wrappers.response import Response
 
 from asfquart.base import ASFQuartException
 from asfquart.session import read as session_read
-from atr.apache import ApacheProjects, get_apache_project_data
+from atr.apache import LDAPProjects, get_ldap_projects_data
 from atr.db import get_session
 from atr.db.models import (
     PMC,
@@ -185,11 +185,11 @@ async def secret_pmcs_update() -> str | Response:
     return await render_template("secret/update-pmcs.html")
 
 
-async def secret_pmcs_update_data() -> tuple[ApacheProjects, dict, dict]:
+async def secret_pmcs_update_data() -> tuple[LDAPProjects, dict, dict]:
     """Fetch and update PMCs and podlings from remote data."""
     # Fetch committee-info.json from whimsy.apache.org
     try:
-        apache_projects = await get_apache_project_data()
+        apache_projects = await get_ldap_projects_data()
     except (httpx.RequestError, json.JSONDecodeError) as e:
         raise FlashError(f"Failed to fetch committee data: {e!s}")
 
