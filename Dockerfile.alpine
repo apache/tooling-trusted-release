@@ -11,6 +11,7 @@ RUN apk update && apk add --no-cache \
     file \
     gcompat \
     git \
+    gpg \
     make \
     nix \
     nodejs \

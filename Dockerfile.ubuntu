@@ -8,6 +8,7 @@ ENV SCRIPTS=${SCRIPTS}
 
 RUN apt-get update && apt-get install -y \
     git \
+    gpg \
     make \
     software-properties-common
 
