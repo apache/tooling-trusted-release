@@ -48,5 +48,4 @@ jobs:
       # Run tests
       - name: Run tests
         run: |
-          source $VENV
-          pytest -rs tests
+          poetry run pytest -rs tests
