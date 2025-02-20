@@ -48,6 +48,7 @@ from atr.db.models import (
     PMC,
     Package,
     PMCKeyLink,
+    ProductLine,
     PublicSigningKey,
     Release,
     ReleasePhase,
@@ -100,19 +101,19 @@ async def ephemeral_gpg_home():
         await asyncio.to_thread(shutil.rmtree, temp_dir)
 
 
-async def release_attach_post(session: ClientSession, request: Request) -> Response:
-    """Handle POST request for attaching package artifacts to a release."""
+async def package_add_post(session: ClientSession, request: Request) -> Response:
+    """Handle POST request for adding a package to a release."""
     try:
-        release_key, artifact_file, checksum_file, signature_file, artifact_type = await release_attach_post_validate(
+        release_key, artifact_file, checksum_file, signature_file, artifact_type = await package_add_post_validate(
             request
         )
     except FlashError as e:
         await flash(f"{e!s}", "error")
-        return redirect(url_for("root_candidate_attach"))
+        return redirect(url_for("root_package_add"))
     # This must come here to appease the type checker
     if artifact_file.filename is None:
         await flash("Release artifact filename is required", "error")
-        return redirect(url_for("root_candidate_attach"))
+        return redirect(url_for("root_package_add"))
 
     # Save files and create package record in one transaction
     async with get_session() as db_session:
@@ -120,12 +121,12 @@ async def release_attach_post(session: ClientSession, request: Request) -> Respo
             # Process and save the files
             try:
                 try:
-                    artifact_sha3, artifact_size, artifact_sha512, signature_sha3 = await release_attach_post_session(
+                    artifact_sha3, artifact_size, artifact_sha512, signature_sha3 = await package_add_post_session(
                         db_session, release_key, artifact_file, checksum_file, signature_file
                     )
                 except FlashError as e:
                     await flash(f"{e!s}", "error")
-                    return redirect(url_for("root_candidate_attach"))
+                    return redirect(url_for("root_package_add"))
 
                 # Create the package record
                 package = Package(
@@ -142,13 +143,13 @@ async def release_attach_post(session: ClientSession, request: Request) -> Respo
 
             except Exception as e:
                 await flash(f"Error processing files: {e!s}", "error")
-                return redirect(url_for("root_candidate_attach"))
+                return redirect(url_for("root_package_add"))
 
     # Otherwise redirect to review page
     return redirect(url_for("root_candidate_review"))
 
 
-async def release_attach_post_validate(
+async def package_add_post_validate(
     request: Request,
 ) -> tuple[str, FileStorage, FileStorage | None, FileStorage | None, str]:
     form = await request.form
@@ -199,14 +200,14 @@ async def get_artifact_info(
     return artifact_sha3, compute_sha512(uploads_path / artifact_sha3), artifact_size
 
 
-async def release_attach_post_session(
+async def package_add_post_session(
     db_session: AsyncSession,
     release_key: str,
     artifact_file: FileStorage,
     checksum_file: FileStorage | None,
     signature_file: FileStorage | None,
 ) -> tuple[str, int, str, str | None]:
-    """Helper function for release_attach_post."""
+    """Helper function for package_add_post."""
 
     # First check for duplicates by filename
     statement = select(Package).where(
@@ -293,19 +294,33 @@ async def release_create_post(session: ClientSession, request: Request) -> Respo
             # TODO: Perhaps we should call this the release_key instead
             storage_key = secrets.token_hex(16)
 
-            # Create release record
+            # Create or get existing product line
+            statement = select(ProductLine).where(
+                ProductLine.pmc_id == pmc.id, ProductLine.product_name == product_name
+            )
+            product_line = (await db_session.execute(statement)).scalar_one_or_none()
+
+            if not product_line:
+                # Create new product line if it doesn't exist
+                product_line = ProductLine(pmc_id=pmc.id, product_name=product_name, latest_version=version)
+                db_session.add(product_line)
+                # Flush to get the product_line.id
+                await db_session.flush()
+
+            # Create release record with product line
             release = Release(
                 storage_key=storage_key,
                 stage=ReleaseStage.CANDIDATE,
                 phase=ReleasePhase.RELEASE_CANDIDATE,
                 pmc_id=pmc.id,
+                product_line_id=product_line.id,
                 version=version,
                 created=datetime.datetime.now(datetime.UTC),
             )
             db_session.add(release)
 
-    # Redirect to the attach artifacts page with the storage token
-    return redirect(url_for("root_candidate_attach", storage_key=storage_key))
+    # Redirect to the add package page with the storage token
+    return redirect(url_for("root_package_add", storage_key=storage_key))
 
 
 @APP.route("/")
@@ -314,17 +329,17 @@ async def root() -> str:
     return await render_template("index.html")
 
 
-@APP.route("/candidate/attach", methods=["GET", "POST"])
+@APP.route("/package/add", methods=["GET", "POST"])
 @require(Requirements.committer)
-async def root_candidate_attach() -> Response | str:
-    """Attach package artifacts to an existing release."""
+async def root_package_add() -> Response | str:
+    """Add package artifacts to an existing release."""
     session = await session_read()
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
     # For POST requests, handle the file upload
     if request.method == "POST":
-        return await release_attach_post(session, request)
+        return await package_add_post(session, request)
 
     # Get the storage_key from the query parameters (if redirected from create)
     storage_key = request.args.get("storage_key")
@@ -333,7 +348,13 @@ async def root_candidate_attach() -> Response | str:
     async with get_session() as db_session:
         # TODO: This duplicates code in root_candidate_review
         release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
-        statement = select(Release).options(release_pmc).join(PMC).where(Release.stage == ReleaseStage.CANDIDATE)
+        release_product_line = selectinload(cast(InstrumentedAttribute[ProductLine], Release.product_line))
+        statement = (
+            select(Release)
+            .options(release_pmc, release_product_line)
+            .join(PMC)
+            .where(Release.stage == ReleaseStage.CANDIDATE)
+        )
         releases = (await db_session.execute(statement)).scalars().all()
 
         # Filter to only show releases for PMCs or PPMCs where the user is a member or committer
@@ -348,7 +369,7 @@ async def root_candidate_attach() -> Response | str:
 
     # For GET requests, show the form
     return await render_template(
-        "candidate-attach.html",
+        "package-add.html",
         asf_id=session.uid,
         releases=user_releases,
         selected_release=storage_key,
@@ -655,6 +676,17 @@ def format_file_size(size_in_bytes: int) -> str:
         return f"{formatted_bytes} bytes"
 
 
+def format_artifact_name(project_name: str, product_name: str, version: str, is_podling: bool = False) -> str:
+    """Format an artifact name according to Apache naming conventions.
+
+    For regular projects: apache-${project}-${product}-${version}
+    For podlings: apache-${project}-incubating-${product}-${version}
+    """
+    if is_podling:
+        return f"apache-{project_name}-incubating-{product_name}-{version}"
+    return f"apache-{project_name}-{product_name}-{version}"
+
+
 @APP.route("/candidate/review")
 @require(Requirements.committer)
 async def root_candidate_review() -> str:
@@ -667,12 +699,13 @@ async def root_candidate_review() -> str:
         # Get all releases where the user is a PMC member or committer
         # TODO: We don't actually record who uploaded the release candidate
         # We should probably add that information!
-        # TODO: This duplicates code in root_candidate_attach
+        # TODO: This duplicates code in root_package_add
         release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
         release_packages = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages))
+        release_product_line = selectinload(cast(InstrumentedAttribute[ProductLine], Release.product_line))
         statement = (
             select(Release)
-            .options(release_pmc, release_packages)
+            .options(release_pmc, release_packages, release_product_line)
             .join(PMC)
             .where(Release.stage == ReleaseStage.CANDIDATE)
         )
@@ -687,7 +720,12 @@ async def root_candidate_review() -> str:
             if session.uid in r.pmc.pmc_members or session.uid in r.pmc.committers:
                 user_releases.append(r)
 
-        return await render_template("candidate-review.html", releases=user_releases, format_file_size=format_file_size)
+        return await render_template(
+            "candidate-review.html",
+            releases=user_releases,
+            format_file_size=format_file_size,
+            format_artifact_name=format_artifact_name,
+        )
 
 
 async def delete_package_files(package: Package, uploads_path: Path) -> None:
@@ -974,3 +1012,65 @@ async def verify_gpg_signature_file(
         "status": "Valid signature",
         "debug_info": debug_info,
     }
+
+
+async def validate_release_deletion(db_session: AsyncSession, release_key: str, session_uid: str) -> Release:
+    """Validate release deletion request and return the release if valid."""
+    if Release.pmc is None:
+        raise FlashError("Release has no associated PMC")
+
+    rel_pmc = cast(InstrumentedAttribute[PMC], Release.pmc)
+    statement = select(Release).options(selectinload(rel_pmc)).where(Release.storage_key == release_key)
+    result = await db_session.execute(statement)
+    release = result.scalar_one_or_none()
+
+    if not release:
+        raise FlashError("Release not found")
+
+    # Check permissions
+    if release.pmc:
+        if session_uid not in release.pmc.pmc_members and session_uid not in release.pmc.committers:
+            raise FlashError("You don't have permission to delete this release")
+
+    return release
+
+
+async def delete_release_files(release: Release, uploads_path: Path) -> None:
+    """Delete all files associated with a release."""
+    if not release.packages:
+        return
+
+    for package in release.packages:
+        await delete_package_files(package, uploads_path)
+
+
+@APP.route("/release/delete", methods=["POST"])
+@require(Requirements.committer)
+async def root_release_delete() -> Response:
+    """Delete a release and all its associated packages."""
+    session = await session_read()
+    if (session is None) or (session.uid is None):
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    form = await request.form
+    release_key = form.get("release_key")
+
+    if not release_key:
+        await flash("Missing required parameters", "error")
+        return redirect(url_for("root_candidate_review"))
+
+    async with get_session() as db_session:
+        async with db_session.begin():
+            try:
+                release = await validate_release_deletion(db_session, release_key, session.uid)
+                await delete_release_files(release, Path(get_release_storage_dir()))
+                await db_session.delete(release)
+            except FlashError as e:
+                await flash(str(e), "error")
+                return redirect(url_for("root_candidate_review"))
+            except Exception as e:
+                await flash(f"Error deleting release: {e!s}", "error")
+                return redirect(url_for("root_candidate_review"))
+
+    await flash("Release deleted successfully", "success")
+    return redirect(url_for("root_candidate_review"))

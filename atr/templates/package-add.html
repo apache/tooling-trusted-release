@@ -1,11 +1,11 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Attach package artifacts ~ ATR
+  Add a package ~ ATR
 {% endblock title %}
 
 {% block description %}
-  Attach package artifacts to an existing release.
+  Add a package to an existing release.
 {% endblock description %}
 
 {% block stylesheets %}
@@ -103,9 +103,9 @@
 {% endblock stylesheets %}
 
 {% block content %}
-  <h1>Attach package artifacts</h1>
+  <h1>Add package</h1>
   <p class="intro">
-    Welcome, <strong>{{ asf_id }}</strong>! Use this form to attach package artifacts
+    Welcome, <strong>{{ asf_id }}</strong>! Use this form to add package artifacts
     to an existing release candidate.
   </p>
 
@@ -133,22 +133,17 @@
               {% for release in releases %}
                 <option value="{{ release.storage_key }}"
                         {% if release.storage_key == selected_release %}selected{% endif %}>
-                  {{ release.pmc.display_name }} - {{ release.version }}
+                  {{ release.pmc.display_name }} - {{ release.product_line.product_name if release.product_line else "unknown" }} - {{ release.version }}
                 </option>
               {% endfor %}
             </select>
-            {% if not releases %}
-              <p class="error-message">
-                No releases found that you can
-                attach artifacts to.
-              </p>
-            {% endif %}
+            {% if not releases %}<p class="error-message">No releases found that you can add a package to.</p>{% endif %}
           </td>
         </tr>
 
         <tr>
           <th>
-            <label for="release_artifact">Release Candidate Archive:</label>
+            <label for="release_artifact">Release candidate artifact:</label>
           </th>
           <td>
             <input type="file"
@@ -163,7 +158,7 @@
 
         <tr>
           <th>
-            <label>Artifact Type:</label>
+            <label>Artifact type:</label>
           </th>
           <td>
             <div class="radio-group">
@@ -193,7 +188,7 @@
 
         <tr>
           <th>
-            <label for="release_checksum">SHA-512 Checksum File:</label>
+            <label for="release_checksum">SHA2-512 hash file:</label>
           </th>
           <td>
             <input type="file"
@@ -207,7 +202,7 @@
 
         <tr>
           <th>
-            <label for="release_signature">Detached GPG Signature:</label>
+            <label for="release_signature">Detached signature:</label>
           </th>
           <td>
             <input type="file"
@@ -222,7 +217,7 @@
         <tr>
           <td></td>
           <td>
-            <button type="submit" {% if not releases %}disabled{% endif %}>Attach Package Artifacts</button>
+            <button type="submit" {% if not releases %}disabled{% endif %}>Add package</button>
           </td>
         </tr>
       </tbody>

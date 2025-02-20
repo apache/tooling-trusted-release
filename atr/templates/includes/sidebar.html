@@ -47,8 +47,8 @@
         </li>
         <!-- TODO: Don't show this if the user doesn't have any release candidates? -->
         <li>
-          <a href="{{ url_for('root_candidate_attach') }}"
-             {% if request.endpoint == 'root_candidate_attach' %}class="active"{% endif %}>Attach artifacts</a>
+          <a href="{{ url_for('root_package_add') }}"
+             {% if request.endpoint == 'root_package_add' %}class="active"{% endif %}>Add package</a>
         </li>
         <li>
           <a href="{{ url_for('root_candidate_review') }}"
