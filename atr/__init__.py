@@ -14,9 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-"__init__.py"
-
-from .server import app
-
-__all__ = ["app"]

@@ -25,7 +25,7 @@ report:
 	@echo SCRIPTS = $(SCRIPTS)
 
 serve:
-	$(SCRIPTS)/run hypercorn --bind $(BIND) --keyfile key.pem --certfile cert.pem atr:app --debug --reload
+	$(SCRIPTS)/run hypercorn --bind $(BIND) --keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
 
 sync:
 	$(SCRIPTS)/sync $(PYTHON)

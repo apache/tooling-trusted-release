@@ -32,6 +32,10 @@ dev = [
   "ruff>=0.9.4",
   "types-aiofiles>=24.1.0.20241221,<25.0.0.0",
 ]
+test = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.24"
+]
 
 # Other configuration
 
@@ -47,6 +51,10 @@ package-mode = false
 [tool.poetry.dependencies]
 asfquart = { path = "./asfquart", develop = true }
 python = "~=3.13"
+
+[tool.poetry.group.test.dependencies]
+pytest = ">=8.0"
+pytest-asyncio = ">=0.24"
 
 [tool.poetry.group.dev.dependencies]
 djlint = "^1.36.4"
@@ -64,7 +72,7 @@ asfquart = { path = "./asfquart", editable = true }
 
 [tool.pyright]
 include = ["atr"]
-exclude = ["**/node_modules", "**/__pycache__", ".venv*", "asfquart"]
+exclude = ["**/node_modules", "**/__pycache__", ".venv*", "asfquart", "tests"]
 ignore = []
 defineConstant = { DEBUG = true }
 stubPath = "typestubs"
@@ -94,7 +102,7 @@ exclude = ["asfquart"]
 
 [tool.mypy]
 python_version = "3.13"
-exclude = ["asfquart"]
+exclude = ["asfquart", "tests"]
 mypy_path = "typestubs"
 check_untyped_defs = true
 disallow_incomplete_defs = true
@@ -125,3 +133,7 @@ use_gitignore = true
 preserve_blank_lines = true
 ignore = "H006,H031"
 include = "atr/templates"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths  = ["tests"]
