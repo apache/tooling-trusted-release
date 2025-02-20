@@ -24,6 +24,7 @@ import pprint
 import secrets
 import shutil
 import tempfile
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, BinaryIO, cast
@@ -608,7 +609,6 @@ async def root_keys_add() -> str:
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    error = None
     key_info = None
 
     # Get PMC objects for all projects the user is a member of
@@ -621,48 +621,39 @@ async def root_keys_add() -> str:
         user_pmcs = (await db_session.execute(statement)).scalars().all()
 
     if request.method == "POST":
-        form = await request.form
-        public_key = form.get("public_key")
-        if not public_key:
-            # Shouldn't happen, so we can raise an exception
-            raise ASFQuartException("Public key is required", errorcode=400)
-
-        # Get selected PMCs from form
-        selected_pmcs = form.getlist("selected_pmcs")
-        if not selected_pmcs:
-            return await render_template(
-                "keys-add.html",
-                asf_id=session.uid,
-                user_pmcs=user_pmcs,
-                error="You must select at least one PMC",
-                key_info=None,
-                algorithms=algorithms,
-            )
-
-        # Ensure that the selected PMCs are ones of which the user is actually a member
-        invalid_pmcs = [
-            pmc for pmc in selected_pmcs if (pmc not in session.committees) and (pmc not in session.projects)
-        ]
-        if invalid_pmcs:
-            return await render_template(
-                "keys-add.html",
-                asf_id=session.uid,
-                user_pmcs=user_pmcs,
-                error=f"Invalid PMC selection: {', '.join(invalid_pmcs)}",
-                key_info=None,
-                algorithms=algorithms,
-            )
-
-        error, key_info = await user_keys_add(session, public_key, selected_pmcs)
+        try:
+            key_info = await keys_add_post(session, request, user_pmcs)
+        except FlashError as e:
+            await flash(str(e), "error")
+        except Exception as e:
+            await flash(f"Exception: {e}", "error")
 
     return await render_template(
         "keys-add.html",
         asf_id=session.uid,
         user_pmcs=user_pmcs,
-        error=error,
         key_info=key_info,
         algorithms=algorithms,
     )
+
+
+async def keys_add_post(session: ClientSession, request: Request, user_pmcs: Sequence[PMC]) -> dict | None:
+    form = await request.form
+    public_key = form.get("public_key")
+    if not public_key:
+        raise FlashError("Public key is required")
+
+    # Get selected PMCs from form
+    selected_pmcs = form.getlist("selected_pmcs")
+    if not selected_pmcs:
+        raise FlashError("You must select at least one PMC")
+
+    # Ensure that the selected PMCs are ones of which the user is actually a member
+    invalid_pmcs = [pmc for pmc in selected_pmcs if (pmc not in session.committees) and (pmc not in session.projects)]
+    if invalid_pmcs:
+        raise FlashError(f"Invalid PMC selection: {', '.join(invalid_pmcs)}")
+
+    return await user_keys_add(session, public_key, selected_pmcs)
 
 
 def format_file_size(size_in_bytes: int) -> str:
@@ -856,9 +847,9 @@ async def save_file_by_hash(base_dir: Path, file: FileStorage) -> tuple[str, int
         raise e
 
 
-async def user_keys_add(session: ClientSession, public_key: str, selected_pmcs: list[str]) -> tuple[str, dict | None]:
+async def user_keys_add(session: ClientSession, public_key: str, selected_pmcs: list[str]) -> dict | None:
     if not public_key:
-        return ("Public key is required", None)
+        raise FlashError("Public key is required")
 
     # Import the key into GPG to validate and extract info
     # TODO: We'll just assume for now that gnupg.GPG() doesn't need to be async
@@ -867,7 +858,7 @@ async def user_keys_add(session: ClientSession, public_key: str, selected_pmcs: 
         import_result = await asyncio.to_thread(gpg.import_keys, public_key)
 
         if not import_result.fingerprints:
-            return ("Invalid public key format", None)
+            raise FlashError("Invalid public key format")
 
         fingerprint = import_result.fingerprints[0]
         if fingerprint is not None:
@@ -883,11 +874,11 @@ async def user_keys_add(session: ClientSession, public_key: str, selected_pmcs: 
     # Note that "fingerprint" is not listed there, but we have it anyway...
     key = next((k for k in keys if (k["fingerprint"] is not None) and (k["fingerprint"].lower() == fingerprint)), None)
     if not key:
-        return ("Failed to import key", None)
+        raise FlashError("Failed to import key")
     if (key.get("algo") == "1") and (int(key.get("length", "0")) < 2048):
         # https://infra.apache.org/release-signing.html#note
         # Says that keys must be at least 2048 bits
-        return ("Key is not long enough; must be at least 2048 bits", None)
+        raise FlashError("Key is not long enough; must be at least 2048 bits")
 
     # Store key in database
     async with get_session() as db_session:
@@ -900,7 +891,7 @@ async def user_keys_add_session(
     key: dict,
     selected_pmcs: list[str],
     db_session: AsyncSession,
-) -> tuple[str, dict | None]:
+) -> dict | None:
     # Check if key already exists
     statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
 
@@ -910,11 +901,11 @@ async def user_keys_add_session(
     #     return ("You already have a key registered", None)
 
     if not session.uid:
-        return ("You must be signed in to add a key", None)
+        raise FlashError("You must be signed in to add a key")
 
     fingerprint = key.get("fingerprint")
     if not isinstance(fingerprint, str):
-        return ("Invalid key fingerprint", None)
+        raise FlashError("Invalid key fingerprint")
     fingerprint = fingerprint.lower()
     uids = key.get("uids")
     async with db_session.begin():
@@ -942,17 +933,14 @@ async def user_keys_add_session(
                 # TODO: Log? Add to "error"?
                 continue
 
-    return (
-        "",
-        {
-            "key_id": key["keyid"],
-            "fingerprint": key["fingerprint"].lower() if key.get("fingerprint") else "Unknown",
-            "user_id": key["uids"][0] if key.get("uids") else "Unknown",
-            "creation_date": datetime.datetime.fromtimestamp(int(key["date"])),
-            "expiration_date": datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
-            "data": pprint.pformat(key),
-        },
-    )
+    return {
+        "key_id": key["keyid"],
+        "fingerprint": key["fingerprint"].lower() if key.get("fingerprint") else "Unknown",
+        "user_id": key["uids"][0] if key.get("uids") else "Unknown",
+        "creation_date": datetime.datetime.fromtimestamp(int(key["date"])),
+        "expiration_date": datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
+        "data": pprint.pformat(key),
+    }
 
 
 async def verify_gpg_signature(artifact_path: Path, signature_path: Path, public_keys: list[str]) -> dict[str, Any]:
