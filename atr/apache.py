@@ -17,17 +17,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator, ItemsView
 from datetime import datetime
 from typing import Annotated
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 
 from atr.util import DictToList
 
 _WHIMSY_COMMITTEE_INFO_URL = "https://whimsy.apache.org/public/committee-info.json"
 _WHIMSY_COMMITTEE_RETIRED_URL = "https://whimsy.apache.org/public/committee-retired.json"
 _WHIMSY_PROJECTS_URL = "https://whimsy.apache.org/public/public_ldap_projects.json"
+_PROJECT_PODLINGS_URL = "https://projects.apache.org/json/foundation/podlings.json"
+_PROJECT_GROUPS_URL = "https://projects.apache.org/json/foundation/groups.json"
 
 
 class LDAPProjects(BaseModel):
@@ -92,6 +95,44 @@ class RetiredCommittee(BaseModel):
     description: str
 
 
+class PodlingStatus(BaseModel):
+    description: str
+    homepage: str
+    name: str
+    pmc: str
+    podling: bool
+    started: str
+    champion: str | None = None
+    retiring: bool | None = None
+    resolution: str | None = None
+
+
+class PodlingsData(RootModel):
+    root: dict[str, PodlingStatus]
+
+    def __iter__(self) -> Generator[tuple[str, PodlingStatus]]:
+        yield from self.root.items()
+
+    def items(self) -> ItemsView[str, PodlingStatus]:
+        return self.root.items()
+
+    def get(self, key: str) -> PodlingStatus | None:
+        return self.root.get(key)
+
+
+class GroupsData(RootModel):
+    root: dict[str, list[str]]
+
+    def __iter__(self) -> Generator[tuple[str, list[str]]]:
+        yield from self.root.items()
+
+    def items(self) -> ItemsView[str, list[str]]:
+        return self.root.items()
+
+    def get(self, key: str) -> list[str] | None:
+        return self.root.get(key)
+
+
 async def get_ldap_projects_data() -> LDAPProjects:
     async with httpx.AsyncClient() as client:
         response = await client.get(_WHIMSY_PROJECTS_URL)
@@ -117,3 +158,19 @@ async def get_committee_retired_data() -> CommitteeRetired:
         data = response.json()
 
     return CommitteeRetired.model_validate(data)
+
+
+async def get_podlings_data() -> PodlingsData:
+    async with httpx.AsyncClient() as client:
+        response = await client.get(_PROJECT_PODLINGS_URL)
+        response.raise_for_status()
+        data = response.json()
+    return PodlingsData(root=data)
+
+
+async def get_groups_data() -> GroupsData:
+    async with httpx.AsyncClient() as client:
+        response = await client.get(_PROJECT_GROUPS_URL)
+        response.raise_for_status()
+        data = response.json()
+    return GroupsData(root=data)

@@ -91,7 +91,12 @@ executionEnvironments = [
 ]
 
 [tool.ruff]
-lint.select = [
+exclude = ["asfquart"]
+line-length = 120
+
+[tool.ruff.lint]
+ignore = []
+select = [
   "I",   # isort
   "E",
   "W",
@@ -100,15 +105,12 @@ lint.select = [
   "RUF", # ruff-checks
   "C90",
   "TID", # flake8-tidy-imports
-  "TCH", # flake8-type-checking
+  "TC",  # flake8-type-checking
   "UP"   # pyupgrade
 ]
-lint.ignore = []
-line-length = 120
-exclude = ["asfquart"]
 
 [tool.ruff.lint.per-file-ignores]
-"atr/apache.py" = ["N815"]
+"atr/apache.py" = ["N815", "TC003"]
 
 [tool.mypy]
 python_version = "3.13"

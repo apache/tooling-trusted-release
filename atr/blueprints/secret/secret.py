@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import json
 
 import httpx
 from quart import current_app, flash, redirect, render_template, request, url_for
@@ -24,7 +23,11 @@ from werkzeug.wrappers.response import Response
 
 from asfquart.base import ASFQuartException
 from asfquart.session import read as session_read
-from atr.apache import LDAPProjects, get_ldap_projects_data
+from atr.apache import (
+    get_groups_data,
+    get_ldap_projects_data,
+    get_podlings_data,
+)
 from atr.db import get_session
 from atr.db.models import (
     PMC,
@@ -101,9 +104,11 @@ async def secret_pmcs_update() -> str | Response:
     """Update PMCs and podlings from remote data."""
     if request.method == "POST":
         try:
-            apache_projects, podlings_data, groups_data = await secret_pmcs_update_data()
-        except FlashError as e:
-            await flash(f"{e!s}", "error")
+            apache_projects = await get_ldap_projects_data()
+            podlings_data = await get_podlings_data()
+            groups_data = await get_groups_data()
+        except httpx.RequestError as e:
+            await flash(f"Failed to fetch data: {e!s}", "error")
             return redirect(url_for("secret_blueprint.secret_pmcs_update"))
 
         updated_count = 0
@@ -126,9 +131,12 @@ async def secret_pmcs_update() -> str | Response:
                             db_session.add(pmc)
 
                         # Update PMC data from groups.json
-                        pmc.pmc_members = groups_data.get(f"{name}-pmc", [])
-                        pmc.committers = groups_data.get(name, [])
-                        pmc.is_podling = False  # Ensure this is set for PMCs
+                        pmc_members = groups_data.get(f"{name}-pmc")
+                        committers = groups_data.get(name)
+                        pmc.pmc_members = pmc_members if pmc_members is not None else []
+                        pmc.committers = committers if committers is not None else []
+                        # Ensure this is set for PMCs
+                        pmc.is_podling = False
 
                         # For release managers, use PMC members for now
                         # TODO: Consider a more sophisticated way to determine release managers
@@ -137,7 +145,7 @@ async def secret_pmcs_update() -> str | Response:
                         updated_count += 1
 
                     # Then add PPMCs (podlings)
-                    for podling_name, podling_data in podlings_data.items():
+                    for podling_name, podling_data in podlings_data:
                         # Get or create PPMC
                         statement = select(PMC).where(PMC.project_name == podling_name)
                         ppmc = (await db_session.execute(statement)).scalar_one_or_none()
@@ -147,8 +155,10 @@ async def secret_pmcs_update() -> str | Response:
 
                         # Update PPMC data from groups.json
                         ppmc.is_podling = True
-                        ppmc.pmc_members = groups_data.get(f"{podling_name}-pmc", [])
-                        ppmc.committers = groups_data.get(podling_name, [])
+                        pmc_members = groups_data.get(f"{podling_name}-pmc")
+                        committers = groups_data.get(podling_name)
+                        ppmc.pmc_members = pmc_members if pmc_members is not None else []
+                        ppmc.committers = committers if committers is not None else []
                         # Use PPMC members as release managers
                         ppmc.release_managers = ppmc.pmc_members
 
@@ -180,35 +190,6 @@ async def secret_pmcs_update() -> str | Response:
 
     # For GET requests, show the update form
     return await render_template("secret/update-pmcs.html")
-
-
-async def secret_pmcs_update_data() -> tuple[LDAPProjects, dict, dict]:
-    """Fetch and update PMCs and podlings from remote data."""
-    # Fetch committee-info.json from whimsy.apache.org
-    try:
-        apache_projects = await get_ldap_projects_data()
-    except (httpx.RequestError, json.JSONDecodeError) as e:
-        raise FlashError(f"Failed to fetch committee data: {e!s}")
-
-    # Fetch podlings data from projects.apache.org
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(_PROJECT_PODLINGS_URL)
-            response.raise_for_status()
-            podlings_data = response.json()
-    except (httpx.RequestError, json.JSONDecodeError) as e:
-        raise FlashError(f"Failed to fetch podling data: {e!s}")
-
-    # Fetch groups data from projects.apache.org
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(_PROJECT_GROUPS_URL)
-            response.raise_for_status()
-            groups_data = response.json()
-    except (httpx.RequestError, json.JSONDecodeError) as e:
-        raise FlashError(f"Failed to fetch groups data: {e!s}")
-
-    return apache_projects, podlings_data, groups_data
 
 
 @blueprint.route("/debug/database")
