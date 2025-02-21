@@ -11,6 +11,7 @@
 <li>[DONE] Differentiate between podling PPMCs and top level PMCs</li>
 <li>[DONE] Allow package deletion</li>
 <li>[DONE] Allow RCs to be deleted</li>
+<li>[DONE] Move signature verification to a task runner</li>
 </ul>
 </li>
 <li>
@@ -22,7 +23,8 @@
 <li>[DONE] Show KB, MB, or GB units for file sizes</li>
 <li>[DONE] Add a standard artifact naming pattern based on the project and product</li>
 <li>[DONE] Potentially add the option to upload package artifacts without signatures</li>
-<li>Show validation status indicators</li>
+<li>[DONE] Show validation status indicators</li>
+<li>Improve validation status indicators</li>
 <li>Add developer RC download buttons with clear verification instructions</li>
 </ul>
 </li>
@@ -31,8 +33,8 @@
 <ul>
 <li>[DONE] Display which PMCs are using each key</li>
 <li>[DONE] Add key expiration warnings</li>
-<li>Fix reported problem with adding keys</li>
-<li>Add debugging output error messages for when key addition fails</li>
+<li>[DONE] Fix reported problem with adding keys</li>
+<li>[DONE] Add debugging output error messages for when key addition fails</li>
 <li>Allow adding keys from a KEYS file</li>
 </ul>
 </li>
@@ -57,7 +59,7 @@
 <li>
 <p>Task runner workers</p>
 <ul>
-<li>Implement worker process with RLIMIT controls for CPU and RAM</li>
+<li>[DONE] Implement worker process with RLIMIT controls for CPU and RAM</li>
 <li>Add disk usage tracking through API and psutil polling</li>
 <li>Add rollback or reporting for failed tasks</li>
 <li>Ensure idempotent operations where possible</li>
@@ -68,10 +70,17 @@
 <li>
 <p>Orchestrating scheduler and resource management</p>
 <ul>
-<li>Implement process-based task isolation</li>
-<li>Create task table in sqlite database</li>
-<li>Add task queue management</li>
+<li>[DONE] Implement process-based task isolation</li>
+<li>[DONE] Create task table in sqlite database</li>
+<li>[DONE] Add task queue management</li>
 <li>Track and limit disk usage per task in the scheduler</li>
+</ul>
+</li>
+<li>
+<p>Improve the task UI</p>
+<ul>
+<li>Test that tasks are deleted when a package is deleted</li>
+<li>Allow restarting failed tasks</li>
 </ul>
 </li>
 </ol>
@@ -83,11 +92,17 @@
 <h2>Site improvements</h2>
 <ol>
 <li>
-<p>Ensure that performance is optimal and debugging is easy</p>
+<p>Fix bugs and improve workflow</p>
+<ul>
+<li>[DONE] Add ATR commit or version number to the UI</li>
+<li>Ensure that all errors are caught and logged or displayed</li>
+</ul>
+</li>
+<li>
+<p>Ensure that performance is optimal</p>
 <ul>
 <li>Add page load timing metrics to a log</li>
 <li>Add a basic metrics dashboard</li>
-<li>Ensure that all errors are caught and logged or displayed</li>
 </ul>
 </li>
 <li>
@@ -103,7 +118,8 @@
 <li>
 <p>Basic artifact validation</p>
 <ul>
-<li>Implement basic structure validation (archives, signatures)</li>
+<li>[DONE] Implement basic archive verification</li>
+<li>[DONE] Implement basic signature verification</li>
 </ul>
 </li>
 <li>

@@ -1,0 +1,145 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Package check status ~ ATR
+{% endblock title %}
+
+{% block description %}
+  View the status and results of package verification tasks.
+{% endblock description %}
+
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .task-list {
+          margin: 1rem 0;
+      }
+
+      .task-item {
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          padding: 1rem;
+          margin-bottom: 1rem;
+      }
+
+      .task-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.5rem;
+      }
+
+      .task-type {
+          font-weight: 600;
+      }
+
+      .task-status {
+          padding: 0.25rem 0.5rem;
+          border-radius: 4px;
+          font-size: 0.9em;
+      }
+
+      .status-queued {
+          background: #f8f9fa;
+          border: 1px solid #dee2e6;
+      }
+
+      .status-active {
+          background: #cff4fc;
+          border: 1px solid #9eeaf9;
+      }
+
+      .status-completed {
+          background: #d1e7dd;
+          border: 1px solid #a3cfbb;
+      }
+
+      .status-failed {
+          background: #f8d7da;
+          border: 1px solid #f5c6cb;
+      }
+
+      .task-details {
+          margin-top: 0.5rem;
+          font-size: 0.9em;
+      }
+
+      .task-result {
+          margin-top: 0.5rem;
+          padding: 0.5rem;
+          background: #f8f9fa;
+          border-radius: 4px;
+          white-space: pre-wrap;
+      }
+
+      .package-info {
+          margin-bottom: 2rem;
+          padding: 1rem;
+          background: #f8f9fa;
+          border: 1px solid #dee2e6;
+          border-radius: 4px;
+      }
+
+      .package-info h2 {
+          margin-top: 0;
+      }
+
+      .back-link {
+          display: inline-block;
+          margin-bottom: 1rem;
+          color: #0d6efd;
+          text-decoration: none;
+      }
+
+      .back-link:hover {
+          text-decoration: underline;
+      }
+  </style>
+{% endblock stylesheets %}
+
+{% block content %}
+  <a href="{{ url_for('root_candidate_review') }}" class="back-link">← Back to Release Candidates</a>
+
+  <div class="package-info">
+    <h2>Package details</h2>
+    <p>
+      <strong>Filename:</strong> {{ package.filename }}
+    </p>
+    <p>
+      <strong>Type:</strong> {{ package.artifact_type }}
+    </p>
+    <p>
+      <strong>Size:</strong> {{ format_file_size(package.bytes_size) }}
+    </p>
+    <p>
+      <strong>Uploaded:</strong> {{ package.uploaded.strftime("%Y-%m-%d %H:%M UTC") }}
+    </p>
+  </div>
+
+  <p>
+    <strong>Note:</strong> Refresh this page to see the latest status of the verification tasks.
+  </p>
+
+  <h2>Verification tasks</h2>
+
+  <div class="task-list">
+    {% if tasks %}
+      {% for task in tasks %}
+        <div class="task-item">
+          <div class="task-header">
+            <span class="task-type">{{ task.task_type }}</span>
+            <span class="task-status status-{{ task.status.value.lower() }}">{{ task.status.value }}</span>
+          </div>
+          <div class="task-details">
+            <div>Started: {{ task.started.strftime("%Y-%m-%d %H:%M UTC") if task.started else "Not started" }}</div>
+            <div>Completed: {{ task.completed.strftime("%Y-%m-%d %H:%M UTC") if task.completed else "Not completed" }}</div>
+            {% if task.result %}<div class="task-result">{{ task.result }}</div>{% endif %}
+            {% if task.error %}<div class="task-result">Error: {{ task.error }}</div>{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>No verification tasks found for this package.</p>
+    {% endif %}
+  </div>
+{% endblock content %}

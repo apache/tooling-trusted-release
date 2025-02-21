@@ -11,6 +11,7 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
    - [DONE] Differentiate between podling PPMCs and top level PMCs
    - [DONE] Allow package deletion
    - [DONE] Allow RCs to be deleted
+   - [DONE] Move signature verification to a task runner
 
 2. Enhance RC display
    - [DONE] Augment raw file hashes with the original filenames in the UI
@@ -19,7 +20,8 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
    - [DONE] Show KB, MB, or GB units for file sizes
    - [DONE] Add a standard artifact naming pattern based on the project and product
    - [DONE] Potentially add the option to upload package artifacts without signatures
-   - Show validation status indicators
+   - [DONE] Show validation status indicators
+   - Improve validation status indicators
    - Add developer RC download buttons with clear verification instructions
 
 3. Improve key management interface
@@ -44,7 +46,7 @@ Advanced tasks, possibly deferred
 We aim to work on the task scheduler in parallel with the UX improvements above. Artifact validation and the release status dashboard are dependent on tasks, which are managed by the task scheduler.
 
 1. Task runner workers
-   - Implement worker process with RLIMIT controls for CPU and RAM
+   - [DONE] Implement worker process with RLIMIT controls for CPU and RAM
    - Add disk usage tracking through API and psutil polling
    - Add rollback or reporting for failed tasks
    - Ensure idempotent operations where possible
@@ -52,10 +54,14 @@ We aim to work on the task scheduler in parallel with the UX improvements above.
    - Test external tool use
 
 2. Orchestrating scheduler and resource management
-   - Implement process-based task isolation
-   - Create task table in sqlite database
-   - Add task queue management
+   - [DONE] Implement process-based task isolation
+   - [DONE] Create task table in sqlite database
+   - [DONE] Add task queue management
    - Track and limit disk usage per task in the scheduler
+
+3. Improve the task UI
+   - Test that tasks are deleted when a package is deleted
+   - Allow restarting failed tasks
 
 Advanced tasks, possibly deferred
    - Check fair scheduling across cores
@@ -64,7 +70,7 @@ Advanced tasks, possibly deferred
 ## Site improvements
 
 1. Fix bugs and improve workflow
-   - Add ATR commit or version number to the UI
+   - [DONE] Add ATR commit or version number to the UI
    - Ensure that all errors are caught and logged or displayed
 
 2. Ensure that performance is optimal
@@ -79,8 +85,8 @@ Advanced tasks, possibly deferred
 These tasks are dependent on the task scheduler above.
 
 1. Basic artifact validation
-   - Implement basic archive verification
-   - Implement basic signature verification
+   - [DONE] Implement basic archive verification
+   - [DONE] Implement basic signature verification
 
 2. License compliance
    - Verify LICENSE and NOTICE files exist and are placed correctly

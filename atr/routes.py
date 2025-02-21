@@ -27,7 +27,7 @@ import tempfile
 from collections.abc import Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, BinaryIO, cast
+from typing import cast
 
 import aiofiles
 import aiofiles.os
@@ -54,6 +54,8 @@ from atr.db.models import (
     Release,
     ReleasePhase,
     ReleaseStage,
+    Task,
+    TaskStatus,
 )
 
 from .db import get_session
@@ -410,6 +412,7 @@ async def root_candidate_create() -> Response | str:
 @require(Requirements.committer)
 async def root_candidate_signatures_verify(release_key: str) -> str:
     """Verify the signatures for all packages in a release candidate."""
+    # TODO: This entire endpoint can be removed
     session = await session_read()
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
@@ -424,7 +427,7 @@ async def root_candidate_signatures_verify(release_key: str) -> str:
 
         # For now, for debugging, we'll just get all keys in the database
         statement = select(PublicSigningKey)
-        all_signing_keys = (await db_session.execute(statement)).scalars().all()
+        # all_signing_keys = (await db_session.execute(statement)).scalars().all()
 
         statement = (
             select(Release)
@@ -436,7 +439,7 @@ async def root_candidate_signatures_verify(release_key: str) -> str:
             raise ASFQuartException("Release not found", errorcode=404)
 
         # Get all ASCII-armored keys associated with the PMC
-        ascii_armored_keys = [key.ascii_armored_key for key in all_signing_keys]
+        # ascii_armored_keys = [key.ascii_armored_key for key in all_signing_keys]
 
         # Verify each package's signature
         verification_results = []
@@ -459,7 +462,8 @@ async def root_candidate_signatures_verify(release_key: str) -> str:
                 result["error"] = "Package signature file not found"
             else:
                 # Verify the signature
-                result = await verify_gpg_signature(artifact_path, signature_path, ascii_armored_keys)
+                result = {}
+                # await verify_gpg_signature(artifact_path, signature_path, ascii_armored_keys)
                 result["file"] = package.artifact_sha3
                 result["filename"] = package.filename
 
@@ -701,10 +705,13 @@ async def root_candidate_review() -> str:
         # TODO: This duplicates code in root_package_add
         release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
         release_packages = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages))
+        package_tasks = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages)).selectinload(
+            cast(InstrumentedAttribute[list[Task]], Package.tasks)
+        )
         release_product_line = selectinload(cast(InstrumentedAttribute[ProductLine], Release.product_line))
         statement = (
             select(Release)
-            .options(release_pmc, release_packages, release_product_line)
+            .options(release_pmc, release_packages, package_tasks, release_product_line)
             .join(PMC)
             .where(Release.stage == ReleaseStage.CANDIDATE)
         )
@@ -740,7 +747,7 @@ async def delete_package_files(package: Package, uploads_path: Path) -> None:
             await aiofiles.os.remove(signature_path)
 
 
-async def validate_package_deletion(
+async def package_from_data(
     db_session: AsyncSession, artifact_sha3: str, release_key: str, session_uid: str
 ) -> Package:
     """Validate package deletion request and return the package if valid."""
@@ -769,7 +776,7 @@ async def validate_package_deletion(
     # Check permissions
     if package.release and package.release.pmc:
         if session_uid not in package.release.pmc.pmc_members and session_uid not in package.release.pmc.committers:
-            raise FlashError("You don't have permission to delete this package")
+            raise FlashError("You don't have permission to access this package")
 
     return package
 
@@ -793,7 +800,7 @@ async def root_package_delete() -> Response:
     async with get_session() as db_session:
         async with db_session.begin():
             try:
-                package = await validate_package_deletion(db_session, artifact_sha3, release_key, session.uid)
+                package = await package_from_data(db_session, artifact_sha3, release_key, session.uid)
                 await delete_package_files(package, Path(get_release_storage_dir()))
                 await db_session.delete(package)
             except FlashError as e:
@@ -943,73 +950,6 @@ async def user_keys_add_session(
     }
 
 
-async def verify_gpg_signature(artifact_path: Path, signature_path: Path, public_keys: list[str]) -> dict[str, Any]:
-    """
-    Verify a GPG signature for a release artifact.
-    Returns a dictionary with verification results and debug information.
-    """
-    try:
-        with open(signature_path, "rb") as sig_file:
-            return await verify_gpg_signature_file(sig_file, artifact_path, public_keys)
-    except Exception as e:
-        return {
-            "verified": False,
-            "error": str(e),
-            "status": "Verification failed",
-            "debug_info": {"exception_type": type(e).__name__, "exception_message": str(e)},
-        }
-
-
-async def verify_gpg_signature_file(
-    sig_file: BinaryIO, artifact_path: Path, ascii_armored_keys: list[str]
-) -> dict[str, Any]:
-    """Verify a GPG signature for a file."""
-    async with ephemeral_gpg_home() as gpg_home:
-        gpg = gnupg.GPG(gnupghome=gpg_home)
-
-        # Import all PMC public signing keys
-        for key in ascii_armored_keys:
-            import_result = await asyncio.to_thread(gpg.import_keys, key)
-            if not import_result.fingerprints:
-                # TODO: Log warning about invalid key?
-                continue
-        verified = await asyncio.to_thread(gpg.verify_file, sig_file, str(artifact_path))
-
-    # Collect all available information for debugging
-    debug_info = {
-        "key_id": verified.key_id or "Not available",
-        "fingerprint": verified.fingerprint.lower() if verified.fingerprint else "Not available",
-        "pubkey_fingerprint": verified.pubkey_fingerprint.lower() if verified.pubkey_fingerprint else "Not available",
-        "creation_date": verified.creation_date or "Not available",
-        "timestamp": verified.timestamp or "Not available",
-        "username": verified.username or "Not available",
-        "status": verified.status or "Not available",
-        "valid": bool(verified),
-        "trust_level": verified.trust_level if hasattr(verified, "trust_level") else "Not available",
-        "trust_text": verified.trust_text if hasattr(verified, "trust_text") else "Not available",
-        "stderr": verified.stderr if hasattr(verified, "stderr") else "Not available",
-        "num_pmc_keys": len(ascii_armored_keys),
-    }
-
-    if not verified:
-        return {
-            "verified": False,
-            "error": "No valid signature found",
-            "status": "Invalid signature",
-            "debug_info": debug_info,
-        }
-
-    return {
-        "verified": True,
-        "key_id": verified.key_id,
-        "timestamp": verified.timestamp,
-        "username": verified.username or "Unknown",
-        "email": verified.pubkey_fingerprint.lower() or "Unknown",
-        "status": "Valid signature",
-        "debug_info": debug_info,
-    }
-
-
 async def validate_release_deletion(db_session: AsyncSession, release_key: str, session_uid: str) -> Release:
     """Validate release deletion request and return the release if valid."""
     if Release.pmc is None:
@@ -1070,3 +1010,95 @@ async def root_release_delete() -> Response:
 
     await flash("Release deleted successfully", "success")
     return redirect(url_for("root_candidate_review"))
+
+
+async def get_package_tasks_status(db_session: AsyncSession, artifact_sha3: str) -> tuple[Sequence[Task], bool]:
+    """
+    Get all tasks for a package and determine if any are still in progress.
+    Returns tuple[Sequence[Task], bool]: List of tasks and whether any are still in progress
+    TODO: Could instead give active count and total count
+    """
+    statement = select(Task).where(Task.package_sha3 == artifact_sha3)
+    tasks = (await db_session.execute(statement)).scalars().all()
+    has_active_tasks = any(task.status in [TaskStatus.QUEUED, TaskStatus.ACTIVE] for task in tasks)
+    return tasks, has_active_tasks
+
+
+@APP.route("/package/check", methods=["GET", "POST"])
+@require(Requirements.committer)
+async def root_package_check() -> str | Response:
+    """Show or create package verification tasks."""
+    session = await session_read()
+    if (session is None) or (session.uid is None):
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    # Get parameters from either form data (POST) or query args (GET)
+    if request.method == "POST":
+        form = await request.form
+        artifact_sha3 = form.get("artifact_sha3")
+        release_key = form.get("release_key")
+    else:
+        artifact_sha3 = request.args.get("artifact_sha3")
+        release_key = request.args.get("release_key")
+
+    if not artifact_sha3 or not release_key:
+        await flash("Missing required parameters", "error")
+        return redirect(url_for("root_candidate_review"))
+
+    async with get_session() as db_session:
+        async with db_session.begin():
+            # Get the package and verify permissions
+            try:
+                package = await package_from_data(db_session, artifact_sha3, release_key, session.uid)
+            except FlashError as e:
+                await flash(str(e), "error")
+                return redirect(url_for("root_candidate_review"))
+
+            if request.method == "POST":
+                # Check if package already has active tasks
+                tasks, has_active_tasks = await get_package_tasks_status(db_session, artifact_sha3)
+                if has_active_tasks:
+                    await flash("Package verification is already in progress", "warning")
+                    return redirect(url_for("root_candidate_review"))
+
+                if not package.release or not package.release.pmc:
+                    await flash("Could not determine PMC for package", "error")
+                    return redirect(url_for("root_candidate_review"))
+
+                if package.signature_sha3 is None:
+                    await flash("Package has no signature", "error")
+                    return redirect(url_for("root_candidate_review"))
+
+                # Create verification tasks
+                tasks = [
+                    Task(
+                        status=TaskStatus.QUEUED,
+                        task_type="verify_archive_integrity",
+                        task_args=["releases/" + artifact_sha3],
+                        package_sha3=artifact_sha3,
+                    ),
+                    Task(
+                        status=TaskStatus.QUEUED,
+                        task_type="verify_signature",
+                        task_args=[
+                            package.release.pmc.project_name,
+                            "releases/" + artifact_sha3,
+                            "releases/" + package.signature_sha3,
+                        ],
+                        package_sha3=artifact_sha3,
+                    ),
+                ]
+                for task in tasks:
+                    db_session.add(task)
+
+                await flash(f"Added verification tasks for package {package.filename}", "success")
+                return redirect(url_for("root_package_check", artifact_sha3=artifact_sha3, release_key=release_key))
+            else:
+                # Get all tasks for this package for GET request
+                tasks, _ = await get_package_tasks_status(db_session, artifact_sha3)
+                return await render_template(
+                    "package-check.html",
+                    package=package,
+                    tasks=tasks,
+                    format_file_size=format_file_size,
+                )

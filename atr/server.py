@@ -32,6 +32,7 @@ from asfquart.base import QuartApp
 from atr.blueprints import register_blueprints
 from atr.config import AppConfig, config_dict
 from atr.db import create_database
+from atr.manager import get_worker_manager
 
 # WARNING: Don't run with debug turned on in production!
 DEBUG: bool = config("DEBUG", default=True, cast=bool)
@@ -104,8 +105,19 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
             "is_admin": is_admin,
         }
 
+    @app.before_serving
+    async def startup() -> None:
+        """Start services before the app starts serving requests."""
+        # Start the worker manager
+        worker_manager = get_worker_manager()
+        await worker_manager.start()
+
     @app.after_serving
     async def shutdown() -> None:
+        """Clean up services after the app stops serving requests."""
+        # Stop the worker manager
+        worker_manager = get_worker_manager()
+        await worker_manager.stop()
         app.background_tasks.clear()
 
     # Configure logging

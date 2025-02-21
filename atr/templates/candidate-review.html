@@ -61,8 +61,12 @@
           color: white;
       }
 
-      .delete-form {
+      .button-form {
           display: inline-block;
+      }
+
+      .button-form+.button-form {
+          margin-left: 1rem;
       }
 
       .delete-button {
@@ -149,14 +153,10 @@
         </div>
         <div class="candidate-actions">
           <a class="verify-link"
-             href="{{ url_for('root_candidate_signatures_verify', release_key=release.storage_key) }}">
-            Verify signatures
-          </a>
-          <a class="verify-link"
              href="{{ url_for('root_package_add', storage_key=release.storage_key) }}">Add package</a>
           <form method="post"
                 action="{{ url_for('root_release_delete') }}"
-                class="delete-form">
+                class="button-form">
             <input type="hidden" name="release_key" value="{{ release.storage_key }}" />
             <button type="submit"
                     class="delete-button"
@@ -205,11 +205,41 @@
             <td>{{ package.uploaded.strftime("%Y-%m-%d %H:%M UTC") }}</td>
           </tr>
           <tr>
+            <th>Package checks</th>
+            <td>
+              {% set total_tasks = package.tasks|length %}
+              {% set completed_tasks = package.tasks|selectattr("status", "in", ["COMPLETED", "FAILED"])|list|length %}
+              {% if total_tasks == 0 %}
+                Not started
+              {% else %}
+                {% if completed_tasks == total_tasks %}
+                  Completed ({{ completed_tasks }}/{{ total_tasks }})
+                {% else %}
+                  Ongoing ({{ completed_tasks }}/{{ total_tasks }})
+                {% endif %}
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
             <th>Actions</th>
             <td class="prose">
+              {% if package.tasks %}
+                <a href="{{ url_for('root_package_check', artifact_sha3=package.artifact_sha3, release_key=release.storage_key) }}"
+                   class="verify-link">Show check status</a>
+              {% else %}
+                <form method="post"
+                      action="{{ url_for('root_package_check') }}"
+                      class="button-form">
+                  <input type="hidden"
+                         name="artifact_sha3"
+                         value="{{ package.artifact_sha3 }}" />
+                  <input type="hidden" name="release_key" value="{{ release.storage_key }}" />
+                  <button type="submit" class="verify-link">Check package</button>
+                </form>
+              {% endif %}
               <form method="post"
                     action="{{ url_for('root_package_delete') }}"
-                    class="delete-form">
+                    class="button-form">
                 <input type="hidden"
                        name="artifact_sha3"
                        value="{{ package.artifact_sha3 }}" />

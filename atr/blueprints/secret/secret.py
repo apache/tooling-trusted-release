@@ -15,9 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import datetime
 import json
-import secrets
 
 import httpx
 from quart import current_app, flash, redirect, render_template, request, url_for
@@ -37,7 +35,6 @@ from atr.db.models import (
     PublicSigningKey,
     Release,
     Task,
-    TaskStatus,
     VotePolicy,
 )
 from atr.db.service import get_pmcs
@@ -241,31 +238,3 @@ async def secret_keys_delete_all() -> str:
                 await db_session.delete(key)
 
         return f"Deleted {count} keys"
-
-
-@blueprint.route("/tasks/add-random", methods=["GET", "POST"])
-async def secret_tasks_add_random() -> str | Response:
-    """Add a random task to the queue for testing."""
-    if request.method == "POST":
-        async with get_session() as db_session:
-            async with db_session.begin():
-                # Create a random task
-                task = Task(
-                    id=None,
-                    task_type="example",
-                    task_args=json.dumps(
-                        {
-                            "random_number": secrets.randbelow(100),
-                            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-                        }
-                    ),
-                    status=TaskStatus.QUEUED,
-                )
-                db_session.add(task)
-                # Flush to get the task ID
-                await db_session.flush()
-                await flash(f"Added random task (ID: {task.id})", "success")
-
-        return redirect(url_for("secret_blueprint.secret_tasks_add_random"))
-
-    return await render_template("secret/tasks-add-random.html")

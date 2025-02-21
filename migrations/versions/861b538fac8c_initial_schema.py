@@ -1,15 +1,15 @@
 """initial_schema
 
-Revision ID: d3ff8c13bb8b
+Revision ID: 861b538fac8c
 Revises:
-Create Date: 2025-02-20 16:49:57.374714
+Create Date: 2025-02-21 16:38:15.050882
 
 """
 
 from collections.abc import Sequence
 
 # revision identifiers, used by Alembic.
-revision: str = "d3ff8c13bb8b"
+revision: str = "861b538fac8c"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

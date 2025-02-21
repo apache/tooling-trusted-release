@@ -19,7 +19,7 @@
 
 import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 from sqlalchemy import JSON, CheckConstraint, Column, Index
@@ -163,6 +163,11 @@ class Package(SQLModel, table=True):
     release_key: str | None = Field(default=None, foreign_key="release.storage_key")
     release: Optional["Release"] = Relationship(back_populates="packages")
 
+    # One-to-many: A package can have multiple tasks
+    tasks: list["Task"] = Relationship(
+        back_populates="package", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
 
 class VoteEntry(BaseModel):
     result: bool
@@ -208,14 +213,19 @@ class Task(SQLModel, table=True):
     """A task in the task queue."""
 
     id: int | None = Field(default=None, primary_key=True)
-    task_type: str
-    task_args: str = Field(sa_column=Column(JSON))
     status: TaskStatus = Field(default=TaskStatus.QUEUED, index=True)
+    task_type: str
+    task_args: Any = Field(sa_column=Column(JSON))
     added: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC), index=True)
     started: datetime.datetime | None = None
-    completed: datetime.datetime | None = None
     pid: int | None = None
+    completed: datetime.datetime | None = None
+    result: Any | None = Field(default=None, sa_column=Column(JSON))
     error: str | None = None
+
+    # Package relationship
+    package_sha3: str | None = Field(default=None, foreign_key="package.artifact_sha3")
+    package: Package | None = Relationship(back_populates="tasks")
 
     # Create an index on status and added for efficient task claiming
     __table_args__ = (
@@ -231,9 +241,9 @@ class Task(SQLModel, table=True):
                 status = 'QUEUED'
                 -- QUEUED -> ACTIVE requires setting started time and pid
                 OR (status = 'ACTIVE' AND started IS NOT NULL AND pid IS NOT NULL)
-                -- ACTIVE -> COMPLETED requires setting completed time
-                OR (status = 'COMPLETED' AND completed IS NOT NULL)
-                -- ACTIVE -> FAILED requires setting completed time and error
+                -- ACTIVE -> COMPLETED requires setting completed time and result
+                OR (status = 'COMPLETED' AND completed IS NOT NULL AND result IS NOT NULL)
+                -- ACTIVE -> FAILED requires setting completed time and error (result optional)
                 OR (status = 'FAILED' AND completed IS NOT NULL AND error IS NOT NULL)
             )
             """,
