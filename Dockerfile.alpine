@@ -4,6 +4,8 @@ ARG BIND=127.0.0.1:8080
 ENV BIND=${BIND}
 ARG SCRIPTS=scripts/poetry
 ENV SCRIPTS=${SCRIPTS}
+ARG VERSION=unknown
+ENV VERSION=${VERSION}
 
 # gcompat is required for ruff to work
 # nodejs is required for pyright to work
@@ -21,6 +23,7 @@ ENV PYTHONUNBUFFERED=1
 RUN pip3 install setuptools wheel pip-tools poetry
 WORKDIR /opt/atr
 COPY . /opt/atr
+RUN sed -i "s%ATR-VERSION%${VERSION}%" atr/templates/includes/footer.html
 RUN rm -rf .venv-*
 RUN make sync PYTHON="$(which python3)"
 RUN make certs

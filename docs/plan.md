@@ -25,8 +25,8 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
 3. Improve key management interface
    - [DONE] Display which PMCs are using each key
    - [DONE] Add key expiration warnings
-   - Fix reported problem with adding keys
-   - Add debugging output error messages for when key addition fails
+   - [DONE] Fix reported problem with adding keys
+   - [DONE] Add debugging output error messages for when key addition fails
    - Allow adding keys from a KEYS file
 
 4. Release status dashboard
@@ -63,12 +63,15 @@ Advanced tasks, possibly deferred
 
 ## Site improvements
 
-1. Ensure that performance is optimal and debugging is easy
-   - Add page load timing metrics to a log
-   - Add a basic metrics dashboard
+1. Fix bugs and improve workflow
+   - Add ATR commit or version number to the UI
    - Ensure that all errors are caught and logged or displayed
 
-2. Increase the linting and type checking
+2. Ensure that performance is optimal
+   - Add page load timing metrics to a log
+   - Add a basic metrics dashboard
+
+3. Increase the linting and type checking
    - Potentially add blockbuster
 
 ## Basic RC validation
@@ -76,7 +79,8 @@ Advanced tasks, possibly deferred
 These tasks are dependent on the task scheduler above.
 
 1. Basic artifact validation
-   - Implement basic structure validation (archives, signatures)
+   - Implement basic archive verification
+   - Implement basic signature verification
 
 2. License compliance
    - Verify LICENSE and NOTICE files exist and are placed correctly

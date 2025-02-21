@@ -1,0 +1,2 @@
+#!/bin/sh
+sudo docker run --rm -d -v "$HOME/tooling-atr-experiments/state:/opt/atr/state" --network host tooling-atr-experiments
