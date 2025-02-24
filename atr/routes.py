@@ -104,12 +104,221 @@ async def ephemeral_gpg_home():
         await asyncio.to_thread(shutil.rmtree, temp_dir)
 
 
+async def file_hash_save(base_dir: Path, file: FileStorage) -> tuple[str, int]:
+    """
+    Save a file using its SHA3-256 hash as the filename.
+    Returns the hash and size in bytes of the saved file.
+    """
+    sha3 = hashlib.sha3_256()
+    total_bytes = 0
+
+    # Create temporary file to stream to while computing hash
+    temp_path = base_dir / f"temp-{secrets.token_hex(8)}"
+    try:
+        stream = file.stream
+
+        async with aiofiles.open(temp_path, "wb") as f:
+            while True:
+                chunk = await asyncio.to_thread(stream.read, 8192)
+                if not chunk:
+                    break
+                sha3.update(chunk)
+                total_bytes += len(chunk)
+                await f.write(chunk)
+
+        file_hash = sha3.hexdigest()
+        final_path = base_dir / file_hash
+
+        # Only move to final location if it doesn't exist
+        # This can race, but it's hash based so it's okay
+        if not await aiofiles.os.path.exists(final_path):
+            await aiofiles.os.rename(temp_path, final_path)
+        else:
+            # If file already exists, just remove the temp file
+            await aiofiles.os.remove(temp_path)
+
+        return file_hash, total_bytes
+    except Exception as e:
+        if await aiofiles.os.path.exists(temp_path):
+            await aiofiles.os.remove(temp_path)
+        raise e
+
+
+def format_file_size(size_in_bytes: int) -> str:
+    """Format a file size with appropriate units and comma-separated digits."""
+    # Format the raw bytes with commas
+    formatted_bytes = f"{size_in_bytes:,}"
+
+    # Calculate the appropriate unit
+    if size_in_bytes >= 1_000_000_000:
+        size_in_gb = size_in_bytes // 1_000_000_000
+        return f"{size_in_gb:,} GB ({formatted_bytes} bytes)"
+    elif size_in_bytes >= 1_000_000:
+        size_in_mb = size_in_bytes // 1_000_000
+        return f"{size_in_mb:,} MB ({formatted_bytes} bytes)"
+    elif size_in_bytes >= 1_000:
+        size_in_kb = size_in_bytes // 1_000
+        return f"{size_in_kb:,} KB ({formatted_bytes} bytes)"
+    else:
+        return f"{formatted_bytes} bytes"
+
+
+def format_artifact_name(project_name: str, product_name: str, version: str, is_podling: bool = False) -> str:
+    """Format an artifact name according to Apache naming conventions.
+
+    For regular projects: apache-${project}-${product}-${version}
+    For podlings: apache-${project}-incubating-${product}-${version}
+    """
+    if is_podling:
+        return f"apache-{project_name}-incubating-{product_name}-{version}"
+    return f"apache-{project_name}-{product_name}-{version}"
+
+
+async def key_add_post(session: ClientSession, request: Request, user_pmcs: Sequence[PMC]) -> dict | None:
+    form = await request.form
+    public_key = form.get("public_key")
+    if not public_key:
+        raise FlashError("Public key is required")
+
+    # Get selected PMCs from form
+    selected_pmcs = form.getlist("selected_pmcs")
+    if not selected_pmcs:
+        raise FlashError("You must select at least one PMC")
+
+    # Ensure that the selected PMCs are ones of which the user is actually a member
+    invalid_pmcs = [pmc for pmc in selected_pmcs if (pmc not in session.committees) and (pmc not in session.projects)]
+    if invalid_pmcs:
+        raise FlashError(f"Invalid PMC selection: {', '.join(invalid_pmcs)}")
+
+    return await key_user_add(session, public_key, selected_pmcs)
+
+
+async def key_user_add(session: ClientSession, public_key: str, selected_pmcs: list[str]) -> dict | None:
+    if not public_key:
+        raise FlashError("Public key is required")
+
+    # Import the key into GPG to validate and extract info
+    # TODO: We'll just assume for now that gnupg.GPG() doesn't need to be async
+    async with ephemeral_gpg_home() as gpg_home:
+        gpg = gnupg.GPG(gnupghome=gpg_home)
+        import_result = await asyncio.to_thread(gpg.import_keys, public_key)
+
+        if not import_result.fingerprints:
+            raise FlashError("Invalid public key format")
+
+        fingerprint = import_result.fingerprints[0]
+        if fingerprint is not None:
+            fingerprint = fingerprint.lower()
+        # APP.logger.info("Import result: %s", vars(import_result))
+        # Get key details
+        # We could probably use import_result instead
+        # But this way it shows that they've really been imported
+        keys = await asyncio.to_thread(gpg.list_keys)
+
+    # Then we have the properties listed here:
+    # https://gnupg.readthedocs.io/en/latest/#listing-keys
+    # Note that "fingerprint" is not listed there, but we have it anyway...
+    key = next((k for k in keys if (k["fingerprint"] is not None) and (k["fingerprint"].lower() == fingerprint)), None)
+    if not key:
+        raise FlashError("Failed to import key")
+    if (key.get("algo") == "1") and (int(key.get("length", "0")) < 2048):
+        # https://infra.apache.org/release-signing.html#note
+        # Says that keys must be at least 2048 bits
+        raise FlashError("Key is not long enough; must be at least 2048 bits")
+
+    # Store key in database
+    async with get_session() as db_session:
+        return await key_user_session_add(session, public_key, key, selected_pmcs, db_session)
+
+
+async def key_user_session_add(
+    session: ClientSession,
+    public_key: str,
+    key: dict,
+    selected_pmcs: list[str],
+    db_session: AsyncSession,
+) -> dict | None:
+    # Check if key already exists
+    statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
+
+    # # If uncommented, this will prevent a user from adding a second key
+    # existing_key = (await db_session.execute(statement)).scalar_one_or_none()
+    # if existing_key:
+    #     return ("You already have a key registered", None)
+
+    if not session.uid:
+        raise FlashError("You must be signed in to add a key")
+
+    fingerprint = key.get("fingerprint")
+    if not isinstance(fingerprint, str):
+        raise FlashError("Invalid key fingerprint")
+    fingerprint = fingerprint.lower()
+    uids = key.get("uids")
+    async with db_session.begin():
+        # Create new key record
+        key_record = PublicSigningKey(
+            fingerprint=fingerprint,
+            algorithm=int(key["algo"]),
+            length=int(key.get("length", "0")),
+            created=datetime.datetime.fromtimestamp(int(key["date"])),
+            expires=datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
+            declared_uid=uids[0] if uids else None,
+            apache_uid=session.uid,
+            ascii_armored_key=public_key,
+        )
+        db_session.add(key_record)
+
+        # Link key to selected PMCs
+        for pmc_name in selected_pmcs:
+            statement = select(PMC).where(PMC.project_name == pmc_name)
+            pmc = (await db_session.execute(statement)).scalar_one_or_none()
+            if pmc and pmc.id:
+                link = PMCKeyLink(pmc_id=pmc.id, key_fingerprint=key_record.fingerprint)
+                db_session.add(link)
+            else:
+                # TODO: Log? Add to "error"?
+                continue
+
+    return {
+        "key_id": key["keyid"],
+        "fingerprint": key["fingerprint"].lower() if key.get("fingerprint") else "Unknown",
+        "user_id": key["uids"][0] if key.get("uids") else "Unknown",
+        "creation_date": datetime.datetime.fromtimestamp(int(key["date"])),
+        "expiration_date": datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
+        "data": pprint.pformat(key),
+    }
+
+
+# Package functions
+
+
+async def package_add_artifact_info_get(
+    db_session: AsyncSession, uploads_path: Path, artifact_file: FileStorage
+) -> tuple[str, str, int]:
+    """Get artifact information during package addition process.
+
+    Returns a tuple of (sha3_hash, sha512_hash, size) for the artifact file.
+    Validates that the artifact hasn't already been uploaded to another release.
+    """
+    # In a separate function to appease the complexity checker
+    artifact_sha3, artifact_size = await file_hash_save(uploads_path, artifact_file)
+
+    # Check for duplicates by artifact_sha3 before proceeding
+    statement = select(Package).where(Package.artifact_sha3 == artifact_sha3)
+    duplicate = (await db_session.execute(statement)).first()
+    if duplicate:
+        # Remove the saved file since we won't be using it
+        await aiofiles.os.remove(uploads_path / artifact_sha3)
+        raise FlashError("This exact file has already been uploaded to another release")
+
+    # Compute SHA-512 of the artifact for the package record
+    return artifact_sha3, compute_sha512(uploads_path / artifact_sha3), artifact_size
+
+
 async def package_add_post(session: ClientSession, request: Request) -> Response:
     """Handle POST request for adding a package to a release."""
     try:
-        release_key, artifact_file, checksum_file, signature_file, artifact_type = await package_add_post_validate(
-            request
-        )
+        release_key, artifact_file, checksum_file, signature_file, artifact_type = await package_add_validate(request)
     except FlashError as e:
         await flash(f"{e!s}", "error")
         return redirect(url_for("root_package_add"))
@@ -124,7 +333,7 @@ async def package_add_post(session: ClientSession, request: Request) -> Response
             # Process and save the files
             try:
                 try:
-                    artifact_sha3, artifact_size, artifact_sha512, signature_sha3 = await package_add_post_session(
+                    artifact_sha3, artifact_size, artifact_sha512, signature_sha3 = await package_add_session_process(
                         db_session, release_key, artifact_file, checksum_file, signature_file
                     )
                 except FlashError as e:
@@ -152,7 +361,63 @@ async def package_add_post(session: ClientSession, request: Request) -> Response
     return redirect(url_for("root_candidate_review"))
 
 
-async def package_add_post_validate(
+async def package_add_session_process(
+    db_session: AsyncSession,
+    release_key: str,
+    artifact_file: FileStorage,
+    checksum_file: FileStorage | None,
+    signature_file: FileStorage | None,
+) -> tuple[str, int, str, str | None]:
+    """Helper function for package_add_post."""
+
+    # First check for duplicates by filename
+    statement = select(Package).where(
+        Package.release_key == release_key,
+        Package.filename == artifact_file.filename,
+    )
+    duplicate = (await db_session.execute(statement)).first()
+
+    if duplicate:
+        raise FlashError("This release artifact has already been uploaded")
+
+    # Save files using their hashes as filenames
+    uploads_path = Path(get_release_storage_dir())
+    try:
+        artifact_sha3, artifact_sha512, artifact_size = await package_add_artifact_info_get(
+            db_session, uploads_path, artifact_file
+        )
+    except Exception as e:
+        raise FlashError(f"Error saving artifact file: {e!s}")
+    # Note: "error" is not permitted past this point
+    # Because we don't want to roll back saving the artifact
+
+    # Validate checksum file if provided
+    if checksum_file:
+        try:
+            # Read only the number of bytes required for the checksum
+            bytes_required: int = len(artifact_sha512)
+            checksum_content = checksum_file.read(bytes_required).decode().strip()
+            if checksum_content.lower() != artifact_sha512.lower():
+                await flash("Warning: Provided checksum does not match computed SHA-512", "warning")
+        except UnicodeDecodeError:
+            await flash("Warning: Could not read checksum file as text", "warning")
+        except Exception as e:
+            await flash(f"Warning: Error validating checksum file: {e!s}", "warning")
+
+    # Process signature file if provided
+    signature_sha3 = None
+    if signature_file and signature_file.filename:
+        if not signature_file.filename.endswith(".asc"):
+            await flash("Warning: Signature file should have .asc extension", "warning")
+        try:
+            signature_sha3, _ = await file_hash_save(uploads_path, signature_file)
+        except Exception as e:
+            await flash(f"Warning: Could not save signature file: {e!s}", "warning")
+
+    return artifact_sha3, artifact_size, artifact_sha512, signature_sha3
+
+
+async def package_add_validate(
     request: Request,
 ) -> tuple[str, FileStorage, FileStorage | None, FileStorage | None, str]:
     form = await request.form
@@ -185,79 +450,55 @@ async def package_add_post_validate(
     return release_key, artifact_file, checksum_file, signature_file, artifact_type
 
 
-async def get_artifact_info(
-    db_session: AsyncSession, uploads_path: Path, artifact_file: FileStorage
-) -> tuple[str, str, int]:
-    # In a separate function to appease the complexity checker
-    artifact_sha3, artifact_size = await save_file_by_hash(uploads_path, artifact_file)
+async def package_data_get(db_session: AsyncSession, artifact_sha3: str, release_key: str, session_uid: str) -> Package:
+    """Validate package deletion request and return the package if valid."""
+    # Get the package and its associated release
+    if Package.release is None:
+        raise FlashError("Package has no associated release")
+    if Release.pmc is None:
+        raise FlashError("Release has no associated PMC")
 
-    # Check for duplicates by artifact_sha3 before proceeding
-    statement = select(Package).where(Package.artifact_sha3 == artifact_sha3)
-    duplicate = (await db_session.execute(statement)).first()
-    if duplicate:
-        # Remove the saved file since we won't be using it
-        await aiofiles.os.remove(uploads_path / artifact_sha3)
-        raise FlashError("This exact file has already been uploaded to another release")
-
-    # Compute SHA-512 of the artifact for the package record
-    return artifact_sha3, compute_sha512(uploads_path / artifact_sha3), artifact_size
-
-
-async def package_add_post_session(
-    db_session: AsyncSession,
-    release_key: str,
-    artifact_file: FileStorage,
-    checksum_file: FileStorage | None,
-    signature_file: FileStorage | None,
-) -> tuple[str, int, str, str | None]:
-    """Helper function for package_add_post."""
-
-    # First check for duplicates by filename
-    statement = select(Package).where(
-        Package.release_key == release_key,
-        Package.filename == artifact_file.filename,
+    pkg_release = cast(InstrumentedAttribute[Release], Package.release)
+    rel_pmc = cast(InstrumentedAttribute[PMC], Release.pmc)
+    statement = (
+        select(Package)
+        .options(selectinload(pkg_release).selectinload(rel_pmc))
+        .where(Package.artifact_sha3 == artifact_sha3)
     )
-    duplicate = (await db_session.execute(statement)).first()
+    result = await db_session.execute(statement)
+    package = result.scalar_one_or_none()
 
-    if duplicate:
-        raise FlashError("This release artifact has already been uploaded")
+    if not package:
+        raise FlashError("Package not found")
 
-    # Save files using their hashes as filenames
-    uploads_path = Path(get_release_storage_dir())
-    try:
-        artifact_sha3, artifact_sha512, artifact_size = await get_artifact_info(db_session, uploads_path, artifact_file)
-    except Exception as e:
-        raise FlashError(f"Error saving artifact file: {e!s}")
-    # Note: "error" is not permitted past this point
-    # Because we don't want to roll back saving the artifact
+    if package.release_key != release_key:
+        raise FlashError("Invalid release key")
 
-    # Validate checksum file if provided
-    if checksum_file:
-        try:
-            # Read only the number of bytes required for the checksum
-            bytes_required: int = len(artifact_sha512)
-            checksum_content = checksum_file.read(bytes_required).decode().strip()
-            if checksum_content.lower() != artifact_sha512.lower():
-                await flash("Warning: Provided checksum does not match computed SHA-512", "warning")
-        except UnicodeDecodeError:
-            await flash("Warning: Could not read checksum file as text", "warning")
-        except Exception as e:
-            await flash(f"Warning: Error validating checksum file: {e!s}", "warning")
+    # Check permissions
+    if package.release and package.release.pmc:
+        if session_uid not in package.release.pmc.pmc_members and session_uid not in package.release.pmc.committers:
+            raise FlashError("You don't have permission to access this package")
 
-    # Process signature file if provided
-    signature_sha3 = None
-    if signature_file and signature_file.filename:
-        if not signature_file.filename.endswith(".asc"):
-            await flash("Warning: Signature file should have .asc extension", "warning")
-        try:
-            signature_sha3, _ = await save_file_by_hash(uploads_path, signature_file)
-        except Exception as e:
-            await flash(f"Warning: Could not save signature file: {e!s}", "warning")
-
-    return artifact_sha3, artifact_size, artifact_sha512, signature_sha3
+    return package
 
 
-async def release_create_post(session: ClientSession, request: Request) -> Response:
+async def package_files_delete(package: Package, uploads_path: Path) -> None:
+    """Delete the artifact and signature files associated with a package."""
+    if package.artifact_sha3:
+        artifact_path = uploads_path / package.artifact_sha3
+        if await aiofiles.os.path.exists(artifact_path):
+            await aiofiles.os.remove(artifact_path)
+
+    if package.signature_sha3:
+        signature_path = uploads_path / package.signature_sha3
+        if await aiofiles.os.path.exists(signature_path):
+            await aiofiles.os.remove(signature_path)
+
+
+# Release functions
+
+
+async def release_add_post(session: ClientSession, request: Request) -> Response:
     """Handle POST request for creating a new release."""
     form = await request.form
 
@@ -326,10 +567,279 @@ async def release_create_post(session: ClientSession, request: Request) -> Respo
     return redirect(url_for("root_package_add", storage_key=storage_key))
 
 
+async def release_delete_validate(db_session: AsyncSession, release_key: str, session_uid: str) -> Release:
+    """Validate release deletion request and return the release if valid."""
+    if Release.pmc is None:
+        raise FlashError("Release has no associated PMC")
+
+    rel_pmc = cast(InstrumentedAttribute[PMC], Release.pmc)
+    statement = select(Release).options(selectinload(rel_pmc)).where(Release.storage_key == release_key)
+    result = await db_session.execute(statement)
+    release = result.scalar_one_or_none()
+
+    if not release:
+        raise FlashError("Release not found")
+
+    # Check permissions
+    if release.pmc:
+        if session_uid not in release.pmc.pmc_members and session_uid not in release.pmc.committers:
+            raise FlashError("You don't have permission to delete this release")
+
+    return release
+
+
+async def release_files_delete(release: Release, uploads_path: Path) -> None:
+    """Delete all files associated with a release."""
+    if not release.packages:
+        return
+
+    for package in release.packages:
+        await package_files_delete(package, uploads_path)
+
+
+# Root functions
+
+
 @APP.route("/")
 async def root() -> str:
     """Main page."""
     return await render_template("index.html")
+
+
+@APP.route("/candidate/create", methods=["GET", "POST"])
+@require(Requirements.committer)
+async def root_candidate_create() -> Response | str:
+    """Create a new release in the database."""
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    # For POST requests, handle the release creation
+    if request.method == "POST":
+        return await release_add_post(session, request)
+
+    # Get PMC objects for all projects the user is a member of
+    async with get_session() as db_session:
+        from sqlalchemy.sql.expression import ColumnElement
+
+        project_list = session.committees + session.projects
+        project_name: ColumnElement[str] = cast(ColumnElement[str], PMC.project_name)
+        statement = select(PMC).where(project_name.in_(project_list))
+        user_pmcs = (await db_session.execute(statement)).scalars().all()
+
+    # For GET requests, show the form
+    return await render_template(
+        "candidate-create.html",
+        asf_id=session.uid,
+        user_pmcs=user_pmcs,
+    )
+
+
+@APP.route("/candidate/review")
+@require(Requirements.committer)
+async def root_candidate_review() -> str:
+    """Show all release candidates to which the user has access."""
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    async with get_session() as db_session:
+        # Get all releases where the user is a PMC member or committer
+        # TODO: We don't actually record who uploaded the release candidate
+        # We should probably add that information!
+        # TODO: This duplicates code in root_package_add
+        release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
+        release_packages = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages))
+        package_tasks = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages)).selectinload(
+            cast(InstrumentedAttribute[list[Task]], Package.tasks)
+        )
+        release_product_line = selectinload(cast(InstrumentedAttribute[ProductLine], Release.product_line))
+        statement = (
+            select(Release)
+            .options(release_pmc, release_packages, package_tasks, release_product_line)
+            .join(PMC)
+            .where(Release.stage == ReleaseStage.CANDIDATE)
+        )
+        releases = (await db_session.execute(statement)).scalars().all()
+
+        # Filter to only show releases for PMCs or PPMCs where the user is a member or committer
+        user_releases = []
+        for r in releases:
+            if r.pmc is None:
+                continue
+            # For PPMCs the "members" are stored in the committers field
+            if session.uid in r.pmc.pmc_members or session.uid in r.pmc.committers:
+                user_releases.append(r)
+
+        return await render_template(
+            "candidate-review.html",
+            releases=user_releases,
+            format_file_size=format_file_size,
+            format_artifact_name=format_artifact_name,
+        )
+
+
+# @APP.route("/candidate/signatures/verify/<release_key>")
+# @require(Requirements.committer)
+# async def root_candidate_signatures_verify(release_key: str) -> str:
+#     """Verify the signatures for all packages in a release candidate."""
+#     # TODO: This entire endpoint can be removed
+#     session = await session_read()
+#     if session is None:
+#         raise ASFQuartException("Not authenticated", errorcode=401)
+
+#     async with get_session() as db_session:
+#         # Get the release and its packages, and PMC with its keys
+#         release_packages = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages))
+#         release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
+#         pmc_keys_loader = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc)).selectinload(
+#             cast(InstrumentedAttribute[list[PublicSigningKey]], PMC.public_signing_keys)
+#         )
+
+#         # For now, for debugging, we'll just get all keys in the database
+#         statement = select(PublicSigningKey)
+#         # all_signing_keys = (await db_session.execute(statement)).scalars().all()
+
+#         statement = (
+#             select(Release)
+#             .options(release_packages, release_pmc, pmc_keys_loader)
+#             .where(Release.storage_key == release_key)
+#         )
+#         release = (await db_session.execute(statement)).scalar_one_or_none()
+#         if not release:
+#             raise ASFQuartException("Release not found", errorcode=404)
+
+#         # Get all ASCII-armored keys associated with the PMC
+#         # ascii_armored_keys = [key.ascii_armored_key for key in all_signing_keys]
+
+#         # Verify each package's signature
+#         verification_results = []
+#         storage_dir = Path(get_release_storage_dir())
+
+#         for package in release.packages:
+#             result = {"file": package.artifact_sha3, "filename": package.filename}
+
+#             artifact_path = storage_dir / package.artifact_sha3
+#             if package.signature_sha3 is None:
+#                 result["error"] = "No signature file provided"
+#                 verification_results.append(result)
+#                 continue
+
+#             signature_path = storage_dir / package.signature_sha3
+
+#             if not artifact_path.exists():
+#                 result["error"] = "Package artifact file not found"
+#             elif not signature_path.exists():
+#                 result["error"] = "Package signature file not found"
+#             else:
+#                 # Verify the signature
+#                 result = {}
+#                 # await verify_gpg_signature(artifact_path, signature_path, ascii_armored_keys)
+#                 result["file"] = package.artifact_sha3
+#                 result["filename"] = package.filename
+
+#             verification_results.append(result)
+
+#         return await render_template(
+#             "candidate-signature-verify.html", release=release, verification_results=verification_results
+#         )
+
+
+@APP.route("/keys/add", methods=["GET", "POST"])
+@require(Requirements.committer)
+async def root_keys_add() -> str:
+    """Add a new public signing key to the user's account."""
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    key_info = None
+
+    # Get PMC objects for all projects the user is a member of
+    async with get_session() as db_session:
+        from sqlalchemy.sql.expression import ColumnElement
+
+        project_list = session.committees + session.projects
+        project_name = cast(ColumnElement[str], PMC.project_name)
+        statement = select(PMC).where(project_name.in_(project_list))
+        user_pmcs = (await db_session.execute(statement)).scalars().all()
+
+    if request.method == "POST":
+        try:
+            key_info = await key_add_post(session, request, user_pmcs)
+        except FlashError as e:
+            await flash(str(e), "error")
+        except Exception as e:
+            await flash(f"Exception: {e}", "error")
+
+    return await render_template(
+        "keys-add.html",
+        asf_id=session.uid,
+        user_pmcs=user_pmcs,
+        key_info=key_info,
+        algorithms=algorithms,
+    )
+
+
+@APP.route("/keys/delete", methods=["POST"])
+@require(Requirements.committer)
+async def root_keys_delete() -> Response:
+    """Delete a public signing key from the user's account."""
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    form = await request.form
+    fingerprint = form.get("fingerprint")
+    if not fingerprint:
+        await flash("No key fingerprint provided", "error")
+        return redirect(url_for("root_keys_review"))
+
+    async with get_session() as db_session:
+        async with db_session.begin():
+            # Get the key and verify ownership
+            statement = select(PublicSigningKey).where(
+                PublicSigningKey.fingerprint == fingerprint, PublicSigningKey.apache_uid == session.uid
+            )
+            key = (await db_session.execute(statement)).scalar_one_or_none()
+
+            if not key:
+                await flash("Key not found or not owned by you", "error")
+                return redirect(url_for("root_keys_review"))
+
+            # Delete the key
+            await db_session.delete(key)
+
+    await flash("Key deleted successfully", "success")
+    return redirect(url_for("root_keys_review"))
+
+
+@APP.route("/keys/review")
+@require(Requirements.committer)
+async def root_keys_review() -> str:
+    """Show all keys associated with the user's account."""
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    # Get all existing keys for the user
+    async with get_session() as db_session:
+        pmcs_loader = selectinload(cast(InstrumentedAttribute[list[PMC]], PublicSigningKey.pmcs))
+        statement = select(PublicSigningKey).options(pmcs_loader).where(PublicSigningKey.apache_uid == session.uid)
+        user_keys = (await db_session.execute(statement)).scalars().all()
+
+    status_message = request.args.get("status_message")
+    status_type = request.args.get("status_type")
+
+    return await render_template(
+        "keys-review.html",
+        asf_id=session.uid,
+        user_keys=user_keys,
+        algorithms=algorithms,
+        status_message=status_message,
+        status_type=status_type,
+        now=datetime.datetime.now(datetime.UTC),
+    )
 
 
 @APP.route("/package/add", methods=["GET", "POST"])
@@ -379,406 +889,110 @@ async def root_package_add() -> Response | str:
     )
 
 
-@APP.route("/candidate/create", methods=["GET", "POST"])
+@APP.route("/package/check", methods=["GET", "POST"])
 @require(Requirements.committer)
-async def root_candidate_create() -> Response | str:
-    """Create a new release in the database."""
+async def root_package_check() -> str | Response:
+    """Show or create package verification tasks."""
     session = await session_read()
-    if session is None:
+    if (session is None) or (session.uid is None):
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    # For POST requests, handle the release creation
+    # Get parameters from either form data (POST) or query args (GET)
     if request.method == "POST":
-        return await release_create_post(session, request)
+        form = await request.form
+        artifact_sha3 = form.get("artifact_sha3")
+        release_key = form.get("release_key")
+    else:
+        artifact_sha3 = request.args.get("artifact_sha3")
+        release_key = request.args.get("release_key")
 
-    # Get PMC objects for all projects the user is a member of
-    async with get_session() as db_session:
-        from sqlalchemy.sql.expression import ColumnElement
-
-        project_list = session.committees + session.projects
-        project_name: ColumnElement[str] = cast(ColumnElement[str], PMC.project_name)
-        statement = select(PMC).where(project_name.in_(project_list))
-        user_pmcs = (await db_session.execute(statement)).scalars().all()
-
-    # For GET requests, show the form
-    return await render_template(
-        "candidate-create.html",
-        asf_id=session.uid,
-        user_pmcs=user_pmcs,
-    )
-
-
-@APP.route("/candidate/signatures/verify/<release_key>")
-@require(Requirements.committer)
-async def root_candidate_signatures_verify(release_key: str) -> str:
-    """Verify the signatures for all packages in a release candidate."""
-    # TODO: This entire endpoint can be removed
-    session = await session_read()
-    if session is None:
-        raise ASFQuartException("Not authenticated", errorcode=401)
-
-    async with get_session() as db_session:
-        # Get the release and its packages, and PMC with its keys
-        release_packages = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages))
-        release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
-        pmc_keys_loader = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc)).selectinload(
-            cast(InstrumentedAttribute[list[PublicSigningKey]], PMC.public_signing_keys)
-        )
-
-        # For now, for debugging, we'll just get all keys in the database
-        statement = select(PublicSigningKey)
-        # all_signing_keys = (await db_session.execute(statement)).scalars().all()
-
-        statement = (
-            select(Release)
-            .options(release_packages, release_pmc, pmc_keys_loader)
-            .where(Release.storage_key == release_key)
-        )
-        release = (await db_session.execute(statement)).scalar_one_or_none()
-        if not release:
-            raise ASFQuartException("Release not found", errorcode=404)
-
-        # Get all ASCII-armored keys associated with the PMC
-        # ascii_armored_keys = [key.ascii_armored_key for key in all_signing_keys]
-
-        # Verify each package's signature
-        verification_results = []
-        storage_dir = Path(get_release_storage_dir())
-
-        for package in release.packages:
-            result = {"file": package.artifact_sha3, "filename": package.filename}
-
-            artifact_path = storage_dir / package.artifact_sha3
-            if package.signature_sha3 is None:
-                result["error"] = "No signature file provided"
-                verification_results.append(result)
-                continue
-
-            signature_path = storage_dir / package.signature_sha3
-
-            if not artifact_path.exists():
-                result["error"] = "Package artifact file not found"
-            elif not signature_path.exists():
-                result["error"] = "Package signature file not found"
-            else:
-                # Verify the signature
-                result = {}
-                # await verify_gpg_signature(artifact_path, signature_path, ascii_armored_keys)
-                result["file"] = package.artifact_sha3
-                result["filename"] = package.filename
-
-            verification_results.append(result)
-
-        return await render_template(
-            "candidate-signature-verify.html", release=release, verification_results=verification_results
-        )
-
-
-@APP.route("/pmc/<project_name>")
-async def root_pmc_arg(project_name: str) -> dict:
-    """Get a specific PMC by project name."""
-    pmc = await get_pmc_by_name(project_name)
-    if not pmc:
-        raise ASFQuartException("PMC not found", errorcode=404)
-
-    return {
-        "id": pmc.id,
-        "project_name": pmc.project_name,
-        "pmc_members": pmc.pmc_members,
-        "committers": pmc.committers,
-        "release_managers": pmc.release_managers,
-    }
-
-
-# @APP.route("/pmc/create/<project_name>")
-# async def root_pmc_create_arg(project_name: str) -> dict:
-#     "Create a new PMC with some sample data."
-#     pmc = PMC(
-#         project_name=project_name,
-#         pmc_members=["alice", "bob"],
-#         committers=["charlie", "dave"],
-#         release_managers=["alice"],
-#     )
-
-#     async with get_session() as db_session:
-#         async with db_session.begin():
-#             try:
-#                 db_session.add(pmc)
-#             except IntegrityError:
-#                 raise ASFQuartException(
-#                     f"PMC with name '{project_name}' already exists",
-#                     errorcode=409,  # HTTP 409 Conflict
-#                 )
-
-#         # Convert to dict for response
-#         return {
-#             "id": pmc.id,
-#             "project_name": pmc.project_name,
-#             "pmc_members": pmc.pmc_members,
-#             "committers": pmc.committers,
-#             "release_managers": pmc.release_managers,
-#         }
-
-
-@APP.route("/pmc/directory")
-async def root_pmc_directory() -> str:
-    """Main PMC directory page."""
-    pmcs = await get_pmcs()
-    return await render_template("pmc-directory.html", pmcs=pmcs)
-
-
-@APP.route("/pmc/list")
-async def root_pmc_list() -> list[dict]:
-    """List all PMCs in the database."""
-    pmcs = await get_pmcs()
-
-    return [
-        {
-            "id": pmc.id,
-            "project_name": pmc.project_name,
-            "pmc_members": pmc.pmc_members,
-            "committers": pmc.committers,
-            "release_managers": pmc.release_managers,
-        }
-        for pmc in pmcs
-    ]
-
-
-@APP.route("/keys/review")
-@require(Requirements.committer)
-async def root_keys_review() -> str:
-    """Show all keys associated with the user's account."""
-    session = await session_read()
-    if session is None:
-        raise ASFQuartException("Not authenticated", errorcode=401)
-
-    # Get all existing keys for the user
-    async with get_session() as db_session:
-        pmcs_loader = selectinload(cast(InstrumentedAttribute[list[PMC]], PublicSigningKey.pmcs))
-        statement = select(PublicSigningKey).options(pmcs_loader).where(PublicSigningKey.apache_uid == session.uid)
-        user_keys = (await db_session.execute(statement)).scalars().all()
-
-    status_message = request.args.get("status_message")
-    status_type = request.args.get("status_type")
-
-    return await render_template(
-        "keys-review.html",
-        asf_id=session.uid,
-        user_keys=user_keys,
-        algorithms=algorithms,
-        status_message=status_message,
-        status_type=status_type,
-        now=datetime.datetime.now(datetime.UTC),
-    )
-
-
-@APP.route("/keys/delete", methods=["POST"])
-@require(Requirements.committer)
-async def root_keys_delete() -> Response:
-    """Delete a public signing key from the user's account."""
-    session = await session_read()
-    if session is None:
-        raise ASFQuartException("Not authenticated", errorcode=401)
-
-    form = await request.form
-    fingerprint = form.get("fingerprint")
-    if not fingerprint:
-        await flash("No key fingerprint provided", "error")
-        return redirect(url_for("root_keys_review"))
+    if not artifact_sha3 or not release_key:
+        await flash("Missing required parameters", "error")
+        return redirect(url_for("root_candidate_review"))
 
     async with get_session() as db_session:
         async with db_session.begin():
-            # Get the key and verify ownership
-            statement = select(PublicSigningKey).where(
-                PublicSigningKey.fingerprint == fingerprint, PublicSigningKey.apache_uid == session.uid
-            )
-            key = (await db_session.execute(statement)).scalar_one_or_none()
+            # Get the package and verify permissions
+            try:
+                package = await package_data_get(db_session, artifact_sha3, release_key, session.uid)
+            except FlashError as e:
+                await flash(str(e), "error")
+                return redirect(url_for("root_candidate_review"))
 
-            if not key:
-                await flash("Key not found or not owned by you", "error")
-                return redirect(url_for("root_keys_review"))
+            if request.method == "POST":
+                # Check if package already has active tasks
+                tasks, has_active_tasks = await task_package_status_get(db_session, artifact_sha3)
+                if has_active_tasks:
+                    await flash("Package verification is already in progress", "warning")
+                    return redirect(url_for("root_candidate_review"))
 
-            # Delete the key
-            await db_session.delete(key)
+                try:
+                    await task_verification_create(db_session, package)
+                except FlashError as e:
+                    await flash(str(e), "error")
+                    return redirect(url_for("root_candidate_review"))
 
-    await flash("Key deleted successfully", "success")
-    return redirect(url_for("root_keys_review"))
+                await flash(f"Added verification tasks for package {package.filename}", "success")
+                return redirect(url_for("root_package_check", artifact_sha3=artifact_sha3, release_key=release_key))
+            else:
+                # Get all tasks for this package for GET request
+                tasks, _ = await task_package_status_get(db_session, artifact_sha3)
+                all_tasks_completed = bool(tasks) and all(
+                    task.status == TaskStatus.COMPLETED or task.status == TaskStatus.FAILED for task in tasks
+                )
+                return await render_template(
+                    "package-check.html",
+                    package=package,
+                    release=package.release,
+                    tasks=tasks,
+                    all_tasks_completed=all_tasks_completed,
+                    format_file_size=format_file_size,
+                )
 
 
-@APP.route("/keys/add", methods=["GET", "POST"])
+@APP.route("/package/check/restart", methods=["POST"])
 @require(Requirements.committer)
-async def root_keys_add() -> str:
-    """Add a new public signing key to the user's account."""
+async def root_package_check_restart() -> Response:
+    """Restart package verification tasks."""
     session = await session_read()
-    if session is None:
+    if (session is None) or (session.uid is None):
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    key_info = None
-
-    # Get PMC objects for all projects the user is a member of
-    async with get_session() as db_session:
-        from sqlalchemy.sql.expression import ColumnElement
-
-        project_list = session.committees + session.projects
-        project_name = cast(ColumnElement[str], PMC.project_name)
-        statement = select(PMC).where(project_name.in_(project_list))
-        user_pmcs = (await db_session.execute(statement)).scalars().all()
-
-    if request.method == "POST":
-        try:
-            key_info = await keys_add_post(session, request, user_pmcs)
-        except FlashError as e:
-            await flash(str(e), "error")
-        except Exception as e:
-            await flash(f"Exception: {e}", "error")
-
-    return await render_template(
-        "keys-add.html",
-        asf_id=session.uid,
-        user_pmcs=user_pmcs,
-        key_info=key_info,
-        algorithms=algorithms,
-    )
-
-
-async def keys_add_post(session: ClientSession, request: Request, user_pmcs: Sequence[PMC]) -> dict | None:
     form = await request.form
-    public_key = form.get("public_key")
-    if not public_key:
-        raise FlashError("Public key is required")
+    artifact_sha3 = form.get("artifact_sha3")
+    release_key = form.get("release_key")
 
-    # Get selected PMCs from form
-    selected_pmcs = form.getlist("selected_pmcs")
-    if not selected_pmcs:
-        raise FlashError("You must select at least one PMC")
-
-    # Ensure that the selected PMCs are ones of which the user is actually a member
-    invalid_pmcs = [pmc for pmc in selected_pmcs if (pmc not in session.committees) and (pmc not in session.projects)]
-    if invalid_pmcs:
-        raise FlashError(f"Invalid PMC selection: {', '.join(invalid_pmcs)}")
-
-    return await user_keys_add(session, public_key, selected_pmcs)
-
-
-def format_file_size(size_in_bytes: int) -> str:
-    """Format a file size with appropriate units and comma-separated digits."""
-    # Format the raw bytes with commas
-    formatted_bytes = f"{size_in_bytes:,}"
-
-    # Calculate the appropriate unit
-    if size_in_bytes >= 1_000_000_000:
-        size_in_gb = size_in_bytes // 1_000_000_000
-        return f"{size_in_gb:,} GB ({formatted_bytes} bytes)"
-    elif size_in_bytes >= 1_000_000:
-        size_in_mb = size_in_bytes // 1_000_000
-        return f"{size_in_mb:,} MB ({formatted_bytes} bytes)"
-    elif size_in_bytes >= 1_000:
-        size_in_kb = size_in_bytes // 1_000
-        return f"{size_in_kb:,} KB ({formatted_bytes} bytes)"
-    else:
-        return f"{formatted_bytes} bytes"
-
-
-def format_artifact_name(project_name: str, product_name: str, version: str, is_podling: bool = False) -> str:
-    """Format an artifact name according to Apache naming conventions.
-
-    For regular projects: apache-${project}-${product}-${version}
-    For podlings: apache-${project}-incubating-${product}-${version}
-    """
-    if is_podling:
-        return f"apache-{project_name}-incubating-{product_name}-{version}"
-    return f"apache-{project_name}-{product_name}-{version}"
-
-
-@APP.route("/candidate/review")
-@require(Requirements.committer)
-async def root_candidate_review() -> str:
-    """Show all release candidates to which the user has access."""
-    session = await session_read()
-    if session is None:
-        raise ASFQuartException("Not authenticated", errorcode=401)
+    if not artifact_sha3 or not release_key:
+        await flash("Missing required parameters", "error")
+        return redirect(url_for("root_candidate_review"))
 
     async with get_session() as db_session:
-        # Get all releases where the user is a PMC member or committer
-        # TODO: We don't actually record who uploaded the release candidate
-        # We should probably add that information!
-        # TODO: This duplicates code in root_package_add
-        release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
-        release_packages = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages))
-        package_tasks = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages)).selectinload(
-            cast(InstrumentedAttribute[list[Task]], Package.tasks)
-        )
-        release_product_line = selectinload(cast(InstrumentedAttribute[ProductLine], Release.product_line))
-        statement = (
-            select(Release)
-            .options(release_pmc, release_packages, package_tasks, release_product_line)
-            .join(PMC)
-            .where(Release.stage == ReleaseStage.CANDIDATE)
-        )
-        releases = (await db_session.execute(statement)).scalars().all()
+        async with db_session.begin():
+            # Get the package and verify permissions
+            try:
+                package = await package_data_get(db_session, artifact_sha3, release_key, session.uid)
+            except FlashError as e:
+                await flash(str(e), "error")
+                return redirect(url_for("root_candidate_review"))
 
-        # Filter to only show releases for PMCs or PPMCs where the user is a member or committer
-        user_releases = []
-        for r in releases:
-            if r.pmc is None:
-                continue
-            # For PPMCs the "members" are stored in the committers field
-            if session.uid in r.pmc.pmc_members or session.uid in r.pmc.committers:
-                user_releases.append(r)
+            # Check if package has any active tasks
+            tasks, has_active_tasks = await task_package_status_get(db_session, artifact_sha3)
+            if has_active_tasks:
+                await flash("Cannot restart checks while tasks are still in progress", "error")
+                return redirect(url_for("root_package_check", artifact_sha3=artifact_sha3, release_key=release_key))
 
-        return await render_template(
-            "candidate-review.html",
-            releases=user_releases,
-            format_file_size=format_file_size,
-            format_artifact_name=format_artifact_name,
-        )
+            # Delete existing tasks
+            for task in tasks:
+                await db_session.delete(task)
 
+            try:
+                await task_verification_create(db_session, package)
+            except FlashError as e:
+                await flash(str(e), "error")
+                return redirect(url_for("root_candidate_review"))
 
-async def delete_package_files(package: Package, uploads_path: Path) -> None:
-    """Delete the artifact and signature files associated with a package."""
-    if package.artifact_sha3:
-        artifact_path = uploads_path / package.artifact_sha3
-        if await aiofiles.os.path.exists(artifact_path):
-            await aiofiles.os.remove(artifact_path)
-
-    if package.signature_sha3:
-        signature_path = uploads_path / package.signature_sha3
-        if await aiofiles.os.path.exists(signature_path):
-            await aiofiles.os.remove(signature_path)
-
-
-async def package_from_data(
-    db_session: AsyncSession, artifact_sha3: str, release_key: str, session_uid: str
-) -> Package:
-    """Validate package deletion request and return the package if valid."""
-    # Get the package and its associated release
-    if Package.release is None:
-        raise FlashError("Package has no associated release")
-    if Release.pmc is None:
-        raise FlashError("Release has no associated PMC")
-
-    pkg_release = cast(InstrumentedAttribute[Release], Package.release)
-    rel_pmc = cast(InstrumentedAttribute[PMC], Release.pmc)
-    statement = (
-        select(Package)
-        .options(selectinload(pkg_release).selectinload(rel_pmc))
-        .where(Package.artifact_sha3 == artifact_sha3)
-    )
-    result = await db_session.execute(statement)
-    package = result.scalar_one_or_none()
-
-    if not package:
-        raise FlashError("Package not found")
-
-    if package.release_key != release_key:
-        raise FlashError("Invalid release key")
-
-    # Check permissions
-    if package.release and package.release.pmc:
-        if session_uid not in package.release.pmc.pmc_members and session_uid not in package.release.pmc.committers:
-            raise FlashError("You don't have permission to access this package")
-
-    return package
+            await flash("Package checks restarted successfully", "success")
+            return redirect(url_for("root_package_check", artifact_sha3=artifact_sha3, release_key=release_key))
 
 
 @APP.route("/package/delete", methods=["POST"])
@@ -800,8 +1014,8 @@ async def root_package_delete() -> Response:
     async with get_session() as db_session:
         async with db_session.begin():
             try:
-                package = await package_from_data(db_session, artifact_sha3, release_key, session.uid)
-                await delete_package_files(package, Path(get_release_storage_dir()))
+                package = await package_data_get(db_session, artifact_sha3, release_key, session.uid)
+                await package_files_delete(package, Path(get_release_storage_dir()))
                 await db_session.delete(package)
             except FlashError as e:
                 await flash(str(e), "error")
@@ -814,170 +1028,44 @@ async def root_package_delete() -> Response:
     return redirect(url_for("root_candidate_review"))
 
 
-async def save_file_by_hash(base_dir: Path, file: FileStorage) -> tuple[str, int]:
-    """
-    Save a file using its SHA3-256 hash as the filename.
-    Returns the hash and size in bytes of the saved file.
-    """
-    sha3 = hashlib.sha3_256()
-    total_bytes = 0
-
-    # Create temporary file to stream to while computing hash
-    temp_path = base_dir / f"temp-{secrets.token_hex(8)}"
-    try:
-        stream = file.stream
-
-        async with aiofiles.open(temp_path, "wb") as f:
-            while True:
-                chunk = await asyncio.to_thread(stream.read, 8192)
-                if not chunk:
-                    break
-                sha3.update(chunk)
-                total_bytes += len(chunk)
-                await f.write(chunk)
-
-        file_hash = sha3.hexdigest()
-        final_path = base_dir / file_hash
-
-        # Only move to final location if it doesn't exist
-        # This can race, but it's hash based so it's okay
-        if not await aiofiles.os.path.exists(final_path):
-            await aiofiles.os.rename(temp_path, final_path)
-        else:
-            # If file already exists, just remove the temp file
-            await aiofiles.os.remove(temp_path)
-
-        return file_hash, total_bytes
-    except Exception as e:
-        if await aiofiles.os.path.exists(temp_path):
-            await aiofiles.os.remove(temp_path)
-        raise e
+@APP.route("/project/directory")
+async def root_project_directory() -> str:
+    """Main project directory page."""
+    projects = await get_pmcs()
+    return await render_template("project-directory.html", projects=projects)
 
 
-async def user_keys_add(session: ClientSession, public_key: str, selected_pmcs: list[str]) -> dict | None:
-    if not public_key:
-        raise FlashError("Public key is required")
+@APP.route("/project/list")
+async def root_project_list() -> list[dict]:
+    """List all projects in the database."""
+    pmcs = await get_pmcs()
 
-    # Import the key into GPG to validate and extract info
-    # TODO: We'll just assume for now that gnupg.GPG() doesn't need to be async
-    async with ephemeral_gpg_home() as gpg_home:
-        gpg = gnupg.GPG(gnupghome=gpg_home)
-        import_result = await asyncio.to_thread(gpg.import_keys, public_key)
-
-        if not import_result.fingerprints:
-            raise FlashError("Invalid public key format")
-
-        fingerprint = import_result.fingerprints[0]
-        if fingerprint is not None:
-            fingerprint = fingerprint.lower()
-        # APP.logger.info("Import result: %s", vars(import_result))
-        # Get key details
-        # We could probably use import_result instead
-        # But this way it shows that they've really been imported
-        keys = await asyncio.to_thread(gpg.list_keys)
-
-    # Then we have the properties listed here:
-    # https://gnupg.readthedocs.io/en/latest/#listing-keys
-    # Note that "fingerprint" is not listed there, but we have it anyway...
-    key = next((k for k in keys if (k["fingerprint"] is not None) and (k["fingerprint"].lower() == fingerprint)), None)
-    if not key:
-        raise FlashError("Failed to import key")
-    if (key.get("algo") == "1") and (int(key.get("length", "0")) < 2048):
-        # https://infra.apache.org/release-signing.html#note
-        # Says that keys must be at least 2048 bits
-        raise FlashError("Key is not long enough; must be at least 2048 bits")
-
-    # Store key in database
-    async with get_session() as db_session:
-        return await user_keys_add_session(session, public_key, key, selected_pmcs, db_session)
+    return [
+        {
+            "id": pmc.id,
+            "project_name": pmc.project_name,
+            "pmc_members": pmc.pmc_members,
+            "committers": pmc.committers,
+            "release_managers": pmc.release_managers,
+        }
+        for pmc in pmcs
+    ]
 
 
-async def user_keys_add_session(
-    session: ClientSession,
-    public_key: str,
-    key: dict,
-    selected_pmcs: list[str],
-    db_session: AsyncSession,
-) -> dict | None:
-    # Check if key already exists
-    statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
-
-    # # If uncommented, this will prevent a user from adding a second key
-    # existing_key = (await db_session.execute(statement)).scalar_one_or_none()
-    # if existing_key:
-    #     return ("You already have a key registered", None)
-
-    if not session.uid:
-        raise FlashError("You must be signed in to add a key")
-
-    fingerprint = key.get("fingerprint")
-    if not isinstance(fingerprint, str):
-        raise FlashError("Invalid key fingerprint")
-    fingerprint = fingerprint.lower()
-    uids = key.get("uids")
-    async with db_session.begin():
-        # Create new key record
-        key_record = PublicSigningKey(
-            fingerprint=fingerprint,
-            algorithm=int(key["algo"]),
-            length=int(key.get("length", "0")),
-            created=datetime.datetime.fromtimestamp(int(key["date"])),
-            expires=datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
-            declared_uid=uids[0] if uids else None,
-            apache_uid=session.uid,
-            ascii_armored_key=public_key,
-        )
-        db_session.add(key_record)
-
-        # Link key to selected PMCs
-        for pmc_name in selected_pmcs:
-            statement = select(PMC).where(PMC.project_name == pmc_name)
-            pmc = (await db_session.execute(statement)).scalar_one_or_none()
-            if pmc and pmc.id:
-                link = PMCKeyLink(pmc_id=pmc.id, key_fingerprint=key_record.fingerprint)
-                db_session.add(link)
-            else:
-                # TODO: Log? Add to "error"?
-                continue
+@APP.route("/project/<project_name>")
+async def root_project_project_name(project_name: str) -> dict:
+    """Get a specific project by project name."""
+    pmc = await get_pmc_by_name(project_name)
+    if not pmc:
+        raise ASFQuartException("PMC not found", errorcode=404)
 
     return {
-        "key_id": key["keyid"],
-        "fingerprint": key["fingerprint"].lower() if key.get("fingerprint") else "Unknown",
-        "user_id": key["uids"][0] if key.get("uids") else "Unknown",
-        "creation_date": datetime.datetime.fromtimestamp(int(key["date"])),
-        "expiration_date": datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
-        "data": pprint.pformat(key),
+        "id": pmc.id,
+        "project_name": pmc.project_name,
+        "pmc_members": pmc.pmc_members,
+        "committers": pmc.committers,
+        "release_managers": pmc.release_managers,
     }
-
-
-async def validate_release_deletion(db_session: AsyncSession, release_key: str, session_uid: str) -> Release:
-    """Validate release deletion request and return the release if valid."""
-    if Release.pmc is None:
-        raise FlashError("Release has no associated PMC")
-
-    rel_pmc = cast(InstrumentedAttribute[PMC], Release.pmc)
-    statement = select(Release).options(selectinload(rel_pmc)).where(Release.storage_key == release_key)
-    result = await db_session.execute(statement)
-    release = result.scalar_one_or_none()
-
-    if not release:
-        raise FlashError("Release not found")
-
-    # Check permissions
-    if release.pmc:
-        if session_uid not in release.pmc.pmc_members and session_uid not in release.pmc.committers:
-            raise FlashError("You don't have permission to delete this release")
-
-    return release
-
-
-async def delete_release_files(release: Release, uploads_path: Path) -> None:
-    """Delete all files associated with a release."""
-    if not release.packages:
-        return
-
-    for package in release.packages:
-        await delete_package_files(package, uploads_path)
 
 
 @APP.route("/release/delete", methods=["POST"])
@@ -998,8 +1086,8 @@ async def root_release_delete() -> Response:
     async with get_session() as db_session:
         async with db_session.begin():
             try:
-                release = await validate_release_deletion(db_session, release_key, session.uid)
-                await delete_release_files(release, Path(get_release_storage_dir()))
+                release = await release_delete_validate(db_session, release_key, session.uid)
+                await release_files_delete(release, Path(get_release_storage_dir()))
                 await db_session.delete(release)
             except FlashError as e:
                 await flash(str(e), "error")
@@ -1012,7 +1100,7 @@ async def root_release_delete() -> Response:
     return redirect(url_for("root_candidate_review"))
 
 
-async def get_package_tasks_status(db_session: AsyncSession, artifact_sha3: str) -> tuple[Sequence[Task], bool]:
+async def task_package_status_get(db_session: AsyncSession, artifact_sha3: str) -> tuple[Sequence[Task], bool]:
     """
     Get all tasks for a package and determine if any are still in progress.
     Returns tuple[Sequence[Task], bool]: List of tasks and whether any are still in progress
@@ -1024,7 +1112,7 @@ async def get_package_tasks_status(db_session: AsyncSession, artifact_sha3: str)
     return tasks, has_active_tasks
 
 
-async def create_verification_tasks(db_session: AsyncSession, package: Package) -> list[Task]:
+async def task_verification_create(db_session: AsyncSession, package: Package) -> list[Task]:
     """Create verification tasks for a package."""
     if not package.release or not package.release.pmc:
         raise FlashError("Could not determine PMC for package")
@@ -1066,109 +1154,3 @@ async def create_verification_tasks(db_session: AsyncSession, package: Package) 
         db_session.add(task)
 
     return tasks
-
-
-@APP.route("/package/check", methods=["GET", "POST"])
-@require(Requirements.committer)
-async def root_package_check() -> str | Response:
-    """Show or create package verification tasks."""
-    session = await session_read()
-    if (session is None) or (session.uid is None):
-        raise ASFQuartException("Not authenticated", errorcode=401)
-
-    # Get parameters from either form data (POST) or query args (GET)
-    if request.method == "POST":
-        form = await request.form
-        artifact_sha3 = form.get("artifact_sha3")
-        release_key = form.get("release_key")
-    else:
-        artifact_sha3 = request.args.get("artifact_sha3")
-        release_key = request.args.get("release_key")
-
-    if not artifact_sha3 or not release_key:
-        await flash("Missing required parameters", "error")
-        return redirect(url_for("root_candidate_review"))
-
-    async with get_session() as db_session:
-        async with db_session.begin():
-            # Get the package and verify permissions
-            try:
-                package = await package_from_data(db_session, artifact_sha3, release_key, session.uid)
-            except FlashError as e:
-                await flash(str(e), "error")
-                return redirect(url_for("root_candidate_review"))
-
-            if request.method == "POST":
-                # Check if package already has active tasks
-                tasks, has_active_tasks = await get_package_tasks_status(db_session, artifact_sha3)
-                if has_active_tasks:
-                    await flash("Package verification is already in progress", "warning")
-                    return redirect(url_for("root_candidate_review"))
-
-                try:
-                    await create_verification_tasks(db_session, package)
-                except FlashError as e:
-                    await flash(str(e), "error")
-                    return redirect(url_for("root_candidate_review"))
-
-                await flash(f"Added verification tasks for package {package.filename}", "success")
-                return redirect(url_for("root_package_check", artifact_sha3=artifact_sha3, release_key=release_key))
-            else:
-                # Get all tasks for this package for GET request
-                tasks, _ = await get_package_tasks_status(db_session, artifact_sha3)
-                all_tasks_completed = bool(tasks) and all(
-                    task.status == TaskStatus.COMPLETED or task.status == TaskStatus.FAILED for task in tasks
-                )
-                return await render_template(
-                    "package-check.html",
-                    package=package,
-                    release=package.release,
-                    tasks=tasks,
-                    all_tasks_completed=all_tasks_completed,
-                    format_file_size=format_file_size,
-                )
-
-
-@APP.route("/package/check/restart", methods=["POST"])
-@require(Requirements.committer)
-async def root_package_check_restart() -> Response:
-    """Restart package verification tasks."""
-    session = await session_read()
-    if (session is None) or (session.uid is None):
-        raise ASFQuartException("Not authenticated", errorcode=401)
-
-    form = await request.form
-    artifact_sha3 = form.get("artifact_sha3")
-    release_key = form.get("release_key")
-
-    if not artifact_sha3 or not release_key:
-        await flash("Missing required parameters", "error")
-        return redirect(url_for("root_candidate_review"))
-
-    async with get_session() as db_session:
-        async with db_session.begin():
-            # Get the package and verify permissions
-            try:
-                package = await package_from_data(db_session, artifact_sha3, release_key, session.uid)
-            except FlashError as e:
-                await flash(str(e), "error")
-                return redirect(url_for("root_candidate_review"))
-
-            # Check if package has any active tasks
-            tasks, has_active_tasks = await get_package_tasks_status(db_session, artifact_sha3)
-            if has_active_tasks:
-                await flash("Cannot restart checks while tasks are still in progress", "error")
-                return redirect(url_for("root_package_check", artifact_sha3=artifact_sha3, release_key=release_key))
-
-            # Delete existing tasks
-            for task in tasks:
-                await db_session.delete(task)
-
-            try:
-                await create_verification_tasks(db_session, package)
-            except FlashError as e:
-                await flash(str(e), "error")
-                return redirect(url_for("root_candidate_review"))
-
-            await flash("Package checks restarted successfully", "success")
-            return redirect(url_for("root_package_check", artifact_sha3=artifact_sha3, release_key=release_key))

@@ -77,7 +77,7 @@
   <button type="button" onclick="filter()">Filter</button>
 
   <div class="pmc-grid">
-    {% for pmc in pmcs %}
+    {% for pmc in projects %}
       <div class="pmc-card">
         <div class="pmc-name">{{ pmc.display_name }}</div>
         <div class="pmc-stats">
@@ -100,7 +100,7 @@
 {% endblock content %}
 
 {% block javascripts %}
-  super()
+  {{ super() }}
   <script>
       function filter() {
           e = document.getElementById("pmc-filter");

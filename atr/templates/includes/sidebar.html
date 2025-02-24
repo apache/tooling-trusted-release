@@ -33,8 +33,8 @@
            {% if request.endpoint == 'root' %}class="active"{% endif %}>About ATR</a>
       </li>
       <li>
-        <a href="{{ url_for('root_pmc_directory') }}"
-           {% if request.endpoint == 'root_pmc_directory' %}class="active"{% endif %}>Projects</a>
+        <a href="{{ url_for('root_project_directory') }}"
+           {% if request.endpoint == 'root_project_directory' %}class="active"{% endif %}>Projects</a>
       </li>
     </ul>
 
@@ -76,8 +76,8 @@
                {% if request.endpoint == 'secret_blueprint.secret_data' %}class="active"{% endif %}>Browse database</a>
           </li>
           <li>
-            <a href="{{ url_for('secret_blueprint.secret_pmcs_update') }}"
-               {% if request.endpoint == 'secret_blueprint.secret_pmcs_update' %}class="active"{% endif %}>Update PMCs</a>
+            <a href="{{ url_for('secret_blueprint.secret_projects_update') }}"
+               {% if request.endpoint == 'secret_blueprint.secret_projects_update' %}class="active"{% endif %}>Update projects</a>
           </li>
         </ul>
       {% endif %}

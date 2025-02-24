@@ -23,7 +23,7 @@ from atr.db.service import get_pmc_by_name
 from . import blueprint
 
 
-@blueprint.route("/pmc/<project_name>")
+@blueprint.route("/project/<project_name>")
 async def api_pmc(project_name: str) -> tuple[Mapping[str, Any], int]:
     pmc = await get_pmc_by_name(project_name)
     if pmc:

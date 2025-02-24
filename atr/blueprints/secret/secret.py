@@ -99,9 +99,9 @@ async def secret_data(model: str = "PMC") -> str:
         )
 
 
-@blueprint.route("/pmcs/update", methods=["GET", "POST"])
-async def secret_pmcs_update() -> str | Response:
-    """Update PMCs and podlings from remote data."""
+@blueprint.route("/projects/update", methods=["GET", "POST"])
+async def secret_projects_update() -> str | Response:
+    """Update projects from remote data."""
     if request.method == "POST":
         try:
             apache_projects = await get_ldap_projects_data()
