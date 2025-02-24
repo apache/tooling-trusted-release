@@ -185,6 +185,43 @@
             <td>{{ package.filename }}</td>
           </tr>
           <tr>
+            <th>Package checks</th>
+            <td class="bold">
+              {% set total_tasks = package.tasks|length %}
+              {% set pending_tasks = package.tasks|selectattr("status.value", "==", "queued")|list|length %}
+              {% set running_tasks = package.tasks|selectattr("status.value", "==", "active")|list|length %}
+              {% set passed_tasks = package.tasks|selectattr("status.value", "==", "completed")|list|length %}
+              {% set issue_tasks = package.tasks|selectattr("status.value", "==", "failed")|list|length %}
+              {% set completed_tasks = passed_tasks + issue_tasks %}
+              {% if total_tasks == 0 %}
+                No checks configured
+              {% else %}
+                {%- set status_parts = [] -%}
+                {%- if pending_tasks > 0 -%}
+                  {%- set _ = status_parts.append(pending_tasks|string + " Pending") -%}
+                {%- endif -%}
+                {%- if running_tasks > 0 -%}
+                  {%- set _ = status_parts.append(running_tasks|string + " Running") -%}
+                {%- endif -%}
+                {%- if passed_tasks > 0 -%}
+                  {%- set _ = status_parts.append(passed_tasks|string + " Passed") -%}
+                {%- endif -%}
+                {%- if issue_tasks > 0 -%}
+                  {%- set _ = status_parts.append(issue_tasks|string + " " + ("Issue" if issue_tasks == 1 else "Issues")) -%}
+                {%- endif -%}
+                {{ status_parts|join(", ") }} ({{ completed_tasks }}/{{ total_tasks }} {{ "Check" if total_tasks == 1 else "Checks" }} Complete)
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th>File size</th>
+            <td>{{ format_file_size(package.bytes_size) }}</td>
+          </tr>
+          <tr>
+            <th>Uploaded</th>
+            <td>{{ package.uploaded.strftime("%Y-%m-%d %H:%M UTC") }}</td>
+          </tr>
+          <tr>
             <th>Artifact hash (SHA3-256)</th>
             <td>{{ package.artifact_sha3 }}</td>
           </tr>
@@ -193,32 +230,8 @@
             <td>{{ package.sha512 }}</td>
           </tr>
           <tr>
-            <th>File size</th>
-            <td>{{ format_file_size(package.bytes_size) }}</td>
-          </tr>
-          <tr>
             <th>Signature hash (SHA3-256)</th>
             <td>{{ package.signature_sha3 }}</td>
-          </tr>
-          <tr>
-            <th>Uploaded</th>
-            <td>{{ package.uploaded.strftime("%Y-%m-%d %H:%M UTC") }}</td>
-          </tr>
-          <tr>
-            <th>Package checks</th>
-            <td>
-              {% set total_tasks = package.tasks|length %}
-              {% set completed_tasks = package.tasks|selectattr("status", "in", ["COMPLETED", "FAILED"])|list|length %}
-              {% if total_tasks == 0 %}
-                Not started
-              {% else %}
-                {% if completed_tasks == total_tasks %}
-                  Completed ({{ completed_tasks }}/{{ total_tasks }})
-                {% else %}
-                  Ongoing ({{ completed_tasks }}/{{ total_tasks }})
-                {% endif %}
-              {% endif %}
-            </td>
           </tr>
           <tr>
             <th>Actions</th>

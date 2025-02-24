@@ -127,8 +127,20 @@
       {% for task in tasks %}
         <div class="task-item">
           <div class="task-header">
-            <span class="task-type">{{ task.task_type }}</span>
-            <span class="task-status status-{{ task.status.value.lower() }}">{{ task.status.value }}</span>
+            <span class="task-type">{{ task.task_type.replace('_', ' ').title() }}</span>
+            <span class="task-status status-{{ task.status.value.lower() }}">
+              {%- if task.status.value.upper() == "QUEUED" -%}
+                Pending
+              {%- elif task.status.value.upper() == "ACTIVE" -%}
+                Running
+              {%- elif task.status.value.upper() == "COMPLETED" -%}
+                Passed
+              {%- elif task.status.value.upper() == "FAILED" -%}
+                Issue
+              {%- else -%}
+                {{ task.status.value }}
+              {%- endif -%}
+            </span>
           </div>
           <div class="task-details">
             <div>Started: {{ task.started.strftime("%Y-%m-%d %H:%M UTC") if task.started else "Not started" }}</div>

@@ -52,6 +52,8 @@ We aim to work on the task scheduler in parallel with the UX improvements above.
    - Ensure idempotent operations where possible
    - Implement safe handling for compressed asset expansion
    - Test external tool use
+   - Consider distinguishing between issue and error states
+   - Use consistent task status values (pending, running, passed, issue, error?)
 
 2. Orchestrating scheduler and resource management
    - [DONE] Implement process-based task isolation
@@ -71,6 +73,7 @@ Advanced tasks, possibly deferred
 
 1. Fix bugs and improve workflow
    - [DONE] Add ATR commit or version number to the UI
+   - [DONE] Fix and improve the package checks summary count
    - Ensure that all errors are caught and logged or displayed
 
 2. Ensure that performance is optimal
