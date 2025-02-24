@@ -17,6 +17,62 @@
           margin-bottom: 1rem;
       }
 
+      .task-summary {
+          display: flex;
+          gap: 1rem;
+          align-items: center;
+          padding: 1rem;
+          background: #f8f9fa;
+          border: 1px solid #dee2e6;
+          border-radius: 4px;
+          margin-bottom: 1rem;
+      }
+
+      .summary-title {
+          font-weight: 600;
+          margin-right: 1rem;
+      }
+
+      .summary-stats {
+          display: flex;
+          gap: 1rem;
+          flex-wrap: wrap;
+      }
+
+      .summary-stat {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.5rem 1rem;
+          border-radius: 4px;
+          font-weight: 500;
+      }
+
+      .summary-stat .count {
+          font-size: 1.2em;
+          /* font-weight: 600; */
+      }
+
+      .summary-stat.completed {
+          background: #d1e7dd;
+          border: 1px solid #a3cfbb;
+      }
+
+      .summary-stat.failed {
+          background: #f8d7da;
+          border: 1px solid #f5c6cb;
+      }
+
+      .summary-stat.active {
+          background: #cff4fc;
+          border: 1px solid #9eeaf9;
+      }
+
+      .summary-stat.queued {
+          background: #f8f9fa;
+          border: 1px solid #dee2e6;
+      }
+
       .task-actions .button-form {
           margin: 0;
       }
@@ -164,6 +220,43 @@
 
   <h2>Verification tasks</h2>
 
+  {% if tasks %}
+    <div class="task-summary">
+      <span class="summary-title">Status summary:</span>
+      <div class="summary-stats">
+        {% with %}
+          {% set status_counts = {
+                      'completed': tasks|selectattr("status.value", "equalto", "completed")|list|length,
+                      'failed': tasks|selectattr("status.value", "equalto", "failed")|list|length,
+                      'active': tasks|selectattr("status.value", "equalto", "active")|list|length,
+                      'queued': tasks|selectattr("status.value", "equalto", "queued")|list|length
+                    } %}
+
+          {% for status, count in status_counts.items() %}
+            {% if count > 0 %}
+              <div class="summary-stat {{ status }}">
+                <span class="count">{{ count }}</span>
+                <span class="label">
+                  {%- if status == "queued" -%}
+                    Pending
+                  {%- elif status == "active" -%}
+                    Running
+                  {%- elif status == "completed" -%}
+                    Passed
+                  {%- elif status == "failed" -%}
+                    Issues
+                  {%- else -%}
+                    {{ status|title }}
+                  {%- endif -%}
+                </span>
+              </div>
+            {% endif %}
+          {% endfor %}
+        {% endwith %}
+      </div>
+    </div>
+  {% endif %}
+
   <div class="task-actions">
     <button type="button" onclick="toggleAllDetails()" class="verify-link">Toggle all details</button>
     {% if tasks and all_tasks_completed %}
@@ -186,13 +279,13 @@
           <div class="task-header">
             <span class="task-type">{{ task.task_type.replace('_', ' ').title() }}</span>
             <span class="task-status status-{{ task.status.value.lower() }}">
-              {%- if task.status.value.upper() == "QUEUED" -%}
+              {%- if task.status.value == "queued" -%}
                 Pending
-              {%- elif task.status.value.upper() == "ACTIVE" -%}
+              {%- elif task.status.value == "active" -%}
                 Running
-              {%- elif task.status.value.upper() == "COMPLETED" -%}
+              {%- elif task.status.value == "completed" -%}
                 Passed
-              {%- elif task.status.value.upper() == "FAILED" -%}
+              {%- elif task.status.value == "failed" -%}
                 Issue
               {%- else -%}
                 {{ task.status.value }}

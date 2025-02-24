@@ -78,6 +78,7 @@ Advanced tasks, possibly deferred
    - [DONE] Add ATR commit or version number to the UI
    - [DONE] Fix and improve the package checks summary count
    - Ensure that all errors are caught and logged or displayed
+   - Add tests
 
 2. Ensure that performance is optimal
    - Add page load timing metrics to a log

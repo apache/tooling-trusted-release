@@ -309,7 +309,7 @@ def signature_gpg_file(sig_file: BinaryIO, artifact_path: str, ascii_armored_key
 
 
 # File type comment style definitions
-# Ordered by their popularity in the GitHub Octoverse Survey 2024
+# Ordered by their popularity in the Stack Overflow Developer Survey 2024
 COMMENT_STYLES = {
     # JavaScript and variants
     "js": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
@@ -398,7 +398,7 @@ COMMENT_STYLES = {
 }
 
 # Patterns for files to include in license header checks
-# Ordered by their popularity in the GitHub Octoverse Survey 2024
+# Ordered by their popularity in the Stack Overflow Developer Survey 2024
 INCLUDED_PATTERNS = [
     r"\.(js|mjs|cjs|jsx)$",  # JavaScript
     r"\.py$",  # Python
