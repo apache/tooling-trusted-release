@@ -1024,6 +1024,44 @@ async def get_package_tasks_status(db_session: AsyncSession, artifact_sha3: str)
     return tasks, has_active_tasks
 
 
+async def create_verification_tasks(db_session: AsyncSession, package: Package) -> list[Task]:
+    """Create verification tasks for a package."""
+    if not package.release or not package.release.pmc:
+        raise FlashError("Could not determine PMC for package")
+
+    if package.signature_sha3 is None:
+        raise FlashError("Package has no signature")
+
+    tasks = [
+        Task(
+            status=TaskStatus.QUEUED,
+            task_type="verify_archive_integrity",
+            task_args=["releases/" + package.artifact_sha3],
+            package_sha3=package.artifact_sha3,
+        ),
+        Task(
+            status=TaskStatus.QUEUED,
+            task_type="verify_signature",
+            task_args=[
+                package.release.pmc.project_name,
+                "releases/" + package.artifact_sha3,
+                "releases/" + package.signature_sha3,
+            ],
+            package_sha3=package.artifact_sha3,
+        ),
+        Task(
+            status=TaskStatus.QUEUED,
+            task_type="verify_license_files",
+            task_args=["releases/" + package.artifact_sha3],
+            package_sha3=package.artifact_sha3,
+        ),
+    ]
+    for task in tasks:
+        db_session.add(task)
+
+    return tasks
+
+
 @APP.route("/package/check", methods=["GET", "POST"])
 @require(Requirements.committer)
 async def root_package_check() -> str | Response:
@@ -1061,44 +1099,70 @@ async def root_package_check() -> str | Response:
                     await flash("Package verification is already in progress", "warning")
                     return redirect(url_for("root_candidate_review"))
 
-                if not package.release or not package.release.pmc:
-                    await flash("Could not determine PMC for package", "error")
+                try:
+                    await create_verification_tasks(db_session, package)
+                except FlashError as e:
+                    await flash(str(e), "error")
                     return redirect(url_for("root_candidate_review"))
-
-                if package.signature_sha3 is None:
-                    await flash("Package has no signature", "error")
-                    return redirect(url_for("root_candidate_review"))
-
-                # Create verification tasks
-                tasks = [
-                    Task(
-                        status=TaskStatus.QUEUED,
-                        task_type="verify_archive_integrity",
-                        task_args=["releases/" + artifact_sha3],
-                        package_sha3=artifact_sha3,
-                    ),
-                    Task(
-                        status=TaskStatus.QUEUED,
-                        task_type="verify_signature",
-                        task_args=[
-                            package.release.pmc.project_name,
-                            "releases/" + artifact_sha3,
-                            "releases/" + package.signature_sha3,
-                        ],
-                        package_sha3=artifact_sha3,
-                    ),
-                ]
-                for task in tasks:
-                    db_session.add(task)
 
                 await flash(f"Added verification tasks for package {package.filename}", "success")
                 return redirect(url_for("root_package_check", artifact_sha3=artifact_sha3, release_key=release_key))
             else:
                 # Get all tasks for this package for GET request
                 tasks, _ = await get_package_tasks_status(db_session, artifact_sha3)
+                all_tasks_completed = bool(tasks) and all(
+                    task.status == TaskStatus.COMPLETED or task.status == TaskStatus.FAILED for task in tasks
+                )
                 return await render_template(
                     "package-check.html",
                     package=package,
+                    release=package.release,
                     tasks=tasks,
+                    all_tasks_completed=all_tasks_completed,
                     format_file_size=format_file_size,
                 )
+
+
+@APP.route("/package/check/restart", methods=["POST"])
+@require(Requirements.committer)
+async def root_package_check_restart() -> Response:
+    """Restart package verification tasks."""
+    session = await session_read()
+    if (session is None) or (session.uid is None):
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    form = await request.form
+    artifact_sha3 = form.get("artifact_sha3")
+    release_key = form.get("release_key")
+
+    if not artifact_sha3 or not release_key:
+        await flash("Missing required parameters", "error")
+        return redirect(url_for("root_candidate_review"))
+
+    async with get_session() as db_session:
+        async with db_session.begin():
+            # Get the package and verify permissions
+            try:
+                package = await package_from_data(db_session, artifact_sha3, release_key, session.uid)
+            except FlashError as e:
+                await flash(str(e), "error")
+                return redirect(url_for("root_candidate_review"))
+
+            # Check if package has any active tasks
+            tasks, has_active_tasks = await get_package_tasks_status(db_session, artifact_sha3)
+            if has_active_tasks:
+                await flash("Cannot restart checks while tasks are still in progress", "error")
+                return redirect(url_for("root_package_check", artifact_sha3=artifact_sha3, release_key=release_key))
+
+            # Delete existing tasks
+            for task in tasks:
+                await db_session.delete(task)
+
+            try:
+                await create_verification_tasks(db_session, package)
+            except FlashError as e:
+                await flash(str(e), "error")
+                return redirect(url_for("root_candidate_review"))
+
+            await flash("Package checks restarted successfully", "success")
+            return redirect(url_for("root_package_check", artifact_sha3=artifact_sha3, release_key=release_key))

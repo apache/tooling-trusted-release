@@ -30,6 +30,7 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
    - [DONE] Fix reported problem with adding keys
    - [DONE] Add debugging output error messages for when key addition fails
    - Allow adding keys from a KEYS file
+   - Allow +1 binding voters to have their signatures added to the release
 
 4. Release status dashboard
    - Add progress indicators for release phases
@@ -47,6 +48,7 @@ We aim to work on the task scheduler in parallel with the UX improvements above.
 
 1. Task runner workers
    - [DONE] Implement worker process with RLIMIT controls for CPU and RAM
+   - Track the duration of tasks in milliseconds
    - Add disk usage tracking through API and psutil polling
    - Add rollback or reporting for failed tasks
    - Ensure idempotent operations where possible
@@ -62,8 +64,8 @@ We aim to work on the task scheduler in parallel with the UX improvements above.
    - Track and limit disk usage per task in the scheduler
 
 3. Improve the task UI
+   - [DONE] Allow restarting all tasks
    - Test that tasks are deleted when a package is deleted
-   - Allow restarting failed tasks
 
 Advanced tasks, possibly deferred
    - Check fair scheduling across cores

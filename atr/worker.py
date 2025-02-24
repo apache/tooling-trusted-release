@@ -159,6 +159,17 @@ def verify_gpg_signature_file(sig_file: BinaryIO, artifact_path: str, ascii_armo
     }
 
 
+def verify_license_files(artifact_path: str) -> dict[str, Any]:
+    """Verify that LICENSE and NOTICE files exist and are placed correctly."""
+    # TODO: Implement actual verification
+    # For now, just return a stub result
+    return {
+        "files_checked": ["LICENSE", "NOTICE"],
+        "files_found": [],
+        "message": "License file verification not yet implemented",
+    }
+
+
 def get_db_session() -> Session:
     """Get a new database session."""
     # Create database engine
@@ -209,6 +220,7 @@ def wrap(item: Any) -> tuple[Any, ...]:
 def process_task(task_id: int, task_type: str, task_args: str) -> None:
     """Process a claimed task."""
     logger.info(f"Processing task {task_id} ({task_type}) with args {task_args}")
+    error = None
     try:
         status = "COMPLETED"
         if task_type == "verify_archive_integrity":
@@ -221,11 +233,13 @@ def process_task(task_id: int, task_type: str, task_args: str) -> None:
             logger.info(f"Verified {args} with result {task_results[0]}")
             if task_results[0]["error"]:
                 status = "FAILED"
-        # Checksums are verified when uploaded, so we don't need to verify them here
-        # elif task_type == "verify_checksums":
-        #     args = json.loads(task_args)
-        #     task_results = wrap(verify_checksums(*args))
-        #     logger.info(f"Verified {args} and computed size {task_results[0]}")
+        elif task_type == "verify_license_files":
+            args = json.loads(task_args)
+            task_results = wrap(verify_license_files(*args))
+            logger.info(f"Verified license files for {args}")
+            if not task_results[0]["files_found"]:
+                status = "FAILED"
+                error = "Required license files not found"
         else:
             error = f"Unknown task type: {task_type}"
             logger.error(error)
@@ -234,14 +248,30 @@ def process_task(task_id: int, task_type: str, task_args: str) -> None:
         with get_db_session() as session:
             result = json.dumps(task_results)
             with session.begin():
-                session.execute(
-                    text("""
-                        UPDATE task
-                        SET status = :status, completed = :now, result = :result
-                        WHERE id = :task_id
-                        """),
-                    {"now": datetime.datetime.now(UTC), "task_id": task_id, "result": result, "status": status},
-                )
+                if status == "FAILED" and error:
+                    session.execute(
+                        text("""
+                            UPDATE task
+                            SET status = :status, completed = :now, result = :result, error = :error
+                            WHERE id = :task_id
+                            """),
+                        {
+                            "now": datetime.datetime.now(UTC),
+                            "task_id": task_id,
+                            "result": result,
+                            "status": status,
+                            "error": error,
+                        },
+                    )
+                else:
+                    session.execute(
+                        text("""
+                            UPDATE task
+                            SET status = :status, completed = :now, result = :result
+                            WHERE id = :task_id
+                            """),
+                        {"now": datetime.datetime.now(UTC), "task_id": task_id, "result": result, "status": status},
+                    )
     except VerifyError as e:
         logger.error(f"Task {task_id} failed: {e.message}")
         result = json.dumps(e.result)
@@ -327,15 +357,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    with open("atr-worker-error.log", "a") as f:
-        f.write(f"{datetime.datetime.now(UTC)}: starting\n")
-        f.flush()
     try:
         main()
     except Exception as e:
         with open("atr-worker-error.log", "a") as f:
             f.write(f"{datetime.datetime.now(UTC)}: {e}\n")
             f.flush()
-    with open("atr-worker-error.log", "a") as f:
-        f.write(f"{datetime.datetime.now(UTC)}: exiting\n")
-        f.flush()

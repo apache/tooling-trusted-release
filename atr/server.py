@@ -82,6 +82,9 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
     app = asfquart.construct(__name__)
     app.config.from_object(app_config)
 
+    # Add a from_json filter to the Jinja2 environment
+    # app.jinja_env.filters["from_json"] = lambda x: json.loads(x) if x else None
+
     QuartSchema(
         app,
         openapi_provider_class=ApiOnlyOpenAPIProvider,
