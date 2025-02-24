@@ -109,7 +109,7 @@ async def secret_projects_update() -> str | Response:
             groups_data = await get_groups_data()
         except httpx.RequestError as e:
             await flash(f"Failed to fetch data: {e!s}", "error")
-            return redirect(url_for("secret_blueprint.secret_pmcs_update"))
+            return redirect(url_for("secret_blueprint.secret_projects_update"))
 
         updated_count = 0
 
@@ -186,7 +186,7 @@ async def secret_projects_update() -> str | Response:
         except Exception as e:
             await flash(f"Failed to update projects: {e!s}", "error")
 
-        return redirect(url_for("secret_blueprint.secret_pmcs_update"))
+        return redirect(url_for("secret_blueprint.secret_projects_update"))
 
     # For GET requests, show the update form
     return await render_template("secret/update-pmcs.html")
