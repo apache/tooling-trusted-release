@@ -1041,6 +1041,12 @@ async def create_verification_tasks(db_session: AsyncSession, package: Package) 
         ),
         Task(
             status=TaskStatus.QUEUED,
+            task_type="verify_archive_structure",
+            task_args=["releases/" + package.artifact_sha3, package.filename],
+            package_sha3=package.artifact_sha3,
+        ),
+        Task(
+            status=TaskStatus.QUEUED,
             task_type="verify_signature",
             task_args=[
                 package.release.pmc.project_name,

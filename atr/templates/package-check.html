@@ -85,7 +85,8 @@
           margin-top: 0.5rem;
       }
 
-      .task-result summary {
+      /* TODO: Move to atr.css */
+      details summary {
           padding: 0.5rem;
           cursor: pointer;
           user-select: none;
@@ -201,48 +202,49 @@
           <div class="task-details">
             <div>Started: {{ task.started.strftime("%Y-%m-%d %H:%M UTC") if task.started else "Not started" }}</div>
             <div>Completed: {{ task.completed.strftime("%Y-%m-%d %H:%M UTC") if task.completed else "Not completed" }}</div>
-            {% if task.result %}
-              {% if task.result[0] is mapping %}
-                <details class="task-result">
-                  <summary>
-                    {% if task.error %}
-                      Issue: {{ task.error }}
-                    {% else %}
-                      View detailed results
-                    {% endif %}
-                  </summary>
-                  <table class="result-table">
-                    <tbody>
-                      {% for key, value in task.result[0].items() %}
-                        {% if key != "debug_info" %}
-                          <tr>
-                            <th>{{ key|replace('_', ' ') |title }}</th>
-                            <td>
-                              {% if value is boolean %}
-                                {{ "Yes" if value else "No" }}
-                              {% elif value is mapping %}
-                                <table class="nested-table">
-                                  {% for k, v in value.items() %}
-                                    <tr>
-                                      <th>{{ k|replace('_', ' ') |title }}</th>
-                                      <td>{{ v }}</td>
-                                    </tr>
-                                  {% endfor %}
-                                </table>
-                              {% elif value is sequence and value is not string %}
-                                {{ value|join(", ") }}
-                              {% else %}
-                                {{ value }}
-                              {% endif %}
-                            </td>
-                          </tr>
-                        {% endif %}
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </details>
-              {% else %}
-                <div class="task-result">{{ task.result[0] }}</div>
+            {% if task.result and task.result[0] is mapping and task.result|length == 1 %}
+              <details class="task-result">
+                {% if task.error %}
+                  <summary>Issue: {{ task.error }}</summary>
+                {% else %}
+                  <summary>View detailed results</summary>
+                {% endif %}
+                <table class="result-table">
+                  <tbody>
+                    {% for key, value in task.result[0].items() %}
+                      {% if key != "debug_info" %}
+                        <tr>
+                          <th>{{ key|replace('_', ' ') |title }}</th>
+                          <td>
+                            {% if value is boolean %}
+                              {{ "Yes" if value else "No" }}
+                            {% elif value is mapping %}
+                              <table class="nested-table">
+                                {% for k, v in value.items() %}
+                                  <tr>
+                                    <th>{{ k|replace('_', ' ') |title }}</th>
+                                    <td>{{ v }}</td>
+                                  </tr>
+                                {% endfor %}
+                              </table>
+                            {% elif value is sequence and value is not string %}
+                              {{ value|join(", ") }}
+                            {% else %}
+                              {{ value }}
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% endif %}
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </details>
+            {% else %}
+              {% if task.error %}<div class="task-result">Issue: {{ task.error }}</div>{% endif %}
+              {% if task.result %}
+                <div class="task-result">
+                  <pre>{{ task.result }}</pre>
+                </div>
               {% endif %}
             {% endif %}
           </div>

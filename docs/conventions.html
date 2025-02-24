@@ -1,0 +1,42 @@
+<h1>Project conventions</h1>
+<h2>Python function names</h2>
+<h3>Name functions in a collation friendly way</h3>
+<p>Functions should be named hierarchically, with the most general category first, followed by increasingly specific details. This makes related functions group together naturally when sorted alphabetically, making code navigation and discovery easier.</p>
+<p><strong>Example</strong>:</p>
+<p>Instead of scattered, hard to find related functions:</p>
+<pre><code class="language-python">def get_user_from_db():
+def insert_new_record():
+def query_user_settings():
+def update_db_record():
+</code></pre>
+<p>Use hierarchical naming that groups related functionality:</p>
+<pre><code class="language-python">def db_user_get():
+def db_record_insert():
+def db_user_settings_query():
+def db_record_update():
+</code></pre>
+<p><strong>Example</strong>:</p>
+<p>Another example with license files, the wrong way:</p>
+<pre><code class="language-python">def check_root_license_file():      # Lost among other &quot;check_&quot; functions
+def validate_package_license():     # Separated from other license functions
+def verify_license_files():         # Yet another scattered license function
+</code></pre>
+<p>The right way:</p>
+<pre><code class="language-python">def license_root_file_check():      # All license-related functions
+def license_package_validate():     # will appear together when
+def license_files_verify():         # sorted alphabetically
+</code></pre>
+<p>Note how verbs tend to come last, so that function names now read in an object oriented style, with a module, object, and action.</p>
+<p>While this approach can lead to slightly longer function names, the benefits of improved code organisation and discoverability outweigh the verbosity.</p>
+<h3>Give helper functions the same prefix as their parent function</h3>
+<p>This makes it easier to find all the functions related to a specific task.</p>
+<p><strong>Example</strong>:</p>
+<p>Instead of:</p>
+<pre><code class="language-python">def verify_archive_integrity():
+def do_something_in_verify_archive_integrity():
+</code></pre>
+<p>Use the same prefix:</p>
+<pre><code class="language-python">def verify_archive_integrity():
+def verify_archive_integrity_do_something():
+</code></pre>
+<p>This makes it easier to find all the functions related to a specific task, and means that they sort together.</p>

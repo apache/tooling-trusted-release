@@ -117,6 +117,10 @@ aside h3 {
     margin-top: 1.5rem;
 }
 
+pre {
+    white-space: pre-wrap;
+}
+
 footer {
   padding: 2rem;
   background: #eeeeee;

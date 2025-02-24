@@ -94,7 +94,7 @@ These tasks are dependent on the task scheduler above.
    - [DONE] Implement basic signature verification
 
 2. License compliance
-   - Verify LICENSE and NOTICE files exist and are placed correctly
+   - [DONE] Verify LICENSE and NOTICE files exist and are placed correctly
    - Check for Apache License headers in source files
    - Basic RAT integration for license header validation
 

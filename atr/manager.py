@@ -79,14 +79,14 @@ class WorkerManager:
 
     def __init__(
         self,
-        min_workers: int = 2,
-        max_workers: int = 4,
-        check_interval: float = 5.0,
+        min_workers: int = 4,
+        max_workers: int = 8,
+        check_interval_seconds: float = 2.0,
         max_task_seconds: float = 300.0,
     ):
         self.min_workers = min_workers
         self.max_workers = max_workers
-        self.check_interval = check_interval
+        self.check_interval_seconds = check_interval_seconds
         self.max_task_seconds = max_task_seconds
         self.workers: dict[int, WorkerProcess] = {}
         self.running = False
@@ -198,7 +198,7 @@ class WorkerManager:
         while self.running:
             try:
                 await self.check_workers()
-                await asyncio.sleep(self.check_interval)
+                await asyncio.sleep(self.check_interval_seconds)
             except asyncio.CancelledError:
                 break
             except Exception as e:
