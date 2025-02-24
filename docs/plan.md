@@ -56,6 +56,7 @@ We aim to work on the task scheduler in parallel with the UX improvements above.
    - Test external tool use
    - Consider distinguishing between issue and error states
    - Use consistent task status values (pending, running, passed, issue, error?)
+   - Add a warning task result status
 
 2. Orchestrating scheduler and resource management
    - [DONE] Implement process-based task isolation

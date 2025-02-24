@@ -38,12 +38,18 @@ from sqlalchemy import text
 import atr.verify as verify
 
 # Configure logging
-logging.basicConfig(
-    format="[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] %(message)s",
-    level=logging.INFO,
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+log_format = "[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] %(message)s"
+date_format = "%Y-%m-%d %H:%M:%S"
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+# console_handler = logging.StreamHandler()
+# console_handler.setLevel(logging.INFO)
+# console_handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
+# logger.addHandler(console_handler)
+file_handler = logging.FileHandler("atr-worker.log")
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
+logger.addHandler(file_handler)
 
 # Resource limits, 5 minutes and 1GB
 CPU_LIMIT_SECONDS = 300
@@ -160,40 +166,77 @@ def task_result_process(
                 )
 
 
+def task_verify_archive_integrity(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
+    """Process verify_archive_integrity task."""
+    # TODO: We should standardise the "ERROR" mechanism here in the data
+    # Then we can have a single task wrapper for all tasks
+    # First argument should be the path, second is optional chunk_size
+    path = args[0]
+    chunk_size = int(args[1]) if len(args) > 1 else 4096
+    task_results = task_process_wrap(verify.archive_integrity(path, chunk_size))
+    logger.info(f"Verified {args} and computed size {task_results[0]}")
+    return "COMPLETED", None, task_results
+
+
+def task_verify_archive_structure(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
+    """Process verify_archive_structure task."""
+    task_results = task_process_wrap(verify.archive_structure(*args))
+    logger.info(f"Verified archive structure for {args}")
+    status = "FAILED" if not task_results[0]["valid"] else "COMPLETED"
+    error = task_results[0]["message"] if not task_results[0]["valid"] else None
+    return status, error, task_results
+
+
+def task_verify_license_files(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
+    """Process verify_license_files task."""
+    task_results = task_process_wrap(verify.license_files(*args))
+    logger.info(f"Verified license files for {args}")
+    status = "FAILED" if not task_results[0]["files_found"] else "COMPLETED"
+    error = "Required license files not found" if not task_results[0]["files_found"] else None
+    return status, error, task_results
+
+
+def task_verify_signature(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
+    """Process verify_signature task."""
+    task_results = task_process_wrap(verify.signature(*args))
+    logger.info(f"Verified {args} with result {task_results[0]}")
+    status = "FAILED" if task_results[0].get("error") else "COMPLETED"
+    error = task_results[0].get("error")
+    return status, error, task_results
+
+
+def task_verify_license_headers(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
+    """Process verify_license_headers task."""
+    task_results = task_process_wrap(verify.license_header_verify(*args))
+    logger.info(f"Verified license headers for {args}")
+    status = "FAILED" if not task_results[0]["valid"] else "COMPLETED"
+    error = task_results[0]["message"] if not task_results[0]["valid"] else None
+    return status, error, task_results
+
+
 def task_process(task_id: int, task_type: str, task_args: str) -> None:
     """Process a claimed task."""
     logger.info(f"Processing task {task_id} ({task_type}) with args {task_args}")
     try:
-        status = "COMPLETED"
-        error = None
         args = json.loads(task_args)
 
-        if task_type == "verify_archive_integrity":
-            task_results = task_process_wrap(verify.archive_integrity(*args))
-            logger.info(f"Verified {args} and computed size {task_results[0]}")
-        elif task_type == "verify_archive_structure":
-            task_results = task_process_wrap(verify.archive_structure(*args))
-            logger.info(f"Verified archive structure for {args}")
-            if not task_results[0]["valid"]:
-                status = "FAILED"
-                error = task_results[0]["message"]
-        elif task_type == "verify_license_files":
-            task_results = task_process_wrap(verify.license_files(*args))
-            logger.info(f"Verified license files for {args}")
-            if not task_results[0]["files_found"]:
-                status = "FAILED"
-                error = "Required license files not found"
-        elif task_type == "verify_signature":
-            task_results = task_process_wrap(verify.signature(*args))
-            logger.info(f"Verified {args} with result {task_results[0]}")
-            if task_results[0]["error"]:
-                status = "FAILED"
-        else:
-            error = f"Unknown task type: {task_type}"
-            logger.error(error)
-            raise Exception(error)
+        # Map task types to their handler functions
+        task_handlers = {
+            "verify_archive_integrity": task_verify_archive_integrity,
+            "verify_archive_structure": task_verify_archive_structure,
+            "verify_license_files": task_verify_license_files,
+            "verify_signature": task_verify_signature,
+            "verify_license_headers": task_verify_license_headers,
+        }
 
-        task_result_process(task_id, task_results, status, error)
+        handler = task_handlers.get(task_type)
+        if not handler:
+            msg = f"Unknown task type: {task_type}"
+            logger.error(msg)
+            raise Exception(msg)
+
+        status, error, task_results = handler(args)
+        task_result_process(task_id, task_results, status=status, error=error)
 
     except Exception as e:
         task_error_handle(task_id, e)
