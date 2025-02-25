@@ -47,22 +47,28 @@
       .verify-link {
           display: inline-block;
           padding: 0.5rem 1rem;
-          background: #003366;
+          background: #004477;
           color: white;
           border: none;
           border-radius: 4px;
           cursor: pointer;
           font-weight: 500;
           text-decoration: none;
+          font-size: 17px;
       }
 
       .verify-link:hover {
-          background: #004477;
+          background: #003366;
           color: white;
       }
 
       .button-form {
           display: inline-block;
+      }
+
+      /* TODO: This is a bit of a mess */
+      td .button-form {
+          margin-bottom: 0;
       }
 
       .button-form+.button-form {
@@ -77,6 +83,11 @@
           border-radius: 4px;
           cursor: pointer;
           font-weight: 500;
+      }
+
+      /* TODO: This is a bit of a mess */
+      td .delete-button {
+          margin: 0;
       }
 
       .delete-button:hover {
@@ -132,6 +143,66 @@
           padding: 1rem;
           border-top: 1px solid #ddd;
       }
+
+      .download-section {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+          align-items: center;
+      }
+
+      .download-button {
+          display: inline-flex;
+          align-items: center;
+          padding: 0.5rem 1rem;
+          background: #2c7a3d;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 500;
+          text-decoration: none;
+          font-size: 17px;
+          line-height: 24px;
+          height: 40px;
+      }
+
+      .download-button:hover {
+          background: #246832;
+          color: white;
+      }
+
+      .download-button svg {
+          margin-right: 0.25rem;
+          width: 16px;
+          height: 16px;
+      }
+
+      .verify-button {
+          padding: 0.5rem 1rem;
+          background: #666666;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 500;
+          font-size: 17px;
+          line-height: 24px;
+          height: 40px;
+          margin-top: 0;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+      }
+
+      .verify-button:hover {
+          background: #555555;
+          color: white;
+      }
+
+      .verify-link-container {
+          margin-top: 1rem;
+      }
   </style>
 {% endblock stylesheets %}
 
@@ -185,8 +256,16 @@
             <td>{{ package.filename }}</td>
           </tr>
           <tr>
+            <th>File size</th>
+            <td>{{ format_file_size(package.bytes_size) }}</td>
+          </tr>
+          <tr>
+            <th>Uploaded</th>
+            <td>{{ package.uploaded.strftime("%Y-%m-%d %H:%M UTC") }}</td>
+          </tr>
+          <tr>
             <th>Package checks</th>
-            <td class="bold">
+            <td>
               {% set total_tasks = package.tasks|length %}
               {% set pending_tasks = package.tasks|selectattr("status.value", "==", "queued")|list|length %}
               {% set running_tasks = package.tasks|selectattr("status.value", "==", "active")|list|length %}
@@ -210,46 +289,43 @@
                   {%- set _ = status_parts.append(issue_tasks|string + " " + ("Issue" if issue_tasks == 1 else "Issues")) -%}
                 {%- endif -%}
                 {{ status_parts|join(", ") }} ({{ completed_tasks }}/{{ total_tasks }} {{ "Check" if total_tasks == 1 else "Checks" }} Complete)
+                {% if package.tasks %}
+                  <div class="verify-link-container">
+                    <a href="{{ url_for('root_package_check', artifact_sha3=package.artifact_sha3, release_key=release.storage_key) }}"
+                       class="verify-link prose">Show check status</a>
+                  </div>
+                {% else %}
+                  <form method="post"
+                        action="{{ url_for('root_package_check') }}"
+                        class="button-form">
+                    <input type="hidden"
+                           name="artifact_sha3"
+                           value="{{ package.artifact_sha3 }}" />
+                    <input type="hidden" name="release_key" value="{{ release.storage_key }}" />
+                    <button type="submit" class="verify-link">Check package</button>
+                  </form>
+                {% endif %}
               {% endif %}
             </td>
           </tr>
           <tr>
-            <th>File size</th>
-            <td>{{ format_file_size(package.bytes_size) }}</td>
-          </tr>
-          <tr>
-            <th>Uploaded</th>
-            <td>{{ package.uploaded.strftime("%Y-%m-%d %H:%M UTC") }}</td>
-          </tr>
-          <tr>
-            <th>Artifact hash (SHA3-256)</th>
-            <td>{{ package.artifact_sha3 }}</td>
-          </tr>
-          <tr>
-            <th>Artifact hash (SHA-512)</th>
-            <td>{{ package.sha512 }}</td>
-          </tr>
-          <tr>
-            <th>Signature hash (SHA3-256)</th>
-            <td>{{ package.signature_sha3 }}</td>
+            <th>Downloads</th>
+            <td class="prose">
+              <div class="download-section">
+                <a href="{{ url_for('root_download_artifact', release_key=release.storage_key, artifact_sha3=package.artifact_sha3) }}"
+                   class="download-button">Download Artifact</a>
+                {% if package.signature_sha3 %}
+                  <a href="{{ url_for('root_download_signature', release_key=release.storage_key, signature_sha3=package.signature_sha3) }}"
+                     class="download-button">Download Signature</a>
+                {% endif %}
+                <a href="{{ url_for('root_docs_verify', filename=package.filename, artifact_sha3=package.artifact_sha3, sha512=package.sha512, has_signature='true' if package.signature_sha3 else 'false') }}"
+                   class="verify-button">Verification Instructions</a>
+              </div>
+            </td>
           </tr>
           <tr>
             <th>Actions</th>
             <td class="prose">
-              {% if package.tasks %}
-                <a href="{{ url_for('root_package_check', artifact_sha3=package.artifact_sha3, release_key=release.storage_key) }}"
-                   class="verify-link">Show check status</a>
-              {% else %}
-                <form method="post"
-                      action="{{ url_for('root_package_check') }}"
-                      class="button-form">
-                  <input type="hidden"
-                         name="artifact_sha3"
-                         value="{{ package.artifact_sha3 }}" />
-                  <input type="hidden" name="release_key" value="{{ release.storage_key }}" />
-                  <button type="submit" class="verify-link">Check package</button>
-                </form>
-              {% endif %}
               <form method="post"
                     action="{{ url_for('root_package_delete') }}"
                     class="button-form">
@@ -265,6 +341,18 @@
               </form>
             </td>
           </tr>
+          <tr>
+            <th>Artifact hash (SHA3-256)</th>
+            <td>{{ package.artifact_sha3 }}</td>
+          </tr>
+          <tr>
+            <th>Artifact hash (SHA-512)</th>
+            <td>{{ package.sha512 }}</td>
+          </tr>
+          <tr>
+            <th>Signature hash (SHA3-256)</th>
+            <td>{{ package.signature_sha3 }}</td>
+          </tr>
         {% endfor %}
       </table>
     {% endfor %}
@@ -277,3 +365,7 @@
     <a href="{{ url_for('root_candidate_create') }}">Create a release candidate</a>
   </p>
 {% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+{% endblock javascripts %}

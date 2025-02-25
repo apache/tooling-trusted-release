@@ -1,6 +1,6 @@
 # Project conventions
 
-## Python function names
+## Python functions
 
 ### Name functions in a collation friendly way
 
@@ -75,3 +75,9 @@ This makes it easier to find all the functions related to a specific task, and m
 We limit function complexity to a score of 10. If the linter complains, your function is doing too much.
 
 Cyclomatic complexity counts the number of independent paths through code: more if/else branches, loops, and exception handlers means higher complexity. Complex code is harder to test, maintain, and understand. The easiest way to fix high complexity is usually to refactor a chunk of related logic into a separate helper function.
+
+## HTML
+
+### Use sentence case for headings
+
+We write headings like "This is a heading", and not "This is a Heading" or "This Is A Heading". This follows the [Wikipedia style for headings](https://en.wikipedia.org/wiki/Wikipedia:Manual_of_Style#Section_headings). The same goes for button texts.

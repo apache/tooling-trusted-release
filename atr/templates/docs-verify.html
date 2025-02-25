@@ -1,0 +1,73 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Verification instructions ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Instructions for verifying an artifact.
+{% endblock description %}
+
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .verification-steps {
+          margin-top: 1rem;
+      }
+
+      .verification-steps h3 {
+          margin-top: 1.5rem;
+          margin-bottom: 0.5rem;
+      }
+
+      .verification-steps pre {
+          background-color: #f5f5f5;
+          padding: 0.8rem;
+          border-radius: 4px;
+          overflow-x: auto;
+          font-family: monospace;
+          margin: 0.5rem 0;
+          position: relative;
+      }
+  </style>
+{% endblock stylesheets %}
+
+{% block content %}
+  <p>
+    <a href="{{ url_for('root_candidate_review') }}" class="back-link">← Back to release candidates</a>
+  </p>
+  <h1>Verification instructions</h1>
+
+  <p>
+    Follow these steps to verify the downloaded artifact <code>{{ filename }}</code>.
+  </p>
+
+  <div class="verification-steps">
+    <h3>1. Download the artifact and signature</h3>
+    <p>Use the download buttons on the release candidate page to download both the artifact and its signature.</p>
+
+    <h3>2. Verify signature with GPG</h3>
+    <p>Run the following command to verify the signature:</p>
+    <pre>{% if has_signature %}gpg --verify {{ filename }}.asc {{ filename }}{% else %}No signature available for this artifact.{% endif %}</pre>
+
+    <h3>3. Verify SHA3-256 hash</h3>
+    <p>Run the following command and compare the output with the hash displayed on the release candidate page:</p>
+    <pre>sha3sum -a 256 {{ filename }}</pre>
+    {% if artifact_sha3 %}
+      <p>Expected SHA3-256 hash:</p>
+      <pre>{{ artifact_sha3 }}</pre>
+    {% endif %}
+
+    <h3>4. Verify SHA-512 hash</h3>
+    <p>Run the following command and compare the output with the hash displayed on the release candidate page:</p>
+    <pre>sha512sum {{ filename }}</pre>
+    {% if sha512 %}
+      <p>Expected SHA-512 hash:</p>
+      <pre>{{ sha512 }}</pre>
+    {% endif %}
+  </div>
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+{% endblock javascripts %}

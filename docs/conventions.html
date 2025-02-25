@@ -1,5 +1,5 @@
 <h1>Project conventions</h1>
-<h2>Python function names</h2>
+<h2>Python functions</h2>
 <h3>Name functions in a collation friendly way</h3>
 <p>Functions should be named hierarchically, with the most general category first, followed by increasingly specific details. This makes related functions group together naturally when sorted alphabetically, making code navigation and discovery easier.</p>
 <p><strong>Example</strong>:</p>
@@ -43,3 +43,6 @@ def verify_archive_integrity_do_something():
 <h3>Keep cyclomatic complexity below 10</h3>
 <p>We limit function complexity to a score of 10. If the linter complains, your function is doing too much.</p>
 <p>Cyclomatic complexity counts the number of independent paths through code: more if/else branches, loops, and exception handlers means higher complexity. Complex code is harder to test, maintain, and understand. The easiest way to fix high complexity is usually to refactor a chunk of related logic into a separate helper function.</p>
+<h2>HTML</h2>
+<h3>Use sentence case for headings</h3>
+<p>We write headings like &quot;This is a heading&quot;, and not &quot;This is a Heading&quot; or &quot;This Is A Heading&quot;. This follows the <a href="https://en.wikipedia.org/wiki/Wikipedia:Manual_of_Style#Section_headings">Wikipedia style for headings</a>. The same goes for button texts.</p>

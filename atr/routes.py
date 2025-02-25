@@ -32,7 +32,8 @@ from typing import cast
 import aiofiles
 import aiofiles.os
 import gnupg
-from quart import Request, flash, redirect, render_template, request, url_for
+from quart import Request, flash, redirect, render_template, request, send_file, url_for
+from quart.wrappers.response import Response as QuartResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import InstrumentedAttribute
@@ -1166,3 +1167,121 @@ async def task_verification_create(db_session: AsyncSession, package: Package) -
         db_session.add(task)
 
     return tasks
+
+
+@APP.route("/download/<release_key>/<artifact_sha3>")
+@require(Requirements.committer)
+async def root_download_artifact(release_key: str, artifact_sha3: str) -> Response | QuartResponse:
+    """Download an artifact file."""
+    # TODO: This function is very similar to the signature download function
+    # We should probably extract the common code into a helper function
+    session = await session_read()
+    if (session is None) or (session.uid is None):
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    async with get_session() as db_session:
+        # Find the package
+        release_pmc = selectinload(cast(InstrumentedAttribute[Release], Package.release)).selectinload(
+            cast(InstrumentedAttribute[PMC], Release.pmc)
+        )
+        statement = (
+            select(Package)
+            .where(Package.artifact_sha3 == artifact_sha3, Package.release_key == release_key)
+            .options(release_pmc)
+        )
+        result = await db_session.execute(statement)
+        package = result.scalar_one_or_none()
+
+        if not package:
+            await flash("Artifact not found", "error")
+            return redirect(url_for("root_candidate_review"))
+
+        # Check permissions
+        if package.release and package.release.pmc:
+            if (session.uid not in package.release.pmc.pmc_members) and (
+                session.uid not in package.release.pmc.committers
+            ):
+                await flash("You don't have permission to download this file", "error")
+                return redirect(url_for("root_candidate_review"))
+
+        # Construct file path
+        file_path = Path(get_release_storage_dir()) / artifact_sha3
+
+        # Check that the file exists
+        if not await aiofiles.os.path.exists(file_path):
+            await flash("Artifact file not found", "error")
+            return redirect(url_for("root_candidate_review"))
+
+        # Send the file with original filename
+        return await send_file(
+            file_path, as_attachment=True, attachment_filename=package.filename, mimetype="application/octet-stream"
+        )
+
+
+@APP.route("/download/signature/<release_key>/<signature_sha3>")
+@require(Requirements.committer)
+async def root_download_signature(release_key: str, signature_sha3: str) -> QuartResponse | Response:
+    """Download a signature file."""
+    session = await session_read()
+    if (session is None) or (session.uid is None):
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    async with get_session() as db_session:
+        # Find the package that has this signature
+        release_pmc = selectinload(cast(InstrumentedAttribute[Release], Package.release)).selectinload(
+            cast(InstrumentedAttribute[PMC], Release.pmc)
+        )
+        statement = (
+            select(Package)
+            .where(Package.signature_sha3 == signature_sha3, Package.release_key == release_key)
+            .options(release_pmc)
+        )
+        result = await db_session.execute(statement)
+        package = result.scalar_one_or_none()
+
+        if not package:
+            await flash("Signature not found", "error")
+            return redirect(url_for("root_candidate_review"))
+
+        # Check permissions
+        if package.release and package.release.pmc:
+            if (session.uid not in package.release.pmc.pmc_members) and (
+                session.uid not in package.release.pmc.committers
+            ):
+                await flash("You don't have permission to download this file", "error")
+                return redirect(url_for("root_candidate_review"))
+
+        # Construct file path
+        file_path = Path(get_release_storage_dir()) / signature_sha3
+
+        # Check that the file exists
+        if not await aiofiles.os.path.exists(file_path):
+            await flash("Signature file not found", "error")
+            return redirect(url_for("root_candidate_review"))
+
+        # Send the file with original filename and .asc extension
+        return await send_file(
+            file_path,
+            as_attachment=True,
+            attachment_filename=f"{package.filename}.asc",
+            mimetype="application/pgp-signature",
+        )
+
+
+@APP.route("/docs/verify/<filename>")
+@require(Requirements.committer)
+async def root_docs_verify(filename: str) -> str:
+    """Show verification instructions for an artifact."""
+    # Get query parameters
+    artifact_sha3 = request.args.get("artifact_sha3", "")
+    sha512 = request.args.get("sha512", "")
+    has_signature = request.args.get("has_signature", "false").lower() == "true"
+
+    # Return the template
+    return await render_template(
+        "docs-verify.html",
+        filename=filename,
+        artifact_sha3=artifact_sha3,
+        sha512=sha512,
+        has_signature=has_signature,
+    )

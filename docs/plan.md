@@ -21,8 +21,9 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
    - [DONE] Add a standard artifact naming pattern based on the project and product
    - [DONE] Potentially add the option to upload package artifacts without signatures
    - [DONE] Show validation status indicators
+   - [DONE] Add developer RC download buttons with clear verification instructions
+   - Make developer RC download buttons public for external developers
    - Improve validation status indicators
-   - Add developer RC download buttons with clear verification instructions
 
 3. Improve key management interface
    - [DONE] Display which PMCs are using each key
