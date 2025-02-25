@@ -97,8 +97,8 @@ These tasks are dependent on the task scheduler above.
 
 2. License compliance
    - [DONE] Verify LICENSE and NOTICE files exist and are placed correctly
-   - Check for Apache License headers in source files
-   - Basic RAT integration for license header validation
+   - [DONE] Check for Apache License headers in source files
+   - [DONE] Basic RAT integration for license header validation
 
 3. SBOM integration
    - Generate a basic SBOM for release artifacts
@@ -108,8 +108,8 @@ These tasks are dependent on the task scheduler above.
 ## Advanced RC validation
 
 1. Reproducible build verification
-   - Accept upload of binary artifact builds
-   - Compare built built artifacts with any existing provided binary artifacts
+   - Accept upload of binary packages
+   - Compare built artifacts with any existing provided binary artifacts
    - Give a detailed report of differences between user provided builds
 
 2. Dependency analysis

@@ -19,8 +19,10 @@ import logging
 import os
 import re
 import shutil
+import subprocess
 import tarfile
 import tempfile
+import xml.etree.ElementTree as ET
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any, BinaryIO, cast
@@ -30,6 +32,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import select
 
+from atr.config import config_dict
 from atr.db.models import PMC, PMCKeyLink, PublicSigningKey
 
 # Configure logging
@@ -41,6 +44,26 @@ file_handler = logging.FileHandler("atr-worker.log")
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
 logger.addHandler(file_handler)
+
+# Import configuration
+try:
+    # Determine which configuration to use
+    from decouple import config
+
+    config_mode = "Debug" if config("DEBUG", default=True, cast=bool) else "Production"
+    app_config = config_dict[config_mode]
+except (ImportError, KeyError):
+    # Default to Debug config if there's an issue
+    app_config = config_dict["Debug"]
+
+# Default path for Apache RAT JAR file
+DEFAULT_RAT_JAR_PATH = app_config.APACHE_RAT_JAR_PATH
+
+# Default maximum size for archive extraction
+DEFAULT_MAX_EXTRACT_SIZE = app_config.MAX_EXTRACT_SIZE
+
+# Default chunk size for reading files
+DEFAULT_CHUNK_SIZE = app_config.EXTRACT_CHUNK_SIZE
 
 
 class VerifyError(Exception):
@@ -641,3 +664,417 @@ def license_header_verify(artifact_path: str) -> dict[str, Any]:
         "message": message,
         "valid": valid,
     }
+
+
+def rat_license_jar_verify(rat_jar_path: str) -> tuple[str, dict[str, Any] | None]:
+    """Verify that the Apache RAT JAR file exists and is accessible."""
+    # Check that the RAT JAR exists
+    if not os.path.exists(rat_jar_path):
+        logger.error(f"Apache RAT JAR not found at: {rat_jar_path}")
+        # Try a few common locations:
+        # ./rat.jar
+        # ./state/rat.jar
+        # ../rat.jar
+        # ../state/rat.jar
+        # NOTE: We're also doing something like this in task_verify_rat_license
+        # Should probably decide one place to do it, and do it well
+        alternative_paths = [
+            os.path.join(os.getcwd(), os.path.basename(rat_jar_path)),
+            os.path.join(os.getcwd(), "state", os.path.basename(rat_jar_path)),
+            os.path.join(os.path.dirname(os.getcwd()), os.path.basename(rat_jar_path)),
+            os.path.join(os.path.dirname(os.getcwd()), "state", os.path.basename(rat_jar_path)),
+        ]
+
+        for alt_path in alternative_paths:
+            if os.path.exists(alt_path):
+                logger.info(f"Found alternative RAT JAR at: {alt_path}")
+                rat_jar_path = alt_path
+                break
+
+        # Double check whether we found the JAR
+        if not os.path.exists(rat_jar_path):
+            logger.error("Tried alternative paths but Apache RAT JAR still not found")
+            logger.error(f"Current directory: {os.getcwd()}")
+            logger.error(f"Directory contents: {os.listdir(os.getcwd())}")
+            if os.path.exists("state"):
+                logger.error(f"State directory contents: {os.listdir('state')}")
+
+            return rat_jar_path, {
+                "valid": False,
+                "message": f"Apache RAT JAR not found at: {rat_jar_path}",
+                "total_files": 0,
+                "approved_licenses": 0,
+                "unapproved_licenses": 0,
+                "unknown_licenses": 0,
+                "unapproved_files": [],
+                "unknown_license_files": [],
+                "errors": [f"Missing JAR: {rat_jar_path}"],
+            }
+    else:
+        logger.info(f"Found Apache RAT JAR at: {rat_jar_path}")
+
+    return rat_jar_path, None
+
+
+def rat_license_execute(rat_jar_path: str, extract_dir: str, temp_dir: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Execute Apache RAT and process its output."""
+    # Define output file path
+    xml_output_path = os.path.join(temp_dir, "rat-report.xml")
+    logger.info(f"XML output will be written to: {xml_output_path}")
+
+    # Run Apache RAT on the extracted directory
+    # Use -x flag for XML output and -o to specify the output file
+    command = ["java", "-jar", rat_jar_path, "-d", extract_dir, "-x", "-o", xml_output_path]
+    logger.info(f"Running Apache RAT: {' '.join(command)}")
+
+    # Change working directory to temp_dir when running the process
+    current_dir = os.getcwd()
+    os.chdir(temp_dir)
+
+    logger.info(f"Executing Apache RAT from directory: {os.getcwd()}")
+
+    try:
+        # # First make sure we can run Java
+        # java_check = subprocess.run(["java", "-version"], capture_output=True, timeout=10)
+        # logger.info(f"Java check completed with return code {java_check.returncode}")
+
+        # Run the actual RAT command
+        # We do check=False because we'll handle errors below
+        # The timeout is five minutes
+        process = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=300,
+        )
+
+        if process.returncode != 0:
+            logger.error(f"Apache RAT failed with return code {process.returncode}")
+            logger.error(f"STDOUT: {process.stdout}")
+            logger.error(f"STDERR: {process.stderr}")
+            os.chdir(current_dir)
+            error_dict = {
+                "valid": False,
+                "message": f"Apache RAT process failed with code {process.returncode}",
+                "total_files": 0,
+                "approved_licenses": 0,
+                "unapproved_licenses": 0,
+                "unknown_licenses": 0,
+                "unapproved_files": [],
+                "unknown_license_files": [],
+                "errors": [
+                    f"Process error code: {process.returncode}",
+                    f"STDOUT: {process.stdout}",
+                    f"STDERR: {process.stderr}",
+                ],
+            }
+            return error_dict, None
+
+        logger.info(f"Apache RAT completed successfully with return code {process.returncode}")
+        logger.info(f"stdout: {process.stdout[:200]}...")
+    except subprocess.TimeoutExpired as e:
+        os.chdir(current_dir)
+        logger.error(f"Apache RAT process timed out: {e}")
+        return {
+            "valid": False,
+            "message": "Apache RAT process timed out",
+            "total_files": 0,
+            "approved_licenses": 0,
+            "unapproved_licenses": 0,
+            "unknown_licenses": 0,
+            "unapproved_files": [],
+            "unknown_license_files": [],
+            "errors": [f"Timeout: {e}"],
+        }, None
+    except Exception as e:
+        # Change back to the original directory before raising
+        os.chdir(current_dir)
+        logger.error(f"Exception running Apache RAT: {e}")
+        return {
+            "valid": False,
+            "message": f"Apache RAT process failed: {e}",
+            "total_files": 0,
+            "approved_licenses": 0,
+            "unapproved_licenses": 0,
+            "unknown_licenses": 0,
+            "unapproved_files": [],
+            "unknown_license_files": [],
+            "errors": [f"Process error: {e}"],
+        }, None
+
+    # Change back to the original directory
+    os.chdir(current_dir)
+
+    # Check that the output file exists
+    if os.path.exists(xml_output_path):
+        logger.info(f"Found XML output at: {xml_output_path} (size: {os.path.getsize(xml_output_path)} bytes)")
+        return None, xml_output_path
+    else:
+        logger.error(f"XML output file not found at: {xml_output_path}")
+        # # Check for other XML files that might have been created
+        # # This is probably too defensive
+        # xml_files = [f for f in os.listdir(temp_dir) if f.endswith(".xml")]
+        # if xml_files:
+        #     logger.info(f"Found other XML files in {temp_dir}: {xml_files}")
+        #     # Use the first XML file found
+        #     xml_output_path = os.path.join(temp_dir, xml_files[0])
+        #     logger.info(f"Using alternative XML file: {xml_output_path}")
+        # else:
+        # List files in the temporary directory
+        logger.info(f"Files in {temp_dir}: {os.listdir(temp_dir)}")
+        # Look in the current directory too
+        logger.info(f"Files in current directory: {os.listdir('.')}")
+        return {
+            "valid": False,
+            "message": f"RAT output XML file not found: {xml_output_path}",
+            "total_files": 0,
+            "approved_licenses": 0,
+            "unapproved_licenses": 0,
+            "unknown_licenses": 0,
+            "unapproved_files": [],
+            "unknown_license_files": [],
+            "errors": [f"Missing output file: {xml_output_path}"],
+        }, None
+
+
+def rat_license_verify(
+    artifact_path: str,
+    rat_jar_path: str = DEFAULT_RAT_JAR_PATH,
+    max_extract_size: int = DEFAULT_MAX_EXTRACT_SIZE,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+) -> dict[str, Any]:
+    """Verify license headers using Apache RAT."""
+    logger.info(f"Verifying licenses with Apache RAT for {artifact_path}")
+
+    # Check that Java is installed
+    try:
+        java_version = subprocess.check_output(["java", "-version"], stderr=subprocess.STDOUT, text=True)
+        logger.info(f"Java version: {java_version.splitlines()[0]}")
+    except (subprocess.SubprocessError, FileNotFoundError) as e:
+        logger.error(f"Java is not properly installed or not in PATH: {e}")
+        return {
+            "valid": False,
+            "message": "Java is not properly installed or not in PATH",
+            "total_files": 0,
+            "approved_licenses": 0,
+            "unapproved_licenses": 0,
+            "unknown_licenses": 0,
+            "unapproved_files": [],
+            "unknown_license_files": [],
+            "errors": [f"Java error: {e}"],
+        }
+
+    # Verify RAT JAR exists and is accessible
+    rat_jar_path, jar_error = rat_license_jar_verify(rat_jar_path)
+    if jar_error:
+        return jar_error
+
+    try:
+        # Create a temporary directory for extraction
+        # TODO: We could extract to somewhere in "state/" instead
+        with tempfile.TemporaryDirectory(prefix="rat_verify_") as temp_dir:
+            logger.info(f"Created temporary directory: {temp_dir}")
+
+            # Find and validate the root directory
+            root_dir, error_msg = utility_archive_root_dir_find(artifact_path)
+            if error_msg or (root_dir is None):
+                logger.error(f"Archive root directory issue: {error_msg}")
+                return {
+                    "valid": False,
+                    "message": error_msg or "No root directory found",
+                    "total_files": 0,
+                    "approved_licenses": 0,
+                    "unapproved_licenses": 0,
+                    "unknown_licenses": 0,
+                    "unapproved_files": [],
+                    "unknown_license_files": [],
+                    "errors": [error_msg or "No root directory found"],
+                }
+
+            extract_dir = os.path.join(temp_dir, root_dir)
+
+            # Extract the archive to the temporary directory
+            logger.info(f"Extracting {artifact_path} to {temp_dir}")
+            extracted_size = safe_extract_archive(
+                artifact_path, temp_dir, max_size=max_extract_size, chunk_size=chunk_size
+            )
+            logger.info(f"Extracted {extracted_size} bytes")
+
+            # Execute RAT and get results or error
+            error_result, xml_output_path = rat_license_execute(rat_jar_path, extract_dir, temp_dir)
+            if error_result:
+                return error_result
+
+            # Parse the XML output
+            try:
+                logger.info(f"Parsing RAT XML output: {xml_output_path}")
+                # Make sure xml_output_path is not None before parsing
+                if xml_output_path is None:
+                    raise ValueError("XML output path is None")
+
+                results = parse_rat_output(xml_output_path, extract_dir)
+                logger.info(f"Successfully parsed RAT output with {results.get('total_files', 0)} files")
+                return results
+            except Exception as e:
+                logger.error(f"Error parsing RAT output: {e}")
+                return {
+                    "valid": False,
+                    "message": f"Failed to parse Apache RAT output: {e!s}",
+                    "total_files": 0,
+                    "approved_licenses": 0,
+                    "unapproved_licenses": 0,
+                    "unknown_licenses": 0,
+                    "unapproved_files": [],
+                    "unknown_license_files": [],
+                    "errors": [f"Parse error: {e}"],
+                }
+
+    except Exception as e:
+        logger.error(f"Error running Apache RAT: {e}")
+        import traceback
+
+        logger.error(traceback.format_exc())
+        return {
+            "valid": False,
+            "message": f"Failed to run Apache RAT: {e!s}",
+            "total_files": 0,
+            "approved_licenses": 0,
+            "unapproved_licenses": 0,
+            "unknown_licenses": 0,
+            "unapproved_files": [],
+            "unknown_license_files": [],
+            "errors": [str(e), traceback.format_exc()],
+        }
+
+
+def safe_extract_archive(
+    archive_path: str, extract_dir: str, max_size: int = DEFAULT_MAX_EXTRACT_SIZE, chunk_size: int = DEFAULT_CHUNK_SIZE
+) -> int:
+    """Safely extract an archive with size limits."""
+    total_extracted = 0
+
+    with tarfile.open(archive_path, mode="r|gz") as tf:
+        for member in tf:
+            # Skip anything that's not a file or directory
+            if not (member.isreg() or member.isdir()):
+                continue
+
+            # Check whether extraction would exceed the size limit
+            if member.isreg() and ((total_extracted + member.size) > max_size):
+                raise VerifyError(
+                    f"Extraction would exceed maximum size limit of {max_size} bytes",
+                    {"max_size": max_size, "current_size": total_extracted, "file_size": member.size},
+                )
+
+            # Extract directories directly
+            if member.isdir():
+                tf.extract(member, extract_dir)
+                continue
+
+            target_path = os.path.join(extract_dir, member.name)
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+
+            source = tf.extractfile(member)
+            if source is None:
+                continue
+
+            # For files, extract in chunks to avoid saturating memory
+            with open(target_path, "wb") as target:
+                extracted_file_size = 0
+                while True:
+                    chunk = source.read(chunk_size)
+                    if not chunk:
+                        break
+                    target.write(chunk)
+                    extracted_file_size += len(chunk)
+
+                    # Check size limits during extraction
+                    if (total_extracted + extracted_file_size) > max_size:
+                        # Clean up the partial file
+                        target.close()
+                        os.unlink(target_path)
+                        raise VerifyError(
+                            f"Extraction exceeded maximum size limit of {max_size} bytes",
+                            {"max_size": max_size, "current_size": total_extracted},
+                        )
+
+            total_extracted += extracted_file_size
+
+    return total_extracted
+
+
+def parse_rat_output(xml_file: str, base_dir: str) -> dict[str, Any]:
+    """Parse the XML output from Apache RAT."""
+    try:
+        tree = ET.parse(xml_file)
+        root = tree.getroot()
+
+        total_files = 0
+        approved_licenses = 0
+        unapproved_licenses = 0
+        unknown_licenses = 0
+
+        unapproved_files = []
+        unknown_license_files = []
+
+        # Process each resource
+        for resource in root.findall(".//resource"):
+            total_files += 1
+
+            # Get the name attribute value
+            name = resource.get("name", "")
+
+            # Remove base_dir prefix for cleaner display
+            if name.startswith(base_dir):
+                name = name[len(base_dir) :].lstrip("/")
+
+            # Get license information
+            license_approval = resource.find("license-approval")
+            license_family = resource.find("license-family")
+
+            is_approved = license_approval is not None and license_approval.get("name") == "true"
+            license_name = license_family.get("name") if license_family is not None else "Unknown"
+
+            # Update counters and lists
+            if is_approved:
+                approved_licenses += 1
+            elif license_name == "Unknown license":
+                unknown_licenses += 1
+                unknown_license_files.append({"name": name, "license": license_name})
+            else:
+                unapproved_licenses += 1
+                unapproved_files.append({"name": name, "license": license_name})
+
+        # Calculate overall validity
+        valid = unapproved_licenses == 0
+
+        # Prepare awkwardly long summary message
+        message = f"""\
+Found {approved_licenses} files with approved licenses, {unapproved_licenses} \
+with unapproved licenses, and {unknown_licenses} with unknown licenses"""
+
+        # We limit the number of files we report to 100
+        return {
+            "valid": valid,
+            "message": message,
+            "total_files": total_files,
+            "approved_licenses": approved_licenses,
+            "unapproved_licenses": unapproved_licenses,
+            "unknown_licenses": unknown_licenses,
+            "unapproved_files": unapproved_files[:100],
+            "unknown_license_files": unknown_license_files[:100],
+            "errors": [],
+        }
+
+    except Exception as e:
+        logger.error(f"Error parsing RAT output: {e}")
+        return {
+            "valid": False,
+            "message": f"Failed to parse Apache RAT output: {e!s}",
+            "total_files": 0,
+            "approved_licenses": 0,
+            "unapproved_licenses": 0,
+            "unknown_licenses": 0,
+            "errors": [f"XML parsing error: {e!s}"],
+        }

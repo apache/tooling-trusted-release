@@ -170,6 +170,52 @@
           font-weight: 600;
       }
 
+      .file-list-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 0.5rem;
+      }
+
+      .file-list-table th,
+      .file-list-table td {
+          padding: 0.25rem 0.5rem;
+          text-align: left;
+          border: 1px solid #dee2e6;
+          font-size: 0.9em;
+      }
+
+      .file-list-table th {
+          background: #e9ecef;
+          font-weight: 600;
+      }
+
+      .license-summary {
+          display: flex;
+          gap: 1rem;
+          margin-bottom: 0.5rem;
+      }
+
+      .license-stat {
+          padding: 0.25rem 0.5rem;
+          border-radius: 4px;
+          font-size: 0.9em;
+      }
+
+      .license-approved {
+          background: #d1e7dd;
+          border: 1px solid #a3cfbb;
+      }
+
+      .license-unapproved {
+          background: #f8d7da;
+          border: 1px solid #f5c6cb;
+      }
+
+      .license-unknown {
+          background: #fff3cd;
+          border: 1px solid #ffecb5;
+      }
+
       .package-info {
           margin-bottom: 2rem;
           padding: 1rem;
@@ -277,7 +323,7 @@
       {% for task in tasks %}
         <div class="task-item">
           <div class="task-header">
-            <span class="task-type">{{ task.task_type.replace('_', ' ').title() }}</span>
+            <span class="task-type">{{ task.task_type.replace('_', ' ').replace("verify ", "").title() }}</span>
             <span class="task-status status-{{ task.status.value.lower() }}">
               {%- if task.status.value == "queued" -%}
                 Pending
@@ -302,6 +348,25 @@
                 {% else %}
                   <summary>View detailed results</summary>
                 {% endif %}
+
+                {% if task.task_type == 'verify_rat_license' and task.result[0] is mapping %}
+                  <div class="license-summary">
+                    <span class="license-stat license-approved">
+                      <strong>{{ task.result[0].approved_licenses }}</strong> files with approved licenses
+                    </span>
+                    {% if task.result[0].unapproved_licenses > 0 %}
+                      <span class="license-stat license-unapproved">
+                        <strong>{{ task.result[0].unapproved_licenses }}</strong> files with unapproved licenses
+                      </span>
+                    {% endif %}
+                    {% if task.result[0].unknown_licenses > 0 %}
+                      <span class="license-stat license-unknown">
+                        <strong>{{ task.result[0].unknown_licenses }}</strong> files with unknown licenses
+                      </span>
+                    {% endif %}
+                  </div>
+                {% endif %}
+
                 <table class="result-table">
                   <tbody>
                     {% for key, value in task.result[0].items() %}
@@ -320,6 +385,27 @@
                                   </tr>
                                 {% endfor %}
                               </table>
+                            {% elif key == "unapproved_files" or key == "unknown_license_files" %}
+                              {% if value|length > 0 %}
+                                <table class="file-list-table">
+                                  <thead>
+                                    <tr>
+                                      <th>File</th>
+                                      <th>License</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {% for file_info in value %}
+                                      <tr>
+                                        <td>{{ file_info.name }}</td>
+                                        <td>{{ file_info.license }}</td>
+                                      </tr>
+                                    {% endfor %}
+                                  </tbody>
+                                </table>
+                              {% else %}
+                                None
+                              {% endif %}
                             {% elif value is sequence and value is not string %}
                               {{ value|join(", ") }}
                             {% else %}

@@ -214,6 +214,59 @@ def task_verify_license_headers(args: list[str]) -> tuple[str, str | None, tuple
     return status, error, task_results
 
 
+def task_verify_rat_license(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
+    """Process verify_rat_license task using Apache RAT."""
+    # First argument is the artifact path
+    artifact_path = args[0]
+
+    # Optional argument, with a default
+    rat_jar_path = args[1] if len(args) > 1 else verify.DEFAULT_RAT_JAR_PATH
+
+    # Make sure that the JAR path is absolute, handling various cases
+    # We WILL find that JAR path!
+    # In other words, we only run these heuristics when the configuration path is relative
+    if not os.path.isabs(rat_jar_path):
+        # If JAR path is relative to the state dir and we're already in it
+        # I.e. we're already in state and the relative file is here too
+        if os.path.basename(os.getcwd()) == "state" and os.path.exists(os.path.basename(rat_jar_path)):
+            rat_jar_path = os.path.join(os.getcwd(), os.path.basename(rat_jar_path))
+        # If JAR path starts with "state/" but we're not in state dir
+        # E.g. the configuration path is "state/apache-rat-0.16.1.jar" but we're not in the state dir
+        elif rat_jar_path.startswith("state/") and os.path.basename(os.getcwd()) != "state":
+            potential_path = os.path.join(os.getcwd(), rat_jar_path)
+            if os.path.exists(potential_path):
+                rat_jar_path = potential_path
+        # Try parent directory if JAR is not found
+        # P.S. Don't put the JAR in the parent of the state dir
+        if not os.path.exists(rat_jar_path) and os.path.basename(os.getcwd()) == "state":
+            parent_path = os.path.join(os.path.dirname(os.getcwd()), os.path.basename(rat_jar_path))
+            if os.path.exists(parent_path):
+                rat_jar_path = parent_path
+
+    # Log the actual JAR path being used
+    logger.info(f"Using Apache RAT JAR at: {rat_jar_path} (exists: {os.path.exists(rat_jar_path)})")
+
+    max_extract_size = int(args[2]) if len(args) > 2 else verify.DEFAULT_MAX_EXTRACT_SIZE
+    chunk_size = int(args[3]) if len(args) > 3 else verify.DEFAULT_CHUNK_SIZE
+
+    task_results = task_process_wrap(
+        verify.rat_license_verify(
+            artifact_path=artifact_path,
+            rat_jar_path=rat_jar_path,
+            max_extract_size=max_extract_size,
+            chunk_size=chunk_size,
+        )
+    )
+
+    logger.info(f"Verified license headers with Apache RAT for {artifact_path}")
+
+    # Determine whether the task was successful based on the results
+    status = "FAILED" if not task_results[0]["valid"] else "COMPLETED"
+    error = task_results[0]["message"] if not task_results[0]["valid"] else None
+
+    return status, error, task_results
+
+
 def task_process(task_id: int, task_type: str, task_args: str) -> None:
     """Process a claimed task."""
     logger.info(f"Processing task {task_id} ({task_type}) with args {task_args}")
@@ -227,6 +280,7 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
             "verify_license_files": task_verify_license_files,
             "verify_signature": task_verify_signature,
             "verify_license_headers": task_verify_license_headers,
+            "verify_rat_license": task_verify_rat_license,
         }
 
         handler = task_handlers.get(task_type)

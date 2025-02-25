@@ -300,6 +300,14 @@ class WorkerManager:
                         return False
 
                     task_id, started = task
+                    # Convert started to datetime if it's a string
+                    if isinstance(started, str):
+                        try:
+                            started = datetime.fromisoformat(started.replace("Z", "+00:00"))
+                        except ValueError:
+                            logger.error(f"Could not parse started time '{started}' for task {task_id}")
+                            return False
+
                     task_duration = (datetime.now(UTC) - started).total_seconds()
                     if task_duration > self.max_task_seconds:
                         await self.terminate_long_running_task(session, worker, task_id, pid)

@@ -69,3 +69,9 @@ def verify_archive_integrity_do_something():
 ```
 
 This makes it easier to find all the functions related to a specific task, and means that they sort together.
+
+### Keep cyclomatic complexity below 10
+
+We limit function complexity to a score of 10. If the linter complains, your function is doing too much.
+
+Cyclomatic complexity counts the number of independent paths through code: more if/else branches, loops, and exception handlers means higher complexity. Complex code is harder to test, maintain, and understand. The easiest way to fix high complexity is usually to refactor a chunk of related logic into a separate helper function.

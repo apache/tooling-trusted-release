@@ -9,9 +9,11 @@ ARG VERSION=unknown
 ENV VERSION=${VERSION}
 
 RUN apt-get update && apt-get install -y \
+    curl \
     git \
     gpg \
     make \
+    openjdk-8-jdk \
     software-properties-common
 
 RUN add-apt-repository ppa:deadsnakes/ppa \
@@ -23,6 +25,14 @@ RUN rm -rf /usr/local && python3.13 -m venv /usr/local
 RUN pip3 install setuptools wheel pip-tools poetry uv
 WORKDIR /opt/atr
 COPY . /opt/atr
+# Download and extract Apache RAT
+RUN mkdir -p state && \
+    cd state && \
+    curl -L https://dlcdn.apache.org/creadur/apache-rat-0.16.1/apache-rat-0.16.1-bin.tar.gz -o apache-rat.tar.gz && \
+    tar -xzf apache-rat.tar.gz && \
+    cp apache-rat-0.16.1/apache-rat-0.16.1.jar . && \
+    rm -rf apache-rat-0.16.1 apache-rat.tar.gz && \
+    cd ..
 RUN sed -i "s%ATR-VERSION%${VERSION}%" atr/templates/includes/footer.html
 RUN rm -rf .venv-*
 RUN make sync PYTHON="$(find /usr/bin -name python3.13 | head -n 1)"

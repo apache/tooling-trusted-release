@@ -9,7 +9,9 @@ ENV VERSION=${VERSION}
 
 # gcompat is required for ruff to work
 # nodejs is required for pyright to work
+# openjdk8 is required for Apache RAT
 RUN apk update && apk add --no-cache \
+    curl \
     file \
     gcompat \
     git \
@@ -17,12 +19,21 @@ RUN apk update && apk add --no-cache \
     make \
     nix \
     nodejs \
+    openjdk8 \
     uv
 
 ENV PYTHONUNBUFFERED=1
 RUN pip3 install setuptools wheel pip-tools poetry
 WORKDIR /opt/atr
 COPY . /opt/atr
+# Download and extract Apache RAT
+RUN mkdir -p state && \
+    cd state && \
+    curl -L https://dlcdn.apache.org/creadur/apache-rat-0.16.1/apache-rat-0.16.1-bin.tar.gz -o apache-rat.tar.gz && \
+    tar -xzf apache-rat.tar.gz && \
+    cp apache-rat-0.16.1/apache-rat-0.16.1.jar . && \
+    rm -rf apache-rat-0.16.1 apache-rat.tar.gz && \
+    cd ..
 RUN sed -i "s%ATR-VERSION%${VERSION}%" atr/templates/includes/footer.html
 RUN rm -rf .venv-*
 RUN make sync PYTHON="$(which python3)"
