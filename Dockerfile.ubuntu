@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y \
     openjdk-8-jdk \
     software-properties-common
 
+# Set JAVA_TOOL_OPTIONS to limit memory usage
+ENV JAVA_TOOL_OPTIONS="-XX:MaxMetaspaceSize=32m -Xmx128m -XX:+UseSerialGC -XX:MaxRAM=256m -XX:CompressedClassSpaceSize=16m"
+
 RUN add-apt-repository ppa:deadsnakes/ppa \
     && apt update \
     && apt install -y python3.13 python3.13-venv python3.13-dev
@@ -24,18 +27,27 @@ ENV PYTHONUNBUFFERED=1
 RUN rm -rf /usr/local && python3.13 -m venv /usr/local
 RUN pip3 install setuptools wheel pip-tools poetry uv
 WORKDIR /opt/atr
-COPY . /opt/atr
-# Download and extract Apache RAT
-RUN mkdir -p state && \
-    cd state && \
+RUN mkdir -p /tmp/apache-rat && \
+    cd /tmp/apache-rat && \
     curl -L https://dlcdn.apache.org/creadur/apache-rat-0.16.1/apache-rat-0.16.1-bin.tar.gz -o apache-rat.tar.gz && \
     tar -xzf apache-rat.tar.gz && \
-    cp apache-rat-0.16.1/apache-rat-0.16.1.jar . && \
-    rm -rf apache-rat-0.16.1 apache-rat.tar.gz && \
-    cd ..
+    find apache-rat-0.16.1 -type f -name "*.jar" -exec cp {} . \; && \
+    # Rename to match expected filename if needed
+    [ -f apache-rat-0.16.1.jar ] || mv $(find . -maxdepth 1 -type f -name "apache-rat*.jar" | head -1) apache-rat-0.16.1.jar
+RUN java -version
+COPY . /opt/atr
 RUN sed -i "s%ATR-VERSION%${VERSION}%" atr/templates/includes/footer.html
 RUN rm -rf .venv-*
 RUN make sync PYTHON="$(find /usr/bin -name python3.13 | head -n 1)"
 RUN make certs
 EXPOSE 8080
-CMD ["sh", "-c", "make serve BIND=${BIND}"]
+
+RUN printf '#!/bin/sh\n\
+mkdir -p /opt/atr/state\n\
+cp /tmp/apache-rat/apache-rat-0.16.1.jar /opt/atr/state/\n\
+echo "Copied Apache RAT JAR to state directory:"\n\
+ls -la /opt/atr/state/apache-rat-0.16.1.jar\n\
+exec make serve BIND=${BIND}\n\
+' > /usr/local/bin/start-atr.sh
+RUN chmod +x /usr/local/bin/start-atr.sh
+CMD ["/usr/local/bin/start-atr.sh"]

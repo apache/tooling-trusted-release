@@ -65,6 +65,17 @@ DEFAULT_MAX_EXTRACT_SIZE = app_config.MAX_EXTRACT_SIZE
 # Default chunk size for reading files
 DEFAULT_CHUNK_SIZE = app_config.EXTRACT_CHUNK_SIZE
 
+java_memory_args: list[str] = []
+# Use this to set smaller memory limits and use SerialGC which also requires less memory
+# We prefer, however, to set this in the container
+# java_memory_args = [
+#     "-XX:MaxMetaspaceSize=32m",
+#     "-Xmx128m",
+#     "-XX:+UseSerialGC",
+#     "-XX:MaxRAM=256m",
+#     "-XX:CompressedClassSpaceSize=16m"
+# ]
+
 
 class VerifyError(Exception):
     """Error during verification."""
@@ -724,7 +735,17 @@ def rat_license_execute(rat_jar_path: str, extract_dir: str, temp_dir: str) -> t
 
     # Run Apache RAT on the extracted directory
     # Use -x flag for XML output and -o to specify the output file
-    command = ["java", "-jar", rat_jar_path, "-d", extract_dir, "-x", "-o", xml_output_path]
+    command = [
+        "java",
+        *java_memory_args,
+        "-jar",
+        rat_jar_path,
+        "-d",
+        extract_dir,
+        "-x",
+        "-o",
+        xml_output_path,
+    ]
     logger.info(f"Running Apache RAT: {' '.join(command)}")
 
     # Change working directory to temp_dir when running the process
@@ -847,12 +868,38 @@ def rat_license_verify(
     """Verify license headers using Apache RAT."""
     logger.info(f"Verifying licenses with Apache RAT for {artifact_path}")
 
+    # Log the PATH environment variable
+    logger.info(f"PATH environment variable: {os.environ.get('PATH', 'PATH not found')}")
+
     # Check that Java is installed
     try:
-        java_version = subprocess.check_output(["java", "-version"], stderr=subprocess.STDOUT, text=True)
+        java_version = subprocess.check_output(
+            ["java", *java_memory_args, "-version"], stderr=subprocess.STDOUT, text=True
+        )
         logger.info(f"Java version: {java_version.splitlines()[0]}")
     except (subprocess.SubprocessError, FileNotFoundError) as e:
         logger.error(f"Java is not properly installed or not in PATH: {e}")
+
+        # Try to get some output even if the command failed
+        try:
+            # Use run instead of check_output to avoid exceptions
+            java_result = subprocess.run(
+                ["java", *java_memory_args, "-version"],
+                stderr=subprocess.STDOUT,
+                stdout=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+            logger.info(f"Java command return code: {java_result.returncode}")
+            logger.info(f"Java command output: {java_result.stdout or java_result.stderr}")
+
+            # Try to find where Java might be located
+            which_java = subprocess.run(["which", "java"], capture_output=True, text=True, check=False)
+            which_java_result = which_java.stdout.strip() if which_java.returncode == 0 else "not found"
+            logger.info(f"Result for which java: {which_java_result}")
+        except Exception as inner_e:
+            logger.error(f"Additional error while trying to debug java: {inner_e}")
+
         return {
             "valid": False,
             "message": "Java is not properly installed or not in PATH",
