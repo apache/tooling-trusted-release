@@ -273,7 +273,15 @@
               {% set issue_tasks = package.tasks|selectattr("status.value", "==", "failed")|list|length %}
               {% set completed_tasks = passed_tasks + issue_tasks %}
               {% if total_tasks == 0 %}
-                No checks configured
+                <form method="post"
+                      action="{{ url_for('root_package_check') }}"
+                      class="button-form">
+                  <input type="hidden"
+                         name="artifact_sha3"
+                         value="{{ package.artifact_sha3 }}" />
+                  <input type="hidden" name="release_key" value="{{ release.storage_key }}" />
+                  <button type="submit" class="verify-link">Check package</button>
+                </form>
               {% else %}
                 {%- set status_parts = [] -%}
                 {%- if pending_tasks > 0 -%}
@@ -294,16 +302,6 @@
                     <a href="{{ url_for('root_package_check', artifact_sha3=package.artifact_sha3, release_key=release.storage_key) }}"
                        class="verify-link prose">Show check status</a>
                   </div>
-                {% else %}
-                  <form method="post"
-                        action="{{ url_for('root_package_check') }}"
-                        class="button-form">
-                    <input type="hidden"
-                           name="artifact_sha3"
-                           value="{{ package.artifact_sha3 }}" />
-                    <input type="hidden" name="release_key" value="{{ release.storage_key }}" />
-                    <button type="submit" class="verify-link">Check package</button>
-                  </form>
                 {% endif %}
               {% endif %}
             </td>

@@ -1162,6 +1162,12 @@ async def task_verification_create(db_session: AsyncSession, package: Package) -
             task_args=["releases/" + package.artifact_sha3],
             package_sha3=package.artifact_sha3,
         ),
+        Task(
+            status=TaskStatus.QUEUED,
+            task_type="generate_spdx_sbom",
+            task_args=["releases/" + package.artifact_sha3],
+            package_sha3=package.artifact_sha3,
+        ),
     ]
     for task in tasks:
         db_session.add(task)

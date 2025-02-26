@@ -1,0 +1,9 @@
+from typing import Any, Callable, TypeVar
+
+T = TypeVar('T')
+
+def dataclass_with_properties(cls: type[T]) -> type[T]: ...
+
+def make_setter(field_name: str, field_type: Any) -> Callable[[Any, Any], None]: ...
+
+def make_getter(field_name: str, field_type: Any) -> Callable[[Any], Any]: ...

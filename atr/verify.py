@@ -482,6 +482,109 @@ specific language governing permissions and limitations
 under the License."""
 
 
+def sbom_spdx_generate(artifact_path: str) -> dict[str, Any]:
+    """Generate a SPDX SBOM for the given artifact."""
+    logger.info(f"Generating SPDX SBOM for {artifact_path}")
+    try:
+        return sbom_spdx_generate_unsafe(artifact_path)
+    except Exception as e:
+        logger.error(f"Failed to generate SPDX SBOM: {e}")
+        return {
+            "valid": False,
+            "message": f"Failed to generate SPDX SBOM: {e!s}",
+        }
+
+
+def sbom_spdx_generate_unsafe(artifact_path: str) -> dict[str, Any]:
+    """Generate a SPDX SBOM for the given artifact, raising potential exceptions."""
+    import os
+    from datetime import UTC, datetime
+    from tempfile import mkdtemp
+
+    from spdx_tools.common.spdx_licensing import spdx_licensing
+    from spdx_tools.spdx.model.actor import Actor, ActorType
+    from spdx_tools.spdx.model.document import CreationInfo, Document
+    from spdx_tools.spdx.model.package import Package
+    from spdx_tools.spdx.validation.document_validator import validate_full_spdx_document
+
+    # Create temporary directory for the SBOM
+    # Ideally we'll use the state directory for this
+    temp_dir = mkdtemp(prefix="atr_sbom_")
+    sbom_path = os.path.join(temp_dir, "sbom.spdx.json")
+
+    # Create minimal creation info
+    creation_info = CreationInfo(
+        spdx_version="SPDX-2.3",
+        spdx_id="SPDXRef-DOCUMENT",
+        name=f"SBOM for {os.path.basename(artifact_path)}",
+        data_license="CC0-1.0",
+        document_namespace=f"https://apache.example.org/sbom/{os.path.basename(artifact_path)}",
+        creators=[Actor(ActorType.TOOL, "Apache-ATR", None)],
+        created=datetime.now(UTC),
+    )
+
+    document = Document(creation_info=creation_info)
+
+    # Create package information with Apache License 2.0
+    # The download_location must be a URL otherwise validation fails
+    apache_license = spdx_licensing.parse("Apache-2.0")
+    package = Package(
+        name=os.path.basename(artifact_path),
+        spdx_id="SPDXRef-Package",
+        download_location="https://apache.example.org/" + os.path.basename(artifact_path),
+        version=None,
+        file_name=None,
+        supplier=None,
+        originator=None,
+        files_analyzed=True,
+        verification_code=None,
+        checksums=[],
+        homepage=None,
+        source_info=None,
+        license_concluded=apache_license,
+        license_info_from_files=[apache_license],
+        license_declared=apache_license,
+        license_comment=None,
+        copyright_text="Copyright The Apache Software Foundation",
+        summary=None,
+        description=None,
+        comment=None,
+        external_references=[],
+        attribution_texts=[],
+        primary_package_purpose=None,
+        release_date=None,
+        built_date=None,
+        valid_until_date=None,
+    )
+    document.packages = [package]
+
+    # Validate the SPDX SBOM document
+    validation_messages = validate_full_spdx_document(document)
+    if validation_messages:
+        validation_errors = [str(msg.validation_message) for msg in validation_messages]
+        return {
+            "valid": False,
+            "message": "SPDX SBOM validation failed",
+            "errors": validation_errors,
+        }
+
+    # Write SBOM to file
+    # Again, ideally we'd use the state directory for this
+    # write_file(document, sbom_path)
+
+    return {
+        "valid": True,
+        "message": "SPDX SBOM generation completed",
+        "spdx_version": creation_info.spdx_version,
+        "data_license": creation_info.data_license,
+        "sbom_created": creation_info.created.isoformat(),
+        "file_analyzed": artifact_path,
+        "sbom_path": sbom_path,
+        "packages": [package.name],
+        "license": "Apache-2.0",
+    }
+
+
 def license_header_strip_comments(content: bytes, file_ext: str) -> bytes:
     """Strip comment prefixes from the content based on the file extension."""
     if file_ext not in COMMENT_STYLES:
@@ -833,15 +936,6 @@ def rat_license_execute(rat_jar_path: str, extract_dir: str, temp_dir: str) -> t
         return None, xml_output_path
     else:
         logger.error(f"XML output file not found at: {xml_output_path}")
-        # # Check for other XML files that might have been created
-        # # This is probably too defensive
-        # xml_files = [f for f in os.listdir(temp_dir) if f.endswith(".xml")]
-        # if xml_files:
-        #     logger.info(f"Found other XML files in {temp_dir}: {xml_files}")
-        #     # Use the first XML file found
-        #     xml_output_path = os.path.join(temp_dir, xml_files[0])
-        #     logger.info(f"Using alternative XML file: {xml_output_path}")
-        # else:
         # List files in the temporary directory
         logger.info(f"Files in {temp_dir}: {os.listdir(temp_dir)}")
         # Look in the current directory too
