@@ -482,6 +482,106 @@ specific language governing permissions and limitations
 under the License."""
 
 
+def sbom_cyclonedx_generate(artifact_path: str) -> dict[str, Any]:
+    """Generate a CycloneDX SBOM for the given artifact."""
+    logger.info(f"Generating CycloneDX SBOM for {artifact_path}")
+    try:
+        return sbom_cyclonedx_generate_unsafe(artifact_path)
+    except Exception as e:
+        logger.error(f"Failed to generate CycloneDX SBOM: {e}")
+        return {
+            "valid": False,
+            "message": f"Failed to generate CycloneDX SBOM: {e!s}",
+        }
+
+
+def sbom_cyclonedx_generate_unsafe(artifact_path: str) -> dict[str, Any]:
+    """Generate a CycloneDX SBOM for the given artifact, raising potential exceptions."""
+    import json
+    import subprocess
+    import tempfile
+
+    # Create a temporary directory for extraction
+    with tempfile.TemporaryDirectory(prefix="cyclonedx_sbom_") as temp_dir:
+        logger.info(f"Created temporary directory: {temp_dir}")
+
+        # Find and validate the root directory
+        root_dir, error_msg = utility_archive_root_dir_find(artifact_path)
+        if error_msg or (root_dir is None):
+            logger.error(f"Archive root directory issue: {error_msg}")
+            return {
+                "valid": False,
+                "message": error_msg or "No root directory found",
+                "errors": [error_msg or "No root directory found"],
+            }
+
+        extract_dir = os.path.join(temp_dir, root_dir)
+
+        # Extract the archive to the temporary directory
+        logger.info(f"Extracting {artifact_path} to {temp_dir}")
+        # TODO: We need task dependencies, because we don't want to do this more than once
+        extracted_size = safe_extract_archive(
+            artifact_path, temp_dir, max_size=DEFAULT_MAX_EXTRACT_SIZE, chunk_size=DEFAULT_CHUNK_SIZE
+        )
+        logger.info(f"Extracted {extracted_size} bytes")
+
+        # Run syft to generate CycloneDX SBOM
+        try:
+            logger.info(f"Running syft on {extract_dir}")
+            process = subprocess.run(
+                ["syft", extract_dir, "-o", "cyclonedx-json"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=300,
+            )
+
+            # Parse the JSON output from syft
+            try:
+                sbom_data = json.loads(process.stdout)
+                return {
+                    "valid": True,
+                    "message": "Successfully generated CycloneDX SBOM",
+                    "sbom": sbom_data,
+                    "format": "CycloneDX",
+                    "components": len(sbom_data.get("components", [])),
+                }
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse syft output as JSON: {e}")
+                # Include first 1000 chars of output for debugging
+                return {
+                    "valid": False,
+                    "message": f"Failed to parse syft output: {e}",
+                    "errors": [str(e), process.stdout[:1000]],
+                }
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"syft command failed: {e}")
+            return {
+                "valid": False,
+                "message": f"syft command failed with code {e.returncode}",
+                "errors": [
+                    f"Process error code: {e.returncode}",
+                    f"STDOUT: {e.stdout}",
+                    f"STDERR: {e.stderr}",
+                ],
+            }
+        except subprocess.TimeoutExpired as e:
+            logger.error(f"syft command timed out: {e}")
+            return {
+                "valid": False,
+                "message": "syft command timed out after 5 minutes",
+                "errors": [str(e)],
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error running syft: {e}")
+            return {
+                "valid": False,
+                "message": f"Unexpected error running syft: {e}",
+                "errors": [str(e)],
+            }
+
+
 def sbom_spdx_generate(artifact_path: str) -> dict[str, Any]:
     """Generate a SPDX SBOM for the given artifact."""
     logger.info(f"Generating SPDX SBOM for {artifact_path}")

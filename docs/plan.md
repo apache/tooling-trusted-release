@@ -58,6 +58,7 @@ We aim to work on the task scheduler in parallel with the UX improvements above.
    - Consider distinguishing between issue and error states
    - Use consistent task status values (pending, running, passed, issue, error?)
    - Add a warning task result status
+   - Allow dependencies between tasks to reduce duplication of effort
 
 2. Orchestrating scheduler and resource management
    - [DONE] Implement process-based task isolation
@@ -102,7 +103,7 @@ These tasks are dependent on the task scheduler above.
    - [DONE] Basic RAT integration for license header validation
 
 3. SBOM integration
-   - Generate a basic SBOM for release artifacts
+   - [DONE] Generate a basic SBOM for release artifacts
    - Store SBOMs with release metadata
    - Add SBOM management options to UI
 

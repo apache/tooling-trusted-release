@@ -35,6 +35,9 @@ RUN mkdir -p /tmp/apache-rat && \
     # Rename to match expected filename if needed
     [ -f apache-rat-0.16.1.jar ] || mv $(find . -maxdepth 1 -type f -name "apache-rat*.jar" | head -1) apache-rat-0.16.1.jar
 RUN java -version
+# TODO: We should pin the syft version
+# RUN GOPATH=/usr/local go install github.com/anchore/syft/cmd/syft@latest
+RUN curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 COPY . /opt/atr
 RUN sed -i "s%ATR-VERSION%${VERSION}%" atr/templates/includes/footer.html
 RUN rm -rf .venv-*

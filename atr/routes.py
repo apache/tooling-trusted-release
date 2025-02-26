@@ -1121,6 +1121,7 @@ async def task_verification_create(db_session: AsyncSession, package: Package) -
     if package.signature_sha3 is None:
         raise FlashError("Package has no signature")
 
+    # TODO: We should probably use an enum for task_type
     tasks = [
         Task(
             status=TaskStatus.QUEUED,
@@ -1162,9 +1163,15 @@ async def task_verification_create(db_session: AsyncSession, package: Package) -
             task_args=["releases/" + package.artifact_sha3],
             package_sha3=package.artifact_sha3,
         ),
+        # Task(
+        #     status=TaskStatus.QUEUED,
+        #     task_type="generate_spdx_sbom",
+        #     task_args=["releases/" + package.artifact_sha3],
+        #     package_sha3=package.artifact_sha3,
+        # ),
         Task(
             status=TaskStatus.QUEUED,
-            task_type="generate_spdx_sbom",
+            task_type="generate_cyclonedx_sbom",
             task_args=["releases/" + package.artifact_sha3],
             package_sha3=package.artifact_sha3,
         ),
