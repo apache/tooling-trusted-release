@@ -20,6 +20,7 @@
 import logging
 import os
 from collections.abc import Iterable
+from typing import Any
 
 from decouple import config
 from quart_schema import OpenAPIProvider, QuartSchema
@@ -69,22 +70,26 @@ def create_config() -> type[AppConfig]:
     return app_config
 
 
-def create_app(app_config: type[AppConfig]) -> QuartApp:
+def app_dirs_setup(app_config: type[AppConfig]) -> None:
+    """Setup application directories."""
     if not os.path.isdir(app_config.STATE_DIR):
         raise RuntimeError(f"State directory not found: {app_config.STATE_DIR}")
     os.chdir(app_config.STATE_DIR)
     print(f"Working directory changed to: {os.getcwd()}")
-
     os.makedirs(app_config.RELEASE_STORAGE_DIR, exist_ok=True)
 
+
+def app_create_base(app_config: type[AppConfig]) -> QuartApp:
+    """Create the base Quart application."""
     if asfquart.construct is ...:
         raise ValueError("asfquart.construct is not set")
     app = asfquart.construct(__name__)
     app.config.from_object(app_config)
+    return app
 
-    # Add a from_json filter to the Jinja2 environment
-    # app.jinja_env.filters["from_json"] = lambda x: json.loads(x) if x else None
 
+def app_setup_api_docs(app: QuartApp) -> None:
+    """Configure OpenAPI documentation."""
     QuartSchema(
         app,
         openapi_provider_class=ApiOnlyOpenAPIProvider,
@@ -92,15 +97,12 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
         openapi_path="/api/openapi.json",
     )
 
-    # # Configure static folder path before changing working directory
-    # app.static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
-    create_database(app)
-    register_routes()
-    register_blueprints(app)
+def app_setup_context(app: QuartApp) -> None:
+    """Setup application context processor."""
 
     @app.context_processor
-    async def app_wide():
+    async def app_wide() -> dict[str, Any]:
         from atr.util import is_admin
 
         return {
@@ -108,22 +110,26 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
             "is_admin": is_admin,
         }
 
+
+def app_setup_lifecycle(app: QuartApp) -> None:
+    """Setup application lifecycle hooks."""
+
     @app.before_serving
     async def startup() -> None:
         """Start services before the app starts serving requests."""
-        # Start the worker manager
         worker_manager = get_worker_manager()
         await worker_manager.start()
 
     @app.after_serving
     async def shutdown() -> None:
         """Clean up services after the app stops serving requests."""
-        # Stop the worker manager
         worker_manager = get_worker_manager()
         await worker_manager.stop()
         app.background_tasks.clear()
 
-    # Configure logging
+
+def app_setup_logging(app: QuartApp, config_mode: str, app_config: type[AppConfig]) -> None:
+    """Setup application logging."""
     logging.basicConfig(
         format="[%(asctime)s.%(msecs)03d  ] [%(process)d] [%(levelname)s] %(message)s",
         level=logging.INFO,
@@ -137,6 +143,22 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
             app.logger.info("DEBUG        = " + str(DEBUG))
             app.logger.info("ENVIRONMENT  = " + config_mode)
             app.logger.info("STATE_DIR    = " + app_config.STATE_DIR)
+
+
+def create_app(app_config: type[AppConfig]) -> QuartApp:
+    """Create and configure the application."""
+    app_dirs_setup(app_config)
+
+    app = app_create_base(app_config)
+    app_setup_api_docs(app)
+
+    create_database(app)
+    register_routes()
+    register_blueprints(app)
+
+    app_setup_context(app)
+    app_setup_lifecycle(app)
+    app_setup_logging(app, config_mode, app_config)
 
     return app
 
