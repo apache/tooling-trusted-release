@@ -42,7 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlmodel import select
-from werkzeug.datastructures import FileStorage
+from werkzeug.datastructures import FileStorage, MultiDict
 from werkzeug.wrappers.response import Response
 
 from asfquart import APP
@@ -137,25 +137,25 @@ class AsyncFileHandler(logging.Handler):
 
     async def our_worker(self):
         """Background task that writes queued log messages to file."""
-        while True:
-            record = await self.queue.get()
-            if record is None:
-                break
+        # Use a binary mode literal with aiofiles.open
+        # https://github.com/Tinche/aiofiles/blob/main/src/aiofiles/threadpool/__init__.py
+        # We should be able to use any mode, but pyright requires a binary mode
+        async with aiofiles.open(self.filename, "wb+") as f:
+            while True:
+                record = await self.queue.get()
+                if record is None:
+                    break
 
-            try:
-                # Format the log record first
-                formatted_message = self.format(record) + "\n"
-                message_bytes = formatted_message.encode(self.encoding or "utf-8")
-
-                # Use a binary mode literal with aiofiles.open
-                # https://github.com/Tinche/aiofiles/blob/main/src/aiofiles/threadpool/__init__.py
-                # We should be able to use any mode, but pyright requires a binary mode
-                async with aiofiles.open(self.filename, "wb+") as f:
+                try:
+                    # Format the log record first
+                    formatted_message = self.format(record) + "\n"
+                    message_bytes = formatted_message.encode(self.encoding or "utf-8")
                     await f.write(message_bytes)
-            except Exception:
-                self.handleError(record)
-            finally:
-                self.queue.task_done()
+                    await f.flush()
+                except Exception:
+                    self.handleError(record)
+                finally:
+                    self.queue.task_done()
 
     def emit(self, record):
         """Queue the record for writing by the worker task."""
@@ -167,9 +167,7 @@ class AsyncFileHandler(logging.Handler):
             try:
                 self.queue.put_nowait(record)
             except RuntimeError:
-                # If there's no event loop, log synchronously as fallback
-                with open(self.filename, "w", encoding=self.encoding) as f:
-                    f.write(self.format(record) + "\n")
+                ...
         except Exception:
             self.handleError(record)
 
@@ -374,8 +372,33 @@ def format_artifact_name(project_name: str, product_name: str, version: str, is_
     return f"apache-{project_name}-{product_name}-{version}"
 
 
-async def key_add_post(session: ClientSession, request: Request, user_pmcs: Sequence[PMC]) -> dict | None:
+async def get_form(request: Request) -> MultiDict:
+    # The request.form() method in Quart calls a synchronous tempfile method
+    # It calls quart.wrappers.request.form _load_form_data
+    # Which calls quart.formparser parse and parse_func and parser.parse
+    # Which calls _write which calls tempfile, which is synchronous
+    # It's getting a tempfile back from some prior call
+    # We can't just make blockbuster ignore the call because then it ignores it everywhere
+    from asfquart import APP
+
+    if APP is ...:
+        raise RuntimeError("APP is not set")
+
+    # Or quart.current_app?
+    blockbuster = APP.config["blockbuster"]
+
+    # Turn blockbuster off
+    if blockbuster is not None:
+        blockbuster.deactivate()
     form = await request.form
+    # Turn blockbuster on
+    if blockbuster is not None:
+        blockbuster.activate()
+    return form
+
+
+async def key_add_post(session: ClientSession, request: Request, user_pmcs: Sequence[PMC]) -> dict | None:
+    form = await get_form(request)
     public_key = form.get("public_key")
     if not public_key:
         raise FlashError("Public key is required")
@@ -512,7 +535,7 @@ async def package_add_artifact_info_get(
         raise FlashError("This exact file has already been uploaded to another release")
 
     # Compute SHA-512 of the artifact for the package record
-    return artifact_sha3, compute_sha512(uploads_path / artifact_sha3), artifact_size
+    return artifact_sha3, await compute_sha512(uploads_path / artifact_sha3), artifact_size
 
 
 async def package_add_post(session: ClientSession, request: Request) -> Response:
@@ -520,6 +543,7 @@ async def package_add_post(session: ClientSession, request: Request) -> Response
     try:
         release_key, artifact_file, checksum_file, signature_file, artifact_type = await package_add_validate(request)
     except FlashError as e:
+        logging.exception("FlashError:")
         await flash(f"{e!s}", "error")
         return redirect(url_for("root_package_add"))
     # This must come here to appease the type checker
@@ -537,6 +561,7 @@ async def package_add_post(session: ClientSession, request: Request) -> Response
                         db_session, release_key, artifact_file, checksum_file, signature_file
                     )
                 except FlashError as e:
+                    logging.exception("FlashError:")
                     await flash(f"{e!s}", "error")
                     return redirect(url_for("root_package_add"))
 
@@ -620,11 +645,7 @@ async def package_add_session_process(
 async def package_add_validate(
     request: Request,
 ) -> tuple[str, FileStorage, FileStorage | None, FileStorage | None, str]:
-    # This calls quart.wrappers.request.form _load_form_data
-    # Which calls quart.formparser parse and parse_func and parser.parse
-    # Which calls _write which calls tempfile, which is synchronous
-    # It's getting a tempfile back from some prior call
-    form = await request.form
+    form = await get_form(request)
 
     # TODO: Check that the submitter is a committer of the project
 
@@ -704,7 +725,7 @@ async def package_files_delete(package: Package, uploads_path: Path) -> None:
 
 async def release_add_post(session: ClientSession, request: Request) -> Response:
     """Handle POST request for creating a new release."""
-    form = await request.form
+    form = await get_form(request)
 
     project_name = form.get("project_name")
     if not project_name:
@@ -856,9 +877,7 @@ async def root_candidate_review() -> str:
         # TODO: This duplicates code in root_package_add
         release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
         release_packages = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages))
-        package_tasks = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages)).selectinload(
-            cast(InstrumentedAttribute[list[Task]], Package.tasks)
-        )
+        package_tasks = release_packages.selectinload(cast(InstrumentedAttribute[list[Task]], Package.tasks))
         release_product_line = selectinload(cast(InstrumentedAttribute[ProductLine], Release.product_line))
         statement = (
             select(Release)
@@ -918,9 +937,8 @@ async def root_download_artifact(release_key: str, artifact_sha3: str) -> Respon
 
     async with get_session() as db_session:
         # Find the package
-        release_pmc = selectinload(cast(InstrumentedAttribute[Release], Package.release)).selectinload(
-            cast(InstrumentedAttribute[PMC], Release.pmc)
-        )
+        package_release = selectinload(cast(InstrumentedAttribute[Release], Package.release))
+        release_pmc = package_release.selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
         statement = (
             select(Package)
             .where(Package.artifact_sha3 == artifact_sha3, Package.release_key == release_key)
@@ -965,9 +983,8 @@ async def root_download_signature(release_key: str, signature_sha3: str) -> Quar
 
     async with get_session() as db_session:
         # Find the package that has this signature
-        release_pmc = selectinload(cast(InstrumentedAttribute[Release], Package.release)).selectinload(
-            cast(InstrumentedAttribute[PMC], Release.pmc)
-        )
+        package_release = selectinload(cast(InstrumentedAttribute[Release], Package.release))
+        release_pmc = package_release.selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
         statement = (
             select(Package)
             .where(Package.signature_sha3 == signature_sha3, Package.release_key == release_key)
@@ -1028,8 +1045,10 @@ async def root_keys_add() -> str:
         try:
             key_info = await key_add_post(session, request, user_pmcs)
         except FlashError as e:
+            logging.exception("FlashError:")
             await flash(str(e), "error")
         except Exception as e:
+            logging.exception("Exception:")
             await flash(f"Exception: {e}", "error")
 
     return await render_template(
@@ -1049,7 +1068,7 @@ async def root_keys_delete() -> Response:
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    form = await request.form
+    form = await get_form(request)
     fingerprint = form.get("fingerprint")
     if not fingerprint:
         await flash("No key fingerprint provided", "error")
@@ -1159,7 +1178,7 @@ async def root_package_check() -> str | Response:
 
     # Get parameters from either form data (POST) or query args (GET)
     if request.method == "POST":
-        form = await request.form
+        form = await get_form(request)
         artifact_sha3 = form.get("artifact_sha3")
         release_key = form.get("release_key")
     else:
@@ -1176,6 +1195,7 @@ async def root_package_check() -> str | Response:
             try:
                 package = await package_data_get(db_session, artifact_sha3, release_key, session.uid)
             except FlashError as e:
+                logging.exception("FlashError:")
                 await flash(str(e), "error")
                 return redirect(url_for("root_candidate_review"))
 
@@ -1189,6 +1209,7 @@ async def root_package_check() -> str | Response:
                 try:
                     await task_verification_create(db_session, package)
                 except FlashError as e:
+                    logging.exception("FlashError:")
                     await flash(str(e), "error")
                     return redirect(url_for("root_candidate_review"))
 
@@ -1218,7 +1239,7 @@ async def root_package_check_restart() -> Response:
     if (session is None) or (session.uid is None):
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    form = await request.form
+    form = await get_form(request)
     artifact_sha3 = form.get("artifact_sha3")
     release_key = form.get("release_key")
 
@@ -1232,6 +1253,7 @@ async def root_package_check_restart() -> Response:
             try:
                 package = await package_data_get(db_session, artifact_sha3, release_key, session.uid)
             except FlashError as e:
+                logging.exception("FlashError:")
                 await flash(str(e), "error")
                 return redirect(url_for("root_candidate_review"))
 
@@ -1248,6 +1270,7 @@ async def root_package_check_restart() -> Response:
             try:
                 await task_verification_create(db_session, package)
             except FlashError as e:
+                logging.exception("FlashError:")
                 await flash(str(e), "error")
                 return redirect(url_for("root_candidate_review"))
 
@@ -1263,7 +1286,7 @@ async def root_package_delete() -> Response:
     if (session is None) or (session.uid is None):
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    form = await request.form
+    form = await get_form(request)
     artifact_sha3 = form.get("artifact_sha3")
     release_key = form.get("release_key")
 
@@ -1278,6 +1301,7 @@ async def root_package_delete() -> Response:
                 await package_files_delete(package, Path(get_release_storage_dir()))
                 await db_session.delete(package)
             except FlashError as e:
+                logging.exception("FlashError:")
                 await flash(str(e), "error")
                 return redirect(url_for("root_candidate_review"))
             except Exception as e:
@@ -1336,7 +1360,7 @@ async def root_release_delete() -> Response:
     if (session is None) or (session.uid is None):
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    form = await request.form
+    form = await get_form(request)
     release_key = form.get("release_key")
 
     if not release_key:
@@ -1350,6 +1374,7 @@ async def root_release_delete() -> Response:
                 await release_files_delete(release, Path(get_release_storage_dir()))
                 await db_session.delete(release)
             except FlashError as e:
+                logging.exception("FlashError:")
                 await flash(str(e), "error")
                 return redirect(url_for("root_candidate_review"))
             except Exception as e:

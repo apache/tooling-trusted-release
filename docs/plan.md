@@ -84,10 +84,10 @@ Advanced tasks, possibly deferred
 
 2. Ensure that performance is optimal
    - [DONE] Add page load timing metrics to a log
-   - Add a basic metrics dashboard
+   - [DONE] Add a basic metrics dashboard
 
 3. Increase the linting and type checking
-   - Potentially add blockbuster
+   - [DONE] Potentially add blockbuster
 
 ## Basic RC validation
 

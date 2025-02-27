@@ -21,6 +21,7 @@ from functools import cache
 from pathlib import Path
 from typing import Annotated, Any
 
+import aiofiles
 from pydantic import GetCoreSchemaHandler, TypeAdapter, create_model
 from pydantic_core import CoreSchema, core_schema
 from quart import current_app
@@ -47,12 +48,14 @@ def compute_sha3_256(file_data: bytes) -> str:
     return hashlib.sha3_256(file_data).hexdigest()
 
 
-def compute_sha512(file_path: Path) -> str:
+async def compute_sha512(file_path: Path) -> str:
     """Compute SHA-512 hash of a file."""
     sha512 = hashlib.sha512()
-    with open(file_path, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
+    async with aiofiles.open(file_path, "rb") as f:
+        chunk = await f.read(4096)
+        while chunk:
             sha512.update(chunk)
+            chunk = await f.read(4096)
     return sha512.hexdigest()
 
 

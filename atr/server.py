@@ -164,20 +164,23 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
     app_setup_lifecycle(app)
     app_setup_logging(app, config_mode, app_config)
 
-    # "I'll have a P, please, Bob."
-    blockbuster = BlockBuster()
     setup_template_preloading(app)
 
     @app.before_serving
     async def start_blockbuster() -> None:
+        # "I'll have a P, please, Bob."
+        blockbuster: BlockBuster | None = None
         if DEBUG and use_blockbuster:
-            blockbuster.activate()
+            blockbuster = BlockBuster()
+        app.config["blockbuster"] = blockbuster
+        if app.config["blockbuster"] is not None:
+            app.config["blockbuster"].activate()
             app.logger.info("Blockbuster activated to detect blocking calls")
 
     @app.after_serving
     async def stop_blockbuster() -> None:
-        if DEBUG and use_blockbuster:
-            blockbuster.deactivate()
+        if app.config["blockbuster"] is not None:
+            app.config["blockbuster"].deactivate()
             app.logger.info("Blockbuster deactivated")
 
     return app

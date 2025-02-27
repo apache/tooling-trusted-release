@@ -161,7 +161,8 @@ class WorkerManager:
 
         try:
             # Get the absolute path to the project root (i.e. atr/..)
-            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            abs_path = await asyncio.to_thread(os.path.abspath, __file__)
+            project_root = os.path.dirname(os.path.dirname(abs_path))
 
             # Ensure PYTHONPATH includes our project root
             env = os.environ.copy()

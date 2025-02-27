@@ -16,6 +16,11 @@
 # under the License.
 
 
+from collections import defaultdict
+from pathlib import Path
+from statistics import mean, median, stdev
+
+import aiofiles.os
 import httpx
 from quart import current_app, flash, redirect, render_template, request, url_for
 from sqlmodel import select
@@ -44,12 +49,89 @@ from atr.db.service import get_pmcs
 
 from . import blueprint
 
-_WHIMSY_COMMITTEE_URL = "https://whimsy.apache.org/public/committee-info.json"
-_PROJECT_PODLINGS_URL = "https://projects.apache.org/json/foundation/podlings.json"
-_PROJECT_GROUPS_URL = "https://projects.apache.org/json/foundation/groups.json"
-
 
 class FlashError(RuntimeError): ...
+
+
+@blueprint.route("/performance")
+async def secret_performance() -> str:
+    """Display performance statistics for all routes."""
+    from asfquart import APP
+
+    if APP is ...:
+        raise ASFQuartException("APP is not set", errorcode=500)
+
+    # Read and parse the performance log file
+    log_path = Path("route-performance.log")
+    # # Show current working directory and its files
+    # cwd = await asyncio.to_thread(Path.cwd)
+    # await asyncio.to_thread(APP.logger.info, "Current working directory: %s", cwd)
+    # iterable = await asyncio.to_thread(cwd.iterdir)
+    # files = list(iterable)
+    # await asyncio.to_thread(APP.logger.info, "Files in current directory: %s", files)
+    if not await aiofiles.os.path.exists(log_path):
+        await flash("No performance data currently available", "error")
+        return await render_template("secret/performance.html", stats=None)
+
+    # Parse the log file and collect statistics
+    stats = defaultdict(list)
+    async with aiofiles.open(log_path) as f:
+        async for line in f:
+            try:
+                _, _, _, methods, path, func, _, sync_ms, async_ms, total_ms = line.strip().split(" ")
+                stats[path].append(
+                    {
+                        "methods": methods,
+                        "function": func,
+                        "sync_ms": int(sync_ms),
+                        "async_ms": int(async_ms),
+                        "total_ms": int(total_ms),
+                        "timestamp": line.split(" - ")[0],
+                    }
+                )
+            except (ValueError, IndexError):
+                APP.logger.error("Error parsing line: %s", line)
+                continue
+
+    # Calculate summary statistics for each route
+    summary = {}
+    for path, timings in stats.items():
+        total_times = [int(str(t["total_ms"])) for t in timings]
+        sync_times = [int(str(t["sync_ms"])) for t in timings]
+        async_times = [int(str(t["async_ms"])) for t in timings]
+
+        summary[path] = {
+            "count": len(timings),
+            "methods": timings[0]["methods"],
+            "function": timings[0]["function"],
+            "total": {
+                "mean": mean(total_times),
+                "median": median(total_times),
+                "min": min(total_times),
+                "max": max(total_times),
+                "stdev": stdev(total_times) if len(total_times) > 1 else 0,
+            },
+            "sync": {
+                "mean": mean(sync_times),
+                "median": median(sync_times),
+                "min": min(sync_times),
+                "max": max(sync_times),
+            },
+            "async": {
+                "mean": mean(async_times),
+                "median": median(async_times),
+                "min": min(async_times),
+                "max": max(async_times),
+            },
+            "last_timestamp": timings[-1]["timestamp"],
+        }
+
+    # Sort routes by average total time, descending
+    def one_total_mean(x: tuple[str, dict]) -> float:
+        return x[1]["total"]["mean"]
+
+    sorted_summary = dict(sorted(summary.items(), key=one_total_mean, reverse=True))
+    return await render_template("secret/performance.html", stats=sorted_summary)
 
 
 @blueprint.route("/data")

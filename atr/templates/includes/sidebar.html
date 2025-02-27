@@ -79,6 +79,10 @@
             <a href="{{ url_for('secret_blueprint.secret_projects_update') }}"
                {% if request.endpoint == 'secret_blueprint.secret_projects_update' %}class="active"{% endif %}>Update projects</a>
           </li>
+          <li>
+            <a href="{{ url_for('secret_blueprint.secret_performance') }}"
+               {% if request.endpoint == 'secret_blueprint.secret_performance' %}class="active"{% endif %}>Performance dashboard</a>
+          </li>
         </ul>
       {% endif %}
     {% endif %}
