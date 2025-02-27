@@ -323,6 +323,21 @@ files = [
 ]
 
 [[package]]
+name = "blockbuster"
+version = "1.5.23"
+description = "Utility to detect blocking calls in the async event loop"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "blockbuster-1.5.23-py3-none-any.whl", hash = "sha256:cf4d9df51d0ba5ac9b0f14594a456e42b7a49dcc35819c6b36805ac285b1f6fe"},
+    {file = "blockbuster-1.5.23.tar.gz", hash = "sha256:ede6302307e700a60518c99caccfea159485382648e0158131e3506d4ff7b49c"},
+]
+
+[package.dependencies]
+forbiddenfruit = ">=0.1.4"
+
+[[package]]
 name = "boolean-py"
 version = "4.0"
 description = "Define boolean algebras, create and parse boolean expressions and create custom boolean DSL."
@@ -769,6 +784,17 @@ Werkzeug = ">=3.1"
 [package.extras]
 async = ["asgiref (>=3.2)"]
 dotenv = ["python-dotenv"]
+
+[[package]]
+name = "forbiddenfruit"
+version = "0.1.4"
+description = "Patch python built-in objects"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "forbiddenfruit-0.1.4.tar.gz", hash = "sha256:e3f7e66561a29ae129aac139a85d610dbf3dd896128187ed5454b6421f624253"},
+]
 
 [[package]]
 name = "frozenlist"
@@ -2746,4 +2772,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = "~=3.13"
-content-hash = "1a93f827762f5267884f42f4ecb06249d951e8d897e242abd9d85ad4ff6b07c0"
+content-hash = "79260867a4d15fb6f9c7eb985dae7cca7f425f6011baca8dc805615cb1b780f1"

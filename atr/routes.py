@@ -111,11 +111,84 @@ class MicrosecondsFormatter(logging.Formatter):
     default_msec_format = "%s.%03d"
 
 
+class AsyncFileHandler(logging.Handler):
+    """A logging handler that writes logs asynchronously using aiofiles."""
+
+    def __init__(self, filename, mode="w", encoding=None):
+        super().__init__()
+        self.filename = filename
+
+        if mode != "w":
+            raise RuntimeError("Only write mode is supported")
+
+        self.encoding = encoding
+        self.queue = asyncio.Queue()
+        self.our_worker_task = None
+
+    def our_worker_task_ensure(self):
+        """Lazily create the worker task if it doesn't exist and there's an event loop."""
+        if self.our_worker_task is None:
+            try:
+                loop = asyncio.get_running_loop()
+                self.our_worker_task = loop.create_task(self.our_worker())
+            except RuntimeError:
+                # No event loop running yet, try again on next emit
+                ...
+
+    async def our_worker(self):
+        """Background task that writes queued log messages to file."""
+        while True:
+            record = await self.queue.get()
+            if record is None:
+                break
+
+            try:
+                # Format the log record first
+                formatted_message = self.format(record) + "\n"
+                message_bytes = formatted_message.encode(self.encoding or "utf-8")
+
+                # Use a binary mode literal with aiofiles.open
+                # https://github.com/Tinche/aiofiles/blob/main/src/aiofiles/threadpool/__init__.py
+                # We should be able to use any mode, but pyright requires a binary mode
+                async with aiofiles.open(self.filename, "wb+") as f:
+                    await f.write(message_bytes)
+            except Exception:
+                self.handleError(record)
+            finally:
+                self.queue.task_done()
+
+    def emit(self, record):
+        """Queue the record for writing by the worker task."""
+        try:
+            # Ensure worker task is running
+            self.our_worker_task_ensure()
+
+            # Queue the record, but handle the case where no event loop is running yet
+            try:
+                self.queue.put_nowait(record)
+            except RuntimeError:
+                # If there's no event loop, log synchronously as fallback
+                with open(self.filename, "w", encoding=self.encoding) as f:
+                    f.write(self.format(record) + "\n")
+        except Exception:
+            self.handleError(record)
+
+    def close(self):
+        """Shut down the worker task cleanly."""
+        if self.our_worker_task is not None and not self.our_worker_task.done():
+            try:
+                self.queue.put_nowait(None)
+            except RuntimeError:
+                # No running event loop, no need to clean up
+                ...
+        super().close()
+
+
 # Setup a dedicated logger for route performance metrics
 route_logger = logging.getLogger("route.performance")
 # Use custom formatter that properly includes microseconds
 # TODO: Is this actually UTC?
-route_logger_handler = logging.FileHandler("route-performance.log")
+route_logger_handler = AsyncFileHandler("route-performance.log")
 route_logger_handler.setFormatter(MicrosecondsFormatter("%(asctime)s - %(message)s"))
 route_logger.addHandler(route_logger_handler)
 route_logger.setLevel(logging.INFO)
@@ -547,6 +620,10 @@ async def package_add_session_process(
 async def package_add_validate(
     request: Request,
 ) -> tuple[str, FileStorage, FileStorage | None, FileStorage | None, str]:
+    # This calls quart.wrappers.request.form _load_form_data
+    # Which calls quart.formparser parse and parse_func and parser.parse
+    # Which calls _write which calls tempfile, which is synchronous
+    # It's getting a tempfile back from some prior call
     form = await request.form
 
     # TODO: Check that the submitter is a committer of the project

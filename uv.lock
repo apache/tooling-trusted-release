@@ -190,6 +190,18 @@ wheels = [
 ]
 
 [[package]]
+name = "blockbuster"
+version = "1.5.23"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "forbiddenfruit" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/07/cd/19a5c7cef4ded0d5cab07c3df2195d8f599c33e7c18a362ce059d87ea79a/blockbuster-1.5.23.tar.gz", hash = "sha256:ede6302307e700a60518c99caccfea159485382648e0158131e3506d4ff7b49c", size = 51198 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/35/5f/7991d1f3b8d91eddabf883bc52f88f7d8c8f556be0d50ee8b0fa078be8a9/blockbuster-1.5.23-py3-none-any.whl", hash = "sha256:cf4d9df51d0ba5ac9b0f14594a456e42b7a49dcc35819c6b36805ac285b1f6fe", size = 13199 },
+]
+
+[[package]]
 name = "boolean-py"
 version = "4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -411,6 +423,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/89/50/dff6380f1c7f84135
 wheels = [
     { url = "https://files.pythonhosted.org/packages/af/47/93213ee66ef8fae3b93b3e29206f6b251e65c97bd91d8e1c5596ef15af0a/flask-3.1.0-py3-none-any.whl", hash = "sha256:d667207822eb83f1c4b50949b1623c8fc8d51f2341d65f72e1a1815397551136", size = 102979 },
 ]
+
+[[package]]
+name = "forbiddenfruit"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e6/79/d4f20e91327c98096d605646bdc6a5ffedae820f38d378d3515c42ec5e60/forbiddenfruit-0.1.4.tar.gz", hash = "sha256:e3f7e66561a29ae129aac139a85d610dbf3dd896128187ed5454b6421f624253", size = 43756 }
 
 [[package]]
 name = "frozenlist"
@@ -1176,6 +1194,7 @@ dependencies = [
     { name = "aiosqlite" },
     { name = "alembic" },
     { name = "asfquart" },
+    { name = "blockbuster" },
     { name = "cryptography" },
     { name = "greenlet" },
     { name = "httpx" },
@@ -1207,6 +1226,7 @@ requires-dist = [
     { name = "aiosqlite", specifier = ">=0.21.0,<0.22.0" },
     { name = "alembic", specifier = "~=1.14" },
     { name = "asfquart", editable = "asfquart" },
+    { name = "blockbuster", specifier = ">=1.5.23,<2.0.0" },
     { name = "cryptography", specifier = "~=44.0" },
     { name = "greenlet", specifier = ">=3.1.1,<4.0.0" },
     { name = "httpx", specifier = "~=0.27" },

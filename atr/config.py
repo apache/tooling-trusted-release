@@ -28,6 +28,8 @@ GB = 1024 * MB
 class AppConfig:
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     STATE_DIR = os.path.join(PROJECT_ROOT, "state")
+    DEBUG = False
+    USE_BLOCKBUSTER = False
 
     RELEASE_STORAGE_DIR = os.path.join(STATE_DIR, "releases")
     DATA_MODELS_FILE = data_models_file
@@ -54,13 +56,13 @@ class AppConfig:
     )
 
 
-class ProductionConfig(AppConfig):
-    DEBUG = False
+class ProductionConfig(AppConfig): ...
 
 
 class DebugConfig(AppConfig):
     DEBUG = True
     TEMPLATES_AUTO_RELOAD = True
+    USE_BLOCKBUSTER = False
 
 
 # Load all possible configurations
