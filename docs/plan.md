@@ -49,12 +49,12 @@ We aim to work on the task scheduler in parallel with the UX improvements above.
 
 1. Task runner workers
    - [DONE] Implement worker process with RLIMIT controls for CPU and RAM
+   - [DONE] Implement safe handling for compressed asset expansion
+   - [DONE] Test external tool use
    - Track the duration of tasks in milliseconds
    - Add disk usage tracking through API and psutil polling
    - Add rollback or reporting for failed tasks
    - Ensure idempotent operations where possible
-   - Implement safe handling for compressed asset expansion
-   - Test external tool use
    - Consider distinguishing between issue and error states
    - Use consistent task status values (pending, running, passed, issue, error?)
    - Add a warning task result status
@@ -83,7 +83,7 @@ Advanced tasks, possibly deferred
    - Add tests
 
 2. Ensure that performance is optimal
-   - Add page load timing metrics to a log
+   - [DONE] Add page load timing metrics to a log
    - Add a basic metrics dashboard
 
 3. Increase the linting and type checking
@@ -106,11 +106,14 @@ These tasks are dependent on the task scheduler above.
    - [DONE] Generate a basic SBOM for release artifacts
    - Store SBOMs with release metadata
    - Add SBOM management options to UI
+   - Ensure that release managers are made aware of SBOM quality and contents in the UI
+   - Add ability to upload existing SBOMs
+   - Add ability to validate uploaded SBOMs
 
 ## Advanced RC validation
 
 1. Reproducible build verification
-   - Accept upload of binary packages
+   - [DONE] Accept upload of binary packages
    - Compare built artifacts with any existing provided binary artifacts
    - Give a detailed report of differences between user provided builds
 

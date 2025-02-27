@@ -62,12 +62,12 @@
 <p>Task runner workers</p>
 <ul>
 <li>[DONE] Implement worker process with RLIMIT controls for CPU and RAM</li>
+<li>[DONE] Implement safe handling for compressed asset expansion</li>
+<li>[DONE] Test external tool use</li>
 <li>Track the duration of tasks in milliseconds</li>
 <li>Add disk usage tracking through API and psutil polling</li>
 <li>Add rollback or reporting for failed tasks</li>
 <li>Ensure idempotent operations where possible</li>
-<li>Implement safe handling for compressed asset expansion</li>
-<li>Test external tool use</li>
 <li>Consider distinguishing between issue and error states</li>
 <li>Use consistent task status values (pending, running, passed, issue, error?)</li>
 <li>Add a warning task result status</li>
@@ -110,7 +110,7 @@
 <li>
 <p>Ensure that performance is optimal</p>
 <ul>
-<li>Add page load timing metrics to a log</li>
+<li>[DONE] Add page load timing metrics to a log</li>
 <li>Add a basic metrics dashboard</li>
 </ul>
 </li>
@@ -142,9 +142,12 @@
 <li>
 <p>SBOM integration</p>
 <ul>
-<li>Generate a basic SBOM for release artifacts</li>
+<li>[DONE] Generate a basic SBOM for release artifacts</li>
 <li>Store SBOMs with release metadata</li>
 <li>Add SBOM management options to UI</li>
+<li>Ensure that release managers are made aware of SBOM quality and contents in the UI</li>
+<li>Add ability to upload existing SBOMs</li>
+<li>Add ability to validate uploaded SBOMs</li>
 </ul>
 </li>
 </ol>
@@ -153,7 +156,7 @@
 <li>
 <p>Reproducible build verification</p>
 <ul>
-<li>Accept upload of binary packages</li>
+<li>[DONE] Accept upload of binary packages</li>
 <li>Compare built artifacts with any existing provided binary artifacts</li>
 <li>Give a detailed report of differences between user provided builds</li>
 </ul>
