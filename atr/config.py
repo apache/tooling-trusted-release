@@ -16,6 +16,7 @@
 # under the License.
 
 import os
+from enum import Enum
 
 from decouple import config
 
@@ -65,8 +66,21 @@ class DebugConfig(AppConfig):
     USE_BLOCKBUSTER = False
 
 
+class ProfilingConfig(AppConfig):
+    DEBUG = False
+    TEMPLATES_AUTO_RELOAD = False
+    USE_BLOCKBUSTER = True
+
+
+class ConfigMode(Enum):
+    Debug = "Debug"
+    Production = "Production"
+    Profiling = "Profiling"
+
+
 # Load all possible configurations
 config_dict = {
-    "Debug": DebugConfig,
-    "Production": ProductionConfig,
+    ConfigMode.Debug: DebugConfig,
+    ConfigMode.Production: ProductionConfig,
+    ConfigMode.Profiling: ProfilingConfig,
 }

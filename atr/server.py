@@ -32,17 +32,21 @@ import asfquart.generics
 import asfquart.session
 from asfquart.base import QuartApp
 from atr.blueprints import register_blueprints
-from atr.config import AppConfig, DebugConfig, config_dict
+from atr.config import AppConfig, ConfigMode, config_dict
 from atr.db import create_database
 from atr.manager import get_worker_manager
 from atr.preload import setup_template_preloading
 
 # WARNING: Don't run with debug turned on in production!
-# TODO: Need to ask @tn how he wants this to work
-DEBUG: bool = config("DEBUG", default=DebugConfig.DEBUG, cast=bool)
-# Determine which configuration to use
-config_mode = "Debug" if DEBUG else "Production"
-use_blockbuster: bool = config("USE_BLOCKBUSTER", default=DebugConfig.USE_BLOCKBUSTER, cast=bool)
+DEBUG = False
+if config("PROFILING", default=False, cast=bool):
+    config_mode = ConfigMode.Profiling
+elif config("PRODUCTION", default=False, cast=bool):
+    config_mode = ConfigMode.Production
+else:
+    config_mode = ConfigMode.Debug
+    DEBUG = True
+
 
 # Avoid OIDC
 asfquart.generics.OAUTH_URL_INIT = "https://oauth.apache.org/auth?state=%s&redirect_uri=%s"
@@ -162,7 +166,7 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
 
     app_setup_context(app)
     app_setup_lifecycle(app)
-    app_setup_logging(app, config_mode, app_config)
+    app_setup_logging(app, config_mode.value, app_config)
 
     setup_template_preloading(app)
 
@@ -170,7 +174,7 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
     async def start_blockbuster() -> None:
         # "I'll have a P, please, Bob."
         blockbuster: BlockBuster | None = None
-        if DEBUG and use_blockbuster:
+        if config_mode == ConfigMode.Profiling:
             blockbuster = BlockBuster()
         app.config["blockbuster"] = blockbuster
         if app.config["blockbuster"] is not None:

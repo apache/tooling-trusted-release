@@ -32,7 +32,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import select
 
-from atr.config import config_dict
+from atr.config import ConfigMode, config_dict
 from atr.db.models import PMC, PMCKeyLink, PublicSigningKey
 
 # Configure logging
@@ -45,16 +45,8 @@ file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
 logger.addHandler(file_handler)
 
-# Import configuration
-try:
-    # Determine which configuration to use
-    from decouple import config
 
-    config_mode = "Debug" if config("DEBUG", default=True, cast=bool) else "Production"
-    app_config = config_dict[config_mode]
-except (ImportError, KeyError):
-    # Default to Debug config if there's an issue
-    app_config = config_dict["Debug"]
+app_config = config_dict[ConfigMode.Production]
 
 # Default path for Apache RAT JAR file
 DEFAULT_RAT_JAR_PATH = app_config.APACHE_RAT_JAR_PATH
