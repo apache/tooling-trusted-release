@@ -19,15 +19,19 @@
 
 import asyncio
 import datetime
+import functools
 import hashlib
+import logging
+import logging.handlers
 import pprint
 import secrets
 import shutil
 import tempfile
-from collections.abc import Sequence
+import time
+from collections.abc import Awaitable, Callable, Coroutine, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import cast
+from typing import Any, ParamSpec, TypeVar, cast
 
 import aiofiles
 import aiofiles.os
@@ -66,6 +70,13 @@ from .util import compute_sha512, get_release_storage_dir
 if APP is ...:
     raise ValueError("APP is not set")
 
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+# TODO: Should get this from config, checking debug there
+measure_performance = True
+
 # |         1 | RSA (Encrypt or Sign) [HAC]                        |
 # |         2 | RSA Encrypt-Only [HAC]                             |
 # |         3 | RSA Sign-Only [HAC]                                |
@@ -95,9 +106,124 @@ algorithms = {
 class FlashError(RuntimeError): ...
 
 
+class MicrosecondsFormatter(logging.Formatter):
+    # Answers on a postcard if you know why Python decided to use a comma by default
+    default_msec_format = "%s.%03d"
+
+
+# Setup a dedicated logger for route performance metrics
+route_logger = logging.getLogger("route.performance")
+# Use custom formatter that properly includes microseconds
+# TODO: Is this actually UTC?
+route_logger_handler = logging.FileHandler("route-performance.log")
+route_logger_handler.setFormatter(MicrosecondsFormatter("%(asctime)s - %(message)s"))
+route_logger.addHandler(route_logger_handler)
+route_logger.setLevel(logging.INFO)
+# If we don't set propagate to False then it logs to the term as well
+route_logger.propagate = False
+
+
+def app_route(path: str, methods: list[str] | None = None):
+    """Register a route with the Flask app with built-in performance logging."""
+
+    def decorator(f):
+        # First apply our performance measuring decorator
+        if measure_performance:
+            measured_func = app_route_performance_measure(path, methods)(f)
+        else:
+            measured_func = f
+        # Then apply the original route decorator
+        return APP.route(path, methods=methods)(measured_func)
+
+    return decorator
+
+
+def app_route_performance_measure(route_path: str, http_methods: list[str] | None = None) -> Callable:
+    """Decorator that measures and logs route performance with path and method information."""
+
+    # def format_time(seconds: float) -> str:
+    #     """Format time in appropriate units (µs or ms)."""
+    #     microseconds = seconds * 1_000_000
+    #     if microseconds < 1000:
+    #         return f"{microseconds:.2f} µs"
+    #     else:
+    #         milliseconds = microseconds / 1000
+    #         return f"{milliseconds:.2f} ms"
+
+    def decorator(f: Callable[P, Coroutine[Any, Any, T]]) -> Callable[P, Awaitable[T]]:
+        @functools.wraps(f)
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+            # This wrapper is based on an outstanding idea by Mostafa Farzán
+            # Farzán realised that we can step the event loop manually
+            # That way, we can also divide it into synchronous and asynchronous parts
+            # The synchronous part is done using coro.send(None)
+            # The asynchronous part is done using asyncio.sleep(0)
+            # We use two methods for measuring the async part, and take the largest
+            # This performance measurement adds a bit of overhead, about 10-20ms
+            # Therefore it should be avoided in production, or made more efficient
+            # We could perhaps use for a small portion of requests
+            blocking_time = 0.0
+            async_time = 0.0
+            loop_time = 0.0
+            total_start = time.perf_counter()
+            coro = f(*args, **kwargs)
+            try:
+                while True:
+                    # Measure the synchronous part
+                    sync_start = time.perf_counter()
+                    future = coro.send(None)
+                    sync_end = time.perf_counter()
+                    blocking_time += sync_end - sync_start
+
+                    # Measure the asynchronous part in two different ways
+                    loop = asyncio.get_running_loop()
+                    wait_start = time.perf_counter()
+                    loop_start = loop.time()
+                    while not future.done():
+                        await asyncio.sleep(0)
+                    wait_end = time.perf_counter()
+                    loop_end = loop.time()
+                    async_time += wait_end - wait_start
+                    loop_time += loop_end - loop_start
+
+                    # Raise exception if any
+                    future.result()
+            except StopIteration as e:
+                total_end = time.perf_counter()
+                total_time = total_end - total_start
+
+                methods_str = ",".join(http_methods) if http_methods else "GET"
+
+                nonblocking_time = max(async_time, loop_time)
+                # If async time is more than 10% different from loop time, log it
+                delta_symbol = "="
+                nonblocking_delta = abs(async_time - loop_time)
+                # Must check that nonblocking_time is not 0 to avoid division by zero
+                if nonblocking_time and ((nonblocking_delta / nonblocking_time) > 0.1):
+                    delta_symbol = "!"
+                route_logger.info(
+                    "%s %s %s %s %s %s %s",
+                    methods_str,
+                    route_path,
+                    f.__name__,
+                    delta_symbol,
+                    int(blocking_time * 1000),
+                    int(nonblocking_time * 1000),
+                    int(total_time * 1000),
+                )
+
+                return e.value
+
+        return wrapper
+
+    return decorator
+
+
 @asynccontextmanager
 async def ephemeral_gpg_home():
     """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
+    # TODO: This is only used in key_user_add
+    # We could even inline it there
     temp_dir = await asyncio.to_thread(tempfile.mkdtemp, prefix="gpg-")
     try:
         yield temp_dir
@@ -601,13 +727,13 @@ async def release_files_delete(release: Release, uploads_path: Path) -> None:
 # Root functions
 
 
-@APP.route("/")
+@app_route("/")
 async def root() -> str:
     """Main page."""
     return await render_template("index.html")
 
 
-@APP.route("/candidate/create", methods=["GET", "POST"])
+@app_route("/candidate/create", methods=["GET", "POST"])
 @require(Requirements.committer)
 async def root_candidate_create() -> Response | str:
     """Create a new release in the database."""
@@ -636,10 +762,12 @@ async def root_candidate_create() -> Response | str:
     )
 
 
-@APP.route("/candidate/review")
+@app_route("/candidate/review")
 @require(Requirements.committer)
 async def root_candidate_review() -> str:
     """Show all release candidates to which the user has access."""
+    # time.sleep(0.37)
+    # await asyncio.sleep(0.73)
     session = await session_read()
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
@@ -672,6 +800,8 @@ async def root_candidate_review() -> str:
             if session.uid in r.pmc.pmc_members or session.uid in r.pmc.committers:
                 user_releases.append(r)
 
+        # time.sleep(0.37)
+        # await asyncio.sleep(0.73)
         return await render_template(
             "candidate-review.html",
             releases=user_releases,
@@ -680,73 +810,125 @@ async def root_candidate_review() -> str:
         )
 
 
-# @APP.route("/candidate/signatures/verify/<release_key>")
-# @require(Requirements.committer)
-# async def root_candidate_signatures_verify(release_key: str) -> str:
-#     """Verify the signatures for all packages in a release candidate."""
-#     # TODO: This entire endpoint can be removed
-#     session = await session_read()
-#     if session is None:
-#         raise ASFQuartException("Not authenticated", errorcode=401)
+@app_route("/docs/verify/<filename>")
+@require(Requirements.committer)
+async def root_docs_verify(filename: str) -> str:
+    """Show verification instructions for an artifact."""
+    # Get query parameters
+    artifact_sha3 = request.args.get("artifact_sha3", "")
+    sha512 = request.args.get("sha512", "")
+    has_signature = request.args.get("has_signature", "false").lower() == "true"
 
-#     async with get_session() as db_session:
-#         # Get the release and its packages, and PMC with its keys
-#         release_packages = selectinload(cast(InstrumentedAttribute[list[Package]], Release.packages))
-#         release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
-#         pmc_keys_loader = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc)).selectinload(
-#             cast(InstrumentedAttribute[list[PublicSigningKey]], PMC.public_signing_keys)
-#         )
-
-#         # For now, for debugging, we'll just get all keys in the database
-#         statement = select(PublicSigningKey)
-#         # all_signing_keys = (await db_session.execute(statement)).scalars().all()
-
-#         statement = (
-#             select(Release)
-#             .options(release_packages, release_pmc, pmc_keys_loader)
-#             .where(Release.storage_key == release_key)
-#         )
-#         release = (await db_session.execute(statement)).scalar_one_or_none()
-#         if not release:
-#             raise ASFQuartException("Release not found", errorcode=404)
-
-#         # Get all ASCII-armored keys associated with the PMC
-#         # ascii_armored_keys = [key.ascii_armored_key for key in all_signing_keys]
-
-#         # Verify each package's signature
-#         verification_results = []
-#         storage_dir = Path(get_release_storage_dir())
-
-#         for package in release.packages:
-#             result = {"file": package.artifact_sha3, "filename": package.filename}
-
-#             artifact_path = storage_dir / package.artifact_sha3
-#             if package.signature_sha3 is None:
-#                 result["error"] = "No signature file provided"
-#                 verification_results.append(result)
-#                 continue
-
-#             signature_path = storage_dir / package.signature_sha3
-
-#             if not artifact_path.exists():
-#                 result["error"] = "Package artifact file not found"
-#             elif not signature_path.exists():
-#                 result["error"] = "Package signature file not found"
-#             else:
-#                 # Verify the signature
-#                 result = {}
-#                 # await verify_gpg_signature(artifact_path, signature_path, ascii_armored_keys)
-#                 result["file"] = package.artifact_sha3
-#                 result["filename"] = package.filename
-
-#             verification_results.append(result)
-
-#         return await render_template(
-#             "candidate-signature-verify.html", release=release, verification_results=verification_results
-#         )
+    # Return the template
+    return await render_template(
+        "docs-verify.html",
+        filename=filename,
+        artifact_sha3=artifact_sha3,
+        sha512=sha512,
+        has_signature=has_signature,
+    )
 
 
-@APP.route("/keys/add", methods=["GET", "POST"])
+@app_route("/download/<release_key>/<artifact_sha3>")
+@require(Requirements.committer)
+async def root_download_artifact(release_key: str, artifact_sha3: str) -> Response | QuartResponse:
+    """Download an artifact file."""
+    # TODO: This function is very similar to the signature download function
+    # We should probably extract the common code into a helper function
+    session = await session_read()
+    if (session is None) or (session.uid is None):
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    async with get_session() as db_session:
+        # Find the package
+        release_pmc = selectinload(cast(InstrumentedAttribute[Release], Package.release)).selectinload(
+            cast(InstrumentedAttribute[PMC], Release.pmc)
+        )
+        statement = (
+            select(Package)
+            .where(Package.artifact_sha3 == artifact_sha3, Package.release_key == release_key)
+            .options(release_pmc)
+        )
+        result = await db_session.execute(statement)
+        package = result.scalar_one_or_none()
+
+        if not package:
+            await flash("Artifact not found", "error")
+            return redirect(url_for("root_candidate_review"))
+
+        # Check permissions
+        if package.release and package.release.pmc:
+            if (session.uid not in package.release.pmc.pmc_members) and (
+                session.uid not in package.release.pmc.committers
+            ):
+                await flash("You don't have permission to download this file", "error")
+                return redirect(url_for("root_candidate_review"))
+
+        # Construct file path
+        file_path = Path(get_release_storage_dir()) / artifact_sha3
+
+        # Check that the file exists
+        if not await aiofiles.os.path.exists(file_path):
+            await flash("Artifact file not found", "error")
+            return redirect(url_for("root_candidate_review"))
+
+        # Send the file with original filename
+        return await send_file(
+            file_path, as_attachment=True, attachment_filename=package.filename, mimetype="application/octet-stream"
+        )
+
+
+@app_route("/download/signature/<release_key>/<signature_sha3>")
+@require(Requirements.committer)
+async def root_download_signature(release_key: str, signature_sha3: str) -> QuartResponse | Response:
+    """Download a signature file."""
+    session = await session_read()
+    if (session is None) or (session.uid is None):
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    async with get_session() as db_session:
+        # Find the package that has this signature
+        release_pmc = selectinload(cast(InstrumentedAttribute[Release], Package.release)).selectinload(
+            cast(InstrumentedAttribute[PMC], Release.pmc)
+        )
+        statement = (
+            select(Package)
+            .where(Package.signature_sha3 == signature_sha3, Package.release_key == release_key)
+            .options(release_pmc)
+        )
+        result = await db_session.execute(statement)
+        package = result.scalar_one_or_none()
+
+        if not package:
+            await flash("Signature not found", "error")
+            return redirect(url_for("root_candidate_review"))
+
+        # Check permissions
+        if package.release and package.release.pmc:
+            if (session.uid not in package.release.pmc.pmc_members) and (
+                session.uid not in package.release.pmc.committers
+            ):
+                await flash("You don't have permission to download this file", "error")
+                return redirect(url_for("root_candidate_review"))
+
+        # Construct file path
+        file_path = Path(get_release_storage_dir()) / signature_sha3
+
+        # Check that the file exists
+        if not await aiofiles.os.path.exists(file_path):
+            await flash("Signature file not found", "error")
+            return redirect(url_for("root_candidate_review"))
+
+        # Send the file with original filename and .asc extension
+        return await send_file(
+            file_path,
+            as_attachment=True,
+            attachment_filename=f"{package.filename}.asc",
+            mimetype="application/pgp-signature",
+        )
+
+
+@app_route("/keys/add", methods=["GET", "POST"])
 @require(Requirements.committer)
 async def root_keys_add() -> str:
     """Add a new public signing key to the user's account."""
@@ -782,7 +964,7 @@ async def root_keys_add() -> str:
     )
 
 
-@APP.route("/keys/delete", methods=["POST"])
+@app_route("/keys/delete", methods=["POST"])
 @require(Requirements.committer)
 async def root_keys_delete() -> Response:
     """Delete a public signing key from the user's account."""
@@ -815,7 +997,7 @@ async def root_keys_delete() -> Response:
     return redirect(url_for("root_keys_review"))
 
 
-@APP.route("/keys/review")
+@app_route("/keys/review")
 @require(Requirements.committer)
 async def root_keys_review() -> str:
     """Show all keys associated with the user's account."""
@@ -843,7 +1025,7 @@ async def root_keys_review() -> str:
     )
 
 
-@APP.route("/package/add", methods=["GET", "POST"])
+@app_route("/package/add", methods=["GET", "POST"])
 @require(Requirements.committer)
 async def root_package_add() -> Response | str:
     """Add package artifacts to an existing release."""
@@ -890,7 +1072,7 @@ async def root_package_add() -> Response | str:
     )
 
 
-@APP.route("/package/check", methods=["GET", "POST"])
+@app_route("/package/check", methods=["GET", "POST"])
 @require(Requirements.committer)
 async def root_package_check() -> str | Response:
     """Show or create package verification tasks."""
@@ -951,7 +1133,7 @@ async def root_package_check() -> str | Response:
                 )
 
 
-@APP.route("/package/check/restart", methods=["POST"])
+@app_route("/package/check/restart", methods=["POST"])
 @require(Requirements.committer)
 async def root_package_check_restart() -> Response:
     """Restart package verification tasks."""
@@ -996,7 +1178,7 @@ async def root_package_check_restart() -> Response:
             return redirect(url_for("root_package_check", artifact_sha3=artifact_sha3, release_key=release_key))
 
 
-@APP.route("/package/delete", methods=["POST"])
+@app_route("/package/delete", methods=["POST"])
 @require(Requirements.committer)
 async def root_package_delete() -> Response:
     """Delete a package from a release candidate."""
@@ -1029,14 +1211,14 @@ async def root_package_delete() -> Response:
     return redirect(url_for("root_candidate_review"))
 
 
-@APP.route("/project/directory")
+@app_route("/project/directory")
 async def root_project_directory() -> str:
     """Main project directory page."""
     projects = await get_pmcs()
     return await render_template("project-directory.html", projects=projects)
 
 
-@APP.route("/project/list")
+@app_route("/project/list")
 async def root_project_list() -> list[dict]:
     """List all projects in the database."""
     pmcs = await get_pmcs()
@@ -1053,7 +1235,7 @@ async def root_project_list() -> list[dict]:
     ]
 
 
-@APP.route("/project/<project_name>")
+@app_route("/project/<project_name>")
 async def root_project_project_name(project_name: str) -> dict:
     """Get a specific project by project name."""
     pmc = await get_pmc_by_name(project_name)
@@ -1069,7 +1251,7 @@ async def root_project_project_name(project_name: str) -> dict:
     }
 
 
-@APP.route("/release/delete", methods=["POST"])
+@app_route("/release/delete", methods=["POST"])
 @require(Requirements.committer)
 async def root_release_delete() -> Response:
     """Delete a release and all its associated packages."""
@@ -1180,121 +1362,3 @@ async def task_verification_create(db_session: AsyncSession, package: Package) -
         db_session.add(task)
 
     return tasks
-
-
-@APP.route("/download/<release_key>/<artifact_sha3>")
-@require(Requirements.committer)
-async def root_download_artifact(release_key: str, artifact_sha3: str) -> Response | QuartResponse:
-    """Download an artifact file."""
-    # TODO: This function is very similar to the signature download function
-    # We should probably extract the common code into a helper function
-    session = await session_read()
-    if (session is None) or (session.uid is None):
-        raise ASFQuartException("Not authenticated", errorcode=401)
-
-    async with get_session() as db_session:
-        # Find the package
-        release_pmc = selectinload(cast(InstrumentedAttribute[Release], Package.release)).selectinload(
-            cast(InstrumentedAttribute[PMC], Release.pmc)
-        )
-        statement = (
-            select(Package)
-            .where(Package.artifact_sha3 == artifact_sha3, Package.release_key == release_key)
-            .options(release_pmc)
-        )
-        result = await db_session.execute(statement)
-        package = result.scalar_one_or_none()
-
-        if not package:
-            await flash("Artifact not found", "error")
-            return redirect(url_for("root_candidate_review"))
-
-        # Check permissions
-        if package.release and package.release.pmc:
-            if (session.uid not in package.release.pmc.pmc_members) and (
-                session.uid not in package.release.pmc.committers
-            ):
-                await flash("You don't have permission to download this file", "error")
-                return redirect(url_for("root_candidate_review"))
-
-        # Construct file path
-        file_path = Path(get_release_storage_dir()) / artifact_sha3
-
-        # Check that the file exists
-        if not await aiofiles.os.path.exists(file_path):
-            await flash("Artifact file not found", "error")
-            return redirect(url_for("root_candidate_review"))
-
-        # Send the file with original filename
-        return await send_file(
-            file_path, as_attachment=True, attachment_filename=package.filename, mimetype="application/octet-stream"
-        )
-
-
-@APP.route("/download/signature/<release_key>/<signature_sha3>")
-@require(Requirements.committer)
-async def root_download_signature(release_key: str, signature_sha3: str) -> QuartResponse | Response:
-    """Download a signature file."""
-    session = await session_read()
-    if (session is None) or (session.uid is None):
-        raise ASFQuartException("Not authenticated", errorcode=401)
-
-    async with get_session() as db_session:
-        # Find the package that has this signature
-        release_pmc = selectinload(cast(InstrumentedAttribute[Release], Package.release)).selectinload(
-            cast(InstrumentedAttribute[PMC], Release.pmc)
-        )
-        statement = (
-            select(Package)
-            .where(Package.signature_sha3 == signature_sha3, Package.release_key == release_key)
-            .options(release_pmc)
-        )
-        result = await db_session.execute(statement)
-        package = result.scalar_one_or_none()
-
-        if not package:
-            await flash("Signature not found", "error")
-            return redirect(url_for("root_candidate_review"))
-
-        # Check permissions
-        if package.release and package.release.pmc:
-            if (session.uid not in package.release.pmc.pmc_members) and (
-                session.uid not in package.release.pmc.committers
-            ):
-                await flash("You don't have permission to download this file", "error")
-                return redirect(url_for("root_candidate_review"))
-
-        # Construct file path
-        file_path = Path(get_release_storage_dir()) / signature_sha3
-
-        # Check that the file exists
-        if not await aiofiles.os.path.exists(file_path):
-            await flash("Signature file not found", "error")
-            return redirect(url_for("root_candidate_review"))
-
-        # Send the file with original filename and .asc extension
-        return await send_file(
-            file_path,
-            as_attachment=True,
-            attachment_filename=f"{package.filename}.asc",
-            mimetype="application/pgp-signature",
-        )
-
-
-@APP.route("/docs/verify/<filename>")
-@require(Requirements.committer)
-async def root_docs_verify(filename: str) -> str:
-    """Show verification instructions for an artifact."""
-    # Get query parameters
-    artifact_sha3 = request.args.get("artifact_sha3", "")
-    sha512 = request.args.get("sha512", "")
-    has_signature = request.args.get("has_signature", "false").lower() == "true"
-
-    # Return the template
-    return await render_template(
-        "docs-verify.html",
-        filename=filename,
-        artifact_sha3=artifact_sha3,
-        sha512=sha512,
-        has_signature=has_signature,
-    )
