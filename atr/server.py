@@ -62,11 +62,20 @@ class ApiOnlyOpenAPIProvider(OpenAPIProvider):
                 yield rule
 
 
-def register_routes() -> str:
-    from . import routes
+def register_routes() -> tuple[str, ...]:
+    from atr.routes import candidate, docs, download, keys, package, project, release, root
 
-    # Must do this otherwise ruff "fixes" this function by removing the import.
-    return routes.__name__
+    # Must do this otherwise ruff "fixes" this function by removing the imports
+    return (
+        candidate.__name__,
+        docs.__name__,
+        download.__name__,
+        keys.__name__,
+        package.__name__,
+        project.__name__,
+        release.__name__,
+        root.__name__,
+    )
 
 
 def create_config() -> type[AppConfig]:
