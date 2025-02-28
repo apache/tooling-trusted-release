@@ -44,11 +44,12 @@ RUN curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | 
 RUN sed -i "s%ATR-VERSION%${VERSION}%" atr/templates/includes/footer.html
 RUN rm -rf .venv-*
 RUN make sync PYTHON="$(which python3)"
-RUN make certs
 EXPOSE 8080
 
 RUN printf '#!/bin/sh\n\
-mkdir -p /opt/atr/state\n\
+cd /opt/atr\n\
+test -d /opt/atr/state || mkdir -p /opt/atr/state\n\
+make certs\n\
 cp /tmp/apache-rat/apache-rat-0.16.1.jar /opt/atr/state/\n\
 echo "Copied Apache RAT JAR to state directory:"\n\
 ls -la /opt/atr/state/apache-rat-0.16.1.jar\n\

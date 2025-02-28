@@ -678,10 +678,10 @@ async def package_add_validate(
 async def package_data_get(db_session: AsyncSession, artifact_sha3: str, release_key: str, session_uid: str) -> Package:
     """Validate package deletion request and return the package if valid."""
     # Get the package and its associated release
-    if Package.release is None:
-        raise FlashError("Package has no associated release")
-    if Release.pmc is None:
-        raise FlashError("Release has no associated PMC")
+    # if Package.release is None:
+    #     raise FlashError("Package has no associated release")
+    # if Release.pmc is None:
+    #     raise FlashError("Release has no associated PMC")
 
     pkg_release = cast(InstrumentedAttribute[Release], Package.release)
     rel_pmc = cast(InstrumentedAttribute[PMC], Release.pmc)
@@ -794,8 +794,8 @@ async def release_add_post(session: ClientSession, request: Request) -> Response
 
 async def release_delete_validate(db_session: AsyncSession, release_key: str, session_uid: str) -> Release:
     """Validate release deletion request and return the release if valid."""
-    if Release.pmc is None:
-        raise FlashError("Release has no associated PMC")
+    # if Release.pmc is None:
+    #     raise FlashError("Release has no associated PMC")
 
     rel_pmc = cast(InstrumentedAttribute[PMC], Release.pmc)
     statement = select(Release).options(selectinload(rel_pmc)).where(Release.storage_key == release_key)
@@ -807,7 +807,7 @@ async def release_delete_validate(db_session: AsyncSession, release_key: str, se
 
     # Check permissions
     if release.pmc:
-        if session_uid not in release.pmc.pmc_members and session_uid not in release.pmc.committers:
+        if (session_uid not in release.pmc.pmc_members) and (session_uid not in release.pmc.committers):
             raise FlashError("You don't have permission to delete this release")
 
     return release

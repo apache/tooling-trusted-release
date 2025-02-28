@@ -42,11 +42,12 @@ COPY . /opt/atr
 RUN sed -i "s%ATR-VERSION%${VERSION}%" atr/templates/includes/footer.html
 RUN rm -rf .venv-*
 RUN make sync PYTHON="$(find /usr/bin -name python3.13 | head -n 1)"
-RUN make certs
 EXPOSE 8080
 
 RUN printf '#!/bin/sh\n\
-mkdir -p /opt/atr/state\n\
+cd /opt/atr\n\
+test -d /opt/atr/state || mkdir -p /opt/atr/state\n\
+make certs\n\
 cp /tmp/apache-rat/apache-rat-0.16.1.jar /opt/atr/state/\n\
 echo "Copied Apache RAT JAR to state directory:"\n\
 ls -la /opt/atr/state/apache-rat-0.16.1.jar\n\
