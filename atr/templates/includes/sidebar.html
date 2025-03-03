@@ -18,17 +18,19 @@
       </div>
       <a href="#"
          onclick="location.href='/auth?logout=/';"
-         class="logout-link">Logout</a>
+         class="logout-link"><i class="fa-solid fa-right-from-bracket"></i></a>
     {% else %}
+
       <a href="#"
          onclick="location.href='/auth?login=' + window.location.pathname;"
-         class="login-link">Login</a>
+         class="login-link">Login&nbsp;<i class="fa-solid fa-right-to-bracket"></i></a>
     {% endif %}
   </div>
   <nav>
     <h3>Main pages</h3>
     <ul>
       <li>
+        <i class="fa-solid fa-house"></i>
         <a href="{{ url_for('root') }}"
            {% if request.endpoint == 'root' %}class="active"{% endif %}>About ATR</a>
       </li>
