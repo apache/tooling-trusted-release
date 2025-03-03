@@ -267,22 +267,6 @@ def task_verify_rat_license(args: list[str]) -> tuple[str, str | None, tuple[Any
     return status, error, task_results
 
 
-def task_generate_spdx_sbom(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
-    """Process generate_spdx_sbom task to create an SPDX SBOM."""
-    # First argument should be the artifact path
-    artifact_path = args[0]
-
-    task_results = task_process_wrap(verify.sbom_spdx_generate(artifact_path))
-    logger.info(f"Generated SPDX SBOM for {artifact_path}")
-
-    # Check whether the generation was successful
-    result = task_results[0]
-    if not result.get("valid", False):
-        return "FAILED", result.get("message", "SBOM generation failed"), task_results
-
-    return "COMPLETED", None, task_results
-
-
 def task_generate_cyclonedx_sbom(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
     """Process generate_cyclonedx_sbom task to create a CycloneDX SBOM."""
     # First argument should be the artifact path
@@ -314,7 +298,6 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
             "verify_signature": task_verify_signature,
             "verify_license_headers": task_verify_license_headers,
             "verify_rat_license": task_verify_rat_license,
-            # "generate_spdx_sbom": task_generate_spdx_sbom,
             "generate_cyclonedx_sbom": task_generate_cyclonedx_sbom,
         }
 

@@ -1,9 +1,0 @@
-from beartype.typing import Any, Union
-from license_expression import LicenseExpression
-from boolean.boolean import Expression as BooleanExpression
-
-class Expression(BooleanExpression): ...
-
-class SpdxExpression(Expression): ...
-
-def parse(expression: str) -> LicenseExpression: ...

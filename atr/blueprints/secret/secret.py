@@ -50,9 +50,6 @@ from atr.db.service import get_pmcs
 from . import blueprint
 
 
-class FlashError(RuntimeError): ...
-
-
 @blueprint.route("/performance")
 async def secret_performance() -> str:
     """Display performance statistics for all routes."""
