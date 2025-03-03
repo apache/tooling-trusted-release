@@ -133,6 +133,10 @@ warn_unused_ignores = true
 module = "asfquart.*"
 ignore_errors = true
 
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
+
 [tool.djlint]
 profile = "jinja"
 extension = "html"
