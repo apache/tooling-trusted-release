@@ -177,7 +177,9 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
     app_setup_lifecycle(app)
     app_setup_logging(app, config_mode.value, app_config)
 
-    setup_template_preloading(app)
+    # do not enable template pre-loading if we explicitly want to reload templates
+    if not app_config.TEMPLATES_AUTO_RELOAD:
+        setup_template_preloading(app)
 
     @app.before_serving
     async def start_blockbuster() -> None:

@@ -30,6 +30,7 @@ class AppConfig:
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     STATE_DIR = os.path.join(PROJECT_ROOT, "state")
     DEBUG = False
+    TEMPLATES_AUTO_RELOAD = False
     USE_BLOCKBUSTER = False
 
     RELEASE_STORAGE_DIR = os.path.join(STATE_DIR, "releases")
