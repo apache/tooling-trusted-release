@@ -74,16 +74,16 @@
         <h3>Administration</h3>
         <ul>
           <li>
-            <a href="{{ url_for('secret_blueprint.secret_data') }}"
-               {% if request.endpoint == 'secret_blueprint.secret_data' %}class="active"{% endif %}>Browse database</a>
+            <a href="{{ url_for('admin.admin_data') }}"
+               {% if request.endpoint == 'admin.admin_data' %}class="active"{% endif %}>Browse database</a>
           </li>
           <li>
-            <a href="{{ url_for('secret_blueprint.secret_projects_update') }}"
-               {% if request.endpoint == 'secret_blueprint.secret_projects_update' %}class="active"{% endif %}>Update projects</a>
+            <a href="{{ url_for('admin.admin_projects_update') }}"
+               {% if request.endpoint == 'admin.admin_projects_update' %}class="active"{% endif %}>Update projects</a>
           </li>
           <li>
-            <a href="{{ url_for('secret_blueprint.secret_performance') }}"
-               {% if request.endpoint == 'secret_blueprint.secret_performance' %}class="active"{% endif %}>Performance dashboard</a>
+            <a href="{{ url_for('admin.admin_performance') }}"
+               {% if request.endpoint == 'admin.admin_performance' %}class="active"{% endif %}>Performance dashboard</a>
           </li>
         </ul>
       {% endif %}

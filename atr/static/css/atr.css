@@ -125,7 +125,7 @@ pre {
 }
 
 footer {
-  padding: 2rem;
+  padding: 1rem;
   background: #eeeeee;
   font-size: 15px;
   margin: 2rem;
@@ -133,16 +133,22 @@ footer {
   font-variation-settings: "opsz" 14;
   border-radius: 0.5rem;
   border: 2px solid #d1d2d3;
+  display: table;
+  text-align: center;
 }
 
 footer a {
-    color: #333333;
-    font-weight: 425;
+  color: #333333;
+  font-weight: 425;
 }
 
 footer a:visited {
-    color: #333333;
-    font-weight: 425;
+  color: #333333;
+  font-weight: 425;
+}
+
+footer p {
+  margin-bottom: 0;
 }
 
 button {
@@ -366,4 +372,8 @@ span.warning {
     background-color: #d4edda;
     border: 1px solid #c3e6cb;
     color: #155724;
+}
+
+.admin-content {
+  box-shadow:inset 0 0 0 10px #dc3545;
 }

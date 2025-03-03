@@ -42,7 +42,7 @@
 
         {% include "includes/sidebar.html" %}
 
-        <div class="main-container">
+        <div class="main-container {% block main_class %}{% endblock main_class %}">
           <main class="main-content">
             <div class="warning-banner">
               <strong>Pre-release Software:</strong> ATR is actively being developed. You cannot make releases.

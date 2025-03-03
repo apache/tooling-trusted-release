@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+"""Any routes related to the admin interface of the ATR."""
+
 from quart import Blueprint
 
 from asfquart.auth import Requirements, require
@@ -22,7 +24,7 @@ from asfquart.base import ASFQuartException
 from asfquart.session import read as session_read
 from atr.util import get_admin_users
 
-blueprint = Blueprint("secret_blueprint", __name__, url_prefix="/secret")
+blueprint = Blueprint("admin", __name__, url_prefix="/admin", template_folder="templates")
 
 
 @blueprint.before_request

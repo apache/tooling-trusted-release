@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-
 from collections import defaultdict
 from pathlib import Path
 from statistics import mean, median, stdev
@@ -51,7 +50,7 @@ from . import blueprint
 
 
 @blueprint.route("/performance")
-async def secret_performance() -> str:
+async def admin_performance() -> str:
     """Display performance statistics for all routes."""
     from asfquart import APP
 
@@ -68,7 +67,7 @@ async def secret_performance() -> str:
     # await asyncio.to_thread(APP.logger.info, "Files in current directory: %s", files)
     if not await aiofiles.os.path.exists(log_path):
         await flash("No performance data currently available", "error")
-        return await render_template("secret/performance.html", stats=None)
+        return await render_template("performance.html", stats=None)
 
     # Parse the log file and collect statistics
     stats = defaultdict(list)
@@ -128,12 +127,12 @@ async def secret_performance() -> str:
         return x[1]["total"]["mean"]
 
     sorted_summary = dict(sorted(summary.items(), key=one_total_mean, reverse=True))
-    return await render_template("secret/performance.html", stats=sorted_summary)
+    return await render_template("performance.html", stats=sorted_summary)
 
 
 @blueprint.route("/data")
 @blueprint.route("/data/<model>")
-async def secret_data(model: str = "PMC") -> str:
+async def admin_data(model: str = "PMC") -> str:
     """Browse all records in the database."""
 
     # Map of model names to their classes
@@ -173,13 +172,11 @@ async def secret_data(model: str = "PMC") -> str:
                         record_dict[key] = getattr(record, key)
             records_dict.append(record_dict)
 
-        return await render_template(
-            "secret/data-browser.html", models=list(models.keys()), model=model, records=records_dict
-        )
+        return await render_template("data-browser.html", models=list(models.keys()), model=model, records=records_dict)
 
 
 @blueprint.route("/projects/update", methods=["GET", "POST"])
-async def secret_projects_update() -> str | Response:
+async def admin_projects_update() -> str | Response:
     """Update projects from remote data."""
     if request.method == "POST":
         try:
@@ -188,7 +185,7 @@ async def secret_projects_update() -> str | Response:
             groups_data = await get_groups_data()
         except httpx.RequestError as e:
             await flash(f"Failed to fetch data: {e!s}", "error")
-            return redirect(url_for("secret_blueprint.secret_projects_update"))
+            return redirect(url_for("admin.admin_projects_update"))
 
         updated_count = 0
 
@@ -265,21 +262,21 @@ async def secret_projects_update() -> str | Response:
         except Exception as e:
             await flash(f"Failed to update projects: {e!s}", "error")
 
-        return redirect(url_for("secret_blueprint.secret_projects_update"))
+        return redirect(url_for("admin.admin_projects_update"))
 
     # For GET requests, show the update form
-    return await render_template("secret/update-pmcs.html")
+    return await render_template("update-pmcs.html")
 
 
 @blueprint.route("/debug/database")
-async def secret_debug_database() -> str:
+async def admin_debug_database() -> str:
     """Debug information about the database."""
     pmcs = await get_pmcs()
     return f"Database using {current_app.config['DATA_MODELS_FILE']} has {len(pmcs)} PMCs"
 
 
 @blueprint.route("/keys/delete-all")
-async def secret_keys_delete_all() -> str:
+async def admin_keys_delete_all() -> str:
     """Debug endpoint to delete all of a user's keys."""
     session = await session_read()
     if session is None:

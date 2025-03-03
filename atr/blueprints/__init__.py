@@ -20,7 +20,7 @@ from importlib.util import find_spec
 
 from asfquart.base import QuartApp
 
-_BLUEPRINT_MODULES = ["api", "secret"]
+_BLUEPRINT_MODULES = ["api", "admin"]
 
 
 def register_blueprints(app: QuartApp) -> None:

@@ -1,4 +1,4 @@
-{% extends "layouts/base.html" %}
+{% extends "layouts/base-admin.html" %}
 
 {% block title %}
   Data browser ~ ATR
@@ -70,7 +70,7 @@
 
   <div class="model-nav">
     {% for model_name in models %}
-      <a href="{{ url_for('secret_blueprint.secret_data', model=model_name) }}"
+      <a href="{{ url_for('admin.admin_data', model=model_name) }}"
          {% if model == model_name %}class="active"{% endif %}>{{ model_name }}</a>
     {% endfor %}
   </div>
