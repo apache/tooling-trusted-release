@@ -1,0 +1,41 @@
+{
+  "last_updated": "2025-02-19 21:57:21 UTC",
+  "committee_count": 1,
+  "pmc_count": 1,
+  "committees": {
+    "tooling": {
+      "display_name": "Tooling",
+      "site": "http://tooling.apache.org/",
+      "description": "tools, tools, tools",
+      "mail_list": "tooling",
+      "established": "01/2025",
+      "report": [
+        "January",
+        "April",
+        "July",
+        "October"
+      ],
+      "chair": {
+        "wave": {
+          "name": "Dave Fisher"
+        }
+      },
+      "roster_count": 3,
+      "roster": {
+        "wave": {
+          "name": "Dave Fisher",
+          "date": "2025-01-01"
+        },
+        "sbp": {
+          "name": "Sean B. Palmer",
+          "date": "2025-02-01"
+        },
+        "tn": {
+          "name": "Thomas Neidhart",
+          "date": "2025-03-01"
+        }
+      },
+      "pmc": true
+    }
+  }
+}

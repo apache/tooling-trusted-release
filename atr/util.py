@@ -16,6 +16,7 @@
 # under the License.
 
 import hashlib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
@@ -63,6 +64,10 @@ def _get_dict_to_list_inner_type_adapter(source_type: Any, key: str) -> TypeAdap
     root_adapter = TypeAdapter(source_type)
     schema = root_adapter.core_schema
 
+    # support further nesting of model classes
+    if schema["type"] == "definitions":
+        schema = schema["schema"]
+
     assert schema["type"] == "list"
     assert (item_schema := schema["items_schema"])
     assert item_schema["type"] == "model"
@@ -80,9 +85,21 @@ def _get_dict_to_list_inner_type_adapter(source_type: Any, key: str) -> TypeAdap
 
 def _get_dict_to_list_validator(inner_adapter: TypeAdapter[dict[Any, Any]], key: str) -> Any:
     def validator(val: Any) -> Any:
+        from pydantic.fields import FieldInfo
+
         if isinstance(val, dict):
             validated = inner_adapter.validate_python(val)
-            return [{key: k, **{f: getattr(v, f) for f in v.model_fields}} for k, v in validated.items()]
+
+            # need to get the alias of the field in the nested model
+            # as this will be fed into the actual model class
+            def get_alias(field_name: str, field_infos: Mapping[str, FieldInfo]) -> Any:
+                field = field_infos[field_name]
+                return field.alias if field.alias else field_name
+
+            return [
+                {key: k, **{get_alias(f, v.model_fields): getattr(v, f) for f in v.model_fields}}
+                for k, v in validated.items()
+            ]
 
         return val
 

@@ -1,0 +1,11 @@
+{
+  "last_updated": "2025-02-19 21:57:21 UTC",
+  "retired_count": 1,
+  "retired": {
+    "abdera": {
+      "display_name": "Abdera",
+      "description": "blablabla",
+      "retired": "2017-03"
+    }
+  }
+}

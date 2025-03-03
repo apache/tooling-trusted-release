@@ -1,0 +1,10 @@
+{
+  "amoro": {
+    "description": "Amoro is a Lakehouse management system built on open data lake formats like Apache Iceberg and Apache Paimon.",
+    "homepage": "http://amoro.incubator.apache.org/",
+    "name": "Apache Amoro (Incubating)",
+    "pmc": "incubator",
+    "podling": true,
+    "started": "2024-03"
+  }
+}

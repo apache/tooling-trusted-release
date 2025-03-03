@@ -28,10 +28,10 @@ from werkzeug.wrappers.response import Response
 
 from asfquart.base import ASFQuartException
 from asfquart.session import read as session_read
-from atr.apache import (
+from atr.datasources.apache import (
+    get_current_podlings_data,
     get_groups_data,
-    get_ldap_projects_data,
-    get_podlings_data,
+    get_projects_data,
 )
 from atr.db import get_session
 from atr.db.models import (
@@ -186,8 +186,8 @@ async def secret_projects_update() -> str | Response:
     """Update projects from remote data."""
     if request.method == "POST":
         try:
-            apache_projects = await get_ldap_projects_data()
-            podlings_data = await get_podlings_data()
+            apache_projects = await get_projects_data()
+            podlings_data = await get_current_podlings_data()
             groups_data = await get_groups_data()
         except httpx.RequestError as e:
             await flash(f"Failed to fetch data: {e!s}", "error")
