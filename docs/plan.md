@@ -12,6 +12,7 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
    - [DONE] Allow package deletion
    - [DONE] Allow RCs to be deleted
    - [DONE] Move signature verification to a task runner
+   - Add methods to allow the bulk addition of RC artifacts
 
 2. Enhance RC display
    - [DONE] Augment raw file hashes with the original filenames in the UI
@@ -37,6 +38,9 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
    - Add progress indicators for release phases
    - Show current blockers and required actions
    - Add quick actions for release managers
+
+5. General website improvements
+   - Add orienting style or features to improve navigability
 
 Advanced tasks, possibly deferred
    - Implement a key revocation workflow
@@ -86,8 +90,9 @@ Advanced tasks, possibly deferred
    - [DONE] Add page load timing metrics to a log
    - [DONE] Add a basic metrics dashboard
 
-3. Increase the linting and type checking
+3. Increase the linting, type checking, and other QA
    - [DONE] Potentially add blockbuster
+   - Create website UX integration tests using a browser driver
 
 ## Basic RC validation
 
