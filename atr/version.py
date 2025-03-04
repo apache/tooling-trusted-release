@@ -18,7 +18,7 @@
 import os
 
 
-def _get_development_version() -> tuple[str, str] | None:
+def get_development_version() -> tuple[str, str] | None:
     """Returns the version when within a development environment."""
 
     try:
@@ -29,7 +29,10 @@ def _get_development_version() -> tuple[str, str] | None:
         return None
 
     try:
-        version = Version.from_git()
+        from pathlib import Path
+
+        # We start in state/, so we need to go up one level
+        version = Version.from_git(path=Path(".."))
         if version.distance > 0:
             return version.serialize(format="v{base}+{distance}.{commit}", bump=True), version.serialize(
                 format="{commit}"
@@ -41,12 +44,15 @@ def _get_development_version() -> tuple[str, str] | None:
         return None
 
 
-def _get_version_from_env() -> tuple[str, str | None]:
+def get_version_from_env() -> tuple[str, str | None]:
     """Returns the version from an environment variable."""
 
-    return os.environ.get("VERSION", "undefined"), os.environ.get("COMMIT")
+    # Use the commit where dunamai was added by default
+    # TODO: Use a better default value
+    return os.environ.get("VERSION", "undefined"), os.environ.get("COMMIT", "4e5bff1")
 
 
 # Try to determine the version from a development environment first.
 # If this fails, try to get it from environment variables that are set when building a docker image.
-__version__, __commit__ = _get_development_version() or _get_version_from_env()
+# We don't use __version__ and __commit__ as these are not reserved words in Python
+version, commit = get_development_version() or get_version_from_env()
