@@ -32,6 +32,7 @@ dev = [
   "pyright>=1.1.393",
   "ruff>=0.9.4",
   "types-aiofiles>=24.1.0.20241221,<25.0.0.0",
+  "dunamai>=1.23.0"
 ]
 test = [
   "pytest>=8.0",
@@ -64,6 +65,8 @@ pre-commit = ">=2.20.0"
 pyright = ">=1.1.393"
 ruff = ">=0.9.4"
 types-aiofiles = ">=24.1.0.20241221,<25.0.0.0"
+dunamai = ">=1.23.0"
+
 # UV specific configuration
 
 [tool.uv.sources]
