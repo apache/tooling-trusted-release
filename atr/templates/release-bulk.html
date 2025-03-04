@@ -1,0 +1,263 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Bulk download status ~ ATR
+{% endblock title %}
+
+{% block description %}
+  View the status of a bulk download task.
+{% endblock description %}
+
+{% block head_extra %}
+  {% if task.status.value == "queued" or task.status.value == "active" %}
+    <meta http-equiv="refresh" content="2" />
+  {% endif %}
+{% endblock head_extra %}
+
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      nav.breadcrumbs {
+          margin-bottom: 1rem;
+      }
+
+      nav.breadcrumbs a {
+          text-decoration: none;
+      }
+
+      .task-container {
+          margin: 1rem 0;
+      }
+
+      .task-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+          padding: 1rem;
+          background: #f8f9fa;
+          border: 1px solid #dee2e6;
+          border-radius: 4px;
+      }
+
+      .task-title {
+          font-weight: 600;
+      }
+
+      .task-status {
+          padding: 0.25rem 0.5rem;
+          border-radius: 4px;
+          font-size: 0.9em;
+      }
+
+      .status-queued {
+          background: #f8f9fa;
+          border: 1px solid #dee2e6;
+      }
+
+      .status-active {
+          background: #cff4fc;
+          border: 1px solid #9eeaf9;
+      }
+
+      .status-completed {
+          background: #d1e7dd;
+          border: 1px solid #a3cfbb;
+      }
+
+      .status-failed {
+          background: #f8d7da;
+          border: 1px solid #f5c6cb;
+      }
+
+      .task-details {
+          margin-top: 1rem;
+          padding: 1rem;
+          background: #fff;
+          border: 1px solid #dee2e6;
+          border-radius: 4px;
+      }
+
+      .detail-row {
+          display: flex;
+          margin-bottom: 1rem;
+      }
+
+      .detail-label {
+          width: 150px;
+          font-weight: 600;
+      }
+
+      .progress-container {
+          margin: 1rem 0;
+      }
+
+      /* Progress bar styling */
+      progress {
+          width: 100%;
+          height: 20px;
+          border-radius: 4px;
+          overflow: hidden;
+          border: 1px solid #dee2e6;
+      }
+
+      /* Styling the progress bar for different browsers */
+      progress::-webkit-progress-bar {
+          background-color: #f8f9fa;
+          border-radius: 4px;
+      }
+
+      progress::-webkit-progress-value {
+          background-color: #0366d6;
+          transition: width 0.3s ease;
+      }
+
+      progress::-moz-progress-bar {
+          background-color: #0366d6;
+          border-radius: 4px;
+      }
+
+      .progress-text {
+          margin-top: 0.5rem;
+          font-size: 0.9em;
+          color: #666;
+      }
+
+      .message-box {
+          margin-top: 1rem;
+          margin-bottom: 1rem;
+          padding: 1rem;
+          background: #f8f9fa;
+          border: 1px solid #dee2e6;
+          border-radius: 4px;
+      }
+
+      .error-box {
+          margin-top: 1rem;
+          padding: 1rem;
+          background: #f8d7da;
+          border: 1px solid #f5c6cb;
+          border-radius: 4px;
+          color: #842029;
+      }
+
+      .info-box {
+          margin-top: 1rem;
+          padding: 1rem;
+          background: #cff4fc;
+          border: 1px solid #9eeaf9;
+          border-radius: 4px;
+      }
+
+      .full-width {
+          width: 100%;
+      }
+  </style>
+{% endblock stylesheets %}
+
+{% block content %}
+  <div class="task-container">
+    <nav class="breadcrumbs">
+      <a href="{{ url_for('root_candidate_review') }}">Release candidates</a>
+      {% if release %}
+        <span>→</span>
+        <span>{{ release.pmc.display_name }}</span>
+        <span>→</span>
+        <span>{{ release.product_line.product_name if release.product_line else "Unknown product" }}</span>
+        <span>→</span>
+        <span>{{ release.version }}</span>
+      {% endif %}
+      <span>→</span>
+      <span>Bulk download status</span>
+    </nav>
+
+    <div class="task-header">
+      <div class="task-title">Task status</div>
+      <div class="task-status status-{{ task.status.value.lower() }}">
+        {%- if task.status.value == "queued" -%}
+          Pending
+        {%- elif task.status.value == "active" -%}
+          Running
+        {%- elif task.status.value == "completed" -%}
+          Completed
+        {%- elif task.status.value == "failed" -%}
+          Failed
+        {%- else -%}
+          {{ task.status.value }}
+        {%- endif -%}
+      </div>
+    </div>
+
+    <div class="task-details">
+      <div class="detail-row">
+        <div class="detail-label">Task ID</div>
+        <div>{{ task.id }}</div>
+      </div>
+
+      <div class="detail-row">
+        <div class="detail-label">Started</div>
+        <div>
+          {% if task.started %}
+            {{ task.started.strftime("%Y-%m-%d %H:%M:%S UTC") }}
+          {% else %}
+            Not started
+          {% endif %}
+        </div>
+      </div>
+
+      {% if task.completed %}
+        <div class="detail-row">
+          <div class="detail-label">Completed</div>
+          <div>{{ task.completed.strftime("%Y-%m-%d %H:%M:%S UTC") }}</div>
+        </div>
+      {% endif %}
+
+      {% if task.result %}
+        {% if task.result.progress is defined %}
+          <div class="progress-container">
+            <progress value="{{ task.result.progress }}" max="100"></progress>
+            <div class="progress-text">{{ task.result.progress }}% complete</div>
+          </div>
+        {% endif %}
+
+        {% if task.result.message %}<div class="message-box">{{ task.result.message }}</div>{% endif %}
+
+        {% if task.status == TaskStatus.COMPLETED %}
+          <div class="detail-row">
+            <div class="detail-label">Summary</div>
+            <div class="full-width">
+              <table>
+                <tbody>
+                  {% if task.result.url %}
+                    <tr>
+                      <th>URL</th>
+                      <td>{{ task.result.url }}</td>
+                    </tr>
+                  {% endif %}
+                  {% if task.result.file_types %}
+                    <tr>
+                      <th>File types</th>
+                      <td>{{ task.result.file_types|join(", ") }}</td>
+                    </tr>
+                  {% endif %}
+                  {% if task.result.files_downloaded %}
+                    <tr>
+                      <th>Files downloaded</th>
+                      <td>{{ task.result.files_downloaded }}</td>
+                    </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% endif %}
+      {% endif %}
+
+      {% if task.error %}<div class="error-box">{{ task.error }}</div>{% endif %}
+    </div>
+
+    {% if task.status in [TaskStatus.QUEUED, TaskStatus.ACTIVE] %}
+      <div class="info-box">This page will automatically refresh every 2 seconds to show the latest status.</div>
+    {% endif %}
+  </div>
+{% endblock content %}

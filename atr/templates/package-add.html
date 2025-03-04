@@ -75,6 +75,51 @@
       .radio-group input[type="radio"] {
           cursor: pointer;
       }
+
+      .checkbox-group {
+          margin-bottom: 0.5rem;
+      }
+
+      .checkbox-group div {
+          margin: 0.5rem 0;
+      }
+
+      .checkbox-group label {
+          margin-left: 0.5rem;
+          cursor: pointer;
+      }
+
+      .checkbox-group input[type="checkbox"] {
+          cursor: pointer;
+      }
+
+      .form-separator {
+          margin: 2rem 0;
+          border-top: 1px solid #ddd;
+          text-align: center;
+          position: relative;
+      }
+
+      .form-separator span {
+          background: #fff;
+          padding: 0 1rem;
+          color: #666;
+          position: relative;
+          top: -0.75rem;
+      }
+
+      input[type="url"],
+      input[type="number"] {
+          width: 100%;
+          max-width: 600px;
+          padding: 0.375rem;
+          border: 1px solid #ced4da;
+          border-radius: 0.25rem;
+      }
+
+      input[type="number"] {
+          width: 100px;
+      }
   </style>
 {% endblock stylesheets %}
 
@@ -86,6 +131,7 @@
   </p>
 
   <form method="post" enctype="multipart/form-data" class="striking">
+    <input type="hidden" name="form_type" value="single" />
     <table class="form-table">
       <tbody>
         <tr>
@@ -183,6 +229,121 @@
           <td></td>
           <td>
             <button type="submit" {% if not releases %}disabled{% endif %}>Add package</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </form>
+
+  <div class="form-separator">
+    <span>Or add multiple packages from a URL</span>
+  </div>
+
+  <form method="post" class="striking">
+    <input type="hidden" name="form_type" value="bulk" />
+    <table class="form-table">
+      <tbody>
+        <tr>
+          <th>
+            <label for="bulk_release_key">Release:</label>
+          </th>
+          <td>
+            <select id="bulk_release_key" name="release_key" required>
+              <option value="">Select a release...</option>
+              {% for release in releases %}
+                <option value="{{ release.storage_key }}"
+                        {% if release.storage_key == selected_release %}selected{% endif %}>
+                  {{ release.pmc.display_name }} - {{ release.product_line.product_name if release.product_line else "unknown" }} - {{ release.version }}
+                </option>
+              {% endfor %}
+            </select>
+            {% if not releases %}<p class="error-message">No releases found that you can add packages to.</p>{% endif %}
+          </td>
+        </tr>
+
+        <tr>
+          <th>
+            <label for="bulk_url">URL:</label>
+          </th>
+          <td>
+            <input type="url"
+                   id="bulk_url"
+                   name="url"
+                   required
+                   placeholder="https://example.org/path/to/packages/"
+                   aria-describedby="url-help" />
+            <span id="url-help" class="help-text">Enter the URL of the directory containing release packages</span>
+          </td>
+        </tr>
+
+        <tr>
+          <th>
+            <label>File types:</label>
+          </th>
+          <td>
+            <div class="checkbox-group">
+              <div>
+                <input type="checkbox"
+                       id="type_targz"
+                       name="file_types"
+                       value=".tar.gz"
+                       checked />
+                <label for="type_targz">.tar.gz files</label>
+              </div>
+              <div>
+                <input type="checkbox" id="type_tgz" name="file_types" value=".tgz" checked />
+                <label for="type_tgz">.tgz files</label>
+              </div>
+              <div>
+                <input type="checkbox" id="type_zip" name="file_types" value=".zip" />
+                <label for="type_zip">.zip files</label>
+              </div>
+              <div>
+                <input type="checkbox" id="type_jar" name="file_types" value=".jar" />
+                <label for="type_jar">.jar files</label>
+              </div>
+            </div>
+          </td>
+        </tr>
+
+        <tr>
+          <th>
+            <label for="bulk_max_depth">Maximum depth:</label>
+          </th>
+          <td>
+            <input type="number"
+                   id="bulk_max_depth"
+                   name="max_depth"
+                   value="1"
+                   min="1"
+                   max="10"
+                   required
+                   aria-describedby="depth-help" />
+            <span id="depth-help" class="help-text">Maximum request depth to search for packages (1-10)</span>
+          </td>
+        </tr>
+
+        <tr>
+          <th>
+            <label for="bulk_require_signatures">Require signatures:</label>
+          </th>
+          <td>
+            <div class="checkbox-group">
+              <div>
+                <input type="checkbox"
+                       id="bulk_require_signatures"
+                       name="require_signatures"
+                       checked />
+                <label for="bulk_require_signatures">Only download packages that have corresponding .asc signature files</label>
+              </div>
+            </div>
+          </td>
+        </tr>
+
+        <tr>
+          <td></td>
+          <td>
+            <button type="submit" {% if not releases %}disabled{% endif %}>Add packages from URL</button>
           </td>
         </tr>
       </tbody>

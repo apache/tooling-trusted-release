@@ -63,6 +63,7 @@ We aim to work on the task scheduler in parallel with the UX improvements above.
    - Use consistent task status values (pending, running, passed, issue, error?)
    - Add a warning task result status
    - Allow dependencies between tasks to reduce duplication of effort
+   - Add UI to restart all waiting workers
 
 2. Orchestrating scheduler and resource management
    - [DONE] Implement process-based task isolation

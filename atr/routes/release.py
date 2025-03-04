@@ -24,7 +24,7 @@ from typing import cast
 
 import aiofiles
 import aiofiles.os
-from quart import Request, flash, redirect, request, url_for
+from quart import Request, flash, redirect, render_template, request, url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import InstrumentedAttribute
@@ -41,6 +41,8 @@ from atr.db.models import (
     PMC,
     Package,
     Release,
+    Task,
+    TaskStatus,
 )
 from atr.routes import FlashError, app_route
 from atr.util import get_release_storage_dir
@@ -154,3 +156,49 @@ async def root_release_delete() -> Response:
 
     await flash("Release deleted successfully", "success")
     return redirect(url_for("root_candidate_review"))
+
+
+@app_route("/release/bulk/<int:task_id>", methods=["GET"])
+async def release_bulk_status(task_id: int) -> str | Response:
+    """Show status for a bulk download task."""
+    session = await session_read()
+    if (session is None) or (session.uid is None):
+        await flash("You must be logged in to view bulk download status.", "error")
+        return redirect(url_for("root_login"))
+
+    async with get_session() as db_session:
+        # Query for the task with the given ID
+        query = select(Task).where(Task.id == task_id)
+        result = await db_session.execute(query)
+        task = result.scalar_one_or_none()
+
+        if not task:
+            await flash(f"Task with ID {task_id} not found.", "error")
+            return redirect(url_for("root_candidate_review"))
+
+        # Verify this is a bulk download task
+        if task.task_type != "package_bulk_download":
+            await flash(f"Task with ID {task_id} is not a bulk download task.", "error")
+            return redirect(url_for("root_candidate_review"))
+
+        # If result is a list or tuple with a single item, extract it
+        if isinstance(task.result, list | tuple) and (len(task.result) == 1):
+            task.result = task.result[0]
+
+        # Get the release associated with this task if available
+        release = None
+        # Debug print the task.task_args using the logger
+        logging.debug(f"Task args: {task.task_args}")
+        if task.task_args and isinstance(task.task_args, dict) and ("release_key" in task.task_args):
+            release_query = select(Release).where(Release.storage_key == task.task_args["release_key"])
+            release_result = await db_session.execute(release_query)
+            release = release_result.scalar_one_or_none()
+
+            # Check whether the user has permission to view this task
+            # Either they're a PMC member or committer for the release's PMC
+            if release and release.pmc:
+                if (session.uid not in release.pmc.pmc_members) and (session.uid not in release.pmc.committers):
+                    await flash("You don't have permission to view this task.", "error")
+                    return redirect(url_for("root_candidate_review"))
+
+    return await render_template("release-bulk.html", task=task, release=release, TaskStatus=TaskStatus)

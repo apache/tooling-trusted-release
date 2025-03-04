@@ -76,6 +76,20 @@ We limit function complexity to a score of 10. If the linter complains, your fun
 
 Cyclomatic complexity counts the number of independent paths through code: more if/else branches, loops, and exception handlers means higher complexity. Complex code is harder to test, maintain, and understand. The easiest way to fix high complexity is usually to refactor a chunk of related logic into a separate helper function.
 
+### Use parentheses to group subexpressions in boolean expressions always
+
+Instead of this:
+
+```python
+a or b and c == d or e
+```
+
+Do:
+
+```python
+(a or b) and (c == d) or e
+```
+
 ## HTML
 
 ### Use sentence case for headings

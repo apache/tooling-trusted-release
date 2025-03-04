@@ -40,7 +40,6 @@ from werkzeug.wrappers.response import Response
 from asfquart import APP
 from asfquart.auth import Requirements, require
 from asfquart.base import ASFQuartException
-from asfquart.session import ClientSession
 from asfquart.session import read as session_read
 from atr.db import get_session
 from atr.db.models import (
@@ -163,54 +162,6 @@ async def package_add_artifact_info_get(
 
     # Compute SHA-512 of the artifact for the package record
     return artifact_sha3, await compute_sha512(uploads_path / artifact_sha3), artifact_size
-
-
-async def package_add_post(session: ClientSession, request: Request) -> Response:
-    """Handle POST request for adding a package to a release."""
-    try:
-        release_key, artifact_file, checksum_file, signature_file, artifact_type = await package_add_validate(request)
-    except FlashError as e:
-        logging.exception("FlashError:")
-        await flash(f"{e!s}", "error")
-        return redirect(url_for("root_package_add"))
-    # This must come here to appease the type checker
-    if artifact_file.filename is None:
-        await flash("Release artifact filename is required", "error")
-        return redirect(url_for("root_package_add"))
-
-    # Save files and create package record in one transaction
-    async with get_session() as db_session:
-        async with db_session.begin():
-            # Process and save the files
-            try:
-                try:
-                    artifact_sha3, artifact_size, artifact_sha512, signature_sha3 = await package_add_session_process(
-                        db_session, release_key, artifact_file, checksum_file, signature_file
-                    )
-                except FlashError as e:
-                    logging.exception("FlashError:")
-                    await flash(f"{e!s}", "error")
-                    return redirect(url_for("root_package_add"))
-
-                # Create the package record
-                package = Package(
-                    artifact_sha3=artifact_sha3,
-                    artifact_type=artifact_type,
-                    filename=artifact_file.filename,
-                    signature_sha3=signature_sha3,
-                    sha512=artifact_sha512,
-                    release_key=release_key,
-                    uploaded=datetime.datetime.now(datetime.UTC),
-                    bytes_size=artifact_size,
-                )
-                db_session.add(package)
-
-            except Exception as e:
-                await flash(f"Error processing files: {e!s}", "error")
-                return redirect(url_for("root_package_add"))
-
-    # Otherwise redirect to review page
-    return redirect(url_for("root_candidate_review"))
 
 
 async def package_add_session_process(
@@ -350,6 +301,118 @@ async def package_files_delete(package: Package, uploads_path: Path) -> None:
 # Release functions
 
 
+async def package_add_bulk_validate(form: MultiDict, request: Request) -> tuple[str, str, list[str], bool, int]:
+    """Validate bulk package addition form data."""
+    release_key = form.get("release_key")
+    if (not release_key) or (not isinstance(release_key, str)):
+        raise FlashError("Release key is required")
+
+    url = form.get("url")
+    if (not url) or (not isinstance(url, str)):
+        raise FlashError("URL is required")
+
+    # Validate URL format
+    if not url.startswith(("http://", "https://")):
+        raise FlashError("URL must start with http:// or https://")
+
+    # Get selected file types
+    file_types = form.getlist("file_types")
+    if not file_types:
+        raise FlashError("At least one file type must be selected")
+
+    # Validate file types
+    valid_types = {".tar.gz", ".tgz", ".zip", ".jar"}
+    if not all(ft in valid_types for ft in file_types):
+        raise FlashError("Invalid file type selected")
+
+    # Get require signatures flag
+    require_signatures = bool(form.get("require_signatures"))
+
+    # Get max depth
+    try:
+        max_depth = int(form.get("max_depth", "1"))
+        if not 1 <= max_depth <= 10:
+            raise ValueError()
+    except (TypeError, ValueError):
+        raise FlashError("Maximum depth must be between 1 and 10 inclusive")
+
+    return release_key, url, file_types, require_signatures, max_depth
+
+
+async def package_add_single_post(form: MultiDict, request: Request) -> Response:
+    """Process single package upload submission."""
+    try:
+        release_key, artifact_file, checksum_file, signature_file, artifact_type = await package_add_validate(request)
+    except FlashError as e:
+        logging.exception("FlashError:")
+        await flash(f"{e!s}", "error")
+        return redirect(url_for("root_package_add"))
+    # This must come here to appease the type checker
+    if artifact_file.filename is None:
+        await flash("Release artifact filename is required", "error")
+        return redirect(url_for("root_package_add"))
+
+    # Save files and create package record in one transaction
+    async with get_session() as db_session:
+        async with db_session.begin():
+            # Process and save the files
+            try:
+                try:
+                    artifact_sha3, artifact_size, artifact_sha512, signature_sha3 = await package_add_session_process(
+                        db_session, release_key, artifact_file, checksum_file, signature_file
+                    )
+                except FlashError as e:
+                    logging.exception("FlashError:")
+                    await flash(f"{e!s}", "error")
+                    return redirect(url_for("root_package_add"))
+
+                # Create the package record
+                package = Package(
+                    artifact_sha3=artifact_sha3,
+                    artifact_type=artifact_type,
+                    filename=artifact_file.filename,
+                    signature_sha3=signature_sha3,
+                    sha512=artifact_sha512,
+                    release_key=release_key,
+                    uploaded=datetime.datetime.now(datetime.UTC),
+                    bytes_size=artifact_size,
+                )
+                db_session.add(package)
+
+            except Exception as e:
+                await flash(f"Error processing files: {e!s}", "error")
+                return redirect(url_for("root_package_add"))
+
+    # Otherwise redirect to review page
+    return redirect(url_for("root_candidate_review"))
+
+
+async def package_add_bulk_post(form: MultiDict, request: Request) -> Response:
+    """Process bulk package URL submission."""
+    try:
+        release_key, url, file_types, require_signatures, max_depth = await package_add_bulk_validate(form, request)
+    except FlashError as e:
+        logging.exception("FlashError:")
+        await flash(f"{e!s}", "error")
+        return redirect(url_for("root_package_add"))
+
+    # Create a task for bulk downloading
+    max_concurrency = 5
+    async with get_session() as db_session:
+        async with db_session.begin():
+            task = Task(
+                status=TaskStatus.QUEUED,
+                task_type="package_bulk_download",
+                task_args=[release_key, url, file_types, require_signatures, max_depth, max_concurrency],
+            )
+            db_session.add(task)
+            # Flush to get the task ID
+            await db_session.flush()
+
+    await flash("Started downloading packages from URL", "success")
+    return redirect(url_for("release_bulk_status", task_id=task.id))
+
+
 @app_route("/package/add", methods=["GET", "POST"])
 @require(Requirements.committer)
 async def root_package_add() -> Response | str:
@@ -358,9 +421,15 @@ async def root_package_add() -> Response | str:
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    # For POST requests, handle the file upload
+    # For POST requests, handle the form submission
     if request.method == "POST":
-        return await package_add_post(session, request)
+        form = await get_form(request)
+        form_type = form.get("form_type")
+
+        if form_type == "bulk":
+            return await package_add_bulk_post(form, request)
+        else:
+            return await package_add_single_post(form, request)
 
     # Get the storage_key from the query parameters (if redirected from create)
     storage_key = request.args.get("storage_key")
