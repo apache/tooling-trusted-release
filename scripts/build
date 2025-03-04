@@ -6,7 +6,7 @@ DISTANCE=$(dunamai from git --format "{distance}")
 if [ "${DISTANCE}" = "0" ]; then
     VERSION=$(dunamai from git --format "v{base}")
 else
-    VERSION=$(dunamai from git --format "v{base}+{distance}.{commit}")
+    VERSION=$(dunamai from git --bump --format "v{base}+{distance}.{commit}")
 fi
 
 docker build -t tooling-atr-experiments --build-arg BIND=0.0.0.0:443 --build-arg VERSION="${VERSION}" --build-arg COMMIT="${COMMIT}" -f Dockerfile.alpine .

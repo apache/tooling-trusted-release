@@ -31,7 +31,9 @@ def _get_development_version() -> tuple[str, str] | None:
     try:
         version = Version.from_git()
         if version.distance > 0:
-            return version.serialize(format="v{base}+{distance}.{commit}"), version.serialize(format="{commit}")
+            return version.serialize(format="v{base}+{distance}.{commit}", bump=True), version.serialize(
+                format="{commit}"
+            )
         else:
             return version.serialize(format="v{base}"), version.serialize(format="{commit}")
 
