@@ -28,7 +28,7 @@ report:
 	@echo SCRIPTS = $(SCRIPTS)
 
 run:
-	 scripts/run
+	scripts/run
 
 serve:
 	$(SCRIPTS)/run hypercorn --bind $(BIND) --keyfile key.pem --certfile cert.pem atr.server:app --debug --reload

@@ -121,10 +121,13 @@ def app_setup_context(app: QuartApp) -> None:
     @app.context_processor
     async def app_wide() -> dict[str, Any]:
         from atr.util import is_admin
+        from atr.version import __commit__, __version__
 
         return {
             "current_user": await asfquart.session.read(),
             "is_admin": is_admin,
+            "commit": __commit__,
+            "version": __version__,
         }
 
 

@@ -7,6 +7,8 @@ ARG SCRIPTS=scripts/poetry
 ENV SCRIPTS=${SCRIPTS}
 ARG VERSION=unknown
 ENV VERSION=${VERSION}
+ARG COMMIT=unknown
+ENV COMMIT=${COMMIT}
 
 RUN apt-get update && apt-get install -y \
     curl \
