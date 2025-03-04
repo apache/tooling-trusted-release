@@ -30,6 +30,10 @@
           background: #047;
       }
 
+      button:disabled {
+          color: gray;
+      }
+
       div.warning {
           margin: 1.5rem 0;
           padding: 1rem;
@@ -84,7 +88,56 @@
     </ul>
   </div>
 
-  <form method="post">
-    <button type="submit">Update Projects</button>
+  <div id="status"></div>
+
+  <form action="javascript:submitForm().then(_ => { return false; })">
+    <button type="submit" id="submitButton">Update Projects</button>
   </form>
+
+  <script>
+    const submitForm = async () => {
+      const button = document.getElementById("submitButton");
+      button.disabled = true;
+      document.body.style.cursor = 'wait'
+
+      const statusElement = document.getElementById("status");
+      while (statusElement.firstChild) {
+        statusElement.firstChild.remove();
+      }
+
+      try {
+          const response = await fetch(window.location.href, {
+              method: "POST",
+          });
+
+          if (!response.ok) {
+              addStatusMessage(statusElement, "Could not make network request", "error");
+              return
+          }
+
+          const data = await response.json();
+          addStatusMessage(statusElement, data.message, data.category)
+      } catch (error) {
+          addStatusMessage(statusElement, error, "error")
+      } finally {
+        button.disabled = false;
+        document.body.style.cursor = 'default'
+      }
+    };
+
+    function addStatusMessage(parentElement, message, category) {
+      const divElement = document.createElement("div");
+      divElement.classList.add("status-message");
+      divElement.classList.add(category);
+      if (category === "error") {
+          const prefixElement = document.createElement("strong");
+          const textElement = document.createTextNode("Error: ");
+          prefixElement.appendChild(textElement);
+          divElement.appendChild(prefixElement);
+      }
+      const textNode = document.createTextNode(message);
+      divElement.appendChild(textNode);
+      parentElement.appendChild(divElement);
+    }
+  </script>
 {% endblock content %}
