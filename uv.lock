@@ -1119,6 +1119,7 @@ dependencies = [
     { name = "asfquart" },
     { name = "blockbuster" },
     { name = "cryptography" },
+    { name = "dunamai" },
     { name = "greenlet" },
     { name = "httpx" },
     { name = "hypercorn" },
@@ -1131,7 +1132,6 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "djlint" },
-    { name = "dunamai" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pyright" },
@@ -1151,6 +1151,7 @@ requires-dist = [
     { name = "asfquart", editable = "asfquart" },
     { name = "blockbuster", specifier = ">=1.5.23,<2.0.0" },
     { name = "cryptography", specifier = "~=44.0" },
+    { name = "dunamai", specifier = ">=1.23.0" },
     { name = "greenlet", specifier = ">=3.1.1,<4.0.0" },
     { name = "httpx", specifier = "~=0.27" },
     { name = "hypercorn", specifier = "~=0.17" },
@@ -1163,7 +1164,6 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "djlint", specifier = ">=1.36.4" },
-    { name = "dunamai", specifier = ">=1.23.0" },
     { name = "mypy", specifier = ">=1.15.0" },
     { name = "pre-commit", specifier = ">=2.20.0" },
     { name = "pyright", specifier = ">=1.1.393" },
