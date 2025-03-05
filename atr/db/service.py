@@ -17,9 +17,10 @@
 
 from collections.abc import Sequence
 
+from sqlalchemy import func
 from sqlmodel import select
 
-from atr.db.models import PMC
+from atr.db.models import PMC, Task
 
 from . import get_session
 
@@ -37,3 +38,13 @@ async def get_pmcs() -> Sequence[PMC]:
         statement = select(PMC)
         pmcs = (await db_session.execute(statement)).scalars().all()
         return pmcs
+
+
+async def get_tasks_paged(limit: int, offset: int) -> tuple[Sequence[Task], int]:
+    """Returns a list of Tasks based on limit and offset values together with the total count."""
+
+    async with get_session() as db_session:
+        statement = select(Task).limit(limit).offset(offset).order_by(Task.id.desc())  # type: ignore
+        tasks = (await db_session.execute(statement)).scalars().all()
+        count = (await db_session.execute(select(func.count(Task.id)))).scalar_one()  # type: ignore
+        return tasks, count

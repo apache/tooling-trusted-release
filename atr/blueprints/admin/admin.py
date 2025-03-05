@@ -278,6 +278,11 @@ async def _update_pmcs() -> int:
     return updated_count
 
 
+@blueprint.route("/tasks")
+async def admin_tasks() -> str:
+    return await render_template("tasks.html")
+
+
 @blueprint.route("/debug/database")
 async def admin_debug_database() -> str:
     """Debug information about the database."""

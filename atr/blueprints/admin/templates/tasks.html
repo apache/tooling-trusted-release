@@ -1,0 +1,70 @@
+{% extends "layouts/base-admin.html" %}
+
+{% block title %}
+  Executed Tasks ~ ATR
+{% endblock %}
+
+{% block stylesheets %}
+  {{ super() }}
+  <link rel="stylesheet"
+        href="{{ url_for('static', filename='css/mermaid.min.css') }}" />
+
+  <style>
+    .gridjs-pages button {
+        color: unset;
+    }
+  </style>
+{% endblock stylesheets %}
+
+{% block content %}
+  <h1>Executed Background Tasks</h1>
+
+  <div id="task-table"></div>
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='js/gridjs.production.min.js') }}"></script>
+
+  <script>
+    new gridjs.Grid({
+      columns: [
+        'ID',
+        'Task Type',
+        'Task Status',
+        {
+          name: 'Added',
+          formatter: (cell) => `${new Date(cell).toISOString()}`
+        },
+        {
+          name: 'Started',
+          formatter: (cell) => `${new Date(cell).toISOString()}`
+        },
+        {
+          name: 'Completed',
+          formatter: (cell) => `${new Date(cell).toISOString()}`
+        }
+      ],
+      style: {
+        table: {
+          'white-space': 'nowrap'
+        }
+      },
+      search: true,
+      pagination: {
+        limit: 15,
+        server: {
+          url: (prev, page, limit) => `${prev}?limit=${limit}&offset=${page * limit}`
+        }
+      },
+      // sort: true,
+      server: {
+        url: '/api/tasks',
+        then: data => data.data.map(task => [
+          task.id, task.task_type, task.status, task.added, task.started, task.completed
+        ]),
+        total: data => data.count
+      }
+    }).render(document.getElementById("task-table"));
+  </script>
+{% endblock javascripts %}
