@@ -29,7 +29,6 @@ from quart import Request, redirect, render_template, request, url_for
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlmodel import select
-from werkzeug.datastructures import MultiDict
 from werkzeug.wrappers.response import Response
 
 from asfquart import APP
@@ -47,7 +46,7 @@ from atr.db.models import (
     ReleaseStage,
     Task,
 )
-from atr.routes import app_route
+from atr.routes import app_route, get_form
 
 if APP is ...:
     raise RuntimeError("APP is not set")
@@ -93,31 +92,6 @@ def format_artifact_name(project_name: str, product_name: str, version: str, is_
     if is_podling:
         return f"apache-{project_name}-incubating-{product_name}-{version}"
     return f"apache-{project_name}-{product_name}-{version}"
-
-
-async def get_form(request: Request) -> MultiDict:
-    # The request.form() method in Quart calls a synchronous tempfile method
-    # It calls quart.wrappers.request.form _load_form_data
-    # Which calls quart.formparser parse and parse_func and parser.parse
-    # Which calls _write which calls tempfile, which is synchronous
-    # It's getting a tempfile back from some prior call
-    # We can't just make blockbuster ignore the call because then it ignores it everywhere
-    from asfquart import APP
-
-    if APP is ...:
-        raise RuntimeError("APP is not set")
-
-    # Or quart.current_app?
-    blockbuster = APP.config["blockbuster"]
-
-    # Turn blockbuster off
-    if blockbuster is not None:
-        blockbuster.deactivate()
-    form = await request.form
-    # Turn blockbuster on
-    if blockbuster is not None:
-        blockbuster.activate()
-    return form
 
 
 # Release functions

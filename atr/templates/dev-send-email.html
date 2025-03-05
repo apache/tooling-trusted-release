@@ -1,0 +1,153 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Email testing ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Test email sending functionality.
+{% endblock description %}
+
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .form-table {
+          width: 100%;
+      }
+
+      .form-table th {
+          width: 200px;
+          text-align: right;
+          padding-right: 1rem;
+          vertical-align: top;
+          font-weight: 500;
+      }
+
+      .form-table td {
+          vertical-align: top;
+      }
+
+      .form-table label {
+          border-bottom: none;
+          padding-bottom: 0;
+      }
+
+      input[type="text"],
+      input[type="email"] {
+          width: 100%;
+          max-width: 600px;
+          padding: 0.375rem;
+          border: 1px solid #ced4da;
+          border-radius: 0.25rem;
+      }
+
+      .help-text {
+          color: #666;
+          font-size: 0.9em;
+          display: block;
+          margin-top: 0.25rem;
+      }
+
+      .error-message {
+          color: #dc3545;
+          margin-top: 0.25rem;
+      }
+
+      .success-message {
+          color: #28a745;
+          margin-top: 0.25rem;
+      }
+
+      button {
+          margin-top: 1rem;
+      }
+  </style>
+{% endblock stylesheets %}
+
+{% block content %}
+  <h1>Test email sending</h1>
+  <p class="intro">
+    Welcome, <strong>{{ asf_id }}</strong>! Use this form to test the email sending functionality.
+  </p>
+
+  {% if error %}
+    <div class="error-message">
+      <p>
+        <strong>Error:</strong> {{ error }}
+      </p>
+    </div>
+  {% endif %}
+
+  {% if success %}
+    <div class="success-message">
+      <p>
+        <strong>Success!</strong>
+        {% if message %}
+          {{ message }}
+        {% else %}
+          Email was sent successfully.
+        {% endif %}
+      </p>
+    </div>
+  {% endif %}
+
+  <form method="post" class="striking">
+    <table class="form-table">
+      <tbody>
+        <tr>
+          <th>
+            <label for="email_recipient">Recipient email:</label>
+          </th>
+          <td>
+            <input type="email"
+                   id="email_recipient"
+                   name="email_recipient"
+                   required
+                   value="{{ email_recipient or '' }}"
+                   placeholder="recipient@example.com"
+                   aria-describedby="email-help" />
+            <span id="email-help" class="help-text">Enter the email address to send the test email to</span>
+          </td>
+        </tr>
+
+        <tr>
+          <th>
+            <label for="artifact_name">Artifact name:</label>
+          </th>
+          <td>
+            <input type="text"
+                   id="artifact_name"
+                   name="artifact_name"
+                   required
+                   value="{{ artifact_name or '' }}"
+                   placeholder="my-artifact-1.0.0"
+                   aria-describedby="artifact-help" />
+            <span id="artifact-help" class="help-text">Enter a name for the artifact</span>
+          </td>
+        </tr>
+
+        <tr>
+          <th>
+            <label for="token">Token (optional):</label>
+          </th>
+          <td>
+            <input type="text"
+                   id="token"
+                   name="token"
+                   value="{{ token or '' }}"
+                   placeholder="Optional token"
+                   aria-describedby="token-help" />
+            <span id="token-help" class="help-text">Optional token to include in the email</span>
+          </td>
+        </tr>
+
+        <tr>
+          <td></td>
+          <td>
+            <button type="submit">Send test email</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </form>
+{% endblock content %}

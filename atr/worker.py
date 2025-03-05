@@ -388,6 +388,7 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
     # TODO: This does not go here permanently
     # We need to move the other tasks into atr.tasks
     from atr.tasks.bulk import download as bulk_download
+    from atr.tasks.mailtest import send as mailtest_send
 
     logger.info(f"Processing task {task_id} ({task_type}) with args {task_args}")
     try:
@@ -404,11 +405,12 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
             "verify_rat_license": task_verify_rat_license,
             "generate_cyclonedx_sbom": task_generate_cyclonedx_sbom,
             "package_bulk_download": bulk_download,
+            "mailtest_send": mailtest_send,
         }
 
         handler = task_handlers.get(task_type)
         if not handler:
-            msg = f"Unknown task type: {task_type}"
+            msg = f"Unknown task type: {task_type}, {task_handlers.keys()}"
             logger.error(msg)
             raise Exception(msg)
 
@@ -478,6 +480,8 @@ def worker_signal_handle(signum: int, frame: object) -> None:
 
 
 if __name__ == "__main__":
+    logger.info("Starting ATR worker...")
+    print("Starting ATR worker...")
     try:
         main()
     except Exception as e:

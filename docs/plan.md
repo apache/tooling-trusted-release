@@ -86,6 +86,8 @@ Advanced tasks, possibly deferred
    - [DONE] Fix and improve the package checks summary count
    - Ensure that all errors are caught and logged or displayed
    - Add tests
+   - Improve the proprietary platform patch in ASFQuart and submit upstream
+   - Patch the synchronous behaviour in Jinja and submit upstream
 
 2. Ensure that performance is optimal
    - [DONE] Add page load timing metrics to a log

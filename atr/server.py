@@ -63,11 +63,12 @@ class ApiOnlyOpenAPIProvider(OpenAPIProvider):
 
 
 def register_routes() -> tuple[str, ...]:
-    from atr.routes import candidate, docs, download, keys, package, project, release, root
+    from atr.routes import candidate, dev, docs, download, keys, package, project, release, root
 
     # Must do this otherwise ruff "fixes" this function by removing the imports
     return (
         candidate.__name__,
+        dev.__name__,
         docs.__name__,
         download.__name__,
         keys.__name__,

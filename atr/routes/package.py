@@ -37,7 +37,6 @@ from sqlmodel import select
 from werkzeug.datastructures import FileStorage, MultiDict
 from werkzeug.wrappers.response import Response
 
-from asfquart import APP
 from asfquart.auth import Requirements, require
 from asfquart.base import ASFQuartException
 from asfquart.session import read as session_read
@@ -51,7 +50,7 @@ from atr.db.models import (
     Task,
     TaskStatus,
 )
-from atr.routes import FlashError, app_route
+from atr.routes import FlashError, app_route, get_form
 from atr.util import compute_sha512, get_release_storage_dir
 
 
@@ -112,30 +111,6 @@ def format_file_size(size_in_bytes: int) -> str:
         return f"{size_in_kb:,} KB ({formatted_bytes} bytes)"
     else:
         return f"{formatted_bytes} bytes"
-
-
-async def get_form(request: Request) -> MultiDict:
-    # The request.form() method in Quart calls a synchronous tempfile method
-    # It calls quart.wrappers.request.form _load_form_data
-    # Which calls quart.formparser parse and parse_func and parser.parse
-    # Which calls _write which calls tempfile, which is synchronous
-    # It's getting a tempfile back from some prior call
-    # We can't just make blockbuster ignore the call because then it ignores it everywhere
-
-    if APP is ...:
-        raise RuntimeError("APP is not set")
-
-    # Or quart.current_app?
-    blockbuster = APP.config["blockbuster"]
-
-    # Turn blockbuster off
-    if blockbuster is not None:
-        blockbuster.deactivate()
-    form = await request.form
-    # Turn blockbuster on
-    if blockbuster is not None:
-        blockbuster.activate()
-    return form
 
 
 # Package functions

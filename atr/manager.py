@@ -23,6 +23,7 @@ import os
 import signal
 import sys
 from datetime import UTC, datetime
+from io import TextIOWrapper
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +37,9 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+# Global debug flag to control worker process output capturing
+global_worker_debug = False
 
 
 class WorkerProcess:
@@ -172,13 +176,30 @@ class WorkerManager:
             # Get absolute path to worker script
             worker_script = os.path.join(project_root, "atr", "worker.py")
 
+            # Handle stdout and stderr based on debug setting
+            stdout_target: int | TextIOWrapper = asyncio.subprocess.DEVNULL
+            stderr_target: int | TextIOWrapper = asyncio.subprocess.DEVNULL
+
+            # Generate a unique log file name for this worker if debugging is enabled
+            log_file_path = None
+            if global_worker_debug:
+                timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+                log_file_name = f"worker_{timestamp}_{os.getpid()}.log"
+                log_file_path = os.path.join(project_root, "state", log_file_name)
+
+                # Open log file for writing
+                log_file = await asyncio.to_thread(open, log_file_path, "w")
+                stdout_target = log_file
+                stderr_target = log_file
+                logger.info(f"Worker output will be logged to {log_file_path}")
+
             # Start worker process with the updated environment
             # Use preexec_fn to create new process group
             process = await asyncio.create_subprocess_exec(
                 sys.executable,
                 worker_script,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
+                stdout=stdout_target,
+                stderr=stderr_target,
                 env=env,
                 preexec_fn=os.setsid,
             )
@@ -187,10 +208,12 @@ class WorkerManager:
             if worker.pid:
                 self.workers[worker.pid] = worker
                 logger.info(f"Started worker process {worker.pid}")
+                if global_worker_debug and log_file_path:
+                    logger.info(f"Worker {worker.pid} logs: {log_file_path}")
             else:
-                # TODO: We should count failures
-                # We could perhaps stop the manager over a certain count
-                logger.error("Failed to start worker process")
+                logger.error("Failed to start worker process: No PID assigned")
+                if global_worker_debug and isinstance(stdout_target, TextIOWrapper):
+                    await asyncio.to_thread(stdout_target.close)
         except Exception as e:
             logger.error(f"Error spawning worker: {e}")
 

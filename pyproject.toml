@@ -8,6 +8,7 @@ authors = [
 license = "Apache-2.0"
 readme = "README.md"
 requires-python = "~=3.13"
+# https://bugs.launchpad.net/dkimpy/+bug/2024461
 dependencies = [
   "aiofiles>=24.1.0,<25.0.0",
   "aiosqlite>=0.21.0,<0.22.0",
@@ -23,6 +24,9 @@ dependencies = [
   "python-gnupg~=0.5",
   "quart-schema~=0.21",
   "sqlmodel~=0.0",
+  "dnspython>=2.7.0,<3.0.0",
+  # "dkimpy>=1.1.8,<2.0.0",  # Using GitHub fork instead
+  "dkimpy @ git+https://github.com/sbp/dkimpy.git@main",
 ]
 
 [dependency-groups]
@@ -53,6 +57,9 @@ package-mode = false
 [tool.poetry.dependencies]
 asfquart = { path = "./asfquart", develop = true }
 python = "~=3.13"
+# dnspython = ">=2.7.0,<3.0.0"
+# dkimpy = { version = ">=1.1.8,<2.0.0", extras = ["dnspython"] }
+# dkimpy = { git = "https://github.com/sbp/dkimpy.git#subdirectory=src/dkimpy", branch = "main" }
 
 [tool.poetry.group.test.dependencies]
 pytest = ">=8.0"
@@ -70,6 +77,7 @@ types-aiofiles = ">=24.1.0.20241221,<25.0.0.0"
 
 [tool.uv.sources]
 asfquart = { path = "./asfquart", editable = true }
+# dkimpy = { git = "https://github.com/sbp/dkimpy.git", branch = "main" }
 
 # Additional tools
 
