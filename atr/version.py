@@ -34,9 +34,19 @@ def get_development_version() -> tuple[str, str] | None:
         # We start in state/, so we need to go up one level
         version = Version.from_git(path=Path(".."))
         if version.distance > 0:
-            return version.serialize(format="v{base}+{distance}.{commit}", bump=True), version.serialize(
+            # The development version number should reflect the next release that is going to be cut,
+            # indicating how many commits have already going into that since the last release.
+            # e.g. v0.2.0.dev100-abcdef means that there have been already 100 commits since the last release
+            # (which presumably was 0.1.x). We explicitly bump the minor version for the next release.
+            # The commit hash is added to the version string for convenience reasons.
+            return version.bump(1).serialize(format="v{base}.dev{distance}-{commit}"), version.serialize(
                 format="{commit}"
             )
+            # another option is to do a format like "v0.1.0+100.abcdef" which indicates that that version
+            # is 100 commits past the last release which was "v0.1.0".
+            # return version.serialize(format="v{base}+{distance}.{commit}"), version.serialize(
+            #     format="{commit}"
+            # )
         else:
             return version.serialize(format="v{base}"), version.serialize(format="{commit}")
 
