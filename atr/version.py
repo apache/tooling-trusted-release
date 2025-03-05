@@ -18,7 +18,7 @@
 import os
 
 
-def get_development_version() -> tuple[str, str] | None:
+def _get_development_version() -> tuple[str, str] | None:
     """Returns the version when within a development environment."""
 
     try:
@@ -54,7 +54,7 @@ def get_development_version() -> tuple[str, str] | None:
         return None
 
 
-def get_version_from_env() -> tuple[str, str | None]:
+def _get_version_from_env() -> tuple[str, str | None]:
     """Returns the version from an environment variable."""
 
     # Use the commit where dunamai was added by default
@@ -65,4 +65,4 @@ def get_version_from_env() -> tuple[str, str | None]:
 # Try to determine the version from a development environment first.
 # If this fails, try to get it from environment variables that are set when building a docker image.
 # We don't use __version__ and __commit__ as these are not reserved words in Python
-version, commit = get_development_version() or get_version_from_env()
+version, commit = _get_development_version() or _get_version_from_env()
