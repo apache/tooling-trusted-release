@@ -107,8 +107,17 @@ def app_create_base(app_config: type[AppConfig]) -> QuartApp:
 
 def app_setup_api_docs(app: QuartApp) -> None:
     """Configure OpenAPI documentation."""
+    from quart_schema import Info
+
+    from atr.version import version
+
     QuartSchema(
         app,
+        info=Info(
+            title="ATR API",
+            description="OpenAPI documentation for the Apache Trusted Release Platform.",
+            version=version,
+        ),
         openapi_provider_class=ApiOnlyOpenAPIProvider,
         swagger_ui_path="/api/docs",
         openapi_path="/api/openapi.json",
