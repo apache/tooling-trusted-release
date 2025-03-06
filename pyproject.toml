@@ -1,9 +1,10 @@
 [project]
 name = "tooling-atr-experiment"
-version = "0.0.1"
+version = "0.1.0"
 description = "Some experiments with ATR"
 authors = [
-  { name = "ASF Tooling", email = "dev@tooling.apache.org" }
+  { name = "Sean B. Palmer", email = "sbp@apache.org" },
+  { name = "Thomas Neidhart", email = "tn@apache.org" }
 ]
 license = "Apache-2.0"
 readme = "README.md"
