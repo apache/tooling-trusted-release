@@ -2069,6 +2069,7 @@ files = [
 ]
 
 [package.dependencies]
+pydantic = {version = ">=2", optional = true, markers = "extra == \"pydantic\""}
 pyhumps = ">=1.6.1"
 quart = ">=0.19.0"
 
@@ -2681,4 +2682,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = "~=3.13"
-content-hash = "21ae2248c3ba9dc64b5cf5db2f15f48bd25930b6edd36ff24b0a813d46c202ac"
+content-hash = "a98c364b6127622f6e736714e55a17542846076377de998e5dc479c56e2d0975"

@@ -1019,6 +1019,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ae/b7/c5cfa45ec6835005f72c7d667508e91a5f00f656ece2bd83e9ecb0d8643d/quart_schema-0.21.0-py3-none-any.whl", hash = "sha256:57b8f7d2f8cc5bcbf6b2200ed17f870fc26811c5d0ac5c6a02352644ab068129", size = 21360 },
 ]
 
+[package.optional-dependencies]
+pydantic = [
+    { name = "pydantic" },
+]
+
 [[package]]
 name = "regex"
 version = "2024.11.6"
@@ -1153,7 +1158,7 @@ dependencies = [
     { name = "hypercorn" },
     { name = "python-decouple" },
     { name = "python-gnupg" },
-    { name = "quart-schema" },
+    { name = "quart-schema", extra = ["pydantic"] },
     { name = "sqlmodel" },
 ]
 
@@ -1188,7 +1193,7 @@ requires-dist = [
     { name = "hypercorn", specifier = "~=0.17" },
     { name = "python-decouple", specifier = "~=3.8" },
     { name = "python-gnupg", specifier = "~=0.5" },
-    { name = "quart-schema", specifier = "~=0.21" },
+    { name = "quart-schema", extras = ["pydantic"], specifier = "~=0.21" },
     { name = "sqlmodel", specifier = "~=0.0" },
 ]
 
