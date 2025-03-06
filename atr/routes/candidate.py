@@ -17,12 +17,8 @@
 
 """candidate.py"""
 
-import asyncio
 import datetime
 import secrets
-import shutil
-import tempfile
-from contextlib import asynccontextmanager
 from typing import cast
 
 from quart import Request, redirect, render_template, request, url_for
@@ -46,41 +42,10 @@ from atr.db.models import (
     ReleaseStage,
     Task,
 )
-from atr.routes import app_route, get_form
+from atr.routes import app_route, format_file_size, get_form
 
 if APP is ...:
     raise RuntimeError("APP is not set")
-
-
-@asynccontextmanager
-async def ephemeral_gpg_home():
-    """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
-    # TODO: This is only used in key_user_add
-    # We could even inline it there
-    temp_dir = await asyncio.to_thread(tempfile.mkdtemp, prefix="gpg-")
-    try:
-        yield temp_dir
-    finally:
-        await asyncio.to_thread(shutil.rmtree, temp_dir)
-
-
-def format_file_size(size_in_bytes: int) -> str:
-    """Format a file size with appropriate units and comma-separated digits."""
-    # Format the raw bytes with commas
-    formatted_bytes = f"{size_in_bytes:,}"
-
-    # Calculate the appropriate unit
-    if size_in_bytes >= 1_000_000_000:
-        size_in_gb = size_in_bytes // 1_000_000_000
-        return f"{size_in_gb:,} GB ({formatted_bytes} bytes)"
-    elif size_in_bytes >= 1_000_000:
-        size_in_mb = size_in_bytes // 1_000_000
-        return f"{size_in_mb:,} MB ({formatted_bytes} bytes)"
-    elif size_in_bytes >= 1_000:
-        size_in_kb = size_in_bytes // 1_000
-        return f"{size_in_kb:,} KB ({formatted_bytes} bytes)"
-    else:
-        return f"{formatted_bytes} bytes"
 
 
 def format_artifact_name(project_name: str, product_name: str, version: str, is_podling: bool = False) -> str:

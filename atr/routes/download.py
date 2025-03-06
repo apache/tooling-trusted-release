@@ -17,15 +17,6 @@
 
 """download.py"""
 
-import asyncio
-import datetime
-import hashlib
-import pprint
-import secrets
-import shutil
-import tempfile
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import cast
 
@@ -33,163 +24,22 @@ import aiofiles
 import aiofiles.os
 from quart import flash, redirect, send_file, url_for
 from quart.wrappers.response import Response as QuartResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlmodel import select
-from werkzeug.datastructures import FileStorage
 from werkzeug.wrappers.response import Response
 
 from asfquart.auth import Requirements, require
 from asfquart.base import ASFQuartException
-from asfquart.session import ClientSession
 from asfquart.session import read as session_read
 from atr.db import create_async_db_session
 from atr.db.models import (
     PMC,
     Package,
-    PMCKeyLink,
-    PublicSigningKey,
     Release,
 )
-from atr.routes import FlashError, app_route
-from atr.util import compute_sha512, get_release_storage_dir
-
-
-@asynccontextmanager
-async def ephemeral_gpg_home() -> AsyncGenerator[str]:
-    """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
-    # TODO: This is only used in key_user_add
-    # We could even inline it there
-    temp_dir = await asyncio.to_thread(tempfile.mkdtemp, prefix="gpg-")
-    try:
-        yield temp_dir
-    finally:
-        await asyncio.to_thread(shutil.rmtree, temp_dir)
-
-
-async def file_hash_save(base_dir: Path, file: FileStorage) -> tuple[str, int]:
-    """
-    Save a file using its SHA3-256 hash as the filename.
-    Returns the hash and size in bytes of the saved file.
-    """
-    sha3 = hashlib.sha3_256()
-    total_bytes = 0
-
-    # Create temporary file to stream to while computing hash
-    temp_path = base_dir / f"temp-{secrets.token_hex(8)}"
-    try:
-        stream = file.stream
-
-        async with aiofiles.open(temp_path, "wb") as f:
-            while True:
-                chunk = await asyncio.to_thread(stream.read, 8192)
-                if not chunk:
-                    break
-                sha3.update(chunk)
-                total_bytes += len(chunk)
-                await f.write(chunk)
-
-        file_hash = sha3.hexdigest()
-        final_path = base_dir / file_hash
-
-        # Only move to final location if it doesn't exist
-        # This can race, but it's hash based so it's okay
-        if not await aiofiles.os.path.exists(final_path):
-            await aiofiles.os.rename(temp_path, final_path)
-        else:
-            # If file already exists, just remove the temp file
-            await aiofiles.os.remove(temp_path)
-
-        return file_hash, total_bytes
-    except Exception as e:
-        if await aiofiles.os.path.exists(temp_path):
-            await aiofiles.os.remove(temp_path)
-        raise e
-
-
-async def key_user_session_add(
-    session: ClientSession,
-    public_key: str,
-    key: dict,
-    selected_pmcs: list[str],
-    db_session: AsyncSession,
-) -> dict | None:
-    # TODO: Check if key already exists
-    # psk_statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
-
-    # # If uncommented, this will prevent a user from adding a second key
-    # existing_key = (await db_session.execute(statement)).scalar_one_or_none()
-    # if existing_key:
-    #     return ("You already have a key registered", None)
-
-    if not session.uid:
-        raise FlashError("You must be signed in to add a key")
-
-    fingerprint = key.get("fingerprint")
-    if not isinstance(fingerprint, str):
-        raise FlashError("Invalid key fingerprint")
-    fingerprint = fingerprint.lower()
-    uids = key.get("uids")
-    async with db_session.begin():
-        # Create new key record
-        key_record = PublicSigningKey(
-            fingerprint=fingerprint,
-            algorithm=int(key["algo"]),
-            length=int(key.get("length", "0")),
-            created=datetime.datetime.fromtimestamp(int(key["date"])),
-            expires=datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
-            declared_uid=uids[0] if uids else None,
-            apache_uid=session.uid,
-            ascii_armored_key=public_key,
-        )
-        db_session.add(key_record)
-
-        # Link key to selected PMCs
-        for pmc_name in selected_pmcs:
-            pmc_statement = select(PMC).where(PMC.project_name == pmc_name)
-            pmc = (await db_session.execute(pmc_statement)).scalar_one_or_none()
-            if pmc and pmc.id:
-                link = PMCKeyLink(pmc_id=pmc.id, key_fingerprint=key_record.fingerprint)
-                db_session.add(link)
-            else:
-                # TODO: Log? Add to "error"?
-                continue
-
-    return {
-        "key_id": key["keyid"],
-        "fingerprint": key["fingerprint"].lower() if key.get("fingerprint") else "Unknown",
-        "user_id": key["uids"][0] if key.get("uids") else "Unknown",
-        "creation_date": datetime.datetime.fromtimestamp(int(key["date"])),
-        "expiration_date": datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
-        "data": pprint.pformat(key),
-    }
-
-
-# Package functions
-
-
-async def package_add_artifact_info_get(
-    db_session: AsyncSession, uploads_path: Path, artifact_file: FileStorage
-) -> tuple[str, str, int]:
-    """Get artifact information during package addition process.
-
-    Returns a tuple of (sha3_hash, sha512_hash, size) for the artifact file.
-    Validates that the artifact hasn't already been uploaded to another release.
-    """
-    # In a separate function to appease the complexity checker
-    artifact_sha3, artifact_size = await file_hash_save(uploads_path, artifact_file)
-
-    # Check for duplicates by artifact_sha3 before proceeding
-    package_statement = select(Package).where(Package.artifact_sha3 == artifact_sha3)
-    duplicate = (await db_session.execute(package_statement)).first()
-    if duplicate:
-        # Remove the saved file since we won't be using it
-        await aiofiles.os.remove(uploads_path / artifact_sha3)
-        raise FlashError("This exact file has already been uploaded to another release")
-
-    # Compute SHA-512 of the artifact for the package record
-    return artifact_sha3, await compute_sha512(uploads_path / artifact_sha3), artifact_size
+from atr.routes import app_route
+from atr.util import get_release_storage_dir
 
 
 @app_route("/download/<release_key>/<artifact_sha3>")

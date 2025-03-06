@@ -50,7 +50,7 @@ from atr.db.models import (
     Task,
     TaskStatus,
 )
-from atr.routes import FlashError, app_route, get_form
+from atr.routes import FlashError, app_route, format_file_size, get_form, package_files_delete
 from atr.util import compute_sha512, get_release_storage_dir
 
 
@@ -92,25 +92,6 @@ async def file_hash_save(base_dir: Path, file: FileStorage) -> tuple[str, int]:
         if await aiofiles.os.path.exists(temp_path):
             await aiofiles.os.remove(temp_path)
         raise e
-
-
-def format_file_size(size_in_bytes: int) -> str:
-    """Format a file size with appropriate units and comma-separated digits."""
-    # Format the raw bytes with commas
-    formatted_bytes = f"{size_in_bytes:,}"
-
-    # Calculate the appropriate unit
-    if size_in_bytes >= 1_000_000_000:
-        size_in_gb = size_in_bytes // 1_000_000_000
-        return f"{size_in_gb:,} GB ({formatted_bytes} bytes)"
-    elif size_in_bytes >= 1_000_000:
-        size_in_mb = size_in_bytes // 1_000_000
-        return f"{size_in_mb:,} MB ({formatted_bytes} bytes)"
-    elif size_in_bytes >= 1_000:
-        size_in_kb = size_in_bytes // 1_000
-        return f"{size_in_kb:,} KB ({formatted_bytes} bytes)"
-    else:
-        return f"{formatted_bytes} bytes"
 
 
 # Package functions
@@ -258,19 +239,6 @@ async def package_data_get(db_session: AsyncSession, artifact_sha3: str, release
             raise FlashError("You don't have permission to access this package")
 
     return package
-
-
-async def package_files_delete(package: Package, uploads_path: Path) -> None:
-    """Delete the artifact and signature files associated with a package."""
-    if package.artifact_sha3:
-        artifact_path = uploads_path / package.artifact_sha3
-        if await aiofiles.os.path.exists(artifact_path):
-            await aiofiles.os.remove(artifact_path)
-
-    if package.signature_sha3:
-        signature_path = uploads_path / package.signature_sha3
-        if await aiofiles.os.path.exists(signature_path):
-            await aiofiles.os.remove(signature_path)
 
 
 # Release functions

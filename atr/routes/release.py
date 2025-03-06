@@ -22,8 +22,6 @@ import logging.handlers
 from pathlib import Path
 from typing import cast
 
-import aiofiles
-import aiofiles.os
 from quart import flash, redirect, render_template, request, url_for
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -38,32 +36,15 @@ from asfquart.session import read as session_read
 from atr.db import create_async_db_session
 from atr.db.models import (
     PMC,
-    Package,
     Release,
     Task,
     TaskStatus,
 )
-from atr.routes import FlashError, app_route, get_form
+from atr.routes import FlashError, app_route, get_form, package_files_delete
 from atr.util import get_release_storage_dir
 
 if APP is ...:
     raise RuntimeError("APP is not set")
-
-
-# Package functions
-
-
-async def package_files_delete(package: Package, uploads_path: Path) -> None:
-    """Delete the artifact and signature files associated with a package."""
-    if package.artifact_sha3:
-        artifact_path = uploads_path / package.artifact_sha3
-        if await aiofiles.os.path.exists(artifact_path):
-            await aiofiles.os.remove(artifact_path)
-
-    if package.signature_sha3:
-        signature_path = uploads_path / package.signature_sha3
-        if await aiofiles.os.path.exists(signature_path):
-            await aiofiles.os.remove(signature_path)
 
 
 # Release functions

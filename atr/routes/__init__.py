@@ -20,13 +20,16 @@ import functools
 import logging
 import time
 from collections.abc import Awaitable, Callable, Coroutine
+from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
 
 import aiofiles
+import aiofiles.os
 from quart import Request
 from werkzeug.datastructures import MultiDict
 
 from asfquart import APP
+from atr.db.models import Package
 
 if APP is ...:
     raise RuntimeError("APP is not set")
@@ -251,6 +254,25 @@ def app_route_performance_measure(route_path: str, http_methods: list[str] | Non
     return decorator
 
 
+def format_file_size(size_in_bytes: int) -> str:
+    """Format a file size with appropriate units and comma-separated digits."""
+    # Format the raw bytes with commas
+    formatted_bytes = f"{size_in_bytes:,}"
+
+    # Calculate the appropriate unit
+    if size_in_bytes >= 1_000_000_000:
+        size_in_gb = size_in_bytes // 1_000_000_000
+        return f"{size_in_gb:,} GB ({formatted_bytes} bytes)"
+    elif size_in_bytes >= 1_000_000:
+        size_in_mb = size_in_bytes // 1_000_000
+        return f"{size_in_mb:,} MB ({formatted_bytes} bytes)"
+    elif size_in_bytes >= 1_000:
+        size_in_kb = size_in_bytes // 1_000
+        return f"{size_in_kb:,} KB ({formatted_bytes} bytes)"
+    else:
+        return f"{formatted_bytes} bytes"
+
+
 async def get_form(request: Request) -> MultiDict:
     # The request.form() method in Quart calls a synchronous tempfile method
     # It calls quart.wrappers.request.form _load_form_data
@@ -274,3 +296,16 @@ async def get_form(request: Request) -> MultiDict:
     if blockbuster is not None:
         blockbuster.activate()
     return form
+
+
+async def package_files_delete(package: Package, uploads_path: Path) -> None:
+    """Delete the artifact and signature files associated with a package."""
+    if package.artifact_sha3:
+        artifact_path = uploads_path / package.artifact_sha3
+        if await aiofiles.os.path.exists(artifact_path):
+            await aiofiles.os.remove(artifact_path)
+
+    if package.signature_sha3:
+        signature_path = uploads_path / package.signature_sha3
+        if await aiofiles.os.path.exists(signature_path):
+            await aiofiles.os.remove(signature_path)
