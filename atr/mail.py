@@ -188,25 +188,24 @@ class LoggingSMTP(smtplib.SMTP):
 
 
 def send_one(mx_host: str, from_addr: str, to_addr: str, msg_reader: StringIO) -> None:
-    """Send an email to a single recipient via a specific MX server."""
+    """Send an email to a single recipient via the ASF mail relay."""
     default_timeout_seconds = 30
 
     try:
-        # Connect to the SMTP server
-        logging.info(f"Connecting to {mx_host}:25")
-        smtp = LoggingSMTP(mx_host, 25, timeout=default_timeout_seconds)
+        # Connect to the ASF mail relay
+        mail_relay = "mail-relay.apache.org"
+        logging.info(f"Connecting to {mail_relay}:587")
+        smtp = LoggingSMTP(mail_relay, 587, timeout=default_timeout_seconds)
         smtp.set_debuglevel(2)
 
         # Identify ourselves to the server
         smtp.ehlo(global_domain)
 
-        # If STARTTLS is available, use it
-        if smtp.has_extn("STARTTLS"):
-            context = ssl.create_default_context()
-            context.minimum_version = ssl.TLSVersion.TLSv1_2
-            smtp.starttls(context=context)
-            # Re-identify after TLS
-            smtp.ehlo(global_domain)
+        # Use STARTTLS for port 587
+        context = ssl.create_default_context()
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        smtp.starttls(context=context)
+        smtp.ehlo(global_domain)
 
         # Send the message
         smtp.mail(from_addr)
