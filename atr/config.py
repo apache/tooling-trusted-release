@@ -17,7 +17,6 @@
 
 import os
 from enum import Enum
-from typing import Any, TypeVar
 
 from decouple import config
 
@@ -25,14 +24,6 @@ from atr.db.models import __file__ as data_models_file
 
 MB = 1024 * 1024
 GB = 1024 * MB
-
-T = TypeVar("T")
-
-
-def ensure_type(value: Any, expected_type: type[T]) -> T:
-    if not isinstance(value, expected_type):
-        raise TypeError(f"Expected {expected_type.__name__}, got {type(value).__name__}")
-    return value
 
 
 class AppConfig:
@@ -46,10 +37,10 @@ class AppConfig:
     DATA_MODELS_FILE = data_models_file
 
     # TODO: Understand why cast=str doesn't satisfy the type checker
-    SQLITE_DB_PATH: str = ensure_type(config("SQLITE_DB_PATH", default="/atr.db"), str)
+    SQLITE_DB_PATH = config("SQLITE_DB_PATH", default="/atr.db")
 
     # Apache RAT configuration
-    APACHE_RAT_JAR_PATH: str = ensure_type(config("APACHE_RAT_JAR_PATH", default="state/apache-rat-0.16.1.jar"), str)
+    APACHE_RAT_JAR_PATH = config("APACHE_RAT_JAR_PATH", default="state/apache-rat-0.16.1.jar")
     # Maximum size limit for archive extraction
     MAX_EXTRACT_SIZE: int = config("MAX_EXTRACT_SIZE", default=2 * GB, cast=int)
     # Chunk size for reading files during extraction
@@ -91,7 +82,7 @@ class ConfigMode(Enum):
 
 
 # Load all possible configurations
-config_dict = {
+_CONFIG_DICT = {
     ConfigMode.Debug: DebugConfig,
     ConfigMode.Production: ProductionConfig,
     ConfigMode.Profiling: ProfilingConfig,
@@ -118,9 +109,6 @@ def get_config_mode() -> ConfigMode:
 
 def get_config() -> type[AppConfig]:
     try:
-        return config_dict[get_config_mode()]
+        return _CONFIG_DICT[get_config_mode()]
     except KeyError:
         exit("Error: Invalid <config_mode>. Expected values [Debug, Production, Profiling].")
-
-
-# WARNING: Don't run with debug turned on in production!
