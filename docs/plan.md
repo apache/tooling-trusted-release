@@ -86,8 +86,8 @@ Advanced tasks, possibly deferred
 1. Fix bugs and improve workflow
    - [DONE] Add ATR commit or version number to the UI
    - [DONE] Fix and improve the package checks summary count
-   - Ensure that all errors are caught and logged or displayed
-   - Improve the proprietary platform patch in ASFQuart and submit upstream
+   - [DONE] Improve the proprietary platform patch in ASFQuart
+   - [DONE] Ensure that all errors are caught and logged or displayed
    - Add further tests
 
 2. Ensure that performance is optimal

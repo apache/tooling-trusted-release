@@ -23,6 +23,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from blockbuster import BlockBuster
+from quart import render_template
 from quart_schema import OpenAPIProvider, QuartSchema
 from werkzeug.routing import Rule
 
@@ -174,6 +175,15 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
     # do not enable template pre-loading if we explicitly want to reload templates
     if not app_config.TEMPLATES_AUTO_RELOAD:
         setup_template_preloading(app)
+
+    # Add a global error handler to show helpful error messages with tracebacks
+    @app.errorhandler(Exception)
+    async def handle_any_exception(error: Exception) -> Any:
+        import traceback
+
+        tb = traceback.format_exc()
+        app.logger.error(f"Unhandled exception: {error}\n{tb}")
+        return await render_template("error.html", error=str(error), traceback=tb, status_code=500), 500
 
     @app.before_serving
     async def start_blockbuster() -> None:
