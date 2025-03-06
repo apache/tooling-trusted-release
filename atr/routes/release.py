@@ -40,6 +40,7 @@ from atr.db.models import (
     Task,
     TaskStatus,
 )
+from atr.db.service import get_release_by_key
 from atr.routes import FlashError, app_route, get_form, package_files_delete
 from atr.util import get_release_storage_dir
 
@@ -157,3 +158,120 @@ async def release_bulk_status(task_id: int) -> str | Response:
                     return redirect(url_for("root_candidate_review"))
 
     return await render_template("release-bulk.html", task=task, release=release, TaskStatus=TaskStatus)
+
+
+@app_route("/release/vote", methods=["GET", "POST"])
+@require(Requirements.committer)
+async def root_release_vote() -> Response | str:
+    """Show the vote initiation form for a release."""
+
+    session = await session_read()
+    if session is None:
+        raise ASFQuartException("Not authenticated", errorcode=401)
+
+    release_key = request.args.get("release_key", "")
+    form = None
+    if request.method == "POST":
+        form = await get_form(request)
+        release_key = form.get("release_key", "")
+
+    if not release_key:
+        await flash("No release key provided", "error")
+        return redirect(url_for("root_candidate_review"))
+
+    release = await get_release_by_key(release_key)
+    if release is None:
+        await flash(f"Release with key {release_key} not found", "error")
+        return redirect(url_for("root_candidate_review"))
+
+    # If POST, process the form and create a vote_initiate task
+    if (request.method == "POST") and (form is not None):
+        # Extract form data
+        mailing_list = form.get("mailing_list", "dev")
+        vote_duration = form.get("vote_duration", "72")
+        # These fields are just for testing, we'll do something better in the real UI
+        gpg_key_id = form.get("gpg_key_id", "")
+        commit_hash = form.get("commit_hash", "")
+        if release.pmc is None:
+            raise ASFQuartException("Release has no associated PMC", errorcode=400)
+
+        # Prepare email recipient
+        email_to = f"{mailing_list}@{release.pmc.project_name}.apache.org"
+
+        # Create a task for vote initiation
+        task = Task(
+            status=TaskStatus.QUEUED,
+            task_type="vote_initiate",
+            task_args=[
+                release_key,
+                email_to,
+                vote_duration,
+                gpg_key_id,
+                commit_hash,
+                session.uid,
+            ],
+        )
+        async with create_async_db_session() as db_session:
+            db_session.add(task)
+            # Flush to get the task ID
+            await db_session.flush()
+            await db_session.commit()
+
+            await flash(
+                f"Vote initiation task queued as task #{task.id}. You'll receive an email confirmation when complete.",
+                "success",
+            )
+            return redirect(url_for("root_candidate_review"))
+
+    # For GET
+    return await render_template(
+        "release-vote.html",
+        release=release,
+        email_preview=generate_vote_email_preview(release),
+    )
+
+
+def generate_vote_email_preview(release: Release) -> str:
+    """Generate a preview of the vote email."""
+    version = release.version
+
+    # Get PMC details
+    if release.pmc is None:
+        raise ASFQuartException("Release has no associated PMC", errorcode=400)
+    pmc_name = release.pmc.project_name
+    pmc_display = release.pmc.display_name
+
+    # Get product information
+    product_name = release.product_line.product_name if release.product_line else "Unknown"
+
+    # Create email subject
+    subject = f"[VOTE] Release Apache {pmc_display} {product_name} {version}"
+
+    # Create email body
+    body = f"""Hello {pmc_name},
+
+I'd like to call a vote on releasing the following artifacts as
+Apache {pmc_display} {product_name} {version}.
+
+The release candidate can be found at:
+
+https://apache.example.org/{pmc_name}/{product_name}-{version}/
+
+The release artifacts are signed with my GPG key, [KEY_ID].
+
+The artifacts were built from commit:
+
+[COMMIT_HASH]
+
+Please review the release candidate and vote accordingly.
+
+[ ] +1 Release this package
+[ ] +0 Abstain
+[ ] -1 Do not release this package (please provide specific comments)
+
+This vote will remain open for at least 72 hours.
+
+Thanks,
+[YOUR_NAME]
+"""
+    return f"{subject}\n\n{body}"

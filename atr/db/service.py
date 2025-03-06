@@ -16,11 +16,14 @@
 # under the License.
 
 from collections.abc import Sequence
+from typing import cast
 
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlmodel import select
 
-from atr.db.models import PMC, Task
+from atr.db.models import PMC, ProductLine, Release, Task
 
 from . import create_async_db_session
 
@@ -38,6 +41,36 @@ async def get_pmcs() -> Sequence[PMC]:
         statement = select(PMC)
         pmcs = (await db_session.execute(statement)).scalars().all()
         return pmcs
+
+
+async def get_release_by_key(storage_key: str) -> Release | None:
+    """Get a release by its storage key."""
+    async with create_async_db_session() as db_session:
+        # Get the release with its PMC and product line
+        query = (
+            select(Release)
+            .where(Release.storage_key == storage_key)
+            .options(selectinload(cast(InstrumentedAttribute[PMC], Release.pmc)))
+            .options(selectinload(cast(InstrumentedAttribute[ProductLine], Release.product_line)))
+        )
+        result = await db_session.execute(query)
+        return result.scalar_one_or_none()
+
+
+def get_release_by_key_sync(storage_key: str) -> Release | None:
+    """Synchronous version of get_release_by_key for use in background tasks."""
+    from atr.db import create_sync_db_session
+
+    with create_sync_db_session() as session:
+        # Get the release with its PMC and product line
+        query = (
+            select(Release)
+            .where(Release.storage_key == storage_key)
+            .options(selectinload(cast(InstrumentedAttribute[PMC], Release.pmc)))
+            .options(selectinload(cast(InstrumentedAttribute[ProductLine], Release.product_line)))
+        )
+        result = session.execute(query)
+        return result.scalar_one_or_none()
 
 
 async def get_tasks(limit: int, offset: int) -> tuple[Sequence[Task], int]:

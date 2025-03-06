@@ -1,0 +1,218 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Start release vote ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Initiate a vote for a release candidate.
+{% endblock description %}
+
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .vote-container {
+          max-width: 1000px;
+          margin: 0 auto;
+      }
+
+      .form-group {
+          margin-bottom: 1.5rem;
+      }
+
+      .form-table {
+          width: 100%;
+          margin-bottom: 1.5rem;
+      }
+
+      .form-table th {
+          width: 200px;
+          text-align: right;
+          padding-right: 1rem;
+          vertical-align: top;
+          font-weight: 500;
+      }
+
+      .form-table td {
+          vertical-align: top;
+      }
+
+      .form-table label {
+          border-bottom: none;
+          padding-bottom: 0;
+      }
+
+      .radio-group {
+          display: flex;
+          gap: 1.5rem;
+      }
+
+      .radio-option {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+      }
+
+      .submit-button {
+          padding: 0.5rem 1rem;
+          background: #004477;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 500;
+          font-size: 1rem;
+          margin-top: 1rem;
+      }
+
+      .submit-button:hover {
+          background: #003366;
+      }
+
+      .cancel-link {
+          margin-left: 1rem;
+          color: #666;
+          text-decoration: none;
+      }
+
+      .cancel-link:hover {
+          text-decoration: underline;
+      }
+
+      .release-info {
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          padding: 1rem;
+          margin-bottom: 1.5rem;
+          background-color: #f8f8f8;
+      }
+
+      .email-preview {
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          padding: 1rem;
+          margin-top: 1rem;
+          background-color: #fff;
+          font-family: monospace;
+          white-space: pre-wrap;
+          overflow-x: auto;
+      }
+
+      .preview-header {
+          font-weight: 600;
+          margin-bottom: 0.5rem;
+      }
+
+      .warning-text {
+          color: #856404;
+          background-color: #fff3cd;
+          border: 1px solid #ffeeba;
+          border-radius: 4px;
+          padding: 1rem;
+          margin-bottom: 1.5rem;
+      }
+
+      select,
+      input[type="text"] {
+          padding: 0.375rem;
+          border: 1px solid #ced4da;
+          border-radius: 0.25rem;
+          width: 100%;
+          max-width: 600px;
+      }
+  </style>
+{% endblock stylesheets %}
+
+{% block content %}
+  <div class="vote-container">
+    <h1>Start release vote</h1>
+
+    <div class="release-info">
+      <h3>
+        {{ release.pmc.display_name }} - {{ release.product_line.product_name if release.product_line else "Unknown" }} {{ release.version }}
+      </h3>
+      <p>Initiating a vote for this release candidate will prepare an email to be sent to the appropriate mailing list.</p>
+    </div>
+
+    <div class="warning-text">
+      <strong>Note:</strong> This feature is currently in development. The form below only sends email to a test account.
+    </div>
+
+    <form method="post"
+          action="{{ url_for('root_release_vote') }}"
+          class="striking">
+      <input type="hidden" name="release_key" value="{{ release.storage_key }}" />
+
+      <table class="form-table">
+        <tbody>
+          <tr>
+            <th>
+              <label>Send vote email to:</label>
+            </th>
+            <td>
+              <div class="radio-group">
+                <div class="radio-option">
+                  <input type="radio" id="list_dev" name="mailing_list" value="dev" checked />
+                  <label for="list_dev">dev@{{ release.pmc.project_name }}.apache.org</label>
+                </div>
+                <div class="radio-option">
+                  <input type="radio" id="list_private" name="mailing_list" value="private" />
+                  <label for="list_private">private@{{ release.pmc.project_name }}.apache.org</label>
+                </div>
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <th>
+              <label for="vote_duration">Vote duration:</label>
+            </th>
+            <td>
+              <select id="vote_duration" name="vote_duration" class="form-select">
+                <option value="72">72 hours (minimum)</option>
+                <option value="120">5 days</option>
+                <option value="168">7 days</option>
+              </select>
+            </td>
+          </tr>
+
+          <tr>
+            <th>
+              <label for="gpg_key_id">Your GPG key ID:</label>
+            </th>
+            <td>
+              <input type="text"
+                     id="gpg_key_id"
+                     name="gpg_key_id"
+                     class="form-control"
+                     placeholder="e.g., 0x1A2B3C4D" />
+            </td>
+          </tr>
+
+          <tr>
+            <th>
+              <label for="commit_hash">Commit hash:</label>
+            </th>
+            <td>
+              <input type="text"
+                     id="commit_hash"
+                     name="commit_hash"
+                     class="form-control"
+                     placeholder="Git commit hash used for this release" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="form-group">
+        <label class="preview-header">Email Preview:</label>
+        <div class="email-preview">{{ email_preview }}</div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="submit-button">Prepare Vote Email</button>
+        <a href="{{ url_for('root_candidate_review') }}" class="cancel-link">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock content %}

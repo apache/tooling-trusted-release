@@ -235,6 +235,8 @@
               Delete release
             </button>
           </form>
+          <a class="verify-link"
+             href="{{ url_for('root_release_vote', release_key=release.storage_key) }}">Start vote</a>
         </div>
       </div>
 

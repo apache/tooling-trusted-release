@@ -25,6 +25,7 @@ from typing import Any
 from blockbuster import BlockBuster
 from quart import render_template
 from quart_schema import OpenAPIProvider, QuartSchema
+from werkzeug.exceptions import NotFound
 from werkzeug.routing import Rule
 
 import asfquart
@@ -179,6 +180,8 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
     # Add a global error handler to show helpful error messages with tracebacks
     @app.errorhandler(Exception)
     async def handle_any_exception(error: Exception) -> Any:
+        if isinstance(error, NotFound):
+            return await render_template("error.html", error="404 Not Found", traceback="", status_code=404), 404
         import traceback
 
         tb = traceback.format_exc()

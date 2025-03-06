@@ -397,6 +397,7 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
     # We need to move the other tasks into atr.tasks
     from atr.tasks.bulk import download as bulk_download
     from atr.tasks.mailtest import send as mailtest_send
+    from atr.tasks.vote import initiate as vote_initiate
 
     _LOGGER.info(f"Processing task {task_id} ({task_type}) with args {task_args}")
     try:
@@ -414,6 +415,7 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
             "generate_cyclonedx_sbom": task_generate_cyclonedx_sbom,
             "package_bulk_download": bulk_download,
             "mailtest_send": mailtest_send,
+            "vote_initiate": vote_initiate,
         }
 
         handler = task_handlers.get(task_type)

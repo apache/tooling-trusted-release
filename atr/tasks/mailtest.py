@@ -96,7 +96,10 @@ def send(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
 
 def send_core(args_list: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
     """Send a test email."""
+    import asyncio
+
     import atr.mail
+    from atr.db.service import get_pmc_by_name
 
     logger.info("Starting send_core")
     try:
@@ -118,6 +121,35 @@ def send_core(args_list: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
         logger.info(
             f"Args parsed successfully: artifact_name={args.artifact_name}, email_recipient={args.email_recipient}"
         )
+
+        # Check if the recipient is allowed
+        # They must be a PMC member of tooling or dev@tooling.apache.org
+        email_recipient = args.email_recipient
+        local_part, domain = email_recipient.split("@", 1)
+
+        # Allow dev@tooling.apache.org
+        if email_recipient != "dev@tooling.apache.org":
+            # Must be a PMC member of tooling
+            # Since get_pmc_by_name is async, we need to run it in an event loop
+            # TODO: We could make a sync version
+            tooling_pmc = asyncio.run(get_pmc_by_name("tooling"))
+
+            if not tooling_pmc:
+                error_msg = "Tooling PMC not found in database"
+                logger.error(error_msg)
+                return "FAILED", error_msg, tuple()
+
+            if domain != "apache.org":
+                error_msg = f"Email domain must be apache.org, got {domain}"
+                logger.error(error_msg)
+                return "FAILED", error_msg, tuple()
+
+            if local_part not in tooling_pmc.pmc_members:
+                error_msg = f"Email recipient {local_part} is not a member of the tooling PMC"
+                logger.error(error_msg)
+                return "FAILED", error_msg, tuple()
+
+            logger.info(f"Recipient {email_recipient} is a tooling PMC member, allowed")
 
         # Load and set DKIM key
         try:

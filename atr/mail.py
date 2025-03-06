@@ -56,6 +56,19 @@ class ArtifactEvent:
         self.token = token
 
 
+class VoteEvent:
+    """Data class to represent a release vote event."""
+
+    def __init__(
+        self, release_key: str, email_recipient: str, subject: str, body: str, vote_end: datetime.datetime
+    ) -> None:
+        self.release_key = release_key
+        self.email_recipient = email_recipient
+        self.subject = subject
+        self.body = body
+        self.vote_end = vote_end
+
+
 def split_address(addr: str) -> tuple[str, str]:
     """Split an email address into local and domain parts."""
     parts = addr.split("@", 1)
@@ -64,15 +77,41 @@ def split_address(addr: str) -> tuple[str, str]:
     return parts[0], parts[1]
 
 
-def send(event: ArtifactEvent) -> None:
-    """Send an email notification about an artifact."""
+def validate_recipient(to_addr: str) -> None:
+    # Ensure recipient is @apache.org or @tooling.apache.org
+    _, domain = split_address(to_addr)
+    if domain not in ("apache.org", "tooling.apache.org"):
+        error_msg = f"Email recipient must be @apache.org or @tooling.apache.org, got {to_addr}"
+        logging.error(error_msg)
+        raise ValueError(error_msg)
+
+
+def send(event: ArtifactEvent | VoteEvent) -> None:
+    """Send an email notification about an artifact or a vote."""
     logging.info(f"Sending email for event: {event}")
     from_addr = global_email_contact
     to_addr = event.email_recipient
+    validate_recipient(to_addr)
+
     # UUID4 is entirely random, with no timestamp nor namespace
     # It does have 6 version and variant bits, so only 122 bits are random
     mid = f"<{uuid.uuid4()}@{global_domain}>"
-    msg_text = f"""
+
+    # Different message format depending on event type
+    if isinstance(event, VoteEvent):
+        msg_text = f"""
+From: {from_addr}
+To: {to_addr}
+Subject: {event.subject}
+Date: {formatdate(localtime=True)}
+Message-ID: {mid}
+
+{event.body}
+"""
+    else:
+        # ArtifactEvent
+        # This was just for testing
+        msg_text = f"""
 From: {from_addr}
 To: {to_addr}
 Subject: {event.artifact_name}
@@ -99,9 +138,11 @@ If you have any questions, please reply to this email.
 
     try:
         send_many(from_addr, [to_addr], msg_text)
-        logging.info(f"sent to {to_addr}")
     except Exception as e:
         logging.error(f"send error: {e}")
+        raise e
+    else:
+        logging.info(f"sent to {to_addr}")
 
     elapsed = time.perf_counter() - start
     logging.info(f" send_many took {elapsed:.3f}s")
@@ -190,6 +231,7 @@ class LoggingSMTP(smtplib.SMTP):
 def send_one(mx_host: str, from_addr: str, to_addr: str, msg_reader: StringIO) -> None:
     """Send an email to a single recipient via the ASF mail relay."""
     default_timeout_seconds = 30
+    validate_recipient(to_addr)
 
     try:
         # Connect to the ASF mail relay
