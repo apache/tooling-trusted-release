@@ -40,7 +40,7 @@ async def get_pmcs() -> Sequence[PMC]:
         return pmcs
 
 
-async def get_tasks_paged(limit: int, offset: int) -> tuple[Sequence[Task], int]:
+async def get_tasks(limit: int, offset: int) -> tuple[Sequence[Task], int]:
     """Returns a list of Tasks based on limit and offset values together with the total count."""
 
     async with create_async_db_session() as db_session:

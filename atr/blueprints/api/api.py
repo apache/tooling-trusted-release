@@ -17,23 +17,38 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
 
 from quart import Response, jsonify
-from quart_schema import validate_querystring
+from quart_schema import validate_querystring, validate_response
+from werkzeug.exceptions import NotFound
 
-from atr.db.service import get_pmc_by_name, get_tasks_paged
+from atr.db.models import PMC
+from atr.db.service import get_pmc_by_name, get_pmcs, get_tasks
 
 from . import blueprint
 
+# FIXME: we need to return the dumped model instead of the actual pydantic class
+#        as otherwise pyright will complain about the return type
+#        it would work though, see https://github.com/pgjones/quart-schema/issues/91
+#        For now, just explicitly dump the model.
 
-@blueprint.route("/project/<project_name>")
-async def api_pmc(project_name: str) -> tuple[Mapping[str, Any], int]:
+
+@blueprint.route("/projects/<project_name>")
+@validate_response(PMC, 200)
+async def project_by_name(project_name: str) -> tuple[Mapping, int]:
     pmc = await get_pmc_by_name(project_name)
     if pmc:
         return pmc.model_dump(), 200
     else:
-        return {}, 404
+        raise NotFound()
+
+
+@blueprint.route("/projects")
+@validate_response(list[PMC], 200)
+async def projects() -> tuple[list[Mapping], int]:
+    """List all projects in the database."""
+    pmcs = await get_pmcs()
+    return [pmc.model_dump() for pmc in pmcs], 200
 
 
 @dataclass
@@ -45,6 +60,6 @@ class Pagination:
 @blueprint.route("/tasks")
 @validate_querystring(Pagination)
 async def api_tasks(query_args: Pagination) -> Response:
-    paged_tasks, count = await get_tasks_paged(limit=query_args.limit, offset=query_args.offset)
+    paged_tasks, count = await get_tasks(limit=query_args.limit, offset=query_args.offset)
     result = {"data": [x.model_dump(exclude={"result"}) for x in paged_tasks], "count": count}
     return jsonify(result)
