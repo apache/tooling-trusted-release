@@ -23,7 +23,7 @@ from asfquart import APP
 from asfquart.auth import Requirements, require
 from asfquart.base import ASFQuartException
 from asfquart.session import read as session_read
-from atr.db import get_session
+from atr.db import create_async_db_session
 from atr.db.models import Task, TaskStatus
 from atr.routes import app_route, get_form
 
@@ -62,7 +62,7 @@ async def dev_email_send() -> ResponseReturnValue:
             )
 
         # Create a task for mail testing
-        async with get_session() as db_session:
+        async with create_async_db_session() as db_session:
             async with db_session.begin():
                 task = Task(
                     status=TaskStatus.QUEUED,

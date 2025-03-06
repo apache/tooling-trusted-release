@@ -28,7 +28,7 @@ from io import TextIOWrapper
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from atr.db import get_session
+from atr.db import create_async_db_session
 
 # Configure logging
 logging.basicConfig(
@@ -309,7 +309,7 @@ class WorkerManager:
         Returns True if the worker has been terminated.
         """
         try:
-            async with get_session() as session:
+            async with create_async_db_session() as session:
                 async with session.begin():
                     result = await session.execute(
                         text("""
@@ -355,7 +355,7 @@ class WorkerManager:
     async def reset_broken_tasks(self, exited_pids: list[int]) -> None:
         """Reset any tasks that were being processed by exited workers."""
         try:
-            async with get_session() as session:
+            async with create_async_db_session() as session:
                 async with session.begin():
                     # Generate named parameters for each PID
                     placeholders = ",".join(f":pid_{i}" for i in range(len(exited_pids)))

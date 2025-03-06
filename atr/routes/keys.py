@@ -40,7 +40,7 @@ from asfquart.auth import Requirements, require
 from asfquart.base import ASFQuartException
 from asfquart.session import ClientSession
 from asfquart.session import read as session_read
-from atr.db import get_session
+from atr.db import create_async_db_session
 from atr.db.models import (
     PMC,
     PMCKeyLink,
@@ -114,7 +114,7 @@ async def key_user_add(session: ClientSession, public_key: str, selected_pmcs: l
         raise FlashError("Key is not long enough; must be at least 2048 bits")
 
     # Store key in database
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         return await key_user_session_add(session, public_key, key, selected_pmcs, db_session)
 
 
@@ -187,7 +187,7 @@ async def root_keys_add() -> str:
     key_info = None
 
     # Get PMC objects for all projects the user is a member of
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         from sqlalchemy.sql.expression import ColumnElement
 
         project_list = session.committees + session.projects
@@ -228,7 +228,7 @@ async def root_keys_delete() -> Response:
         await flash("No key fingerprint provided", "error")
         return redirect(url_for("root_keys_review"))
 
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         async with db_session.begin():
             # Get the key and verify ownership
             psk_statement = select(PublicSigningKey).where(
@@ -256,7 +256,7 @@ async def root_keys_review() -> str:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
     # Get all existing keys for the user
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         pmcs_loader = selectinload(cast(InstrumentedAttribute[list[PMC]], PublicSigningKey.pmcs))
         psk_statement = select(PublicSigningKey).options(pmcs_loader).where(PublicSigningKey.apache_uid == session.uid)
         user_keys = (await db_session.execute(psk_statement)).scalars().all()

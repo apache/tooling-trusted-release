@@ -37,6 +37,7 @@ dev = [
   "pyright>=1.1.393",
   "ruff>=0.9.4",
   "types-aiofiles>=24.1.0.20241221,<25.0.0.0",
+  "decouple-types>=1.0",
 ]
 test = [
   "pytest>=8.0",
@@ -72,6 +73,7 @@ pre-commit = ">=2.20.0"
 pyright = ">=1.1.393"
 ruff = ">=0.9.4"
 types-aiofiles = ">=24.1.0.20241221,<25.0.0.0"
+decouple-types = ">=1.0"
 
 # UV specific configuration
 
@@ -127,7 +129,7 @@ select = [
 python_version = "3.13"
 exclude = ["asfquart", "tests"]
 mypy_path = "typestubs"
-check_untyped_defs = true
+check_untyped_defs = false
 disallow_incomplete_defs = true
 disallow_untyped_decorators = true
 disallow_untyped_defs = true

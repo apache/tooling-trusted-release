@@ -36,14 +36,14 @@ class AppConfig:
     RELEASE_STORAGE_DIR = os.path.join(STATE_DIR, "releases")
     DATA_MODELS_FILE = data_models_file
 
-    SQLITE_URL = config("SQLITE_URL", default="sqlite+aiosqlite:///./atr.db")
+    SQLITE_DB_PATH = config("SQLITE_DB_PATH", default="/atr.db")
 
     # Apache RAT configuration
     APACHE_RAT_JAR_PATH = config("APACHE_RAT_JAR_PATH", default="state/apache-rat-0.16.1.jar")
     # Maximum size limit for archive extraction
-    MAX_EXTRACT_SIZE = config("MAX_EXTRACT_SIZE", default=2 * GB, cast=int)
+    MAX_EXTRACT_SIZE: int = config("MAX_EXTRACT_SIZE", default=2 * GB, cast=int)
     # Chunk size for reading files during extraction
-    EXTRACT_CHUNK_SIZE = config("EXTRACT_CHUNK_SIZE", default=4 * MB, cast=int)
+    EXTRACT_CHUNK_SIZE: int = config("EXTRACT_CHUNK_SIZE", default=4 * MB, cast=int)
 
     ADMIN_USERS = frozenset(
         {
@@ -85,3 +85,31 @@ config_dict = {
     ConfigMode.Production: ProductionConfig,
     ConfigMode.Profiling: ProfilingConfig,
 }
+
+_CONFIG_MODE = None
+
+
+def get_config_mode() -> ConfigMode:
+    global _CONFIG_MODE
+
+    if _CONFIG_MODE is None:
+        if config("PROFILING", default=False, cast=bool):
+            config_mode = ConfigMode.Profiling
+        elif config("PRODUCTION", default=False, cast=bool):
+            config_mode = ConfigMode.Production
+        else:
+            config_mode = ConfigMode.Debug
+
+        _CONFIG_MODE = config_mode
+
+    return _CONFIG_MODE
+
+
+def get_config() -> type[AppConfig]:
+    try:
+        return config_dict[get_config_mode()]
+    except KeyError:
+        exit("Error: Invalid <config_mode>. Expected values [Debug, Production, Profiling].")
+
+
+# WARNING: Don't run with debug turned on in production!

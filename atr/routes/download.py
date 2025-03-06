@@ -44,7 +44,7 @@ from asfquart.auth import Requirements, require
 from asfquart.base import ASFQuartException
 from asfquart.session import ClientSession
 from asfquart.session import read as session_read
-from atr.db import get_session
+from atr.db import create_async_db_session
 from atr.db.models import (
     PMC,
     Package,
@@ -202,7 +202,7 @@ async def root_download_artifact(release_key: str, artifact_sha3: str) -> Respon
     if (session is None) or (session.uid is None):
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         # Find the package
         package_release = selectinload(cast(InstrumentedAttribute[Release], Package.release))
         release_pmc = package_release.selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
@@ -248,7 +248,7 @@ async def root_download_signature(release_key: str, signature_sha3: str) -> Quar
     if (session is None) or (session.uid is None):
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         # Find the package that has this signature
         package_release = selectinload(cast(InstrumentedAttribute[Release], Package.release))
         release_pmc = package_release.selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))

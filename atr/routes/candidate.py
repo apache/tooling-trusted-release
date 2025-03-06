@@ -36,7 +36,7 @@ from asfquart.auth import Requirements, require
 from asfquart.base import ASFQuartException
 from asfquart.session import ClientSession
 from asfquart.session import read as session_read
-from atr.db import get_session
+from atr.db import create_async_db_session
 from atr.db.models import (
     PMC,
     Package,
@@ -115,7 +115,7 @@ async def release_add_post(session: ClientSession, request: Request) -> Response
 
     # TODO: Forbid creating a release with an existing project, product, and version
     # Create the release record in the database
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         async with db_session.begin():
             statement = select(PMC).where(PMC.project_name == project_name)
             pmc = (await db_session.execute(statement)).scalar_one_or_none()
@@ -182,7 +182,7 @@ async def root_candidate_create() -> Response | str:
         return await release_add_post(session, request)
 
     # Get PMC objects for all projects the user is a member of
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         from sqlalchemy.sql.expression import ColumnElement
 
         project_list = session.committees + session.projects
@@ -208,7 +208,7 @@ async def root_candidate_review() -> str:
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         # Get all releases where the user is a PMC member or committer
         # TODO: We don't actually record who uploaded the release candidate
         # We should probably add that information!

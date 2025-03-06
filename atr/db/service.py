@@ -22,18 +22,18 @@ from sqlmodel import select
 
 from atr.db.models import PMC, Task
 
-from . import get_session
+from . import create_async_db_session
 
 
 async def get_pmc_by_name(project_name: str) -> PMC | None:
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         statement = select(PMC).where(PMC.project_name == project_name)
         pmc = (await db_session.execute(statement)).scalar_one_or_none()
         return pmc
 
 
 async def get_pmcs() -> Sequence[PMC]:
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         # Get all PMCs and their latest releases
         statement = select(PMC)
         pmcs = (await db_session.execute(statement)).scalars().all()
@@ -43,7 +43,7 @@ async def get_pmcs() -> Sequence[PMC]:
 async def get_tasks_paged(limit: int, offset: int) -> tuple[Sequence[Task], int]:
     """Returns a list of Tasks based on limit and offset values together with the total count."""
 
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         statement = select(Task).limit(limit).offset(offset).order_by(Task.id.desc())  # type: ignore
         tasks = (await db_session.execute(statement)).scalars().all()
         count = (await db_session.execute(select(func.count(Task.id)))).scalar_one()  # type: ignore

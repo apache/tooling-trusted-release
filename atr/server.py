@@ -23,7 +23,6 @@ from collections.abc import Iterable
 from typing import Any
 
 from blockbuster import BlockBuster
-from decouple import config
 from quart_schema import OpenAPIProvider, QuartSchema
 from werkzeug.routing import Rule
 
@@ -32,21 +31,10 @@ import asfquart.generics
 import asfquart.session
 from asfquart.base import QuartApp
 from atr.blueprints import register_blueprints
-from atr.config import AppConfig, ConfigMode, config_dict
+from atr.config import AppConfig, ConfigMode, get_config, get_config_mode
 from atr.db import create_database
 from atr.manager import get_worker_manager
 from atr.preload import setup_template_preloading
-
-# WARNING: Don't run with debug turned on in production!
-DEBUG = False
-if config("PROFILING", default=False, cast=bool):
-    config_mode = ConfigMode.Profiling
-elif config("PRODUCTION", default=False, cast=bool):
-    config_mode = ConfigMode.Production
-else:
-    config_mode = ConfigMode.Debug
-    DEBUG = True
-
 
 # Avoid OIDC
 asfquart.generics.OAUTH_URL_INIT = "https://oauth.apache.org/auth?state=%s&redirect_uri=%s"
@@ -77,15 +65,6 @@ def register_routes() -> tuple[str, ...]:
         release.__name__,
         root.__name__,
     )
-
-
-def create_config() -> type[AppConfig]:
-    try:
-        app_config = config_dict[config_mode]
-    except KeyError:
-        exit("Error: Invalid <config_mode>. Expected values [Debug, Production] ")
-
-    return app_config
 
 
 def app_dirs_setup(app_config: type[AppConfig]) -> None:
@@ -169,8 +148,8 @@ def app_setup_logging(app: QuartApp, config_mode: str, app_config: type[AppConfi
     # Only log in the worker process
     @app.before_serving
     async def log_debug_info() -> None:
-        if DEBUG:
-            app.logger.info("DEBUG        = " + str(DEBUG))
+        if get_config_mode() == ConfigMode.Debug:
+            app.logger.info("DEBUG        = True")
             app.logger.info("ENVIRONMENT  = " + config_mode)
             app.logger.info("STATE_DIR    = " + app_config.STATE_DIR)
 
@@ -185,6 +164,8 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
     create_database(app)
     register_routes()
     register_blueprints(app)
+
+    config_mode = get_config_mode()
 
     app_setup_context(app)
     app_setup_lifecycle(app)
@@ -218,11 +199,11 @@ def main() -> None:
     """Quart debug server"""
     global app
     if app is None:
-        app = create_app(create_config())
+        app = create_app(get_config())
     app.run(port=8080, ssl_keyfile="key.pem", ssl_certfile="cert.pem")
 
 
 if __name__ == "__main__":
     main()
 else:
-    app = create_app(create_config())
+    app = create_app(get_config())

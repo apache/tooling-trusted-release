@@ -28,25 +28,15 @@ from contextlib import contextmanager
 from typing import Any, BinaryIO, cast
 
 import gnupg
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 from sqlalchemy.sql import select
 
-from atr.config import ConfigMode, config_dict
+from atr.config import get_config
+from atr.db import create_sync_db_session
 from atr.db.models import PMC, PMCKeyLink, PublicSigningKey
 
-# Configure logging
-log_format = "[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] %(message)s"
-date_format = "%Y-%m-%d %H:%M:%S"
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-file_handler = logging.FileHandler("atr-worker.log")
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
-logger.addHandler(file_handler)
 
-
-app_config = config_dict[ConfigMode.Production]
+app_config = get_config()
 
 # Default path for Apache RAT JAR file
 DEFAULT_RAT_JAR_PATH = app_config.APACHE_RAT_JAR_PATH
@@ -75,13 +65,6 @@ class VerifyError(Exception):
     def __init__(self, message: str, *result: Any) -> None:
         self.message = message
         self.result = tuple(result)
-
-
-def db_session_get() -> Session:
-    """Get a new database session."""
-    # Create database engine
-    engine = create_engine("sqlite:///atr.db", echo=False)
-    return Session(engine)
 
 
 def utility_archive_root_dir_find(artifact_path: str) -> tuple[str | None, str | None]:
@@ -265,7 +248,7 @@ def license_files(artifact_path: str) -> dict[str, Any]:
 def signature(pmc_name: str, artifact_path: str, signature_path: str) -> dict[str, Any]:
     """Verify a signature file using the PMC's public signing keys."""
     # Query only the signing keys associated with this PMC
-    with db_session_get() as session:
+    with create_sync_db_session() as session:
         from sqlalchemy.sql.expression import ColumnElement
 
         statement = (

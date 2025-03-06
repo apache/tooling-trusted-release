@@ -34,7 +34,7 @@ from atr.datasources.apache import (
     get_groups_data,
     get_projects_data,
 )
-from atr.db import get_session
+from atr.db import create_async_db_session
 from atr.db.models import (
     PMC,
     DistributionChannel,
@@ -153,7 +153,7 @@ async def admin_data(model: str = "PMC") -> str:
     if model not in models:
         raise ASFQuartException(f"Model type '{model}' not found", 404)
 
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         # Get all records for the selected model
         statement = select(models[model])
         records = (await db_session.execute(statement)).scalars().all()
@@ -209,7 +209,7 @@ async def _update_pmcs() -> int:
 
     updated_count = 0
 
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         async with db_session.begin():
             # First update PMCs
             for project in apache_projects.projects:
@@ -297,7 +297,7 @@ async def admin_keys_delete_all() -> str:
     if session is None:
         raise ASFQuartException("Not authenticated", errorcode=401)
 
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         async with db_session.begin():
             # Get all keys for the user
             # TODO: Use session.apache_uid instead of session.uid?

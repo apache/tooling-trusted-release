@@ -40,7 +40,7 @@ from werkzeug.wrappers.response import Response
 from asfquart.auth import Requirements, require
 from asfquart.base import ASFQuartException
 from asfquart.session import read as session_read
-from atr.db import get_session
+from atr.db import create_async_db_session
 from atr.db.models import (
     PMC,
     Package,
@@ -328,7 +328,7 @@ async def package_add_single_post(form: MultiDict, request: Request) -> Response
         return redirect(url_for("root_package_add"))
 
     # Save files and create package record in one transaction
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         async with db_session.begin():
             # Process and save the files
             try:
@@ -373,7 +373,7 @@ async def package_add_bulk_post(form: MultiDict, request: Request) -> Response:
 
     # Create a task for bulk downloading
     max_concurrency = 5
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         async with db_session.begin():
             task = Task(
                 status=TaskStatus.QUEUED,
@@ -410,7 +410,7 @@ async def root_package_add() -> Response | str:
     storage_key = request.args.get("storage_key")
 
     # Get all releases where the user is a PMC member or committer of the associated PMC
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         # TODO: This duplicates code in root_candidate_review
         release_pmc = selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
         release_product_line = selectinload(cast(InstrumentedAttribute[ProductLine], Release.product_line))
@@ -462,7 +462,7 @@ async def root_package_check() -> str | Response:
         await flash("Missing required parameters", "error")
         return redirect(url_for("root_candidate_review"))
 
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         async with db_session.begin():
             # Get the package and verify permissions
             try:
@@ -520,7 +520,7 @@ async def root_package_check_restart() -> Response:
         await flash("Missing required parameters", "error")
         return redirect(url_for("root_candidate_review"))
 
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         async with db_session.begin():
             # Get the package and verify permissions
             try:
@@ -567,7 +567,7 @@ async def root_package_delete() -> Response:
         await flash("Missing required parameters", "error")
         return redirect(url_for("root_candidate_review"))
 
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         async with db_session.begin():
             try:
                 package = await package_data_get(db_session, artifact_sha3, release_key, session.uid)

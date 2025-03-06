@@ -35,7 +35,7 @@ from asfquart import APP
 from asfquart.auth import Requirements, require
 from asfquart.base import ASFQuartException
 from asfquart.session import read as session_read
-from atr.db import get_session
+from atr.db import create_async_db_session
 from atr.db.models import (
     PMC,
     Package,
@@ -114,7 +114,7 @@ async def root_release_delete() -> Response:
         await flash("Missing required parameters", "error")
         return redirect(url_for("root_candidate_review"))
 
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         async with db_session.begin():
             try:
                 release = await release_delete_validate(db_session, release_key, session.uid)
@@ -140,7 +140,7 @@ async def release_bulk_status(task_id: int) -> str | Response:
         await flash("You must be logged in to view bulk download status.", "error")
         return redirect(url_for("root_login"))
 
-    async with get_session() as db_session:
+    async with create_async_db_session() as db_session:
         # Query for the task with the given ID
         query = select(Task).where(Task.id == task_id)
         result = await db_session.execute(query)

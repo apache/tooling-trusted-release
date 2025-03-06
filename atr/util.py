@@ -25,12 +25,13 @@ from typing import Annotated, Any
 import aiofiles
 from pydantic import GetCoreSchemaHandler, TypeAdapter, create_model
 from pydantic_core import CoreSchema, core_schema
-from quart import current_app
 
 
 @cache
 def get_admin_users() -> set[str]:
-    return set(current_app.config["ADMIN_USERS"])
+    from atr.config import get_config
+
+    return set(get_config().ADMIN_USERS)
 
 
 def is_admin(user_id: str | None) -> bool:
@@ -41,7 +42,9 @@ def is_admin(user_id: str | None) -> bool:
 
 
 def get_release_storage_dir() -> str:
-    return str(current_app.config["RELEASE_STORAGE_DIR"])
+    from atr.config import get_config
+
+    return str(get_config().RELEASE_STORAGE_DIR)
 
 
 def compute_sha3_256(file_data: bytes) -> str:

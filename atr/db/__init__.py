@@ -14,25 +14,29 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
+import logging
 import os
 
 # from alembic import command
 from alembic.config import Config
 from quart import current_app
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 from sqlmodel import SQLModel
 
 from asfquart.base import QuartApp
+
+_logger = logging.getLogger(__name__)
 
 
 def create_database(app: QuartApp) -> None:
     @app.before_serving
     async def create() -> None:
         project_root = app.config["PROJECT_ROOT"]
-        sqlite_url = app.config["SQLITE_URL"]
-
+        sqlite_db_path = app.config["SQLITE_DB_PATH"]
+        sqlite_url = f"sqlite+aiosqlite://{sqlite_db_path}"
         # Use aiosqlite for async SQLite access
         engine = create_async_engine(
             sqlite_url,
@@ -73,5 +77,28 @@ def create_database(app: QuartApp) -> None:
             await conn.run_sync(SQLModel.metadata.create_all)
 
 
-def get_session() -> AsyncSession:
+def create_async_db_session() -> AsyncSession:
+    """Create a new asynchronous database session."""
     return current_app.async_session()  # type: ignore
+
+
+_SYNC_ENGINE: Engine | None = None
+
+
+def create_sync_db_engine() -> None:
+    """Create a synchronous database engine."""
+    from atr.config import get_config
+
+    global _SYNC_ENGINE
+
+    config = get_config()
+    sqlite_url = f"sqlite://{config.SQLITE_DB_PATH}"
+    _logger.debug(f"Creating sync database engine in process {os.getpid()}")
+    _SYNC_ENGINE = create_engine(sqlite_url, echo=False)
+
+
+def create_sync_db_session() -> Session:
+    """Create a new synchronous database session."""
+    global _SYNC_ENGINE
+    assert _SYNC_ENGINE is not None
+    return Session(_SYNC_ENGINE)

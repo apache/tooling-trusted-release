@@ -36,20 +36,9 @@ from typing import Any
 from sqlalchemy import text
 
 import atr.verify as verify
+from atr.db import create_sync_db_engine, create_sync_db_session
 
-# Configure logging
-log_format = "[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] %(message)s"
-date_format = "%Y-%m-%d %H:%M:%S"
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-# console_handler = logging.StreamHandler()
-# console_handler.setLevel(logging.INFO)
-# console_handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
-# logger.addHandler(console_handler)
-file_handler = logging.FileHandler("atr-worker.log")
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
-logger.addHandler(file_handler)
 
 # Resource limits, 5 minutes and 1GB
 CPU_LIMIT_SECONDS = 300
@@ -61,11 +50,30 @@ MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024
 
 def main() -> None:
     """Main entry point."""
+    from atr.config import get_config
+
     signal.signal(signal.SIGTERM, worker_signal_handle)
     signal.signal(signal.SIGINT, worker_signal_handle)
 
+    config = get_config()
+    if os.path.isdir(config.STATE_DIR):
+        os.chdir(config.STATE_DIR)
+
+    setup_logging()
+
+    logger.info(f"Starting worker process with pid {os.getpid()}")
+    create_sync_db_engine()
+
     worker_resources_limit_set()
     worker_loop_run()
+
+
+def setup_logging() -> None:
+    # Configure logging
+    log_format = "[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] %(message)s"
+    date_format = "%Y-%m-%d %H:%M:%S"
+
+    logging.basicConfig(filename="atr-worker.log", format=log_format, datefmt=date_format, level=logging.DEBUG)
 
 
 # Task functions
@@ -76,7 +84,7 @@ def task_error_handle(task_id: int, e: Exception) -> None:
     if isinstance(e, verify.VerifyError):
         logger.error(f"Task {task_id} failed: {e.message}")
         result = json.dumps(e.result)
-        with verify.db_session_get() as session:
+        with create_sync_db_session() as session:
             with session.begin():
                 session.execute(
                     text("""
@@ -88,7 +96,7 @@ def task_error_handle(task_id: int, e: Exception) -> None:
                 )
     else:
         logger.error(f"Task {task_id} failed: {e}")
-        with verify.db_session_get() as session:
+        with create_sync_db_session() as session:
             with session.begin():
                 session.execute(
                     text("""
@@ -106,7 +114,7 @@ def task_next_claim() -> tuple[int, str, str] | None:
     Returns (task_id, task_type, task_args) if successful.
     Returns None if no tasks are available.
     """
-    with verify.db_session_get() as session:
+    with create_sync_db_session() as session:
         with session.begin():
             # Find and claim the oldest unclaimed task
             # We have an index on (status, added)
@@ -137,7 +145,7 @@ def task_result_process(
     task_id: int, task_results: tuple[Any, ...], status: str = "COMPLETED", error: str | None = None
 ) -> None:
     """Process and store task results in the database."""
-    with verify.db_session_get() as session:
+    with create_sync_db_session() as session:
         result = json.dumps(task_results)
         with session.begin():
             if status == "FAILED" and error:
@@ -322,7 +330,7 @@ def task_bulk_download_debug(args: list[str] | dict) -> tuple[str, str | None, t
         task_id = None
 
         # Get the task ID for the current process
-        with verify.db_session_get() as session:
+        with create_sync_db_session() as session:
             result = session.execute(
                 text("SELECT id FROM task WHERE pid = :pid AND status = 'ACTIVE'"), {"pid": current_pid}
             )
@@ -349,7 +357,7 @@ def task_bulk_download_debug(args: list[str] | dict) -> tuple[str, str | None, t
 
             # Update the database with the current progress if we have a task_id
             if task_id:
-                with verify.db_session_get() as session:
+                with create_sync_db_session() as session:
                     # Update the task with the current progress message
                     with session.begin():
                         session.execute(
@@ -433,9 +441,6 @@ def task_process_wrap(item: Any) -> tuple[Any, ...]:
 
 def worker_loop_run() -> None:
     """Main worker loop."""
-    if os.path.isdir("state"):
-        os.chdir("state")
-
     while True:
         try:
             task = task_next_claim()
