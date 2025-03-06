@@ -48,6 +48,7 @@ class AppConfig:
     ADMIN_USERS = frozenset(
         {
             "cwells",
+            "dfoulks",
             "fluxo",
             "gmcdonald",
             "humbedooh",
