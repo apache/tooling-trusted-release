@@ -34,7 +34,7 @@ from atr.config import get_config
 from atr.db import create_sync_db_session
 from atr.db.models import PMC, PMCKeyLink, PublicSigningKey
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 app_config = get_config()
 
@@ -459,11 +459,11 @@ under the License."""
 
 def sbom_cyclonedx_generate(artifact_path: str) -> dict[str, Any]:
     """Generate a CycloneDX SBOM for the given artifact."""
-    logger.info(f"Generating CycloneDX SBOM for {artifact_path}")
+    _LOGGER.info(f"Generating CycloneDX SBOM for {artifact_path}")
     try:
         return sbom_cyclonedx_generate_unsafe(artifact_path)
     except Exception as e:
-        logger.error(f"Failed to generate CycloneDX SBOM: {e}")
+        _LOGGER.error(f"Failed to generate CycloneDX SBOM: {e}")
         return {
             "valid": False,
             "message": f"Failed to generate CycloneDX SBOM: {e!s}",
@@ -478,12 +478,12 @@ def sbom_cyclonedx_generate_unsafe(artifact_path: str) -> dict[str, Any]:
 
     # Create a temporary directory for extraction
     with tempfile.TemporaryDirectory(prefix="cyclonedx_sbom_") as temp_dir:
-        logger.info(f"Created temporary directory: {temp_dir}")
+        _LOGGER.info(f"Created temporary directory: {temp_dir}")
 
         # Find and validate the root directory
         root_dir, error_msg = utility_archive_root_dir_find(artifact_path)
         if error_msg or (root_dir is None):
-            logger.error(f"Archive root directory issue: {error_msg}")
+            _LOGGER.error(f"Archive root directory issue: {error_msg}")
             return {
                 "valid": False,
                 "message": error_msg or "No root directory found",
@@ -493,16 +493,16 @@ def sbom_cyclonedx_generate_unsafe(artifact_path: str) -> dict[str, Any]:
         extract_dir = os.path.join(temp_dir, root_dir)
 
         # Extract the archive to the temporary directory
-        logger.info(f"Extracting {artifact_path} to {temp_dir}")
+        _LOGGER.info(f"Extracting {artifact_path} to {temp_dir}")
         # TODO: We need task dependencies, because we don't want to do this more than once
         extracted_size = safe_extract_archive(
             artifact_path, temp_dir, max_size=DEFAULT_MAX_EXTRACT_SIZE, chunk_size=DEFAULT_CHUNK_SIZE
         )
-        logger.info(f"Extracted {extracted_size} bytes")
+        _LOGGER.info(f"Extracted {extracted_size} bytes")
 
         # Run syft to generate CycloneDX SBOM
         try:
-            logger.info(f"Running syft on {extract_dir}")
+            _LOGGER.info(f"Running syft on {extract_dir}")
             process = subprocess.run(
                 ["syft", extract_dir, "-o", "cyclonedx-json"],
                 capture_output=True,
@@ -522,7 +522,7 @@ def sbom_cyclonedx_generate_unsafe(artifact_path: str) -> dict[str, Any]:
                     "components": len(sbom_data.get("components", [])),
                 }
             except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse syft output as JSON: {e}")
+                _LOGGER.error(f"Failed to parse syft output as JSON: {e}")
                 # Include first 1000 chars of output for debugging
                 return {
                     "valid": False,
@@ -531,7 +531,7 @@ def sbom_cyclonedx_generate_unsafe(artifact_path: str) -> dict[str, Any]:
                 }
 
         except subprocess.CalledProcessError as e:
-            logger.error(f"syft command failed: {e}")
+            _LOGGER.error(f"syft command failed: {e}")
             return {
                 "valid": False,
                 "message": f"syft command failed with code {e.returncode}",
@@ -542,14 +542,14 @@ def sbom_cyclonedx_generate_unsafe(artifact_path: str) -> dict[str, Any]:
                 ],
             }
         except subprocess.TimeoutExpired as e:
-            logger.error(f"syft command timed out: {e}")
+            _LOGGER.error(f"syft command timed out: {e}")
             return {
                 "valid": False,
                 "message": "syft command timed out after 5 minutes",
                 "errors": [str(e)],
             }
         except Exception as e:
-            logger.error(f"Unexpected error running syft: {e}")
+            _LOGGER.error(f"Unexpected error running syft: {e}")
             return {
                 "valid": False,
                 "message": f"Unexpected error running syft: {e}",
@@ -627,9 +627,9 @@ def license_header_validate(content: bytes, filename: str) -> tuple[bool, str | 
         # expected_lines = expected_header.split(b"\n")
         # for i, (c, e) in enumerate(zip(cleaned_lines, expected_lines)):
         #     if c != e:
-        #         logger.debug("\nFirst difference at line %d:", i + 1)
-        #         logger.debug("Expected: '%s'", e.decode(errors="replace"))
-        #         logger.debug("Got:      '%s'", c.decode(errors="replace"))
+        #         _LOGGER.debug("\nFirst difference at line %d:", i + 1)
+        #         _LOGGER.debug("Expected: '%s'", e.decode(errors="replace"))
+        #         _LOGGER.debug("Got:      '%s'", c.decode(errors="replace"))
         #         break
         return False, "License header does not match the required Apache License header text"
 
@@ -756,7 +756,7 @@ def rat_license_jar_verify(rat_jar_path: str) -> tuple[str, dict[str, Any] | Non
     """Verify that the Apache RAT JAR file exists and is accessible."""
     # Check that the RAT JAR exists
     if not os.path.exists(rat_jar_path):
-        logger.error(f"Apache RAT JAR not found at: {rat_jar_path}")
+        _LOGGER.error(f"Apache RAT JAR not found at: {rat_jar_path}")
         # Try a few common locations:
         # ./rat.jar
         # ./state/rat.jar
@@ -773,17 +773,17 @@ def rat_license_jar_verify(rat_jar_path: str) -> tuple[str, dict[str, Any] | Non
 
         for alt_path in alternative_paths:
             if os.path.exists(alt_path):
-                logger.info(f"Found alternative RAT JAR at: {alt_path}")
+                _LOGGER.info(f"Found alternative RAT JAR at: {alt_path}")
                 rat_jar_path = alt_path
                 break
 
         # Double check whether we found the JAR
         if not os.path.exists(rat_jar_path):
-            logger.error("Tried alternative paths but Apache RAT JAR still not found")
-            logger.error(f"Current directory: {os.getcwd()}")
-            logger.error(f"Directory contents: {os.listdir(os.getcwd())}")
+            _LOGGER.error("Tried alternative paths but Apache RAT JAR still not found")
+            _LOGGER.error(f"Current directory: {os.getcwd()}")
+            _LOGGER.error(f"Directory contents: {os.listdir(os.getcwd())}")
             if os.path.exists("state"):
-                logger.error(f"State directory contents: {os.listdir('state')}")
+                _LOGGER.error(f"State directory contents: {os.listdir('state')}")
 
             return rat_jar_path, {
                 "valid": False,
@@ -797,7 +797,7 @@ def rat_license_jar_verify(rat_jar_path: str) -> tuple[str, dict[str, Any] | Non
                 "errors": [f"Missing JAR: {rat_jar_path}"],
             }
     else:
-        logger.info(f"Found Apache RAT JAR at: {rat_jar_path}")
+        _LOGGER.info(f"Found Apache RAT JAR at: {rat_jar_path}")
 
     return rat_jar_path, None
 
@@ -806,7 +806,7 @@ def rat_license_execute(rat_jar_path: str, extract_dir: str, temp_dir: str) -> t
     """Execute Apache RAT and process its output."""
     # Define output file path
     xml_output_path = os.path.join(temp_dir, "rat-report.xml")
-    logger.info(f"XML output will be written to: {xml_output_path}")
+    _LOGGER.info(f"XML output will be written to: {xml_output_path}")
 
     # Run Apache RAT on the extracted directory
     # Use -x flag for XML output and -o to specify the output file
@@ -821,18 +821,18 @@ def rat_license_execute(rat_jar_path: str, extract_dir: str, temp_dir: str) -> t
         "-o",
         xml_output_path,
     ]
-    logger.info(f"Running Apache RAT: {' '.join(command)}")
+    _LOGGER.info(f"Running Apache RAT: {' '.join(command)}")
 
     # Change working directory to temp_dir when running the process
     current_dir = os.getcwd()
     os.chdir(temp_dir)
 
-    logger.info(f"Executing Apache RAT from directory: {os.getcwd()}")
+    _LOGGER.info(f"Executing Apache RAT from directory: {os.getcwd()}")
 
     try:
         # # First make sure we can run Java
         # java_check = subprocess.run(["java", "-version"], capture_output=True, timeout=10)
-        # logger.info(f"Java check completed with return code {java_check.returncode}")
+        # _LOGGER.info(f"Java check completed with return code {java_check.returncode}")
 
         # Run the actual RAT command
         # We do check=False because we'll handle errors below
@@ -846,9 +846,9 @@ def rat_license_execute(rat_jar_path: str, extract_dir: str, temp_dir: str) -> t
         )
 
         if process.returncode != 0:
-            logger.error(f"Apache RAT failed with return code {process.returncode}")
-            logger.error(f"STDOUT: {process.stdout}")
-            logger.error(f"STDERR: {process.stderr}")
+            _LOGGER.error(f"Apache RAT failed with return code {process.returncode}")
+            _LOGGER.error(f"STDOUT: {process.stdout}")
+            _LOGGER.error(f"STDERR: {process.stderr}")
             os.chdir(current_dir)
             error_dict = {
                 "valid": False,
@@ -867,11 +867,11 @@ def rat_license_execute(rat_jar_path: str, extract_dir: str, temp_dir: str) -> t
             }
             return error_dict, None
 
-        logger.info(f"Apache RAT completed successfully with return code {process.returncode}")
-        logger.info(f"stdout: {process.stdout[:200]}...")
+        _LOGGER.info(f"Apache RAT completed successfully with return code {process.returncode}")
+        _LOGGER.info(f"stdout: {process.stdout[:200]}...")
     except subprocess.TimeoutExpired as e:
         os.chdir(current_dir)
-        logger.error(f"Apache RAT process timed out: {e}")
+        _LOGGER.error(f"Apache RAT process timed out: {e}")
         return {
             "valid": False,
             "message": "Apache RAT process timed out",
@@ -886,7 +886,7 @@ def rat_license_execute(rat_jar_path: str, extract_dir: str, temp_dir: str) -> t
     except Exception as e:
         # Change back to the original directory before raising
         os.chdir(current_dir)
-        logger.error(f"Exception running Apache RAT: {e}")
+        _LOGGER.error(f"Exception running Apache RAT: {e}")
         return {
             "valid": False,
             "message": f"Apache RAT process failed: {e}",
@@ -904,14 +904,14 @@ def rat_license_execute(rat_jar_path: str, extract_dir: str, temp_dir: str) -> t
 
     # Check that the output file exists
     if os.path.exists(xml_output_path):
-        logger.info(f"Found XML output at: {xml_output_path} (size: {os.path.getsize(xml_output_path)} bytes)")
+        _LOGGER.info(f"Found XML output at: {xml_output_path} (size: {os.path.getsize(xml_output_path)} bytes)")
         return None, xml_output_path
     else:
-        logger.error(f"XML output file not found at: {xml_output_path}")
+        _LOGGER.error(f"XML output file not found at: {xml_output_path}")
         # List files in the temporary directory
-        logger.info(f"Files in {temp_dir}: {os.listdir(temp_dir)}")
+        _LOGGER.info(f"Files in {temp_dir}: {os.listdir(temp_dir)}")
         # Look in the current directory too
-        logger.info(f"Files in current directory: {os.listdir('.')}")
+        _LOGGER.info(f"Files in current directory: {os.listdir('.')}")
         return {
             "valid": False,
             "message": f"RAT output XML file not found: {xml_output_path}",
@@ -932,19 +932,19 @@ def rat_license_verify(
     chunk_size: int = DEFAULT_CHUNK_SIZE,
 ) -> dict[str, Any]:
     """Verify license headers using Apache RAT."""
-    logger.info(f"Verifying licenses with Apache RAT for {artifact_path}")
+    _LOGGER.info(f"Verifying licenses with Apache RAT for {artifact_path}")
 
     # Log the PATH environment variable
-    logger.info(f"PATH environment variable: {os.environ.get('PATH', 'PATH not found')}")
+    _LOGGER.info(f"PATH environment variable: {os.environ.get('PATH', 'PATH not found')}")
 
     # Check that Java is installed
     try:
         java_version = subprocess.check_output(
             ["java", *java_memory_args, "-version"], stderr=subprocess.STDOUT, text=True
         )
-        logger.info(f"Java version: {java_version.splitlines()[0]}")
+        _LOGGER.info(f"Java version: {java_version.splitlines()[0]}")
     except (subprocess.SubprocessError, FileNotFoundError) as e:
-        logger.error(f"Java is not properly installed or not in PATH: {e}")
+        _LOGGER.error(f"Java is not properly installed or not in PATH: {e}")
 
         # Try to get some output even if the command failed
         try:
@@ -956,15 +956,15 @@ def rat_license_verify(
                 text=True,
                 check=False,
             )
-            logger.info(f"Java command return code: {java_result.returncode}")
-            logger.info(f"Java command output: {java_result.stdout or java_result.stderr}")
+            _LOGGER.info(f"Java command return code: {java_result.returncode}")
+            _LOGGER.info(f"Java command output: {java_result.stdout or java_result.stderr}")
 
             # Try to find where Java might be located
             which_java = subprocess.run(["which", "java"], capture_output=True, text=True, check=False)
             which_java_result = which_java.stdout.strip() if which_java.returncode == 0 else "not found"
-            logger.info(f"Result for which java: {which_java_result}")
+            _LOGGER.info(f"Result for which java: {which_java_result}")
         except Exception as inner_e:
-            logger.error(f"Additional error while trying to debug java: {inner_e}")
+            _LOGGER.error(f"Additional error while trying to debug java: {inner_e}")
 
         return {
             "valid": False,
@@ -987,12 +987,12 @@ def rat_license_verify(
         # Create a temporary directory for extraction
         # TODO: We could extract to somewhere in "state/" instead
         with tempfile.TemporaryDirectory(prefix="rat_verify_") as temp_dir:
-            logger.info(f"Created temporary directory: {temp_dir}")
+            _LOGGER.info(f"Created temporary directory: {temp_dir}")
 
             # Find and validate the root directory
             root_dir, error_msg = utility_archive_root_dir_find(artifact_path)
             if error_msg or (root_dir is None):
-                logger.error(f"Archive root directory issue: {error_msg}")
+                _LOGGER.error(f"Archive root directory issue: {error_msg}")
                 return {
                     "valid": False,
                     "message": error_msg or "No root directory found",
@@ -1008,11 +1008,11 @@ def rat_license_verify(
             extract_dir = os.path.join(temp_dir, root_dir)
 
             # Extract the archive to the temporary directory
-            logger.info(f"Extracting {artifact_path} to {temp_dir}")
+            _LOGGER.info(f"Extracting {artifact_path} to {temp_dir}")
             extracted_size = safe_extract_archive(
                 artifact_path, temp_dir, max_size=max_extract_size, chunk_size=chunk_size
             )
-            logger.info(f"Extracted {extracted_size} bytes")
+            _LOGGER.info(f"Extracted {extracted_size} bytes")
 
             # Execute RAT and get results or error
             error_result, xml_output_path = rat_license_execute(rat_jar_path, extract_dir, temp_dir)
@@ -1021,16 +1021,16 @@ def rat_license_verify(
 
             # Parse the XML output
             try:
-                logger.info(f"Parsing RAT XML output: {xml_output_path}")
+                _LOGGER.info(f"Parsing RAT XML output: {xml_output_path}")
                 # Make sure xml_output_path is not None before parsing
                 if xml_output_path is None:
                     raise ValueError("XML output path is None")
 
                 results = parse_rat_output(xml_output_path, extract_dir)
-                logger.info(f"Successfully parsed RAT output with {results.get('total_files', 0)} files")
+                _LOGGER.info(f"Successfully parsed RAT output with {results.get('total_files', 0)} files")
                 return results
             except Exception as e:
-                logger.error(f"Error parsing RAT output: {e}")
+                _LOGGER.error(f"Error parsing RAT output: {e}")
                 return {
                     "valid": False,
                     "message": f"Failed to parse Apache RAT output: {e!s}",
@@ -1044,10 +1044,10 @@ def rat_license_verify(
                 }
 
     except Exception as e:
-        logger.error(f"Error running Apache RAT: {e}")
+        _LOGGER.error(f"Error running Apache RAT: {e}")
         import traceback
 
-        logger.error(traceback.format_exc())
+        _LOGGER.error(traceback.format_exc())
         return {
             "valid": False,
             "message": f"Failed to run Apache RAT: {e!s}",
@@ -1181,7 +1181,7 @@ with unapproved licenses, and {unknown_licenses} with unknown licenses"""
         }
 
     except Exception as e:
-        logger.error(f"Error parsing RAT output: {e}")
+        _LOGGER.error(f"Error parsing RAT output: {e}")
         return {
             "valid": False,
             "message": f"Failed to parse Apache RAT output: {e!s}",

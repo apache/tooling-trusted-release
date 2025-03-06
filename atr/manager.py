@@ -36,7 +36,8 @@ logging.basicConfig(
     level=logging.INFO,
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logger = logging.getLogger(__name__)
+
+_LOGGER = logging.getLogger(__name__)
 
 # Global debug flag to control worker process output capturing
 global_worker_debug = False
@@ -74,7 +75,7 @@ class WorkerProcess:
         except PermissionError:
             # Process exists but we don't have permission to signal it
             # This shouldn't happen in our case since we own the process
-            logger.warning(f"Permission error checking process {self.pid}")
+            _LOGGER.warning(f"Permission error checking process {self.pid}")
             return False
 
 
@@ -102,7 +103,7 @@ class WorkerManager:
             return
 
         self.running = True
-        logger.info("Starting worker manager in %s", os.getcwd())
+        _LOGGER.info("Starting worker manager in %s", os.getcwd())
 
         # Start initial workers
         for _ in range(self.min_workers):
@@ -117,7 +118,7 @@ class WorkerManager:
             return
 
         self.running = False
-        logger.info("Stopping worker manager")
+        _LOGGER.info("Stopping worker manager")
 
         # Cancel monitoring task
         if self.check_task:
@@ -140,7 +141,7 @@ class WorkerManager:
                     # The process may have already exited
                     ...
                 except Exception as e:
-                    logger.error(f"Error stopping worker {worker.pid}: {e}")
+                    _LOGGER.error(f"Error stopping worker {worker.pid}: {e}")
 
         # Wait for processes to exit
         for worker in list(self.workers.values()):
@@ -154,7 +155,7 @@ class WorkerManager:
                         # The process may have already exited
                         ...
                     except Exception as e:
-                        logger.error(f"Error force killing worker {worker.pid}: {e}")
+                        _LOGGER.error(f"Error force killing worker {worker.pid}: {e}")
 
         self.workers.clear()
 
@@ -191,7 +192,7 @@ class WorkerManager:
                 log_file = await asyncio.to_thread(open, log_file_path, "w")
                 stdout_target = log_file
                 stderr_target = log_file
-                logger.info(f"Worker output will be logged to {log_file_path}")
+                _LOGGER.info(f"Worker output will be logged to {log_file_path}")
 
             # Start worker process with the updated environment
             # Use preexec_fn to create new process group
@@ -207,15 +208,15 @@ class WorkerManager:
             worker = WorkerProcess(process, datetime.now(UTC))
             if worker.pid:
                 self.workers[worker.pid] = worker
-                logger.info(f"Started worker process {worker.pid}")
+                _LOGGER.info(f"Started worker process {worker.pid}")
                 if global_worker_debug and log_file_path:
-                    logger.info(f"Worker {worker.pid} logs: {log_file_path}")
+                    _LOGGER.info(f"Worker {worker.pid} logs: {log_file_path}")
             else:
-                logger.error("Failed to start worker process: No PID assigned")
+                _LOGGER.error("Failed to start worker process: No PID assigned")
                 if global_worker_debug and isinstance(stdout_target, TextIOWrapper):
                     await asyncio.to_thread(stdout_target.close)
         except Exception as e:
-            logger.error(f"Error spawning worker: {e}")
+            _LOGGER.error(f"Error spawning worker: {e}")
 
     async def monitor_workers(self) -> None:
         """Monitor worker processes and restart them if needed."""
@@ -226,7 +227,7 @@ class WorkerManager:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in worker monitor: {e}")
+                _LOGGER.error(f"Error in worker monitor: {e}")
                 # TODO: How long should we wait before trying again?
                 await asyncio.sleep(1.0)
 
@@ -239,7 +240,7 @@ class WorkerManager:
             # Check if process is running
             if not await worker.is_running():
                 exited_workers.append(pid)
-                logger.info(f"Worker {pid} has exited")
+                _LOGGER.info(f"Worker {pid} has exited")
                 continue
 
             # Check if worker has been processing its task for too long
@@ -297,11 +298,11 @@ class WorkerManager:
             )
             if worker.pid:
                 os.kill(worker.pid, signal.SIGTERM)
-                logger.info(f"Worker {pid} terminated after processing task {task_id} for > {self.max_task_seconds}s")
+                _LOGGER.info(f"Worker {pid} terminated after processing task {task_id} for > {self.max_task_seconds}s")
         except ProcessLookupError:
             return
         except Exception as e:
-            logger.error(f"Error stopping long-running worker {pid}: {e}")
+            _LOGGER.error(f"Error stopping long-running worker {pid}: {e}")
 
     async def check_task_duration(self, pid: int, worker: WorkerProcess) -> bool:
         """
@@ -329,7 +330,7 @@ class WorkerManager:
                         try:
                             started = datetime.fromisoformat(started.replace("Z", "+00:00"))
                         except ValueError:
-                            logger.error(f"Could not parse started time '{started}' for task {task_id}")
+                            _LOGGER.error(f"Could not parse started time '{started}' for task {task_id}")
                             return False
 
                     task_duration = (datetime.now(UTC) - started).total_seconds()
@@ -339,7 +340,7 @@ class WorkerManager:
 
                     return False
         except Exception as e:
-            logger.error(f"Error checking task duration for worker {pid}: {e}")
+            _LOGGER.error(f"Error checking task duration for worker {pid}: {e}")
             # TODO: Return True? False? Maybe None would be more suitable, or propagate the error
             return True
 
@@ -347,10 +348,10 @@ class WorkerManager:
         """Ensure we maintain the minimum number of workers."""
         current_count = len(self.workers)
         if current_count < self.min_workers:
-            logger.info(f"Worker pool below minimum ({current_count} < {self.min_workers}), spawning new workers")
+            _LOGGER.info(f"Worker pool below minimum ({current_count} < {self.min_workers}), spawning new workers")
             while len(self.workers) < self.min_workers:
                 await self.spawn_worker()
-            logger.info(f"Worker pool restored to {len(self.workers)} workers")
+            _LOGGER.info(f"Worker pool restored to {len(self.workers)} workers")
 
     async def reset_broken_tasks(self, exited_pids: list[int]) -> None:
         """Reset any tasks that were being processed by exited workers."""
@@ -372,7 +373,7 @@ class WorkerManager:
                         params,
                     )
         except Exception as e:
-            logger.error(f"Error resetting broken tasks: {e}")
+            _LOGGER.error(f"Error resetting broken tasks: {e}")
 
 
 # Global worker manager instance

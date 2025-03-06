@@ -14,6 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+
 import logging
 import os
 
@@ -28,7 +29,7 @@ from sqlmodel import SQLModel
 
 from asfquart.base import QuartApp
 
-_logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 def create_database(app: QuartApp) -> None:
@@ -93,7 +94,7 @@ def create_sync_db_engine() -> None:
 
     config = get_config()
     sqlite_url = f"sqlite://{config.SQLITE_DB_PATH}"
-    _logger.debug(f"Creating sync database engine in process {os.getpid()}")
+    _LOGGER.debug(f"Creating sync database engine in process {os.getpid()}")
     _SYNC_ENGINE = create_engine(sqlite_url, echo=False)
 
 
