@@ -264,7 +264,7 @@ async def get_form(request: Request) -> MultiDict:
         raise RuntimeError("APP is not set")
 
     # Or quart.current_app?
-    blockbuster = APP.config["blockbuster"]
+    blockbuster = APP.extensions.get("blockbuster")
 
     # Turn blockbuster off
     if blockbuster is not None:

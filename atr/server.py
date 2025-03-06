@@ -137,7 +137,7 @@ def app_setup_lifecycle(app: QuartApp) -> None:
         app.background_tasks.clear()
 
 
-def app_setup_logging(app: QuartApp, config_mode: str, app_config: type[AppConfig]) -> None:
+def app_setup_logging(app: QuartApp, config_mode: ConfigMode, app_config: type[AppConfig]) -> None:
     """Setup application logging."""
     logging.basicConfig(
         format="[%(asctime)s.%(msecs)03d  ] [%(process)d] [%(levelname)s] %(message)s",
@@ -148,10 +148,10 @@ def app_setup_logging(app: QuartApp, config_mode: str, app_config: type[AppConfi
     # Only log in the worker process
     @app.before_serving
     async def log_debug_info() -> None:
-        if get_config_mode() == ConfigMode.Debug:
-            app.logger.info("DEBUG        = True")
-            app.logger.info("ENVIRONMENT  = " + config_mode)
-            app.logger.info("STATE_DIR    = " + app_config.STATE_DIR)
+        if config_mode == ConfigMode.Debug or config_mode == ConfigMode.Profiling:
+            app.logger.info(f"DEBUG        = {config_mode == ConfigMode.Debug}")
+            app.logger.info(f"ENVIRONMENT  = {config_mode.value}")
+            app.logger.info(f"STATE_DIR    = {app_config.STATE_DIR}")
 
 
 def create_app(app_config: type[AppConfig]) -> QuartApp:
@@ -169,7 +169,7 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
 
     app_setup_context(app)
     app_setup_lifecycle(app)
-    app_setup_logging(app, config_mode.value, app_config)
+    app_setup_logging(app, config_mode, app_config)
 
     # do not enable template pre-loading if we explicitly want to reload templates
     if not app_config.TEMPLATES_AUTO_RELOAD:
@@ -181,15 +181,16 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
         blockbuster: BlockBuster | None = None
         if config_mode == ConfigMode.Profiling:
             blockbuster = BlockBuster()
-        app.config["blockbuster"] = blockbuster
-        if app.config["blockbuster"] is not None:
-            app.config["blockbuster"].activate()
+        app.extensions["blockbuster"] = blockbuster
+        if blockbuster is not None:
+            blockbuster.activate()
             app.logger.info("Blockbuster activated to detect blocking calls")
 
     @app.after_serving
     async def stop_blockbuster() -> None:
-        if app.config["blockbuster"] is not None:
-            app.config["blockbuster"].deactivate()
+        blockbuster = app.extensions.get("blockbuster")
+        if blockbuster is not None:
+            blockbuster.deactivate()
             app.logger.info("Blockbuster deactivated")
 
     return app
