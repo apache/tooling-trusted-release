@@ -12,7 +12,9 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
    - [DONE] Allow package deletion
    - [DONE] Allow RCs to be deleted
    - [DONE] Move signature verification to a task runner
-   - Add methods to allow the bulk addition of RC artifacts
+   - [DONE] Add a method to allow the bulk addition of RC artifacts
+   - Improve the existing method to allow the bulk addition of RC artifacts
+   - Add further methods to allow the bulk addition of RC artifacts
 
 2. Enhance RC display
    - [DONE] Augment raw file hashes with the original filenames in the UI
@@ -65,14 +67,14 @@ We aim to work on the task scheduler in parallel with the UX improvements above.
    - Allow dependencies between tasks to reduce duplication of effort
    - Add UI to restart all waiting workers
 
-2. Orchestrating scheduler and resource management
+2. Orchestrating manager and resource management
    - [DONE] Implement process-based task isolation
    - [DONE] Create task table in sqlite database
    - [DONE] Add task queue management
-   - Track and limit disk usage per task in the scheduler
+   - Track and limit disk usage per task in the manager
 
 3. Improve the task UI
-   - [DONE] Allow restarting all tasks
+   - [DONE] Allow restarting all tasks when inactive
    - Test that tasks are deleted when a package is deleted
 
 Advanced tasks, possibly deferred
@@ -85,9 +87,8 @@ Advanced tasks, possibly deferred
    - [DONE] Add ATR commit or version number to the UI
    - [DONE] Fix and improve the package checks summary count
    - Ensure that all errors are caught and logged or displayed
-   - Add tests
    - Improve the proprietary platform patch in ASFQuart and submit upstream
-   - Patch the synchronous behaviour in Jinja and submit upstream
+   - Add further tests
 
 2. Ensure that performance is optimal
    - [DONE] Add page load timing metrics to a log
@@ -96,6 +97,9 @@ Advanced tasks, possibly deferred
 3. Increase the linting, type checking, and other QA
    - [DONE] Potentially add blockbuster
    - Create website UX integration tests using a browser driver
+
+Advanced tasks, possibly deferred
+   - Patch the synchronous behaviour in Jinja and submit upstream
 
 ## Basic RC validation
 
