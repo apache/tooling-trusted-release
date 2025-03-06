@@ -17,6 +17,7 @@
 
 import os
 from enum import Enum
+from typing import Any, TypeVar
 
 from decouple import config
 
@@ -24,6 +25,14 @@ from atr.db.models import __file__ as data_models_file
 
 MB = 1024 * 1024
 GB = 1024 * MB
+
+T = TypeVar("T")
+
+
+def ensure_type(value: Any, expected_type: type[T]) -> T:
+    if not isinstance(value, expected_type):
+        raise TypeError(f"Expected {expected_type.__name__}, got {type(value).__name__}")
+    return value
 
 
 class AppConfig:
@@ -36,10 +45,11 @@ class AppConfig:
     RELEASE_STORAGE_DIR = os.path.join(STATE_DIR, "releases")
     DATA_MODELS_FILE = data_models_file
 
-    SQLITE_DB_PATH = config("SQLITE_DB_PATH", default="/atr.db")
+    # TODO: Understand why cast=str doesn't satisfy the type checker
+    SQLITE_DB_PATH: str = ensure_type(config("SQLITE_DB_PATH", default="/atr.db"), str)
 
     # Apache RAT configuration
-    APACHE_RAT_JAR_PATH = config("APACHE_RAT_JAR_PATH", default="state/apache-rat-0.16.1.jar")
+    APACHE_RAT_JAR_PATH: str = ensure_type(config("APACHE_RAT_JAR_PATH", default="state/apache-rat-0.16.1.jar"), str)
     # Maximum size limit for archive extraction
     MAX_EXTRACT_SIZE: int = config("MAX_EXTRACT_SIZE", default=2 * GB, cast=int)
     # Chunk size for reading files during extraction

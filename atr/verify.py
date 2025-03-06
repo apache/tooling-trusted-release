@@ -39,13 +39,13 @@ _LOGGER = logging.getLogger(__name__)
 app_config = get_config()
 
 # Default path for Apache RAT JAR file
-DEFAULT_RAT_JAR_PATH = app_config.APACHE_RAT_JAR_PATH
+DEFAULT_RAT_JAR_PATH: str = app_config.APACHE_RAT_JAR_PATH
 
 # Default maximum size for archive extraction
-DEFAULT_MAX_EXTRACT_SIZE = app_config.MAX_EXTRACT_SIZE
+DEFAULT_MAX_EXTRACT_SIZE: int = app_config.MAX_EXTRACT_SIZE
 
 # Default chunk size for reading files
-DEFAULT_CHUNK_SIZE = app_config.EXTRACT_CHUNK_SIZE
+DEFAULT_CHUNK_SIZE: int = app_config.EXTRACT_CHUNK_SIZE
 
 java_memory_args: list[str] = []
 # Use this to set smaller memory limits and use SerialGC which also requires less memory

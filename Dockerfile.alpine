@@ -1,6 +1,6 @@
 FROM python:3.13.2-alpine3.21
 
-ARG BIND=127.0.0.1:8080
+ARG BIND=127.0.0.1:4443
 ENV BIND=${BIND}
 ARG SCRIPTS=scripts/poetry
 ENV SCRIPTS=${SCRIPTS}
@@ -42,7 +42,7 @@ WORKDIR /opt/atr
 RUN curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 RUN rm -rf .venv-*
 RUN make sync PYTHON="$(which python3)"
-EXPOSE 8080
+EXPOSE 4443
 
 RUN printf '#!/bin/sh\n\
 cd /opt/atr\n\
