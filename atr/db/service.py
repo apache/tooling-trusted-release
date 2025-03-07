@@ -23,14 +23,20 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlmodel import select
 
-from atr.db.models import PMC, ProductLine, Release, Task
+from atr.db.models import PMC, ProductLine, PublicSigningKey, Release, Task
 
 from . import create_async_db_session
 
 
-async def get_pmc_by_name(project_name: str) -> PMC | None:
+async def get_pmc_by_name(project_name: str, include_keys: bool = False) -> PMC | None:
     async with create_async_db_session() as db_session:
         statement = select(PMC).where(PMC.project_name == project_name)
+
+        if include_keys:
+            statement = statement.options(
+                selectinload(cast(InstrumentedAttribute[PublicSigningKey], PMC.public_signing_keys))
+            )
+
         pmc = (await db_session.execute(statement)).scalar_one_or_none()
         return pmc
 

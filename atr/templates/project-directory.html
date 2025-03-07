@@ -79,7 +79,9 @@
   <div class="pmc-grid">
     {% for pmc in projects %}
       <div class="pmc-card">
-        <div class="pmc-name">{{ pmc.display_name }}</div>
+        <a href="{{ url_for('root_project_view', project_name=pmc.project_name) }}">
+          <div class="pmc-name">{{ pmc.display_name }}</div>
+        </a>
         <div class="pmc-stats">
           <div class="stat-item">
             <span class="stat-label">PMC Members</span>
@@ -103,17 +105,12 @@
   {{ super() }}
   <script>
       function filter() {
-          e = document.getElementById("pmc-filter");
-          pmc_filter = e.value;
-          cards = document.getElementsByClassName("pmc-card");
+          const pmcFilter = document.getElementById("pmc-filter").value;
+          const cards = document.getElementsByClassName("pmc-card");
           for (let card of cards) {
-              name_element = card.getElementsByClassName("pmc-name");
-              name = name_element[0].innerHTML;
-              if (pmc_filter && !name.startsWith(pmc_filter)) {
-                  card.hidden = true;
-              } else {
-                  card.hidden = false;
-              }
+              const nameElement = card.getElementsByClassName("pmc-name");
+              const name = nameElement[0].innerHTML;
+              card.hidden = !!(pmcFilter && !name.startsWith(pmcFilter));
           }
       }
   </script>

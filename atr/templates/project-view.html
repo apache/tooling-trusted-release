@@ -1,0 +1,174 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Project ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Release candidates to which you have access.
+{% endblock description %}
+
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .card-header {
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          padding: 1rem;
+          margin-bottom: 1rem;
+          background-color: #f8f8f8;
+      }
+
+      .card-header h3 {
+          margin: 0 0 0.5rem 0;
+      }
+
+      .card-meta {
+          color: #666;
+          font-size: 0.9em;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 1rem;
+          margin-bottom: .5rem;
+          padding-bottom: 1rem;
+          border-bottom: 1px solid #ddd;
+      }
+
+      .card-meta-item::after {
+          content: "•";
+          margin-left: 1rem;
+          color: #ccc;
+      }
+
+      .card-meta-item:last-child::after {
+          content: none;
+      }
+
+      .card-body {
+          display: flex;
+          gap: 1rem;
+          align-items: center;
+      }
+
+      .keys-grid {
+          display: grid;
+          gap: 1.5rem;
+      }
+
+      .key-card {
+          background: white;
+          border: 1px solid #d1d2d3;
+          border-radius: 4px;
+          overflow: hidden;
+          padding: 1rem;
+      }
+
+      .key-card table {
+          margin: 0;
+      }
+
+      .key-card td {
+          word-break: break-all;
+      }
+
+      .key-card h3 {
+          margin-top: 0;
+          margin-bottom: 1rem;
+      }
+  </style>
+{% endblock stylesheets %}
+
+{% block content %}
+  <h1>{{ project.display_name | capitalize }}</h1>
+
+  <div class="card-header">
+    <h3>PMC members</h3>
+    <div class="card-meta"></div>
+    <div class="card-body">
+      <p>
+        {% for user in project.pmc_members %}{{ user }},{% endfor %}
+      </p>
+    </div>
+  </div>
+
+  <div class="card-header">
+    <h3>Committers</h3>
+    <div class="card-meta"></div>
+    <div class="card-body">
+      <p>
+        {% for user in project.committers %}{{ user }},{% endfor %}
+      </p>
+    </div>
+  </div>
+
+  <div class="card-header">
+    <h3>Signing Keys</h3>
+    <div class="card-meta"></div>
+    <div class="keys-grid">
+      {% for key in project.public_signing_keys %}
+        <div class="key-card">
+          <table>
+            <tbody>
+              <tr>
+                <th>Fingerprint</th>
+                <td>{{ key.fingerprint }}</td>
+              </tr>
+              <tr>
+                <th>Key Type</th>
+                <td>{{ algorithms[key.algorithm] }} ({{ key.length }} bits)</td>
+              </tr>
+              <tr>
+                <th>Created</th>
+                <td>{{ key.created.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+              </tr>
+              <tr>
+                <th>Expires</th>
+                <td>
+                  {% if key.expires %}
+                    {% set days_until_expiry = (key.expires - now).days %}
+                    {% if days_until_expiry < 0 %}
+                      <span class="expiry-error">
+                        {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
+                        <span class="notice-badge error">Expired</span>
+                      </span>
+                    {% elif days_until_expiry <= 30 %}
+                      <span class="expiry-warning">
+                        {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
+                        <span class="notice-badge warning">Expires in {{ days_until_expiry }} days</span>
+                      </span>
+                    {% else %}
+                      {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
+                    {% endif %}
+                  {% else %}
+                    Never
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <th>User ID</th>
+                <td>{{ key.declared_uid or 'Not specified' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card-header">
+    <h3>Voting Policy</h3>
+    <div class="card-meta"></div>
+    <div class="card-body"></div>
+  </div>
+
+  <div class="card-header">
+    <h3>Product Lines</h3>
+    <div class="card-meta"></div>
+    <div class="card-body"></div>
+  </div>
+
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+{% endblock javascripts %}

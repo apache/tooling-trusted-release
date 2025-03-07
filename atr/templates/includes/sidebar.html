@@ -32,9 +32,10 @@
       <li>
         <i class="fa-solid fa-house"></i>
         <a href="{{ url_for('root') }}"
-           {% if request.endpoint == 'root' %}class="active"{% endif %}>About ATR</a>
+           {% if request.endpoint == 'root' %}class="active"{% endif %}>About</a>
       </li>
       <li>
+        <i class="fa-solid fa-diagram-project"></i>
         <a href="{{ url_for('root_project_directory') }}"
            {% if request.endpoint == 'root_project_directory' %}class="active"{% endif %}>Projects</a>
       </li>
