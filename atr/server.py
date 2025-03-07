@@ -25,7 +25,6 @@ from typing import Any
 from blockbuster import BlockBuster
 from quart import render_template
 from quart_schema import OpenAPIProvider, QuartSchema
-from werkzeug.exceptions import NotFound
 from werkzeug.routing import Rule
 
 import asfquart
@@ -67,7 +66,7 @@ def register_routes(app: QuartApp) -> tuple[str, ...]:
     # Add a global error handler in case a page does not exist.
     @app.errorhandler(404)
     async def handle_not_found(error: Exception) -> Any:
-        return await render_template("notfound.html", error=str(error), status_code=404), 404
+        return await render_template("notfound.html", error="404 Not Found", traceback="", status_code=404), 404
 
     # Must do this otherwise ruff "fixes" this function by removing the imports
     return (

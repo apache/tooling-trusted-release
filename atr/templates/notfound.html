@@ -32,13 +32,18 @@
 
 {% block content %}
   <div>
-    <h1>Page Not Found</h1>
+    <h1>Error</h1>
     <div class="error-container">
       <h2 class="error-title">{{ error }}</h2>
       <p>
-        The page you are looking for does not exist. How you get here is a mystery.
-        But you can click the link below to get back to the homepage.
+        The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
       </p>
+
+      {% if status_code %}
+        <p>
+          <strong>Status Code:</strong> {{ status_code }}
+        </p>
+      {% endif %}
     </div>
 
     <div class="actions">
