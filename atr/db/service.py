@@ -38,7 +38,7 @@ async def get_pmc_by_name(project_name: str) -> PMC | None:
 async def get_pmcs() -> Sequence[PMC]:
     async with create_async_db_session() as db_session:
         # Get all PMCs and their latest releases
-        statement = select(PMC)
+        statement = select(PMC).order_by(PMC.project_name)
         pmcs = (await db_session.execute(statement)).scalars().all()
         return pmcs
 

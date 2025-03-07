@@ -19,7 +19,14 @@ import json
 import os
 from typing import Any
 
-from atr.datasources.apache import CommitteeData, GroupsData, PodlingsData, ProjectData, RetiredCommitteeData
+from atr.datasources.apache import (
+    CommitteeData,
+    GroupsData,
+    LDAPProjectsData,
+    PodlingsData,
+    ProjectsData,
+    RetiredCommitteeData,
+)
 
 
 def _load_test_data(name: str) -> Any:
@@ -27,8 +34,8 @@ def _load_test_data(name: str) -> Any:
         return json.load(f)
 
 
-def test_projects_data_model():
-    projects = ProjectData.model_validate(_load_test_data("projects"))
+def test_ldap_projects_data_model():
+    projects = LDAPProjectsData.model_validate(_load_test_data("ldap_projects"))
 
     assert projects is not None
     assert projects.project_count == 1
@@ -75,3 +82,10 @@ def test_groups_data_model():
     assert len(groups) == 2
     assert groups.get("accumulo") is not None
     assert groups.get("accumulo-pmc") is not None
+
+
+def test_projects_data_model():
+    projects = ProjectsData.model_validate(_load_test_data("projects"))
+
+    assert len(projects) == 1
+    assert projects.get("accumulo") is not None

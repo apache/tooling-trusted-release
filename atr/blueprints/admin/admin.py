@@ -32,7 +32,7 @@ from asfquart.session import read as session_read
 from atr.datasources.apache import (
     get_current_podlings_data,
     get_groups_data,
-    get_projects_data,
+    get_ldap_projects_data,
 )
 from atr.db import create_async_db_session
 from atr.db.models import (
@@ -203,7 +203,7 @@ async def admin_projects_update() -> str | Response | tuple[Mapping[str, Any], i
 
 
 async def _update_pmcs() -> int:
-    apache_projects = await get_projects_data()
+    ldap_projects = await get_ldap_projects_data()
     podlings_data = await get_current_podlings_data()
     groups_data = await get_groups_data()
 
@@ -212,7 +212,7 @@ async def _update_pmcs() -> int:
     async with create_async_db_session() as db_session:
         async with db_session.begin():
             # First update PMCs
-            for project in apache_projects.projects:
+            for project in ldap_projects.projects:
                 name = project.name
                 # Skip non-PMC committees
                 if not project.pmc:
@@ -235,6 +235,8 @@ async def _update_pmcs() -> int:
 
                 # For release managers, use PMC members for now
                 # TODO: Consider a more sophisticated way to determine release managers
+                #       from my POV, the list of release managers should be the list of people
+                #       that have actually cut a release for that project
                 pmc.release_managers = pmc.pmc_members
 
                 updated_count += 1

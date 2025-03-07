@@ -52,8 +52,22 @@ class ApiOnlyOpenAPIProvider(OpenAPIProvider):
                 yield rule
 
 
-def register_routes() -> tuple[str, ...]:
+def register_routes(app: QuartApp) -> tuple[str, ...]:
     from atr.routes import candidate, dev, docs, download, keys, package, project, release, root
+
+    # Add a global error handler to show helpful error messages with tracebacks.
+    @app.errorhandler(Exception)
+    async def handle_any_exception(error: Exception) -> Any:
+        import traceback
+
+        tb = traceback.format_exc()
+        app.logger.error(f"Unhandled exception: {error}\n{tb}")
+        return await render_template("error.html", error=str(error), traceback=tb, status_code=500), 500
+
+    # Add a global error handler in case a page does not exist.
+    @app.errorhandler(404)
+    async def handle_not_found(error: Exception) -> Any:
+        return await render_template("notfound.html", error=str(error), status_code=404), 404
 
     # Must do this otherwise ruff "fixes" this function by removing the imports
     return (
@@ -164,7 +178,7 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
     app_setup_api_docs(app)
 
     create_database(app)
-    register_routes()
+    register_routes(app)
     register_blueprints(app)
 
     config_mode = get_config_mode()
@@ -176,17 +190,6 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
     # do not enable template pre-loading if we explicitly want to reload templates
     if not app_config.TEMPLATES_AUTO_RELOAD:
         setup_template_preloading(app)
-
-    # Add a global error handler to show helpful error messages with tracebacks
-    @app.errorhandler(Exception)
-    async def handle_any_exception(error: Exception) -> Any:
-        if isinstance(error, NotFound):
-            return await render_template("error.html", error="404 Not Found", traceback="", status_code=404), 404
-        import traceback
-
-        tb = traceback.format_exc()
-        app.logger.error(f"Unhandled exception: {error}\n{tb}")
-        return await render_template("error.html", error=str(error), traceback=tb, status_code=500), 500
 
     @app.before_serving
     async def start_blockbuster() -> None:

@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, TypeVar
 
 import httpx
 from pydantic import BaseModel, Field, RootModel
@@ -33,21 +33,24 @@ if TYPE_CHECKING:
 _WHIMSY_COMMITTEE_INFO_URL = "https://whimsy.apache.org/public/committee-info.json"
 _WHIMSY_COMMITTEE_RETIRED_URL = "https://whimsy.apache.org/public/committee-retired.json"
 _WHIMSY_PROJECTS_URL = "https://whimsy.apache.org/public/public_ldap_projects.json"
-_PROJECT_PODLINGS_URL = "https://projects.apache.org/json/foundation/podlings.json"
-_PROJECT_GROUPS_URL = "https://projects.apache.org/json/foundation/groups.json"
+_PROJECTS_PROJECTS_URL = "https://projects.apache.org/json/foundation/projects.json"
+_PROJECTS_PODLINGS_URL = "https://projects.apache.org/json/foundation/podlings.json"
+_PROJECTS_GROUPS_URL = "https://projects.apache.org/json/foundation/groups.json"
+
+VT = TypeVar("VT")
 
 
-class ProjectData(BaseModel):
+class LDAPProjectsData(BaseModel):
     last_timestamp: str = Field(alias="lastTimestamp")
     project_count: int
-    projects: Annotated[list[Project], DictToList(key="name")]
+    projects: Annotated[list[LDAPProject], DictToList(key="name")]
 
     @property
     def last_time(self) -> datetime:
         return datetime.strptime(self.last_timestamp, "%Y%m%d%H%M%S%z")
 
 
-class Project(BaseModel):
+class LDAPProject(BaseModel):
     name: str
     create_timestamp: str = Field(alias="createTimestamp")
     modify_timestamp: str = Field(alias="modifyTimestamp")
@@ -111,45 +114,58 @@ class PodlingStatus(BaseModel):
     resolution: str | None = None
 
 
-class PodlingsData(RootModel):
-    root: dict[str, PodlingStatus]
-
-    def __iter__(self) -> Generator[tuple[str, PodlingStatus]]:
+class _DictRootModel(RootModel[dict[str, VT]]):
+    def __iter__(self) -> Generator[tuple[str, VT]]:
         yield from self.root.items()
 
-    def items(self) -> ItemsView[str, PodlingStatus]:
+    def items(self) -> ItemsView[str, VT]:
         return self.root.items()
 
-    def get(self, key: str) -> PodlingStatus | None:
+    def get(self, key: str) -> VT | None:
         return self.root.get(key)
 
     def __len__(self) -> int:
         return len(self.root)
 
 
-class GroupsData(RootModel):
-    root: dict[str, list[str]]
-
-    def __iter__(self) -> Generator[tuple[str, list[str]]]:
-        yield from self.root.items()
-
-    def items(self) -> ItemsView[str, list[str]]:
-        return self.root.items()
-
-    def get(self, key: str) -> list[str] | None:
-        return self.root.get(key)
-
-    def __len__(self) -> int:
-        return len(self.root)
+class PodlingsData(_DictRootModel[PodlingStatus]):
+    pass
 
 
-async def get_projects_data() -> ProjectData:
+class GroupsData(_DictRootModel[list[str]]):
+    pass
+
+
+class Release(BaseModel):
+    created: str | None = None
+    name: str
+    revision: str | None = None
+
+
+class ProjectStatus(BaseModel):
+    category: str | None = None
+    created: str | None = None
+    description: str | None = None
+    doap: str
+    homepage: str
+    name: str
+    pmc: str
+    shortdesc: str | None = None
+    repository: list[str | dict] = Field(default_factory=list)
+    release: list[Release] = Field(default_factory=list)
+
+
+class ProjectsData(_DictRootModel[ProjectStatus]):
+    pass
+
+
+async def get_ldap_projects_data() -> LDAPProjectsData:
     async with httpx.AsyncClient() as client:
         response = await client.get(_WHIMSY_PROJECTS_URL)
         response.raise_for_status()
         data = response.json()
 
-    return ProjectData.model_validate(data)
+    return LDAPProjectsData.model_validate(data)
 
 
 async def get_active_committee_data() -> CommitteeData:
@@ -178,17 +194,27 @@ async def get_current_podlings_data() -> PodlingsData:
     """Returns the list of current podlings."""
 
     async with httpx.AsyncClient() as client:
-        response = await client.get(_PROJECT_PODLINGS_URL)
+        response = await client.get(_PROJECTS_PODLINGS_URL)
         response.raise_for_status()
         data = response.json()
-    return PodlingsData(root=data)
+    return PodlingsData.model_validate(data)
 
 
 async def get_groups_data() -> GroupsData:
     """Returns LDAP Groups with their members."""
 
     async with httpx.AsyncClient() as client:
-        response = await client.get(_PROJECT_GROUPS_URL)
+        response = await client.get(_PROJECTS_GROUPS_URL)
         response.raise_for_status()
         data = response.json()
-    return GroupsData(root=data)
+    return GroupsData.model_validate(data)
+
+
+async def get_projects_data() -> ProjectsData:
+    """Returns the list of projects."""
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(_PROJECTS_PROJECTS_URL)
+        response.raise_for_status()
+        data = response.json()
+    return ProjectsData.model_validate(data)
