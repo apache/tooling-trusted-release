@@ -18,21 +18,13 @@
 import logging
 import os
 import re
-import shutil
 import subprocess
 import tarfile
 import tempfile
 import xml.etree.ElementTree as ET
-from collections.abc import Generator
-from contextlib import contextmanager
-from typing import Any, BinaryIO, cast
-
-import gnupg
-from sqlalchemy.sql import select
+from typing import Any
 
 from atr.config import get_config
-from atr.db import create_sync_db_session
-from atr.db.models import PMC, PMCKeyLink, PublicSigningKey
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -191,78 +183,6 @@ def license_files(artifact_path: str) -> dict[str, Any]:
         "notice_valid": notice_ok,
         "notice_issues": notice_issues if notice_issues else None,
         "message": "; ".join(messages) if messages else "All license files present and valid",
-    }
-
-
-def signature(pmc_name: str, artifact_path: str, signature_path: str) -> dict[str, Any]:
-    """Verify a signature file using the PMC's public signing keys."""
-    # Query only the signing keys associated with this PMC
-    with create_sync_db_session() as session:
-        from sqlalchemy.sql.expression import ColumnElement
-
-        statement = (
-            select(PublicSigningKey)
-            .join(PMCKeyLink)
-            .join(PMC)
-            .where(cast(ColumnElement[bool], PMC.project_name == pmc_name))
-        )
-        result = session.execute(statement)
-        public_keys = [key.ascii_armored_key for key in result.scalars().all()]
-
-    with open(signature_path, "rb") as sig_file:
-        return signature_gpg_file(sig_file, artifact_path, public_keys)
-
-
-def signature_gpg_file(sig_file: BinaryIO, artifact_path: str, ascii_armored_keys: list[str]) -> dict[str, Any]:
-    """Verify a GPG signature for a file."""
-
-    @contextmanager
-    def ephemeral_gpg_home() -> Generator[str]:
-        """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
-        temp_dir = tempfile.mkdtemp(prefix="gpg-")
-        try:
-            yield temp_dir
-        finally:
-            shutil.rmtree(temp_dir)
-
-    with ephemeral_gpg_home() as gpg_home:
-        gpg = gnupg.GPG(gnupghome=gpg_home)
-
-        # Import all PMC public signing keys
-        for key in ascii_armored_keys:
-            import_result = gpg.import_keys(key)
-            if not import_result.fingerprints:
-                # TODO: Log warning about invalid key?
-                continue
-        verified = gpg.verify_file(sig_file, str(artifact_path))
-
-    # Collect all available information for debugging
-    debug_info = {
-        "key_id": verified.key_id or "Not available",
-        "fingerprint": verified.fingerprint.lower() if verified.fingerprint else "Not available",
-        "pubkey_fingerprint": verified.pubkey_fingerprint.lower() if verified.pubkey_fingerprint else "Not available",
-        "creation_date": verified.creation_date or "Not available",
-        "timestamp": verified.timestamp or "Not available",
-        "username": verified.username or "Not available",
-        "status": verified.status or "Not available",
-        "valid": bool(verified),
-        "trust_level": verified.trust_level if hasattr(verified, "trust_level") else "Not available",
-        "trust_text": verified.trust_text if hasattr(verified, "trust_text") else "Not available",
-        "stderr": verified.stderr if hasattr(verified, "stderr") else "Not available",
-        "num_pmc_keys": len(ascii_armored_keys),
-    }
-
-    if not verified:
-        raise VerifyError("No valid signature found", debug_info)
-
-    return {
-        "verified": True,
-        "key_id": verified.key_id,
-        "timestamp": verified.timestamp,
-        "username": verified.username or "Unknown",
-        "email": verified.pubkey_fingerprint.lower() or "Unknown",
-        "status": "Valid signature",
-        "debug_info": debug_info,
     }
 
 

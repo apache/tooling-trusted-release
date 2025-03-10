@@ -28,7 +28,7 @@ Do not use uppercase for constants within functions and methods.
 
 ### Use the `Final` type with all constants
 
-This pattern must be followed for top level constants, and should be followed for function and method level constants too.
+This pattern must be followed for top level constants, and should be followed for function and method level constants too. The longer the function, the more important the use of `Final`.
 
 ### Prefix global variables with `global_`
 
@@ -70,7 +70,7 @@ from p.q.r import s
 s()
 ```
 
-The typing module is an exception to this rule. Always import typing identifiers directly using the `from` syntax:
+The collections.abc and typing modules are an exception to this rule. Always import typing identifiers directly using the `from` syntax:
 
 ```python
 # Preferred

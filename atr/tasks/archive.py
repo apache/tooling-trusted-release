@@ -25,7 +25,7 @@ import atr.tasks.task as task
 _LOGGER = logging.getLogger(__name__)
 
 
-def check_integrity(args: list[str]) -> tuple[task.TaskStatus, str | None, tuple[Any, ...]]:
+def check_integrity(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Check the integrity of a .tar.gz file."""
     # TODO: We should standardise the "ERROR" mechanism here in the data
     # Then we can have a single task wrapper for all tasks
@@ -33,14 +33,14 @@ def check_integrity(args: list[str]) -> tuple[task.TaskStatus, str | None, tuple
     # First argument should be the path, second is optional chunk_size
     path = args[0]
     chunk_size = int(args[1]) if len(args) > 1 else 4096
-    task_results = _wrap_results(_check_integrity_core(path, chunk_size))
+    task_results = task.results_as_tuple(_check_integrity_core(path, chunk_size))
     _LOGGER.info(f"Verified {args} and computed size {task_results[0]}")
     return task.COMPLETED, None, task_results
 
 
-def check_structure(args: list[str]) -> tuple[task.TaskStatus, str | None, tuple[Any, ...]]:
+def check_structure(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Check the structure of a .tar.gz file."""
-    task_results = _wrap_results(_check_structure_core(*args))
+    task_results = task.results_as_tuple(_check_structure_core(*args))
     _LOGGER.info(f"Verified archive structure for {args}")
     status = task.FAILED if not task_results[0]["valid"] else task.COMPLETED
     error = task_results[0]["message"] if not task_results[0]["valid"] else None
@@ -104,10 +104,3 @@ def _check_structure_core(tgz_path: str, filename: str) -> dict[str, Any]:
         }
 
     return {"valid": True, "root_dirs": [root], "message": "Archive structure is valid"}
-
-
-def _wrap_results(item: Any) -> tuple[Any, ...]:
-    """Ensure that returned results are structured as a tuple."""
-    if not isinstance(item, tuple):
-        return (item,)
-    return item

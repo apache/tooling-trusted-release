@@ -16,13 +16,28 @@
 # under the License.
 
 from enum import Enum
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 
-class TaskStatus(Enum):
+class Status(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
 
-COMPLETED: Final[Literal[TaskStatus.COMPLETED]] = TaskStatus.COMPLETED
-FAILED: Final[Literal[TaskStatus.FAILED]] = TaskStatus.FAILED
+COMPLETED: Final[Literal[Status.COMPLETED]] = Status.COMPLETED
+FAILED: Final[Literal[Status.FAILED]] = Status.FAILED
+
+
+class Error(Exception):
+    """Error during task execution."""
+
+    def __init__(self, message: str, *result: Any) -> None:
+        self.message = message
+        self.result = tuple(result)
+
+
+def results_as_tuple(item: Any) -> tuple[Any, ...]:
+    """Ensure that returned results are structured as a tuple."""
+    if not isinstance(item, tuple):
+        return (item,)
+    return item

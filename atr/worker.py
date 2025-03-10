@@ -38,6 +38,7 @@ from sqlalchemy import text
 import atr.tasks.archive as archive
 import atr.tasks.bulk as bulk
 import atr.tasks.mailtest as mailtest
+import atr.tasks.signature as signature
 import atr.tasks.task as task
 import atr.tasks.vote as vote
 import atr.verify as verify
@@ -87,6 +88,20 @@ def setup_logging() -> None:
 def task_error_handle(task_id: int, e: Exception) -> None:
     """Handle task error by updating the database with error information."""
     if isinstance(e, verify.VerifyError):
+        # VerifyError is deprecated, use task.Error instead
+        _LOGGER.error(f"Task {task_id} failed: {e.message}")
+        result = json.dumps(e.result)
+        with create_sync_db_session() as session:
+            with session.begin():
+                session.execute(
+                    text("""
+                        UPDATE task
+                        SET status = 'FAILED', completed = :now, error = :error, result = :result
+                        WHERE id = :task_id
+                        """),
+                    {"now": datetime.datetime.now(UTC), "task_id": task_id, "error": e.message, "result": result},
+                )
+    elif isinstance(e, task.Error):
         _LOGGER.error(f"Task {task_id} failed: {e.message}")
         result = json.dumps(e.result)
         with create_sync_db_session() as session:
@@ -185,15 +200,6 @@ def task_verify_license_files(args: list[str]) -> tuple[str, str | None, tuple[A
     _LOGGER.info(f"Verified license files for {args}")
     status = "FAILED" if not task_results[0]["files_found"] else "COMPLETED"
     error = "Required license files not found" if not task_results[0]["files_found"] else None
-    return status, error, task_results
-
-
-def task_verify_signature(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
-    """Process verify_signature task."""
-    task_results = task_process_wrap(verify.signature(*args))
-    _LOGGER.info(f"Verified {args} with result {task_results[0]}")
-    status = "FAILED" if task_results[0].get("error") else "COMPLETED"
-    error = task_results[0].get("error")
     return status, error, task_results
 
 
@@ -387,7 +393,7 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
             "verify_archive_integrity": archive.check_integrity,
             "verify_archive_structure": archive.check_structure,
             "verify_license_files": task_verify_license_files,
-            "verify_signature": task_verify_signature,
+            "verify_signature": signature.check,
             "verify_license_headers": task_verify_license_headers,
             "verify_rat_license": task_verify_rat_license,
             "generate_cyclonedx_sbom": task_generate_cyclonedx_sbom,
@@ -403,7 +409,7 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
             raise Exception(msg)
 
         raw_status, error, task_results = handler(args)
-        if isinstance(raw_status, task.TaskStatus):
+        if isinstance(raw_status, task.Status):
             status = raw_status.value
         elif isinstance(raw_status, str):
             status = raw_status
