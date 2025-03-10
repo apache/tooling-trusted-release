@@ -1,49 +1,130 @@
 <h1>Project conventions</h1>
-<h2>Python functions</h2>
-<h3>Name functions in a collation friendly way</h3>
-<p>Functions should be named hierarchically, with the most general category first, followed by increasingly specific details. This makes related functions group together naturally when sorted alphabetically, making code navigation and discovery easier.</p>
+<p><strong>STATUS: Draft.</strong></p>
+<p>This document does not yet reflect the consensus of the ASF Tooling team, and, unlike the rest of this codebase, is provided for internal ASF Tooling discussion only.</p>
+<h2>Python code</h2>
+<p>Follow <a href="https://peps.python.org/pep-0008/#constants">PEP 8</a> unless otherwise indicated in this document. Some of the conventions listed below recapitulate or add exceptions to PEP 8 rules.</p>
+<p>Obey all project local lints, e.g. the use of <code>ruff</code> and specific <code>ruff</code> rules.</p>
+<h3>Prefix private interfaces with a single underscore</h3>
+<p>Prefix all private interfaces, e.g. functions, classes, constants, variables, with a single underscore. An interface is private when used exclusively within its containing module and not referenced by external code, templates, or processes.</p>
+<p>Exceptions to this rule include:</p>
+<ul>
+<li>Type variables</li>
+<li>Enumerations</li>
+<li>Methods requiring interface compatibility with their superclass</li>
+</ul>
+<h3>Use UPPERCASE for top level constants</h3>
+<p>Define top level constants using <code>UPPERCASE</code> letters. Don't forget to apply an underscore prefix to constants which are private to their module.</p>
+<p>Do not use uppercase for constants within functions and methods.</p>
+<h3>Use the <code>Final</code> type with all constants</h3>
+<p>This pattern must be followed for top level constants, and should be followed for function and method level constants too.</p>
+<h3>Prefix global variables with <code>global_</code></h3>
+<p>Top level variables should be avoided. When their use is necessary, prefix them with <code>global_</code>, using lowercase letters, to ensure clear identification of their scope. Use an underscore prefix too, <code>_global_</code>, when the variable is private.</p>
+<h3>Import modules as their least significant name part</h3>
+<p>Import modules using their least significant name component:</p>
+<pre><code class="language-python"># Preferred
+import a.b.c as c
+
+# Avoid
+import a.b.c
+</code></pre>
+<p>This convention aligns with Go's package naming practices. Follow <a href="https://go.dev/blog/package-names">Go naming rules</a> for all modules.</p>
+<h3>Never import names directly from modules</h3>
+<p>Avoid importing specific names from modules:</p>
+<pre><code class="language-python"># Preferred
+import p.q.r as r
+r.s()
+
+# Avoid
+from p.q.r import s
+s()
+</code></pre>
+<p>The typing module is an exception to this rule. Always import typing identifiers directly using the <code>from</code> syntax:</p>
+<pre><code class="language-python"># Preferred
+from typing import Final
+
+CONSTANT: Final = &quot;CONSTANT&quot;
+
+# Avoid
+import typing
+
+CONSTANT: typing.Final = &quot;CONSTANT&quot;
+</code></pre>
+<h3>Use concise typing patterns</h3>
+<p>Do not use <code>List</code> or <code>Optional</code> etc. from the typing module.</p>
+<pre><code class="language-python"># Preferred
+def example() -&gt; list[str | None]:
+    return [&quot;a&quot;, &quot;c&quot;, None]
+
+# Avoid
+from typing import List, Optional
+
+def example() -&gt; List[Optional[str]]:
+    return [&quot;a&quot;, &quot;c&quot;, None]
+</code></pre>
+<h3>Never name interfaces after their module</h3>
+<p>Do not name interfaces with the same identifier as their containing module. For example, in a module named <code>example</code>, the function names <code>example</code> and <code>example_function</code> are prohibited.</p>
+<h3>Keep modules small and focused</h3>
+<p>Maintain modules with a reasonable number of interfaces. Though no strict limits are enforced, modules containing numerous classes, constants, or functions should be considered for logical subdivision. Exceptions may be made when closely related functionality necessitates grouping multiple interfaces within a single module.</p>
+<h3>Name functions to group related items together alphabetically</h3>
+<p>Modules should, in general, be split into small collections of code items. If this is unavoidable, large groups of functions should be named hierarchically, with the most general category first, followed by increasingly specific details. This makes related functions group together naturally when sorted alphabetically, making code navigation and discovery easier.</p>
 <p><strong>Example</strong>:</p>
 <p>Instead of scattered, hard to find related functions:</p>
-<pre><code class="language-python">def get_user_from_db():
+<pre><code class="language-python"># Avoid
+def get_user_from_db():
 def insert_new_record():
 def query_user_settings():
 def update_db_record():
 </code></pre>
 <p>Use hierarchical naming that groups related functionality:</p>
-<pre><code class="language-python">def db_user_get():
+<pre><code class="language-python"># Preferred
+def db_user_get():
 def db_record_insert():
 def db_user_settings_query():
 def db_record_update():
 </code></pre>
+<p>Note that if the same prefix is used for a large number of functions, that indicates that these functions are a good candidate for splitting off into their own module.</p>
 <p><strong>Example</strong>:</p>
 <p>Another example with license files, the wrong way:</p>
-<pre><code class="language-python">def check_root_license_file():      # Lost among other &quot;check_&quot; functions
+<pre><code class="language-python"># Avoid
+def check_root_license_file():      # Lost among other &quot;check_&quot; functions
 def validate_package_license():     # Separated from other license functions
 def verify_license_files():         # Yet another scattered license function
 </code></pre>
 <p>The right way:</p>
-<pre><code class="language-python">def license_root_file_check():      # All license-related functions
+<pre><code class="language-python"># Preferred
+def license_root_file_check():      # All license-related functions
 def license_package_validate():     # will appear together when
 def license_files_verify():         # sorted alphabetically
 </code></pre>
-<p>Note how verbs tend to come last, so that function names now read in an object oriented style, with a module, object, and action.</p>
+<p>Note how verbs tend to come last, so that function names now read in an object oriented style, like a module, object, and action.</p>
 <p>While this approach can lead to slightly longer function names, the benefits of improved code organisation and discoverability outweigh the verbosity.</p>
+<p>Private, underscored, functions should be placed after all public functions.</p>
 <h3>Give helper functions the same prefix as their parent function</h3>
 <p>This makes it easier to find all the functions related to a specific task.</p>
 <p><strong>Example</strong>:</p>
 <p>Instead of:</p>
-<pre><code class="language-python">def verify_archive_integrity():
-def do_something_in_verify_archive_integrity():
+<pre><code class="language-python"># Avoid
+def _verify_archive_integrity():
+def _do_something_in_verify_archive_integrity():
 </code></pre>
 <p>Use the same prefix:</p>
-<pre><code class="language-python">def verify_archive_integrity():
-def verify_archive_integrity_do_something():
+<pre><code class="language-python"># Preferred
+def _verify_archive_integrity():
+def _verify_archive_integrity_do_something():
 </code></pre>
 <p>This makes it easier to find all the functions related to a specific task, and means that they sort together.</p>
 <h3>Keep cyclomatic complexity below 10</h3>
 <p>We limit function complexity to a score of 10. If the linter complains, your function is doing too much.</p>
 <p>Cyclomatic complexity counts the number of independent paths through code: more if/else branches, loops, and exception handlers means higher complexity. Complex code is harder to test, maintain, and understand. The easiest way to fix high complexity is usually to refactor a chunk of related logic into a separate helper function.</p>
-<h3>Use parentheses to group subexpressions in boolean expressions always</h3>
+<h3>Replace synchronous calls with asynchronous counterparts in async code</h3>
+<p>Our use of blockbuster enables automatic detection of synchronous function calls within asynchronous code. When detected, replace these calls with their asynchronous equivalents without performance testing. The conversion process typically requires minimal, trivial effort.</p>
+<p>Exceptions to this rule apply only in these scenarios:</p>
+<ul>
+<li>When dealing with third party dependencies</li>
+<li>When the asynchronous equivalent function is unknown</li>
+</ul>
+<p>If either exception applies, either submit a brief issue with the blockbuster traceback, notify the team via Slack, or add a code comment if part of another commit. An ATR Tooling engineer will address the issue without requiring significant time investment from you.</p>
+<h3>Always use parentheses to group subexpressions in boolean expressions</h3>
 <p>Instead of this:</p>
 <pre><code class="language-python">a or b and c == d or e
 </code></pre>
