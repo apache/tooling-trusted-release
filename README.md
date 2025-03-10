@@ -3,19 +3,19 @@
 <a href="https://github.com/apache/tooling-atr-experiments/actions/workflows/build.yml?query=branch%3Amain"><img alt="Build & Tests" src="https://github.com/apache/tooling-atr-experiments/actions/workflows/build.yml/badge.svg?branch=main" /></a>
 <a href="https://github.com/apache/tooling-atr-experiments/blob/main/LICENSE"><img alt="Apache License" src="https://img.shields.io/github/license/apache/tooling-atr-experiments" /></a>
 
-## Disclaimers
+## Status
 
-**IMPORTANT!**
+This project contains experimental code developed by the Apache Software Foundation (ASF) Tooling team. As of 10 March 2025, this code is available for internal ASF feedback only.
 
-**Please do not file issues, bugs, or feature requests if you are not a member of ASF Tooling as such submissions will not be handled through our normal support channels.**
+This codebase is in early development and subject to significant changes. We welcome feedback but recommend focusing on architectural and design aspects rather than implementation details. Many known issues, espsecially regarding implementation details, are already scheduled for improvement. Documentation and code quality will be enhanced incrementally.
 
-This repository contains experimental code developed by the Tooling team at the Apache Software Foundation (ASF). Please be aware that this code is provided solely for exploration and experimentation by ASF Tooling. It is not part of any officially maintained or supported ASF project, and is not intended to be used in any other projects. It does not indicate choices which may be made by the ASF Tooling in future for official products.
+This repository is not yet part of any officially maintained or supported ASF project. It does not represent final technical decisions for future ASF Tooling products.
 
-This experimental code is therefore published with no guarantee of stability, security, backward compatibility, or ongoing maintenance. ASF Tooling does not provide any form of support for this code.
+The code is provided without guarantees regarding stability, security, or backward compatibility.
 
 ## Purpose
 
-This code is intended to one day help ASF Tooling to test internal ideas for the [Apache Trusted Release](https://github.com/apache/tooling-docs/blob/main/apache-trusted-release/requirements.md) platform. In its early phase it consists only of, essentially, an empty Python [asfquart](https://github.com/apache/infrastructure-asfquart) project.
+This code is intended to one day help ASF Tooling to test internal ideas for the [Apache Trusted Release](https://github.com/apache/tooling-docs/blob/main/apache-trusted-release/requirements.md) platform.
 
 ## License
 
