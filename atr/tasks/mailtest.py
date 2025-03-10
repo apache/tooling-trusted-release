@@ -20,6 +20,8 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+import atr.tasks.task as task
+
 # Configure detailed logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -81,7 +83,7 @@ class Args:
         return args_obj
 
 
-def send(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
+def send(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Send a test email."""
     logger.info(f"Sending with args: {args}")
     try:
@@ -91,10 +93,10 @@ def send(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
         return status, error, result
     except Exception as e:
         logger.exception(f"Error in send function: {e}")
-        return "FAILED", str(e), tuple()
+        return task.FAILED, str(e), tuple()
 
 
-def send_core(args_list: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
+def send_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Send a test email."""
     import asyncio
 
@@ -137,17 +139,17 @@ def send_core(args_list: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
             if not tooling_pmc:
                 error_msg = "Tooling PMC not found in database"
                 logger.error(error_msg)
-                return "FAILED", error_msg, tuple()
+                return task.FAILED, error_msg, tuple()
 
             if domain != "apache.org":
                 error_msg = f"Email domain must be apache.org, got {domain}"
                 logger.error(error_msg)
-                return "FAILED", error_msg, tuple()
+                return task.FAILED, error_msg, tuple()
 
             if local_part not in tooling_pmc.pmc_members:
                 error_msg = f"Email recipient {local_part} is not a member of the tooling PMC"
                 logger.error(error_msg)
-                return "FAILED", error_msg, tuple()
+                return task.FAILED, error_msg, tuple()
 
             logger.info(f"Recipient {email_recipient} is a tooling PMC member, allowed")
 
@@ -163,7 +165,7 @@ def send_core(args_list: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
         except Exception as e:
             error_msg = f"Failed to load DKIM key: {e}"
             logger.error(error_msg)
-            return "FAILED", error_msg, tuple()
+            return task.FAILED, error_msg, tuple()
 
         event = atr.mail.ArtifactEvent(
             artifact_name=args.artifact_name,
@@ -173,8 +175,8 @@ def send_core(args_list: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
         atr.mail.send(event)
         logger.info(f"Email sent successfully to {args.email_recipient}")
 
-        return "COMPLETED", None, tuple()
+        return task.COMPLETED, None, tuple()
 
     except Exception as e:
         logger.exception(f"Error in send_core: {e}")
-        return "FAILED", str(e), tuple()
+        return task.FAILED, str(e), tuple()

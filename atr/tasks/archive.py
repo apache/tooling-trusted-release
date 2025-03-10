@@ -20,21 +20,28 @@ import os.path
 import tarfile
 from typing import Any, Final
 
+from pydantic import BaseModel, Field
+
 import atr.tasks.task as task
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def check_integrity(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+class CheckIntegrity(BaseModel):
+    """Parameters for archive integrity checking."""
+
+    path: str = Field(..., description="Path to the .tar.gz file to check")
+    chunk_size: int = Field(default=4096, description="Size of chunks to read when checking the file")
+
+
+def check_integrity(args: dict[str, Any]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Check the integrity of a .tar.gz file."""
     # TODO: We should standardise the "ERROR" mechanism here in the data
     # Then we can have a single task wrapper for all tasks
     # TODO: We should use task.TaskError as standard, and maybe typeguard each function
-    # First argument should be the path, second is optional chunk_size
-    path = args[0]
-    chunk_size = int(args[1]) if len(args) > 1 else 4096
-    task_results = task.results_as_tuple(_check_integrity_core(path, chunk_size))
-    _LOGGER.info(f"Verified {args} and computed size {task_results[0]}")
+    data = CheckIntegrity(**args)
+    task_results = task.results_as_tuple(_check_integrity_core(data.path, data.chunk_size))
+    _LOGGER.info(f"Verified {data.path} and computed size {task_results[0]}")
     return task.COMPLETED, None, task_results
 
 

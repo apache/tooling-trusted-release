@@ -191,106 +191,6 @@ def task_result_process(
                 )
 
 
-def task_bulk_download_debug(args: list[str] | dict) -> tuple[str, str | None, tuple[Any, ...]]:
-    # This was a debug function; pay no attention to this
-    # TODO: Remove once we're sure everything is working
-    _LOGGER.info(f"Bulk download debug task received args: {args}")
-
-    try:
-        # Extract parameters from args (support both list and dict inputs)
-        if isinstance(args, list):
-            # If it's a list, the release_key is the first element
-            # release_key = args[0] if args else "unknown"
-            url = args[1] if len(args) > 1 else "unknown"
-            file_types = args[2] if len(args) > 2 else []
-            require_signatures = args[3] if len(args) > 3 else False
-        elif isinstance(args, dict):
-            # release_key = args.get("release_key", "unknown")
-            url = args.get("url", "unknown")
-            file_types = args.get("file_types", [])
-            require_signatures = args.get("require_signatures", False)
-        # else:
-        #     _LOGGER.warning(f"Unexpected args type: {type(args)}")
-        #     release_key = "unknown"
-        #     url = "unknown"
-        #     file_types = []
-        #     require_signatures = False
-
-        # Progress messages to display over time
-        progress_messages = [
-            f"Connecting to {url}...",
-            f"Connected to {url}. Scanning for {', '.join(file_types) if file_types else 'all'} files...",
-            "Found 15 files matching criteria. Downloading...",
-            "Downloaded 7/15 files (47%)...",
-            "Downloaded 15/15 files (100%). Processing...",
-        ]
-
-        # Get task_id from the current process
-        current_pid = os.getpid()
-        task_id = None
-
-        # Get the task ID for the current process
-        with db.create_sync_db_session() as session:
-            result = session.execute(
-                sqlalchemy.text("SELECT id FROM task WHERE pid = :pid AND status = 'ACTIVE'"), {"pid": current_pid}
-            )
-            task_row = result.first()
-            if task_row:
-                task_id = task_row[0]
-
-        if not task_id:
-            _LOGGER.warning(f"Could not find active task for PID {current_pid}")
-
-        # Process each progress message with a delay
-        for i, message in enumerate(progress_messages):
-            progress_pct = (i + 1) * 20
-
-            update = {
-                "message": message,
-                "progress": progress_pct,
-                "url": url,
-                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-            }
-
-            # Log the progress
-            _LOGGER.info(f"Progress update {i + 1}/{len(progress_messages)}: {message} ({progress_pct}%)")
-
-            # Update the database with the current progress if we have a task_id
-            if task_id:
-                with db.create_sync_db_session() as session:
-                    # Update the task with the current progress message
-                    with session.begin():
-                        session.execute(
-                            sqlalchemy.text("""
-                                UPDATE task
-                                SET result = :result
-                                WHERE id = :task_id AND status = 'ACTIVE'
-                            """),
-                            {"task_id": task_id, "result": json.dumps(update)},
-                        )
-
-            # Sleep before the next update, except for the last one
-            if i < len(progress_messages) - 1:
-                time.sleep(2.75)
-
-        final_result = {
-            "message": f"Successfully processed {url}",
-            "progress": 100,
-            "files_processed": 15,
-            "files_downloaded": 15,
-            "url": url,
-            "file_types": file_types,
-            "require_signatures": require_signatures,
-            "completed_at": datetime.datetime.now(datetime.UTC).isoformat(),
-        }
-
-        return "COMPLETED", None, (final_result,)
-
-    except Exception as e:
-        _LOGGER.exception(f"Error in bulk download debug task: {e}")
-        return "FAILED", str(e), ({"error": str(e), "message": f"Error: {e!s}", "progress": 0},)
-
-
 def task_process(task_id: int, task_type: str, task_args: str) -> None:
     """Process a claimed task."""
     _LOGGER.info(f"Processing task {task_id} ({task_type}) with args {task_args}")
@@ -299,8 +199,10 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
 
         # Map task types to their handler functions
         # TODO: We should use a decorator to register these automatically
-        task_handlers = {
+        dict_task_handlers = {
             "verify_archive_integrity": archive.check_integrity,
+        }
+        list_task_handlers = {
             "verify_archive_structure": archive.check_structure,
             "verify_license_files": license.check_files,
             "verify_signature": signature.check,
@@ -312,20 +214,22 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
             "vote_initiate": vote.initiate,
         }
 
-        handler = task_handlers.get(task_type)
-        if not handler:
-            msg = f"Unknown task type: {task_type}, {task_handlers.keys()}"
-            _LOGGER.error(msg)
-            raise Exception(msg)
-
-        raw_status, error, task_results = handler(args)
-        if isinstance(raw_status, task.Status):
-            status = raw_status.value.upper()
-        elif isinstance(raw_status, str):
-            status = raw_status.upper()
+        if isinstance(args, dict):
+            dict_handler = dict_task_handlers.get(task_type)
+            if not dict_handler:
+                msg = f"Unknown task type: {task_type}"
+                _LOGGER.error(msg)
+                raise Exception(msg)
+            status, error, task_results = dict_handler(args)
         else:
-            raise Exception(f"Unknown task status type: {type(raw_status)}")
-        task_result_process(task_id, task_results, status=status, error=error)
+            list_handler = list_task_handlers.get(task_type)
+            if not list_handler:
+                msg = f"Unknown task type: {task_type}"
+                _LOGGER.error(msg)
+                raise Exception(msg)
+            status, error, task_results = list_handler(args)
+
+        task_result_process(task_id, task_results, status=status.value.upper(), error=error)
 
     except Exception as e:
         task_error_handle(task_id, e)

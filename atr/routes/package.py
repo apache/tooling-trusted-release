@@ -37,6 +37,7 @@ from sqlmodel import select
 from werkzeug.datastructures import FileStorage, MultiDict
 from werkzeug.wrappers.response import Response
 
+import atr.tasks.archive as archive
 from asfquart.auth import Requirements, require
 from asfquart.base import ASFQuartException
 from asfquart.session import read as session_read
@@ -578,7 +579,7 @@ async def task_verification_create(db_session: AsyncSession, package: Package) -
         Task(
             status=TaskStatus.QUEUED,
             task_type="verify_archive_integrity",
-            task_args=["releases/" + package.artifact_sha3],
+            task_args=archive.CheckIntegrity(path="releases/" + package.artifact_sha3).model_dump(),
             package_sha3=package.artifact_sha3,
         ),
         Task(

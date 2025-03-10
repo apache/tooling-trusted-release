@@ -29,6 +29,8 @@ import aiohttp
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+import atr.tasks.task as task
+
 # Configure detailed logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -280,7 +282,7 @@ def database_progress_percentage_calculate(progress: tuple[int, int] | None) -> 
     return percentage
 
 
-def download(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
+def download(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Download bulk package from URL."""
     # Returns (status, error, result)
     # This is the main task entry point, called by worker.py
@@ -294,10 +296,10 @@ def download(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
     except Exception as e:
         logger.exception(f"Error in download function: {e}")
         # Return a tuple with a dictionary that matches what the template expects
-        return "FAILED", str(e), ({"message": f"Error: {e}", "progress": 0},)
+        return task.FAILED, str(e), ({"message": f"Error: {e}", "progress": 0},)
 
 
-def download_core(args_list: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
+def download_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Download bulk package from URL."""
     logger.info("Starting download_core")
     try:
@@ -329,7 +331,7 @@ def download_core(args_list: list[str]) -> tuple[str, str | None, tuple[Any, ...
         # Return a result dictionary
         # This matches what we have in templates/release-bulk.html
         return (
-            "COMPLETED",
+            task.COMPLETED,
             None,
             (
                 {
@@ -345,7 +347,7 @@ def download_core(args_list: list[str]) -> tuple[str, str | None, tuple[Any, ...
     except Exception as e:
         logger.exception(f"Error in download_core: {e}")
         return (
-            "FAILED",
+            task.FAILED,
             str(e),
             (
                 {

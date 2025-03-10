@@ -22,6 +22,8 @@ from dataclasses import dataclass
 from datetime import UTC
 from typing import Any
 
+import atr.tasks.task as task
+
 # Configure detailed logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -98,7 +100,7 @@ class Args:
         return args_obj
 
 
-def initiate(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
+def initiate(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Initiate a vote for a release."""
     logger.info(f"Initiating vote with args: {args}")
     try:
@@ -108,10 +110,10 @@ def initiate(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
         return status, error, result
     except Exception as e:
         logger.exception(f"Error in initiate function: {e}")
-        return "FAILED", str(e), tuple()
+        return task.FAILED, str(e), tuple()
 
 
-def initiate_core(args_list: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
+def initiate_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Get arguments, create an email, and then send it to the recipient."""
     import atr.mail
     from atr.db.service import get_release_by_key_sync
@@ -141,7 +143,7 @@ def initiate_core(args_list: list[str]) -> tuple[str, str | None, tuple[Any, ...
         if not release:
             error_msg = f"Release with key {args.release_key} not found"
             logger.error(error_msg)
-            return "FAILED", error_msg, tuple()
+            return task.FAILED, error_msg, tuple()
 
         # GPG key ID, just for testing the UI
         gpg_key_id = args.gpg_key_id
@@ -166,13 +168,13 @@ def initiate_core(args_list: list[str]) -> tuple[str, str | None, tuple[Any, ...
         except Exception as e:
             error_msg = f"Failed to load DKIM key: {e}"
             logger.error(error_msg)
-            return "FAILED", error_msg, tuple()
+            return task.FAILED, error_msg, tuple()
 
         # Get PMC and product details
         if release.pmc is None:
             error_msg = "Release has no associated PMC"
             logger.error(error_msg)
-            return "FAILED", error_msg, tuple()
+            return task.FAILED, error_msg, tuple()
 
         pmc_name = release.pmc.project_name
         pmc_display = release.pmc.display_name
@@ -235,7 +237,7 @@ Thanks,
         # TODO: Update release status to indicate a vote is in progress
         # This would involve updating the database with the vote details somehow
         return (
-            "COMPLETED",
+            task.COMPLETED,
             None,
             (
                 {
@@ -250,4 +252,4 @@ Thanks,
 
     except Exception as e:
         logger.exception(f"Error in initiate_core: {e}")
-        return "FAILED", str(e), tuple()
+        return task.FAILED, str(e), tuple()
