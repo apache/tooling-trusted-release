@@ -32,9 +32,14 @@ This pattern must be followed for top level constants, and should be followed fo
 
 ### Prefix global variables with `global_`
 
+TBD: imho global variables are already implicitly defined by the rules above, uppercase name and no underscore as prefix so no need to add an additional `global_` prefix, that would just be redundant.
+Any variable at module level that is written in uppercase and does not have an underscore is global be definition.
+
 Top level variables should be avoided. When their use is necessary, prefix them with `global_`, using lowercase letters, to ensure clear identification of their scope. Use an underscore prefix too, `_global_`, when the variable is private.
 
 ### Import modules as their least significant name part
+
+TBD: this rule should have some exceptions imho, e.g. typing. The are quite commonly known and used a lot, like Any.
 
 Import modules using their least significant name component:
 
