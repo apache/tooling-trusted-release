@@ -30,20 +30,20 @@ import resource
 import signal
 import sys
 import time
-from datetime import UTC
 from typing import Any
 
-from sqlalchemy import text
+import sqlalchemy
 
+import atr.db as db
 import atr.tasks.archive as archive
 import atr.tasks.bulk as bulk
 import atr.tasks.license as license
 import atr.tasks.mailtest as mailtest
+import atr.tasks.rat as rat
+import atr.tasks.sbom as sbom
 import atr.tasks.signature as signature
 import atr.tasks.task as task
 import atr.tasks.vote as vote
-import atr.verify as verify
-from atr.db import create_sync_db_engine, create_sync_db_session
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ def main() -> None:
     setup_logging()
 
     _LOGGER.info(f"Starting worker process with pid {os.getpid()}")
-    create_sync_db_engine()
+    db.create_sync_db_engine()
 
     worker_resources_limit_set()
     worker_loop_run()
@@ -88,44 +88,35 @@ def setup_logging() -> None:
 
 def task_error_handle(task_id: int, e: Exception) -> None:
     """Handle task error by updating the database with error information."""
-    if isinstance(e, verify.VerifyError):
-        # VerifyError is deprecated, use task.Error instead
+    if isinstance(e, task.Error):
         _LOGGER.error(f"Task {task_id} failed: {e.message}")
         result = json.dumps(e.result)
-        with create_sync_db_session() as session:
+        with db.create_sync_db_session() as session:
             with session.begin():
                 session.execute(
-                    text("""
+                    sqlalchemy.text("""
                         UPDATE task
                         SET status = 'FAILED', completed = :now, error = :error, result = :result
                         WHERE id = :task_id
                         """),
-                    {"now": datetime.datetime.now(UTC), "task_id": task_id, "error": e.message, "result": result},
-                )
-    elif isinstance(e, task.Error):
-        _LOGGER.error(f"Task {task_id} failed: {e.message}")
-        result = json.dumps(e.result)
-        with create_sync_db_session() as session:
-            with session.begin():
-                session.execute(
-                    text("""
-                        UPDATE task
-                        SET status = 'FAILED', completed = :now, error = :error, result = :result
-                        WHERE id = :task_id
-                        """),
-                    {"now": datetime.datetime.now(UTC), "task_id": task_id, "error": e.message, "result": result},
+                    {
+                        "now": datetime.datetime.now(datetime.UTC),
+                        "task_id": task_id,
+                        "error": e.message,
+                        "result": result,
+                    },
                 )
     else:
         _LOGGER.error(f"Task {task_id} failed: {e}")
-        with create_sync_db_session() as session:
+        with db.create_sync_db_session() as session:
             with session.begin():
                 session.execute(
-                    text("""
+                    sqlalchemy.text("""
                         UPDATE task
                         SET status = 'FAILED', completed = :now, error = :error
                         WHERE id = :task_id
                         """),
-                    {"now": datetime.datetime.now(UTC), "task_id": task_id, "error": str(e)},
+                    {"now": datetime.datetime.now(datetime.UTC), "task_id": task_id, "error": str(e)},
                 )
 
 
@@ -135,12 +126,12 @@ def task_next_claim() -> tuple[int, str, str] | None:
     Returns (task_id, task_type, task_args) if successful.
     Returns None if no tasks are available.
     """
-    with create_sync_db_session() as session:
+    with db.create_sync_db_session() as session:
         with session.begin():
             # Find and claim the oldest unclaimed task
             # We have an index on (status, added)
             result = session.execute(
-                text("""
+                sqlalchemy.text("""
                     UPDATE task
                     SET started = :now, pid = :pid, status = 'ACTIVE'
                     WHERE id = (
@@ -151,7 +142,7 @@ def task_next_claim() -> tuple[int, str, str] | None:
                     AND status = 'QUEUED'
                     RETURNING id, task_type, task_args
                     """),
-                {"now": datetime.datetime.now(UTC), "pid": os.getpid()},
+                {"now": datetime.datetime.now(datetime.UTC), "pid": os.getpid()},
             )
             task = result.first()
             if task:
@@ -166,18 +157,18 @@ def task_result_process(
     task_id: int, task_results: tuple[Any, ...], status: str = "COMPLETED", error: str | None = None
 ) -> None:
     """Process and store task results in the database."""
-    with create_sync_db_session() as session:
+    with db.create_sync_db_session() as session:
         result = json.dumps(task_results)
         with session.begin():
             if status == "FAILED" and error:
                 session.execute(
-                    text("""
+                    sqlalchemy.text("""
                         UPDATE task
                         SET status = :status, completed = :now, result = :result, error = :error
                         WHERE id = :task_id
                         """),
                     {
-                        "now": datetime.datetime.now(UTC),
+                        "now": datetime.datetime.now(datetime.UTC),
                         "task_id": task_id,
                         "result": result,
                         "status": status.upper(),
@@ -186,82 +177,18 @@ def task_result_process(
                 )
             else:
                 session.execute(
-                    text("""
+                    sqlalchemy.text("""
                         UPDATE task
                         SET status = :status, completed = :now, result = :result
                         WHERE id = :task_id
                         """),
-                    {"now": datetime.datetime.now(UTC), "task_id": task_id, "result": result, "status": status.upper()},
+                    {
+                        "now": datetime.datetime.now(datetime.UTC),
+                        "task_id": task_id,
+                        "result": result,
+                        "status": status.upper(),
+                    },
                 )
-
-
-def task_verify_rat_license(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
-    """Process verify_rat_license task using Apache RAT."""
-    # First argument is the artifact path
-    artifact_path = args[0]
-
-    # Optional argument, with a default
-    rat_jar_path = args[1] if len(args) > 1 else verify.DEFAULT_RAT_JAR_PATH
-
-    # Make sure that the JAR path is absolute, handling various cases
-    # We WILL find that JAR path!
-    # In other words, we only run these heuristics when the configuration path is relative
-    if not os.path.isabs(rat_jar_path):
-        # If JAR path is relative to the state dir and we're already in it
-        # I.e. we're already in state and the relative file is here too
-        if os.path.basename(os.getcwd()) == "state" and os.path.exists(os.path.basename(rat_jar_path)):
-            rat_jar_path = os.path.join(os.getcwd(), os.path.basename(rat_jar_path))
-        # If JAR path starts with "state/" but we're not in state dir
-        # E.g. the configuration path is "state/apache-rat-0.16.1.jar" but we're not in the state dir
-        elif rat_jar_path.startswith("state/") and os.path.basename(os.getcwd()) != "state":
-            potential_path = os.path.join(os.getcwd(), rat_jar_path)
-            if os.path.exists(potential_path):
-                rat_jar_path = potential_path
-        # Try parent directory if JAR is not found
-        # P.S. Don't put the JAR in the parent of the state dir
-        if not os.path.exists(rat_jar_path) and os.path.basename(os.getcwd()) == "state":
-            parent_path = os.path.join(os.path.dirname(os.getcwd()), os.path.basename(rat_jar_path))
-            if os.path.exists(parent_path):
-                rat_jar_path = parent_path
-
-    # Log the actual JAR path being used
-    _LOGGER.info(f"Using Apache RAT JAR at: {rat_jar_path} (exists: {os.path.exists(rat_jar_path)})")
-
-    max_extract_size = int(args[2]) if len(args) > 2 else verify.DEFAULT_MAX_EXTRACT_SIZE
-    chunk_size = int(args[3]) if len(args) > 3 else verify.DEFAULT_CHUNK_SIZE
-
-    task_results = task_process_wrap(
-        verify.rat_license_verify(
-            artifact_path=artifact_path,
-            rat_jar_path=rat_jar_path,
-            max_extract_size=max_extract_size,
-            chunk_size=chunk_size,
-        )
-    )
-
-    _LOGGER.info(f"Verified license headers with Apache RAT for {artifact_path}")
-
-    # Determine whether the task was successful based on the results
-    status = "FAILED" if not task_results[0]["valid"] else "COMPLETED"
-    error = task_results[0]["message"] if not task_results[0]["valid"] else None
-
-    return status, error, task_results
-
-
-def task_generate_cyclonedx_sbom(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
-    """Process generate_cyclonedx_sbom task to create a CycloneDX SBOM."""
-    # First argument should be the artifact path
-    artifact_path = args[0]
-
-    task_results = task_process_wrap(verify.sbom_cyclonedx_generate(artifact_path))
-    _LOGGER.info(f"Generated CycloneDX SBOM for {artifact_path}")
-
-    # Check whether the generation was successful
-    result = task_results[0]
-    if not result.get("valid", False):
-        return "FAILED", result.get("message", "SBOM generation failed"), task_results
-
-    return "COMPLETED", None, task_results
 
 
 def task_bulk_download_debug(args: list[str] | dict) -> tuple[str, str | None, tuple[Any, ...]]:
@@ -303,9 +230,9 @@ def task_bulk_download_debug(args: list[str] | dict) -> tuple[str, str | None, t
         task_id = None
 
         # Get the task ID for the current process
-        with create_sync_db_session() as session:
+        with db.create_sync_db_session() as session:
             result = session.execute(
-                text("SELECT id FROM task WHERE pid = :pid AND status = 'ACTIVE'"), {"pid": current_pid}
+                sqlalchemy.text("SELECT id FROM task WHERE pid = :pid AND status = 'ACTIVE'"), {"pid": current_pid}
             )
             task_row = result.first()
             if task_row:
@@ -322,7 +249,7 @@ def task_bulk_download_debug(args: list[str] | dict) -> tuple[str, str | None, t
                 "message": message,
                 "progress": progress_pct,
                 "url": url,
-                "timestamp": datetime.datetime.now(UTC).isoformat(),
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             }
 
             # Log the progress
@@ -330,11 +257,11 @@ def task_bulk_download_debug(args: list[str] | dict) -> tuple[str, str | None, t
 
             # Update the database with the current progress if we have a task_id
             if task_id:
-                with create_sync_db_session() as session:
+                with db.create_sync_db_session() as session:
                     # Update the task with the current progress message
                     with session.begin():
                         session.execute(
-                            text("""
+                            sqlalchemy.text("""
                                 UPDATE task
                                 SET result = :result
                                 WHERE id = :task_id AND status = 'ACTIVE'
@@ -354,7 +281,7 @@ def task_bulk_download_debug(args: list[str] | dict) -> tuple[str, str | None, t
             "url": url,
             "file_types": file_types,
             "require_signatures": require_signatures,
-            "completed_at": datetime.datetime.now(UTC).isoformat(),
+            "completed_at": datetime.datetime.now(datetime.UTC).isoformat(),
         }
 
         return "COMPLETED", None, (final_result,)
@@ -378,8 +305,8 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
             "verify_license_files": license.check_files,
             "verify_signature": signature.check,
             "verify_license_headers": license.check_headers,
-            "verify_rat_license": task_verify_rat_license,
-            "generate_cyclonedx_sbom": task_generate_cyclonedx_sbom,
+            "verify_rat_license": rat.check_licenses,
+            "generate_cyclonedx_sbom": sbom.generate_cyclonedx,
             "package_bulk_download": bulk.download,
             "mailtest_send": mailtest.send,
             "vote_initiate": vote.initiate,
@@ -466,5 +393,5 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         with open("atr-worker-error.log", "a") as f:
-            f.write(f"{datetime.datetime.now(UTC)}: {e}\n")
+            f.write(f"{datetime.datetime.now(datetime.UTC)}: {e}\n")
             f.flush()
