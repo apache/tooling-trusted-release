@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""models.py"""
+"""The data models to be persisted in the database."""
 
 import datetime
 from enum import Enum
@@ -23,7 +23,14 @@ from typing import Any, Optional
 
 from pydantic import BaseModel
 from sqlalchemy import JSON, CheckConstraint, Column, Index
+from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlmodel import Field, Relationship, SQLModel
+
+
+class ATRSQLModel(AsyncAttrs, SQLModel):
+    """The base model to use for ATR entities which allows to access related properties in an async manner."""
+
+    pass
 
 
 class UserRole(str, Enum):
@@ -58,7 +65,7 @@ class PublicSigningKey(SQLModel, table=True):
     # The ASCII armored key
     ascii_armored_key: str
     # The PMCs that use this key
-    pmcs: list["PMC"] = Relationship(back_populates="public_signing_keys", link_model=PMCKeyLink)
+    pmcs: list["PMC"] = Relationship(back_populates="_public_signing_keys", link_model=PMCKeyLink)
 
 
 class VotePolicy(SQLModel, table=True):
@@ -77,7 +84,7 @@ class VotePolicy(SQLModel, table=True):
     releases: list["Release"] = Relationship(back_populates="vote_policy")
 
 
-class PMC(SQLModel, table=True):
+class PMC(ATRSQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     project_name: str = Field(unique=True)
     # True if this is an incubator podling with a PPMC, otherwise False
@@ -91,7 +98,11 @@ class PMC(SQLModel, table=True):
     release_managers: list[str] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Many-to-many: A PMC can have multiple signing keys, and a signing key can belong to multiple PMCs
-    public_signing_keys: list[PublicSigningKey] = Relationship(back_populates="pmcs", link_model=PMCKeyLink)
+    _public_signing_keys: list[PublicSigningKey] = Relationship(back_populates="pmcs", link_model=PMCKeyLink)
+
+    @property
+    async def public_signing_keys(self) -> list[PublicSigningKey]:
+        return await self.awaitable_attrs._public_signing_keys  # type: ignore
 
     # Many-to-one: A PMC can have one vote policy, a vote policy can be used by multiple entities
     vote_policy_id: int | None = Field(default=None, foreign_key="votepolicy.id")

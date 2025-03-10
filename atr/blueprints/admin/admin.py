@@ -46,7 +46,7 @@ from atr.db.models import (
     Task,
     VotePolicy,
 )
-from atr.db.service import get_pmcs
+from atr.db.service import get_pmc_by_name, get_pmcs
 
 from . import blueprint
 
@@ -219,8 +219,7 @@ async def _update_pmcs() -> int:
                     continue
 
                 # Get or create PMC
-                statement = select(PMC).where(PMC.project_name == name)
-                pmc = (await db_session.execute(statement)).scalar_one_or_none()
+                pmc = await get_pmc_by_name(name, db_session)
                 if not pmc:
                     pmc = PMC(project_name=name)
                     db_session.add(pmc)

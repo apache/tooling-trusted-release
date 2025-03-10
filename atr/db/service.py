@@ -16,33 +16,31 @@
 # under the License.
 
 from collections.abc import Sequence
+from contextlib import nullcontext
 from typing import cast
 
 from sqlalchemy import func
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlmodel import select
 
-from atr.db.models import PMC, ProductLine, PublicSigningKey, Release, Task
+from atr.db.models import PMC, ProductLine, Release, Task
 
 from . import create_async_db_session
 
 
-async def get_pmc_by_name(project_name: str, include_keys: bool = False) -> PMC | None:
-    async with create_async_db_session() as db_session:
+async def get_pmc_by_name(project_name: str, session: AsyncSession | None = None) -> PMC | None:
+    """Returns a PMC object by name."""
+    async with create_async_db_session() if session is None else nullcontext(session) as db_session:
         statement = select(PMC).where(PMC.project_name == project_name)
-
-        if include_keys:
-            statement = statement.options(
-                selectinload(cast(InstrumentedAttribute[PublicSigningKey], PMC.public_signing_keys))
-            )
-
         pmc = (await db_session.execute(statement)).scalar_one_or_none()
         return pmc
 
 
-async def get_pmcs() -> Sequence[PMC]:
-    async with create_async_db_session() as db_session:
+async def get_pmcs(session: AsyncSession | None = None) -> Sequence[PMC]:
+    """Returns a list of PMC objects."""
+    async with create_async_db_session() if session is None else nullcontext(session) as db_session:
         # Get all PMCs and their latest releases
         statement = select(PMC).order_by(PMC.project_name)
         pmcs = (await db_session.execute(statement)).scalars().all()
@@ -79,10 +77,9 @@ def get_release_by_key_sync(storage_key: str) -> Release | None:
         return result.scalar_one_or_none()
 
 
-async def get_tasks(limit: int, offset: int) -> tuple[Sequence[Task], int]:
+async def get_tasks(limit: int, offset: int, session: AsyncSession | None = None) -> tuple[Sequence[Task], int]:
     """Returns a list of Tasks based on limit and offset values together with the total count."""
-
-    async with create_async_db_session() as db_session:
+    async with create_async_db_session() if session is None else nullcontext(session) as db_session:
         statement = select(Task).limit(limit).offset(offset).order_by(Task.id.desc())  # type: ignore
         tasks = (await db_session.execute(statement)).scalars().all()
         count = (await db_session.execute(select(func.count(Task.id)))).scalar_one()  # type: ignore

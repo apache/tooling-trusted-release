@@ -21,6 +21,7 @@ from http.client import HTTPException
 
 from quart import render_template
 
+from atr.db import create_async_db_session
 from atr.db.service import get_pmc_by_name, get_pmcs
 from atr.routes import algorithms, app_route
 
@@ -28,14 +29,16 @@ from atr.routes import algorithms, app_route
 @app_route("/projects")
 async def root_project_directory() -> str:
     """Main project directory page."""
-    projects = await get_pmcs()
-    return await render_template("project-directory.html", projects=projects)
+    async with create_async_db_session() as session:
+        projects = await get_pmcs(session)
+        return await render_template("project-directory.html", projects=projects)
 
 
 @app_route("/projects/<project_name>")
 async def root_project_view(project_name: str) -> str:
-    project = await get_pmc_by_name(project_name, include_keys=True)
-    if not project:
-        raise HTTPException(404)
+    async with create_async_db_session() as session:
+        project = await get_pmc_by_name(project_name, session=session)
+        if not project:
+            raise HTTPException(404)
 
-    return await render_template("project-view.html", project=project, algorithms=algorithms)
+        return await render_template("project-view.html", project=project, algorithms=algorithms)
