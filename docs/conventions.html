@@ -16,7 +16,7 @@
 <p>Define top level constants using <code>UPPERCASE</code> letters. Don't forget to apply an underscore prefix to constants which are private to their module.</p>
 <p>Do not use uppercase for constants within functions and methods.</p>
 <h3>Use the <code>Final</code> type with all constants</h3>
-<p>This pattern must be followed for top level constants, and should be followed for function and method level constants too.</p>
+<p>This pattern must be followed for top level constants, and should be followed for function and method level constants too. The longer the function, the more important the use of <code>Final</code>.</p>
 <h3>Prefix global variables with <code>global_</code></h3>
 <p>Top level variables should be avoided. When their use is necessary, prefix them with <code>global_</code>, using lowercase letters, to ensure clear identification of their scope. Use an underscore prefix too, <code>_global_</code>, when the variable is private.</p>
 <h3>Import modules as their least significant name part</h3>
@@ -42,7 +42,7 @@ r.s()
 from p.q.r import s
 s()
 </code></pre>
-<p>The typing module is an exception to this rule. Always import typing identifiers directly using the <code>from</code> syntax:</p>
+<p>The collections.abc and typing modules are an exception to this rule. Always import typing identifiers directly using the <code>from</code> syntax:</p>
 <pre><code class="language-python"># Preferred
 from typing import Final
 

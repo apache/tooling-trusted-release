@@ -58,10 +58,10 @@ def root_directory(tgz_path: str) -> str:
                 if not root:
                     root = parts[0]
                 elif parts[0] != root:
-                    raise ValueError(f"Multiple root directories found: {root}, {parts[0]}")
+                    raise task.Error(f"Multiple root directories found: {root}, {parts[0]}")
 
     if not root:
-        raise ValueError("No root directory found in archive")
+        raise task.Error("No root directory found in archive")
 
     return root
 

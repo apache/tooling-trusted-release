@@ -37,6 +37,7 @@ from sqlalchemy import text
 
 import atr.tasks.archive as archive
 import atr.tasks.bulk as bulk
+import atr.tasks.license as license
 import atr.tasks.mailtest as mailtest
 import atr.tasks.signature as signature
 import atr.tasks.task as task
@@ -179,7 +180,7 @@ def task_result_process(
                         "now": datetime.datetime.now(UTC),
                         "task_id": task_id,
                         "result": result,
-                        "status": status,
+                        "status": status.upper(),
                         "error": error,
                     },
                 )
@@ -190,26 +191,8 @@ def task_result_process(
                         SET status = :status, completed = :now, result = :result
                         WHERE id = :task_id
                         """),
-                    {"now": datetime.datetime.now(UTC), "task_id": task_id, "result": result, "status": status},
+                    {"now": datetime.datetime.now(UTC), "task_id": task_id, "result": result, "status": status.upper()},
                 )
-
-
-def task_verify_license_files(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
-    """Process verify_license_files task."""
-    task_results = task_process_wrap(verify.license_files(*args))
-    _LOGGER.info(f"Verified license files for {args}")
-    status = "FAILED" if not task_results[0]["files_found"] else "COMPLETED"
-    error = "Required license files not found" if not task_results[0]["files_found"] else None
-    return status, error, task_results
-
-
-def task_verify_license_headers(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
-    """Process verify_license_headers task."""
-    task_results = task_process_wrap(verify.license_header_verify(*args))
-    _LOGGER.info(f"Verified license headers for {args}")
-    status = "FAILED" if not task_results[0]["valid"] else "COMPLETED"
-    error = task_results[0]["message"] if not task_results[0]["valid"] else None
-    return status, error, task_results
 
 
 def task_verify_rat_license(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
@@ -392,9 +375,9 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
         task_handlers = {
             "verify_archive_integrity": archive.check_integrity,
             "verify_archive_structure": archive.check_structure,
-            "verify_license_files": task_verify_license_files,
+            "verify_license_files": license.check_files,
             "verify_signature": signature.check,
-            "verify_license_headers": task_verify_license_headers,
+            "verify_license_headers": license.check_headers,
             "verify_rat_license": task_verify_rat_license,
             "generate_cyclonedx_sbom": task_generate_cyclonedx_sbom,
             "package_bulk_download": bulk.download,
@@ -410,9 +393,9 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
 
         raw_status, error, task_results = handler(args)
         if isinstance(raw_status, task.Status):
-            status = raw_status.value
+            status = raw_status.value.upper()
         elif isinstance(raw_status, str):
-            status = raw_status
+            status = raw_status.upper()
         else:
             raise Exception(f"Unknown task status type: {type(raw_status)}")
         task_result_process(task_id, task_results, status=status, error=error)
