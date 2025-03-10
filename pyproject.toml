@@ -166,3 +166,4 @@ include = "atr/templates"
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths  = ["tests"]
+asyncio_mode = "auto"
