@@ -1,7 +1,11 @@
 meta:
   nextgen: true
 github:
+  description: "Apache Trusted Release Platform"
+  homepage: https://tooling.apache.org/
   del_branch_on_merge: true
+  features:
+    issues: true
   enabled_merge_buttons:
     squash:  true
     squash_commit_message: DEFAULT
