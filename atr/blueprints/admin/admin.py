@@ -23,7 +23,7 @@ from typing import Any
 
 import aiofiles.os
 import httpx
-from quart import current_app, flash, render_template, request
+from quart import flash, render_template, request
 from sqlmodel import select
 from werkzeug.wrappers.response import Response
 
@@ -46,7 +46,7 @@ from atr.db.models import (
     Task,
     VotePolicy,
 )
-from atr.db.service import get_pmc_by_name, get_pmcs
+from atr.db.service import get_pmc_by_name
 
 from . import blueprint
 
@@ -282,13 +282,6 @@ async def _update_pmcs() -> int:
 @blueprint.route("/tasks")
 async def admin_tasks() -> str:
     return await render_template("tasks.html")
-
-
-@blueprint.route("/debug/database")
-async def admin_debug_database() -> str:
-    """Debug information about the database."""
-    pmcs = await get_pmcs()
-    return f"Database using {current_app.config['DATA_MODELS_FILE']} has {len(pmcs)} PMCs"
 
 
 @blueprint.route("/keys/delete-all")

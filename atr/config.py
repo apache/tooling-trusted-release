@@ -17,10 +17,9 @@
 
 import os
 from enum import Enum
+from typing import Final
 
-from decouple import config
-
-from atr.db.models import __file__ as data_models_file
+import decouple
 
 MB = 1024 * 1024
 GB = 1024 * MB
@@ -34,18 +33,17 @@ class AppConfig:
     USE_BLOCKBUSTER = False
 
     RELEASE_STORAGE_DIR = os.path.join(STATE_DIR, "releases")
-    DATA_MODELS_FILE = data_models_file
 
-    # TODO: Understand why cast=str doesn't satisfy the type checker
-    SQLITE_DB_PATH = config("SQLITE_DB_PATH", default="/atr.db")
+    SQLITE_DB_PATH = decouple.config("SQLITE_DB_PATH", default="/atr.db")
 
     # Apache RAT configuration
-    APACHE_RAT_JAR_PATH = config("APACHE_RAT_JAR_PATH", default="state/apache-rat-0.16.1.jar")
+    APACHE_RAT_JAR_PATH = decouple.config("APACHE_RAT_JAR_PATH", default="state/apache-rat-0.16.1.jar")
     # Maximum size limit for archive extraction
-    MAX_EXTRACT_SIZE: int = config("MAX_EXTRACT_SIZE", default=2 * GB, cast=int)
+    MAX_EXTRACT_SIZE: int = decouple.config("MAX_EXTRACT_SIZE", default=2 * GB, cast=int)
     # Chunk size for reading files during extraction
-    EXTRACT_CHUNK_SIZE: int = config("EXTRACT_CHUNK_SIZE", default=4 * MB, cast=int)
+    EXTRACT_CHUNK_SIZE: int = decouple.config("EXTRACT_CHUNK_SIZE", default=4 * MB, cast=int)
 
+    # FIXME: retrieve the list of admin users from LDAP or oath session / isRoot
     ADMIN_USERS = frozenset(
         {
             "cwells",
@@ -82,7 +80,7 @@ class ConfigMode(Enum):
 
 
 # Load all possible configurations
-_CONFIG_DICT = {
+_CONFIG_DICT: Final = {
     ConfigMode.Debug: DebugConfig,
     ConfigMode.Production: ProductionConfig,
     ConfigMode.Profiling: ProfilingConfig,
@@ -95,9 +93,9 @@ def get_config_mode() -> ConfigMode:
     global _CONFIG_MODE
 
     if _CONFIG_MODE is None:
-        if config("PROFILING", default=False, cast=bool):
+        if decouple.config("PROFILING", default=False, cast=bool):
             config_mode = ConfigMode.Profiling
-        elif config("PRODUCTION", default=False, cast=bool):
+        elif decouple.config("PRODUCTION", default=False, cast=bool):
             config_mode = ConfigMode.Production
         else:
             config_mode = ConfigMode.Debug

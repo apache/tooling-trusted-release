@@ -21,13 +21,13 @@ import datetime
 from enum import Enum
 from typing import Any, Optional
 
+import sqlalchemy
+import sqlmodel
 from pydantic import BaseModel
-from sqlalchemy import JSON, CheckConstraint, Column, Index
 from sqlalchemy.ext.asyncio import AsyncAttrs
-from sqlmodel import Field, Relationship, SQLModel
 
 
-class ATRSQLModel(AsyncAttrs, SQLModel):
+class ATRSQLModel(AsyncAttrs, sqlmodel.SQLModel):
     """The base model to use for ATR entities which allows to access related properties in an async manner."""
 
     pass
@@ -42,14 +42,14 @@ class UserRole(str, Enum):
     SYSADMIN = "sysadmin"
 
 
-class PMCKeyLink(SQLModel, table=True):
-    pmc_id: int = Field(foreign_key="pmc.id", primary_key=True)
-    key_fingerprint: str = Field(foreign_key="publicsigningkey.fingerprint", primary_key=True)
+class PMCKeyLink(sqlmodel.SQLModel, table=True):
+    pmc_id: int = sqlmodel.Field(foreign_key="pmc.id", primary_key=True)
+    key_fingerprint: str = sqlmodel.Field(foreign_key="publicsigningkey.fingerprint", primary_key=True)
 
 
-class PublicSigningKey(SQLModel, table=True):
+class PublicSigningKey(sqlmodel.SQLModel, table=True):
     # The fingerprint must be stored as lowercase hex
-    fingerprint: str = Field(primary_key=True, unique=True)
+    fingerprint: str = sqlmodel.Field(primary_key=True, unique=True)
     # The algorithm is an RFC 4880 algorithm ID
     algorithm: int
     # Key length in bits
@@ -65,51 +65,51 @@ class PublicSigningKey(SQLModel, table=True):
     # The ASCII armored key
     ascii_armored_key: str
     # The PMCs that use this key
-    pmcs: list["PMC"] = Relationship(back_populates="_public_signing_keys", link_model=PMCKeyLink)
+    pmcs: list["PMC"] = sqlmodel.Relationship(back_populates="_public_signing_keys", link_model=PMCKeyLink)
 
 
-class VotePolicy(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    mailto_addresses: list[str] = Field(default_factory=list, sa_column=Column(JSON))
-    manual_vote: bool = Field(default=False)
-    min_hours: int = Field(default=0)
-    release_checklist: str = Field(default="")
-    pause_for_rm: bool = Field(default=False)
+class VotePolicy(sqlmodel.SQLModel, table=True):
+    id: int | None = sqlmodel.Field(default=None, primary_key=True)
+    mailto_addresses: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
+    manual_vote: bool = sqlmodel.Field(default=False)
+    min_hours: int = sqlmodel.Field(default=0)
+    release_checklist: str = sqlmodel.Field(default="")
+    pause_for_rm: bool = sqlmodel.Field(default=False)
 
     # One-to-many: A vote policy can be used by multiple PMCs
-    pmcs: list["PMC"] = Relationship(back_populates="vote_policy")
+    pmcs: list["PMC"] = sqlmodel.Relationship(back_populates="vote_policy")
     # One-to-many: A vote policy can be used by multiple product lines
-    product_lines: list["ProductLine"] = Relationship(back_populates="vote_policy")
+    product_lines: list["ProductLine"] = sqlmodel.Relationship(back_populates="vote_policy")
     # One-to-many: A vote policy can be used by multiple releases
-    releases: list["Release"] = Relationship(back_populates="vote_policy")
+    releases: list["Release"] = sqlmodel.Relationship(back_populates="vote_policy")
 
 
 class PMC(ATRSQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    project_name: str = Field(unique=True)
+    id: int | None = sqlmodel.Field(default=None, primary_key=True)
+    project_name: str = sqlmodel.Field(unique=True)
     # True if this is an incubator podling with a PPMC, otherwise False
-    is_podling: bool = Field(default=False)
+    is_podling: bool = sqlmodel.Field(default=False)
 
     # One-to-many: A PMC can have multiple product lines, each product line belongs to one PMC
-    product_lines: list["ProductLine"] = Relationship(back_populates="pmc")
+    product_lines: list["ProductLine"] = sqlmodel.Relationship(back_populates="pmc")
 
-    pmc_members: list[str] = Field(default_factory=list, sa_column=Column(JSON))
-    committers: list[str] = Field(default_factory=list, sa_column=Column(JSON))
-    release_managers: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    pmc_members: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
+    committers: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
+    release_managers: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
 
     # Many-to-many: A PMC can have multiple signing keys, and a signing key can belong to multiple PMCs
-    _public_signing_keys: list[PublicSigningKey] = Relationship(back_populates="pmcs", link_model=PMCKeyLink)
+    _public_signing_keys: list[PublicSigningKey] = sqlmodel.Relationship(back_populates="pmcs", link_model=PMCKeyLink)
 
     @property
     async def public_signing_keys(self) -> list[PublicSigningKey]:
         return await self.awaitable_attrs._public_signing_keys  # type: ignore
 
     # Many-to-one: A PMC can have one vote policy, a vote policy can be used by multiple entities
-    vote_policy_id: int | None = Field(default=None, foreign_key="votepolicy.id")
-    vote_policy: VotePolicy | None = Relationship(back_populates="pmcs")
+    vote_policy_id: int | None = sqlmodel.Field(default=None, foreign_key="votepolicy.id")
+    vote_policy: VotePolicy | None = sqlmodel.Relationship(back_populates="pmcs")
 
     # One-to-many: A PMC can have multiple releases
-    releases: list["Release"] = Relationship(back_populates="pmc")
+    releases: list["Release"] = sqlmodel.Relationship(back_populates="pmc")
 
     @property
     def display_name(self) -> str:
@@ -119,44 +119,44 @@ class PMC(ATRSQLModel, table=True):
         return self.project_name
 
 
-class ProductLine(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+class ProductLine(sqlmodel.SQLModel, table=True):
+    id: int | None = sqlmodel.Field(default=None, primary_key=True)
 
     # Many-to-one: A product line belongs to one PMC, a PMC can have multiple product lines
-    pmc_id: int | None = Field(default=None, foreign_key="pmc.id")
-    pmc: PMC | None = Relationship(back_populates="product_lines")
+    pmc_id: int | None = sqlmodel.Field(default=None, foreign_key="pmc.id")
+    pmc: PMC | None = sqlmodel.Relationship(back_populates="product_lines")
 
     product_name: str
     latest_version: str
 
     # One-to-many: A product line can have multiple distribution channels, each channel belongs to one product line
-    distribution_channels: list["DistributionChannel"] = Relationship(back_populates="product_line")
+    distribution_channels: list["DistributionChannel"] = sqlmodel.Relationship(back_populates="product_line")
 
     # Many-to-one: A product line can have one vote policy, a vote policy can be used by multiple entities
-    vote_policy_id: int | None = Field(default=None, foreign_key="votepolicy.id")
-    vote_policy: VotePolicy | None = Relationship(back_populates="product_lines")
+    vote_policy_id: int | None = sqlmodel.Field(default=None, foreign_key="votepolicy.id")
+    vote_policy: VotePolicy | None = sqlmodel.Relationship(back_populates="product_lines")
 
     # One-to-many: A product line can have multiple releases, each release belongs to one product line
-    releases: list["Release"] = Relationship(back_populates="product_line")
+    releases: list["Release"] = sqlmodel.Relationship(back_populates="product_line")
 
 
-class DistributionChannel(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(index=True, unique=True)
+class DistributionChannel(sqlmodel.SQLModel, table=True):
+    id: int | None = sqlmodel.Field(default=None, primary_key=True)
+    name: str = sqlmodel.Field(index=True, unique=True)
     url: str
     credentials: str
-    is_test: bool = Field(default=False)
+    is_test: bool = sqlmodel.Field(default=False)
     automation_endpoint: str
 
     # Many-to-one: A distribution channel belongs to one product line, a product line can have multiple channels
-    product_line_id: int | None = Field(default=None, foreign_key="productline.id")
-    product_line: ProductLine | None = Relationship(back_populates="distribution_channels")
+    product_line_id: int | None = sqlmodel.Field(default=None, foreign_key="productline.id")
+    product_line: ProductLine | None = sqlmodel.Relationship(back_populates="distribution_channels")
 
 
-class Package(SQLModel, table=True):
+class Package(sqlmodel.SQLModel, table=True):
     # The SHA3-256 hash of the file, used as filename in storage
     # TODO: We should discuss making this unique
-    artifact_sha3: str = Field(primary_key=True)
+    artifact_sha3: str = sqlmodel.Field(primary_key=True)
     # The type of artifact (source, binary, reproducible binary)
     artifact_type: str
     # Original filename from uploader
@@ -171,11 +171,11 @@ class Package(SQLModel, table=True):
     bytes_size: int
 
     # Many-to-one: A package belongs to one release
-    release_key: str | None = Field(default=None, foreign_key="release.storage_key")
-    release: Optional["Release"] = Relationship(back_populates="packages")
+    release_key: str | None = sqlmodel.Field(default=None, foreign_key="release.storage_key")
+    release: Optional["Release"] = sqlmodel.Relationship(back_populates="packages")
 
     # One-to-many: A package can have multiple tasks
-    tasks: list["Task"] = Relationship(
+    tasks: list["Task"] = sqlmodel.Relationship(
         back_populates="package", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
 
@@ -220,32 +220,32 @@ class TaskStatus(str, Enum):
     FAILED = "failed"
 
 
-class Task(SQLModel, table=True):
+class Task(sqlmodel.SQLModel, table=True):
     """A task in the task queue."""
 
-    id: int | None = Field(default=None, primary_key=True)
-    status: TaskStatus = Field(default=TaskStatus.QUEUED, index=True)
+    id: int | None = sqlmodel.Field(default=None, primary_key=True)
+    status: TaskStatus = sqlmodel.Field(default=TaskStatus.QUEUED, index=True)
     task_type: str
-    task_args: Any = Field(sa_column=Column(JSON))
-    added: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.UTC), index=True)
+    task_args: Any = sqlmodel.Field(sa_column=sqlalchemy.Column(sqlalchemy.JSON))
+    added: datetime.datetime = sqlmodel.Field(default_factory=lambda: datetime.datetime.now(datetime.UTC), index=True)
     started: datetime.datetime | None = None
     pid: int | None = None
     completed: datetime.datetime | None = None
-    result: Any | None = Field(default=None, sa_column=Column(JSON))
+    result: Any | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
     error: str | None = None
 
     # Package relationship
-    package_sha3: str | None = Field(default=None, foreign_key="package.artifact_sha3")
-    package: Package | None = Relationship(back_populates="tasks")
+    package_sha3: str | None = sqlmodel.Field(default=None, foreign_key="package.artifact_sha3")
+    package: Package | None = sqlmodel.Relationship(back_populates="tasks")
 
     # Create an index on status and added for efficient task claiming
     __table_args__ = (
-        Index("ix_task_status_added", "status", "added"),
+        sqlalchemy.Index("ix_task_status_added", "status", "added"),
         # Ensure valid status transitions:
         # - QUEUED can transition to ACTIVE
         # - ACTIVE can transition to COMPLETED or FAILED
         # - COMPLETED and FAILED are terminal states
-        CheckConstraint(
+        sqlalchemy.CheckConstraint(
             """
             (
                 -- Initial state is always valid
@@ -263,28 +263,28 @@ class Task(SQLModel, table=True):
     )
 
 
-class Release(SQLModel, table=True):
-    storage_key: str = Field(primary_key=True)
+class Release(sqlmodel.SQLModel, table=True):
+    storage_key: str = sqlmodel.Field(primary_key=True)
     stage: ReleaseStage
     phase: ReleasePhase
     created: datetime.datetime
 
     # Many-to-one: A release belongs to one PMC, a PMC can have multiple releases
-    pmc_id: int | None = Field(default=None, foreign_key="pmc.id")
-    pmc: PMC | None = Relationship(back_populates="releases")
+    pmc_id: int | None = sqlmodel.Field(default=None, foreign_key="pmc.id")
+    pmc: PMC | None = sqlmodel.Relationship(back_populates="releases")
 
     # Many-to-one: A release belongs to one product line, a product line can have multiple releases
-    product_line_id: int | None = Field(default=None, foreign_key="productline.id")
-    product_line: ProductLine | None = Relationship(back_populates="releases")
+    product_line_id: int | None = sqlmodel.Field(default=None, foreign_key="productline.id")
+    product_line: ProductLine | None = sqlmodel.Relationship(back_populates="releases")
 
-    package_managers: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    package_managers: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
     version: str
     # One-to-many: A release can have multiple packages
-    packages: list[Package] = Relationship(back_populates="release")
-    sboms: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    packages: list[Package] = sqlmodel.Relationship(back_populates="release")
+    sboms: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
 
     # Many-to-one: A release can have one vote policy, a vote policy can be used by multiple releases
-    vote_policy_id: int | None = Field(default=None, foreign_key="votepolicy.id")
-    vote_policy: VotePolicy | None = Relationship(back_populates="releases")
+    vote_policy_id: int | None = sqlmodel.Field(default=None, foreign_key="votepolicy.id")
+    vote_policy: VotePolicy | None = sqlmodel.Relationship(back_populates="releases")
 
-    votes: list[VoteEntry] = Field(default_factory=list, sa_column=Column(JSON))
+    votes: list[VoteEntry] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
