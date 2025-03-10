@@ -69,6 +69,7 @@ class VerifyError(Exception):
 
 def utility_archive_root_dir_find(artifact_path: str) -> tuple[str | None, str | None]:
     """Find the root directory in a tar archive and validate that it has only one root dir."""
+    # TODO: Replace instances of this with archive.root_directory()
     root_dir = None
     error_msg = None
 
@@ -86,58 +87,6 @@ def utility_archive_root_dir_find(artifact_path: str) -> tuple[str | None, str |
         error_msg = "No root directory found in archive"
 
     return root_dir, error_msg
-
-
-def archive_integrity(path: str, chunk_size: int = 4096) -> int:
-    """Verify a .tar.gz file and compute its uncompressed size."""
-    total_size = 0
-
-    with tarfile.open(path, mode="r|gz") as tf:
-        for member in tf:
-            total_size += member.size
-            # Verify file by extraction
-            if member.isfile():
-                f = tf.extractfile(member)
-                if f is not None:
-                    while True:
-                        data = f.read(chunk_size)
-                        if not data:
-                            break
-    return total_size
-
-
-def archive_structure(path: str, filename: str) -> dict[str, Any]:
-    """
-    Verify that the archive contains exactly one root directory named after the package.
-    The package name should match the archive filename without the .tar.gz extension.
-    """
-    expected_dirname = os.path.splitext(os.path.splitext(filename)[0])[0]
-    root_dirs = set()
-
-    with tarfile.open(path, mode="r|gz") as tf:
-        for member in tf:
-            parts = member.name.split("/", 1)
-            if len(parts) >= 1:
-                root_dirs.add(parts[0])
-
-    if len(root_dirs) == 0:
-        return {"valid": False, "root_dirs": list(root_dirs), "message": "Archive contains no directories"}
-    elif len(root_dirs) > 1:
-        return {
-            "valid": False,
-            "root_dirs": list(root_dirs),
-            "message": f"Archive contains multiple root directories: {', '.join(root_dirs)}",
-        }
-
-    root_dir = root_dirs.pop()
-    if root_dir != expected_dirname:
-        return {
-            "valid": False,
-            "root_dirs": [root_dir],
-            "message": f"Root directory '{root_dir}' does not match expected name '{expected_dirname}'",
-        }
-
-    return {"valid": True, "root_dirs": [root_dir], "message": "Archive structure is valid"}
 
 
 def license_files_license(tf: tarfile.TarFile, member: tarfile.TarInfo) -> bool:

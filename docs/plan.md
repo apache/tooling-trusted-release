@@ -89,6 +89,7 @@ Advanced tasks, possibly deferred
    - [DONE] Improve the proprietary platform patch in ASFQuart
    - [DONE] Ensure that all errors are caught and logged or displayed
    - Add further tests
+   - Decide whether to use Alembic and, if not, remove `alembic.cfg`
 
 2. Ensure that performance is optimal
    - [DONE] Add page load timing metrics to a log

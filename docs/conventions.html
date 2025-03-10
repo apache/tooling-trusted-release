@@ -28,6 +28,10 @@ import a.b.c as c
 import a.b.c
 </code></pre>
 <p>This convention aligns with Go's package naming practices. Follow <a href="https://go.dev/blog/package-names">Go naming rules</a> for all modules.</p>
+<p>This only applies to modules outside of the Python standard library. The standard library module <code>os.path</code>, for example, must always be imported using the form <code>import os.path</code>, and <em>not</em> <code>import os.path as path</code>.</p>
+<h3>Avoid duplicated module names</h3>
+<p>Try to avoid using, for example, <code>baking/apple/pie.py</code> and <code>baking/cherry/pie.py</code> because these will both be imported as <code>pie</code> and one will have to be renamed.</p>
+<p>If there are duplicates imported within a single file, they should be disambiguated by the next level up. In the pie example, that would be <code>import baking.apple as apple</code> and then <code>apple.pie</code>, and <code>import baking.cherry as cherry</code> and <code>cherry.pie</code>.</p>
 <h3>Never import names directly from modules</h3>
 <p>Avoid importing specific names from modules:</p>
 <pre><code class="language-python"># Preferred

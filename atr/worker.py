@@ -35,6 +35,11 @@ from typing import Any
 
 from sqlalchemy import text
 
+import atr.tasks.archive as archive
+import atr.tasks.bulk as bulk
+import atr.tasks.mailtest as mailtest
+import atr.tasks.task as task
+import atr.tasks.vote as vote
 import atr.verify as verify
 from atr.db import create_sync_db_engine, create_sync_db_session
 
@@ -172,27 +177,6 @@ def task_result_process(
                         """),
                     {"now": datetime.datetime.now(UTC), "task_id": task_id, "result": result, "status": status},
                 )
-
-
-def task_verify_archive_integrity(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
-    """Process verify_archive_integrity task."""
-    # TODO: We should standardise the "ERROR" mechanism here in the data
-    # Then we can have a single task wrapper for all tasks
-    # First argument should be the path, second is optional chunk_size
-    path = args[0]
-    chunk_size = int(args[1]) if len(args) > 1 else 4096
-    task_results = task_process_wrap(verify.archive_integrity(path, chunk_size))
-    _LOGGER.info(f"Verified {args} and computed size {task_results[0]}")
-    return "COMPLETED", None, task_results
-
-
-def task_verify_archive_structure(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
-    """Process verify_archive_structure task."""
-    task_results = task_process_wrap(verify.archive_structure(*args))
-    _LOGGER.info(f"Verified archive structure for {args}")
-    status = "FAILED" if not task_results[0]["valid"] else "COMPLETED"
-    error = task_results[0]["message"] if not task_results[0]["valid"] else None
-    return status, error, task_results
 
 
 def task_verify_license_files(args: list[str]) -> tuple[str, str | None, tuple[Any, ...]]:
@@ -393,12 +377,6 @@ def task_bulk_download_debug(args: list[str] | dict) -> tuple[str, str | None, t
 
 def task_process(task_id: int, task_type: str, task_args: str) -> None:
     """Process a claimed task."""
-    # TODO: This does not go here permanently
-    # We need to move the other tasks into atr.tasks
-    from atr.tasks.bulk import download as bulk_download
-    from atr.tasks.mailtest import send as mailtest_send
-    from atr.tasks.vote import initiate as vote_initiate
-
     _LOGGER.info(f"Processing task {task_id} ({task_type}) with args {task_args}")
     try:
         args = json.loads(task_args)
@@ -406,16 +384,16 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
         # Map task types to their handler functions
         # TODO: We should use a decorator to register these automatically
         task_handlers = {
-            "verify_archive_integrity": task_verify_archive_integrity,
-            "verify_archive_structure": task_verify_archive_structure,
+            "verify_archive_integrity": archive.check_integrity,
+            "verify_archive_structure": archive.check_structure,
             "verify_license_files": task_verify_license_files,
             "verify_signature": task_verify_signature,
             "verify_license_headers": task_verify_license_headers,
             "verify_rat_license": task_verify_rat_license,
             "generate_cyclonedx_sbom": task_generate_cyclonedx_sbom,
-            "package_bulk_download": bulk_download,
-            "mailtest_send": mailtest_send,
-            "vote_initiate": vote_initiate,
+            "package_bulk_download": bulk.download,
+            "mailtest_send": mailtest.send,
+            "vote_initiate": vote.initiate,
         }
 
         handler = task_handlers.get(task_type)
@@ -424,7 +402,13 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
             _LOGGER.error(msg)
             raise Exception(msg)
 
-        status, error, task_results = handler(args)
+        raw_status, error, task_results = handler(args)
+        if isinstance(raw_status, task.TaskStatus):
+            status = raw_status.value
+        elif isinstance(raw_status, str):
+            status = raw_status
+        else:
+            raise Exception(f"Unknown task status type: {type(raw_status)}")
         task_result_process(task_id, task_results, status=status, error=error)
 
     except Exception as e:
