@@ -173,20 +173,20 @@
       <a class="add-link"
          href="{{ url_for('root_project_voting_policy_add', project_name=project.project_name) }}"><i class="fa-solid fa-plus"></i></a>
     </div>
-<!--    <div class="card-meta"></div>-->
+    <!--    <div class="card-meta"></div>-->
     <div class="card-body">
       {% if project.vote_policy %}
-      {% set vp = project.vote_policy %}
-      <div class="key-card">
-        <table>
-          <tbody>
-            <tr>
-              <th>Mailto Addresses</th>
-              <td>{{ vp.mailto_addresses }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+        {% set vp = project.vote_policy %}
+        <div class="key-card">
+          <table>
+            <tbody>
+              <tr>
+                <th>Mailto Addresses</th>
+                <td>{{ vp.mailto_addresses }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       {% endif %}
     </div>
   </div>

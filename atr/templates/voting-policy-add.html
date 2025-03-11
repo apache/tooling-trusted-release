@@ -141,7 +141,8 @@
             <input type="hidden"
                    id="project_name"
                    name="project_name"
-                   readonly value="{{ project.display_name }}"/>
+                   readonly
+                   value="{{ project.display_name }}" />
             <p id="project_name_text">{{ project.display_name }}</p>
           </td>
         </tr>
@@ -156,7 +157,9 @@
                 <input type="email"
                        id="mailto_addresses"
                        name="mailto_addresses"
-                       pattern=".+@apache\.org" size="30" required />
+                       pattern=".+@apache\.org"
+                       size="30"
+                       required />
               </div>
             </div>
           </td>
@@ -169,9 +172,7 @@
           <td>
             <div class="checkbox-group">
               <div>
-                <input type="checkbox"
-                       id="manual_vote"
-                       name="manual_vote" />
+                <input type="checkbox" id="manual_vote" name="manual_vote" />
                 <label for="manual_vote">Manual Voting</label>
                 <span id="manual_vote-help" class="help-text">If this is set then the vote will be completely manual and following policy is ignored.</span>
               </div>
@@ -201,7 +202,11 @@
             <label for="release_checklist">Release checklist:</label>
           </th>
           <td>
-            <textarea type="text" style="resize: vertical;" id="release_checklist" name="release_checklist" rows="10"></textarea>
+            <textarea type="text"
+                      style="resize: vertical"
+                      id="release_checklist"
+                      name="release_checklist"
+                      rows="10"></textarea>
             <span id="release_checklist-help" class="help-text">Markdown text describing how to test release candidates.</span>
           </td>
         </tr>
@@ -213,10 +218,7 @@
           <td>
             <div class="checkbox-group">
               <div>
-                <input type="checkbox"
-                       id="pause_for_rm"
-                       name="pause_for_rm"
-                       checked />
+                <input type="checkbox" id="pause_for_rm" name="pause_for_rm" checked />
                 <label for="pause_for_rm">Enabled</label>
               </div>
             </div>
