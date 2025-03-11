@@ -75,6 +75,30 @@
           margin-top: 0;
           margin-bottom: 1rem;
       }
+
+      .actions {
+          display: flex;
+          gap: 1rem;
+          align-items: center;
+      }
+
+      .add-link {
+          display: inline-block;
+          padding: 0.5rem 1rem;
+          background: #004477;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 500;
+          text-decoration: none;
+          font-size: 17px;
+      }
+
+      .add-link:hover {
+          background: #003366;
+          color: white;
+      }
   </style>
 {% endblock stylesheets %}
 
@@ -145,8 +169,26 @@
 
   <div class="card-header">
     <h3>Voting Policy</h3>
-    <div class="card-meta"></div>
-    <div class="card-body"></div>
+    <div class="actions">
+      <a class="add-link"
+         href="{{ url_for('root_project_voting_policy_add', project_name=project.project_name) }}"><i class="fa-solid fa-plus"></i></a>
+    </div>
+<!--    <div class="card-meta"></div>-->
+    <div class="card-body">
+      {% if project.vote_policy %}
+      {% set vp = project.vote_policy %}
+      <div class="key-card">
+        <table>
+          <tbody>
+            <tr>
+              <th>Mailto Addresses</th>
+              <td>{{ vp.mailto_addresses }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
   </div>
 
   <div class="card-header">

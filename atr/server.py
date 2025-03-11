@@ -34,6 +34,7 @@ import asfquart.session
 import atr.blueprints as blueprints
 import atr.config as config
 import atr.ssh as ssh
+from asfquart.base import ASFQuartException
 from atr.db import create_database
 from atr.manager import get_worker_manager
 from atr.preload import setup_template_preloading
@@ -65,6 +66,11 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
         tb = traceback.format_exc()
         app.logger.error(f"Unhandled exception: {error}\n{tb}")
         return await render_template("error.html", error=str(error), traceback=tb, status_code=500), 500
+
+    @app.errorhandler(ASFQuartException)
+    async def handle_asfquart_exception(error: ASFQuartException) -> Any:
+        errorcode = error.errorcode  # type: ignore
+        return await render_template("error.html", error=str(error), status_code=errorcode), errorcode
 
     # Add a global error handler in case a page does not exist.
     @app.errorhandler(404)
