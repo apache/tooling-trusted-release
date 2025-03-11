@@ -29,6 +29,8 @@ import dkim
 import dns.rdtypes.ANY.MX as MX
 import dns.resolver as resolver
 
+_LOGGER = logging.getLogger(__name__)
+
 # TODO: We should choose a pattern for globals
 # We could e.g. use uppercase instead of global_
 # It's not always worth identifying globals as globals
@@ -55,9 +57,9 @@ class LoggingSMTP(smtplib.SMTP):
         template = ["%s"] * len(args)
         if self.debuglevel > 1:
             template.append("%s")
-            logging.info(" ".join(template), datetime.datetime.now().time(), *args)
+            _LOGGER.info(" ".join(template), datetime.datetime.now().time(), *args)
         else:
-            logging.info(" ".join(template), *args)
+            _LOGGER.info(" ".join(template), *args)
 
 
 class VoteEvent:
@@ -75,7 +77,7 @@ class VoteEvent:
 
 def send(event: ArtifactEvent | VoteEvent) -> None:
     """Send an email notification about an artifact or a vote."""
-    logging.info(f"Sending email for event: {event}")
+    _LOGGER.info(f"Sending email for event: {event}")
     from_addr = global_email_contact
     to_addr = event.email_recipient
     _validate_recipient(to_addr)
@@ -121,18 +123,18 @@ If you have any questions, please reply to this email.
     msg_text = msg_text.strip().replace("\n", "\r\n") + "\r\n"
 
     start = time.perf_counter()
-    logging.info(f"sending message: {msg_text}")
+    _LOGGER.info(f"sending message: {msg_text}")
 
     try:
         _send_many(from_addr, [to_addr], msg_text)
     except Exception as e:
-        logging.error(f"send error: {e}")
+        _LOGGER.error(f"send error: {e}")
         raise e
     else:
-        logging.info(f"sent to {to_addr}")
+        _LOGGER.info(f"sent to {to_addr}")
 
     elapsed = time.perf_counter() - start
-    logging.info(f" send_many took {elapsed:.3f}s")
+    _LOGGER.info(f" send_many took {elapsed:.3f}s")
 
 
 def set_secret_key(key: str) -> None:
@@ -185,7 +187,7 @@ def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None:
     dkim_msg = sig + message_bytes
     dkim_reader = io.StringIO(str(dkim_msg, "utf-8"))
 
-    logging.info("email_send_many")
+    _LOGGER.info("email_send_many")
 
     for addr in to_addrs:
         _, domain = _split_address(addr)
@@ -218,8 +220,9 @@ def _send_one(mx_host: str, from_addr: str, to_addr: str, msg_reader: io.StringI
 
     try:
         # Connect to the ASF mail relay
+        # TODO: Use asfpy for sending mail
         mail_relay = "mail-relay.apache.org"
-        logging.info(f"Connecting to {mail_relay}:587")
+        _LOGGER.info(f"Connecting to {mail_relay}:587")
         smtp = LoggingSMTP(mail_relay, 587, timeout=default_timeout_seconds)
         smtp.set_debuglevel(2)
 
@@ -257,5 +260,5 @@ def _validate_recipient(to_addr: str) -> None:
     _, domain = _split_address(to_addr)
     if domain not in ("apache.org", "tooling.apache.org"):
         error_msg = f"Email recipient must be @apache.org or @tooling.apache.org, got {to_addr}"
-        logging.error(error_msg)
+        _LOGGER.error(error_msg)
         raise ValueError(error_msg)
