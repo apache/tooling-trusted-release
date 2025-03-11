@@ -26,6 +26,8 @@ GB = 1024 * MB
 
 
 class AppConfig:
+    SSH_HOST = decouple.config("SSH_HOST", default="0.0.0.0")
+    SSH_PORT = decouple.config("SSH_PORT", default=2222, cast=int)
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     STATE_DIR = os.path.join(PROJECT_ROOT, "state")
     DEBUG = False
@@ -62,12 +64,14 @@ class ProductionConfig(AppConfig): ...
 
 
 class DebugConfig(AppConfig):
+    SSH_HOST = "127.0.0.1"
     DEBUG = True
     TEMPLATES_AUTO_RELOAD = True
     USE_BLOCKBUSTER = False
 
 
 class ProfilingConfig(AppConfig):
+    SSH_HOST = "127.0.0.1"
     DEBUG = False
     TEMPLATES_AUTO_RELOAD = False
     USE_BLOCKBUSTER = True
@@ -86,6 +90,7 @@ _CONFIG_DICT: Final = {
     ConfigMode.Profiling: ProfilingConfig,
 }
 
+# TODO: This is a variable, need to use _global_config_mode
 _CONFIG_MODE = None
 
 

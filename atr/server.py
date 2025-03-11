@@ -30,6 +30,7 @@ from werkzeug.routing import Rule
 import asfquart
 import asfquart.generics
 import asfquart.session
+import atr.ssh as ssh
 from asfquart.base import QuartApp
 from atr.blueprints import register_blueprints
 from atr.config import AppConfig, ConfigMode, get_config, get_config_mode
@@ -144,11 +145,19 @@ def app_setup_lifecycle(app: QuartApp) -> None:
         worker_manager = get_worker_manager()
         await worker_manager.start()
 
+        ssh_server = await ssh.server_start()
+        app.extensions["ssh_server"] = ssh_server
+
     @app.after_serving
     async def shutdown() -> None:
         """Clean up services after the app stops serving requests."""
         worker_manager = get_worker_manager()
         await worker_manager.stop()
+
+        ssh_server = app.extensions.get("ssh_server")
+        if ssh_server:
+            await ssh.server_stop(ssh_server)
+
         app.background_tasks.clear()
 
 

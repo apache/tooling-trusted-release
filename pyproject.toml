@@ -14,8 +14,12 @@ dependencies = [
   "aiosqlite>=0.21.0,<0.22.0",
   "alembic~=1.14",
   "asfquart", # TODO: convert asfquart from a source dependency to pypi or git dependency
+  "asyncssh>=2.20.0,<3.0.0",
   "blockbuster>=1.5.23,<2.0.0",
   "cryptography~=44.0",
+  # "dkimpy>=1.1.8,<2.0.0",  # Using GitHub fork instead
+  "dkimpy @ git+https://github.com/sbp/dkimpy.git@main",
+  "dnspython>=2.7.0,<3.0.0",
   "dunamai>=1.23.0",
   "greenlet>=3.1.1,<4.0.0",
   "httpx~=0.27",
@@ -24,9 +28,6 @@ dependencies = [
   "python-gnupg~=0.5",
   "quart-schema[pydantic]~=0.21",
   "sqlmodel~=0.0",
-  "dnspython>=2.7.0,<3.0.0",
-  # "dkimpy>=1.1.8,<2.0.0",  # Using GitHub fork instead
-  "dkimpy @ git+https://github.com/sbp/dkimpy.git@main",
 ]
 
 [dependency-groups]
