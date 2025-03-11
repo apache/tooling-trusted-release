@@ -1,2 +1,2 @@
 #!/bin/sh
-sudo docker run --rm -d -v "$HOME/tooling-atr-experiments/state:/opt/atr/state" --network host tooling-atr-experiments
+sudo docker run --rm -d -v "$HOME/tooling-trusted-release/state:/opt/atr/state" --network host tooling-trusted-release
