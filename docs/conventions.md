@@ -65,6 +65,8 @@ import sqlalchemy.ext.asyncio as asyncio
 import aiofiles.os.path as path
 ```
 
+It's possible to use `from a.b import c` instead of `import a.b.c as c` when `c` is a module, but we prefer the latter form because it makes it clear that `c` must be a module, whereas in the former `from a.b import c` form, `c` could be any interface.
+
 TODO: There's a question as to whether we could actually use `import aiofiles.os.path as path` since we import `os.path` as `os.path` and not `path`.
 
 TODO: Sometimes we're using `as` for standard library modules. We should decide what to do about this.

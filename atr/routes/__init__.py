@@ -18,20 +18,20 @@
 import asyncio
 import functools
 import logging
+import pathlib
 import time
 from collections.abc import Awaitable, Callable, Coroutine
-from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
 
 import aiofiles
 import aiofiles.os
-from quart import Request
-from werkzeug.datastructures import MultiDict
+import quart
+import werkzeug.datastructures as datastructures
 
-from asfquart import APP
-from atr.db.models import Package
+import asfquart
+import atr.db.models as models
 
-if APP is ...:
+if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
 
 P = ParamSpec("P")
@@ -168,7 +168,7 @@ def app_route(path: str, methods: list[str] | None = None) -> Callable:
         else:
             measured_func = f
         # Then apply the original route decorator
-        return APP.route(path, methods=methods)(measured_func)
+        return asfquart.APP.route(path, methods=methods)(measured_func)
 
     return decorator
 
@@ -273,7 +273,7 @@ def format_file_size(size_in_bytes: int) -> str:
         return f"{formatted_bytes} bytes"
 
 
-async def get_form(request: Request) -> MultiDict:
+async def get_form(request: quart.Request) -> datastructures.MultiDict:
     # The request.form() method in Quart calls a synchronous tempfile method
     # It calls quart.wrappers.request.form _load_form_data
     # Which calls quart.formparser parse and parse_func and parser.parse
@@ -298,7 +298,7 @@ async def get_form(request: Request) -> MultiDict:
     return form
 
 
-async def package_files_delete(package: Package, uploads_path: Path) -> None:
+async def package_files_delete(package: models.Package, uploads_path: pathlib.Path) -> None:
     """Delete the artifact and signature files associated with a package."""
     if package.artifact_sha3:
         artifact_path = uploads_path / package.artifact_sha3

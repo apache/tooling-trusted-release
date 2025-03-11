@@ -18,6 +18,7 @@
 """keys.py"""
 
 import asyncio
+import contextlib
 import datetime
 import logging
 import logging.handlers
@@ -25,31 +26,25 @@ import pprint
 import shutil
 import tempfile
 from collections.abc import AsyncGenerator, Sequence
-from contextlib import asynccontextmanager
 from typing import cast
 
 import gnupg
-from quart import Request, flash, redirect, render_template, request, url_for
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from sqlalchemy.orm.attributes import InstrumentedAttribute
-from sqlmodel import select
-from werkzeug.wrappers.response import Response
+import quart
+import sqlalchemy.ext.asyncio
+import sqlalchemy.orm as orm
+import sqlmodel
+import werkzeug.wrappers.response as response
 
-from asfquart.auth import Requirements, require
-from asfquart.base import ASFQuartException
-from asfquart.session import ClientSession
-from asfquart.session import read as session_read
-from atr.db import create_async_db_session
-from atr.db.models import (
-    PMC,
-    PMCKeyLink,
-    PublicSigningKey,
-)
-from atr.routes import FlashError, algorithms, app_route, get_form
+import asfquart as asfquart
+import asfquart.auth as auth
+import asfquart.base as base
+import asfquart.session as session
+import atr.db as db
+import atr.db.models as models
+import atr.routes as routes
 
 
-@asynccontextmanager
+@contextlib.asynccontextmanager
 async def ephemeral_gpg_home() -> AsyncGenerator[str]:
     """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
     # TODO: This is only used in key_user_add
@@ -61,28 +56,32 @@ async def ephemeral_gpg_home() -> AsyncGenerator[str]:
         await asyncio.to_thread(shutil.rmtree, temp_dir)
 
 
-async def key_add_post(session: ClientSession, request: Request, user_pmcs: Sequence[PMC]) -> dict | None:
-    form = await get_form(request)
+async def key_add_post(
+    web_session: session.ClientSession, request: quart.Request, user_pmcs: Sequence[models.PMC]
+) -> dict | None:
+    form = await routes.get_form(request)
     public_key = form.get("public_key")
     if not public_key:
-        raise FlashError("Public key is required")
+        raise routes.FlashError("Public key is required")
 
     # Get selected PMCs from form
     selected_pmcs = form.getlist("selected_pmcs")
     if not selected_pmcs:
-        raise FlashError("You must select at least one PMC")
+        raise routes.FlashError("You must select at least one PMC")
 
     # Ensure that the selected PMCs are ones of which the user is actually a member
-    invalid_pmcs = [pmc for pmc in selected_pmcs if (pmc not in session.committees) and (pmc not in session.projects)]
+    invalid_pmcs = [
+        pmc for pmc in selected_pmcs if (pmc not in web_session.committees) and (pmc not in web_session.projects)
+    ]
     if invalid_pmcs:
-        raise FlashError(f"Invalid PMC selection: {', '.join(invalid_pmcs)}")
+        raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_pmcs)}")
 
-    return await key_user_add(session, public_key, selected_pmcs)
+    return await key_user_add(web_session, public_key, selected_pmcs)
 
 
-async def key_user_add(session: ClientSession, public_key: str, selected_pmcs: list[str]) -> dict | None:
+async def key_user_add(web_session: session.ClientSession, public_key: str, selected_pmcs: list[str]) -> dict | None:
     if not public_key:
-        raise FlashError("Public key is required")
+        raise routes.FlashError("Public key is required")
 
     # Import the key into GPG to validate and extract info
     # TODO: We'll just assume for now that gnupg.GPG() doesn't need to be async
@@ -91,7 +90,7 @@ async def key_user_add(session: ClientSession, public_key: str, selected_pmcs: l
         import_result = await asyncio.to_thread(gpg.import_keys, public_key)
 
         if not import_result.fingerprints:
-            raise FlashError("Invalid public key format")
+            raise routes.FlashError("Invalid public key format")
 
         fingerprint = import_result.fingerprints[0]
         if fingerprint is not None:
@@ -107,23 +106,23 @@ async def key_user_add(session: ClientSession, public_key: str, selected_pmcs: l
     # Note that "fingerprint" is not listed there, but we have it anyway...
     key = next((k for k in keys if (k["fingerprint"] is not None) and (k["fingerprint"].lower() == fingerprint)), None)
     if not key:
-        raise FlashError("Failed to import key")
+        raise routes.FlashError("Failed to import key")
     if (key.get("algo") == "1") and (int(key.get("length", "0")) < 2048):
         # https://infra.apache.org/release-signing.html#note
         # Says that keys must be at least 2048 bits
-        raise FlashError("Key is not long enough; must be at least 2048 bits")
+        raise routes.FlashError("Key is not long enough; must be at least 2048 bits")
 
     # Store key in database
-    async with create_async_db_session() as db_session:
-        return await key_user_session_add(session, public_key, key, selected_pmcs, db_session)
+    async with db.create_async_db_session() as db_session:
+        return await key_user_session_add(web_session, public_key, key, selected_pmcs, db_session)
 
 
 async def key_user_session_add(
-    session: ClientSession,
+    web_session: session.ClientSession,
     public_key: str,
     key: dict,
     selected_pmcs: list[str],
-    db_session: AsyncSession,
+    db_session: sqlalchemy.ext.asyncio.AsyncSession,
 ) -> dict | None:
     # TODO: Check if key already exists
     # psk_statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
@@ -133,34 +132,34 @@ async def key_user_session_add(
     # if existing_key:
     #     return ("You already have a key registered", None)
 
-    if not session.uid:
-        raise FlashError("You must be signed in to add a key")
+    if not web_session.uid:
+        raise routes.FlashError("You must be signed in to add a key")
 
     fingerprint = key.get("fingerprint")
     if not isinstance(fingerprint, str):
-        raise FlashError("Invalid key fingerprint")
+        raise routes.FlashError("Invalid key fingerprint")
     fingerprint = fingerprint.lower()
     uids = key.get("uids")
     async with db_session.begin():
         # Create new key record
-        key_record = PublicSigningKey(
+        key_record = models.PublicSigningKey(
             fingerprint=fingerprint,
             algorithm=int(key["algo"]),
             length=int(key.get("length", "0")),
             created=datetime.datetime.fromtimestamp(int(key["date"])),
             expires=datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
             declared_uid=uids[0] if uids else None,
-            apache_uid=session.uid,
+            apache_uid=web_session.uid,
             ascii_armored_key=public_key,
         )
         db_session.add(key_record)
 
         # Link key to selected PMCs
         for pmc_name in selected_pmcs:
-            pmc_statement = select(PMC).where(PMC.project_name == pmc_name)
+            pmc_statement = sqlmodel.select(models.PMC).where(models.PMC.project_name == pmc_name)
             pmc = (await db_session.execute(pmc_statement)).scalar_one_or_none()
             if pmc and pmc.id:
-                link = PMCKeyLink(pmc_id=pmc.id, key_fingerprint=key_record.fingerprint)
+                link = models.PMCKeyLink(pmc_id=pmc.id, key_fingerprint=key_record.fingerprint)
                 db_session.add(link)
             else:
                 # TODO: Log? Add to "error"?
@@ -176,99 +175,104 @@ async def key_user_session_add(
     }
 
 
-@app_route("/keys/add", methods=["GET", "POST"])
-@require(Requirements.committer)
+@routes.app_route("/keys/add", methods=["GET", "POST"])
+@auth.require(auth.Requirements.committer)
 async def root_keys_add() -> str:
     """Add a new public signing key to the user's account."""
-    session = await session_read()
-    if session is None:
-        raise ASFQuartException("Not authenticated", errorcode=401)
+    web_session = await session.read()
+    if web_session is None:
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
 
     key_info = None
 
     # Get PMC objects for all projects the user is a member of
-    async with create_async_db_session() as db_session:
+    async with db.create_async_db_session() as db_session:
         from sqlalchemy.sql.expression import ColumnElement
 
-        project_list = session.committees + session.projects
-        project_name = cast(ColumnElement[str], PMC.project_name)
-        pmc_statement = select(PMC).where(project_name.in_(project_list))
+        project_list = web_session.committees + web_session.projects
+        project_name = cast(ColumnElement[str], models.PMC.project_name)
+        pmc_statement = sqlmodel.select(models.PMC).where(project_name.in_(project_list))
         user_pmcs = (await db_session.execute(pmc_statement)).scalars().all()
 
-    if request.method == "POST":
+    if quart.request.method == "POST":
         try:
-            key_info = await key_add_post(session, request, user_pmcs)
-        except FlashError as e:
+            key_info = await key_add_post(web_session, quart.request, user_pmcs)
+        except routes.FlashError as e:
             logging.exception("FlashError:")
-            await flash(str(e), "error")
+            await quart.flash(str(e), "error")
         except Exception as e:
             logging.exception("Exception:")
-            await flash(f"Exception: {e}", "error")
+            await quart.flash(f"Exception: {e}", "error")
 
-    return await render_template(
+    return await quart.render_template(
         "keys-add.html",
-        asf_id=session.uid,
+        asf_id=web_session.uid,
         user_pmcs=user_pmcs,
         key_info=key_info,
-        algorithms=algorithms,
+        algorithms=routes.algorithms,
     )
 
 
-@app_route("/keys/delete", methods=["POST"])
-@require(Requirements.committer)
-async def root_keys_delete() -> Response:
+@routes.app_route("/keys/delete", methods=["POST"])
+@auth.require(auth.Requirements.committer)
+async def root_keys_delete() -> response.Response:
     """Delete a public signing key from the user's account."""
-    session = await session_read()
-    if session is None:
-        raise ASFQuartException("Not authenticated", errorcode=401)
+    web_session = await session.read()
+    if web_session is None:
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-    form = await get_form(request)
+    form = await routes.get_form(quart.request)
     fingerprint = form.get("fingerprint")
     if not fingerprint:
-        await flash("No key fingerprint provided", "error")
-        return redirect(url_for("root_keys_review"))
+        await quart.flash("No key fingerprint provided", "error")
+        return quart.redirect(quart.url_for("root_keys_review"))
 
-    async with create_async_db_session() as db_session:
+    async with db.create_async_db_session() as db_session:
         async with db_session.begin():
             # Get the key and verify ownership
-            psk_statement = select(PublicSigningKey).where(
-                PublicSigningKey.fingerprint == fingerprint, PublicSigningKey.apache_uid == session.uid
+            psk_statement = sqlmodel.select(models.PublicSigningKey).where(
+                models.PublicSigningKey.fingerprint == fingerprint,
+                models.PublicSigningKey.apache_uid == web_session.uid,
             )
             key = (await db_session.execute(psk_statement)).scalar_one_or_none()
 
             if not key:
-                await flash("Key not found or not owned by you", "error")
-                return redirect(url_for("root_keys_review"))
+                await quart.flash("Key not found or not owned by you", "error")
+                return quart.redirect(quart.url_for("root_keys_review"))
 
             # Delete the key
             await db_session.delete(key)
 
-    await flash("Key deleted successfully", "success")
-    return redirect(url_for("root_keys_review"))
+    await quart.flash("Key deleted successfully", "success")
+    return quart.redirect(quart.url_for("root_keys_review"))
 
 
-@app_route("/keys/review")
-@require(Requirements.committer)
+@routes.app_route("/keys/review")
+@auth.require(auth.Requirements.committer)
 async def root_keys_review() -> str:
     """Show all keys associated with the user's account."""
-    session = await session_read()
-    if session is None:
-        raise ASFQuartException("Not authenticated", errorcode=401)
+    web_session = await session.read()
+    if web_session is None:
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
 
     # Get all existing keys for the user
-    async with create_async_db_session() as db_session:
-        pmcs_loader = selectinload(cast(InstrumentedAttribute[list[PMC]], PublicSigningKey.pmcs))
-        psk_statement = select(PublicSigningKey).options(pmcs_loader).where(PublicSigningKey.apache_uid == session.uid)
+    async with db.create_async_db_session() as db_session:
+        pmcs_loader = orm.selectinload(cast(orm.InstrumentedAttribute[list[models.PMC]], models.PublicSigningKey.pmcs))
+        psk_statement = (
+            sqlmodel.select(models.PublicSigningKey)
+            .options(pmcs_loader)
+            .where(models.PublicSigningKey.apache_uid == web_session.uid)
+        )
         user_keys = (await db_session.execute(psk_statement)).scalars().all()
 
-    status_message = request.args.get("status_message")
-    status_type = request.args.get("status_type")
+    status_message = quart.request.args.get("status_message")
+    status_type = quart.request.args.get("status_type")
 
-    return await render_template(
+    return await quart.render_template(
         "keys-review.html",
-        asf_id=session.uid,
+        asf_id=web_session.uid,
         user_keys=user_keys,
-        algorithms=algorithms,
+        algorithms=routes.algorithms,
         status_message=status_message,
         status_type=status_type,
         now=datetime.datetime.now(datetime.UTC),

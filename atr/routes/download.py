@@ -17,121 +17,115 @@
 
 """download.py"""
 
-from pathlib import Path
+import pathlib
 from typing import cast
 
 import aiofiles
 import aiofiles.os
-from quart import flash, redirect, send_file, url_for
-from quart.wrappers.response import Response as QuartResponse
-from sqlalchemy.orm import selectinload
-from sqlalchemy.orm.attributes import InstrumentedAttribute
-from sqlmodel import select
-from werkzeug.wrappers.response import Response
+import quart
+import sqlalchemy.orm as orm
+import sqlmodel
+import werkzeug.wrappers.response as response
 
-from asfquart.auth import Requirements, require
-from asfquart.base import ASFQuartException
-from asfquart.session import read as session_read
-from atr.db import create_async_db_session
-from atr.db.models import (
-    PMC,
-    Package,
-    Release,
-)
-from atr.routes import app_route
-from atr.util import get_release_storage_dir
+import asfquart.auth as auth
+import asfquart.base as base
+import asfquart.session as session
+import atr.db as db
+import atr.db.models as models
+import atr.routes as routes
+import atr.util as util
 
 
-@app_route("/download/<release_key>/<artifact_sha3>")
-@require(Requirements.committer)
-async def root_download_artifact(release_key: str, artifact_sha3: str) -> Response | QuartResponse:
+@routes.app_route("/download/<release_key>/<artifact_sha3>")
+@auth.require(auth.Requirements.committer)
+async def root_download_artifact(release_key: str, artifact_sha3: str) -> response.Response | quart.Response:
     """Download an artifact file."""
     # TODO: This function is very similar to the signature download function
     # We should probably extract the common code into a helper function
-    session = await session_read()
-    if (session is None) or (session.uid is None):
-        raise ASFQuartException("Not authenticated", errorcode=401)
+    web_session = await session.read()
+    if (web_session is None) or (web_session.uid is None):
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-    async with create_async_db_session() as db_session:
+    async with db.create_async_db_session() as db_session:
         # Find the package
-        package_release = selectinload(cast(InstrumentedAttribute[Release], Package.release))
-        release_pmc = package_release.selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
+        package_release = orm.selectinload(cast(orm.InstrumentedAttribute[models.Release], models.Package.release))
+        release_pmc = package_release.selectinload(cast(orm.InstrumentedAttribute[models.PMC], models.Release.pmc))
         package_statement = (
-            select(Package)
-            .where(Package.artifact_sha3 == artifact_sha3, Package.release_key == release_key)
+            sqlmodel.select(models.Package)
+            .where(models.Package.artifact_sha3 == artifact_sha3, models.Package.release_key == release_key)
             .options(release_pmc)
         )
         result = await db_session.execute(package_statement)
         package = result.scalar_one_or_none()
 
         if not package:
-            await flash("Artifact not found", "error")
-            return redirect(url_for("root_candidate_review"))
+            await quart.flash("Artifact not found", "error")
+            return quart.redirect(quart.url_for("root_candidate_review"))
 
         # Check permissions
         if package.release and package.release.pmc:
-            if (session.uid not in package.release.pmc.pmc_members) and (
-                session.uid not in package.release.pmc.committers
+            if (web_session.uid not in package.release.pmc.pmc_members) and (
+                web_session.uid not in package.release.pmc.committers
             ):
-                await flash("You don't have permission to download this file", "error")
-                return redirect(url_for("root_candidate_review"))
+                await quart.flash("You don't have permission to download this file", "error")
+                return quart.redirect(quart.url_for("root_candidate_review"))
 
         # Construct file path
-        file_path = Path(get_release_storage_dir()) / artifact_sha3
+        file_path = pathlib.Path(util.get_release_storage_dir()) / artifact_sha3
 
         # Check that the file exists
         if not await aiofiles.os.path.exists(file_path):
-            await flash("Artifact file not found", "error")
-            return redirect(url_for("root_candidate_review"))
+            await quart.flash("Artifact file not found", "error")
+            return quart.redirect(quart.url_for("root_candidate_review"))
 
         # Send the file with original filename
-        return await send_file(
+        return await quart.send_file(
             file_path, as_attachment=True, attachment_filename=package.filename, mimetype="application/octet-stream"
         )
 
 
-@app_route("/download/signature/<release_key>/<signature_sha3>")
-@require(Requirements.committer)
-async def root_download_signature(release_key: str, signature_sha3: str) -> QuartResponse | Response:
+@routes.app_route("/download/signature/<release_key>/<signature_sha3>")
+@auth.require(auth.Requirements.committer)
+async def root_download_signature(release_key: str, signature_sha3: str) -> quart.Response | response.Response:
     """Download a signature file."""
-    session = await session_read()
-    if (session is None) or (session.uid is None):
-        raise ASFQuartException("Not authenticated", errorcode=401)
+    web_session = await session.read()
+    if (web_session is None) or (web_session.uid is None):
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-    async with create_async_db_session() as db_session:
+    async with db.create_async_db_session() as db_session:
         # Find the package that has this signature
-        package_release = selectinload(cast(InstrumentedAttribute[Release], Package.release))
-        release_pmc = package_release.selectinload(cast(InstrumentedAttribute[PMC], Release.pmc))
+        package_release = orm.selectinload(cast(orm.InstrumentedAttribute[models.Release], models.Package.release))
+        release_pmc = package_release.selectinload(cast(orm.InstrumentedAttribute[models.PMC], models.Release.pmc))
         package_statement = (
-            select(Package)
-            .where(Package.signature_sha3 == signature_sha3, Package.release_key == release_key)
+            sqlmodel.select(models.Package)
+            .where(models.Package.signature_sha3 == signature_sha3, models.Package.release_key == release_key)
             .options(release_pmc)
         )
         result = await db_session.execute(package_statement)
         package = result.scalar_one_or_none()
 
         if not package:
-            await flash("Signature not found", "error")
-            return redirect(url_for("root_candidate_review"))
+            await quart.flash("Signature not found", "error")
+            return quart.redirect(quart.url_for("root_candidate_review"))
 
         # Check permissions
         if package.release and package.release.pmc:
-            if (session.uid not in package.release.pmc.pmc_members) and (
-                session.uid not in package.release.pmc.committers
+            if (web_session.uid not in package.release.pmc.pmc_members) and (
+                web_session.uid not in package.release.pmc.committers
             ):
-                await flash("You don't have permission to download this file", "error")
-                return redirect(url_for("root_candidate_review"))
+                await quart.flash("You don't have permission to download this file", "error")
+                return quart.redirect(quart.url_for("root_candidate_review"))
 
         # Construct file path
-        file_path = Path(get_release_storage_dir()) / signature_sha3
+        file_path = pathlib.Path(util.get_release_storage_dir()) / signature_sha3
 
         # Check that the file exists
         if not await aiofiles.os.path.exists(file_path):
-            await flash("Signature file not found", "error")
-            return redirect(url_for("root_candidate_review"))
+            await quart.flash("Signature file not found", "error")
+            return quart.redirect(quart.url_for("root_candidate_review"))
 
         # Send the file with original filename and .asc extension
-        return await send_file(
+        return await quart.send_file(
             file_path,
             as_attachment=True,
             attachment_filename=f"{package.filename}.asc",

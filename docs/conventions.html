@@ -41,6 +41,7 @@ import asyncio.subprocess as subprocess
 import sqlalchemy.ext.asyncio as asyncio
 import aiofiles.os.path as path
 </code></pre>
+<p>It's possible to use <code>from a.b import c</code> instead of <code>import a.b.c as c</code> when <code>c</code> is a module, but we prefer the latter form because it makes it clear that <code>c</code> must be a module, whereas in the former <code>from a.b import c</code> form, <code>c</code> could be any interface.</p>
 <p>TODO: There's a question as to whether we could actually use <code>import aiofiles.os.path as path</code> since we import <code>os.path</code> as <code>os.path</code> and not <code>path</code>.</p>
 <p>TODO: Sometimes we're using <code>as</code> for standard library modules. We should decide what to do about this.</p>
 <h3>Avoid duplicated module names</h3>

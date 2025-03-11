@@ -16,56 +16,55 @@
 # under the License.
 
 
-from quart import render_template, request
-from quart.typing import ResponseReturnValue
+import quart
 
-from asfquart import APP
-from asfquart.auth import Requirements, require
-from asfquart.base import ASFQuartException
-from asfquart.session import read as session_read
-from atr.db import create_async_db_session
-from atr.db.models import Task, TaskStatus
-from atr.routes import app_route, get_form
+import asfquart as asfquart
+import asfquart.auth as auth
+import asfquart.base as base
+import asfquart.session as session
+import atr.db as db
+import atr.db.models as models
+import atr.routes as routes
 
-if APP is ...:
+if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
 
 
-@app_route("/dev/send-email", methods=["GET", "POST"])
-@require(Requirements.committer)
-async def dev_email_send() -> ResponseReturnValue:
+@routes.app_route("/dev/send-email", methods=["GET", "POST"])
+@auth.require(auth.Requirements.committer)
+async def dev_email_send() -> quart.ResponseReturnValue:
     """Simple endpoint for testing email functionality."""
-    session = await session_read()
-    if session is None:
-        raise ASFQuartException("Not authenticated", errorcode=401)
-    asf_id = session.uid
+    web_session = await session.read()
+    if web_session is None:
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
+    asf_id = web_session.uid
 
-    if request.method == "POST":
-        form = await get_form(request)
+    if quart.request.method == "POST":
+        form = await routes.get_form(quart.request)
 
         email = form.get("email_recipient", "")
         name = form.get("artifact_name", "")
         token = form.get("token", "")
 
         if not email:
-            return await render_template(
+            return await quart.render_template(
                 "dev-send-email.html",
                 asf_id=asf_id,
                 error="Email recipient is required",
             )
 
         if not name:
-            return await render_template(
+            return await quart.render_template(
                 "dev-send-email.html",
                 asf_id=asf_id,
                 error="Artifact name is required",
             )
 
         # Create a task for mail testing
-        async with create_async_db_session() as db_session:
+        async with db.create_async_db_session() as db_session:
             async with db_session.begin():
-                task = Task(
-                    status=TaskStatus.QUEUED,
+                task = models.Task(
+                    status=models.TaskStatus.QUEUED,
                     task_type="mailtest_send",
                     task_args=[name, email, token],
                 )
@@ -73,7 +72,7 @@ async def dev_email_send() -> ResponseReturnValue:
                 # Flush to get the task ID
                 await db_session.flush()
 
-        return await render_template(
+        return await quart.render_template(
             "dev-send-email.html",
             asf_id=asf_id,
             success=True,
@@ -83,4 +82,4 @@ async def dev_email_send() -> ResponseReturnValue:
             token=token,
         )
 
-    return await render_template("dev-send-email.html", asf_id=asf_id)
+    return await quart.render_template("dev-send-email.html", asf_id=asf_id)

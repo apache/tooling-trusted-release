@@ -17,23 +17,25 @@
 
 """docs.py"""
 
-from quart import render_template, request
+import quart
 
-from asfquart.auth import Requirements, require
-from atr.routes import app_route
+import asfquart as asfquart
+import asfquart.auth as auth
+import atr.routes as routes
 
 
-@app_route("/docs/verify/<filename>")
-@require(Requirements.committer)
+@routes.app_route("/docs/verify/<filename>")
+@auth.require(auth.Requirements.committer)
 async def root_docs_verify(filename: str) -> str:
     """Show verification instructions for an artifact."""
     # Get query parameters
-    artifact_sha3 = request.args.get("artifact_sha3", "")
-    sha512 = request.args.get("sha512", "")
-    has_signature = request.args.get("has_signature", "false").lower() == "true"
+    args = quart.request.args
+    artifact_sha3 = args.get("artifact_sha3", "")
+    sha512 = args.get("sha512", "")
+    has_signature = args.get("has_signature", "false").lower() == "true"
 
     # Return the template
-    return await render_template(
+    return await quart.render_template(
         "docs-verify.html",
         filename=filename,
         artifact_sha3=artifact_sha3,

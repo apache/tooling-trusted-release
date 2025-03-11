@@ -17,12 +17,12 @@
 
 """root.py"""
 
-from quart import render_template
+import quart
 
-from atr.routes import app_route
+import atr.routes as routes
 
 
-@app_route("/")
+@routes.app_route("/")
 async def root() -> str:
     """Main page."""
-    return await render_template("index.html")
+    return await quart.render_template("index.html")

@@ -17,41 +17,43 @@
 
 """project.py"""
 
-from http.client import HTTPException
+import http.client
 from typing import cast
 
+import quart
 import sqlalchemy.orm as orm
 import sqlmodel
-from quart import render_template
 
-from atr.db import create_async_db_session
-from atr.db.models import PMC, PublicSigningKey
-from atr.db.service import get_pmcs
-from atr.routes import algorithms, app_route
+import atr.db as db
+import atr.db.models as models
+import atr.db.service as service
+import atr.routes as routes
 
 
-@app_route("/projects")
+@routes.app_route("/projects")
 async def root_project_directory() -> str:
     """Main project directory page."""
-    async with create_async_db_session() as session:
-        projects = await get_pmcs(session)
-        return await render_template("project-directory.html", projects=projects)
+    async with db.create_async_db_session() as session:
+        projects = await service.get_pmcs(session)
+        return await quart.render_template("project-directory.html", projects=projects)
 
 
-@app_route("/projects/<project_name>")
+@routes.app_route("/projects/<project_name>")
 async def root_project_view(project_name: str) -> str:
-    async with create_async_db_session() as db_session:
+    async with db.create_async_db_session() as db_session:
         statement = (
-            sqlmodel.select(PMC)
-            .where(PMC.project_name == project_name)
+            sqlmodel.select(models.PMC)
+            .where(models.PMC.project_name == project_name)
             .options(
-                orm.selectinload(cast(orm.attributes.InstrumentedAttribute[PublicSigningKey], PMC.public_signing_keys))
+                orm.selectinload(
+                    cast(orm.attributes.InstrumentedAttribute[models.PublicSigningKey], models.PMC.public_signing_keys)
+                )
             )
         )
 
         project = (await db_session.execute(statement)).scalar_one_or_none()
 
         if not project:
-            raise HTTPException(404)
+            raise http.client.HTTPException(404)
 
-        return await render_template("project-view.html", project=project, algorithms=algorithms)
+        return await quart.render_template("project-view.html", project=project, algorithms=routes.algorithms)
