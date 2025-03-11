@@ -18,15 +18,15 @@
 """The data models to be persisted in the database."""
 
 import datetime
-from enum import Enum
-from typing import Any, Optional
+import enum
+from typing import Any
 
+import pydantic
 import sqlalchemy
 import sqlmodel
-from pydantic import BaseModel
 
 
-class UserRole(str, Enum):
+class UserRole(str, enum.Enum):
     PMC_MEMBER = "pmc_member"
     RELEASE_MANAGER = "release_manager"
     COMMITTER = "committer"
@@ -62,7 +62,7 @@ class PublicSigningKey(sqlmodel.SQLModel, table=True):
 
 
 class VotePolicy(sqlmodel.SQLModel, table=True):
-    id: int | None = sqlmodel.Field(default=None, primary_key=True)
+    id: int = sqlmodel.Field(default=None, primary_key=True)
     mailto_addresses: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
     manual_vote: bool = sqlmodel.Field(default=False)
     min_hours: int = sqlmodel.Field(default=0)
@@ -78,7 +78,7 @@ class VotePolicy(sqlmodel.SQLModel, table=True):
 
 
 class PMC(sqlmodel.SQLModel, table=True):
-    id: int | None = sqlmodel.Field(default=None, primary_key=True)
+    id: int = sqlmodel.Field(default=None, primary_key=True)
     project_name: str = sqlmodel.Field(unique=True)
     # True if this is an incubator podling with a PPMC, otherwise False
     is_podling: bool = sqlmodel.Field(default=False)
@@ -109,11 +109,11 @@ class PMC(sqlmodel.SQLModel, table=True):
 
 
 class ProductLine(sqlmodel.SQLModel, table=True):
-    id: int | None = sqlmodel.Field(default=None, primary_key=True)
+    id: int = sqlmodel.Field(default=None, primary_key=True)
 
     # Many-to-one: A product line belongs to one PMC, a PMC can have multiple product lines
-    pmc_id: int | None = sqlmodel.Field(default=None, foreign_key="pmc.id")
-    pmc: PMC | None = sqlmodel.Relationship(back_populates="product_lines")
+    pmc_id: int = sqlmodel.Field(foreign_key="pmc.id")
+    pmc: PMC = sqlmodel.Relationship(back_populates="product_lines")
 
     product_name: str
     latest_version: str
@@ -130,7 +130,7 @@ class ProductLine(sqlmodel.SQLModel, table=True):
 
 
 class DistributionChannel(sqlmodel.SQLModel, table=True):
-    id: int | None = sqlmodel.Field(default=None, primary_key=True)
+    id: int = sqlmodel.Field(default=None, primary_key=True)
     name: str = sqlmodel.Field(index=True, unique=True)
     url: str
     credentials: str
@@ -138,8 +138,8 @@ class DistributionChannel(sqlmodel.SQLModel, table=True):
     automation_endpoint: str
 
     # Many-to-one: A distribution channel belongs to one product line, a product line can have multiple channels
-    product_line_id: int | None = sqlmodel.Field(default=None, foreign_key="productline.id")
-    product_line: ProductLine | None = sqlmodel.Relationship(back_populates="distribution_channels")
+    product_line_id: int = sqlmodel.Field(foreign_key="productline.id")
+    product_line: ProductLine = sqlmodel.Relationship(back_populates="distribution_channels")
 
 
 class Package(sqlmodel.SQLModel, table=True):
@@ -160,8 +160,8 @@ class Package(sqlmodel.SQLModel, table=True):
     bytes_size: int
 
     # Many-to-one: A package belongs to one release
-    release_key: str | None = sqlmodel.Field(default=None, foreign_key="release.storage_key")
-    release: Optional["Release"] = sqlmodel.Relationship(back_populates="packages")
+    release_key: str = sqlmodel.Field(foreign_key="release.storage_key")
+    release: "Release" = sqlmodel.Relationship(back_populates="packages")
 
     # One-to-many: A package can have multiple tasks
     tasks: list["Task"] = sqlmodel.Relationship(
@@ -169,7 +169,7 @@ class Package(sqlmodel.SQLModel, table=True):
     )
 
 
-class VoteEntry(BaseModel):
+class VoteEntry(pydantic.BaseModel):
     result: bool
     summary: str
     binding_votes: int
@@ -178,14 +178,14 @@ class VoteEntry(BaseModel):
     end: datetime.datetime
 
 
-class ReleaseStage(str, Enum):
+class ReleaseStage(str, enum.Enum):
     BUILD = "build"
     CANDIDATE = "candidate"
     CURRENT = "current"
     ARCHIVED = "archived"
 
 
-class ReleasePhase(str, Enum):
+class ReleasePhase(str, enum.Enum):
     RELEASE_CANDIDATE = "release_candidate"
     EVALUATE_CLAIMS = "evaluate_claims"
     DISTRIBUTE_TEST = "distribute_test"
@@ -200,7 +200,7 @@ class ReleasePhase(str, Enum):
     ARCHIVED = "archived"
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(str, enum.Enum):
     """Status of a task in the task queue."""
 
     QUEUED = "queued"
@@ -212,7 +212,7 @@ class TaskStatus(str, Enum):
 class Task(sqlmodel.SQLModel, table=True):
     """A task in the task queue."""
 
-    id: int | None = sqlmodel.Field(default=None, primary_key=True)
+    id: int = sqlmodel.Field(default=None, primary_key=True)
     status: TaskStatus = sqlmodel.Field(default=TaskStatus.QUEUED, index=True)
     task_type: str
     task_args: Any = sqlmodel.Field(sa_column=sqlalchemy.Column(sqlalchemy.JSON))
@@ -259,12 +259,12 @@ class Release(sqlmodel.SQLModel, table=True):
     created: datetime.datetime
 
     # Many-to-one: A release belongs to one PMC, a PMC can have multiple releases
-    pmc_id: int | None = sqlmodel.Field(default=None, foreign_key="pmc.id")
-    pmc: PMC | None = sqlmodel.Relationship(back_populates="releases")
+    pmc_id: int = sqlmodel.Field(foreign_key="pmc.id")
+    pmc: PMC = sqlmodel.Relationship(back_populates="releases")
 
     # Many-to-one: A release belongs to one product line, a product line can have multiple releases
-    product_line_id: int | None = sqlmodel.Field(default=None, foreign_key="productline.id")
-    product_line: ProductLine | None = sqlmodel.Relationship(back_populates="releases")
+    product_line_id: int = sqlmodel.Field(foreign_key="productline.id")
+    product_line: ProductLine = sqlmodel.Relationship(back_populates="releases")
 
     package_managers: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
     version: str
