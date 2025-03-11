@@ -27,7 +27,7 @@ import atr.tasks.archive as archive
 import atr.tasks.sbom as sbom
 import atr.tasks.task as task
 
-_CONFIG: Final = config.get_config()
+_CONFIG: Final = config.get()
 _JAVA_MEMORY_ARGS: Final[list[str]] = []
 # Use this to set smaller memory limits and use SerialGC which also requires less memory
 # We prefer, however, to set this in the container

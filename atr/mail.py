@@ -16,18 +16,18 @@
 # under the License.
 
 import datetime
+import email.utils as utils
+import io
 import logging
 import smtplib
 import ssl
 import time
 import uuid
-from email.utils import formatdate
-from io import StringIO
 from typing import Any
 
 import dkim
-import dns.rdtypes.ANY.MX
-import dns.resolver
+import dns.rdtypes.ANY.MX as MX
+import dns.resolver as resolver
 
 # TODO: We should choose a pattern for globals
 # We could e.g. use uppercase instead of global_
@@ -35,16 +35,10 @@ import dns.resolver
 # But in many cases we should do so
 # TODO: Get at least global_domain from configuration
 # And probably global_dkim_selector too
-global_dkim_selector = "202501"
-global_domain = "tooling-vm-ec2-de.apache.org"
-global_email_contact = f"contact@{global_domain}"
+global_dkim_selector: str = "202501"
+global_domain: str = "tooling-vm-ec2-de.apache.org"
+global_email_contact: str = f"contact@{global_domain}"
 global_secret_key: str | None = None
-
-
-def set_secret_key(key: str) -> None:
-    """Set the secret key for DKIM signing."""
-    global global_secret_key
-    global_secret_key = key
 
 
 class ArtifactEvent:
@@ -54,6 +48,16 @@ class ArtifactEvent:
         self.artifact_name = artifact_name
         self.email_recipient = email_recipient
         self.token = token
+
+
+class LoggingSMTP(smtplib.SMTP):
+    def _print_debug(self, *args: Any) -> None:
+        template = ["%s"] * len(args)
+        if self.debuglevel > 1:
+            template.append("%s")
+            logging.info(" ".join(template), datetime.datetime.now().time(), *args)
+        else:
+            logging.info(" ".join(template), *args)
 
 
 class VoteEvent:
@@ -69,29 +73,12 @@ class VoteEvent:
         self.vote_end = vote_end
 
 
-def split_address(addr: str) -> tuple[str, str]:
-    """Split an email address into local and domain parts."""
-    parts = addr.split("@", 1)
-    if len(parts) != 2:
-        raise ValueError("Invalid mail address")
-    return parts[0], parts[1]
-
-
-def validate_recipient(to_addr: str) -> None:
-    # Ensure recipient is @apache.org or @tooling.apache.org
-    _, domain = split_address(to_addr)
-    if domain not in ("apache.org", "tooling.apache.org"):
-        error_msg = f"Email recipient must be @apache.org or @tooling.apache.org, got {to_addr}"
-        logging.error(error_msg)
-        raise ValueError(error_msg)
-
-
 def send(event: ArtifactEvent | VoteEvent) -> None:
     """Send an email notification about an artifact or a vote."""
     logging.info(f"Sending email for event: {event}")
     from_addr = global_email_contact
     to_addr = event.email_recipient
-    validate_recipient(to_addr)
+    _validate_recipient(to_addr)
 
     # UUID4 is entirely random, with no timestamp nor namespace
     # It does have 6 version and variant bits, so only 122 bits are random
@@ -103,7 +90,7 @@ def send(event: ArtifactEvent | VoteEvent) -> None:
 From: {from_addr}
 To: {to_addr}
 Subject: {event.subject}
-Date: {formatdate(localtime=True)}
+Date: {utils.formatdate(localtime=True)}
 Message-ID: {mid}
 
 {event.body}
@@ -115,7 +102,7 @@ Message-ID: {mid}
 From: {from_addr}
 To: {to_addr}
 Subject: {event.artifact_name}
-Date: {formatdate(localtime=True)}
+Date: {utils.formatdate(localtime=True)}
 Message-ID: {mid}
 
 The {event.artifact_name} artifact has been uploaded.
@@ -137,7 +124,7 @@ If you have any questions, please reply to this email.
     logging.info(f"sending message: {msg_text}")
 
     try:
-        send_many(from_addr, [to_addr], msg_text)
+        _send_many(from_addr, [to_addr], msg_text)
     except Exception as e:
         logging.error(f"send error: {e}")
         raise e
@@ -148,7 +135,34 @@ If you have any questions, please reply to this email.
     logging.info(f" send_many took {elapsed:.3f}s")
 
 
-def send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None:
+def set_secret_key(key: str) -> None:
+    """Set the secret key for DKIM signing."""
+    global global_secret_key
+    global_secret_key = key
+
+
+def _resolve_mx_records(domain: str) -> list[tuple[str, int]]:
+    try:
+        # Query MX records
+        mx_records = resolver.resolve(domain, "MX")
+        mxs = []
+
+        for rdata in mx_records:
+            if not isinstance(rdata, MX.MX):
+                raise ValueError(f"Unexpected MX record type: {type(rdata)}")
+            mx = rdata
+            mxs.append((mx.exchange.to_text(True), mx.preference))
+        # Sort by preference, array position one
+        mxs.sort(key=lambda x: x[1])
+
+        if not mxs:
+            mxs = [(domain, 0)]
+    except Exception as e:
+        raise ValueError(f"Failed to lookup MX records for {domain}: {e}")
+    return mxs
+
+
+def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None:
     """Send an email to multiple recipients with DKIM signing."""
     message_bytes = bytes(msg_text, "utf-8")
 
@@ -169,23 +183,23 @@ def send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None:
 
     # Prepend the DKIM signature to the message
     dkim_msg = sig + message_bytes
-    dkim_reader = StringIO(str(dkim_msg, "utf-8"))
+    dkim_reader = io.StringIO(str(dkim_msg, "utf-8"))
 
     logging.info("email_send_many")
 
     for addr in to_addrs:
-        _, domain = split_address(addr)
+        _, domain = _split_address(addr)
 
         if domain == "localhost":
             mxs = [("127.0.0.1", 0)]
         else:
-            mxs = resolve_mx_records(domain)
+            mxs = _resolve_mx_records(domain)
 
         # Try each MX server
         errors = []
         for mx_host, _ in mxs:
             try:
-                send_one(mx_host, from_addr, addr, dkim_reader)
+                _send_one(mx_host, from_addr, addr, dkim_reader)
                 # Success, no need to try other MX servers
                 break
             except Exception as e:
@@ -197,41 +211,10 @@ def send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None:
             raise Exception("; ".join(errors))
 
 
-def resolve_mx_records(domain: str) -> list[tuple[str, int]]:
-    try:
-        # Query MX records
-        mx_records = dns.resolver.resolve(domain, "MX")
-        mxs = []
-
-        for rdata in mx_records:
-            if not isinstance(rdata, dns.rdtypes.ANY.MX.MX):
-                raise ValueError(f"Unexpected MX record type: {type(rdata)}")
-            mx = rdata
-            mxs.append((mx.exchange.to_text(True), mx.preference))
-        # Sort by preference, array position one
-        mxs.sort(key=lambda x: x[1])
-
-        if not mxs:
-            mxs = [(domain, 0)]
-    except Exception as e:
-        raise ValueError(f"Failed to lookup MX records for {domain}: {e}")
-    return mxs
-
-
-class LoggingSMTP(smtplib.SMTP):
-    def _print_debug(self, *args: Any) -> None:
-        template = ["%s"] * len(args)
-        if self.debuglevel > 1:
-            template.append("%s")
-            logging.info(" ".join(template), datetime.datetime.now().time(), *args)
-        else:
-            logging.info(" ".join(template), *args)
-
-
-def send_one(mx_host: str, from_addr: str, to_addr: str, msg_reader: StringIO) -> None:
+def _send_one(mx_host: str, from_addr: str, to_addr: str, msg_reader: io.StringIO) -> None:
     """Send an email to a single recipient via the ASF mail relay."""
     default_timeout_seconds = 30
-    validate_recipient(to_addr)
+    _validate_recipient(to_addr)
 
     try:
         # Connect to the ASF mail relay
@@ -259,3 +242,20 @@ def send_one(mx_host: str, from_addr: str, to_addr: str, msg_reader: StringIO) -
 
     except (OSError, smtplib.SMTPException) as e:
         raise Exception(f"SMTP error: {e}")
+
+
+def _split_address(addr: str) -> tuple[str, str]:
+    """Split an email address into local and domain parts."""
+    parts = addr.split("@", 1)
+    if len(parts) != 2:
+        raise ValueError("Invalid mail address")
+    return parts[0], parts[1]
+
+
+def _validate_recipient(to_addr: str) -> None:
+    # Ensure recipient is @apache.org or @tooling.apache.org
+    _, domain = _split_address(to_addr)
+    if domain not in ("apache.org", "tooling.apache.org"):
+        error_msg = f"Email recipient must be @apache.org or @tooling.apache.org, got {to_addr}"
+        logging.error(error_msg)
+        raise ValueError(error_msg)

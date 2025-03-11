@@ -57,14 +57,14 @@ MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024
 
 def main() -> None:
     """Main entry point."""
-    from atr.config import get_config
+    import atr.config as config
 
     signal.signal(signal.SIGTERM, worker_signal_handle)
     signal.signal(signal.SIGINT, worker_signal_handle)
 
-    config = get_config()
-    if os.path.isdir(config.STATE_DIR):
-        os.chdir(config.STATE_DIR)
+    conf = config.get()
+    if os.path.isdir(conf.STATE_DIR):
+        os.chdir(conf.STATE_DIR)
 
     setup_logging()
 

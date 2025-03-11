@@ -19,6 +19,7 @@ Exceptions to this rule include:
 - Type variables
 - Enumerations
 - Methods requiring interface compatibility with their superclass
+- Nested functions, i.e. functions appearing in other functions
 
 ### Use UPPERCASE for top level constants
 
@@ -55,6 +56,24 @@ This convention aligns with Go's package naming practices. Follow [Go naming rul
 
 This only applies to modules outside of the Python standard library. The standard library module `os.path`, for example, must always be imported using the form `import os.path`, and _not_ `import os.path as path`.
 
+Furthermore, if a third party module to be imported would conflict with a Python standard library module, then that third party module must be imported with one extra level.
+
+```python
+# Preferred
+import asyncio.subprocess
+import sqlalchemy.ext as ext
+import aiofiles.os
+
+# Avoid
+import asyncio.subprocess as subprocess
+import sqlalchemy.ext.asyncio as asyncio
+import aiofiles.os.path as path
+```
+
+TODO: There's a question as to whether we could actually use `import aiofiles.os.path as path` since we import `os.path` as `os.path` and not `path`.
+
+TODO: Sometimes we're using `as` for standard library modules. We should decide what to do about this.
+
 ### Avoid duplicated module names
 
 Try to avoid using, for example, `baking/apple/pie.py` and `baking/cherry/pie.py` because these will both be imported as `pie` and one will have to be renamed.
@@ -75,7 +94,7 @@ from p.q.r import s
 s()
 ```
 
-The collections.abc and typing modules are an exception to this rule. Always import typing identifiers directly using the `from` syntax:
+The collections.abc and typing modules are an exception to this rule. Always import collections.abc and typing identifiers directly using the `from` syntax:
 
 ```python
 # Preferred
@@ -165,7 +184,7 @@ Note how verbs tend to come last, so that function names now read in an object o
 
 While this approach can lead to slightly longer function names, the benefits of improved code organisation and discoverability outweigh the verbosity.
 
-Private, underscored, functions should be placed after all public functions.
+Classes should always be placed before functions. Private, underscored, classes should be placed after all public classes, and likewise for functions.
 
 ### Give helper functions the same prefix as their parent function
 

@@ -15,36 +15,34 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import dataclasses
+import functools
 import hashlib
+import pathlib
 from collections.abc import Mapping
-from dataclasses import dataclass
-from functools import cache
-from pathlib import Path
 from typing import Annotated, Any
 
 import aiofiles
-from pydantic import GetCoreSchemaHandler, TypeAdapter, create_model
-from pydantic_core import CoreSchema, core_schema
+import pydantic
+import pydantic_core
+
+import atr.config as config
 
 
-@cache
+@functools.cache
 def get_admin_users() -> set[str]:
-    from atr.config import get_config
-
-    return set(get_config().ADMIN_USERS)
+    return set(config.get().ADMIN_USERS)
 
 
 def is_admin(user_id: str | None) -> bool:
-    """Check if a user is an admin."""
+    """Check whether a user is an admin."""
     if user_id is None:
         return False
     return user_id in get_admin_users()
 
 
 def get_release_storage_dir() -> str:
-    from atr.config import get_config
-
-    return str(get_config().RELEASE_STORAGE_DIR)
+    return str(config.get().RELEASE_STORAGE_DIR)
 
 
 def compute_sha3_256(file_data: bytes) -> str:
@@ -52,7 +50,7 @@ def compute_sha3_256(file_data: bytes) -> str:
     return hashlib.sha3_256(file_data).hexdigest()
 
 
-async def compute_sha512(file_path: Path) -> str:
+async def compute_sha512(file_path: pathlib.Path) -> str:
     """Compute SHA-512 hash of a file."""
     sha512 = hashlib.sha512()
     async with aiofiles.open(file_path, "rb") as f:
@@ -63,8 +61,8 @@ async def compute_sha512(file_path: Path) -> str:
     return sha512.hexdigest()
 
 
-def _get_dict_to_list_inner_type_adapter(source_type: Any, key: str) -> TypeAdapter[dict[Any, Any]]:
-    root_adapter = TypeAdapter(source_type)
+def _get_dict_to_list_inner_type_adapter(source_type: Any, key: str) -> pydantic.TypeAdapter[dict[Any, Any]]:
+    root_adapter = pydantic.TypeAdapter(source_type)
     schema = root_adapter.core_schema
 
     # support further nesting of model classes
@@ -82,11 +80,11 @@ def _get_dict_to_list_inner_type_adapter(source_type: Any, key: str) -> TypeAdap
     assert (other_fields := {k: v for k, v in fields.items() if k != key})  # noqa: RUF018
 
     model_name = f"{cls.__name__}Inner"
-    inner_model = create_model(model_name, **{k: (v.annotation, v) for k, v in other_fields.items()})  # type: ignore
-    return TypeAdapter(dict[Annotated[str, key_field], inner_model])  # type: ignore
+    inner_model = pydantic.create_model(model_name, **{k: (v.annotation, v) for k, v in other_fields.items()})  # type: ignore
+    return pydantic.TypeAdapter(dict[Annotated[str, key_field], inner_model])  # type: ignore
 
 
-def _get_dict_to_list_validator(inner_adapter: TypeAdapter[dict[Any, Any]], key: str) -> Any:
+def _get_dict_to_list_validator(inner_adapter: pydantic.TypeAdapter[dict[Any, Any]], key: str) -> Any:
     def validator(val: Any) -> Any:
         from pydantic.fields import FieldInfo
 
@@ -110,18 +108,18 @@ def _get_dict_to_list_validator(inner_adapter: TypeAdapter[dict[Any, Any]], key:
 
 
 # from https://github.com/pydantic/pydantic/discussions/8755#discussioncomment-8417979
-@dataclass
+@dataclasses.dataclass
 class DictToList:
     key: str
 
     def __get_pydantic_core_schema__(
         self,
         source_type: Any,
-        handler: GetCoreSchemaHandler,
-    ) -> CoreSchema:
+        handler: pydantic.GetCoreSchemaHandler,
+    ) -> pydantic_core.CoreSchema:
         adapter = _get_dict_to_list_inner_type_adapter(source_type, self.key)
 
-        return core_schema.no_info_before_validator_function(
+        return pydantic_core.core_schema.no_info_before_validator_function(
             _get_dict_to_list_validator(adapter, self.key),
             handler(source_type),
         )

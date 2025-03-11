@@ -15,14 +15,23 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import enum
 import os
-from enum import Enum
 from typing import Final
 
 import decouple
 
-MB = 1024 * 1024
-GB = 1024 * MB
+_MB: Final = 1024 * 1024
+_GB: Final = 1024 * _MB
+
+
+class Mode(enum.Enum):
+    Debug = "Debug"
+    Production = "Production"
+    Profiling = "Profiling"
+
+
+_global_mode: Mode | None = None
 
 
 class AppConfig:
@@ -33,17 +42,15 @@ class AppConfig:
     DEBUG = False
     TEMPLATES_AUTO_RELOAD = False
     USE_BLOCKBUSTER = False
-
     RELEASE_STORAGE_DIR = os.path.join(STATE_DIR, "releases")
-
     SQLITE_DB_PATH = decouple.config("SQLITE_DB_PATH", default="/atr.db")
 
     # Apache RAT configuration
     APACHE_RAT_JAR_PATH = decouple.config("APACHE_RAT_JAR_PATH", default="state/apache-rat-0.16.1.jar")
     # Maximum size limit for archive extraction
-    MAX_EXTRACT_SIZE: int = decouple.config("MAX_EXTRACT_SIZE", default=2 * GB, cast=int)
+    MAX_EXTRACT_SIZE: int = decouple.config("MAX_EXTRACT_SIZE", default=2 * _GB, cast=int)
     # Chunk size for reading files during extraction
-    EXTRACT_CHUNK_SIZE: int = decouple.config("EXTRACT_CHUNK_SIZE", default=4 * MB, cast=int)
+    EXTRACT_CHUNK_SIZE: int = decouple.config("EXTRACT_CHUNK_SIZE", default=4 * _MB, cast=int)
 
     # FIXME: retrieve the list of admin users from LDAP or oath session / isRoot
     ADMIN_USERS = frozenset(
@@ -77,41 +84,30 @@ class ProfilingConfig(AppConfig):
     USE_BLOCKBUSTER = True
 
 
-class ConfigMode(Enum):
-    Debug = "Debug"
-    Production = "Production"
-    Profiling = "Profiling"
-
-
 # Load all possible configurations
 _CONFIG_DICT: Final = {
-    ConfigMode.Debug: DebugConfig,
-    ConfigMode.Production: ProductionConfig,
-    ConfigMode.Profiling: ProfilingConfig,
+    Mode.Debug: DebugConfig,
+    Mode.Production: ProductionConfig,
+    Mode.Profiling: ProfilingConfig,
 }
 
-# TODO: This is a variable, need to use _global_config_mode
-_CONFIG_MODE = None
 
+def get_mode() -> Mode:
+    global _global_mode
 
-def get_config_mode() -> ConfigMode:
-    global _CONFIG_MODE
-
-    if _CONFIG_MODE is None:
+    if _global_mode is None:
         if decouple.config("PROFILING", default=False, cast=bool):
-            config_mode = ConfigMode.Profiling
+            _global_mode = Mode.Profiling
         elif decouple.config("PRODUCTION", default=False, cast=bool):
-            config_mode = ConfigMode.Production
+            _global_mode = Mode.Production
         else:
-            config_mode = ConfigMode.Debug
+            _global_mode = Mode.Debug
 
-        _CONFIG_MODE = config_mode
-
-    return _CONFIG_MODE
+    return _global_mode
 
 
-def get_config() -> type[AppConfig]:
+def get() -> type[AppConfig]:
     try:
-        return _CONFIG_DICT[get_config_mode()]
+        return _CONFIG_DICT[get_mode()]
     except KeyError:
-        exit("Error: Invalid <config_mode>. Expected values [Debug, Production, Profiling].")
+        exit("Error: Invalid <mode>. Expected values [Debug, Production, Profiling].")

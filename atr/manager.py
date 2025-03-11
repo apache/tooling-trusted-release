@@ -18,17 +18,17 @@
 """Worker process manager."""
 
 import asyncio
+import datetime
+import io
 import logging
 import os
 import signal
 import sys
-from datetime import UTC, datetime
-from io import TextIOWrapper
+from typing import Final, Optional
 
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+import sqlalchemy
 
-from atr.db import create_async_db_session
+import atr.db as db
 
 # Configure logging
 logging.basicConfig(
@@ -37,46 +37,14 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: Final = logging.getLogger(__name__)
 
 # Global debug flag to control worker process output capturing
 global_worker_debug = False
 
-
-class WorkerProcess:
-    """Interface to control a worker process."""
-
-    def __init__(self, process: asyncio.subprocess.Process, started: datetime):
-        self.process = process
-        self.started = started
-        self.last_checked = started
-
-    @property
-    def pid(self) -> int | None:
-        return self.process.pid
-
-    async def is_running(self) -> bool:
-        """Check if the process is still running."""
-        if self.process.returncode is not None:
-            # Process has already exited
-            return False
-
-        if not self.pid:
-            # Process did not start
-            return False
-
-        try:
-            os.kill(self.pid, 0)
-            self.last_checked = datetime.now(UTC)
-            return True
-        except ProcessLookupError:
-            # Process no longer exists
-            return False
-        except PermissionError:
-            # Process exists but we don't have permission to signal it
-            # This shouldn't happen in our case since we own the process
-            _LOGGER.warning(f"Permission error checking process {self.pid}")
-            return False
+# Global worker manager instance
+# Can't use "StringClass" | None, must use Optional["StringClass"] for forward references
+global_worker_manager: Optional["WorkerManager"] = None
 
 
 class WorkerManager:
@@ -178,13 +146,13 @@ class WorkerManager:
             worker_script = os.path.join(project_root, "atr", "worker.py")
 
             # Handle stdout and stderr based on debug setting
-            stdout_target: int | TextIOWrapper = asyncio.subprocess.DEVNULL
-            stderr_target: int | TextIOWrapper = asyncio.subprocess.DEVNULL
+            stdout_target: int | io.TextIOWrapper = asyncio.subprocess.DEVNULL
+            stderr_target: int | io.TextIOWrapper = asyncio.subprocess.DEVNULL
 
             # Generate a unique log file name for this worker if debugging is enabled
             log_file_path = None
             if global_worker_debug:
-                timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+                timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
                 log_file_name = f"worker_{timestamp}_{os.getpid()}.log"
                 log_file_path = os.path.join(project_root, "state", log_file_name)
 
@@ -205,7 +173,7 @@ class WorkerManager:
                 preexec_fn=os.setsid,
             )
 
-            worker = WorkerProcess(process, datetime.now(UTC))
+            worker = WorkerProcess(process, datetime.datetime.now(datetime.UTC))
             if worker.pid:
                 self.workers[worker.pid] = worker
                 _LOGGER.info(f"Started worker process {worker.pid}")
@@ -213,7 +181,7 @@ class WorkerManager:
                     _LOGGER.info(f"Worker {worker.pid} logs: {log_file_path}")
             else:
                 _LOGGER.error("Failed to start worker process: No PID assigned")
-                if global_worker_debug and isinstance(stdout_target, TextIOWrapper):
+                if global_worker_debug and isinstance(stdout_target, io.TextIOWrapper):
                     await asyncio.to_thread(stdout_target.close)
         except Exception as e:
             _LOGGER.error(f"Error spawning worker: {e}")
@@ -275,7 +243,7 @@ class WorkerManager:
             await self.reset_broken_tasks(exited_workers)
 
     async def terminate_long_running_task(
-        self, session: AsyncSession, worker: WorkerProcess, task_id: int, pid: int
+        self, session: sqlalchemy.ext.asyncio.AsyncSession, worker: "WorkerProcess", task_id: int, pid: int
     ) -> None:
         """
         Terminate a task that has been running for too long.
@@ -283,15 +251,16 @@ class WorkerManager:
         """
         try:
             # Mark the task as failed
+            # TODO: Replace with ORM
             await session.execute(
-                text("""
+                sqlalchemy.text("""
                     UPDATE task
                     SET status = 'FAILED', completed = :now, error = :error
                     WHERE id = :task_id
                     AND status = 'ACTIVE'
                 """),
                 {
-                    "now": datetime.now(UTC),
+                    "now": datetime.datetime.now(datetime.UTC),
                     "task_id": task_id,
                     "error": f"Task terminated after exceeding time limit of {self.max_task_seconds} seconds",
                 },
@@ -304,16 +273,17 @@ class WorkerManager:
         except Exception as e:
             _LOGGER.error(f"Error stopping long-running worker {pid}: {e}")
 
-    async def check_task_duration(self, pid: int, worker: WorkerProcess) -> bool:
+    async def check_task_duration(self, pid: int, worker: "WorkerProcess") -> bool:
         """
         Check if a worker has been processing its task for too long.
         Returns True if the worker has been terminated.
         """
         try:
-            async with create_async_db_session() as session:
+            async with db.create_async_db_session() as session:
                 async with session.begin():
+                    # TODO: Replace with ORM
                     result = await session.execute(
-                        text("""
+                        sqlalchemy.text("""
                             SELECT id, started FROM task
                             WHERE status = 'ACTIVE'
                             AND pid = :pid
@@ -328,12 +298,12 @@ class WorkerManager:
                     # Convert started to datetime if it's a string
                     if isinstance(started, str):
                         try:
-                            started = datetime.fromisoformat(started.replace("Z", "+00:00"))
+                            started = datetime.datetime.fromisoformat(started.replace("Z", "+00:00"))
                         except ValueError:
                             _LOGGER.error(f"Could not parse started time '{started}' for task {task_id}")
                             return False
 
-                    task_duration = (datetime.now(UTC) - started).total_seconds()
+                    task_duration = (datetime.datetime.now(datetime.UTC) - started).total_seconds()
                     if task_duration > self.max_task_seconds:
                         await self.terminate_long_running_task(session, worker, task_id, pid)
                         return True
@@ -356,15 +326,16 @@ class WorkerManager:
     async def reset_broken_tasks(self, exited_pids: list[int]) -> None:
         """Reset any tasks that were being processed by exited workers."""
         try:
-            async with create_async_db_session() as session:
+            async with db.create_async_db_session() as session:
                 async with session.begin():
                     # Generate named parameters for each PID
                     placeholders = ",".join(f":pid_{i}" for i in range(len(exited_pids)))
                     params = {f"pid_{i}": pid for i, pid in enumerate(exited_pids)}
 
                     # Execute update with proper parameter binding
+                    # TODO: Replace with ORM
                     await session.execute(
-                        text(f"""
+                        sqlalchemy.text(f"""
                             UPDATE task
                             SET status = 'QUEUED', started = NULL, pid = NULL
                             WHERE status = 'ACTIVE'
@@ -376,13 +347,45 @@ class WorkerManager:
             _LOGGER.error(f"Error resetting broken tasks: {e}")
 
 
-# Global worker manager instance
-worker_manager: WorkerManager | None = None
+class WorkerProcess:
+    """Interface to control a worker process."""
+
+    def __init__(self, process: asyncio.subprocess.Process, started: datetime.datetime):
+        self.process = process
+        self.started = started
+        self.last_checked = started
+
+    @property
+    def pid(self) -> int | None:
+        return self.process.pid
+
+    async def is_running(self) -> bool:
+        """Check if the process is still running."""
+        if self.process.returncode is not None:
+            # Process has already exited
+            return False
+
+        if not self.pid:
+            # Process did not start
+            return False
+
+        try:
+            os.kill(self.pid, 0)
+            self.last_checked = datetime.datetime.now(datetime.UTC)
+            return True
+        except ProcessLookupError:
+            # Process no longer exists
+            return False
+        except PermissionError:
+            # Process exists but we don't have permission to signal it
+            # This shouldn't happen in our case since we own the process
+            _LOGGER.warning(f"Permission error checking process {self.pid}")
+            return False
 
 
 def get_worker_manager() -> WorkerManager:
     """Get the global worker manager instance."""
-    global worker_manager
-    if worker_manager is None:
-        worker_manager = WorkerManager()
-    return worker_manager
+    global global_worker_manager
+    if global_worker_manager is None:
+        global_worker_manager = WorkerManager()
+    return global_worker_manager

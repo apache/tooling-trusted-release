@@ -26,10 +26,28 @@ import asyncio
 import os
 import pathlib
 
-from asfquart.base import QuartApp
+import asfquart.base as base
 
 
-def preload_templates(app: QuartApp) -> None:
+def setup_template_preloading(app: base.QuartApp) -> None:
+    """Register the template preloading to happen before the async loop starts."""
+    # Store the original before_serving functions
+    original_before_serving = app.before_serving_funcs.copy()
+    app.before_serving_funcs = []
+
+    @app.before_serving
+    async def preload_before_blockbuster() -> None:
+        # Preload all templates
+        # This doesn't really need to be asynchronous
+        # We do this anyway to avoid being ironic
+        await asyncio.to_thread(_preload_templates, app)
+
+        # Run all the original before_serving functions
+        for func in original_before_serving:
+            await func()
+
+
+def _preload_templates(app: base.QuartApp) -> None:
     """Preload all templates in the templates directory."""
     # We must disable automatic reload otherwise Jinja will check for modifications
     # Checking for modifications means that Jinja will call os.stat() in an asynchronous context
@@ -57,21 +75,3 @@ def preload_templates(app: QuartApp) -> None:
         except Exception as e:
             print(f"Error preloading template {template_file}: {e}")
     print(f"Preloaded {len(template_files)} templates")
-
-
-def setup_template_preloading(app: QuartApp) -> None:
-    """Register the template preloading to happen before the async loop starts."""
-    # Store the original before_serving functions
-    original_before_serving = app.before_serving_funcs.copy()
-    app.before_serving_funcs = []
-
-    @app.before_serving
-    async def preload_before_blockbuster() -> None:
-        # Preload all templates
-        # This doesn't really need to be asynchronous
-        # We do this anyway to avoid being ironic
-        await asyncio.to_thread(preload_templates, app)
-
-        # Run all the original before_serving functions
-        for func in original_before_serving:
-            await func()

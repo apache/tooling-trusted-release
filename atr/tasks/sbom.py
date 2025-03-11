@@ -24,7 +24,7 @@ import atr.config as config
 import atr.tasks.archive as archive
 import atr.tasks.task as task
 
-_CONFIG: Final = config.get_config()
+_CONFIG: Final = config.get()
 _LOGGER: Final = logging.getLogger(__name__)
 
 

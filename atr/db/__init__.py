@@ -88,12 +88,12 @@ _SYNC_ENGINE: Engine | None = None
 
 def create_sync_db_engine() -> None:
     """Create a synchronous database engine."""
-    from atr.config import get_config
+    import atr.config as config
 
     global _SYNC_ENGINE
 
-    config = get_config()
-    sqlite_url = f"sqlite://{config.SQLITE_DB_PATH}"
+    conf = config.get()
+    sqlite_url = f"sqlite://{conf.SQLITE_DB_PATH}"
     _LOGGER.debug(f"Creating sync database engine in process {os.getpid()}")
     _SYNC_ENGINE = create_engine(sqlite_url, echo=False)
 

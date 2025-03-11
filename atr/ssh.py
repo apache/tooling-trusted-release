@@ -31,7 +31,7 @@ import atr.config as config
 
 _LOGGER: Final = logging.getLogger(__name__)
 _AUTHORIZED_KEY_PATH: Final = "allowed_ssh_key.pub"
-_CONFIG: Final = config.get_config()
+_CONFIG: Final = config.get()
 
 
 class _SSHServer(asyncssh.SSHServer):

@@ -11,6 +11,7 @@
 <li>Type variables</li>
 <li>Enumerations</li>
 <li>Methods requiring interface compatibility with their superclass</li>
+<li>Nested functions, i.e. functions appearing in other functions</li>
 </ul>
 <h3>Use UPPERCASE for top level constants</h3>
 <p>Define top level constants using <code>UPPERCASE</code> letters. Don't forget to apply an underscore prefix to constants which are private to their module.</p>
@@ -32,6 +33,19 @@ import a.b.c
 </code></pre>
 <p>This convention aligns with Go's package naming practices. Follow <a href="https://go.dev/blog/package-names">Go naming rules</a> for all modules.</p>
 <p>This only applies to modules outside of the Python standard library. The standard library module <code>os.path</code>, for example, must always be imported using the form <code>import os.path</code>, and <em>not</em> <code>import os.path as path</code>.</p>
+<p>Furthermore, if a third party module to be imported would conflict with a Python standard library module, then that third party module must be imported with one extra level.</p>
+<pre><code class="language-python"># Preferred
+import asyncio.subprocess
+import sqlalchemy.ext as ext
+import aiofiles.os
+
+# Avoid
+import asyncio.subprocess as subprocess
+import sqlalchemy.ext.asyncio as asyncio
+import aiofiles.os.path as path
+</code></pre>
+<p>TODO: There's a question as to whether we could actually use <code>import aiofiles.os.path as path</code> since we import <code>os.path</code> as <code>os.path</code> and not <code>path</code>.</p>
+<p>TODO: Sometimes we're using <code>as</code> for standard library modules. We should decide what to do about this.</p>
 <h3>Avoid duplicated module names</h3>
 <p>Try to avoid using, for example, <code>baking/apple/pie.py</code> and <code>baking/cherry/pie.py</code> because these will both be imported as <code>pie</code> and one will have to be renamed.</p>
 <p>If there are duplicates imported within a single file, they should be disambiguated by the next level up. In the pie example, that would be <code>import baking.apple as apple</code> and then <code>apple.pie</code>, and <code>import baking.cherry as cherry</code> and <code>cherry.pie</code>.</p>
@@ -45,7 +59,7 @@ r.s()
 from p.q.r import s
 s()
 </code></pre>
-<p>The collections.abc and typing modules are an exception to this rule. Always import typing identifiers directly using the <code>from</code> syntax:</p>
+<p>The collections.abc and typing modules are an exception to this rule. Always import collections.abc and typing identifiers directly using the <code>from</code> syntax:</p>
 <pre><code class="language-python"># Preferred
 from typing import Final
 
@@ -105,7 +119,7 @@ def license_files_verify():         # sorted alphabetically
 </code></pre>
 <p>Note how verbs tend to come last, so that function names now read in an object oriented style, like a module, object, and action.</p>
 <p>While this approach can lead to slightly longer function names, the benefits of improved code organisation and discoverability outweigh the verbosity.</p>
-<p>Private, underscored, functions should be placed after all public functions.</p>
+<p>Classes should always be placed before functions. Private, underscored, classes should be placed after all public classes, and likewise for functions.</p>
 <h3>Give helper functions the same prefix as their parent function</h3>
 <p>This makes it easier to find all the functions related to a specific task.</p>
 <p><strong>Example</strong>:</p>

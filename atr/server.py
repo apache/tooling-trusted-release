@@ -28,21 +28,23 @@ from quart_schema import OpenAPIProvider, QuartSchema
 from werkzeug.routing import Rule
 
 import asfquart
+import asfquart.base as base
 import asfquart.generics
 import asfquart.session
+import atr.blueprints as blueprints
+import atr.config as config
 import atr.ssh as ssh
-from asfquart.base import QuartApp
-from atr.blueprints import register_blueprints
-from atr.config import AppConfig, ConfigMode, get_config, get_config_mode
 from atr.db import create_database
 from atr.manager import get_worker_manager
 from atr.preload import setup_template_preloading
 
+# TODO: Technically this is a global variable
+# We should probably find a cleaner way to do this
+app: base.QuartApp | None = None
+
 # Avoid OIDC
 asfquart.generics.OAUTH_URL_INIT = "https://oauth.apache.org/auth?state=%s&redirect_uri=%s"
 asfquart.generics.OAUTH_URL_CALLBACK = "https://oauth.apache.org/token?code=%s"
-
-app: QuartApp | None = None
 
 
 class ApiOnlyOpenAPIProvider(OpenAPIProvider):
@@ -52,7 +54,7 @@ class ApiOnlyOpenAPIProvider(OpenAPIProvider):
                 yield rule
 
 
-def register_routes(app: QuartApp) -> tuple[str, ...]:
+def register_routes(app: base.QuartApp) -> tuple[str, ...]:
     from atr.routes import candidate, dev, docs, download, keys, package, project, release, root
 
     # Add a global error handler to show helpful error messages with tracebacks.
@@ -83,7 +85,7 @@ def register_routes(app: QuartApp) -> tuple[str, ...]:
     )
 
 
-def app_dirs_setup(app_config: type[AppConfig]) -> None:
+def app_dirs_setup(app_config: type[config.AppConfig]) -> None:
     """Setup application directories."""
     if not os.path.isdir(app_config.STATE_DIR):
         raise RuntimeError(f"State directory not found: {app_config.STATE_DIR}")
@@ -92,7 +94,7 @@ def app_dirs_setup(app_config: type[AppConfig]) -> None:
     os.makedirs(app_config.RELEASE_STORAGE_DIR, exist_ok=True)
 
 
-def app_create_base(app_config: type[AppConfig]) -> QuartApp:
+def app_create_base(app_config: type[config.AppConfig]) -> base.QuartApp:
     """Create the base Quart application."""
     if asfquart.construct is ...:
         raise ValueError("asfquart.construct is not set")
@@ -101,18 +103,18 @@ def app_create_base(app_config: type[AppConfig]) -> QuartApp:
     return app
 
 
-def app_setup_api_docs(app: QuartApp) -> None:
+def app_setup_api_docs(app: base.QuartApp) -> None:
     """Configure OpenAPI documentation."""
-    from quart_schema import Info
+    import quart_schema
 
-    from atr.version import version
+    import atr.metadata as metadata
 
     QuartSchema(
         app,
-        info=Info(
+        info=quart_schema.Info(
             title="ATR API",
             description="OpenAPI documentation for the Apache Trusted Release Platform.",
-            version=version,
+            version=metadata.version,
         ),
         openapi_provider_class=ApiOnlyOpenAPIProvider,
         swagger_ui_path="/api/docs",
@@ -120,13 +122,13 @@ def app_setup_api_docs(app: QuartApp) -> None:
     )
 
 
-def app_setup_context(app: QuartApp) -> None:
+def app_setup_context(app: base.QuartApp) -> None:
     """Setup application context processor."""
 
     @app.context_processor
     async def app_wide() -> dict[str, Any]:
+        from atr.metadata import commit, version
         from atr.util import is_admin
-        from atr.version import commit, version
 
         return {
             "current_user": await asfquart.session.read(),
@@ -136,7 +138,7 @@ def app_setup_context(app: QuartApp) -> None:
         }
 
 
-def app_setup_lifecycle(app: QuartApp) -> None:
+def app_setup_lifecycle(app: base.QuartApp) -> None:
     """Setup application lifecycle hooks."""
 
     @app.before_serving
@@ -161,7 +163,7 @@ def app_setup_lifecycle(app: QuartApp) -> None:
         app.background_tasks.clear()
 
 
-def app_setup_logging(app: QuartApp, config_mode: ConfigMode, app_config: type[AppConfig]) -> None:
+def app_setup_logging(app: base.QuartApp, config_mode: config.Mode, app_config: type[config.AppConfig]) -> None:
     """Setup application logging."""
     logging.basicConfig(
         format="[%(asctime)s.%(msecs)03d  ] [%(process)d] [%(levelname)s] %(message)s",
@@ -172,13 +174,13 @@ def app_setup_logging(app: QuartApp, config_mode: ConfigMode, app_config: type[A
     # Only log in the worker process
     @app.before_serving
     async def log_debug_info() -> None:
-        if config_mode == ConfigMode.Debug or config_mode == ConfigMode.Profiling:
-            app.logger.info(f"DEBUG        = {config_mode == ConfigMode.Debug}")
+        if config_mode == config.Mode.Debug or config_mode == config.Mode.Profiling:
+            app.logger.info(f"DEBUG        = {config_mode == config.Mode.Debug}")
             app.logger.info(f"ENVIRONMENT  = {config_mode.value}")
             app.logger.info(f"STATE_DIR    = {app_config.STATE_DIR}")
 
 
-def create_app(app_config: type[AppConfig]) -> QuartApp:
+def create_app(app_config: type[config.AppConfig]) -> base.QuartApp:
     """Create and configure the application."""
     app_dirs_setup(app_config)
 
@@ -187,9 +189,9 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
 
     create_database(app)
     register_routes(app)
-    register_blueprints(app)
+    blueprints.register(app)
 
-    config_mode = get_config_mode()
+    config_mode = config.get_mode()
 
     app_setup_context(app)
     app_setup_lifecycle(app)
@@ -203,7 +205,7 @@ def create_app(app_config: type[AppConfig]) -> QuartApp:
     async def start_blockbuster() -> None:
         # "I'll have a P, please, Bob."
         blockbuster: BlockBuster | None = None
-        if config_mode == ConfigMode.Profiling:
+        if config_mode == config.Mode.Profiling:
             blockbuster = BlockBuster()
         app.extensions["blockbuster"] = blockbuster
         if blockbuster is not None:
@@ -224,11 +226,11 @@ def main() -> None:
     """Quart debug server"""
     global app
     if app is None:
-        app = create_app(get_config())
+        app = create_app(config.get())
     app.run(port=8080, ssl_keyfile="key.pem", ssl_certfile="cert.pem")
 
 
 if __name__ == "__main__":
     main()
 else:
-    app = create_app(get_config())
+    app = create_app(config.get())
