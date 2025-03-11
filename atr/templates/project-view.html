@@ -82,22 +82,10 @@
   <h1>{{ project.display_name | capitalize }}</h1>
 
   <div class="card-header">
-    <h3>PMC members</h3>
-    <div class="card-meta"></div>
-    <div class="card-body">
-      <p>
-        {% for user in project.pmc_members %}{{ user }},{% endfor %}
-      </p>
-    </div>
-  </div>
-
-  <div class="card-header">
-    <h3>Committers</h3>
-    <div class="card-meta"></div>
-    <div class="card-body">
-      <p>
-        {% for user in project.committers %}{{ user }},{% endfor %}
-      </p>
+    <h3>Members</h3>
+    <div class="card-meta">
+      <span class="card-meta-item">PMC: {{ project.pmc_members|length }}</span>
+      <span class="card-meta-item">Committers: {{ project.committers|length }}</span>
     </div>
   </div>
 

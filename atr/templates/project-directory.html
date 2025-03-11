@@ -78,10 +78,9 @@
 
   <div class="pmc-grid">
     {% for pmc in projects %}
-      <div class="pmc-card">
-        <a href="{{ url_for('root_project_view', project_name=pmc.project_name) }}">
-          <div class="pmc-name">{{ pmc.display_name }}</div>
-        </a>
+      <div class="pmc-card"
+           onclick="location.href='{{ url_for("root_project_view", project_name=pmc.project_name) }}';">
+        <div class="pmc-name">{{ pmc.display_name }}</div>
         <div class="pmc-stats">
           <div class="stat-item">
             <span class="stat-label">PMC Members</span>
@@ -110,7 +109,11 @@
           for (let card of cards) {
               const nameElement = card.getElementsByClassName("pmc-name");
               const name = nameElement[0].innerHTML;
-              card.hidden = !!(pmcFilter && !name.startsWith(pmcFilter));
+              if (!pmcFilter) {
+                  card.hidden = false;
+              } else {
+                  card.hidden = !name.match(new RegExp(pmcFilter, 'i'));
+              }
           }
       }
   </script>

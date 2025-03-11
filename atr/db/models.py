@@ -24,13 +24,6 @@ from typing import Any, Optional
 import sqlalchemy
 import sqlmodel
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncAttrs
-
-
-class ATRSQLModel(AsyncAttrs, sqlmodel.SQLModel):
-    """The base model to use for ATR entities which allows to access related properties in an async manner."""
-
-    pass
 
 
 class UserRole(str, Enum):
@@ -65,7 +58,7 @@ class PublicSigningKey(sqlmodel.SQLModel, table=True):
     # The ASCII armored key
     ascii_armored_key: str
     # The PMCs that use this key
-    pmcs: list["PMC"] = sqlmodel.Relationship(back_populates="_public_signing_keys", link_model=PMCKeyLink)
+    pmcs: list["PMC"] = sqlmodel.Relationship(back_populates="public_signing_keys", link_model=PMCKeyLink)
 
 
 class VotePolicy(sqlmodel.SQLModel, table=True):
@@ -84,7 +77,7 @@ class VotePolicy(sqlmodel.SQLModel, table=True):
     releases: list["Release"] = sqlmodel.Relationship(back_populates="vote_policy")
 
 
-class PMC(ATRSQLModel, table=True):
+class PMC(sqlmodel.SQLModel, table=True):
     id: int | None = sqlmodel.Field(default=None, primary_key=True)
     project_name: str = sqlmodel.Field(unique=True)
     # True if this is an incubator podling with a PPMC, otherwise False
@@ -98,11 +91,7 @@ class PMC(ATRSQLModel, table=True):
     release_managers: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
 
     # Many-to-many: A PMC can have multiple signing keys, and a signing key can belong to multiple PMCs
-    _public_signing_keys: list[PublicSigningKey] = sqlmodel.Relationship(back_populates="pmcs", link_model=PMCKeyLink)
-
-    @property
-    async def public_signing_keys(self) -> list[PublicSigningKey]:
-        return await self.awaitable_attrs._public_signing_keys  # type: ignore
+    public_signing_keys: list[PublicSigningKey] = sqlmodel.Relationship(back_populates="pmcs", link_model=PMCKeyLink)
 
     # Many-to-one: A PMC can have one vote policy, a vote policy can be used by multiple entities
     vote_policy_id: int | None = sqlmodel.Field(default=None, foreign_key="votepolicy.id")

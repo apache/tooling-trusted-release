@@ -18,11 +18,15 @@
 """project.py"""
 
 from http.client import HTTPException
+from typing import cast
 
+import sqlalchemy.orm as orm
+import sqlmodel
 from quart import render_template
 
 from atr.db import create_async_db_session
-from atr.db.service import get_pmc_by_name, get_pmcs
+from atr.db.models import PMC, PublicSigningKey
+from atr.db.service import get_pmcs
 from atr.routes import algorithms, app_route
 
 
@@ -36,8 +40,17 @@ async def root_project_directory() -> str:
 
 @app_route("/projects/<project_name>")
 async def root_project_view(project_name: str) -> str:
-    async with create_async_db_session() as session:
-        project = await get_pmc_by_name(project_name, session=session)
+    async with create_async_db_session() as db_session:
+        statement = (
+            sqlmodel.select(PMC)
+            .where(PMC.project_name == project_name)
+            .options(
+                orm.selectinload(cast(orm.attributes.InstrumentedAttribute[PublicSigningKey], PMC.public_signing_keys))
+            )
+        )
+
+        project = (await db_session.execute(statement)).scalar_one_or_none()
+
         if not project:
             raise HTTPException(404)
 
