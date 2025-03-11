@@ -15,19 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import importlib
-import importlib.util as util
-from typing import Final
-
 import asfquart.base as base
-
-_BLUEPRINT_MODULES: Final = ["api", "admin"]
 
 
 def register(app: base.QuartApp) -> None:
-    for routes_name in _BLUEPRINT_MODULES:
-        routes_fqn = f"atr.blueprints.{routes_name}.{routes_name}"
-        spec = util.find_spec(routes_fqn)
-        if spec is not None:
-            module = importlib.import_module(routes_fqn)
-            app.register_blueprint(module.blueprint)
+    import atr.blueprints.admin.admin as admin
+    import atr.blueprints.api.api as api
+
+    app.register_blueprint(admin.admin.BLUEPRINT)
+    app.register_blueprint(api.api.BLUEPRINT)

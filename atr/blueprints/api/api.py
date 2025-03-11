@@ -22,10 +22,9 @@ from quart import Response, jsonify
 from quart_schema import validate_querystring, validate_response
 from werkzeug.exceptions import NotFound
 
+import atr.blueprints.api as api
 from atr.db.models import PMC
 from atr.db.service import get_pmc_by_name, get_pmcs, get_tasks
-
-from . import blueprint
 
 # FIXME: we need to return the dumped model instead of the actual pydantic class
 #        as otherwise pyright will complain about the return type
@@ -33,7 +32,7 @@ from . import blueprint
 #        For now, just explicitly dump the model.
 
 
-@blueprint.route("/projects/<project_name>")
+@api.BLUEPRINT.route("/projects/<project_name>")
 @validate_response(PMC, 200)
 async def project_by_name(project_name: str) -> tuple[Mapping, int]:
     pmc = await get_pmc_by_name(project_name)
@@ -43,7 +42,7 @@ async def project_by_name(project_name: str) -> tuple[Mapping, int]:
         raise NotFound()
 
 
-@blueprint.route("/projects")
+@api.BLUEPRINT.route("/projects")
 @validate_response(list[PMC], 200)
 async def projects() -> tuple[list[Mapping], int]:
     """List all projects in the database."""
@@ -57,7 +56,7 @@ class Pagination:
     limit: int = 20
 
 
-@blueprint.route("/tasks")
+@api.BLUEPRINT.route("/tasks")
 @validate_querystring(Pagination)
 async def api_tasks(query_args: Pagination) -> Response:
     paged_tasks, count = await get_tasks(limit=query_args.limit, offset=query_args.offset)

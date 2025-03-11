@@ -17,4 +17,4 @@
 
 from quart import Blueprint
 
-blueprint = Blueprint("api_blueprint", __name__, url_prefix="/api")
+BLUEPRINT = Blueprint("api_blueprint", __name__, url_prefix="/api")

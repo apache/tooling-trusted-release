@@ -15,52 +15,37 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from collections import defaultdict
+import collections
+import pathlib
+import statistics
 from collections.abc import Mapping
-from pathlib import Path
-from statistics import mean, median, stdev
 from typing import Any
 
 import aiofiles.os
 import httpx
-from quart import flash, render_template, request
-from sqlmodel import select
-from werkzeug.wrappers.response import Response
+import quart
+import sqlmodel
+import werkzeug.wrappers.response as response
 
-from asfquart.base import ASFQuartException
-from asfquart.session import read as session_read
-from atr.datasources.apache import (
-    get_current_podlings_data,
-    get_groups_data,
-    get_ldap_projects_data,
-)
-from atr.db import create_async_db_session
-from atr.db.models import (
-    PMC,
-    DistributionChannel,
-    Package,
-    PMCKeyLink,
-    ProductLine,
-    PublicSigningKey,
-    Release,
-    Task,
-    VotePolicy,
-)
-from atr.db.service import get_pmc_by_name
-
-from . import blueprint
+import asfquart.base as base
+import asfquart.session as session
+import atr.blueprints.admin as admin
+import atr.datasources.apache as apache
+import atr.db as db
+import atr.db.models as models
+import atr.db.service as service
 
 
-@blueprint.route("/performance")
+@admin.BLUEPRINT.route("/performance")
 async def admin_performance() -> str:
     """Display performance statistics for all routes."""
     from asfquart import APP
 
     if APP is ...:
-        raise ASFQuartException("APP is not set", errorcode=500)
+        raise base.ASFQuartException("APP is not set", errorcode=500)
 
     # Read and parse the performance log file
-    log_path = Path("route-performance.log")
+    log_path = pathlib.Path("route-performance.log")
     # # Show current working directory and its files
     # cwd = await asyncio.to_thread(Path.cwd)
     # await asyncio.to_thread(APP.logger.info, "Current working directory: %s", cwd)
@@ -68,11 +53,11 @@ async def admin_performance() -> str:
     # files = list(iterable)
     # await asyncio.to_thread(APP.logger.info, "Files in current directory: %s", files)
     if not await aiofiles.os.path.exists(log_path):
-        await flash("No performance data currently available", "error")
-        return await render_template("performance.html", stats=None)
+        await quart.flash("No performance data currently available", "error")
+        return await quart.render_template("performance.html", stats=None)
 
     # Parse the log file and collect statistics
-    stats = defaultdict(list)
+    stats = collections.defaultdict(list)
     async with aiofiles.open(log_path) as f:
         async for line in f:
             try:
@@ -103,21 +88,21 @@ async def admin_performance() -> str:
             "methods": timings[0]["methods"],
             "function": timings[0]["function"],
             "total": {
-                "mean": mean(total_times),
-                "median": median(total_times),
+                "mean": statistics.mean(total_times),
+                "median": statistics.median(total_times),
                 "min": min(total_times),
                 "max": max(total_times),
-                "stdev": stdev(total_times) if len(total_times) > 1 else 0,
+                "stdev": statistics.stdev(total_times) if len(total_times) > 1 else 0,
             },
             "sync": {
-                "mean": mean(sync_times),
-                "median": median(sync_times),
+                "mean": statistics.mean(sync_times),
+                "median": statistics.median(sync_times),
                 "min": min(sync_times),
                 "max": max(sync_times),
             },
             "async": {
-                "mean": mean(async_times),
-                "median": median(async_times),
+                "mean": statistics.mean(async_times),
+                "median": statistics.median(async_times),
                 "min": min(async_times),
                 "max": max(async_times),
             },
@@ -129,33 +114,33 @@ async def admin_performance() -> str:
         return x[1]["total"]["mean"]
 
     sorted_summary = dict(sorted(summary.items(), key=one_total_mean, reverse=True))
-    return await render_template("performance.html", stats=sorted_summary)
+    return await quart.render_template("performance.html", stats=sorted_summary)
 
 
-@blueprint.route("/data")
-@blueprint.route("/data/<model>")
+@admin.BLUEPRINT.route("/data")
+@admin.BLUEPRINT.route("/data/<model>")
 async def admin_data(model: str = "PMC") -> str:
     """Browse all records in the database."""
 
     # Map of model names to their classes
-    models = {
-        "PMC": PMC,
-        "Release": Release,
-        "Package": Package,
-        "VotePolicy": VotePolicy,
-        "ProductLine": ProductLine,
-        "DistributionChannel": DistributionChannel,
-        "PublicSigningKey": PublicSigningKey,
-        "PMCKeyLink": PMCKeyLink,
-        "Task": Task,
+    model_classes = {
+        "PMC": models.PMC,
+        "Release": models.Release,
+        "Package": models.Package,
+        "VotePolicy": models.VotePolicy,
+        "ProductLine": models.ProductLine,
+        "DistributionChannel": models.DistributionChannel,
+        "PublicSigningKey": models.PublicSigningKey,
+        "PMCKeyLink": models.PMCKeyLink,
+        "Task": models.Task,
     }
 
-    if model not in models:
-        raise ASFQuartException(f"Model type '{model}' not found", 404)
+    if model not in model_classes:
+        raise base.ASFQuartException(f"Model type '{model}' not found", 404)
 
-    async with create_async_db_session() as db_session:
+    async with db.create_async_db_session() as db_session:
         # Get all records for the selected model
-        statement = select(models[model])
+        statement = sqlmodel.select(model_classes[model])
         records = (await db_session.execute(statement)).scalars().all()
 
         # Convert records to dictionaries for JSON serialization
@@ -174,13 +159,15 @@ async def admin_data(model: str = "PMC") -> str:
                         record_dict[key] = getattr(record, key)
             records_dict.append(record_dict)
 
-        return await render_template("data-browser.html", models=list(models.keys()), model=model, records=records_dict)
+        return await quart.render_template(
+            "data-browser.html", model_classes=list(model_classes.keys()), model=model, records=records_dict
+        )
 
 
-@blueprint.route("/projects/update", methods=["GET", "POST"])
-async def admin_projects_update() -> str | Response | tuple[Mapping[str, Any], int]:
+@admin.BLUEPRINT.route("/projects/update", methods=["GET", "POST"])
+async def admin_projects_update() -> str | response.Response | tuple[Mapping[str, Any], int]:
     """Update projects from remote data."""
-    if request.method == "POST":
+    if quart.request.method == "POST":
         try:
             updated_count = await _update_pmcs()
             return {
@@ -199,17 +186,17 @@ async def admin_projects_update() -> str | Response | tuple[Mapping[str, Any], i
             }, 200
 
     # For GET requests, show the update form
-    return await render_template("update-pmcs.html")
+    return await quart.render_template("update-pmcs.html")
 
 
 async def _update_pmcs() -> int:
-    ldap_projects = await get_ldap_projects_data()
-    podlings_data = await get_current_podlings_data()
-    groups_data = await get_groups_data()
+    ldap_projects = await apache.get_ldap_projects_data()
+    podlings_data = await apache.get_current_podlings_data()
+    groups_data = await apache.get_groups_data()
 
     updated_count = 0
 
-    async with create_async_db_session() as db_session:
+    async with db.create_async_db_session() as db_session:
         async with db_session.begin():
             # First update PMCs
             for project in ldap_projects.projects:
@@ -219,9 +206,9 @@ async def _update_pmcs() -> int:
                     continue
 
                 # Get or create PMC
-                pmc = await get_pmc_by_name(name, db_session)
+                pmc = await service.get_pmc_by_name(name, db_session)
                 if not pmc:
-                    pmc = PMC(project_name=name)
+                    pmc = models.PMC(project_name=name)
                     db_session.add(pmc)
 
                 # Update PMC data from groups.json
@@ -243,10 +230,10 @@ async def _update_pmcs() -> int:
             # Then add PPMCs (podlings)
             for podling_name, podling_data in podlings_data:
                 # Get or create PPMC
-                statement = select(PMC).where(PMC.project_name == podling_name)
+                statement = sqlmodel.select(models.PMC).where(models.PMC.project_name == podling_name)
                 ppmc = (await db_session.execute(statement)).scalar_one_or_none()
                 if not ppmc:
-                    ppmc = PMC(project_name=podling_name)
+                    ppmc = models.PMC(project_name=podling_name)
                     db_session.add(ppmc)
 
                 # Update PPMC data from groups.json
@@ -262,10 +249,10 @@ async def _update_pmcs() -> int:
 
             # Add special entry for Tooling PMC
             # Not clear why, but it's not in the Whimsy data
-            statement = select(PMC).where(PMC.project_name == "tooling")
+            statement = sqlmodel.select(models.PMC).where(models.PMC.project_name == "tooling")
             tooling_pmc = (await db_session.execute(statement)).scalar_one_or_none()
             if not tooling_pmc:
-                tooling_pmc = PMC(project_name="tooling")
+                tooling_pmc = models.PMC(project_name="tooling")
                 db_session.add(tooling_pmc)
                 updated_count += 1
 
@@ -279,23 +266,25 @@ async def _update_pmcs() -> int:
     return updated_count
 
 
-@blueprint.route("/tasks")
+@admin.BLUEPRINT.route("/tasks")
 async def admin_tasks() -> str:
-    return await render_template("tasks.html")
+    return await quart.render_template("tasks.html")
 
 
-@blueprint.route("/keys/delete-all")
+@admin.BLUEPRINT.route("/keys/delete-all")
 async def admin_keys_delete_all() -> str:
     """Debug endpoint to delete all of a user's keys."""
-    session = await session_read()
-    if session is None:
-        raise ASFQuartException("Not authenticated", errorcode=401)
+    web_session = await session.read()
+    if web_session is None:
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-    async with create_async_db_session() as db_session:
+    async with db.create_async_db_session() as db_session:
         async with db_session.begin():
             # Get all keys for the user
             # TODO: Use session.apache_uid instead of session.uid?
-            statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
+            statement = sqlmodel.select(models.PublicSigningKey).where(
+                models.PublicSigningKey.apache_uid == web_session.uid
+            )
             keys = (await db_session.execute(statement)).scalars().all()
             count = len(keys)
 

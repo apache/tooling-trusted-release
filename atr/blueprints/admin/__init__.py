@@ -17,25 +17,27 @@
 
 """Any routes related to the admin interface of the ATR."""
 
-from quart import Blueprint
+from typing import Final
 
-from asfquart.auth import Requirements, require
-from asfquart.base import ASFQuartException
-from asfquart.session import read as session_read
-from atr.util import get_admin_users
+import quart
 
-blueprint = Blueprint("admin", __name__, url_prefix="/admin", template_folder="templates")
+import asfquart.auth as auth
+import asfquart.base as base
+import asfquart.session as session
+import atr.util as util
+
+BLUEPRINT: Final = quart.Blueprint("admin", __name__, url_prefix="/admin", template_folder="templates")
 
 
-@blueprint.before_request
+@BLUEPRINT.before_request
 async def before_request_func() -> None:
-    @require(Requirements.committer)
+    @auth.require(auth.Requirements.committer)
     async def check_logged_in() -> None:
-        session = await session_read()
-        if session is None:
-            raise ASFQuartException("Not authenticated", errorcode=401)
+        web_session = await session.read()
+        if web_session is None:
+            raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-        if session.uid not in get_admin_users():
-            raise ASFQuartException("You are not authorized to access the admin interface", errorcode=403)
+        if web_session.uid not in util.get_admin_users():
+            raise base.ASFQuartException("You are not authorized to access the admin interface", errorcode=403)
 
     await check_logged_in()
