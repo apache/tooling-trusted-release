@@ -65,6 +65,7 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
     import atr.routes.project as project
     import atr.routes.release as release
     import atr.routes.root as root
+    import atr.routes.vote_policy as vote_policy
 
     # Add a global error handler to show helpful error messages with tracebacks.
     @app.errorhandler(Exception)
@@ -99,6 +100,7 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
         package.__name__,
         project.__name__,
         release.__name__,
+        vote_policy.__name__,
         root.__name__,
     )
 
