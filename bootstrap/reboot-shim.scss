@@ -1,0 +1,7 @@
+// reboot-shim.scss
+// This file provides just the selectors needed by _type.scss
+// without including all of reboot.
+
+h1, h2, h3, h4, h5, h6 { display: block; }
+small { display: inline; }
+mark { display: inline; }

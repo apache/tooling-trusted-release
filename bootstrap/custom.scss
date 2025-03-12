@@ -1,0 +1,87 @@
+// Functions
+@import "../node_modules/bootstrap/scss/functions";
+
+// Custom variables
+$font-family-sans-serif: "Inter", sans-serif;
+$headings-font-family: $font-family-sans-serif;
+$table-cell-padding-y: 0.75rem;
+$table-cell-padding-x: 0.75rem;
+
+// Variables
+@import "../node_modules/bootstrap/scss/variables";
+@import "../node_modules/bootstrap/scss/variables-dark";
+
+// Basics
+@import "../node_modules/bootstrap/scss/maps";
+@import "../node_modules/bootstrap/scss/mixins";
+@import "../node_modules/bootstrap/scss/root";
+@import "../node_modules/bootstrap/scss/utilities";
+
+// Shims
+@import "reboot-shim";
+
+// Components
+@import "../node_modules/bootstrap/scss/accordion";
+@import "../node_modules/bootstrap/scss/alert";
+@import "../node_modules/bootstrap/scss/badge";
+@import "../node_modules/bootstrap/scss/breadcrumb";
+@import "../node_modules/bootstrap/scss/button-group";
+@import "../node_modules/bootstrap/scss/buttons";
+@import "../node_modules/bootstrap/scss/card";
+@import "../node_modules/bootstrap/scss/carousel";
+@import "../node_modules/bootstrap/scss/close";
+@import "../node_modules/bootstrap/scss/containers";
+@import "../node_modules/bootstrap/scss/dropdown";
+@import "../node_modules/bootstrap/scss/forms";
+@import "../node_modules/bootstrap/scss/grid";
+@import "../node_modules/bootstrap/scss/helpers";
+@import "../node_modules/bootstrap/scss/images";
+@import "../node_modules/bootstrap/scss/list-group";
+@import "../node_modules/bootstrap/scss/modal";
+@import "../node_modules/bootstrap/scss/nav";
+@import "../node_modules/bootstrap/scss/navbar";
+@import "../node_modules/bootstrap/scss/offcanvas";
+@import "../node_modules/bootstrap/scss/pagination";
+@import "../node_modules/bootstrap/scss/placeholders";
+@import "../node_modules/bootstrap/scss/popover";
+@import "../node_modules/bootstrap/scss/progress";
+@import "../node_modules/bootstrap/scss/spinners";
+@import "../node_modules/bootstrap/scss/tables";
+@import "../node_modules/bootstrap/scss/toasts";
+@import "../node_modules/bootstrap/scss/tooltip";
+@import "../node_modules/bootstrap/scss/transitions";
+@import "../node_modules/bootstrap/scss/type";
+
+// Utilities
+@import "../node_modules/bootstrap/scss/utilities/api";
+
+// Custom styles
+table.atr-data th {
+  @extend .border-end;
+  @extend .bg-body-tertiary;
+}
+
+th {
+  color: #555;
+  font-weight: 525;
+  @extend .align-middle;
+  @extend .w-25;
+}
+
+.btn {
+  font-family: $font-family-sans-serif;
+  font-size: 17px;
+  font-weight: 475;
+}
+
+.btn-primary {
+  background-color: #004477;
+  border-color: #004477;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+  background-color: darken(#004477, 10%);
+  border-color: darken(#004477, 10%);
+}

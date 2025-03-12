@@ -9,4 +9,5 @@
 .vscode/
 __pycache__/
 apptoken.txt
+bootstrap/build/
 state/
