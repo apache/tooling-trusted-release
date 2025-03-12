@@ -88,7 +88,7 @@ async def root_project_voting_policy_add(project_name: str) -> response.Response
 
     # For GET requests, show the form
     return await quart.render_template(
-        "voting-policy-add.html",
+        "vote-policy-add.html",
         asf_id=web_session.uid,
         project=pmc,
         form=form,
