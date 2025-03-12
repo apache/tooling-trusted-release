@@ -8,79 +8,32 @@
   Test email sending functionality.
 {% endblock description %}
 
+{% block theme_css %}
+  <link rel="stylesheet"
+        href="{{ url_for('static', filename='css/atr-small.css') }}" />
+{% endblock theme_css %}
+
 {% block stylesheets %}
   {{ super() }}
-  <style>
-      .form-table {
-          width: 100%;
-      }
-
-      .form-table th {
-          width: 200px;
-          text-align: right;
-          padding-right: 1rem;
-          vertical-align: top;
-          font-weight: 500;
-      }
-
-      .form-table td {
-          vertical-align: top;
-      }
-
-      .form-table label {
-          border-bottom: none;
-          padding-bottom: 0;
-      }
-
-      input[type="text"],
-      input[type="email"] {
-          width: 100%;
-          max-width: 600px;
-          padding: 0.375rem;
-          border: 1px solid #ced4da;
-          border-radius: 0.25rem;
-      }
-
-      .help-text {
-          color: #666;
-          font-size: 0.9em;
-          display: block;
-          margin-top: 0.25rem;
-      }
-
-      .error-message {
-          color: #dc3545;
-          margin-top: 0.25rem;
-      }
-
-      .success-message {
-          color: #28a745;
-          margin-top: 0.25rem;
-      }
-
-      button {
-          margin-top: 1rem;
-      }
-  </style>
 {% endblock stylesheets %}
 
 {% block content %}
   <h1>Test email sending</h1>
-  <p class="intro">
+  <p>
     Welcome, <strong>{{ asf_id }}</strong>! Use this form to test the email sending functionality.
   </p>
 
   {% if error %}
-    <div class="error-message">
-      <p>
+    <div class="alert alert-danger">
+      <p class="mb-0">
         <strong>Error:</strong> {{ error }}
       </p>
     </div>
   {% endif %}
 
   {% if success %}
-    <div class="success-message">
-      <p>
+    <div class="alert alert-success">
+      <p class="mb-0">
         <strong>Success!</strong>
         {% if message %}
           {{ message }}
@@ -91,63 +44,55 @@
     </div>
   {% endif %}
 
-  <form method="post" class="striking">
-    <table class="form-table">
-      <tbody>
-        <tr>
-          <th>
-            <label for="email_recipient">Recipient email:</label>
-          </th>
-          <td>
-            <input type="email"
-                   id="email_recipient"
-                   name="email_recipient"
-                   required
-                   value="{{ email_recipient or '' }}"
-                   placeholder="recipient@example.com"
-                   aria-describedby="email-help" />
-            <span id="email-help" class="help-text">Enter the email address to send the test email to</span>
-          </td>
-        </tr>
+  <form method="post" class="striking py-4 px-5">
+    <div class="mb-3 pb-3 row border-bottom">
+      <label for="email_recipient" class="col-sm-3 col-form-label text-sm-end">Recipient email:</label>
+      <div class="col-sm-8">
+        <input type="email"
+               id="email_recipient"
+               name="email_recipient"
+               class="form-control"
+               required
+               value="{{ email_recipient or '' }}"
+               placeholder="recipient@example.com"
+               aria-describedby="email-help" />
+        <code id="email-help" class="form-text text-muted d-block mt-2">Enter the email address to send the test email to</code>
+      </div>
+    </div>
 
-        <tr>
-          <th>
-            <label for="artifact_name">Artifact name:</label>
-          </th>
-          <td>
-            <input type="text"
-                   id="artifact_name"
-                   name="artifact_name"
-                   required
-                   value="{{ artifact_name or '' }}"
-                   placeholder="my-artifact-1.0.0"
-                   aria-describedby="artifact-help" />
-            <span id="artifact-help" class="help-text">Enter a name for the artifact</span>
-          </td>
-        </tr>
+    <div class="mb-3 pb-3 row border-bottom">
+      <label for="artifact_name" class="col-sm-3 col-form-label text-sm-end">Artifact name:</label>
+      <div class="col-sm-8">
+        <input type="text"
+               id="artifact_name"
+               name="artifact_name"
+               class="form-control"
+               required
+               value="{{ artifact_name or '' }}"
+               placeholder="my-artifact-1.0.0"
+               aria-describedby="artifact-help" />
+        <code id="artifact-help" class="form-text text-muted d-block mt-2">Enter a name for the artifact</code>
+      </div>
+    </div>
 
-        <tr>
-          <th>
-            <label for="token">Token (optional):</label>
-          </th>
-          <td>
-            <input type="text"
-                   id="token"
-                   name="token"
-                   value="{{ token or '' }}"
-                   placeholder="Optional token"
-                   aria-describedby="token-help" />
-            <span id="token-help" class="help-text">Optional token to include in the email</span>
-          </td>
-        </tr>
+    <div class="mb-3 pb-3 row border-bottom">
+      <label for="token" class="col-sm-3 col-form-label text-sm-end">Token (optional):</label>
+      <div class="col-sm-8">
+        <input type="text"
+               id="token"
+               name="token"
+               class="form-control"
+               value="{{ token or '' }}"
+               placeholder="Optional token"
+               aria-describedby="token-help" />
+        <code id="token-help" class="form-text text-muted d-block mt-2">Optional token to include in the email</code>
+      </div>
+    </div>
 
-        <tr>
-          <td></td>
-          <td>
-            <button type="submit">Send test email</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="row">
+      <div class="col-sm-9 offset-sm-3">
+        <button type="submit" class="btn btn-primary mt-2">Send test email</button>
+      </div>
+    </div>
   </form>
 {% endblock content %}
