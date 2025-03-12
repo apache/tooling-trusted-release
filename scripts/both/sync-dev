@@ -1,8 +1,0 @@
-#!/bin/sh
-set -eu
-_python="$(which python3)"
-echo poetry
-scripts/poetry/sync-dev "${1:-$_python}"
-echo uv
-scripts/uv/sync-dev "${1:-$_python}"
-scripts/both/compare-dev

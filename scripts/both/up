@@ -1,7 +1,0 @@
-#!/bin/sh
-set -eu
-echo poetry
-scripts/poetry/up
-echo uv
-scripts/uv/up
-scripts/both/compare-dev

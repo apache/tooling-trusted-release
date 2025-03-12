@@ -1,6 +1,0 @@
-#!/bin/sh
-set -eu
-unset VIRTUAL_ENV
-_python="$(which python3)"
-UV_PROJECT_ENVIRONMENT=.venv-uv uv sync --python "${1:-$_python}"
-UV_PROJECT_ENVIRONMENT=.venv-uv uv sync --python "${1:-$_python}" --reinstall-package asfquart

@@ -1,2 +1,0 @@
-#!/bin/sh
-UV_PROJECT_ENVIRONMENT=.venv-uv exec uv run "$@"

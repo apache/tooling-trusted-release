@@ -1,4 +1,0 @@
-#!/bin/sh
-set -eu
-scripts/poetry/add "$1"
-scripts/uv/add "$1"

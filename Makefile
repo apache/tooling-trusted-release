@@ -1,9 +1,8 @@
 .PHONY: build build-alpine-ubuntu certs check docs report run serve sync sync-dev
 
 BIND ?= 127.0.0.1:8080
-MANAGER ?= poetry
 PYTHON ?= $(which python3)
-SCRIPTS ?= scripts/$(MANAGER)
+SCRIPTS ?= scripts/poetry
 
 build:
 	scripts/build

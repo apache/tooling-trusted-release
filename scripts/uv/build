@@ -1,5 +1,0 @@
-#!/bin/sh
-# Just to check that the containers build successfully
-set -eu
-docker build -t tooling-trusted-release --build-arg SCRIPTS=scripts/uv -f Dockerfile.alpine .
-docker build -t tooling-trusted-release --build-arg SCRIPTS=scripts/uv -f Dockerfile.ubuntu .
