@@ -62,7 +62,9 @@ repos:
       name: Mypy Type Check
       entry: mypy
       language: system
+      require_serial: true
       types: [python]
       exclude: "tests" # see https://github.com/pre-commit/pre-commit/issues/2967
       args:
         - --config-file=pyproject.toml
+        - --scripts-are-modules
