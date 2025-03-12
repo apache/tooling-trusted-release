@@ -1,4 +1,4 @@
-.PHONY: build build-alpine-ubuntu certs check docs report run serve sync sync-dev
+.PHONY: build build-alpine-ubuntu certs check checks docs report run serve sync sync-dev
 
 BIND ?= 127.0.0.1:8080
 PYTHON ?= $(which python3)
@@ -17,6 +17,10 @@ certs:
 
 check:
 	$(SCRIPTS)/run pre-commit run --all-files
+
+checks:
+	$(SCRIPTS)/run pre-commit run --all-files
+	poetry run pyright
 
 docs:
 	for fn in docs/*.md; \

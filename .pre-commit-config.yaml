@@ -66,9 +66,3 @@ repos:
       exclude: "tests" # see https://github.com/pre-commit/pre-commit/issues/2967
       args:
         - --config-file=pyproject.toml
-    - id: pyright
-      name: Pyright Type Check
-      entry: pyright
-      language: system
-      types: [python]
-      exclude: "tests"
