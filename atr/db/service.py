@@ -52,8 +52,8 @@ async def get_release_by_key(storage_key: str) -> Release | None:
         query = (
             select(Release)
             .where(Release.storage_key == storage_key)
-            .options(db.eager_load(Release.pmc))
-            .options(db.eager_load(Release.product_line))
+            .options(db.select_in_load(Release.pmc))
+            .options(db.select_in_load(Release.product_line))
         )
         result = await db_session.execute(query)
         return result.scalar_one_or_none()
@@ -68,8 +68,8 @@ def get_release_by_key_sync(storage_key: str) -> Release | None:
         query = (
             select(Release)
             .where(Release.storage_key == storage_key)
-            .options(db.eager_load(Release.pmc))
-            .options(db.eager_load(Release.product_line))
+            .options(db.select_in_load(Release.pmc))
+            .options(db.select_in_load(Release.product_line))
         )
         result = session.execute(query)
         return result.scalar_one_or_none()

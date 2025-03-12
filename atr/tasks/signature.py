@@ -45,12 +45,11 @@ def _check_core(pmc_name: str, artifact_path: str, signature_path: str) -> dict[
     """Verify a signature file using the PMC's public signing keys."""
     # Query only the signing keys associated with this PMC
     # TODO: Rename create_sync_db_session to create_session_sync
+    # Using isinstance does not work here, with pyright
+    project_name = db.validate_instrumented_attribute(models.PMC.project_name)
     with db.create_sync_db_session() as session:
         statement = (
-            sql.select(models.PublicSigningKey)
-            .join(models.PMCKeyLink)
-            .join(models.PMC)
-            .where(db.instrumented_attribute(models.PMC.project_name) == pmc_name)
+            sql.select(models.PublicSigningKey).join(models.PMCKeyLink).join(models.PMC).where(project_name == pmc_name)
         )
         result = session.execute(statement)
         public_keys = [key.ascii_armored_key for key in result.scalars().all()]

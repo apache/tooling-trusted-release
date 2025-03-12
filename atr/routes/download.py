@@ -46,8 +46,8 @@ async def root_download_artifact(release_key: str, artifact_sha3: str) -> respon
 
     async with db.create_async_db_session() as db_session:
         # Find the package
-        package_release = db.eager_load(models.Package.release)
-        release_pmc = db.eager_load(models.Release.pmc)
+        package_release = db.select_in_load(models.Package.release)
+        release_pmc = db.select_in_load(models.Release.pmc)
         package_statement = (
             sqlmodel.select(models.Package)
             .where(models.Package.artifact_sha3 == artifact_sha3, models.Package.release_key == release_key)
@@ -92,8 +92,8 @@ async def root_download_signature(release_key: str, signature_sha3: str) -> quar
 
     async with db.create_async_db_session() as db_session:
         # Find the package that has this signature
-        package_release = db.eager_load(models.Package.release)
-        release_pmc = db.eager_load(models.Release.pmc)
+        package_release = db.select_in_load(models.Package.release)
+        release_pmc = db.select_in_load(models.Release.pmc)
         package_statement = (
             sqlmodel.select(models.Package)
             .where(models.Package.signature_sha3 == signature_sha3, models.Package.release_key == release_key)

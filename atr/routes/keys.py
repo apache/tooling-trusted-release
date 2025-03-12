@@ -186,7 +186,8 @@ async def root_keys_add() -> str:
     # Get PMC objects for all projects the user is a member of
     async with db.create_async_db_session() as db_session:
         project_list = web_session.committees + web_session.projects
-        project_name = db.instrumented_attribute(models.PMC.project_name)
+        # Using isinstance also works here
+        project_name = db.validate_instrumented_attribute(models.PMC.project_name)
         pmc_statement = sqlmodel.select(models.PMC).where(project_name.in_(project_list))
         user_pmcs = (await db_session.execute(pmc_statement)).scalars().all()
 
@@ -255,7 +256,7 @@ async def root_keys_review() -> str:
     async with db.create_async_db_session() as db_session:
         psk_statement = (
             sqlmodel.select(models.PublicSigningKey)
-            .options(db.eager_load(models.PublicSigningKey.pmcs))
+            .options(db.select_in_load(models.PublicSigningKey.pmcs))
             .where(models.PublicSigningKey.apache_uid == web_session.uid)
         )
         user_keys = (await db_session.execute(psk_statement)).scalars().all()

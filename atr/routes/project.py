@@ -49,8 +49,8 @@ async def root_project_view(project_name: str) -> str:
             sqlmodel.select(models.PMC)
             .where(models.PMC.project_name == project_name)
             .options(
-                db.eager_load(models.PMC.public_signing_keys),
-                db.eager_load(models.PMC.vote_policy),
+                db.select_in_load(models.PMC.public_signing_keys),
+                db.select_in_load(models.PMC.vote_policy),
             )
         )
 

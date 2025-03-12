@@ -21,8 +21,6 @@ import datetime
 import secrets
 
 import quart
-
-# import sqlalchemy.orm.attributes as attributes
 import sqlmodel
 import werkzeug.wrappers.response as response
 
@@ -139,7 +137,8 @@ async def root_candidate_create() -> response.Response | str:
     # Get PMC objects for all projects the user is a member of
     async with db.create_async_db_session() as db_session:
         project_list = web_session.committees + web_session.projects
-        project_name = db.instrumented_attribute(models.PMC.project_name)
+        # Using isinstance also works here
+        project_name = db.validate_instrumented_attribute(models.PMC.project_name)
         statement = sqlmodel.select(models.PMC).where(project_name.in_(project_list))
         user_pmcs = (await db_session.execute(statement)).scalars().all()
 
@@ -169,9 +168,9 @@ async def root_candidate_review() -> str:
         statement = (
             sqlmodel.select(models.Release)
             .options(
-                db.eager_load(models.Release.pmc),
-                db.eager_load(models.Release.product_line),
-                db.eager_load2(models.Release.packages, models.Package.tasks),
+                db.select_in_load(models.Release.pmc),
+                db.select_in_load(models.Release.product_line),
+                db.select_in_load_nested(models.Release.packages, models.Package.tasks),
             )
             .join(models.PMC)
             .where(models.Release.stage == models.ReleaseStage.CANDIDATE)

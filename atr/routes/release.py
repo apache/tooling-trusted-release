@@ -52,7 +52,7 @@ async def release_delete_validate(
 
     statement = (
         sqlmodel.select(models.Release)
-        .options(db.eager_load(models.Release.pmc))
+        .options(db.select_in_load(models.Release.pmc))
         .where(models.Release.storage_key == release_key)
     )
     result = await db_session.execute(statement)

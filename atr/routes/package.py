@@ -212,7 +212,7 @@ async def package_data_get(
     #     raise FlashError("Release has no associated PMC")
     statement = (
         sqlmodel.select(models.Package)
-        .options(db.eager_load2(models.Package.release, models.Release.pmc))
+        .options(db.select_in_load_nested(models.Package.release, models.Release.pmc))
         .where(models.Package.artifact_sha3 == artifact_sha3)
     )
     result = await db_session.execute(statement)
@@ -373,8 +373,8 @@ async def root_package_add() -> response.Response | str:
     # Get all releases where the user is a PMC member or committer of the associated PMC
     async with db.create_async_db_session() as db_session:
         # TODO: This duplicates code in root_candidate_review
-        release_pmc = db.eager_load(models.Release.pmc)
-        release_product_line = db.eager_load(models.Release.product_line)
+        release_pmc = db.select_in_load(models.Release.pmc)
+        release_product_line = db.select_in_load(models.Release.product_line)
         statement = (
             sqlmodel.select(models.Release)
             .options(release_pmc, release_product_line)

@@ -108,22 +108,27 @@ def create_sync_db_session() -> Session:
     return Session(_SYNC_ENGINE)
 
 
-def eager_load(*entities: Any) -> orm.strategy_options._AbstractLoad:
+def select_in_load(*entities: Any) -> orm.strategy_options._AbstractLoad:
     """Eagerly load the given entities from the query."""
+    validated_entities = []
     for entity in entities:
-        entity = instrumented_attribute(entity)
-    return orm.selectinload(*entities)
+        if not isinstance(entity, orm.InstrumentedAttribute):
+            raise ValueError(f"Object must be an orm.InstrumentedAttribute, got: {type(entity)}")
+        validated_entities.append(entity)
+    return orm.selectinload(*validated_entities)
 
 
-def eager_load2(a: Any, b: Any) -> orm.strategy_options._AbstractLoad:
-    """Eagerly load the given entities from the query."""
-    a = instrumented_attribute(a)
-    b = instrumented_attribute(b)
-    return orm.selectinload(a).selectinload(b)
+def select_in_load_nested(parent: Any, child: Any) -> orm.strategy_options._AbstractLoad:
+    """Eagerly load the given nested entities from the query."""
+    if not isinstance(parent, orm.InstrumentedAttribute):
+        raise ValueError(f"Parent must be an orm.InstrumentedAttribute, got: {type(parent)}")
+    if not isinstance(child, orm.InstrumentedAttribute):
+        raise ValueError(f"Child must be an orm.InstrumentedAttribute, got: {type(child)}")
+    return orm.selectinload(parent).selectinload(child)
 
 
-def instrumented_attribute(entity: Any) -> orm.InstrumentedAttribute:
-    """Check whether the object is an InstrumentedAttribute."""
-    if not isinstance(entity, orm.InstrumentedAttribute):
-        raise ValueError(f"Object must be an orm.InstrumentedAttribute, got: {type(entity)}")
-    return entity
+def validate_instrumented_attribute(obj: Any) -> orm.InstrumentedAttribute:
+    """Check if the given object is an InstrumentedAttribute."""
+    if not isinstance(obj, orm.InstrumentedAttribute):
+        raise ValueError(f"Object must be an orm.InstrumentedAttribute, got: {type(obj)}")
+    return obj
