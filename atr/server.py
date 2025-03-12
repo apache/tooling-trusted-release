@@ -207,7 +207,7 @@ def create_app(app_config: type[config.AppConfig]) -> base.QuartApp:
     app = app_create_base(app_config)
     app_setup_api_docs(app)
 
-    db.create_database(app)
+    db.init_database(app)
     register_routes(app)
     blueprints.register(app)
 

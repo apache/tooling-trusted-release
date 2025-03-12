@@ -69,7 +69,7 @@ def main() -> None:
     _setup_logging()
 
     _LOGGER.info(f"Starting worker process with pid {os.getpid()}")
-    # db.create_sync_db_engine()
+    db.init_database_for_worker()
 
     _worker_resources_limit_set()
     asyncio.run(_worker_loop_run())
@@ -80,7 +80,7 @@ def _setup_logging() -> None:
     log_format = "[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
 
-    logging.basicConfig(filename="atr-worker.log", format=log_format, datefmt=date_format, level=logging.DEBUG)
+    logging.basicConfig(filename="atr-worker.log", format=log_format, datefmt=date_format, level=logging.INFO)
 
 
 # Task functions
@@ -260,7 +260,7 @@ async def _worker_loop_run() -> None:
                 break
             else:
                 # No tasks available, wait 20ms before checking again
-                await asyncio.sleep(0.02)
+                await asyncio.sleep(0.1)
         except Exception:
             # TODO: Should probably be more robust about this
             # Extract the traceback and log it
