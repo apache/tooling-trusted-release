@@ -68,3 +68,10 @@ repos:
       args:
         - --config-file=pyproject.toml
         - --scripts-are-modules
+    - id: pyright
+      name: Pyright Type Check
+      entry: pyright
+      language: system
+      require_serial: true
+      types: [python]
+      exclude: "tests"
