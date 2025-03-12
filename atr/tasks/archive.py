@@ -20,18 +20,18 @@ import os.path
 import tarfile
 from typing import Any, Final
 
-from pydantic import BaseModel, Field
+import pydantic
 
 import atr.tasks.task as task
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class CheckIntegrity(BaseModel):
+class CheckIntegrity(pydantic.BaseModel):
     """Parameters for archive integrity checking."""
 
-    path: str = Field(..., description="Path to the .tar.gz file to check")
-    chunk_size: int = Field(default=4096, description="Size of chunks to read when checking the file")
+    path: str = pydantic.Field(..., description="Path to the .tar.gz file to check")
+    chunk_size: int = pydantic.Field(default=4096, description="Size of chunks to read when checking the file")
 
 
 def check_integrity(args: dict[str, Any]) -> tuple[task.Status, str | None, tuple[Any, ...]]:

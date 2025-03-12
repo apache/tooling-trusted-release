@@ -6986,7 +6986,7 @@ textarea.form-control-lg {
   border-top: 0 !important;
 }
 
-.border-end, th {
+.border-end, table.atr-data th {
   border-right: var(--bs-border-width) var(--bs-border-style) var(--bs-border-color) !important;
 }
 
@@ -8321,7 +8321,7 @@ textarea.form-control-lg {
   background-color: rgba(var(--bs-secondary-bg-rgb), var(--bs-bg-opacity)) !important;
 }
 
-.bg-body-tertiary, th {
+.bg-body-tertiary, table.atr-data th {
   --bs-bg-opacity: 1;
   background-color: rgba(var(--bs-tertiary-bg-rgb), var(--bs-bg-opacity)) !important;
 }

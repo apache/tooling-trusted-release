@@ -15,35 +15,37 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import dataclasses
 import logging
 import os
-from dataclasses import dataclass
-from typing import Any
+from typing import Any, Final
 
 import atr.tasks.task as task
 
 # Configure detailed logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+_LOGGER: Final = logging.getLogger(__name__)
+_LOGGER.setLevel(logging.DEBUG)
 
 # Create file handler for test.log
-file_handler = logging.FileHandler("tasks-mailtest.log")
-file_handler.setLevel(logging.DEBUG)
+_HANDLER: Final = logging.FileHandler("tasks-mailtest.log")
+_HANDLER.setLevel(logging.DEBUG)
 
 # Create formatter with detailed information
-formatter = logging.Formatter(
-    "[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] [%(name)s:%(funcName)s:%(lineno)d] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+_HANDLER.setFormatter(
+    logging.Formatter(
+        "[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] [%(name)s:%(funcName)s:%(lineno)d] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 )
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+_LOGGER.addHandler(_HANDLER)
 # Ensure parent loggers don't duplicate messages
-logger.propagate = False
+_LOGGER.propagate = False
 
-logger.info("Mail test module imported")
+_LOGGER.info("Mail test module imported")
 
 
-@dataclass
+# TODO: Use a Pydantic model instead
+@dataclasses.dataclass
 class Args:
     artifact_name: str
     email_recipient: str
@@ -52,10 +54,10 @@ class Args:
     @staticmethod
     def from_list(args: list[str]) -> "Args":
         """Parse command line arguments."""
-        logger.debug(f"Parsing arguments: {args}")
+        _LOGGER.debug(f"Parsing arguments: {args}")
 
         if len(args) != 3:
-            logger.error(f"Invalid number of arguments: {len(args)}, expected 3")
+            _LOGGER.error(f"Invalid number of arguments: {len(args)}, expected 3")
             raise ValueError("Invalid number of arguments")
 
         artifact_name = args[0]
@@ -63,15 +65,15 @@ class Args:
         token = args[2]
 
         if not isinstance(artifact_name, str):
-            logger.error(f"Artifact name must be a string, got {type(artifact_name)}")
+            _LOGGER.error(f"Artifact name must be a string, got {type(artifact_name)}")
             raise ValueError("Artifact name must be a string")
         if not isinstance(email_recipient, str):
-            logger.error(f"Email recipient must be a string, got {type(email_recipient)}")
+            _LOGGER.error(f"Email recipient must be a string, got {type(email_recipient)}")
             raise ValueError("Email recipient must be a string")
         if not isinstance(token, str):
-            logger.error(f"Token must be a string, got {type(token)}")
+            _LOGGER.error(f"Token must be a string, got {type(token)}")
             raise ValueError("Token must be a string")
-        logger.debug("All argument validations passed")
+        _LOGGER.debug("All argument validations passed")
 
         args_obj = Args(
             artifact_name=artifact_name,
@@ -79,20 +81,20 @@ class Args:
             token=token,
         )
 
-        logger.info(f"Args object created: {args_obj}")
+        _LOGGER.info(f"Args object created: {args_obj}")
         return args_obj
 
 
 def send(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Send a test email."""
-    logger.info(f"Sending with args: {args}")
+    _LOGGER.info(f"Sending with args: {args}")
     try:
-        logger.debug("Delegating to send_core function")
+        _LOGGER.debug("Delegating to send_core function")
         status, error, result = send_core(args)
-        logger.info(f"Send completed with status: {status}")
+        _LOGGER.info(f"Send completed with status: {status}")
         return status, error, result
     except Exception as e:
-        logger.exception(f"Error in send function: {e}")
+        _LOGGER.exception(f"Error in send function: {e}")
         return task.FAILED, str(e), tuple()
 
 
@@ -103,10 +105,10 @@ def send_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any,
     import atr.mail
     from atr.db.service import get_pmc_by_name
 
-    logger.info("Starting send_core")
+    _LOGGER.info("Starting send_core")
     try:
-        # Configure root logger to also write to our log file
-        # This ensures logs from mail.py, using the root logger, are captured
+        # Configure root _LOGGER to also write to our log file
+        # This ensures logs from mail.py, using the root _LOGGER, are captured
         root_logger = logging.getLogger()
         # Check whether our file handler is already added, to avoid duplicates
         has_our_handler = any(
@@ -114,13 +116,13 @@ def send_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any,
             for h in root_logger.handlers
         )
         if not has_our_handler:
-            # Add our file handler to the root logger
-            root_logger.addHandler(file_handler)
-            logger.info("Added file handler to root logger to capture mail.py logs")
+            # Add our file handler to the root _LOGGER
+            root_logger.addHandler(_HANDLER)
+            _LOGGER.info("Added file handler to root _LOGGER to capture mail.py logs")
 
-        logger.debug(f"Parsing arguments: {args_list}")
+        _LOGGER.debug(f"Parsing arguments: {args_list}")
         args = Args.from_list(args_list)
-        logger.info(
+        _LOGGER.info(
             f"Args parsed successfully: artifact_name={args.artifact_name}, email_recipient={args.email_recipient}"
         )
 
@@ -138,20 +140,20 @@ def send_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any,
 
             if not tooling_pmc:
                 error_msg = "Tooling PMC not found in database"
-                logger.error(error_msg)
+                _LOGGER.error(error_msg)
                 return task.FAILED, error_msg, tuple()
 
             if domain != "apache.org":
                 error_msg = f"Email domain must be apache.org, got {domain}"
-                logger.error(error_msg)
+                _LOGGER.error(error_msg)
                 return task.FAILED, error_msg, tuple()
 
             if local_part not in tooling_pmc.pmc_members:
                 error_msg = f"Email recipient {local_part} is not a member of the tooling PMC"
-                logger.error(error_msg)
+                _LOGGER.error(error_msg)
                 return task.FAILED, error_msg, tuple()
 
-            logger.info(f"Recipient {email_recipient} is a tooling PMC member, allowed")
+            _LOGGER.info(f"Recipient {email_recipient} is a tooling PMC member, allowed")
 
         # Load and set DKIM key
         try:
@@ -161,10 +163,10 @@ def send_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any,
             with open(dkim_path) as f:
                 dkim_key = f.read()
                 atr.mail.set_secret_key(dkim_key.strip())
-                logger.info("DKIM key loaded and set successfully")
+                _LOGGER.info("DKIM key loaded and set successfully")
         except Exception as e:
             error_msg = f"Failed to load DKIM key: {e}"
-            logger.error(error_msg)
+            _LOGGER.error(error_msg)
             return task.FAILED, error_msg, tuple()
 
         event = atr.mail.ArtifactEvent(
@@ -173,10 +175,10 @@ def send_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any,
             token=args.token,
         )
         atr.mail.send(event)
-        logger.info(f"Email sent successfully to {args.email_recipient}")
+        _LOGGER.info(f"Email sent successfully to {args.email_recipient}")
 
         return task.COMPLETED, None, tuple()
 
     except Exception as e:
-        logger.exception(f"Error in send_core: {e}")
+        _LOGGER.exception(f"Error in send_core: {e}")
         return task.FAILED, str(e), tuple()

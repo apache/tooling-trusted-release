@@ -15,11 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from enum import Enum
+import enum
 from typing import Any, Final, Literal
 
 
-class Status(Enum):
+class Status(enum.Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 

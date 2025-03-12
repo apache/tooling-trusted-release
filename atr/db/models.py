@@ -17,6 +17,8 @@
 
 """The data models to be persisted in the database."""
 
+# from __future__ import annotations
+
 import datetime
 import enum
 from typing import Any

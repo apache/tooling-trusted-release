@@ -19,13 +19,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import datetime
 from typing import TYPE_CHECKING, Annotated, TypeVar
 
 import httpx
-from pydantic import BaseModel, Field, RootModel
+import pydantic
 
-from atr.util import DictToList
+import atr.util as util
 
 if TYPE_CHECKING:
     from collections.abc import Generator, ItemsView
@@ -40,20 +40,20 @@ _PROJECTS_GROUPS_URL = "https://projects.apache.org/json/foundation/groups.json"
 VT = TypeVar("VT")
 
 
-class LDAPProjectsData(BaseModel):
-    last_timestamp: str = Field(alias="lastTimestamp")
+class LDAPProjectsData(pydantic.BaseModel):
+    last_timestamp: str = pydantic.Field(alias="lastTimestamp")
     project_count: int
-    projects: Annotated[list[LDAPProject], DictToList(key="name")]
+    projects: Annotated[list[LDAPProject], util.DictToList(key="name")]
 
     @property
-    def last_time(self) -> datetime:
-        return datetime.strptime(self.last_timestamp, "%Y%m%d%H%M%S%z")
+    def last_time(self) -> datetime.datetime:
+        return datetime.datetime.strptime(self.last_timestamp, "%Y%m%d%H%M%S%z")
 
 
-class LDAPProject(BaseModel):
+class LDAPProject(pydantic.BaseModel):
     name: str
-    create_timestamp: str = Field(alias="createTimestamp")
-    modify_timestamp: str = Field(alias="modifyTimestamp")
+    create_timestamp: str = pydantic.Field(alias="createTimestamp")
+    modify_timestamp: str = pydantic.Field(alias="modifyTimestamp")
     member_count: int
     owner_count: int
     members: list[str]
@@ -62,20 +62,20 @@ class LDAPProject(BaseModel):
     podling: str | None = None
 
 
-class CommitteeData(BaseModel):
+class CommitteeData(pydantic.BaseModel):
     last_updated: str
     committee_count: int
     pmc_count: int
-    committees: Annotated[list[Committee], DictToList(key="name")]
+    committees: Annotated[list[Committee], util.DictToList(key="name")]
 
 
-class RetiredCommitteeData(BaseModel):
+class RetiredCommitteeData(pydantic.BaseModel):
     last_updated: str
     retired_count: int
-    retired: Annotated[list[RetiredCommittee], DictToList(key="name")]
+    retired: Annotated[list[RetiredCommittee], util.DictToList(key="name")]
 
 
-class Committee(BaseModel):
+class Committee(pydantic.BaseModel):
     name: str
     display_name: str
     site: str
@@ -83,29 +83,29 @@ class Committee(BaseModel):
     mail_list: str
     established: str
     report: list[str]
-    chair: Annotated[list[User], DictToList(key="id")]
+    chair: Annotated[list[User], util.DictToList(key="id")]
     roster_count: int
-    roster: Annotated[list[User], DictToList(key="id")]
+    roster: Annotated[list[User], util.DictToList(key="id")]
     pmc: bool
 
 
-class User(BaseModel):
+class User(pydantic.BaseModel):
     id: str
     name: str
     date: str | None = None
 
 
-class RetiredCommittee(BaseModel):
+class RetiredCommittee(pydantic.BaseModel):
     name: str
     display_name: str
     retired: str
     description: str
 
 
-class PodlingStatus(BaseModel):
+class PodlingStatus(pydantic.BaseModel):
     description: str
     homepage: str
-    name: str = Field(alias="name")
+    name: str = pydantic.Field(alias="name")
     pmc: str
     podling: bool
     started: str
@@ -114,7 +114,7 @@ class PodlingStatus(BaseModel):
     resolution: str | None = None
 
 
-class _DictRootModel(RootModel[dict[str, VT]]):
+class _DictRootModel(pydantic.RootModel[dict[str, VT]]):
     def __iter__(self) -> Generator[tuple[str, VT]]:
         yield from self.root.items()
 
@@ -136,13 +136,13 @@ class GroupsData(_DictRootModel[list[str]]):
     pass
 
 
-class Release(BaseModel):
+class Release(pydantic.BaseModel):
     created: str | None = None
     name: str
     revision: str | None = None
 
 
-class ProjectStatus(BaseModel):
+class ProjectStatus(pydantic.BaseModel):
     category: str | None = None
     created: str | None = None
     description: str | None = None
@@ -151,8 +151,8 @@ class ProjectStatus(BaseModel):
     name: str
     pmc: str
     shortdesc: str | None = None
-    repository: list[str | dict] = Field(default_factory=list)
-    release: list[Release] = Field(default_factory=list)
+    repository: list[str | dict] = pydantic.Field(default_factory=list)
+    release: list[Release] = pydantic.Field(default_factory=list)
 
 
 class ProjectsData(_DictRootModel[ProjectStatus]):

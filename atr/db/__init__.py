@@ -17,22 +17,22 @@
 
 import logging
 import os
-from typing import Any
+from typing import Any, Final
 
+import alembic.config as config
+import quart
+import sqlalchemy
+import sqlalchemy.ext.asyncio
 import sqlalchemy.orm as orm
+import sqlalchemy.sql as sql
+import sqlmodel
 
-# from alembic import command
-from alembic.config import Config
-from quart import current_app
-from sqlalchemy import Engine, create_engine
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import Session
-from sqlalchemy.sql import text
-from sqlmodel import SQLModel
-
+import atr.util as util
 from asfquart.base import QuartApp
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: Final = logging.getLogger(__name__)
+
+_global_sync_engine: sqlalchemy.Engine | None = None
 
 
 def create_database(app: QuartApp) -> None:
@@ -42,7 +42,7 @@ def create_database(app: QuartApp) -> None:
         sqlite_db_path = app.config["SQLITE_DB_PATH"]
         sqlite_url = f"sqlite+aiosqlite://{sqlite_db_path}"
         # Use aiosqlite for async SQLite access
-        engine = create_async_engine(
+        engine = sqlalchemy.ext.asyncio.create_async_engine(
             sqlite_url,
             connect_args={
                 "check_same_thread": False,
@@ -51,24 +51,25 @@ def create_database(app: QuartApp) -> None:
         )
 
         # Create async session factory
-        async_session = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
-        app.async_session = async_session  # type: ignore
+        app.extensions["async_session"] = sqlalchemy.ext.asyncio.async_sessionmaker(
+            bind=engine, class_=sqlalchemy.ext.asyncio.AsyncSession, expire_on_commit=False
+        )
 
         # Set SQLite pragmas for better performance
         # Use 64 MB for the cache_size, and 5000ms for busy_timeout
         async with engine.begin() as conn:
-            await conn.execute(text("PRAGMA journal_mode=WAL"))
-            await conn.execute(text("PRAGMA synchronous=NORMAL"))
-            await conn.execute(text("PRAGMA cache_size=-64000"))
-            await conn.execute(text("PRAGMA foreign_keys=ON"))
-            await conn.execute(text("PRAGMA busy_timeout=5000"))
+            await conn.execute(sql.text("PRAGMA journal_mode=WAL"))
+            await conn.execute(sql.text("PRAGMA synchronous=NORMAL"))
+            await conn.execute(sql.text("PRAGMA cache_size=-64000"))
+            await conn.execute(sql.text("PRAGMA foreign_keys=ON"))
+            await conn.execute(sql.text("PRAGMA busy_timeout=5000"))
 
         # Run any pending migrations
         # In dev we'd do this first:
         # poetry run alembic revision --autogenerate -m "description"
         # Then review the generated migration in migrations/versions/ and commit it
         alembic_ini_path = os.path.join(project_root, "alembic.ini")
-        alembic_cfg = Config(alembic_ini_path)
+        alembic_cfg = config.Config(alembic_ini_path)
         # Override the migrations directory location to use project root
         # TODO: Is it possible to set this in alembic.ini?
         alembic_cfg.set_main_option("script_location", os.path.join(project_root, "migrations"))
@@ -78,34 +79,34 @@ def create_database(app: QuartApp) -> None:
 
         # Create any tables that might be missing
         async with engine.begin() as conn:
-            await conn.run_sync(SQLModel.metadata.create_all)
+            await conn.run_sync(sqlmodel.SQLModel.metadata.create_all)
 
 
-def create_async_db_session() -> AsyncSession:
+def create_async_db_session() -> sqlalchemy.ext.asyncio.AsyncSession:
     """Create a new asynchronous database session."""
-    return current_app.async_session()  # type: ignore
-
-
-_SYNC_ENGINE: Engine | None = None
+    async_session = util.validate_as_type(
+        quart.current_app.extensions["async_session"](), sqlalchemy.ext.asyncio.AsyncSession
+    )
+    return async_session
 
 
 def create_sync_db_engine() -> None:
     """Create a synchronous database engine."""
     import atr.config as config
 
-    global _SYNC_ENGINE
+    global _global_sync_engine
 
     conf = config.get()
     sqlite_url = f"sqlite://{conf.SQLITE_DB_PATH}"
     _LOGGER.debug(f"Creating sync database engine in process {os.getpid()}")
-    _SYNC_ENGINE = create_engine(sqlite_url, echo=False)
+    _global_sync_engine = sqlalchemy.create_engine(sqlite_url, echo=False)
 
 
-def create_sync_db_session() -> Session:
+def create_sync_db_session() -> sqlalchemy.orm.Session:
     """Create a new synchronous database session."""
-    global _SYNC_ENGINE
-    assert _SYNC_ENGINE is not None
-    return Session(_SYNC_ENGINE)
+    global _global_sync_engine
+    assert _global_sync_engine is not None
+    return sqlalchemy.orm.Session(_global_sync_engine)
 
 
 def select_in_load(*entities: Any) -> orm.strategy_options._AbstractLoad:

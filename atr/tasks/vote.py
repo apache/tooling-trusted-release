@@ -15,37 +15,37 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import dataclasses
 import datetime
 import logging
 import os
-from dataclasses import dataclass
-from datetime import UTC
-from typing import Any
+from typing import Any, Final
 
 import atr.tasks.task as task
 
 # Configure detailed logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+_LOGGER: Final = logging.getLogger(__name__)
+_LOGGER.setLevel(logging.DEBUG)
 
 # Create file handler for tasks-vote.log
-file_handler = logging.FileHandler("tasks-vote.log")
-file_handler.setLevel(logging.DEBUG)
+_HANDLER: Final = logging.FileHandler("tasks-vote.log")
+_HANDLER.setLevel(logging.DEBUG)
 
 # Create formatter with detailed information
-formatter = logging.Formatter(
-    "[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] [%(name)s:%(funcName)s:%(lineno)d] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+_HANDLER.setFormatter(
+    logging.Formatter(
+        "[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] [%(name)s:%(funcName)s:%(lineno)d] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 )
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+_LOGGER.addHandler(_HANDLER)
 # Ensure parent loggers don't duplicate messages
-logger.propagate = False
+_LOGGER.propagate = False
 
-logger.info("Vote module imported")
+_LOGGER.info("Vote module imported")
 
 
-@dataclass
+@dataclasses.dataclass
 class Args:
     """Arguments for the vote_initiate task."""
 
@@ -59,10 +59,10 @@ class Args:
     @staticmethod
     def from_list(args: list[str]) -> "Args":
         """Parse task arguments."""
-        logger.debug(f"Parsing arguments: {args}")
+        _LOGGER.debug(f"Parsing arguments: {args}")
 
         if len(args) != 6:
-            logger.error(f"Invalid number of arguments: {len(args)}, expected 6")
+            _LOGGER.error(f"Invalid number of arguments: {len(args)}, expected 6")
             raise ValueError("Invalid number of arguments")
 
         release_key = args[0]
@@ -82,10 +82,10 @@ class Args:
             ("initiator_id", initiator_id),
         ]:
             if not isinstance(arg_value, str):
-                logger.error(f"{arg_name} must be a string, got {type(arg_value)}")
+                _LOGGER.error(f"{arg_name} must be a string, got {type(arg_value)}")
                 raise ValueError(f"{arg_name} must be a string")
 
-        logger.debug("All argument validations passed")
+        _LOGGER.debug("All argument validations passed")
 
         args_obj = Args(
             release_key=release_key,
@@ -96,20 +96,20 @@ class Args:
             initiator_id=initiator_id,
         )
 
-        logger.info(f"Args object created: {args_obj}")
+        _LOGGER.info(f"Args object created: {args_obj}")
         return args_obj
 
 
 def initiate(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Initiate a vote for a release."""
-    logger.info(f"Initiating vote with args: {args}")
+    _LOGGER.info(f"Initiating vote with args: {args}")
     try:
-        logger.debug("Delegating to initiate_core function")
+        _LOGGER.debug("Delegating to initiate_core function")
         status, error, result = initiate_core(args)
-        logger.info(f"Vote initiation completed with status: {status}")
+        _LOGGER.info(f"Vote initiation completed with status: {status}")
         return status, error, result
     except Exception as e:
-        logger.exception(f"Error in initiate function: {e}")
+        _LOGGER.exception(f"Error in initiate function: {e}")
         return task.FAILED, str(e), tuple()
 
 
@@ -119,10 +119,10 @@ def initiate_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[
     from atr.db.service import get_release_by_key_sync
 
     test_recipients = ["sbp"]
-    logger.info("Starting initiate_core")
+    _LOGGER.info("Starting initiate_core")
     try:
-        # Configure root logger to also write to our log file
-        # This ensures logs from mail.py, using the root logger, are captured
+        # Configure root _LOGGER to also write to our log file
+        # This ensures logs from mail.py, using the root _LOGGER, are captured
         root_logger = logging.getLogger()
         # Check whether our file handler is already added, to avoid duplicates
         has_our_handler = any(
@@ -130,19 +130,19 @@ def initiate_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[
             for h in root_logger.handlers
         )
         if not has_our_handler:
-            # Add our file handler to the root logger
-            root_logger.addHandler(file_handler)
-            logger.info("Added file handler to root logger to capture mail.py logs")
+            # Add our file handler to the root _LOGGER
+            root_logger.addHandler(_HANDLER)
+            _LOGGER.info("Added file handler to root _LOGGER to capture mail.py logs")
 
-        logger.debug(f"Parsing arguments: {args_list}")
+        _LOGGER.debug(f"Parsing arguments: {args_list}")
         args = Args.from_list(args_list)
-        logger.info(f"Args parsed successfully: {args}")
+        _LOGGER.info(f"Args parsed successfully: {args}")
 
         # Get the release information
         release = get_release_by_key_sync(args.release_key)
         if not release:
             error_msg = f"Release with key {args.release_key} not found"
-            logger.error(error_msg)
+            _LOGGER.error(error_msg)
             return task.FAILED, error_msg, tuple()
 
         # GPG key ID, just for testing the UI
@@ -150,7 +150,7 @@ def initiate_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[
 
         # Calculate vote end date
         vote_duration_hours = int(args.vote_duration)
-        vote_start = datetime.datetime.now(UTC)
+        vote_start = datetime.datetime.now(datetime.UTC)
         vote_end = vote_start + datetime.timedelta(hours=vote_duration_hours)
 
         # Format dates for email
@@ -164,16 +164,16 @@ def initiate_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[
             with open(dkim_path) as f:
                 dkim_key = f.read()
                 atr.mail.set_secret_key(dkim_key.strip())
-                logger.info("DKIM key loaded and set successfully")
+                _LOGGER.info("DKIM key loaded and set successfully")
         except Exception as e:
             error_msg = f"Failed to load DKIM key: {e}"
-            logger.error(error_msg)
+            _LOGGER.error(error_msg)
             return task.FAILED, error_msg, tuple()
 
         # Get PMC and product details
         if release.pmc is None:
             error_msg = "Release has no associated PMC"
-            logger.error(error_msg)
+            _LOGGER.error(error_msg)
             return task.FAILED, error_msg, tuple()
 
         pmc_name = release.pmc.project_name
@@ -216,7 +216,7 @@ Thanks,
         original_recipient = args.email_to
         # Only one test recipient is required for now
         test_recipient = test_recipients[0] + "@apache.org"
-        logger.info(f"TEMPORARY: Overriding recipient from {original_recipient} to {test_recipient}")
+        _LOGGER.info(f"TEMPORARY: Overriding recipient from {original_recipient} to {test_recipient}")
 
         # Create mail event with test recipient
         # Use test account instead of actual PMC list
@@ -230,7 +230,7 @@ Thanks,
 
         # Send the email
         atr.mail.send(event)
-        logger.info(
+        _LOGGER.info(
             f"Vote email sent successfully to test account {test_recipient} (would have been {original_recipient})"
         )
 
@@ -251,5 +251,5 @@ Thanks,
         )
 
     except Exception as e:
-        logger.exception(f"Error in initiate_core: {e}")
+        _LOGGER.exception(f"Error in initiate_core: {e}")
         return task.FAILED, str(e), tuple()

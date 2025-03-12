@@ -15,70 +15,70 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import contextlib
 from collections.abc import Sequence
-from contextlib import nullcontext
 
-from sqlalchemy import func
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+import sqlalchemy
+import sqlalchemy.ext.asyncio
+import sqlmodel
 
 import atr.db as db
-from atr.db.models import PMC, Release, Task
-
-from . import create_async_db_session
+import atr.db.models as models
 
 
-async def get_pmc_by_name(project_name: str, session: AsyncSession | None = None) -> PMC | None:
+async def get_pmc_by_name(
+    project_name: str, session: sqlalchemy.ext.asyncio.AsyncSession | None = None
+) -> models.PMC | None:
     """Returns a PMC object by name."""
-    async with create_async_db_session() if session is None else nullcontext(session) as db_session:
-        statement = select(PMC).where(PMC.project_name == project_name)
+    async with db.create_async_db_session() if session is None else contextlib.nullcontext(session) as db_session:
+        statement = sqlmodel.select(models.PMC).where(models.PMC.project_name == project_name)
         pmc = (await db_session.execute(statement)).scalar_one_or_none()
         return pmc
 
 
-async def get_pmcs(session: AsyncSession | None = None) -> Sequence[PMC]:
+async def get_pmcs(session: sqlalchemy.ext.asyncio.AsyncSession | None = None) -> Sequence[models.PMC]:
     """Returns a list of PMC objects."""
-    async with create_async_db_session() if session is None else nullcontext(session) as db_session:
+    async with db.create_async_db_session() if session is None else contextlib.nullcontext(session) as db_session:
         # Get all PMCs and their latest releases
-        statement = select(PMC).order_by(PMC.project_name)
+        statement = sqlmodel.select(models.PMC).order_by(models.PMC.project_name)
         pmcs = (await db_session.execute(statement)).scalars().all()
         return pmcs
 
 
-async def get_release_by_key(storage_key: str) -> Release | None:
+async def get_release_by_key(storage_key: str) -> models.Release | None:
     """Get a release by its storage key."""
-    async with create_async_db_session() as db_session:
+    async with db.create_async_db_session() as db_session:
         # Get the release with its PMC and product line
         query = (
-            select(Release)
-            .where(Release.storage_key == storage_key)
-            .options(db.select_in_load(Release.pmc))
-            .options(db.select_in_load(Release.product_line))
+            sqlmodel.select(models.Release)
+            .where(models.Release.storage_key == storage_key)
+            .options(db.select_in_load(models.Release.pmc))
+            .options(db.select_in_load(models.Release.product_line))
         )
         result = await db_session.execute(query)
         return result.scalar_one_or_none()
 
 
-def get_release_by_key_sync(storage_key: str) -> Release | None:
+def get_release_by_key_sync(storage_key: str) -> models.Release | None:
     """Synchronous version of get_release_by_key for use in background tasks."""
-    from atr.db import create_sync_db_session
-
-    with create_sync_db_session() as session:
+    with db.create_sync_db_session() as session:
         # Get the release with its PMC and product line
         query = (
-            select(Release)
-            .where(Release.storage_key == storage_key)
-            .options(db.select_in_load(Release.pmc))
-            .options(db.select_in_load(Release.product_line))
+            sqlmodel.select(models.Release)
+            .where(models.Release.storage_key == storage_key)
+            .options(db.select_in_load(models.Release.pmc))
+            .options(db.select_in_load(models.Release.product_line))
         )
         result = session.execute(query)
         return result.scalar_one_or_none()
 
 
-async def get_tasks(limit: int, offset: int, session: AsyncSession | None = None) -> tuple[Sequence[Task], int]:
+async def get_tasks(
+    limit: int, offset: int, session: sqlalchemy.ext.asyncio.AsyncSession | None = None
+) -> tuple[Sequence[models.Task], int]:
     """Returns a list of Tasks based on limit and offset values together with the total count."""
-    async with create_async_db_session() if session is None else nullcontext(session) as db_session:
-        statement = select(Task).limit(limit).offset(offset).order_by(Task.id.desc())  # type: ignore
+    async with db.create_async_db_session() if session is None else contextlib.nullcontext(session) as db_session:
+        statement = sqlmodel.select(models.Task).limit(limit).offset(offset).order_by(models.Task.id.desc())  # type: ignore
         tasks = (await db_session.execute(statement)).scalars().all()
-        count = (await db_session.execute(select(func.count(Task.id)))).scalar_one()  # type: ignore
+        count = (await db_session.execute(sqlalchemy.select(sqlalchemy.func.count(models.Task.id)))).scalar_one()  # type: ignore
         return tasks, count

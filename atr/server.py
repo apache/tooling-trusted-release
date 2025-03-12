@@ -69,7 +69,11 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
 
     @app.errorhandler(ASFQuartException)
     async def handle_asfquart_exception(error: ASFQuartException) -> Any:
-        errorcode = error.errorcode  # type: ignore
+        # TODO: Figure out why pyright doesn't know about this attribute
+        if not hasattr(error, "errorcode"):
+            errorcode = 500
+        else:
+            errorcode = getattr(error, "errorcode")
         return await render_template("error.html", error=str(error), status_code=errorcode), errorcode
 
     # Add a global error handler in case a page does not exist.

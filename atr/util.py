@@ -82,6 +82,8 @@ def _get_dict_to_list_inner_type_adapter(source_type: Any, key: str) -> pydantic
     assert (other_fields := {k: v for k, v in fields.items() if k != key})  # noqa: RUF018
 
     model_name = f"{cls.__name__}Inner"
+
+    # Create proper field definitions for create_model
     inner_model = pydantic.create_model(model_name, **{k: (v.annotation, v) for k, v in other_fields.items()})  # type: ignore
     return pydantic.TypeAdapter(dict[Annotated[str, key_field], inner_model])  # type: ignore
 
@@ -125,6 +127,13 @@ class DictToList:
             _get_dict_to_list_validator(adapter, self.key),
             handler(source_type),
         )
+
+
+def validate_as_type(value: Any, t: type[T]) -> T:
+    """Validate the given value as the given type."""
+    if not isinstance(value, t):
+        raise ValueError(f"Expected {t}, got {type(value)}")
+    return value
 
 
 def unwrap(value: T | None, error_message: str = "unexpected None when unwrapping value") -> T:
