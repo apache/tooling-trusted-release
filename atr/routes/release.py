@@ -20,11 +20,9 @@
 import logging
 import logging.handlers
 import pathlib
-from typing import cast
 
 import quart
 import sqlalchemy.ext.asyncio
-import sqlalchemy.orm as orm
 import sqlmodel
 import werkzeug.wrappers.response as response
 
@@ -52,10 +50,9 @@ async def release_delete_validate(
     # if Release.pmc is None:
     #     raise FlashError("Release has no associated PMC")
 
-    rel_pmc = cast(orm.InstrumentedAttribute[models.PMC], models.Release.pmc)
     statement = (
         sqlmodel.select(models.Release)
-        .options(orm.selectinload(rel_pmc))
+        .options(db.eager_load(models.Release.pmc))
         .where(models.Release.storage_key == release_key)
     )
     result = await db_session.execute(statement)

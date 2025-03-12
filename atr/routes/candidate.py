@@ -19,10 +19,8 @@
 
 import datetime
 import secrets
-from typing import cast
 
 import quart
-import sqlalchemy.orm as orm
 
 # import sqlalchemy.orm.attributes as attributes
 import sqlmodel
@@ -140,10 +138,8 @@ async def root_candidate_create() -> response.Response | str:
 
     # Get PMC objects for all projects the user is a member of
     async with db.create_async_db_session() as db_session:
-        from sqlalchemy.sql.expression import ColumnElement
-
         project_list = web_session.committees + web_session.projects
-        project_name: ColumnElement[str] = cast(ColumnElement[str], models.PMC.project_name)
+        project_name = db.instrumented_attribute(models.PMC.project_name)
         statement = sqlmodel.select(models.PMC).where(project_name.in_(project_list))
         user_pmcs = (await db_session.execute(statement)).scalars().all()
 
@@ -170,19 +166,13 @@ async def root_candidate_review() -> str:
         # TODO: We don't actually record who uploaded the release candidate
         # We should probably add that information!
         # TODO: This duplicates code in root_package_add
-        release_pmc = orm.selectinload(cast(orm.InstrumentedAttribute[models.PMC], models.Release.pmc))
-        release_packages = orm.selectinload(
-            cast(orm.InstrumentedAttribute[list[models.Package]], models.Release.packages)
-        )
-        package_tasks = release_packages.selectinload(
-            cast(orm.InstrumentedAttribute[list[models.Task]], models.Package.tasks)
-        )
-        release_product_line = orm.selectinload(
-            cast(orm.InstrumentedAttribute[models.ProductLine], models.Release.product_line)
-        )
         statement = (
             sqlmodel.select(models.Release)
-            .options(release_pmc, release_packages, package_tasks, release_product_line)
+            .options(
+                db.eager_load(models.Release.pmc),
+                db.eager_load(models.Release.product_line),
+                db.eager_load2(models.Release.packages, models.Package.tasks),
+            )
             .join(models.PMC)
             .where(models.Release.stage == models.ReleaseStage.CANDIDATE)
         )

@@ -18,11 +18,9 @@
 """project.py"""
 
 import http.client
-from typing import cast
 
 import quart
 import quart_wtf
-import sqlalchemy.orm as orm
 import sqlmodel
 import werkzeug.wrappers.response as response
 import wtforms
@@ -51,10 +49,8 @@ async def root_project_view(project_name: str) -> str:
             sqlmodel.select(models.PMC)
             .where(models.PMC.project_name == project_name)
             .options(
-                orm.selectinload(
-                    cast(orm.attributes.InstrumentedAttribute[models.PublicSigningKey], models.PMC.public_signing_keys)
-                ),
-                orm.selectinload(cast(orm.attributes.InstrumentedAttribute[models.VotePolicy], models.PMC.vote_policy)),
+                db.eager_load(models.PMC.public_signing_keys),
+                db.eager_load(models.PMC.vote_policy),
             )
         )
 

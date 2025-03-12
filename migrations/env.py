@@ -1,5 +1,4 @@
 from logging.config import fileConfig
-from typing import Any, cast
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
@@ -43,10 +42,11 @@ def run_migrations_online() -> None:
         raise RuntimeError("sqlalchemy.url is not set")
 
     # Create synchronous engine for migrations
-    configuration = config.get_section(config.config_ini_section)
-    if configuration is None:
+    section = config.get_section(config.config_ini_section)
+    if section is None:
         configuration = {}
-    configuration = cast(dict[str, Any], configuration)
+    else:
+        configuration = dict(section)
     configuration["sqlalchemy.url"] = sync_url
 
     connectable = engine_from_config(

@@ -20,7 +20,7 @@ import logging
 import shutil
 import tempfile
 from collections.abc import Generator
-from typing import Any, BinaryIO, Final, cast
+from typing import Any, BinaryIO, Final
 
 import gnupg
 import sqlalchemy.sql as sql
@@ -46,13 +46,11 @@ def _check_core(pmc_name: str, artifact_path: str, signature_path: str) -> dict[
     # Query only the signing keys associated with this PMC
     # TODO: Rename create_sync_db_session to create_session_sync
     with db.create_sync_db_session() as session:
-        from sqlalchemy.sql.expression import ColumnElement
-
         statement = (
             sql.select(models.PublicSigningKey)
             .join(models.PMCKeyLink)
             .join(models.PMC)
-            .where(cast(ColumnElement[bool], models.PMC.project_name == pmc_name))
+            .where(db.instrumented_attribute(models.PMC.project_name) == pmc_name)
         )
         result = session.execute(statement)
         public_keys = [key.ascii_armored_key for key in result.scalars().all()]

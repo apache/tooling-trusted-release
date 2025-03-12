@@ -26,12 +26,10 @@ import pprint
 import shutil
 import tempfile
 from collections.abc import AsyncGenerator, Sequence
-from typing import cast
 
 import gnupg
 import quart
 import sqlalchemy.ext.asyncio
-import sqlalchemy.orm as orm
 import sqlmodel
 import werkzeug.wrappers.response as response
 
@@ -187,10 +185,8 @@ async def root_keys_add() -> str:
 
     # Get PMC objects for all projects the user is a member of
     async with db.create_async_db_session() as db_session:
-        from sqlalchemy.sql.expression import ColumnElement
-
         project_list = web_session.committees + web_session.projects
-        project_name = cast(ColumnElement[str], models.PMC.project_name)
+        project_name = db.instrumented_attribute(models.PMC.project_name)
         pmc_statement = sqlmodel.select(models.PMC).where(project_name.in_(project_list))
         user_pmcs = (await db_session.execute(pmc_statement)).scalars().all()
 
@@ -257,10 +253,9 @@ async def root_keys_review() -> str:
 
     # Get all existing keys for the user
     async with db.create_async_db_session() as db_session:
-        pmcs_loader = orm.selectinload(cast(orm.InstrumentedAttribute[list[models.PMC]], models.PublicSigningKey.pmcs))
         psk_statement = (
             sqlmodel.select(models.PublicSigningKey)
-            .options(pmcs_loader)
+            .options(db.eager_load(models.PublicSigningKey.pmcs))
             .where(models.PublicSigningKey.apache_uid == web_session.uid)
         )
         user_keys = (await db_session.execute(psk_statement)).scalars().all()

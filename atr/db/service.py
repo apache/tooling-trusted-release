@@ -17,15 +17,13 @@
 
 from collections.abc import Sequence
 from contextlib import nullcontext
-from typing import cast
 
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlmodel import select
 
-from atr.db.models import PMC, ProductLine, Release, Task
+import atr.db as db
+from atr.db.models import PMC, Release, Task
 
 from . import create_async_db_session
 
@@ -54,8 +52,8 @@ async def get_release_by_key(storage_key: str) -> Release | None:
         query = (
             select(Release)
             .where(Release.storage_key == storage_key)
-            .options(selectinload(cast(InstrumentedAttribute[PMC], Release.pmc)))
-            .options(selectinload(cast(InstrumentedAttribute[ProductLine], Release.product_line)))
+            .options(db.eager_load(Release.pmc))
+            .options(db.eager_load(Release.product_line))
         )
         result = await db_session.execute(query)
         return result.scalar_one_or_none()
@@ -70,8 +68,8 @@ def get_release_by_key_sync(storage_key: str) -> Release | None:
         query = (
             select(Release)
             .where(Release.storage_key == storage_key)
-            .options(selectinload(cast(InstrumentedAttribute[PMC], Release.pmc)))
-            .options(selectinload(cast(InstrumentedAttribute[ProductLine], Release.product_line)))
+            .options(db.eager_load(Release.pmc))
+            .options(db.eager_load(Release.product_line))
         )
         result = session.execute(query)
         return result.scalar_one_or_none()

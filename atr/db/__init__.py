@@ -17,6 +17,9 @@
 
 import logging
 import os
+from typing import Any
+
+import sqlalchemy.orm as orm
 
 # from alembic import command
 from alembic.config import Config
@@ -103,3 +106,24 @@ def create_sync_db_session() -> Session:
     global _SYNC_ENGINE
     assert _SYNC_ENGINE is not None
     return Session(_SYNC_ENGINE)
+
+
+def eager_load(*entities: Any) -> orm.strategy_options._AbstractLoad:
+    """Eagerly load the given entities from the query."""
+    for entity in entities:
+        entity = instrumented_attribute(entity)
+    return orm.selectinload(*entities)
+
+
+def eager_load2(a: Any, b: Any) -> orm.strategy_options._AbstractLoad:
+    """Eagerly load the given entities from the query."""
+    a = instrumented_attribute(a)
+    b = instrumented_attribute(b)
+    return orm.selectinload(a).selectinload(b)
+
+
+def instrumented_attribute(entity: Any) -> orm.InstrumentedAttribute:
+    """Check whether the object is an InstrumentedAttribute."""
+    if not isinstance(entity, orm.InstrumentedAttribute):
+        raise ValueError(f"Object must be an orm.InstrumentedAttribute, got: {type(entity)}")
+    return entity
