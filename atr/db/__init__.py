@@ -84,10 +84,24 @@ def create_database(app: QuartApp) -> None:
 
 def create_async_db_session() -> sqlalchemy.ext.asyncio.AsyncSession:
     """Create a new asynchronous database session."""
-    async_session = util.validate_as_type(
-        quart.current_app.extensions["async_session"](), sqlalchemy.ext.asyncio.AsyncSession
+    if quart.has_app_context():
+        extensions = quart.current_app.extensions
+        return util.validate_as_type(extensions["async_session"](), sqlalchemy.ext.asyncio.AsyncSession)
+
+    import atr.config as config
+
+    conf = config.get()
+    sqlite_url = f"sqlite+aiosqlite://{conf.SQLITE_DB_PATH}"
+    engine = sqlalchemy.ext.asyncio.create_async_engine(
+        sqlite_url,
+        connect_args={
+            "check_same_thread": False,
+            "timeout": 30,
+        },
     )
-    return async_session
+    return sqlalchemy.ext.asyncio.async_sessionmaker(
+        bind=engine, class_=sqlalchemy.ext.asyncio.AsyncSession, expire_on_commit=False
+    )()
 
 
 def create_sync_db_engine() -> None:

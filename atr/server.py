@@ -22,10 +22,10 @@ import os
 from collections.abc import Iterable
 from typing import Any
 
-from blockbuster import BlockBuster
-from quart import render_template
-from quart_schema import OpenAPIProvider, QuartSchema
-from werkzeug.routing import Rule
+import blockbuster
+import quart
+import quart_schema
+import werkzeug.routing as routing
 
 import asfquart
 import asfquart.base as base
@@ -33,11 +33,10 @@ import asfquart.generics
 import asfquart.session
 import atr.blueprints as blueprints
 import atr.config as config
+import atr.db as db
+import atr.manager as manager
+import atr.preload as preload
 import atr.ssh as ssh
-from asfquart.base import ASFQuartException
-from atr.db import create_database
-from atr.manager import get_worker_manager
-from atr.preload import setup_template_preloading
 
 # TODO: Technically this is a global variable
 # We should probably find a cleaner way to do this
@@ -48,15 +47,24 @@ asfquart.generics.OAUTH_URL_INIT = "https://oauth.apache.org/auth?state=%s&redir
 asfquart.generics.OAUTH_URL_CALLBACK = "https://oauth.apache.org/token?code=%s"
 
 
-class ApiOnlyOpenAPIProvider(OpenAPIProvider):
-    def generate_rules(self) -> Iterable[Rule]:
+class ApiOnlyOpenAPIProvider(quart_schema.OpenAPIProvider):
+    def generate_rules(self) -> Iterable[routing.Rule]:
         for rule in super().generate_rules():
             if rule.rule.startswith("/api"):
                 yield rule
 
 
 def register_routes(app: base.QuartApp) -> tuple[str, ...]:
-    from atr.routes import candidate, dev, docs, download, keys, package, project, release, root
+    # NOTE: These imports are for their side effects only
+    import atr.routes.candidate as candidate
+    import atr.routes.dev as dev
+    import atr.routes.docs as docs
+    import atr.routes.download as download
+    import atr.routes.keys as keys
+    import atr.routes.package as package
+    import atr.routes.project as project
+    import atr.routes.release as release
+    import atr.routes.root as root
 
     # Add a global error handler to show helpful error messages with tracebacks.
     @app.errorhandler(Exception)
@@ -65,21 +73,21 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
 
         tb = traceback.format_exc()
         app.logger.error(f"Unhandled exception: {error}\n{tb}")
-        return await render_template("error.html", error=str(error), traceback=tb, status_code=500), 500
+        return await quart.render_template("error.html", error=str(error), traceback=tb, status_code=500), 500
 
-    @app.errorhandler(ASFQuartException)
-    async def handle_asfquart_exception(error: ASFQuartException) -> Any:
+    @app.errorhandler(base.ASFQuartException)
+    async def handle_asfquart_exception(error: base.ASFQuartException) -> Any:
         # TODO: Figure out why pyright doesn't know about this attribute
         if not hasattr(error, "errorcode"):
             errorcode = 500
         else:
             errorcode = getattr(error, "errorcode")
-        return await render_template("error.html", error=str(error), status_code=errorcode), errorcode
+        return await quart.render_template("error.html", error=str(error), status_code=errorcode), errorcode
 
     # Add a global error handler in case a page does not exist.
     @app.errorhandler(404)
     async def handle_not_found(error: Exception) -> Any:
-        return await render_template("notfound.html", error="404 Not Found", traceback="", status_code=404), 404
+        return await quart.render_template("notfound.html", error="404 Not Found", traceback="", status_code=404), 404
 
     # Must do this otherwise ruff "fixes" this function by removing the imports
     return (
@@ -119,7 +127,7 @@ def app_setup_api_docs(app: base.QuartApp) -> None:
 
     import atr.metadata as metadata
 
-    QuartSchema(
+    quart_schema.QuartSchema(
         app,
         info=quart_schema.Info(
             title="ATR API",
@@ -154,7 +162,7 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
     @app.before_serving
     async def startup() -> None:
         """Start services before the app starts serving requests."""
-        worker_manager = get_worker_manager()
+        worker_manager = manager.get_worker_manager()
         await worker_manager.start()
 
         ssh_server = await ssh.server_start()
@@ -163,7 +171,7 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
     @app.after_serving
     async def shutdown() -> None:
         """Clean up services after the app stops serving requests."""
-        worker_manager = get_worker_manager()
+        worker_manager = manager.get_worker_manager()
         await worker_manager.stop()
 
         ssh_server = app.extensions.get("ssh_server")
@@ -197,7 +205,7 @@ def create_app(app_config: type[config.AppConfig]) -> base.QuartApp:
     app = app_create_base(app_config)
     app_setup_api_docs(app)
 
-    create_database(app)
+    db.create_database(app)
     register_routes(app)
     blueprints.register(app)
 
@@ -209,24 +217,24 @@ def create_app(app_config: type[config.AppConfig]) -> base.QuartApp:
 
     # do not enable template pre-loading if we explicitly want to reload templates
     if not app_config.TEMPLATES_AUTO_RELOAD:
-        setup_template_preloading(app)
+        preload.setup_template_preloading(app)
 
     @app.before_serving
     async def start_blockbuster() -> None:
         # "I'll have a P, please, Bob."
-        blockbuster: BlockBuster | None = None
+        bb: blockbuster.BlockBuster | None = None
         if config_mode == config.Mode.Profiling:
-            blockbuster = BlockBuster()
-        app.extensions["blockbuster"] = blockbuster
-        if blockbuster is not None:
-            blockbuster.activate()
+            bb = blockbuster.BlockBuster()
+        app.extensions["blockbuster"] = bb
+        if bb is not None:
+            bb.activate()
             app.logger.info("Blockbuster activated to detect blocking calls")
 
     @app.after_serving
     async def stop_blockbuster() -> None:
-        blockbuster = app.extensions.get("blockbuster")
-        if blockbuster is not None:
-            blockbuster.deactivate()
+        bb = app.extensions.get("blockbuster")
+        if bb is not None:
+            bb.deactivate()
             app.logger.info("Blockbuster deactivated")
 
     return app

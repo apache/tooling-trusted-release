@@ -22,6 +22,7 @@
 # the task to status='QUEUED'. For this to work, ideally we
 # need to check wall clock time as well as CPU time.
 
+import asyncio
 import datetime
 import json
 import logging
@@ -29,8 +30,7 @@ import os
 import resource
 import signal
 import sys
-import time
-from typing import Any
+from typing import Any, Final
 
 import sqlalchemy
 
@@ -45,11 +45,11 @@ import atr.tasks.signature as signature
 import atr.tasks.task as task
 import atr.tasks.vote as vote
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: Final = logging.getLogger(__name__)
 
 # Resource limits, 5 minutes and 1GB
-CPU_LIMIT_SECONDS = 300
-MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024
+# _CPU_LIMIT_SECONDS: Final = 300
+_MEMORY_LIMIT_BYTES: Final = 1024 * 1024 * 1024
 
 # # Create tables if they don't exist
 # SQLModel.metadata.create_all(engine)
@@ -59,23 +59,23 @@ def main() -> None:
     """Main entry point."""
     import atr.config as config
 
-    signal.signal(signal.SIGTERM, worker_signal_handle)
-    signal.signal(signal.SIGINT, worker_signal_handle)
+    signal.signal(signal.SIGTERM, _worker_signal_handle)
+    signal.signal(signal.SIGINT, _worker_signal_handle)
 
     conf = config.get()
     if os.path.isdir(conf.STATE_DIR):
         os.chdir(conf.STATE_DIR)
 
-    setup_logging()
+    _setup_logging()
 
     _LOGGER.info(f"Starting worker process with pid {os.getpid()}")
-    db.create_sync_db_engine()
+    # db.create_sync_db_engine()
 
-    worker_resources_limit_set()
-    worker_loop_run()
+    _worker_resources_limit_set()
+    asyncio.run(_worker_loop_run())
 
 
-def setup_logging() -> None:
+def _setup_logging() -> None:
     # Configure logging
     log_format = "[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
@@ -86,14 +86,14 @@ def setup_logging() -> None:
 # Task functions
 
 
-def task_error_handle(task_id: int, e: Exception) -> None:
+async def _task_error_handle(task_id: int, e: Exception) -> None:
     """Handle task error by updating the database with error information."""
     if isinstance(e, task.Error):
         _LOGGER.error(f"Task {task_id} failed: {e.message}")
         result = json.dumps(e.result)
-        with db.create_sync_db_session() as session:
-            with session.begin():
-                session.execute(
+        async with db.create_async_db_session() as session:
+            async with session.begin():
+                await session.execute(
                     sqlalchemy.text("""
                         UPDATE task
                         SET status = 'FAILED', completed = :now, error = :error, result = :result
@@ -108,9 +108,9 @@ def task_error_handle(task_id: int, e: Exception) -> None:
                 )
     else:
         _LOGGER.error(f"Task {task_id} failed: {e}")
-        with db.create_sync_db_session() as session:
-            with session.begin():
-                session.execute(
+        async with db.create_async_db_session() as session:
+            async with session.begin():
+                await session.execute(
                     sqlalchemy.text("""
                         UPDATE task
                         SET status = 'FAILED', completed = :now, error = :error
@@ -120,17 +120,17 @@ def task_error_handle(task_id: int, e: Exception) -> None:
                 )
 
 
-def task_next_claim() -> tuple[int, str, str] | None:
+async def _task_next_claim() -> tuple[int, str, str] | None:
     """
     Attempt to claim the oldest unclaimed task.
     Returns (task_id, task_type, task_args) if successful.
     Returns None if no tasks are available.
     """
-    with db.create_sync_db_session() as session:
-        with session.begin():
+    async with db.create_async_db_session() as session:
+        async with session.begin():
             # Find and claim the oldest unclaimed task
             # We have an index on (status, added)
-            result = session.execute(
+            result = await session.execute(
                 sqlalchemy.text("""
                     UPDATE task
                     SET started = :now, pid = :pid, status = 'ACTIVE'
@@ -153,15 +153,15 @@ def task_next_claim() -> tuple[int, str, str] | None:
             return None
 
 
-def task_result_process(
+async def _task_result_process(
     task_id: int, task_results: tuple[Any, ...], status: str = "COMPLETED", error: str | None = None
 ) -> None:
     """Process and store task results in the database."""
-    with db.create_sync_db_session() as session:
+    async with db.create_async_db_session() as session:
         result = json.dumps(task_results)
-        with session.begin():
+        async with session.begin():
             if status == "FAILED" and error:
-                session.execute(
+                await session.execute(
                     sqlalchemy.text("""
                         UPDATE task
                         SET status = :status, completed = :now, result = :result, error = :error
@@ -176,7 +176,7 @@ def task_result_process(
                     },
                 )
             else:
-                session.execute(
+                await session.execute(
                     sqlalchemy.text("""
                         UPDATE task
                         SET status = :status, completed = :now, result = :result
@@ -191,7 +191,7 @@ def task_result_process(
                 )
 
 
-def task_process(task_id: int, task_type: str, task_args: str) -> None:
+async def _task_process(task_id: int, task_type: str, task_args: str) -> None:
     """Process a claimed task."""
     _LOGGER.info(f"Processing task {task_id} ({task_type}) with args {task_args}")
     try:
@@ -202,6 +202,8 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
         dict_task_handlers = {
             "verify_archive_integrity": archive.check_integrity,
         }
+        # TODO: These are synchronous
+        # We plan to convert these to async dict handlers
         list_task_handlers = {
             "verify_archive_structure": archive.check_structure,
             "verify_license_files": license.check_files,
@@ -220,7 +222,7 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
                 msg = f"Unknown task type: {task_type}"
                 _LOGGER.error(msg)
                 raise Exception(msg)
-            status, error, task_results = dict_handler(args)
+            status, error, task_results = await dict_handler(args)
         else:
             list_handler = list_task_handlers.get(task_type)
             if not list_handler:
@@ -229,13 +231,13 @@ def task_process(task_id: int, task_type: str, task_args: str) -> None:
                 raise Exception(msg)
             status, error, task_results = list_handler(args)
 
-        task_result_process(task_id, task_results, status=status.value.upper(), error=error)
+        await _task_result_process(task_id, task_results, status=status.value.upper(), error=error)
 
     except Exception as e:
-        task_error_handle(task_id, e)
+        await _task_error_handle(task_id, e)
 
 
-def task_process_wrap(item: Any) -> tuple[Any, ...]:
+async def _task_process_wrap(item: Any) -> tuple[Any, ...]:
     """Ensure that returned results are structured as a tuple."""
     if not isinstance(item, tuple):
         return (item,)
@@ -245,27 +247,30 @@ def task_process_wrap(item: Any) -> tuple[Any, ...]:
 # Worker functions
 
 
-def worker_loop_run() -> None:
+async def _worker_loop_run() -> None:
     """Main worker loop."""
     while True:
         try:
-            task = task_next_claim()
+            task = await _task_next_claim()
             if task:
                 task_id, task_type, task_args = task
-                task_process(task_id, task_type, task_args)
+                await _task_process(task_id, task_type, task_args)
                 # Only process one task and then exit
                 # This prevents memory leaks from accumulating
                 break
             else:
                 # No tasks available, wait 20ms before checking again
-                time.sleep(0.02)
-        except Exception as e:
+                await asyncio.sleep(0.02)
+        except Exception:
             # TODO: Should probably be more robust about this
-            _LOGGER.error(f"Worker loop error: {e}")
-            time.sleep(1)
+            # Extract the traceback and log it
+            import traceback
+
+            _LOGGER.error(f"Worker loop error: {traceback.format_exc()}")
+            await asyncio.sleep(1)
 
 
-def worker_resources_limit_set() -> None:
+def _worker_resources_limit_set() -> None:
     """Set CPU and memory limits for this process."""
     # # Set CPU time limit
     # try:
@@ -276,13 +281,13 @@ def worker_resources_limit_set() -> None:
 
     # Set memory limit
     try:
-        resource.setrlimit(resource.RLIMIT_AS, (MEMORY_LIMIT_BYTES, MEMORY_LIMIT_BYTES))
-        _LOGGER.info(f"Set memory limit to {MEMORY_LIMIT_BYTES} bytes")
+        resource.setrlimit(resource.RLIMIT_AS, (_MEMORY_LIMIT_BYTES, _MEMORY_LIMIT_BYTES))
+        _LOGGER.info(f"Set memory limit to {_MEMORY_LIMIT_BYTES} bytes")
     except ValueError as e:
         _LOGGER.warning(f"Could not set memory limit: {e}")
 
 
-def worker_signal_handle(signum: int, frame: object) -> None:
+def _worker_signal_handle(signum: int, frame: object) -> None:
     """Handle termination signals gracefully."""
     # For RLIMIT_AS we'll generally get a SIGKILL
     # For RLIMIT_CPU we'll get a SIGXCPU, which we can catch

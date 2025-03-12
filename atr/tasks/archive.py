@@ -24,7 +24,7 @@ import pydantic
 
 import atr.tasks.task as task
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: Final = logging.getLogger(__name__)
 
 
 class CheckIntegrity(pydantic.BaseModel):
@@ -34,7 +34,7 @@ class CheckIntegrity(pydantic.BaseModel):
     chunk_size: int = pydantic.Field(default=4096, description="Size of chunks to read when checking the file")
 
 
-def check_integrity(args: dict[str, Any]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+async def check_integrity(args: dict[str, Any]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Check the integrity of a .tar.gz file."""
     # TODO: We should standardise the "ERROR" mechanism here in the data
     # Then we can have a single task wrapper for all tasks
@@ -73,7 +73,7 @@ def root_directory(tgz_path: str) -> str:
     return root
 
 
-def _check_integrity_core(tgz_path: str, chunk_size: int = 4096) -> int:
+async def _check_integrity_core(tgz_path: str, chunk_size: int = 4096) -> int:
     """Verify a .tar.gz file and compute its uncompressed size."""
     total_size = 0
 
