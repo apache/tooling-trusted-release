@@ -9,22 +9,18 @@
       {% block title %}
       {% endblock title %}
     </title>
+
     {% block stylesheets %}
       <link rel="stylesheet"
             href="{{ url_for('static', filename='css/normalize.css') }}" />
-      <link rel="stylesheet"
-            href="{{ url_for('static', filename='css/atr.css') }}" />
+      {% block theme_css %}
+        <link rel="stylesheet"
+              href="{{ url_for('static', filename='css/atr.css') }}" />
+      {% endblock theme_css %}
       <link rel="stylesheet"
             href="{{ url_for('static', filename='css/fontawesome.all.min.css') }}" />
-      <style>
-          .warning-banner {
-              border: 2px solid #dc3545;
-              background: #fcc;
-              padding: 1rem;
-              margin: 0 0 2rem 0;
-              border-radius: 4px;
-          }
-      </style>
+      <link rel="stylesheet"
+            href="{{ url_for('static', filename='css/bootstrap.custom.css') }}" />
     {% endblock stylesheets %}
     {% block head_extra %}
     {% endblock head_extra %}

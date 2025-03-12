@@ -75,23 +75,14 @@ label {
 }
 
 table {
-    width: 100%;
     border-collapse: collapse;
 }
 
 table th {
     text-align: left;
-    padding: 0.5rem;
-    font-weight: 500;
-    width: 30%;
-    color: #333333;
 }
 
 table td {
-    padding: 0.5rem;
-
-    /* Almost all of our tables have data in them */
-
     /* Not sure if we should keep it this way, but it seems pretty good */
     font-family: ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas", monospace;
     word-break: break-all;
@@ -153,21 +144,6 @@ footer a:visited {
 
 footer p {
     margin-bottom: 0;
-}
-
-button {
-    margin-top: 1rem;
-    padding: 0.5rem 1rem;
-    background: #004477;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 500;
-}
-
-button:hover {
-    background: #003366;
 }
 
 input,
