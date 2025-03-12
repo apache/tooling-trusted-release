@@ -27,6 +27,8 @@ dependencies = [
   "python-decouple~=3.8",
   "python-gnupg~=0.5",
   "quart-schema[pydantic]~=0.21",
+  "quart-wtforms~=1.0.3",
+  "email-validator~=2.2.0",
   "sqlmodel~=0.0",
 ]
 

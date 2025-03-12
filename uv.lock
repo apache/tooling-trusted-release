@@ -272,7 +272,7 @@ name = "click"
 version = "8.1.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "colorama", marker = "platform_system == 'Windows'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593 }
 wheels = [
@@ -424,6 +424,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b4/29/785595a0d8b30ab8d2486559cfba1d46487b8dcbd99f74960b6b4cca92a4/editorconfig-0.17.0.tar.gz", hash = "sha256:8739052279699840065d3a9f5c125d7d5a98daeefe53b0e5274261d77cb49aa2", size = 13369 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/af/e5/8dba39ea24ca3de0e954e668107692f4dfc13a85300a531fa9a39e83fde4/EditorConfig-0.17.0-py3-none-any.whl", hash = "sha256:fe491719c5f65959ec00b167d07740e7ffec9a3f362038c72b289330b9991dfc", size = 16276 },
+]
+
+[[package]]
+name = "email-validator"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dnspython" },
+    { name = "idna" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/48/ce/13508a1ec3f8bb981ae4ca79ea40384becc868bfae97fd1c942bb3a001b1/email_validator-2.2.0.tar.gz", hash = "sha256:cb690f344c617a714f22e66ae771445a1ceb46821152df8e165c5f9a364582b7", size = 48967 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d7/ee/bf0adb559ad3c786f12bcbc9296b3f5675f529199bef03e2df281fa1fadb/email_validator-2.2.0-py3-none-any.whl", hash = "sha256:561977c2d73ce3611850a06fa56b414621e0c8faa9d66f2611407d87465da631", size = 33521 },
 ]
 
 [[package]]
@@ -1038,6 +1051,34 @@ pydantic = [
 ]
 
 [[package]]
+name = "quart-uploads"
+version = "0.0.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiofiles" },
+    { name = "quart" },
+    { name = "types-aiofiles" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ed/31/f2e53ac5a7d12466131224a95971576af4f93b409af6a5c169e8aa87de7b/quart_uploads-0.0.4.tar.gz", hash = "sha256:fc19a99b45feada44e750c3b4b9ff323800451e5550e4b66b3003e688011d3fb", size = 9413 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/68/46/82696fd967415765cd73bcdee76894455347b08e9c188284b5bcfd0f3868/quart_uploads-0.0.4-py3-none-any.whl", hash = "sha256:67f7f53b975afb12c0630cebd6acde234c797fca98dd769a9088225aaacdd14a", size = 10971 },
+]
+
+[[package]]
+name = "quart-wtforms"
+version = "1.0.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "quart" },
+    { name = "quart-uploads" },
+    { name = "wtforms" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/dd/37/b563f8cc5e23438b468ee3af68ce02659d1b07704a51fd366005de4c7e59/quart_wtforms-1.0.3.tar.gz", hash = "sha256:9fa4b0203370d6f7294c387fae9e1f096bc1e77003f1207445ca5e1e01e80eb7", size = 10149 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ef/e3/d5f5c3e24dcf2314e9b5f2049bd07b272d1087a93a8ba324f10fbeb012fc/quart_wtforms-1.0.3-py3-none-any.whl", hash = "sha256:7d08214c9606d40d2b35c78a8c1eecc2913b03b09cd256d233c82c29c8526fab", size = 12399 },
+]
+
+[[package]]
 name = "regex"
 version = "2024.11.6"
 source = { registry = "https://pypi.org/simple" }
@@ -1167,12 +1208,14 @@ dependencies = [
     { name = "dkimpy" },
     { name = "dnspython" },
     { name = "dunamai" },
+    { name = "email-validator" },
     { name = "greenlet" },
     { name = "httpx" },
     { name = "hypercorn" },
     { name = "python-decouple" },
     { name = "python-gnupg" },
     { name = "quart-schema", extra = ["pydantic"] },
+    { name = "quart-wtforms" },
     { name = "sqlmodel" },
 ]
 
@@ -1203,12 +1246,14 @@ requires-dist = [
     { name = "dkimpy", git = "https://github.com/sbp/dkimpy.git?rev=main" },
     { name = "dnspython", specifier = ">=2.7.0,<3.0.0" },
     { name = "dunamai", specifier = ">=1.23.0" },
+    { name = "email-validator", specifier = "~=2.2.0" },
     { name = "greenlet", specifier = ">=3.1.1,<4.0.0" },
     { name = "httpx", specifier = "~=0.27" },
     { name = "hypercorn", specifier = "~=0.17" },
     { name = "python-decouple", specifier = "~=3.8" },
     { name = "python-gnupg", specifier = "~=0.5" },
     { name = "quart-schema", extras = ["pydantic"], specifier = "~=0.21" },
+    { name = "quart-wtforms", specifier = "~=1.0.3" },
     { name = "sqlmodel", specifier = "~=0.0" },
 ]
 
@@ -1232,7 +1277,7 @@ name = "tqdm"
 version = "4.67.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "colorama", marker = "platform_system == 'Windows'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a8/4b/29b4ef32e036bb34e4ab51796dd745cdba7ed47ad142a9f4a1eb8e0c744d/tqdm-4.67.1.tar.gz", hash = "sha256:f8aef9c52c08c13a65f30ea34f4e5aac3fd1a34959879d7e59e63027286627f2", size = 169737 }
 wheels = [
@@ -1325,6 +1370,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c9/4a/44d3c295350d776427904d73c189e10aeae66d7f555bb2feee16d1e4ba5a/wsproto-1.2.0.tar.gz", hash = "sha256:ad565f26ecb92588a3e43bc3d96164de84cd9902482b130d0ddbaa9664a85065", size = 53425 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/78/58/e860788190eba3bcce367f74d29c4675466ce8dddfba85f7827588416f01/wsproto-1.2.0-py3-none-any.whl", hash = "sha256:b9acddd652b585d75b20477888c56642fdade28bdfd3579aa24a4d2c037dd736", size = 24226 },
+]
+
+[[package]]
+name = "wtforms"
+version = "3.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markupsafe" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/01/e4/633d080897e769ed5712dcfad626e55dbd6cf45db0ff4d9884315c6a82da/wtforms-3.2.1.tar.gz", hash = "sha256:df3e6b70f3192e92623128123ec8dca3067df9cfadd43d59681e210cfb8d4682", size = 137801 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/08/c9/2088fb5645cd289c99ebe0d4cdcc723922a1d8e1beaefb0f6f76dff9b21c/wtforms-3.2.1-py3-none-any.whl", hash = "sha256:583bad77ba1dd7286463f21e11aa3043ca4869d03575921d1a1698d0715e0fd4", size = 152454 },
 ]
 
 [[package]]

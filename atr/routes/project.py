@@ -21,9 +21,11 @@ import http.client
 from typing import cast
 
 import quart
+import quart_wtf
 import sqlalchemy.orm as orm
 import sqlmodel
 import werkzeug.wrappers.response as response
+import wtforms
 
 import asfquart.session as session
 import atr.db as db
@@ -31,6 +33,7 @@ import atr.db.models as models
 import atr.db.service as service
 import atr.routes as routes
 from asfquart import base
+from atr.util import unwrap
 
 
 @routes.app_route("/projects")
@@ -80,44 +83,43 @@ async def root_project_voting_policy_add(project_name: str) -> response.Response
                 f"You must be a PMC member of {pmc.display_name} to submit a voting policy", errorcode=403
             )
 
-    # For POST requests, handle the release creation
-    if quart.request.method == "POST":
-        return await voting_policy_add_post(web_session, quart.request)
+    # TODO: the create_form method does not return the correct type but QuartForm
+    #       we should create our own baseclass that correctly add typing info
+    form = await CreateVotePolicyForm.create_form(data={"project_name": project_name})
+
+    if await form.validate_on_submit():
+        return await add_voting_policy(web_session, form)  # pyright: ignore [reportArgumentType]
 
     # For GET requests, show the form
     return await quart.render_template(
         "voting-policy-add.html",
         asf_id=web_session.uid,
         project=pmc,
+        form=form,
     )
 
 
-async def voting_policy_add_post(session: session.ClientSession, request: quart.Request) -> response.Response:
-    form = await routes.get_form(request)
+class CreateVotePolicyForm(quart_wtf.QuartForm):
+    project_name = wtforms.HiddenField("project_name")
+    mailto_addresses = wtforms.StringField(
+        "Email",
+        validators=[
+            wtforms.validators.InputRequired("Please provide a valid email address"),
+            wtforms.validators.Email(),
+        ],
+    )
+    min_hours = wtforms.IntegerField(
+        "Minimum Voting Period:", widget=wtforms.widgets.NumberInput(min=0, max=144), default=72
+    )
+    manual_vote = wtforms.BooleanField("Voting Process:")
+    release_checklist = wtforms.StringField("Release Checklist:", widget=wtforms.widgets.TextArea())
+    pause_for_rm = wtforms.BooleanField("Pause for RM:")
 
-    project_name = form.get("project_name")
-    if not project_name:
-        raise base.ASFQuartException("Project name is required", errorcode=400)
+    submit = wtforms.SubmitField("Add")
 
-    mailto_addresses = form.get("mailto_addresses")
-    if not mailto_addresses:
-        raise base.ASFQuartException("Mailto addresses are required", errorcode=400)
 
-    manual_vote = bool(form.get("manual_vote"))
-    if not manual_vote:
-        raise base.ASFQuartException("Manual vote is required", errorcode=400)
-
-    min_hours = form.get("min_hours")
-    if not min_hours:
-        raise base.ASFQuartException("Min hours is required", errorcode=400)
-
-    release_checklist = form.get("release_checklist")
-    if not release_checklist:
-        release_checklist = ""
-
-    pause_for_rm = bool(form.get("pause_for_rm"))
-    if not pause_for_rm:
-        raise base.ASFQuartException("Pause for RM is required", errorcode=400)
+async def add_voting_policy(session: session.ClientSession, form: CreateVotePolicyForm) -> response.Response:
+    project_name = form.project_name.data
 
     async with db.create_async_db_session() as db_session:
         async with db_session.begin():
@@ -131,11 +133,11 @@ async def voting_policy_add_post(session: session.ClientSession, request: quart.
                 )
 
             vote_policy = models.VotePolicy(
-                mailto_addresses=mailto_addresses,
-                manual_vote=manual_vote,
-                min_hours=min_hours,
-                release_checklist=release_checklist,
-                pause_for_rm=pause_for_rm,
+                mailto_addresses=[unwrap(form.mailto_addresses.data)],
+                manual_vote=form.manual_vote.data,
+                min_hours=unwrap(form.min_hours.data),
+                release_checklist=unwrap(form.release_checklist.data),
+                pause_for_rm=form.pause_for_rm.data,
             )
             db_session.add(vote_policy)
 

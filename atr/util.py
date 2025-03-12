@@ -20,13 +20,15 @@ import functools
 import hashlib
 import pathlib
 from collections.abc import Mapping
-from typing import Annotated, Any
+from typing import Annotated, Any, TypeVar
 
 import aiofiles
 import pydantic
 import pydantic_core
 
 import atr.config as config
+
+T = TypeVar("T")
 
 
 @functools.cache
@@ -123,3 +125,17 @@ class DictToList:
             _get_dict_to_list_validator(adapter, self.key),
             handler(source_type),
         )
+
+
+def unwrap(value: T | None, error_message: str = "unexpected None when unwrapping value") -> T:
+    """
+    Will unwrap the given value or raise a ValueError if it is None
+
+    :param value: the optional value to unwrap
+    :param error_message: the error message when failing to unwrap
+    :return: the value or a ValueError if it is None
+    """
+    if value is None:
+        raise ValueError(error_message)
+    else:
+        return value

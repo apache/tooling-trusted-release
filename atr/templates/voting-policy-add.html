@@ -120,6 +120,17 @@
       input[type="number"] {
           width: 100px;
       }
+
+      input[type="submit"] {
+          margin-top: 1rem;
+          padding: 0.5rem 1rem;
+          background: #004477;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 500;
+      }
   </style>
 {% endblock stylesheets %}
 
@@ -131,49 +142,40 @@
 
   <form method="post" enctype="multipart/form-data" class="striking">
     <input type="hidden" name="form_type" value="single" />
+
+    {{ form.hidden_tag() }}
+    {% for field, errors in form.errors.items() %}
+      <div class="alert alert-error">{{ form[field].label }}: {{ ', '.join(errors) }}</div>
+    {% endfor %}
+
     <table class="form-table">
       <tbody>
         <tr>
           <th>
-            <label for="project_name">Project:</label>
+            <label>Project:</label>
           </th>
           <td>
-            <input type="hidden"
-                   id="project_name"
-                   name="project_name"
-                   readonly
-                   value="{{ project.display_name }}" />
             <p id="project_name_text">{{ project.display_name }}</p>
           </td>
         </tr>
 
         <tr>
-          <th>
-            <label for="mailto_addresses">Vote Email Addresses:</label>
-          </th>
+          <th>{{ form.mailto_addresses.label }}</th>
           <td>
-            <div class="checkbox-group">
-              <div>
-                <input type="email"
-                       id="mailto_addresses"
-                       name="mailto_addresses"
-                       pattern=".+@apache\.org"
-                       size="30"
-                       required />
-              </div>
-            </div>
+            <div>{{ form.mailto_addresses(size=30) }}</div>
+            {% if form.mailto_addresses.errors -%}
+              <span class="error-message">{{ form.mailto_addresses.errors[0] }}</span>
+            {%- endif %}
           </td>
         </tr>
 
         <tr>
-          <th>
-            <label for="manual_vote">Voting Process:</label>
-          </th>
+          <th>{{ form.manual_vote.label }}</th>
           <td>
             <div class="checkbox-group">
               <div>
-                <input type="checkbox" id="manual_vote" name="manual_vote" />
-                <label for="manual_vote">Manual Voting</label>
+                {{ form.manual_vote() }}
+                <label>Manual</label>
                 <span id="manual_vote-help" class="help-text">If this is set then the vote will be completely manual and following policy is ignored.</span>
               </div>
             </div>
@@ -181,45 +183,29 @@
         </tr>
 
         <tr>
-          <th>
-            <label for="min_hours">Minimum Voting Period:</label>
-          </th>
+          <th>{{ form.min_hours.label }}</th>
           <td>
-            <input type="number"
-                   id="min_hours"
-                   name="min_hours"
-                   value="72"
-                   min="0"
-                   max="144"
-                   required
-                   aria-describedby="min_hours-help" />
+            {{ form.min_hours() }}
             <span id="min_hours-help" class="help-text">The minimum time to run the vote. If set to 0 then wait until 3 +1 votes and more +1 than -1.</span>
           </td>
         </tr>
 
         <tr>
-          <th>
-            <label for="release_checklist">Release checklist:</label>
-          </th>
+          <th>{{ form.release_checklist.label }}</th>
           <td>
-            <textarea type="text"
-                      style="resize: vertical"
-                      id="release_checklist"
-                      name="release_checklist"
-                      rows="10"></textarea>
+            {{ form.release_checklist(rows=10, style='resize: vertical') }}
             <span id="release_checklist-help" class="help-text">Markdown text describing how to test release candidates.</span>
           </td>
         </tr>
 
         <tr>
-          <th>
-            <label for="pause_for_rm">Pause for RM:</label>
-          </th>
+          <th>{{ form.pause_for_rm.label }}</th>
           <td>
             <div class="checkbox-group">
               <div>
-                <input type="checkbox" id="pause_for_rm" name="pause_for_rm" checked />
-                <label for="pause_for_rm">Enabled</label>
+                {{ form.pause_for_rm() }}
+                <label>Enabled</label>
+                <span id="pause_for_rm-help" class="help-text">If enabled, RM can confirm manually if the vote has passed.</span>
               </div>
             </div>
           </td>
@@ -227,9 +213,7 @@
 
         <tr>
           <td></td>
-          <td>
-            <button type="submit">Save</button>
-          </td>
+          <td>{{ form.submit() }}</td>
         </tr>
       </tbody>
     </table>

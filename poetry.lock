@@ -806,6 +806,22 @@ files = [
 ]
 
 [[package]]
+name = "email-validator"
+version = "2.2.0"
+description = "A robust email address syntax and deliverability validation library."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "email_validator-2.2.0-py3-none-any.whl", hash = "sha256:561977c2d73ce3611850a06fa56b414621e0c8faa9d66f2611407d87465da631"},
+    {file = "email_validator-2.2.0.tar.gz", hash = "sha256:cb690f344c617a714f22e66ae771445a1ceb46821152df8e165c5f9a364582b7"},
+]
+
+[package.dependencies]
+dnspython = ">=2.0.0"
+idna = ">=2.0.0"
+
+[[package]]
 name = "ezt"
 version = "1.1"
 description = "EaZy Templating for Python."
@@ -2104,6 +2120,40 @@ msgspec = ["msgspec (>=0.18)"]
 pydantic = ["pydantic (>=2)"]
 
 [[package]]
+name = "quart-uploads"
+version = "0.0.4"
+description = ""
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "quart_uploads-0.0.4-py3-none-any.whl", hash = "sha256:67f7f53b975afb12c0630cebd6acde234c797fca98dd769a9088225aaacdd14a"},
+    {file = "quart_uploads-0.0.4.tar.gz", hash = "sha256:fc19a99b45feada44e750c3b4b9ff323800451e5550e4b66b3003e688011d3fb"},
+]
+
+[package.dependencies]
+aiofiles = ">=24.0.0"
+quart = ">=0.19"
+types-aiofiles = "*"
+
+[[package]]
+name = "quart-wtforms"
+version = "1.0.3"
+description = "Simple Integration of Quart and WTForms."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "quart_wtforms-1.0.3-py3-none-any.whl", hash = "sha256:7d08214c9606d40d2b35c78a8c1eecc2913b03b09cd256d233c82c29c8526fab"},
+    {file = "quart_wtforms-1.0.3.tar.gz", hash = "sha256:9fa4b0203370d6f7294c387fae9e1f096bc1e77003f1207445ca5e1e01e80eb7"},
+]
+
+[package.dependencies]
+quart = ">=0.19"
+quart-uploads = ">=0.0.2"
+WTForms = ">=3.0"
+
+[[package]]
 name = "regex"
 version = "2024.11.6"
 description = "Alternative regular expression module, to replace re."
@@ -2421,7 +2471,7 @@ version = "24.1.0.20241221"
 description = "Typing stubs for aiofiles"
 optional = false
 python-versions = ">=3.8"
-groups = ["dev"]
+groups = ["main", "dev"]
 files = [
     {file = "types_aiofiles-24.1.0.20241221-py3-none-any.whl", hash = "sha256:11d4e102af0627c02e8c1d17736caa3c39de1058bea37e2f4de6ef11a5b652ab"},
     {file = "types_aiofiles-24.1.0.20241221.tar.gz", hash = "sha256:c40f6c290b0af9e902f7f3fa91213cf5bb67f37086fb21dc0ff458253586ad55"},
@@ -2608,6 +2658,24 @@ files = [
 h11 = ">=0.9.0,<1"
 
 [[package]]
+name = "wtforms"
+version = "3.2.1"
+description = "Form validation and rendering for Python web development."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "wtforms-3.2.1-py3-none-any.whl", hash = "sha256:583bad77ba1dd7286463f21e11aa3043ca4869d03575921d1a1698d0715e0fd4"},
+    {file = "wtforms-3.2.1.tar.gz", hash = "sha256:df3e6b70f3192e92623128123ec8dca3067df9cfadd43d59681e210cfb8d4682"},
+]
+
+[package.dependencies]
+markupsafe = "*"
+
+[package.extras]
+email = ["email-validator"]
+
+[[package]]
 name = "yarl"
 version = "1.18.3"
 description = "Yet another URL library"
@@ -2707,4 +2775,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = "~=3.13"
-content-hash = "7e592890a67b4b1330a5a71dae579a37ff165eaeedf5e4f86a361e04eebdd46f"
+content-hash = "ce8f4d508edeea06cdeda5bdbb75c056be198b37c32d9c59be54373942ba9438"
