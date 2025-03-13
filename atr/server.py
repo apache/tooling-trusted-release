@@ -72,8 +72,9 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
     async def handle_any_exception(error: Exception) -> Any:
         import traceback
 
+        # Required to give to the error.html template
         tb = traceback.format_exc()
-        app.logger.error(f"Unhandled exception: {error}\n{tb}")
+        app.logger.exception("Unhandled exception")
         return await quart.render_template("error.html", error=str(error), traceback=tb, status_code=500), 500
 
     @app.errorhandler(base.ASFQuartException)

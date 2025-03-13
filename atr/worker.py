@@ -259,14 +259,11 @@ async def _worker_loop_run() -> None:
                 # This prevents memory leaks from accumulating
                 break
             else:
-                # No tasks available, wait 20ms before checking again
+                # No tasks available, wait 100ms before checking again
                 await asyncio.sleep(0.1)
         except Exception:
             # TODO: Should probably be more robust about this
-            # Extract the traceback and log it
-            import traceback
-
-            _LOGGER.error(f"Worker loop error: {traceback.format_exc()}")
+            _LOGGER.exception("Worker loop error")
             await asyncio.sleep(1)
 
 

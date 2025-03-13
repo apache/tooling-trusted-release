@@ -215,10 +215,9 @@ def _check_licenses_core(
                 }
 
     except Exception as e:
-        _LOGGER.error(f"Error running Apache RAT: {e}")
         import traceback
 
-        _LOGGER.error(traceback.format_exc())
+        _LOGGER.exception("Error running Apache RAT")
         return {
             "valid": False,
             "message": f"Failed to run Apache RAT: {e!s}",
