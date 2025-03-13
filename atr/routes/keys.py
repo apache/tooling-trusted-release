@@ -154,7 +154,7 @@ async def key_user_session_add(
 
         # Link key to selected PMCs
         for pmc_name in selected_pmcs:
-            pmc_statement = sqlmodel.select(models.PMC).where(models.PMC.project_name == pmc_name)
+            pmc_statement = sqlmodel.select(models.PMC).where(models.PMC.name == pmc_name)
             pmc = (await db_session.execute(pmc_statement)).scalar_one_or_none()
             if pmc and pmc.id:
                 link = models.PMCKeyLink(pmc_id=pmc.id, key_fingerprint=key_record.fingerprint)
@@ -187,8 +187,8 @@ async def root_keys_add() -> str:
     async with db.create_async_db_session() as db_session:
         project_list = web_session.committees + web_session.projects
         # Using isinstance also works here
-        project_name = db.validate_instrumented_attribute(models.PMC.project_name)
-        pmc_statement = sqlmodel.select(models.PMC).where(project_name.in_(project_list))
+        pmc_name = db.validate_instrumented_attribute(models.PMC.name)
+        pmc_statement = sqlmodel.select(models.PMC).where(pmc_name.in_(project_list))
         user_pmcs = (await db_session.execute(pmc_statement)).scalars().all()
 
     if quart.request.method == "POST":

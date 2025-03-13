@@ -66,7 +66,7 @@ class Args:
     max_concurrent: int
 
     @staticmethod
-    def from_list(args: list[str]) -> "Args":
+    def from_dict(args: dict[str, Any]) -> "Args":
         """Parse command line arguments."""
         _LOGGER.debug(f"Parsing arguments: {args}")
 
@@ -74,12 +74,12 @@ class Args:
             _LOGGER.error(f"Invalid number of arguments: {len(args)}, expected 6")
             raise ValueError("Invalid number of arguments")
 
-        release_key = args[0]
-        base_url = args[1]
-        file_types = args[2]
-        require_sigs = args[3]
-        max_depth = args[4]
-        max_concurrent = args[5]
+        release_key = args["release_key"]
+        base_url = args["base_url"]
+        file_types = args["file_types"]
+        require_sigs = args["require_sigs"]
+        max_depth = args["max_depth"]
+        max_concurrent = args["max_concurrent"]
 
         _LOGGER.debug(
             f"Extracted values - release_key: {release_key}, base_url: {base_url}, "
@@ -285,7 +285,7 @@ def database_progress_percentage_calculate(progress: tuple[int, int] | None) -> 
     return percentage
 
 
-def download(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+async def download(args: dict[str, Any]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Download bulk package from URL."""
     # Returns (status, error, result)
     # This is the main task entry point, called by worker.py
@@ -293,7 +293,7 @@ def download(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]
     _LOGGER.info(f"Starting bulk download task with args: {args}")
     try:
         _LOGGER.debug("Delegating to download_core function")
-        status, error, result = download_core(args)
+        status, error, result = await download_core(args)
         _LOGGER.info(f"Download completed with status: {status}")
         return status, error, result
     except Exception as e:
@@ -302,33 +302,32 @@ def download(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]
         return task.FAILED, str(e), ({"message": f"Error: {e}", "progress": 0},)
 
 
-def download_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+async def download_core(args_dict: dict[str, Any]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     """Download bulk package from URL."""
     _LOGGER.info("Starting download_core")
     try:
-        _LOGGER.debug(f"Parsing arguments: {args_list}")
-        args = Args.from_list(args_list)
+        _LOGGER.debug(f"Parsing arguments: {args_dict}")
+        args = Args.from_dict(args_dict)
         _LOGGER.info(f"Args parsed successfully: release_key={args.release_key}, base_url={args.base_url}")
 
         # Create async resources
         _LOGGER.debug("Creating async queue and semaphore")
         queue: asyncio.Queue[str] = asyncio.Queue()
         semaphore = asyncio.Semaphore(args.max_concurrent)
-        loop = asyncio.get_event_loop()
 
         # Start URL crawling
-        loop.run_until_complete(database_message(f"Crawling URLs from {args.base_url}"))
+        await database_message(f"Crawling URLs from {args.base_url}")
 
         _LOGGER.info("Starting artifact_urls coroutine")
-        signatures, artifacts = loop.run_until_complete(artifact_urls(args, queue, semaphore))
+        signatures, artifacts = await artifact_urls(args, queue, semaphore)
         _LOGGER.info(f"Found {len(signatures)} signatures and {len(artifacts)} artifacts")
 
         # Update progress for download phase
-        loop.run_until_complete(database_message(f"Found {len(artifacts)} artifacts to download"))
+        await database_message(f"Found {len(artifacts)} artifacts to download")
 
         # Download artifacts
         _LOGGER.info("Starting artifacts_download coroutine")
-        artifacts_downloaded = loop.run_until_complete(artifacts_download(artifacts, semaphore))
+        artifacts_downloaded = await artifacts_download(artifacts, semaphore)
         files_downloaded = len(artifacts_downloaded)
 
         # Return a result dictionary
@@ -349,12 +348,13 @@ def download_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[
 
     except Exception as e:
         _LOGGER.exception(f"Error in download_core: {e}")
+        base_url = args_dict["base_url"] if len(args_dict) > 1 else "unknown URL"
         return (
             task.FAILED,
             str(e),
             (
                 {
-                    "message": f"Failed to download from {args_list[1] if len(args_list) > 1 else 'unknown URL'}",
+                    "message": f"Failed to download from {base_url}",
                     "progress": 0,
                 },
             ),

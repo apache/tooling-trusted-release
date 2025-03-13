@@ -79,7 +79,7 @@
   <div class="pmc-grid">
     {% for pmc in projects %}
       <div class="pmc-card"
-           onclick="location.href='{{ url_for("root_project_view", project_name=pmc.project_name) }}';">
+           onclick="location.href='{{ url_for("root_project_view", project_name=pmc.name) }}';">
         <div class="pmc-name">{{ pmc.display_name }}</div>
         <div class="pmc-stats">
           <div class="stat-item">

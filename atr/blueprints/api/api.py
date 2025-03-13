@@ -32,10 +32,10 @@ from atr.db.service import get_pmc_by_name, get_pmcs, get_tasks
 #        For now, just explicitly dump the model.
 
 
-@api.BLUEPRINT.route("/projects/<project_name>")
+@api.BLUEPRINT.route("/projects/<name>")
 @validate_response(PMC, 200)
-async def project_by_name(project_name: str) -> tuple[Mapping, int]:
-    pmc = await get_pmc_by_name(project_name)
+async def project_by_name(name: str) -> tuple[Mapping, int]:
+    pmc = await get_pmc_by_name(name)
     if pmc:
         return pmc.model_dump(), 200
     else:

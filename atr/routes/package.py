@@ -206,13 +206,14 @@ async def package_data_get(
 ) -> models.Package:
     """Validate package deletion request and return the package if valid."""
     # Get the package and its associated release
-    # if Package.release is None:
-    #     raise FlashError("Package has no associated release")
-    # if Release.pmc is None:
-    #     raise FlashError("Release has no associated PMC")
     statement = (
         sqlmodel.select(models.Package)
-        .options(db.select_in_load_nested(models.Package.release, models.Release.pmc))
+        .options(
+            db.select_in_load(models.Package.release),
+            db.select_in_load_nested(
+                models.Package.release, models.Release.product, models.Product.project, models.Project.pmc
+            ),
+        )
         .where(models.Package.artifact_sha3 == artifact_sha3)
     )
     result = await db_session.execute(statement)
@@ -339,7 +340,14 @@ async def package_add_bulk_post(form: datastructures.MultiDict, request: quart.R
             task = models.Task(
                 status=models.TaskStatus.QUEUED,
                 task_type="package_bulk_download",
-                task_args=[release_key, url, file_types, require_signatures, max_depth, max_concurrency],
+                task_args={
+                    "release_key": release_key,
+                    "base_url": url,
+                    "file_types": file_types,
+                    "require_sigs": require_signatures,
+                    "max_depth": max_depth,
+                    "max_concurrent": max_concurrency,
+                },
             )
             db_session.add(task)
             # Flush to get the task ID
@@ -372,13 +380,13 @@ async def root_package_add() -> response.Response | str:
 
     # Get all releases where the user is a PMC member or committer of the associated PMC
     async with db.create_async_db_session() as db_session:
-        # TODO: This duplicates code in root_candidate_review
-        release_pmc = db.select_in_load(models.Release.pmc)
-        release_product_line = db.select_in_load(models.Release.product_line)
+        # Load all the necessary relationships for the pmc property to work
+        project_pmc = db.select_in_load_nested(models.Release.product, models.Product.project, models.Project.pmc)
+
+        # Only query releases in candidate stage
         statement = (
             sqlmodel.select(models.Release)
-            .options(release_pmc, release_product_line)
-            .join(models.PMC)
+            .options(project_pmc)
             .where(models.Release.stage == models.ReleaseStage.CANDIDATE)
         )
         releases = (await db_session.execute(statement)).scalars().all()
@@ -595,7 +603,7 @@ async def task_verification_create(
             status=models.TaskStatus.QUEUED,
             task_type="verify_signature",
             task_args=[
-                package.release.pmc.project_name,
+                package.release.pmc.name,
                 "releases/" + package.artifact_sha3,
                 "releases/" + package.signature_sha3,
             ],

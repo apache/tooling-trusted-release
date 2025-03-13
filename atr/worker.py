@@ -201,6 +201,7 @@ async def _task_process(task_id: int, task_type: str, task_args: str) -> None:
         # TODO: We should use a decorator to register these automatically
         dict_task_handlers = {
             "verify_archive_integrity": archive.check_integrity,
+            "package_bulk_download": bulk.download,
         }
         # TODO: These are synchronous
         # We plan to convert these to async dict handlers
@@ -211,7 +212,6 @@ async def _task_process(task_id: int, task_type: str, task_args: str) -> None:
             "verify_license_headers": license.check_headers,
             "verify_rat_license": rat.check_licenses,
             "generate_cyclonedx_sbom": sbom.generate_cyclonedx,
-            "package_bulk_download": bulk.download,
             "mailtest_send": mailtest.send,
             "vote_initiate": vote.initiate,
         }

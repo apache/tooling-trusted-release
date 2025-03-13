@@ -176,9 +176,9 @@ def initiate_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[
             _LOGGER.error(error_msg)
             return task.FAILED, error_msg, tuple()
 
-        pmc_name = release.pmc.project_name
+        pmc_name = release.pmc.name
         pmc_display = release.pmc.display_name
-        product_name = release.product_line.product_name if release.product_line else "Unknown"
+        product_name = release.product.product_name if release.product else "Unknown"
         version = release.version
 
         # Create email subject

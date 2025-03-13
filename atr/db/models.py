@@ -73,20 +73,30 @@ class VotePolicy(sqlmodel.SQLModel, table=True):
 
     # One-to-many: A vote policy can be used by multiple PMCs
     pmcs: list["PMC"] = sqlmodel.Relationship(back_populates="vote_policy")
+    # One-to-many: A vote policy can be used by multiple projects
+    projects: list["Project"] = sqlmodel.Relationship(back_populates="vote_policy")
     # One-to-many: A vote policy can be used by multiple product lines
-    product_lines: list["ProductLine"] = sqlmodel.Relationship(back_populates="vote_policy")
+    products: list["Product"] = sqlmodel.Relationship(back_populates="vote_policy")
     # One-to-many: A vote policy can be used by multiple releases
     releases: list["Release"] = sqlmodel.Relationship(back_populates="vote_policy")
 
 
 class PMC(sqlmodel.SQLModel, table=True):
     id: int = sqlmodel.Field(default=None, primary_key=True)
-    project_name: str = sqlmodel.Field(unique=True)
-    # True if this is an incubator podling with a PPMC, otherwise False
+    name: str = sqlmodel.Field(unique=True)
+    full_name: str | None = sqlmodel.Field(default=None)
+    # True only if this is an incubator podling with a PPMC
     is_podling: bool = sqlmodel.Field(default=False)
 
-    # One-to-many: A PMC can have multiple product lines, each product line belongs to one PMC
-    product_lines: list["ProductLine"] = sqlmodel.Relationship(back_populates="pmc")
+    # One-to-many: A PMC can have multiple child PMCs, each child PMC belongs to one parent PMC
+    child_pmcs: list["PMC"] = sqlmodel.Relationship(
+        sa_relationship_kwargs=dict(
+            backref=sqlalchemy.orm.backref("parent_pmc", remote_side="PMC.id"),
+        ),
+    )
+    parent_pmc_id: int | None = sqlmodel.Field(default=None, foreign_key="pmc.id")
+    # One-to-many: A PMC can have multiple projects, each project belongs to one PMC
+    projects: list["Project"] = sqlmodel.Relationship(back_populates="pmc")
 
     pmc_members: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
     committers: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
@@ -99,36 +109,59 @@ class PMC(sqlmodel.SQLModel, table=True):
     vote_policy_id: int | None = sqlmodel.Field(default=None, foreign_key="votepolicy.id")
     vote_policy: VotePolicy | None = sqlmodel.Relationship(back_populates="pmcs")
 
-    # One-to-many: A PMC can have multiple releases
-    releases: list["Release"] = sqlmodel.Relationship(back_populates="pmc")
-
     @property
     def display_name(self) -> str:
         """Get the display name for the PMC/PPMC."""
-        if self.is_podling:
-            return f"{self.project_name} (podling)"
-        return self.project_name
+        name = self.name if self.full_name is None else self.full_name
+        return f"{name} (PPMC)" if self.is_podling else name
 
 
-class ProductLine(sqlmodel.SQLModel, table=True):
-    id: int = sqlmodel.Field(default=None, primary_key=True)
+class Project(sqlmodel.SQLModel, table=True):
+    id: int | None = sqlmodel.Field(default=None, primary_key=True)
+    name: str = sqlmodel.Field(unique=True)
+    full_name: str | None = sqlmodel.Field(default=None)
+
+    # True if this a podling PPMC
+    is_podling: bool = sqlmodel.Field(default=False)
 
     # Many-to-one: A product line belongs to one PMC, a PMC can have multiple product lines
-    pmc_id: int = sqlmodel.Field(foreign_key="pmc.id")
-    pmc: PMC = sqlmodel.Relationship(back_populates="product_lines")
+    pmc_id: int | None = sqlmodel.Field(default=None, foreign_key="pmc.id")
+    pmc: PMC | None = sqlmodel.Relationship(back_populates="projects")
+
+    # One-to-many: A PMC can have multiple product lines, each product line belongs to one PMC
+    products: list["Product"] = sqlmodel.Relationship(back_populates="project")
+
+    # Many-to-one: A Project can have one vote policy, a vote policy can be used by multiple entities
+    vote_policy_id: int | None = sqlmodel.Field(default=None, foreign_key="votepolicy.id")
+    vote_policy: VotePolicy | None = sqlmodel.Relationship(back_populates="projects")
+
+    @property
+    def display_name(self) -> str:
+        """Get the display name for the Project."""
+        name = self.name if self.full_name is None else self.full_name
+        return f"{name} (podling)" if self.is_podling else name
+
+
+class Product(sqlmodel.SQLModel, table=True):
+    id: int = sqlmodel.Field(default=None, primary_key=True)
+
+    # Many-to-one: A product line belongs to one project, a project can have multiple product lines
+    project_id: int | None = sqlmodel.Field(default=None, foreign_key="project.id")
+    project: Project | None = sqlmodel.Relationship(back_populates="products")
 
     product_name: str
+    # TODO: This could be computed dynamically from Product.releases[-1].version
     latest_version: str
 
     # One-to-many: A product line can have multiple distribution channels, each channel belongs to one product line
-    distribution_channels: list["DistributionChannel"] = sqlmodel.Relationship(back_populates="product_line")
+    distribution_channels: list["DistributionChannel"] = sqlmodel.Relationship(back_populates="product")
 
     # Many-to-one: A product line can have one vote policy, a vote policy can be used by multiple entities
     vote_policy_id: int | None = sqlmodel.Field(default=None, foreign_key="votepolicy.id")
-    vote_policy: VotePolicy | None = sqlmodel.Relationship(back_populates="product_lines")
+    vote_policy: VotePolicy | None = sqlmodel.Relationship(back_populates="products")
 
     # One-to-many: A product line can have multiple releases, each release belongs to one product line
-    releases: list["Release"] = sqlmodel.Relationship(back_populates="product_line")
+    releases: list["Release"] = sqlmodel.Relationship(back_populates="product")
 
 
 class DistributionChannel(sqlmodel.SQLModel, table=True):
@@ -140,8 +173,8 @@ class DistributionChannel(sqlmodel.SQLModel, table=True):
     automation_endpoint: str
 
     # Many-to-one: A distribution channel belongs to one product line, a product line can have multiple channels
-    product_line_id: int = sqlmodel.Field(foreign_key="productline.id")
-    product_line: ProductLine = sqlmodel.Relationship(back_populates="distribution_channels")
+    product_id: int = sqlmodel.Field(foreign_key="product.id")
+    product: Product = sqlmodel.Relationship(back_populates="distribution_channels")
 
 
 class Package(sqlmodel.SQLModel, table=True):
@@ -260,15 +293,15 @@ class Release(sqlmodel.SQLModel, table=True):
     phase: ReleasePhase
     created: datetime.datetime
 
-    # Many-to-one: A release belongs to one PMC, a PMC can have multiple releases
-    pmc_id: int = sqlmodel.Field(foreign_key="pmc.id")
-    pmc: PMC = sqlmodel.Relationship(back_populates="releases")
-
     # Many-to-one: A release belongs to one product line, a product line can have multiple releases
-    product_line_id: int = sqlmodel.Field(foreign_key="productline.id")
-    product_line: ProductLine = sqlmodel.Relationship(back_populates="releases")
+    product_id: int = sqlmodel.Field(foreign_key="product.id")
+    product: Product = sqlmodel.Relationship(back_populates="releases")
 
     package_managers: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
+    # TODO: Not all releases have a version
+    # We could either make this str | None, or we could require version to be set on packages only
+    # For example, Apache Airflow Providers do not have an overall version
+    # They have one version per package, i.e. per provider
     version: str
     # One-to-many: A release can have multiple packages
     packages: list[Package] = sqlmodel.Relationship(back_populates="release")
@@ -279,3 +312,11 @@ class Release(sqlmodel.SQLModel, table=True):
     vote_policy: VotePolicy | None = sqlmodel.Relationship(back_populates="releases")
 
     votes: list[VoteEntry] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
+
+    @property
+    def pmc(self) -> PMC | None:
+        """Get the PMC for the release."""
+        project = self.product.project
+        if project is None:
+            return None
+        return project.pmc

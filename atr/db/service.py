@@ -26,12 +26,10 @@ import atr.db as db
 import atr.db.models as models
 
 
-async def get_pmc_by_name(
-    project_name: str, session: sqlalchemy.ext.asyncio.AsyncSession | None = None
-) -> models.PMC | None:
+async def get_pmc_by_name(name: str, session: sqlalchemy.ext.asyncio.AsyncSession | None = None) -> models.PMC | None:
     """Returns a PMC object by name."""
     async with db.create_async_db_session() if session is None else contextlib.nullcontext(session) as db_session:
-        statement = sqlmodel.select(models.PMC).where(models.PMC.project_name == project_name)
+        statement = sqlmodel.select(models.PMC).where(models.PMC.name == name)
         pmc = (await db_session.execute(statement)).scalar_one_or_none()
         return pmc
 
@@ -40,7 +38,7 @@ async def get_pmcs(session: sqlalchemy.ext.asyncio.AsyncSession | None = None) -
     """Returns a list of PMC objects."""
     async with db.create_async_db_session() if session is None else contextlib.nullcontext(session) as db_session:
         # Get all PMCs and their latest releases
-        statement = sqlmodel.select(models.PMC).order_by(models.PMC.project_name)
+        statement = sqlmodel.select(models.PMC).order_by(models.PMC.name)
         pmcs = (await db_session.execute(statement)).scalars().all()
         return pmcs
 
@@ -48,12 +46,11 @@ async def get_pmcs(session: sqlalchemy.ext.asyncio.AsyncSession | None = None) -
 async def get_release_by_key(storage_key: str) -> models.Release | None:
     """Get a release by its storage key."""
     async with db.create_async_db_session() as db_session:
-        # Get the release with its PMC and product line
+        # Get the release
         query = (
             sqlmodel.select(models.Release)
             .where(models.Release.storage_key == storage_key)
-            .options(db.select_in_load(models.Release.pmc))
-            .options(db.select_in_load(models.Release.product_line))
+            .options(db.select_in_load_nested(models.Release.product, models.Product.project, models.Project.pmc))
         )
         result = await db_session.execute(query)
         return result.scalar_one_or_none()
@@ -62,12 +59,11 @@ async def get_release_by_key(storage_key: str) -> models.Release | None:
 def get_release_by_key_sync(storage_key: str) -> models.Release | None:
     """Synchronous version of get_release_by_key for use in background tasks."""
     with db.create_sync_db_session() as session:
-        # Get the release with its PMC and product line
+        # Get the release
         query = (
             sqlmodel.select(models.Release)
             .where(models.Release.storage_key == storage_key)
-            .options(db.select_in_load(models.Release.pmc))
-            .options(db.select_in_load(models.Release.product_line))
+            .options(db.select_in_load_nested(models.Release.product, models.Product.project, models.Project.pmc))
         )
         result = session.execute(query)
         return result.scalar_one_or_none()

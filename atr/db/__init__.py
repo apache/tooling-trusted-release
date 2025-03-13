@@ -148,13 +148,17 @@ def select_in_load(*entities: Any) -> orm.strategy_options._AbstractLoad:
     return orm.selectinload(*validated_entities)
 
 
-def select_in_load_nested(parent: Any, child: Any) -> orm.strategy_options._AbstractLoad:
+def select_in_load_nested(parent: Any, *descendants: Any) -> orm.strategy_options._AbstractLoad:
     """Eagerly load the given nested entities from the query."""
     if not isinstance(parent, orm.InstrumentedAttribute):
         raise ValueError(f"Parent must be an orm.InstrumentedAttribute, got: {type(parent)}")
-    if not isinstance(child, orm.InstrumentedAttribute):
-        raise ValueError(f"Child must be an orm.InstrumentedAttribute, got: {type(child)}")
-    return orm.selectinload(parent).selectinload(child)
+    for descendant in descendants:
+        if not isinstance(descendant, orm.InstrumentedAttribute):
+            raise ValueError(f"Descendant must be an orm.InstrumentedAttribute, got: {type(descendant)}")
+    result = orm.selectinload(parent)
+    for descendant in descendants:
+        result = result.selectinload(descendant)
+    return result
 
 
 def validate_instrumented_attribute(obj: Any) -> orm.InstrumentedAttribute:

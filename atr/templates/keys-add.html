@@ -143,13 +143,13 @@
       <div class="form-group">
         <label>Associate with projects:</label>
         <div class="pmc-checkboxes">
-          {% for pmc in user_pmcs|sort(attribute='project_name') %}
+          {% for pmc in user_pmcs|sort(attribute='name') %}
             <div class="checkbox-item">
               <input type="checkbox"
-                     id="pmc_{{ pmc.project_name }}"
+                     id="pmc_{{ pmc.name }}"
                      name="selected_pmcs"
-                     value="{{ pmc.project_name }}" />
-              <label for="pmc_{{ pmc.project_name }}">{{ pmc.display_name }}</label>
+                     value="{{ pmc.name }}" />
+              <label for="pmc_{{ pmc.name }}">{{ pmc.display_name }}</label>
             </div>
           {% endfor %}
         </div>

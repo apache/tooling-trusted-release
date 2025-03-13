@@ -143,8 +143,10 @@ async def release_bulk_status(task_id: int) -> str | response.Response:
         # Debug print the task.task_args using the logger
         logging.debug(f"Task args: {task.task_args}")
         if task.task_args and isinstance(task.task_args, dict) and ("release_key" in task.task_args):
-            release_query = sqlmodel.select(models.Release).where(
-                models.Release.storage_key == task.task_args["release_key"]
+            release_query = (
+                sqlmodel.select(models.Release)
+                .where(models.Release.storage_key == task.task_args["release_key"])
+                .options(db.select_in_load_nested(models.Release.product, models.Product.project, models.Project.pmc))
             )
             release_result = await db_session.execute(release_query)
             release = release_result.scalar_one_or_none()
@@ -195,7 +197,7 @@ async def root_release_vote() -> response.Response | str:
             raise base.ASFQuartException("Release has no associated PMC", errorcode=400)
 
         # Prepare email recipient
-        email_to = f"{mailing_list}@{release.pmc.project_name}.apache.org"
+        email_to = f"{mailing_list}@{release.pmc.name}.apache.org"
 
         # Create a task for vote initiation
         task = models.Task(
@@ -237,11 +239,11 @@ def generate_vote_email_preview(release: models.Release) -> str:
     # Get PMC details
     if release.pmc is None:
         raise base.ASFQuartException("Release has no associated PMC", errorcode=400)
-    pmc_name = release.pmc.project_name
+    pmc_name = release.pmc.name
     pmc_display = release.pmc.display_name
 
     # Get product information
-    product_name = release.product_line.product_name if release.product_line else "Unknown"
+    product_name = release.product.product_name if release.product else "Unknown"
 
     # Create email subject
     subject = f"[VOTE] Release Apache {pmc_display} {product_name} {version}"

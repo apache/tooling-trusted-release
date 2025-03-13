@@ -70,17 +70,15 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
     # Create the release record in the database
     async with db.create_async_db_session() as db_session:
         async with db_session.begin():
-            statement = sqlmodel.select(models.PMC).where(models.PMC.project_name == project_name)
+            statement = sqlmodel.select(models.PMC).where(models.PMC.name == project_name)
             pmc = (await db_session.execute(statement)).scalar_one_or_none()
             if not pmc:
                 asfquart.APP.logger.error(f"PMC not found for project {project_name}")
-                asfquart.APP.logger.debug(f"Available committees: {session.committees}")
-                asfquart.APP.logger.debug(f"Available projects: {session.projects}")
-                raise base.ASFQuartException("PMC not found", errorcode=404)
+                raise base.ASFQuartException("Project not found", errorcode=404)
 
             # Verify user is a PMC member or committer of the project
             # We use pmc.display_name, so this must come within the transaction
-            if project_name not in session.committees and project_name not in session.projects:
+            if pmc.name not in (session.committees + session.projects):
                 raise base.ASFQuartException(
                     f"You must be a PMC member or committer of {pmc.display_name} to submit a release candidate",
                     errorcode=403,
@@ -91,16 +89,28 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
             storage_key = secrets.token_hex(16)
 
             # Create or get existing product line
-            statement = sqlmodel.select(models.ProductLine).where(
-                models.ProductLine.pmc_id == pmc.id, models.ProductLine.product_name == product_name
+            on_clause = db.validate_instrumented_attribute(models.Product.project_id) == models.Project.id
+            statement = (
+                sqlmodel.select(models.Product)
+                .join(models.Project, on_clause)
+                .where(
+                    models.Project.pmc_id == pmc.id,
+                    models.Product.product_name == product_name,
+                )
             )
-            product_line = (await db_session.execute(statement)).scalar_one_or_none()
+            product = (await db_session.execute(statement)).scalar_one_or_none()
 
-            if not product_line:
+            if not product:
                 # Create new product line if it doesn't exist
-                product_line = models.ProductLine(pmc_id=pmc.id, product_name=product_name, latest_version=version)
-                db_session.add(product_line)
-                # Flush to get the product_line.id
+                statement = sqlmodel.select(models.Project).where(
+                    models.Project.pmc_id == pmc.id, models.Project.name == project_name
+                )
+                project = (await db_session.execute(statement)).scalar_one_or_none()
+                if not project:
+                    raise base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
+                product = models.Product(project_id=project.id, product_name=product_name, latest_version=version)
+                db_session.add(product)
+                # Flush to make the product.id available
                 await db_session.flush()
 
             # Create release record with product line
@@ -108,8 +118,7 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
                 storage_key=storage_key,
                 stage=models.ReleaseStage.CANDIDATE,
                 phase=models.ReleasePhase.RELEASE_CANDIDATE,
-                pmc_id=pmc.id,
-                product_line_id=product_line.id,
+                product_id=product.id,
                 version=version,
                 created=datetime.datetime.now(datetime.UTC),
             )
@@ -138,8 +147,8 @@ async def root_candidate_create() -> response.Response | str:
     async with db.create_async_db_session() as db_session:
         project_list = web_session.committees + web_session.projects
         # Using isinstance also works here
-        project_name = db.validate_instrumented_attribute(models.PMC.project_name)
-        statement = sqlmodel.select(models.PMC).where(project_name.in_(project_list))
+        pmc_name = db.validate_instrumented_attribute(models.PMC.name)
+        statement = sqlmodel.select(models.PMC).where(pmc_name.in_(project_list))
         user_pmcs = (await db_session.execute(statement)).scalars().all()
 
     # For GET requests, show the form
@@ -168,11 +177,9 @@ async def root_candidate_review() -> str:
         statement = (
             sqlmodel.select(models.Release)
             .options(
-                db.select_in_load(models.Release.pmc),
-                db.select_in_load(models.Release.product_line),
+                db.select_in_load_nested(models.Release.product, models.Product.project, models.Project.pmc),
                 db.select_in_load_nested(models.Release.packages, models.Package.tasks),
             )
-            .join(models.PMC)
             .where(models.Release.stage == models.ReleaseStage.CANDIDATE)
         )
         releases = (await db_session.execute(statement)).scalars().all()

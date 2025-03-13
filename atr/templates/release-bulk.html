@@ -163,7 +163,7 @@
         <span>→</span>
         <span>{{ release.pmc.display_name }}</span>
         <span>→</span>
-        <span>{{ release.product_line.product_name if release.product_line else "Unknown product" }}</span>
+        <span>{{ release.product.product_name if release.product else "Unknown product" }}</span>
         <span>→</span>
         <span>{{ release.version }}</span>
       {% endif %}

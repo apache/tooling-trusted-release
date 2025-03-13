@@ -42,12 +42,12 @@ async def root_project_directory() -> str:
         return await quart.render_template("project-directory.html", projects=projects)
 
 
-@routes.app_route("/projects/<project_name>")
-async def root_project_view(project_name: str) -> str:
+@routes.app_route("/projects/<name>")
+async def root_project_view(name: str) -> str:
     async with db.create_async_db_session() as db_session:
         statement = (
             sqlmodel.select(models.PMC)
-            .where(models.PMC.project_name == project_name)
+            .where(models.PMC.name == name)
             .options(
                 db.select_in_load(models.PMC.public_signing_keys),
                 db.select_in_load(models.PMC.vote_policy),
@@ -62,26 +62,26 @@ async def root_project_view(project_name: str) -> str:
         return await quart.render_template("project-view.html", project=project, algorithms=routes.algorithms)
 
 
-@routes.app_route("/projects/<project_name>/voting/create", methods=["GET", "POST"])
-async def root_project_voting_policy_add(project_name: str) -> response.Response | str:
+@routes.app_route("/projects/<name>/voting/create", methods=["GET", "POST"])
+async def root_project_voting_policy_add(name: str) -> response.Response | str:
     web_session = await session.read()
     if web_session is None:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
 
     async with db.create_async_db_session() as db_session:
-        statement = sqlmodel.select(models.PMC).where(models.PMC.project_name == project_name)
+        statement = sqlmodel.select(models.PMC).where(models.PMC.name == name)
         pmc = (await db_session.execute(statement)).scalar_one_or_none()
 
         if not pmc:
             raise base.ASFQuartException("PMC not found", errorcode=404)
-        elif pmc.project_name not in web_session.committees:
+        elif pmc.name not in web_session.committees:
             raise base.ASFQuartException(
                 f"You must be a PMC member of {pmc.display_name} to submit a voting policy", errorcode=403
             )
 
     # TODO: the create_form method does not return the correct type but QuartForm
     #       we should create our own baseclass that correctly add typing info
-    form = await CreateVotePolicyForm.create_form(data={"project_name": project_name})
+    form = await CreateVotePolicyForm.create_form(data={"project_name": pmc.name})
 
     if await form.validate_on_submit():
         return await add_voting_policy(web_session, form)  # pyright: ignore [reportArgumentType]
@@ -115,15 +115,15 @@ class CreateVotePolicyForm(quart_wtf.QuartForm):
 
 
 async def add_voting_policy(session: session.ClientSession, form: CreateVotePolicyForm) -> response.Response:
-    project_name = form.project_name.data
+    name = form.project_name.data
 
     async with db.create_async_db_session() as db_session:
         async with db_session.begin():
-            statement = sqlmodel.select(models.PMC).where(models.PMC.project_name == project_name)
+            statement = sqlmodel.select(models.PMC).where(models.PMC.name == name)
             pmc = (await db_session.execute(statement)).scalar_one_or_none()
             if not pmc:
                 raise base.ASFQuartException("PMC not found", errorcode=404)
-            elif pmc.project_name not in session.committees:
+            elif pmc.name not in session.committees:
                 raise base.ASFQuartException(
                     f"You must be a PMC member of {pmc.display_name} to submit a voting policy", errorcode=403
                 )
@@ -138,4 +138,4 @@ async def add_voting_policy(session: session.ClientSession, form: CreateVotePoli
             db_session.add(vote_policy)
 
     # Redirect to the add package page with the storage token
-    return quart.redirect(quart.url_for("root_project_view", project_name=project_name))
+    return quart.redirect(quart.url_for("root_project_view", project_name=name))

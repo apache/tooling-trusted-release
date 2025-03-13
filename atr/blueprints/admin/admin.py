@@ -125,10 +125,11 @@ async def admin_data(model: str = "PMC") -> str:
     # Map of model names to their classes
     model_classes = {
         "PMC": models.PMC,
+        "Project": models.Project,
         "Release": models.Release,
         "Package": models.Package,
         "VotePolicy": models.VotePolicy,
-        "ProductLine": models.ProductLine,
+        "Product": models.Product,
         "DistributionChannel": models.DistributionChannel,
         "PublicSigningKey": models.PublicSigningKey,
         "PMCKeyLink": models.PMCKeyLink,
@@ -208,8 +209,10 @@ async def _update_pmcs() -> int:
                 # Get or create PMC
                 pmc = await service.get_pmc_by_name(name, db_session)
                 if not pmc:
-                    pmc = models.PMC(project_name=name)
+                    pmc = models.PMC(name=name)
                     db_session.add(pmc)
+                    pmc_core_project = models.Project(name=name, pmc=pmc)
+                    db_session.add(pmc_core_project)
 
                 # Update PMC data from groups.json
                 pmc_members = groups_data.get(f"{name}-pmc")
@@ -230,11 +233,13 @@ async def _update_pmcs() -> int:
             # Then add PPMCs (podlings)
             for podling_name, podling_data in podlings_data:
                 # Get or create PPMC
-                statement = sqlmodel.select(models.PMC).where(models.PMC.project_name == podling_name)
+                statement = sqlmodel.select(models.PMC).where(models.PMC.name == podling_name)
                 ppmc = (await db_session.execute(statement)).scalar_one_or_none()
                 if not ppmc:
-                    ppmc = models.PMC(project_name=podling_name)
+                    ppmc = models.PMC(name=podling_name, is_podling=True)
                     db_session.add(ppmc)
+                    ppmc_core_project = models.Project(name=podling_name, is_podling=True, pmc=ppmc)
+                    db_session.add(ppmc_core_project)
 
                 # Update PPMC data from groups.json
                 ppmc.is_podling = True
@@ -249,11 +254,13 @@ async def _update_pmcs() -> int:
 
             # Add special entry for Tooling PMC
             # Not clear why, but it's not in the Whimsy data
-            statement = sqlmodel.select(models.PMC).where(models.PMC.project_name == "tooling")
+            statement = sqlmodel.select(models.PMC).where(models.PMC.name == "tooling")
             tooling_pmc = (await db_session.execute(statement)).scalar_one_or_none()
             if not tooling_pmc:
-                tooling_pmc = models.PMC(project_name="tooling")
+                tooling_pmc = models.PMC(name="tooling")
                 db_session.add(tooling_pmc)
+                tooling_project = models.Project(name="tooling", pmc=tooling_pmc)
+                db_session.add(tooling_project)
                 updated_count += 1
 
             # Update Tooling PMC data

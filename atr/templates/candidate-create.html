@@ -40,8 +40,8 @@
                 class="mb-2 form-select"
                 required>
           <option value="">Select a project...</option>
-          {% for pmc in user_pmcs|sort(attribute='project_name') %}
-            <option value="{{ pmc.project_name }}">{{ pmc.display_name }}</option>
+          {% for pmc in user_pmcs|sort(attribute='name') %}
+            <option value="{{ pmc.name }}">{{ pmc.display_name }}</option>
           {% endfor %}
         </select>
         {% if not user_pmcs %}
