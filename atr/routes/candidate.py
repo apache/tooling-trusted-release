@@ -169,20 +169,16 @@ async def root_candidate_review() -> str:
     if web_session is None:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-    async with db.create_async_db_session() as db_session:
+    async with db.session() as data:
         # Get all releases where the user is a PMC member or committer
         # TODO: We don't actually record who uploaded the release candidate
         # We should probably add that information!
         # TODO: This duplicates code in root_package_add
-        statement = (
-            sqlmodel.select(models.Release)
-            .options(
-                db.select_in_load_nested(models.Release.product, models.Product.project, models.Project.pmc),
-                db.select_in_load_nested(models.Release.packages, models.Package.tasks),
-            )
-            .where(models.Release.stage == models.ReleaseStage.CANDIDATE)
-        )
-        releases = (await db_session.execute(statement)).scalars().all()
+        releases = await data.release(
+            stage=models.ReleaseStage.CANDIDATE,
+            _product_project_pmc=True,
+            _packages_tasks=True,
+        ).all()
 
         # Filter to only show releases for PMCs or PPMCs where the user is a member or committer
         user_releases = []

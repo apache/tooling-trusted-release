@@ -44,17 +44,13 @@ async def root_download_artifact(release_key: str, artifact_sha3: str) -> respon
     if (web_session is None) or (web_session.uid is None):
         raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-    async with db.create_async_db_session() as db_session:
+    async with db.session() as data:
         # Find the package
-        package_release = db.select_in_load(models.Package.release)
-        release_pmc = db.select_in_load(models.Release.pmc)
-        package_statement = (
-            sqlmodel.select(models.Package)
-            .where(models.Package.artifact_sha3 == artifact_sha3, models.Package.release_key == release_key)
-            .options(package_release, release_pmc)
-        )
-        result = await db_session.execute(package_statement)
-        package = result.scalar_one_or_none()
+        package = await data.package(
+            artifact_sha3=artifact_sha3,
+            release_key=release_key,
+            _release_pmc=True,
+        ).one()
 
         if not package:
             await quart.flash("Artifact not found", "error")

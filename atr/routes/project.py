@@ -44,22 +44,11 @@ async def root_project_directory() -> str:
 
 @routes.app_route("/projects/<name>")
 async def root_project_view(name: str) -> str:
-    async with db.create_async_db_session() as db_session:
-        statement = (
-            sqlmodel.select(models.PMC)
-            .where(models.PMC.name == name)
-            .options(
-                db.select_in_load(models.PMC.public_signing_keys),
-                db.select_in_load(models.PMC.vote_policy),
-            )
+    async with db.session() as data:
+        pmc = await data.committee(name=name, _public_signing_keys=True, _vote_policy=True).one(
+            error=http.client.HTTPException(404)
         )
-
-        project = (await db_session.execute(statement)).scalar_one_or_none()
-
-        if not project:
-            raise http.client.HTTPException(404)
-
-        return await quart.render_template("project-view.html", project=project, algorithms=routes.algorithms)
+        return await quart.render_template("project-view.html", project=pmc, algorithms=routes.algorithms)
 
 
 @routes.app_route("/projects/<name>/voting/create", methods=["GET", "POST"])
