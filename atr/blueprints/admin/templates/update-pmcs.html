@@ -98,7 +98,7 @@
     const submitForm = async () => {
       const button = document.getElementById("submitButton");
       button.disabled = true;
-      document.body.style.cursor = 'wait'
+      document.body.style.cursor = "wait";
 
       const statusElement = document.getElementById("status");
       while (statusElement.firstChild) {
@@ -121,7 +121,7 @@
           addStatusMessage(statusElement, error, "error")
       } finally {
         button.disabled = false;
-        document.body.style.cursor = 'default'
+        document.body.style.cursor = "default";
       }
     };
 

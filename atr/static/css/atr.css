@@ -27,12 +27,25 @@ body {
     font-weight: 425;
 }
 
+input, textarea, select, option {
+    border-width: 2px !important;
+    border-color: #cccccc !important;
+    font-size: 17px !important;
+    font-weight: 425 !important;
+}
+
 input, textarea, button, select, option {
     font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Oxygen", "Ubuntu", "Cantarell", "Open Sans", "Helvetica Neue", sans-serif;
     font-size: 17px;
     line-height: 24px;
     font-variation-settings: "opsz" 22;
     font-weight: 425;
+}
+
+label[for] {
+    font-weight: 450;
+    border-bottom: 1px dashed #d1d2d3;
+    cursor: pointer;
 }
 
 select, input[type="file"] {
@@ -67,31 +80,15 @@ ul {
     padding-left: 1rem;
 }
 
-label {
-    font-weight: 500;
-    border-bottom: 1px dashed #b1b2b3;
-    padding-bottom: 0.5rem;
-    cursor: pointer;
-}
-
 table {
-    width: 100%;
     border-collapse: collapse;
 }
 
 table th {
     text-align: left;
-    padding: 0.5rem;
-    font-weight: 500;
-    width: 30%;
-    color: #333333;
 }
 
 table td {
-    padding: 0.5rem;
-
-    /* Almost all of our tables have data in them */
-
     /* Not sure if we should keep it this way, but it seems pretty good */
     font-family: ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas", monospace;
     word-break: break-all;
@@ -153,21 +150,6 @@ footer a:visited {
 
 footer p {
     margin-bottom: 0;
-}
-
-button {
-    margin-top: 1rem;
-    padding: 0.5rem 1rem;
-    background: #004477;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 500;
-}
-
-button:hover {
-    background: #003366;
 }
 
 input,

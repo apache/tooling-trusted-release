@@ -8,136 +8,6 @@
   Review your signing keys.
 {% endblock description %}
 
-{% block stylesheets %}
-  {{ super() }}
-  <style>
-      .existing-keys {
-          margin-bottom: 2rem;
-          padding: 1rem 2rem 2rem 2rem;
-          background: #f8f9fa;
-          border-radius: 4px;
-      }
-
-      .keys-grid {
-          display: grid;
-          gap: 1.5rem;
-      }
-
-      .key-card {
-          background: white;
-          border: 1px solid #d1d2d3;
-          border-radius: 4px;
-          overflow: hidden;
-          padding: 1rem;
-      }
-
-      .key-card table {
-          margin: 0;
-      }
-
-      .key-card td {
-          word-break: break-all;
-      }
-
-      .key-card h3 {
-          margin-top: 0;
-          margin-bottom: 1rem;
-      }
-
-      .delete-key-form {
-          margin-top: 1rem;
-      }
-
-      .delete-button {
-          background: #dc3545;
-          color: white;
-          border: none;
-          padding: 0.5rem 1rem;
-          border-radius: 4px;
-          cursor: pointer;
-      }
-
-      .delete-button:hover {
-          background: #c82333;
-      }
-
-      .navigation {
-          margin-top: 2rem;
-      }
-
-      .success-message {
-          color: #28a745;
-          margin: 1rem 0;
-          padding: 1rem;
-          background: #d4edda;
-          border-radius: 4px;
-      }
-
-      .key-details {
-          margin-top: 1rem;
-          padding: 1rem;
-          background: #f8f9fa;
-          border-radius: 4px;
-      }
-
-      .key-details summary {
-          font-weight: bold;
-          cursor: pointer;
-      }
-
-      .key-details pre {
-          margin-top: 1rem;
-          white-space: pre-wrap;
-      }
-
-      .status-message {
-          margin-top: 2rem;
-          padding: 1rem;
-          background: #f8f9fa;
-          border-radius: 4px;
-      }
-
-      .status-message.success {
-          background: #d4edda;
-      }
-
-      .status-message.error {
-          background: #f8d7da;
-      }
-
-      .expiry-warning {
-          color: #e67e22;
-          font-weight: bold;
-      }
-
-      .expiry-error {
-          color: #e74c3c;
-          font-weight: bold;
-      }
-
-      .notice-badge {
-          display: inline-block;
-          padding: 0.25rem 0.5rem;
-          border-radius: 3px;
-          font-size: 0.8em;
-          margin-left: 0.5rem;
-          font-weight: 500;
-      }
-
-      .notice-badge.warning {
-          background-color: #fff3cd;
-          color: #856404;
-          border: 1px solid #ffeeba;
-      }
-
-      .notice-badge.error {
-          background-color: #f8d7da;
-          color: #721c24;
-          border: 1px solid #f5c6cb;
-      }
-  </style>
-{% endblock stylesheets %}
-
 {% block content %}
   <h1>Your signing keys</h1>
   <p class="intro">Review your public keys used for signing release artifacts.</p>
@@ -149,38 +19,38 @@
   </div>
 
   {% if user_keys %}
-    <div class="existing-keys">
-      <div class="keys-grid">
+    <div class="mb-5 p-4 bg-light rounded">
+      <div class="d-grid gap-4">
         {% for key in user_keys %}
-          <div class="key-card">
-            <table>
+          <div class="card p-3 border">
+            <table class="mb-0">
               <tbody>
                 <tr>
-                  <th>Fingerprint</th>
-                  <td>{{ key.fingerprint }}</td>
+                  <th class="p-2 text-dark">Fingerprint</th>
+                  <td class="text-break">{{ key.fingerprint }}</td>
                 </tr>
                 <tr>
-                  <th>Key Type</th>
-                  <td>{{ algorithms[key.algorithm] }} ({{ key.length }} bits)</td>
+                  <th class="p-2 text-dark">Key Type</th>
+                  <td class="text-break">{{ algorithms[key.algorithm] }} ({{ key.length }} bits)</td>
                 </tr>
                 <tr>
-                  <th>Created</th>
-                  <td>{{ key.created.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                  <th class="p-2 text-dark">Created</th>
+                  <td class="text-break">{{ key.created.strftime("%Y-%m-%d %H:%M:%S") }}</td>
                 </tr>
                 <tr>
-                  <th>Expires</th>
-                  <td>
+                  <th class="p-2 text-dark">Expires</th>
+                  <td class="text-break">
                     {% if key.expires %}
                       {% set days_until_expiry = (key.expires - now).days %}
                       {% if days_until_expiry < 0 %}
-                        <span class="expiry-error">
+                        <span class="text-danger fw-bold">
                           {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
-                          <span class="notice-badge error">Expired</span>
+                          <span class="badge bg-danger text-white ms-2">Expired</span>
                         </span>
                       {% elif days_until_expiry <= 30 %}
-                        <span class="expiry-warning">
+                        <span class="text-warning fw-bold">
                           {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
-                          <span class="notice-badge warning">Expires in {{ days_until_expiry }} days</span>
+                          <span class="badge bg-warning text-dark ms-2">Expires in {{ days_until_expiry }} days</span>
                         </span>
                       {% else %}
                         {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
@@ -191,12 +61,12 @@
                   </td>
                 </tr>
                 <tr>
-                  <th>User ID</th>
-                  <td>{{ key.declared_uid or 'Not specified' }}</td>
+                  <th class="p-2 text-dark">User ID</th>
+                  <td class="text-break">{{ key.declared_uid or 'Not specified' }}</td>
                 </tr>
                 <tr>
-                  <th>Associated projects</th>
-                  <td>
+                  <th class="p-2 text-dark">Associated projects</th>
+                  <td class="text-break">
                     {% if key.pmcs %}
                       {{ key.pmcs|map(attribute='name') |join(', ') }}
                     {% else %}
@@ -208,16 +78,14 @@
             </table>
 
             <!-- TODO: We could link to a downloadable version of the key instead -->
-            <details class="key-details">
-              <summary>View whole key</summary>
-              <pre class="key-text">{{ key.ascii_armored_key }}</pre>
+            <details class="mt-3 p-3 bg-light rounded">
+              <summary class="fw-bold">View whole key</summary>
+              <pre class="mt-3">{{ key.ascii_armored_key }}</pre>
             </details>
 
-            <form method="post"
-                  action="{{ url_for('root_keys_delete') }}"
-                  class="delete-key-form">
+            <form method="post" action="{{ url_for('root_keys_delete') }}" class="mt-3">
               <input type="hidden" name="fingerprint" value="{{ key.fingerprint }}" />
-              <button type="submit" class="delete-button">Delete key</button>
+              <button type="submit" class="btn btn-danger">Delete key</button>
             </form>
           </div>
         {% endfor %}

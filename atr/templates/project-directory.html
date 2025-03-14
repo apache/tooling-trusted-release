@@ -8,91 +8,50 @@
   List of all ASF projects and their latest releases.
 {% endblock description %}
 
-{% block head_extra %}
-  <style>
-      .pmc-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-          gap: 1.5rem;
-          margin: 2rem 0;
-      }
-
-      .pmc-card {
-          background: white;
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
-          padding: 1.5rem;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-      }
-
-      .pmc-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      }
-
-      .pmc-name {
-          font-size: 1.5rem;
-          font-weight: 500;
-          color: #333;
-          margin-bottom: 1rem;
-      }
-
-      .pmc-stats {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-          gap: 1rem;
-      }
-
-      .stat-item {
-          background: #f8f9fa;
-          padding: 0.75rem;
-          border-radius: 6px;
-          text-align: center;
-      }
-
-      .stat-label {
-          display: block;
-          color: #666;
-          font-size: 0.9rem;
-          margin-bottom: 0.25rem;
-      }
-
-      .stat-value {
-          display: block;
-          font-weight: 500;
-          font-size: 1.25rem;
-          color: #333;
-      }
-  </style>
-{% endblock head_extra %}
-
 {% block content %}
   <h1>Project directory</h1>
   <p class="intro">Current ASF projects and their releases:</p>
 
-  <input type="text"
-         id="pmc-filter"
-         onkeydown="if (event.key == 'Enter'){ filter() }" />
-  <button type="button" onclick="filter()">Filter</button>
+  <div class="mb-3">
+    <input type="text"
+           id="pmc-filter"
+           class="form-control d-inline-block w-auto" />
+    <button type="button" class="btn btn-primary" id="filter-button">Filter</button>
+  </div>
 
-  <div class="pmc-grid">
+  <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
     {% for pmc in projects %}
-      <div class="pmc-card"
-           onclick="location.href='{{ url_for("root_project_view", project_name=pmc.name) }}';">
-        <div class="pmc-name">{{ pmc.display_name }}</div>
-        <div class="pmc-stats">
-          <div class="stat-item">
-            <span class="stat-label">PMC Members</span>
-            <span class="stat-value">{{ pmc.pmc_members|length }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Committers</span>
-            <span class="stat-value">{{ pmc.committers|length }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">Release Managers</span>
-            <span class="stat-value">{{ pmc.release_managers|length }}</span>
+      <div class="col">
+        <div class="card h-100 shadow-sm cursor-pointer hover-lift project-card"
+             data-project-url="{{ url_for('root_project_view', name=pmc.name) }}">
+          <div class="card-body">
+            <h2 class="card-title fs-4 mb-3">{{ pmc.display_name }}</h2>
+            <div class="row g-3">
+              <div class="col-4">
+                <div class="card h-100 bg-light border-0">
+                  <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
+                    <small class="text-secondary">PMC Members</small>
+                    <span class="fs-4 fw-medium mt-2">{{ pmc.pmc_members|length }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="card h-100 bg-light border-0">
+                  <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
+                    <small class="text-secondary">Committers</small>
+                    <span class="fs-4 fw-medium mt-2">{{ pmc.committers|length }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="col-4">
+                <div class="card h-100 bg-light border-0">
+                  <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
+                    <small class="text-secondary">Release Managers</small>
+                    <span class="fs-4 fw-medium mt-2">{{ pmc.release_managers|length }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -105,16 +64,32 @@
   <script>
       function filter() {
           const pmcFilter = document.getElementById("pmc-filter").value;
-          const cards = document.getElementsByClassName("pmc-card");
+          const cards = document.querySelectorAll(".project-card");
           for (let card of cards) {
-              const nameElement = card.getElementsByClassName("pmc-name");
-              const name = nameElement[0].innerHTML;
+              const nameElement = card.querySelector(".card-title");
+              const name = nameElement.innerHTML;
               if (!pmcFilter) {
-                  card.hidden = false;
+                  card.parentElement.hidden = false;
               } else {
-                  card.hidden = !name.match(new RegExp(pmcFilter, 'i'));
+                  card.parentElement.hidden = !name.match(new RegExp(pmcFilter, 'i'));
               }
           }
       }
+
+      // Add event listeners
+      document.getElementById("filter-button").addEventListener("click", filter);
+      document.getElementById("pmc-filter").addEventListener("keydown", function(event) {
+          if (event.key === "Enter") {
+              filter();
+              event.preventDefault();
+          }
+      });
+
+      // Add click handlers for project cards
+      document.querySelectorAll(".project-card").forEach(function(card) {
+          card.addEventListener("click", function() {
+              window.location.href = this.getAttribute("data-project-url");
+          });
+      });
   </script>
 {% endblock javascripts %}

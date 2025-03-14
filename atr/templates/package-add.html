@@ -8,121 +8,6 @@
   Add a package to an existing release.
 {% endblock description %}
 
-{% block stylesheets %}
-  {{ super() }}
-  <style>
-      .form-table {
-          width: 100%;
-      }
-
-      .form-table th {
-          width: 200px;
-          text-align: right;
-          padding-right: 1rem;
-          vertical-align: top;
-          font-weight: 500;
-      }
-
-      .form-table td {
-          vertical-align: top;
-      }
-
-      .form-table label {
-          border-bottom: none;
-          padding-bottom: 0;
-      }
-
-      select,
-      input[type="file"] {
-          display: block;
-          margin-bottom: 0.5rem;
-      }
-
-      .help-text {
-          color: #666;
-          font-size: 0.9em;
-          display: block;
-          margin-top: 0.25rem;
-      }
-
-      .error-message {
-          color: #dc3545;
-          margin-top: 0.25rem;
-      }
-
-      button {
-          margin-top: 1rem;
-      }
-
-      button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-      }
-
-      .radio-group {
-          margin-bottom: 0.5rem;
-      }
-
-      .radio-group div {
-          margin: 0.5rem 0;
-      }
-
-      .radio-group label {
-          margin-left: 0.5rem;
-          cursor: pointer;
-      }
-
-      .radio-group input[type="radio"] {
-          cursor: pointer;
-      }
-
-      .checkbox-group {
-          margin-bottom: 0.5rem;
-      }
-
-      .checkbox-group div {
-          margin: 0.5rem 0;
-      }
-
-      .checkbox-group label {
-          margin-left: 0.5rem;
-          cursor: pointer;
-      }
-
-      .checkbox-group input[type="checkbox"] {
-          cursor: pointer;
-      }
-
-      .form-separator {
-          margin: 2rem 0;
-          border-top: 1px solid #ddd;
-          text-align: center;
-          position: relative;
-      }
-
-      .form-separator span {
-          background: #fff;
-          padding: 0 1rem;
-          color: #666;
-          position: relative;
-          top: -0.75rem;
-      }
-
-      input[type="url"],
-      input[type="number"] {
-          width: 100%;
-          max-width: 600px;
-          padding: 0.375rem;
-          border: 1px solid #ced4da;
-          border-radius: 0.25rem;
-      }
-
-      input[type="number"] {
-          width: 100px;
-      }
-  </style>
-{% endblock stylesheets %}
-
 {% block content %}
   <h1>Add package</h1>
   <p class="intro">
@@ -132,14 +17,14 @@
 
   <form method="post" enctype="multipart/form-data" class="striking">
     <input type="hidden" name="form_type" value="single" />
-    <table class="form-table">
+    <table class="table">
       <tbody>
         <tr>
-          <th>
+          <th class="text-end pe-3 align-top">
             <label for="release_key">Release:</label>
           </th>
-          <td>
-            <select id="release_key" name="release_key" required>
+          <td class="align-top">
+            <select id="release_key" name="release_key" class="form-select mb-2" required>
               <option value="">Select a release...</option>
               {% for release in releases %}
                 <option value="{{ release.storage_key }}"
@@ -148,107 +33,124 @@
                 </option>
               {% endfor %}
             </select>
-            {% if not releases %}<p class="error-message">No releases found that you can add a package to.</p>{% endif %}
+            {% if not releases %}<p class="text-danger mt-1">No releases found that you can add a package to.</p>{% endif %}
           </td>
         </tr>
 
         <tr>
-          <th>
+          <th class="text-end pe-3 align-top">
             <label for="release_artifact">Release candidate artifact:</label>
           </th>
-          <td>
+          <td class="align-top">
             <input type="file"
                    id="release_artifact"
                    name="release_artifact"
+                   class="form-control mb-2"
                    required
                    accept="application/gzip,application/x-gzip,application/x-tar,application/zip,application/java-archive,.tar.gz,.tgz,.zip,.jar"
                    aria-describedby="artifact-help" />
-            <span id="artifact-help" class="help-text">Upload the release candidate archive (tar.gz, zip, or jar)</span>
+            <span id="artifact-help" class="form-text text-muted">Upload the release candidate archive (tar.gz, zip, or jar)</span>
           </td>
         </tr>
 
         <tr>
-          <th>
+          <th class="text-end pe-3 align-top">
             <label>Artifact type:</label>
           </th>
-          <td>
-            <div class="radio-group">
-              <div>
+          <td class="align-top">
+            <div class="mb-2">
+              <div class="form-check my-2">
                 <input type="radio"
+                       class="form-check-input"
                        id="source"
                        name="artifact_type"
                        value="source"
                        required
                        checked />
-                <label for="source">Source archive</label>
+                <label class="form-check-label" for="source">Source archive</label>
               </div>
-              <div>
-                <input type="radio" id="binary" name="artifact_type" value="binary" />
-                <label for="binary">Binary archive</label>
-              </div>
-              <div>
+              <div class="form-check my-2">
                 <input type="radio"
+                       class="form-check-input"
+                       id="binary"
+                       name="artifact_type"
+                       value="binary" />
+                <label class="form-check-label" for="binary">Binary archive</label>
+              </div>
+              <div class="form-check my-2">
+                <input type="radio"
+                       class="form-check-input"
                        id="reproducible"
                        name="artifact_type"
                        value="reproducible" />
-                <label for="reproducible">Reproducible binary archive</label>
+                <label class="form-check-label" for="reproducible">Reproducible binary archive</label>
               </div>
             </div>
           </td>
         </tr>
 
         <tr>
-          <th>
+          <th class="text-end pe-3 align-top">
             <label for="release_checksum">SHA2-512 hash file:</label>
           </th>
-          <td>
+          <td class="align-top">
             <input type="file"
                    id="release_checksum"
                    name="release_checksum"
+                   class="form-control mb-2"
                    accept=".sha512,.sha,.txt"
                    aria-describedby="checksum-help" />
-            <span id="checksum-help" class="help-text">Optional: Upload the SHA-512 checksum file for verification</span>
+            <span id="checksum-help" class="form-text text-muted">Optional: Upload the SHA-512 checksum file for verification</span>
           </td>
         </tr>
 
         <tr>
-          <th>
+          <th class="text-end pe-3 align-top">
             <label for="release_signature">Detached signature:</label>
           </th>
-          <td>
+          <td class="align-top">
             <input type="file"
                    id="release_signature"
                    name="release_signature"
+                   class="form-control mb-2"
                    accept="application/pgp-signature,.asc"
                    aria-describedby="signature-help" />
-            <span id="signature-help" class="help-text">Optional: Upload the detached GPG signature (.asc) file</span>
+            <span id="signature-help" class="form-text text-muted">Optional: Upload the detached GPG signature (.asc) file</span>
           </td>
         </tr>
 
         <tr>
           <td></td>
           <td>
-            <button type="submit" {% if not releases %}disabled{% endif %}>Add package</button>
+            <button type="submit"
+                    class="btn btn-primary mt-3"
+                    {% if not releases %}disabled{% endif %}>Add package</button>
           </td>
         </tr>
       </tbody>
     </table>
   </form>
 
-  <div class="form-separator">
-    <span>Or add multiple packages from a URL</span>
+  <div class="my-5 position-relative">
+    <hr class="border-2 opacity-25" />
+    <div class="position-absolute top-50 start-50 translate-middle bg-white px-4 fs-5">
+      Or add multiple packages from a URL
+    </div>
   </div>
 
   <form method="post" class="striking">
     <input type="hidden" name="form_type" value="bulk" />
-    <table class="form-table">
+    <table class="table">
       <tbody>
         <tr>
-          <th>
+          <th class="text-end pe-3 align-top">
             <label for="bulk_release_key">Release:</label>
           </th>
-          <td>
-            <select id="bulk_release_key" name="release_key" required>
+          <td class="align-top">
+            <select id="bulk_release_key"
+                    name="release_key"
+                    class="form-select mb-2"
+                    required>
               <option value="">Select a release...</option>
               {% for release in releases %}
                 <option value="{{ release.storage_key }}"
@@ -257,84 +159,103 @@
                 </option>
               {% endfor %}
             </select>
-            {% if not releases %}<p class="error-message">No releases found that you can add packages to.</p>{% endif %}
+            {% if not releases %}<p class="text-danger mt-1">No releases found that you can add packages to.</p>{% endif %}
           </td>
         </tr>
 
         <tr>
-          <th>
+          <th class="text-end pe-3 align-top">
             <label for="bulk_url">URL:</label>
           </th>
-          <td>
+          <td class="align-top">
             <input type="url"
                    id="bulk_url"
                    name="url"
+                   class="form-control mb-2"
                    required
                    placeholder="https://example.org/path/to/packages/"
                    aria-describedby="url-help" />
-            <span id="url-help" class="help-text">Enter the URL of the directory containing release packages</span>
+            <span id="url-help" class="form-text text-muted">Enter the URL of the directory containing release packages</span>
           </td>
         </tr>
 
         <tr>
-          <th>
+          <th class="text-end pe-3 align-top">
             <label>File types:</label>
           </th>
-          <td>
-            <div class="checkbox-group">
-              <div>
+          <td class="align-top">
+            <div class="mb-2">
+              <div class="form-check my-2">
                 <input type="checkbox"
+                       class="form-check-input"
                        id="type_targz"
                        name="file_types"
                        value=".tar.gz"
                        checked />
-                <label for="type_targz">.tar.gz files</label>
+                <label class="form-check-label" for="type_targz">.tar.gz files</label>
               </div>
-              <div>
-                <input type="checkbox" id="type_tgz" name="file_types" value=".tgz" checked />
-                <label for="type_tgz">.tgz files</label>
+              <div class="form-check my-2">
+                <input type="checkbox"
+                       class="form-check-input"
+                       id="type_tgz"
+                       name="file_types"
+                       value=".tgz"
+                       checked />
+                <label class="form-check-label" for="type_tgz">.tgz files</label>
               </div>
-              <div>
-                <input type="checkbox" id="type_zip" name="file_types" value=".zip" />
-                <label for="type_zip">.zip files</label>
+              <div class="form-check my-2">
+                <input type="checkbox"
+                       class="form-check-input"
+                       id="type_zip"
+                       name="file_types"
+                       value=".zip" />
+                <label class="form-check-label" for="type_zip">.zip files</label>
               </div>
-              <div>
-                <input type="checkbox" id="type_jar" name="file_types" value=".jar" />
-                <label for="type_jar">.jar files</label>
+              <div class="form-check my-2">
+                <input type="checkbox"
+                       class="form-check-input"
+                       id="type_jar"
+                       name="file_types"
+                       value=".jar" />
+                <label class="form-check-label" for="type_jar">.jar files</label>
               </div>
             </div>
           </td>
         </tr>
 
         <tr>
-          <th>
+          <th class="text-end pe-3 align-top">
             <label for="bulk_max_depth">Maximum depth:</label>
           </th>
-          <td>
+          <td class="align-top">
             <input type="number"
                    id="bulk_max_depth"
                    name="max_depth"
+                   class="form-control mb-2 w-25"
                    value="1"
                    min="1"
                    max="10"
                    required
                    aria-describedby="depth-help" />
-            <span id="depth-help" class="help-text">Maximum request depth to search for packages (1-10)</span>
+            <span id="depth-help" class="form-text text-muted">Maximum request depth to search for packages (1-10)</span>
           </td>
         </tr>
 
         <tr>
-          <th>
+          <th class="text-end pe-3 align-top">
             <label for="bulk_require_signatures">Require signatures:</label>
           </th>
-          <td>
-            <div class="checkbox-group">
-              <div>
+          <td class="align-top">
+            <div class="mb-2">
+              <div class="form-check my-2">
                 <input type="checkbox"
+                       class="form-check-input"
                        id="bulk_require_signatures"
                        name="require_signatures"
                        checked />
-                <label for="bulk_require_signatures">Only download packages that have corresponding .asc signature files</label>
+                <label class="form-check-label" for="bulk_require_signatures">
+                  Only download packages that have corresponding .asc signature files
+                </label>
               </div>
             </div>
           </td>
@@ -343,7 +264,9 @@
         <tr>
           <td></td>
           <td>
-            <button type="submit" {% if not releases %}disabled{% endif %}>Add packages from URL</button>
+            <button type="submit"
+                    class="btn btn-primary mt-3"
+                    {% if not releases %}disabled{% endif %}>Add packages from URL</button>
           </td>
         </tr>
       </tbody>

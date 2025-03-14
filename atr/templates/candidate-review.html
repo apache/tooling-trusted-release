@@ -8,11 +8,6 @@
   Release candidates to which you have access.
 {% endblock description %}
 
-{% block theme_css %}
-  <link rel="stylesheet"
-        href="{{ url_for('static', filename='css/atr-small.css') }}" />
-{% endblock theme_css %}
-
 {% block stylesheets %}
   {{ super() }}
   <style>

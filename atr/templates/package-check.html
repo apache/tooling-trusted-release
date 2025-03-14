@@ -8,233 +8,11 @@
   View the status and results of package verification tasks.
 {% endblock description %}
 
-{% block stylesheets %}
-  {{ super() }}
-  <style>
-      .task-actions {
-          display: flex;
-          gap: 1rem;
-          margin-bottom: 1rem;
-      }
-
-      .task-summary {
-          display: flex;
-          gap: 1rem;
-          align-items: center;
-          padding: 1rem;
-          background: #f8f9fa;
-          border: 1px solid #dee2e6;
-          border-radius: 4px;
-          margin-bottom: 1rem;
-      }
-
-      .summary-title {
-          font-weight: 600;
-          margin-right: 1rem;
-      }
-
-      .summary-stats {
-          display: flex;
-          gap: 1rem;
-          flex-wrap: wrap;
-      }
-
-      .summary-stat {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.5rem 1rem;
-          border-radius: 4px;
-          font-weight: 500;
-      }
-
-      .summary-stat .count {
-          font-size: 1.2em;
-          /* font-weight: 600; */
-      }
-
-      .summary-stat.completed {
-          background: #d1e7dd;
-          border: 1px solid #a3cfbb;
-      }
-
-      .summary-stat.failed {
-          background: #f8d7da;
-          border: 1px solid #f5c6cb;
-      }
-
-      .summary-stat.active {
-          background: #cff4fc;
-          border: 1px solid #9eeaf9;
-      }
-
-      .summary-stat.queued {
-          background: #f8f9fa;
-          border: 1px solid #dee2e6;
-      }
-
-      .task-actions .button-form {
-          margin: 0;
-      }
-
-      .task-list {
-          margin: 1rem 0;
-      }
-
-      .task-item {
-          border: 2px solid #d1d2d3;
-          border-radius: 4px;
-          padding: 1rem;
-          margin-bottom: 1rem;
-      }
-
-      .task-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 0.5rem;
-      }
-
-      .task-type {
-          font-weight: 600;
-      }
-
-      .task-status {
-          padding: 0.25rem 0.5rem;
-          border-radius: 4px;
-          font-size: 0.9em;
-      }
-
-      .status-queued {
-          background: #f8f9fa;
-          border: 1px solid #dee2e6;
-      }
-
-      .status-active {
-          background: #cff4fc;
-          border: 1px solid #9eeaf9;
-      }
-
-      .status-completed {
-          background: #d1e7dd;
-          border: 1px solid #a3cfbb;
-      }
-
-      .status-failed {
-          background: #f8d7da;
-          border: 1px solid #f5c6cb;
-      }
-
-      .task-details {
-          margin-top: 0.5rem;
-          font-size: 0.9em;
-      }
-
-      .task-result {
-          margin-top: 0.5rem;
-          padding: 0.5rem;
-          background: #f8f9fa;
-          border-radius: 4px;
-      }
-
-      .task-result details {
-          margin-top: 0.5rem;
-      }
-
-      /* TODO: Move to atr.css */
-      details summary {
-          padding: 0.5rem;
-          cursor: pointer;
-          user-select: none;
-      }
-
-      .task-result summary:hover {
-          background: #e9ecef;
-      }
-
-      .task-result table {
-          margin-top: 0.5rem;
-          width: 100%;
-          border-collapse: collapse;
-      }
-
-      .task-result th,
-      .task-result td {
-          padding: 0.5rem;
-          text-align: left;
-          border: 1px solid #dee2e6;
-      }
-
-      .task-result th {
-          background: #f8f9fa;
-          font-weight: 600;
-      }
-
-      .file-list-table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 0.5rem;
-      }
-
-      .file-list-table th,
-      .file-list-table td {
-          padding: 0.25rem 0.5rem;
-          text-align: left;
-          border: 1px solid #dee2e6;
-          font-size: 0.9em;
-      }
-
-      .file-list-table th {
-          background: #e9ecef;
-          font-weight: 600;
-      }
-
-      .license-summary {
-          display: flex;
-          gap: 1rem;
-          margin-bottom: 0.5rem;
-      }
-
-      .license-stat {
-          padding: 0.25rem 0.5rem;
-          border-radius: 4px;
-          font-size: 0.9em;
-      }
-
-      .license-approved {
-          background: #d1e7dd;
-          border: 1px solid #a3cfbb;
-      }
-
-      .license-unapproved {
-          background: #f8d7da;
-          border: 1px solid #f5c6cb;
-      }
-
-      .license-unknown {
-          background: #fff3cd;
-          border: 1px solid #ffecb5;
-      }
-
-      .package-info {
-          margin-bottom: 2rem;
-          padding: 1rem;
-          background: #f8f9fa;
-          border: 1px solid #dee2e6;
-          border-radius: 4px;
-      }
-
-      .package-info h2 {
-          margin-top: 0;
-      }
-  </style>
-{% endblock stylesheets %}
-
 {% block content %}
   <a href="{{ url_for('root_candidate_review') }}" class="back-link">← Back to Release Candidates</a>
 
-  <div class="package-info">
-    <h2>Package details</h2>
+  <div class="p-3 mb-4 bg-light border rounded">
+    <h2 class="mt-0">Package details</h2>
     <p>
       <strong>Filename:</strong> {{ package.filename }}
     </p>
@@ -244,7 +22,7 @@
     <p>
       <strong>Size:</strong> {{ format_file_size(package.bytes_size) }}
     </p>
-    <p>
+    <p class="mb-0">
       <strong>Uploaded:</strong> {{ package.uploaded.strftime("%Y-%m-%d %H:%M UTC") }}
     </p>
   </div>
@@ -256,9 +34,9 @@
   <h2>Verification tasks</h2>
 
   {% if tasks %}
-    <div class="task-summary">
-      <span class="summary-title">Status summary:</span>
-      <div class="summary-stats">
+    <div class="d-flex align-items-center p-3 mb-3 bg-light border rounded">
+      <span class="fw-bold me-3">Status summary:</span>
+      <div class="d-flex flex-wrap gap-3">
         {% with %}
           {% set status_counts = {
                       'completed': tasks|selectattr("status.value", "equalto", "completed")|list|length,
@@ -269,9 +47,9 @@
 
           {% for status, count in status_counts.items() %}
             {% if count > 0 %}
-              <div class="summary-stat {{ status }}">
-                <span class="count">{{ count }}</span>
-                <span class="label">
+              <div class="d-flex align-items-center gap-2 px-3 py-2 rounded fw-medium {% if status == 'completed' %}bg-success-subtle border border-success-subtle {% elif status == 'failed' %}bg-danger-subtle border border-danger-subtle {% elif status == 'active' %}bg-info-subtle border border-info-subtle {% else %}bg-light border{% endif %}">
+                <span class="fs-5">{{ count }}</span>
+                <span>
                   {%- if status == "queued" -%}
                     Pending
                   {%- elif status == "active" -%}
@@ -292,28 +70,28 @@
     </div>
   {% endif %}
 
-  <div class="task-actions">
-    <button type="button" onclick="toggleAllDetails()" class="verify-link">Toggle all details</button>
+  <div class="d-flex gap-3 mb-3">
+    <button type="button" onclick="toggleAllDetails()" class="btn btn-secondary">Toggle all details</button>
     {% if tasks and all_tasks_completed %}
       <form method="post"
             action="{{ url_for('root_package_check_restart') }}"
-            class="button-form">
+            class="m-0">
         <input type="hidden"
                name="artifact_sha3"
                value="{{ package.artifact_sha3 }}" />
         <input type="hidden" name="release_key" value="{{ release.storage_key }}" />
-        <button type="submit" class="verify-link">Restart all checks</button>
+        <button type="submit" class="btn btn-primary">Restart all checks</button>
       </form>
     {% endif %}
   </div>
 
-  <div class="task-list">
+  <div class="mb-3">
     {% if tasks %}
       {% for task in tasks %}
-        <div class="task-item">
-          <div class="task-header">
-            <span class="task-type">{{ task.task_type.replace('_', ' ').replace("verify ", "").title() }}</span>
-            <span class="task-status status-{{ task.status.value.lower() }}">
+        <div class="border border-2 rounded p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-bold">{{ task.task_type.replace('_', ' ').replace("verify ", "").title() }}</span>
+            <span class="badge rounded-pill {% if task.status.value == 'queued' %}bg-secondary {% elif task.status.value == 'active' %}bg-info {% elif task.status.value == 'completed' %}bg-success {% elif task.status.value == 'failed' %}bg-danger {% else %}bg-secondary{% endif %}">
               {%- if task.status.value == "queued" -%}
                 Pending
               {%- elif task.status.value == "active" -%}
@@ -327,60 +105,60 @@
               {%- endif -%}
             </span>
           </div>
-          <div class="task-details">
+          <div class="small">
             <div>Started: {{ task.started.strftime("%Y-%m-%d %H:%M UTC") if task.started else "Not started" }}</div>
             <div>Completed: {{ task.completed.strftime("%Y-%m-%d %H:%M UTC") if task.completed else "Not completed" }}</div>
             {% if task.result and task.result[0] is mapping and task.result|length == 1 %}
-              <details class="task-result">
+              <details class="mt-2 p-2 bg-light rounded">
                 {% if task.error %}
-                  <summary>Issue: {{ task.error }}</summary>
+                  <summary class="cursor-pointer user-select-none p-2">Issue: {{ task.error }}</summary>
                 {% else %}
-                  <summary>View detailed results</summary>
+                  <summary class="cursor-pointer user-select-none p-2">View detailed results</summary>
                 {% endif %}
 
                 {% if task.task_type == 'verify_rat_license' and task.result[0] is mapping %}
-                  <div class="license-summary">
-                    <span class="license-stat license-approved">
+                  <div class="d-flex gap-3 mb-2">
+                    <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle px-2 py-1">
                       <strong>{{ task.result[0].approved_licenses }}</strong> files with approved licenses
                     </span>
                     {% if task.result[0].unapproved_licenses > 0 %}
-                      <span class="license-stat license-unapproved">
+                      <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle px-2 py-1">
                         <strong>{{ task.result[0].unapproved_licenses }}</strong> files with unapproved licenses
                       </span>
                     {% endif %}
                     {% if task.result[0].unknown_licenses > 0 %}
-                      <span class="license-stat license-unknown">
+                      <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
                         <strong>{{ task.result[0].unknown_licenses }}</strong> files with unknown licenses
                       </span>
                     {% endif %}
                   </div>
                 {% endif %}
 
-                <table class="result-table">
+                <table class="table table-bordered mt-2">
                   <tbody>
                     {% for key, value in task.result[0].items() %}
                       {% if key != "debug_info" %}
                         <tr>
-                          <th>{{ key|replace('_', ' ') |title }}</th>
+                          <th class="bg-light fw-bold">{{ key|replace('_', ' ') |title }}</th>
                           <td>
                             {% if value is boolean %}
                               {{ "Yes" if value else "No" }}
                             {% elif value is mapping %}
-                              <table class="nested-table">
+                              <table class="table table-sm mb-0">
                                 {% for k, v in value.items() %}
                                   <tr>
-                                    <th>{{ k|replace('_', ' ') |title }}</th>
+                                    <th class="bg-light fw-bold">{{ k|replace('_', ' ') |title }}</th>
                                     <td>{{ v }}</td>
                                   </tr>
                                 {% endfor %}
                               </table>
                             {% elif key == "unapproved_files" or key == "unknown_license_files" %}
                               {% if value|length > 0 %}
-                                <table class="file-list-table">
+                                <table class="table table-sm table-bordered mb-0">
                                   <thead>
                                     <tr>
-                                      <th>File</th>
-                                      <th>License</th>
+                                      <th class="bg-light fw-bold">File</th>
+                                      <th class="bg-light fw-bold">License</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -408,10 +186,10 @@
                 </table>
               </details>
             {% else %}
-              {% if task.error %}<div class="task-result">Issue: {{ task.error }}</div>{% endif %}
+              {% if task.error %}<div class="mt-2 p-2 bg-light rounded">Issue: {{ task.error }}</div>{% endif %}
               {% if task.result %}
-                <div class="task-result">
-                  <pre>{{ task.result }}</pre>
+                <div class="mt-2 p-2 bg-light rounded">
+                  <pre class="mb-0">{{ task.result }}</pre>
                 </div>
               {% endif %}
             {% endif %}

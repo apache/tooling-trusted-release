@@ -8,15 +8,6 @@
   Create a new release candidate.
 {% endblock description %}
 
-{% block theme_css %}
-  <link rel="stylesheet"
-        href="{{ url_for('static', filename='css/atr-small.css') }}" />
-{% endblock theme_css %}
-
-{% block stylesheets %}
-  {{ super() }}
-{% endblock stylesheets %}
-
 {% block content %}
   <h1>Create release candidate</h1>
   <p>

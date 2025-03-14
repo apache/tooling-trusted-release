@@ -6,6 +6,8 @@ $font-family-sans-serif: "Inter", sans-serif;
 $headings-font-family: $font-family-sans-serif;
 $table-cell-padding-y: 0.75rem;
 $table-cell-padding-x: 0.75rem;
+$table-bg: transparent;
+$table-accent-bg: transparent;
 
 // Variables
 @import "../node_modules/bootstrap/scss/variables";
@@ -62,7 +64,7 @@ table.atr-data th {
 }
 
 th {
-  color: #555;
+  color: $dark;
   font-weight: 525;
   @extend .align-middle;
   @extend .w-25;

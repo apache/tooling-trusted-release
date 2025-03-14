@@ -8,33 +8,11 @@
   An error occurred while processing your request.
 {% endblock description %}
 
-{% block stylesheets %}
-  {{ super() }}
-  <style>
-      .error-container {
-          margin: 20px 0;
-          padding: 15px;
-          border: 1px solid #dc3545;
-          border-radius: 4px;
-          background-color: #f8d7da;
-      }
-
-      .error-title {
-          color: #721c24;
-          margin-top: 0;
-      }
-
-      .actions {
-          margin-top: 20px;
-      }
-  </style>
-{% endblock stylesheets %}
-
 {% block content %}
   <div>
     <h1>Error</h1>
-    <div class="error-container">
-      <h2 class="error-title">{{ error }}</h2>
+    <div class="my-4 p-3 border border-danger rounded bg-danger-subtle">
+      <h2 class="text-danger-emphasis mt-0">{{ error }}</h2>
       <p>
         The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
       </p>
@@ -46,8 +24,8 @@
       {% endif %}
     </div>
 
-    <div class="actions">
-      <a href="{{ url_for('root') }}" class="button">Return to Home</a>
+    <div class="mt-4">
+      <a href="{{ url_for('root') }}" class="btn btn-primary">Return to Home</a>
     </div>
   </div>
 {% endblock content %}

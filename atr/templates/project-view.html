@@ -8,193 +8,116 @@
   Release candidates to which you have access.
 {% endblock description %}
 
-{% block stylesheets %}
-  {{ super() }}
-  <style>
-      .card-header {
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          padding: 1rem;
-          margin-bottom: 1rem;
-          background-color: #f8f8f8;
-      }
-
-      .card-header h3 {
-          margin: 0 0 0.5rem 0;
-      }
-
-      .card-meta {
-          color: #666;
-          font-size: 0.9em;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 1rem;
-          margin-bottom: .5rem;
-          padding-bottom: 1rem;
-          border-bottom: 1px solid #ddd;
-      }
-
-      .card-meta-item::after {
-          content: "•";
-          margin-left: 1rem;
-          color: #ccc;
-      }
-
-      .card-meta-item:last-child::after {
-          content: none;
-      }
-
-      .card-body {
-          display: flex;
-          gap: 1rem;
-          align-items: center;
-      }
-
-      .keys-grid {
-          display: grid;
-          gap: 1.5rem;
-      }
-
-      .key-card {
-          background: white;
-          border: 1px solid #d1d2d3;
-          border-radius: 4px;
-          overflow: hidden;
-          padding: 1rem;
-      }
-
-      .key-card table {
-          margin: 0;
-      }
-
-      .key-card td {
-          word-break: break-all;
-      }
-
-      .key-card h3 {
-          margin-top: 0;
-          margin-bottom: 1rem;
-      }
-
-      .actions {
-          display: flex;
-          gap: 1rem;
-          align-items: center;
-      }
-
-      .add-link {
-          display: inline-block;
-          padding: 0.5rem 1rem;
-          background: #004477;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-weight: 500;
-          text-decoration: none;
-          font-size: 17px;
-      }
-
-      .add-link:hover {
-          background: #003366;
-          color: white;
-      }
-  </style>
-{% endblock stylesheets %}
-
 {% block content %}
   <h1>{{ project.display_name | capitalize }}</h1>
 
-  <div class="card-header">
-    <h3>Members</h3>
-    <div class="card-meta">
-      <span class="card-meta-item">PMC: {{ project.pmc_members|length }}</span>
-      <span class="card-meta-item">Committers: {{ project.committers|length }}</span>
+  <div class="card mb-4">
+    <div class="card-header bg-light">
+      <h3 class="mb-2">Members</h3>
+    </div>
+    <div class="card-body">
+      <div class="d-flex flex-wrap gap-3 small mb-1">
+        <span>PMC: {{ project.pmc_members|length }}</span>
+        <span class="d-flex align-items-center">
+          <span>Committers: {{ project.committers|length }}</span>
+        </span>
+      </div>
     </div>
   </div>
 
-  <div class="card-header">
-    <h3>Signing Keys</h3>
-    <div class="card-meta"></div>
-    <div class="keys-grid">
-      {% for key in project.public_signing_keys %}
-        <div class="key-card">
-          <table>
-            <tbody>
-              <tr>
-                <th>Fingerprint</th>
-                <td>{{ key.fingerprint }}</td>
-              </tr>
-              <tr>
-                <th>Key Type</th>
-                <td>{{ algorithms[key.algorithm] }} ({{ key.length }} bits)</td>
-              </tr>
-              <tr>
-                <th>Created</th>
-                <td>{{ key.created.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-              </tr>
-              <tr>
-                <th>Expires</th>
-                <td>
-                  {% if key.expires %}
-                    {% set days_until_expiry = (key.expires - now).days %}
-                    {% if days_until_expiry < 0 %}
-                      <span class="expiry-error">
-                        {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
-                        <span class="notice-badge error">Expired</span>
-                      </span>
-                    {% elif days_until_expiry <= 30 %}
-                      <span class="expiry-warning">
-                        {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
-                        <span class="notice-badge warning">Expires in {{ days_until_expiry }} days</span>
-                      </span>
-                    {% else %}
-                      {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
-                    {% endif %}
-                  {% else %}
-                    Never
-                  {% endif %}
-                </td>
-              </tr>
-              <tr>
-                <th>User ID</th>
-                <td>{{ key.declared_uid or 'Not specified' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      {% endfor %}
+  <div class="card mb-4">
+    <div class="card-header bg-light">
+      <h3 class="mb-2">Signing Keys</h3>
+    </div>
+    <div class="card-body">
+      <div class="row row-cols-1 g-4">
+        {% for key in project.public_signing_keys %}
+          <div class="col">
+            <div class="card h-100 border">
+              <div class="card-body">
+                <table class="table mb-0">
+                  <tbody>
+                    <tr>
+                      <th class="border-0">Fingerprint</th>
+                      <td class="text-break border-0">{{ key.fingerprint }}</td>
+                    </tr>
+                    <tr>
+                      <th class="border-0">Key Type</th>
+                      <td class="text-break border-0">{{ algorithms[key.algorithm] }} ({{ key.length }} bits)</td>
+                    </tr>
+                    <tr>
+                      <th class="border-0">Created</th>
+                      <td class="text-break border-0">{{ key.created.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                    </tr>
+                    <tr>
+                      <th class="border-0">Expires</th>
+                      <td class="text-break border-0">
+                        {% if key.expires %}
+                          {% set days_until_expiry = (key.expires - now).days %}
+                          {% if days_until_expiry < 0 %}
+                            <span class="text-danger fw-bold">
+                              {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
+                              <span class="badge bg-danger text-white ms-2">Expired</span>
+                            </span>
+                          {% elif days_until_expiry <= 30 %}
+                            <span class="text-warning fw-bold">
+                              {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
+                              <span class="badge bg-warning text-dark ms-2">Expires in {{ days_until_expiry }} days</span>
+                            </span>
+                          {% else %}
+                            {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
+                          {% endif %}
+                        {% else %}
+                          Never
+                        {% endif %}
+                      </td>
+                    </tr>
+                    <tr>
+                      <th class="border-0">User ID</th>
+                      <td class="text-break border-0">{{ key.declared_uid or 'Not specified' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
     </div>
   </div>
 
-  <div class="card-header">
-    <h3>Voting Policy</h3>
-    <div class="actions">
-      <!-- TODO: This is a PMC, not a project -->
-      <a class="add-link"
-         href="{{ url_for('root_project_voting_policy_add', name=project.name) }}"><i class="fa-solid fa-plus"></i></a>
+  <div class="card mb-4">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <h3 class="mb-0">Voting Policy</h3>
+      <div>
+        <!-- TODO: This is a PMC, not a project -->
+        <a class="btn btn-primary"
+           href="{{ url_for('root_project_voting_policy_add', name=project.name) }}"><i class="fa-solid fa-plus"></i></a>
+      </div>
     </div>
-    <!--    <div class="card-meta"></div>-->
     <div class="card-body">
       {% if project.vote_policy %}
         {% set vp = project.vote_policy %}
-        <div class="key-card">
-          <table>
-            <tbody>
-              <tr>
-                <th>Mailto Addresses</th>
-                <td>{{ vp.mailto_addresses }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="card border">
+          <div class="card-body">
+            <table class="table mb-0">
+              <tbody>
+                <tr>
+                  <th class="border-0">Mailto Addresses</th>
+                  <td class="text-break border-0">{{ vp.mailto_addresses }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       {% endif %}
     </div>
   </div>
 
-  <div class="card-header">
-    <h3>Product Lines</h3>
-    <div class="card-meta"></div>
+  <div class="card mb-4">
+    <div class="card-header bg-light">
+      <h3 class="mb-0">Product Lines</h3>
+    </div>
     <div class="card-body"></div>
   </div>
 

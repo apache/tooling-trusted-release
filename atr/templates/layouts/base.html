@@ -13,10 +13,8 @@
     {% block stylesheets %}
       <link rel="stylesheet"
             href="{{ url_for('static', filename='css/normalize.css') }}" />
-      {% block theme_css %}
-        <link rel="stylesheet"
-              href="{{ url_for('static', filename='css/atr.css') }}" />
-      {% endblock theme_css %}
+      <link rel="stylesheet"
+            href="{{ url_for('static', filename='css/atr.css') }}" />
       <link rel="stylesheet"
             href="{{ url_for('static', filename='css/fontawesome.all.min.css') }}" />
       <link rel="stylesheet"

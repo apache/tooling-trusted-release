@@ -8,49 +8,11 @@
   An error occurred while processing your request.
 {% endblock description %}
 
-{% block stylesheets %}
-  {{ super() }}
-  <style>
-      .error-container {
-          margin: 20px 0;
-          padding: 15px;
-          border: 1px solid #dc3545;
-          border-radius: 4px;
-          background-color: #f8d7da;
-      }
-
-      .error-title {
-          color: #721c24;
-          margin-top: 0;
-      }
-
-      .error-details {
-          margin-top: 20px;
-      }
-
-      .error-traceback {
-          background-color: #f5f5f5;
-          padding: 15px;
-          overflow-x: auto;
-          font-family: monospace;
-          font-size: 13px;
-          line-height: 1.5;
-          color: #333;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-      }
-
-      .actions {
-          margin-top: 20px;
-      }
-  </style>
-{% endblock stylesheets %}
-
 {% block content %}
   <div>
     <h1>Error</h1>
-    <div class="error-container">
-      <h2 class="error-title">{{ error }}</h2>
+    <div class="my-4 p-3 border border-danger rounded bg-danger-subtle">
+      <h2 class="text-danger-emphasis mt-0">{{ error }}</h2>
       <p>An error occurred while processing your request. This has been logged and will be addressed.</p>
 
       {% if status_code %}
@@ -60,15 +22,15 @@
       {% endif %}
 
       {% if traceback %}
-        <div class="error-details">
+        <div class="mt-4">
           <h3>Technical Details</h3>
-          <pre class="error-traceback">{{ traceback }}</pre>
+          <pre class="bg-light p-3 overflow-auto font-monospace border rounded">{{ traceback }}</pre>
         </div>
       {% endif %}
     </div>
 
-    <div class="actions">
-      <a href="{{ url_for('root') }}" class="button">Return to Home</a>
+    <div class="mt-4">
+      <a href="{{ url_for('root') }}" class="btn btn-primary">Return to Home</a>
     </div>
   </div>
 {% endblock content %}
