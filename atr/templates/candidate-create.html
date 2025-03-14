@@ -23,11 +23,14 @@
   <form method="post"
         enctype="multipart/form-data"
         class="striking py-4 px-5">
+    <input type="hidden" name="form_type" value="single" />
+    {{ form.hidden_tag() }}
     <div class="mb-3 pb-3 row border-bottom">
-      <label for="committee_name" class="col-sm-3 col-form-label text-sm-end">Committee:</label>
+      <label for="{{ form.committee_name.id }}"
+             class="col-sm-3 col-form-label text-sm-end">{{ form.committee_name.label.text }}:</label>
       <div class="col-sm-8">
-        <select id="committee_name"
-                name="committee_name"
+        <select id="{{ form.committee_name.id }}"
+                name="{{ form.committee_name.name }}"
                 class="mb-2 form-select"
                 required>
           <option value="">Select a committee...</option>
@@ -35,39 +38,36 @@
             <option value="{{ committee.name }}">{{ committee.display_name }}</option>
           {% endfor %}
         </select>
-        {% if not user_committees %}
-          <p class="text-danger">You must be a (P)PMC member or committer to submit a release candidate.</p>
-        {% endif %}
+        {% if form.committee_name.errors -%}<span class="error-message">{{ form.committee_name.errors[0] }}</span>{%- endif %}
+          {% if not user_committees %}
+            <p class="text-danger">You must be a (P)PMC member or committer to submit a release candidate.</p>
+          {% endif %}
+        </div>
       </div>
-    </div>
 
-    <div class="mb-3 pb-3 row border-bottom">
-      <label for="version" class="col-sm-3 col-form-label text-sm-end">Version:</label>
-      <div class="col-sm-8">
-        <input type="text" id="version" name="version" class="form-control" required />
-      </div>
-    </div>
+      <div class="mb-3 pb-3 row border-bottom">
+        <label for="{{ form.version.id }}"
+               class="col-sm-3 col-form-label text-sm-end">{{ form.version.label.text }}:</label>
+        <div class="col-sm-8">
+          {{ form.version(class_="form-control") }}
+          {% if form.version.errors -%}<span class="error-message">{{ form.version.errors[0] }}</span>{%- endif %}
+          </div>
+        </div>
 
-    <div class="mb-3 pb-3 row border-bottom">
-      <label for="project_name" class="col-sm-3 col-form-label text-sm-end">Project name:</label>
-      <div class="col-sm-8">
-        <!-- TODO: Add a dropdown for the project name, plus "add new project" -->
-        <input type="text"
-               id="project_name"
-               name="project_name"
-               class="form-control"
-               required />
-        <!-- TODO: Add a subproject checkbox -->
-        <small class="text-muted">This can be the same as the committee name, but may be different if e.g. this is a subproject.</small>
-      </div>
-    </div>
+        <div class="mb-3 pb-3 row border-bottom">
+          <label for="{{ form.project_name.id }}"
+                 class="col-sm-3 col-form-label text-sm-end">{{ form.project_name.label.text }}:</label>
+          <div class="col-sm-8">
+            <!-- TODO: Add a dropdown for the project name, plus "add new project" -->
+            {{ form.project_name(class_="form-control") }}
+            {% if form.project_name.errors -%}<span class="error-message">{{ form.project_name.errors[0] }}</span>{%- endif %}
+              <!-- TODO: Add a subproject checkbox -->
+              <small class="text-muted">This can be the same as the committee name, but may be different if e.g. this is a subproject.</small>
+            </div>
+          </div>
 
-    <div class="row">
-      <div class="col-sm-9 offset-sm-3">
-        <button type="submit"
-                class="btn btn-primary mt-2"
-                {% if not user_committees %}disabled{% endif %}>Create release</button>
-      </div>
-    </div>
-  </form>
-{% endblock content %}
+          <div class="row">
+            <div class="col-sm-9 offset-sm-3">{{ form.submit(class_="btn btn-primary mt-3") }}</div>
+          </div>
+        </form>
+      {% endblock content %}

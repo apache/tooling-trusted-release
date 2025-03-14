@@ -22,6 +22,7 @@ import secrets
 
 import quart
 import werkzeug.wrappers.response as response
+import wtforms
 
 import asfquart
 import asfquart.auth as auth
@@ -30,9 +31,21 @@ import asfquart.session as session
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
+import atr.util as util
 
 if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
+
+
+class ReleaseAddForm(util.QuartFormTyped):
+    committee_name = wtforms.StringField(
+        "Committee", validators=[wtforms.validators.InputRequired("Committee name is required")]
+    )
+    version = wtforms.StringField("Version", validators=[wtforms.validators.InputRequired("Version is required")])
+    project_name = wtforms.StringField(
+        "Project name", validators=[wtforms.validators.InputRequired("Project name is required")]
+    )
+    submit = wtforms.SubmitField("Create release candidate")
 
 
 def format_artifact_name(project_name: str, version: str, is_podling: bool = False) -> str:
@@ -51,21 +64,33 @@ def format_artifact_name(project_name: str, version: str, is_podling: bool = Fal
 # Release functions
 
 
-async def release_add_post(session: session.ClientSession, request: quart.Request) -> response.Response:
+async def release_add_post(session: session.ClientSession, request: quart.Request) -> str | response.Response:
     """Handle POST request for creating a new release."""
-    form = await routes.get_form(request)
 
-    committee_name = form.get("committee_name")
-    if not committee_name:
-        raise base.ASFQuartException("Committee name is required", errorcode=400)
+    def not_none(value: str | None) -> str:
+        if value is None:
+            raise ValueError("This field is required")
+        return value
 
-    version = form.get("version")
-    if not version:
-        raise base.ASFQuartException("Version is required", errorcode=400)
+    form = await ReleaseAddForm.create_form(data=await request.form)
 
-    project_name = form.get("project_name")
-    if not project_name:
-        raise base.ASFQuartException("Project name is required", errorcode=400)
+    if not await form.validate():
+        # Get PMC objects for all projects the user is a member of
+        async with db.session() as data:
+            project_list = session.committees + session.projects
+            user_committees = await data.committee(name_in=project_list).all()
+
+        # Return the form with validation errors
+        return await quart.render_template(
+            "candidate-create.html",
+            asf_id=session.uid,
+            user_committees=user_committees,
+            form=form,
+        )
+
+    committee_name = form.committee_name.data
+    version = not_none(form.version.data)
+    project_name = not_none(form.project_name.data)
 
     # TODO: Forbid creating a release with an existing project and version
     # Create the release record in the database
@@ -134,10 +159,12 @@ async def root_candidate_create() -> response.Response | str:
         user_committees = await data.committee(name_in=project_list).all()
 
     # For GET requests, show the form
+    form = await ReleaseAddForm.create_form()
     return await quart.render_template(
         "candidate-create.html",
         asf_id=web_session.uid,
         user_committees=user_committees,
+        form=form,
     )
 
 

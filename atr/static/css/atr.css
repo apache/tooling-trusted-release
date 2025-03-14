@@ -28,8 +28,6 @@ body {
 }
 
 input, textarea, select, option {
-    border-width: 2px !important;
-    border-color: #cccccc !important;
     font-size: 17px !important;
     font-weight: 425 !important;
 }
@@ -49,8 +47,24 @@ label[for] {
     cursor: pointer;
 }
 
+input,
+textarea {
+    font-family: monospace;
+    padding: 0.5rem;
+}
+
+textarea {
+    width: 100%;
+    min-height: 200px;
+}
+
 select, input[type="file"] {
     padding: 6px 12px;
+}
+
+input:not([type="submit"]), textarea, select, option {
+    border-width: 2px !important;
+    border-color: #cccccc !important;
 }
 
 a {
@@ -151,17 +165,6 @@ footer a:visited {
 
 footer p {
     margin-bottom: 0;
-}
-
-input,
-textarea {
-    font-family: monospace;
-    padding: 0.5rem;
-}
-
-textarea {
-    width: 100%;
-    min-height: 200px;
 }
 
 summary {

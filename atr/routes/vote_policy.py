@@ -18,18 +18,17 @@
 """vote_policy.py"""
 
 import quart
-import quart_wtf
 import werkzeug.wrappers.response as response
 import wtforms
 
+import asfquart.base as base
 import asfquart.session as session
 import atr.db as db
 import atr.routes as routes
-from asfquart import base
-from asfquart.base import ASFQuartException
+import atr.util as util
 
 
-class VotePolicyForm(quart_wtf.QuartForm):
+class VotePolicyForm(util.QuartFormTyped):
     project_name = wtforms.HiddenField("project_name")
     mailto_addresses = wtforms.StringField(
         "Email",
@@ -56,7 +55,7 @@ async def root_vote_policy_edit(vote_policy_id: str) -> response.Response | str:
 
     async with db.session() as data:
         vote_policy = await data.vote_policy(id=int(vote_policy_id)).demand(
-            ASFQuartException("Vote policy not found", 404)
+            base.ASFQuartException("Vote policy not found", 404)
         )
 
     form = await VotePolicyForm.create_form()
@@ -65,8 +64,8 @@ async def root_vote_policy_edit(vote_policy_id: str) -> response.Response | str:
         form.process(obj=vote_policy)
 
     if await form.validate_on_submit():
+        # return await add_voting_policy(web_session, form)
         return ""
-        # return await add_voting_policy(web_session, form)  # pyright: ignore [reportArgumentType]
 
     # For GET requests, show the form
     return await quart.render_template(

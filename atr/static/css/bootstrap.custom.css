@@ -11455,6 +11455,16 @@ th {
   font-weight: 475;
 }
 
+.btn:disabled {
+  background-color: #cccccc;
+  border-color: #cccccc;
+}
+
+.btn-primary:disabled {
+  background-color: #004477;
+  border-color: #004477;
+}
+
 .btn-primary {
   background-color: #004477;
   border-color: #004477;
