@@ -75,10 +75,10 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
     form = await ReleaseAddForm.create_form(data=await request.form)
 
     if not await form.validate():
-        # Get PMC objects for all projects the user is a member of
+        # Get Committee objects for all committees and projects the user is a member of
         async with db.session() as data:
-            project_list = session.committees + session.projects
-            user_committees = await data.committee(name_in=project_list).all()
+            committee_and_project_list = session.committees + session.projects
+            user_committees = await data.committee(name_in=committee_and_project_list).all()
 
         # Return the form with validation errors
         return await quart.render_template(
