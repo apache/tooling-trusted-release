@@ -85,44 +85,44 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         name: Any = _DEFAULT,
         full_name: Any = _DEFAULT,
         is_podling: Any = _DEFAULT,
-        parent_pmc_id: Any = _DEFAULT,
-        pmc_members: Any = _DEFAULT,
+        parent_committee_id: Any = _DEFAULT,
+        committee_members: Any = _DEFAULT,
         committers: Any = _DEFAULT,
         release_managers: Any = _DEFAULT,
         vote_policy_id: Any = _DEFAULT,
         name_in: list[str] | _DefaultArgument = _DEFAULT,
         _public_signing_keys: bool = False,
         _vote_policy: bool = False,
-    ) -> Query[models.PMC]:
-        query = sqlmodel.select(models.PMC)
+    ) -> Query[models.Committee]:
+        query = sqlmodel.select(models.Committee)
 
         if id is not _DEFAULT:
-            query = query.where(models.PMC.id == id)
+            query = query.where(models.Committee.id == id)
         if name is not _DEFAULT:
-            query = query.where(models.PMC.name == name)
+            query = query.where(models.Committee.name == name)
         if full_name is not _DEFAULT:
-            query = query.where(models.PMC.full_name == full_name)
+            query = query.where(models.Committee.full_name == full_name)
         if is_podling is not _DEFAULT:
-            query = query.where(models.PMC.is_podling == is_podling)
-        if parent_pmc_id is not _DEFAULT:
-            query = query.where(models.PMC.parent_pmc_id == parent_pmc_id)
-        if pmc_members is not _DEFAULT:
-            query = query.where(models.PMC.pmc_members == pmc_members)
+            query = query.where(models.Committee.is_podling == is_podling)
+        if parent_committee_id is not _DEFAULT:
+            query = query.where(models.Committee.parent_committee_id == parent_committee_id)
+        if committee_members is not _DEFAULT:
+            query = query.where(models.Committee.committee_members == committee_members)
         if committers is not _DEFAULT:
-            query = query.where(models.PMC.committers == committers)
+            query = query.where(models.Committee.committers == committers)
         if release_managers is not _DEFAULT:
-            query = query.where(models.PMC.release_managers == release_managers)
+            query = query.where(models.Committee.release_managers == release_managers)
         if vote_policy_id is not _DEFAULT:
-            query = query.where(models.PMC.vote_policy_id == vote_policy_id)
+            query = query.where(models.Committee.vote_policy_id == vote_policy_id)
 
         if not isinstance(name_in, _DefaultArgument):
-            models_pmc_name = validate_instrumented_attribute(models.PMC.name)
-            query = query.where(models_pmc_name.in_(name_in))
+            models_committee_name = validate_instrumented_attribute(models.Committee.name)
+            query = query.where(models_committee_name.in_(name_in))
 
         if _public_signing_keys:
-            query = query.options(select_in_load(models.PMC.public_signing_keys))
+            query = query.options(select_in_load(models.Committee.public_signing_keys))
         if _vote_policy:
-            query = query.options(select_in_load(models.PMC.vote_policy))
+            query = query.options(select_in_load(models.Committee.vote_policy))
 
         return Query(self, query)
 
@@ -138,8 +138,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         release_key: Any = _DEFAULT,
         _release: bool = False,
         _tasks: bool = False,
-        _release_product: bool = False,
-        _release_pmc: bool = False,
+        _release_project: bool = False,
+        _release_committee: bool = False,
     ) -> Query[models.Package]:
         query = sqlmodel.select(models.Package)
 
@@ -163,59 +163,12 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.options(select_in_load(models.Package.release))
         if _tasks:
             query = query.options(select_in_load(models.Package.tasks))
-        if _release_product:
-            query = query.options(select_in_load(models.Package.release, models.Release.product))
-        if _release_pmc:
+        if _release_project:
+            query = query.options(select_in_load(models.Package.release, models.Release.project))
+        if _release_committee:
             query = query.options(
-                select_in_load_nested(
-                    models.Package.release, models.Release.product, models.Product.project, models.Project.pmc
-                )
+                select_in_load_nested(models.Package.release, models.Release.project, models.Project.committee)
             )
-        return Query(self, query)
-
-    def product(
-        self,
-        id: Any = _DEFAULT,
-        project_id: Any = _DEFAULT,
-        product_name: Any = _DEFAULT,
-        latest_version: Any = _DEFAULT,
-        vote_policy_id: Any = _DEFAULT,
-        project_pmc_id: Any = _DEFAULT,
-        _project: bool = False,
-        _distribution_channels: bool = False,
-        _vote_policy: bool = False,
-        _releases: bool = False,
-        _project_pmc: bool = False,
-    ) -> Query[models.Product]:
-        query = sqlmodel.select(models.Product)
-
-        if id is not _DEFAULT:
-            query = query.where(models.Product.id == id)
-        if project_id is not _DEFAULT:
-            query = query.where(models.Product.project_id == project_id)
-        if product_name is not _DEFAULT:
-            query = query.where(models.Product.product_name == product_name)
-        if latest_version is not _DEFAULT:
-            query = query.where(models.Product.latest_version == latest_version)
-        if vote_policy_id is not _DEFAULT:
-            query = query.where(models.Product.vote_policy_id == vote_policy_id)
-
-        if project_pmc_id is not _DEFAULT:
-            query = query.join(
-                models.Project, validate_instrumented_attribute(models.Product.project_id) == models.Project.id
-            ).where(models.Project.pmc_id == project_pmc_id)
-
-        if _project:
-            query = query.options(select_in_load(models.Product.project))
-        if _distribution_channels:
-            query = query.options(select_in_load(models.Product.distribution_channels))
-        if _vote_policy:
-            query = query.options(select_in_load(models.Product.vote_policy))
-        if _releases:
-            query = query.options(select_in_load(models.Product.releases))
-        if _project_pmc:
-            query = query.options(select_in_load_nested(models.Product.project, models.Project.pmc))
-
         return Query(self, query)
 
     def project(
@@ -224,12 +177,13 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         name: Any = _DEFAULT,
         full_name: Any = _DEFAULT,
         is_podling: Any = _DEFAULT,
-        pmc_id: Any = _DEFAULT,
+        committee_id: Any = _DEFAULT,
         vote_policy_id: Any = _DEFAULT,
-        _pmc: bool = False,
-        _products: bool = False,
+        _committee: bool = False,
+        _releases: bool = False,
+        _distribution_channels: bool = False,
         _vote_policy: bool = False,
-        _pmc_public_signing_keys: bool = False,
+        _committee_public_signing_keys: bool = False,
     ) -> Query[models.Project]:
         query = sqlmodel.select(models.Project)
 
@@ -241,19 +195,21 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Project.full_name == full_name)
         if is_podling is not _DEFAULT:
             query = query.where(models.Project.is_podling == is_podling)
-        if pmc_id is not _DEFAULT:
-            query = query.where(models.Project.pmc_id == pmc_id)
+        if committee_id is not _DEFAULT:
+            query = query.where(models.Project.committee_id == committee_id)
         if vote_policy_id is not _DEFAULT:
             query = query.where(models.Project.vote_policy_id == vote_policy_id)
 
-        if _pmc:
-            query = query.options(select_in_load(models.Project.pmc))
-        if _products:
-            query = query.options(select_in_load(models.Project.products))
+        if _committee:
+            query = query.options(select_in_load(models.Project.committee))
+        if _releases:
+            query = query.options(select_in_load(models.Project.releases))
+        if _distribution_channels:
+            query = query.options(select_in_load(models.Project.distribution_channels))
         if _vote_policy:
             query = query.options(select_in_load(models.Project.vote_policy))
-        if _pmc_public_signing_keys:
-            query = query.options(select_in_load_nested(models.Project.pmc, models.PMC.public_signing_keys))
+        if _committee_public_signing_keys:
+            query = query.options(select_in_load_nested(models.Project.committee, models.Committee.public_signing_keys))
 
         return Query(self, query)
 
@@ -267,7 +223,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         declared_uid: Any = _DEFAULT,
         apache_uid: Any = _DEFAULT,
         ascii_armored_key: Any = _DEFAULT,
-        _pmcs: bool = False,
+        _committees: bool = False,
     ) -> Query[models.PublicSigningKey]:
         query = sqlmodel.select(models.PublicSigningKey)
 
@@ -288,8 +244,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         if ascii_armored_key is not _DEFAULT:
             query = query.where(models.PublicSigningKey.ascii_armored_key == ascii_armored_key)
 
-        if _pmcs:
-            query = query.options(select_in_load(models.PublicSigningKey.pmcs))
+        if _committees:
+            query = query.options(select_in_load(models.PublicSigningKey.committees))
 
         return Query(self, query)
 
@@ -299,16 +255,16 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         stage: Any = _DEFAULT,
         phase: Any = _DEFAULT,
         created: Any = _DEFAULT,
-        product_id: Any = _DEFAULT,
+        project_id: Any = _DEFAULT,
         package_managers: Any = _DEFAULT,
         version: Any = _DEFAULT,
         sboms: Any = _DEFAULT,
         vote_policy_id: Any = _DEFAULT,
         votes: Any = _DEFAULT,
-        _product: bool = False,
+        _project: bool = False,
         _packages: bool = False,
         _vote_policy: bool = False,
-        _pmc: bool = False,
+        _committee: bool = False,
         _packages_tasks: bool = False,
     ) -> Query[models.Release]:
         query = sqlmodel.select(models.Release)
@@ -321,8 +277,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Release.phase == phase)
         if created is not _DEFAULT:
             query = query.where(models.Release.created == created)
-        if product_id is not _DEFAULT:
-            query = query.where(models.Release.product_id == product_id)
+        if project_id is not _DEFAULT:
+            query = query.where(models.Release.project_id == project_id)
         if package_managers is not _DEFAULT:
             query = query.where(models.Release.package_managers == package_managers)
         if version is not _DEFAULT:
@@ -334,16 +290,14 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         if votes is not _DEFAULT:
             query = query.where(models.Release.votes == votes)
 
-        if _product:
-            query = query.options(select_in_load(models.Release.product))
+        if _project:
+            query = query.options(select_in_load(models.Release.project))
         if _packages:
             query = query.options(select_in_load(models.Release.packages))
         if _vote_policy:
             query = query.options(select_in_load(models.Release.vote_policy))
-        if _pmc:
-            query = query.options(
-                select_in_load_nested(models.Release.product, models.Product.project, models.Project.pmc)
-            )
+        if _committee:
+            query = query.options(select_in_load_nested(models.Release.project, models.Project.committee))
         if _packages_tasks:
             query = query.options(select_in_load_nested(models.Release.packages, models.Package.tasks))
 
@@ -405,9 +359,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         min_hours: Any = _DEFAULT,
         release_checklist: Any = _DEFAULT,
         pause_for_rm: Any = _DEFAULT,
-        _pmcs: bool = False,
+        _committees: bool = False,
         _projects: bool = False,
-        _products: bool = False,
         _releases: bool = False,
     ) -> Query[models.VotePolicy]:
         query = sqlmodel.select(models.VotePolicy)
@@ -425,12 +378,10 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         if pause_for_rm is not _DEFAULT:
             query = query.where(models.VotePolicy.pause_for_rm == pause_for_rm)
 
-        if _pmcs:
-            query = query.options(select_in_load(models.VotePolicy.pmcs))
+        if _committees:
+            query = query.options(select_in_load(models.VotePolicy.committees))
         if _projects:
             query = query.options(select_in_load(models.VotePolicy.projects))
-        if _products:
-            query = query.options(select_in_load(models.VotePolicy.products))
         if _releases:
             query = query.options(select_in_load(models.VotePolicy.releases))
 

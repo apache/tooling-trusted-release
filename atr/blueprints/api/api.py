@@ -15,16 +15,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import dataclasses
 from collections.abc import Mapping
-from dataclasses import dataclass
 
-from quart import Response, jsonify
-from quart_schema import validate_querystring, validate_response
-from werkzeug.exceptions import NotFound
+import quart
+import quart_schema
+import werkzeug.exceptions as exceptions
 
 import atr.blueprints.api as api
-from atr.db.models import PMC
-from atr.db.service import get_pmc_by_name, get_pmcs, get_tasks
+import atr.db as db
+import atr.db.models as models
+import atr.db.service as service
 
 # FIXME: we need to return the dumped model instead of the actual pydantic class
 #        as otherwise pyright will complain about the return type
@@ -33,32 +34,31 @@ from atr.db.service import get_pmc_by_name, get_pmcs, get_tasks
 
 
 @api.BLUEPRINT.route("/projects/<name>")
-@validate_response(PMC, 200)
+@quart_schema.validate_response(models.Committee, 200)
 async def project_by_name(name: str) -> tuple[Mapping, int]:
-    pmc = await get_pmc_by_name(name)
-    if pmc:
-        return pmc.model_dump(), 200
-    else:
-        raise NotFound()
+    async with db.session() as data:
+        committee = await data.committee(name=name).demand(exceptions.NotFound())
+        return committee.model_dump(), 200
 
 
 @api.BLUEPRINT.route("/projects")
-@validate_response(list[PMC], 200)
+@quart_schema.validate_response(list[models.Committee], 200)
 async def projects() -> tuple[list[Mapping], int]:
     """List all projects in the database."""
-    pmcs = await get_pmcs()
-    return [pmc.model_dump() for pmc in pmcs], 200
+    async with db.session() as data:
+        committees = await data.committee().all()
+        return [committee.model_dump() for committee in committees], 200
 
 
-@dataclass
+@dataclasses.dataclass
 class Pagination:
     offset: int = 0
     limit: int = 20
 
 
 @api.BLUEPRINT.route("/tasks")
-@validate_querystring(Pagination)
-async def api_tasks(query_args: Pagination) -> Response:
-    paged_tasks, count = await get_tasks(limit=query_args.limit, offset=query_args.offset)
+@quart_schema.validate_querystring(Pagination)
+async def api_tasks(query_args: Pagination) -> quart.Response:
+    paged_tasks, count = await service.get_tasks(limit=query_args.limit, offset=query_args.offset)
     result = {"data": [x.model_dump(exclude={"result"}) for x in paged_tasks], "count": count}
-    return jsonify(result)
+    return quart.jsonify(result)

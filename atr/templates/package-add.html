@@ -29,7 +29,7 @@
               {% for release in releases %}
                 <option value="{{ release.storage_key }}"
                         {% if release.storage_key == selected_release %}selected{% endif %}>
-                  {{ release.pmc.display_name }} - {{ release.product.product_name if release.product else "unknown" }} - {{ release.version }}
+                  {{ release.committee.display_name }} - {{ release.project.name if release.project else "unknown" }} - {{ release.version }}
                 </option>
               {% endfor %}
             </select>
@@ -155,7 +155,7 @@
               {% for release in releases %}
                 <option value="{{ release.storage_key }}"
                         {% if release.storage_key == selected_release %}selected{% endif %}>
-                  {{ release.pmc.display_name }} - {{ release.product.product_name if release.product else "unknown" }} - {{ release.version }}
+                  {{ release.committee.display_name }} - {{ release.project.name if release.project else "unknown" }} - {{ release.version }}
                 </option>
               {% endfor %}
             </select>

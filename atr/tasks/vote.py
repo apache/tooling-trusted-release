@@ -170,29 +170,29 @@ def initiate_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[
             _LOGGER.error(error_msg)
             return task.FAILED, error_msg, tuple()
 
-        # Get PMC and product details
-        if release.pmc is None:
-            error_msg = "Release has no associated PMC"
+        # Get PMC and project details
+        if release.committee is None:
+            error_msg = "Release has no associated committee"
             _LOGGER.error(error_msg)
             return task.FAILED, error_msg, tuple()
 
-        pmc_name = release.pmc.name
-        pmc_display = release.pmc.display_name
-        product_name = release.product.product_name if release.product else "Unknown"
+        committee_name = release.committee.name
+        committee_display = release.committee.display_name
+        project_name = release.project.name if release.project else "Unknown"
         version = release.version
 
         # Create email subject
-        subject = f"[VOTE] Release Apache {pmc_display} {product_name} {version}"
+        subject = f"[VOTE] Release Apache {committee_display} {project_name} {version}"
 
         # Create email body with initiator ID
-        body = f"""Hello {pmc_name},
+        body = f"""Hello {committee_name},
 
 I'd like to call a vote on releasing the following artifacts as
-Apache {pmc_display} {product_name} {version}.
+Apache {committee_display} {project_name} {version}.
 
 The release candidate can be found at:
 
-https://apache.example.org/{pmc_name}/{product_name}-{version}/
+https://apache.example.org/{committee_name}/{project_name}-{version}/
 
 The release artifacts are signed with my GPG key, {gpg_key_id}.
 

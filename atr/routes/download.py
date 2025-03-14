@@ -47,7 +47,7 @@ async def root_download_artifact(release_key: str, artifact_sha3: str) -> respon
         package = await data.package(
             artifact_sha3=artifact_sha3,
             release_key=release_key,
-            _release_pmc=True,
+            _release_committee=True,
         ).get()
 
         if not package:
@@ -55,9 +55,9 @@ async def root_download_artifact(release_key: str, artifact_sha3: str) -> respon
             return quart.redirect(quart.url_for("root_candidate_review"))
 
         # Check permissions
-        if package.release and package.release.pmc:
-            if (web_session.uid not in package.release.pmc.pmc_members) and (
-                web_session.uid not in package.release.pmc.committers
+        if package.release and package.release.committee:
+            if (web_session.uid not in package.release.committee.committee_members) and (
+                web_session.uid not in package.release.committee.committers
             ):
                 await quart.flash("You don't have permission to download this file", "error")
                 return quart.redirect(quart.url_for("root_candidate_review"))
@@ -86,15 +86,17 @@ async def root_download_signature(release_key: str, signature_sha3: str) -> quar
 
     async with db.session() as data:
         # Find the package that has this signature
-        package = await data.package(signature_sha3=signature_sha3, release_key=release_key, _release_pmc=True).get()
+        package = await data.package(
+            signature_sha3=signature_sha3, release_key=release_key, _release_committee=True
+        ).get()
         if not package:
             await quart.flash("Signature not found", "error")
             return quart.redirect(quart.url_for("root_candidate_review"))
 
         # Check permissions
-        if package.release and package.release.pmc:
-            if (web_session.uid not in package.release.pmc.pmc_members) and (
-                web_session.uid not in package.release.pmc.committers
+        if package.release and package.release.committee:
+            if (web_session.uid not in package.release.committee.committee_members) and (
+                web_session.uid not in package.release.committee.committers
             ):
                 await quart.flash("You don't have permission to download this file", "error")
                 return quart.redirect(quart.url_for("root_candidate_review"))

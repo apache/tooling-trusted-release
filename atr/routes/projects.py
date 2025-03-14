@@ -27,7 +27,6 @@ import asfquart.base as base
 import asfquart.session as session
 import atr.db as db
 import atr.db.models as models
-import atr.db.service as service
 import atr.routes as routes
 import atr.util as util
 
@@ -56,10 +55,13 @@ async def add_voting_policy(session: session.ClientSession, form: CreateVotePoli
 
     async with db.session() as data:
         async with data.begin():
-            pmc = await data.committee(name=name).demand(base.ASFQuartException("PMC not found", errorcode=404))
-            if pmc.name not in session.committees:
+            committee = await data.committee(name=name).demand(
+                base.ASFQuartException("Committee not found", errorcode=404)
+            )
+            if committee.name not in session.committees:
                 raise base.ASFQuartException(
-                    f"You must be a PMC member of {pmc.display_name} to submit a voting policy", errorcode=403
+                    f"You must be a committee member of {committee.display_name} to submit a voting policy",
+                    errorcode=403,
                 )
 
             vote_policy = models.VotePolicy(
@@ -72,24 +74,24 @@ async def add_voting_policy(session: session.ClientSession, form: CreateVotePoli
             data.add(vote_policy)
 
     # Redirect to the add package page with the storage token
-    return quart.redirect(quart.url_for("root_project_view", project_name=name))
+    return quart.redirect(quart.url_for("root_project_view", name=name))
 
 
 @routes.app_route("/projects")
 async def root_project_directory() -> str:
     """Main project directory page."""
-    async with db.create_async_db_session() as session:
-        projects = await service.get_pmcs(session)
+    async with db.session() as data:
+        projects = await data.project(_committee=True).all()
         return await quart.render_template("project-directory.html", projects=projects)
 
 
 @routes.app_route("/projects/<name>")
 async def root_project_view(name: str) -> str:
     async with db.session() as data:
-        pmc = await data.committee(name=name, _public_signing_keys=True, _vote_policy=True).demand(
+        project = await data.project(name=name, _committee_public_signing_keys=True, _vote_policy=True).demand(
             http.client.HTTPException(404)
         )
-        return await quart.render_template("project-view.html", project=pmc, algorithms=routes.algorithms)
+        return await quart.render_template("project-view.html", project=project, algorithms=routes.algorithms)
 
 
 @routes.app_route("/projects/<name>/voting/create", methods=["GET", "POST"])
@@ -99,13 +101,17 @@ async def root_project_voting_policy_add(name: str) -> response.Response | str:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
 
     async with db.session() as data:
-        pmc = await data.committee(name=name).demand(base.ASFQuartException("PMC not found", errorcode=404))
-        if pmc.name not in web_session.committees:
+        project = await data.project(name=name, _committee=True).demand(
+            base.ASFQuartException("Project not found", errorcode=404)
+        )
+        if project.committee is None:
+            raise base.ASFQuartException("Project is not associated with a committee", errorcode=404)
+        if project.committee.name not in web_session.committees:
             raise base.ASFQuartException(
-                f"You must be a PMC member of {pmc.display_name} to submit a voting policy", errorcode=403
+                f"You must be a committee member of {project.display_name} to submit a voting policy", errorcode=403
             )
 
-    form = await CreateVotePolicyForm.create_form(data={"project_name": pmc.name})
+    form = await CreateVotePolicyForm.create_form(data={"project_name": project.name})
 
     if await form.validate_on_submit():
         return await add_voting_policy(web_session, form)
@@ -114,6 +120,6 @@ async def root_project_voting_policy_add(name: str) -> response.Response | str:
     return await quart.render_template(
         "vote-policy-add.html",
         asf_id=web_session.uid,
-        project=pmc,
+        project=project,
         form=form,
     )

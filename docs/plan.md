@@ -21,7 +21,7 @@ This is a rough plan of immediate tasks. The priority of these tasks may change,
    - [DONE] Add file size and upload timestamp
    - [DONE] Improve the layout of file listings
    - [DONE] Show KB, MB, or GB units for file sizes
-   - [DONE] Add a standard artifact naming pattern based on the project and product
+   - [DONE] Add a standard artifact naming pattern based on the committee and project
    - [DONE] Potentially add the option to upload package artifacts without signatures
    - [DONE] Show validation status indicators
    - [DONE] Add developer RC download buttons with clear verification instructions

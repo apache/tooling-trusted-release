@@ -24,19 +24,19 @@
         enctype="multipart/form-data"
         class="striking py-4 px-5">
     <div class="mb-3 pb-3 row border-bottom">
-      <label for="project_name" class="col-sm-3 col-form-label text-sm-end">Project:</label>
+      <label for="committee_name" class="col-sm-3 col-form-label text-sm-end">Committee:</label>
       <div class="col-sm-8">
-        <select id="project_name"
-                name="project_name"
+        <select id="committee_name"
+                name="committee_name"
                 class="mb-2 form-select"
                 required>
-          <option value="">Select a project...</option>
-          {% for pmc in user_pmcs|sort(attribute='name') %}
-            <option value="{{ pmc.name }}">{{ pmc.display_name }}</option>
+          <option value="">Select a committee...</option>
+          {% for committee in user_committees|sort(attribute='name') %}
+            <option value="{{ committee.name }}">{{ committee.display_name }}</option>
           {% endfor %}
         </select>
-        {% if not user_pmcs %}
-          <p class="text-danger">You must be a PMC member or committer to submit a release candidate.</p>
+        {% if not user_committees %}
+          <p class="text-danger">You must be a (P)PMC member or committer to submit a release candidate.</p>
         {% endif %}
       </div>
     </div>
@@ -49,14 +49,16 @@
     </div>
 
     <div class="mb-3 pb-3 row border-bottom">
-      <label for="product_name" class="col-sm-3 col-form-label text-sm-end">Product name:</label>
+      <label for="project_name" class="col-sm-3 col-form-label text-sm-end">Project name:</label>
       <div class="col-sm-8">
-        <!-- TODO: Add a dropdown for the product name, plus "add new product" -->
+        <!-- TODO: Add a dropdown for the project name, plus "add new project" -->
         <input type="text"
-               id="product_name"
-               name="product_name"
+               id="project_name"
+               name="project_name"
                class="form-control"
                required />
+        <!-- TODO: Add a subproject checkbox -->
+        <small class="text-muted">This can be the same as the committee name, but may be different if e.g. this is a subproject.</small>
       </div>
     </div>
 
@@ -64,7 +66,7 @@
       <div class="col-sm-9 offset-sm-3">
         <button type="submit"
                 class="btn btn-primary mt-2"
-                {% if not user_pmcs %}disabled{% endif %}>Create release</button>
+                {% if not user_committees %}disabled{% endif %}>Create release</button>
       </div>
     </div>
   </form>

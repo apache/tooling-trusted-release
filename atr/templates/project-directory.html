@@ -14,24 +14,24 @@
 
   <div class="mb-3">
     <input type="text"
-           id="pmc-filter"
+           id="project-filter"
            class="form-control d-inline-block w-auto" />
     <button type="button" class="btn btn-primary" id="filter-button">Filter</button>
   </div>
 
   <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-    {% for pmc in projects %}
+    {% for project in projects %}
       <div class="col">
         <div class="card h-100 shadow-sm cursor-pointer hover-lift project-card"
-             data-project-url="{{ url_for('root_project_view', name=pmc.name) }}">
+             data-project-url="{{ url_for('root_project_view', name=project.name) }}">
           <div class="card-body">
-            <h2 class="card-title fs-4 mb-3">{{ pmc.display_name }}</h2>
+            <h2 class="card-title fs-4 mb-3">{{ project.display_name }}</h2>
             <div class="row g-3">
               <div class="col-4">
                 <div class="card h-100 bg-light border-0">
                   <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
-                    <small class="text-secondary">PMC Members</small>
-                    <span class="fs-4 fw-medium mt-2">{{ pmc.pmc_members|length }}</span>
+                    <small class="text-secondary">Project committee members</small>
+                    <span class="fs-4 fw-medium mt-2">{{ project.committee.committee_members|length }}</span>
                   </div>
                 </div>
               </div>
@@ -39,7 +39,7 @@
                 <div class="card h-100 bg-light border-0">
                   <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
                     <small class="text-secondary">Committers</small>
-                    <span class="fs-4 fw-medium mt-2">{{ pmc.committers|length }}</span>
+                    <span class="fs-4 fw-medium mt-2">{{ project.committers|length }}</span>
                   </div>
                 </div>
               </div>
@@ -47,7 +47,7 @@
                 <div class="card h-100 bg-light border-0">
                   <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
                     <small class="text-secondary">Release Managers</small>
-                    <span class="fs-4 fw-medium mt-2">{{ pmc.release_managers|length }}</span>
+                    <span class="fs-4 fw-medium mt-2">{{ project.release_managers|length }}</span>
                   </div>
                 </div>
               </div>
@@ -63,22 +63,22 @@
   {{ super() }}
   <script>
       function filter() {
-          const pmcFilter = document.getElementById("pmc-filter").value;
+          const projectFilter = document.getElementById("project-filter").value;
           const cards = document.querySelectorAll(".project-card");
           for (let card of cards) {
               const nameElement = card.querySelector(".card-title");
               const name = nameElement.innerHTML;
-              if (!pmcFilter) {
+              if (!projectFilter) {
                   card.parentElement.hidden = false;
               } else {
-                  card.parentElement.hidden = !name.match(new RegExp(pmcFilter, 'i'));
+                  card.parentElement.hidden = !name.match(new RegExp(projectFilter, 'i'));
               }
           }
       }
 
       // Add event listeners
       document.getElementById("filter-button").addEventListener("click", filter);
-      document.getElementById("pmc-filter").addEventListener("keydown", function(event) {
+      document.getElementById("project-filter").addEventListener("keydown", function(event) {
           if (event.key === "Enter") {
               filter();
               event.preventDefault();

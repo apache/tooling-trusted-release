@@ -197,7 +197,7 @@ async def package_add_validate(
 async def package_data_get(data: db.Session, artifact_sha3: str, release_key: str, session_uid: str) -> models.Package:
     """Validate package deletion request and return the package if valid."""
     # Get the package and its associated release
-    package = await data.package(artifact_sha3=artifact_sha3, _release_pmc=True).demand(
+    package = await data.package(artifact_sha3=artifact_sha3, _release_committee=True).demand(
         routes.FlashError("Package not found")
     )
 
@@ -205,8 +205,10 @@ async def package_data_get(data: db.Session, artifact_sha3: str, release_key: st
         raise routes.FlashError("Invalid release key")
 
     # Check permissions
-    if package.release and package.release.pmc:
-        if session_uid not in package.release.pmc.pmc_members and session_uid not in package.release.pmc.committers:
+    if package.release and package.release.committee:
+        if (session_uid not in package.release.committee.committee_members) and (
+            session_uid not in package.release.committee.committers
+        ):
             raise routes.FlashError("You don't have permission to access this package")
 
     return package
@@ -360,16 +362,16 @@ async def root_package_add() -> response.Response | str:
     # Get all releases where the user is a PMC member or committer of the associated PMC
     async with db.session() as data:
         # Load all the necessary relationships for the pmc property to work
-        releases = await data.release(stage=models.ReleaseStage.CANDIDATE, _pmc=True).all()
+        releases = await data.release(stage=models.ReleaseStage.CANDIDATE, _committee=True).all()
 
         # Filter to only show releases for PMCs or PPMCs where the user is a member or committer
         # Can we do this in sqlmodel using JSON container operators?
         user_releases = []
         for r in releases:
-            if r.pmc is None:
+            if r.committee is None:
                 continue
             # For PPMCs the "members" are stored in the committers field
-            if web_session.uid in r.pmc.pmc_members or web_session.uid in r.pmc.committers:
+            if (web_session.uid in r.committee.committee_members) or (web_session.uid in r.committee.committers):
                 user_releases.append(r)
 
     # For GET requests, show the form
@@ -545,8 +547,8 @@ async def task_package_status_get(data: db.Session, artifact_sha3: str) -> tuple
 
 async def task_verification_create(data: db.Session, package: models.Package) -> list[models.Task]:
     """Create verification tasks for a package."""
-    if not package.release or not package.release.pmc:
-        raise routes.FlashError("Could not determine PMC for package")
+    if not package.release or not package.release.committee:
+        raise routes.FlashError("Could not determine committee for package")
 
     if package.signature_sha3 is None:
         raise routes.FlashError("Package has no signature")
@@ -569,7 +571,7 @@ async def task_verification_create(data: db.Session, package: models.Package) ->
             status=models.TaskStatus.QUEUED,
             task_type="verify_signature",
             task_args=[
-                package.release.pmc.name,
+                package.release.committee.name,
                 "releases/" + package.artifact_sha3,
                 "releases/" + package.signature_sha3,
             ],

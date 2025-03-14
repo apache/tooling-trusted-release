@@ -41,15 +41,20 @@ def check(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
     return status, error, task_results
 
 
-def _check_core(pmc_name: str, artifact_path: str, signature_path: str) -> dict[str, Any]:
-    """Verify a signature file using the PMC's public signing keys."""
-    # Query only the signing keys associated with this PMC
+def _check_core(committee_name: str, artifact_path: str, signature_path: str) -> dict[str, Any]:
+    """Verify a signature file using the committee's public signing keys."""
+    # Query only the signing keys associated with this committee
     # TODO: Rename create_sync_db_session to create_session_sync
     # Using isinstance does not work here, with pyright
-    name = db.validate_instrumented_attribute(models.PMC.name)
+    name = db.validate_instrumented_attribute(models.Committee.name)
     with db.create_sync_db_session() as session:
         # TODO: This is our only remaining use of select
-        statement = sql.select(models.PublicSigningKey).join(models.PMCKeyLink).join(models.PMC).where(name == pmc_name)
+        statement = (
+            sql.select(models.PublicSigningKey)
+            .join(models.KeyLink)
+            .join(models.Committee)
+            .where(name == committee_name)
+        )
         result = session.execute(statement)
         public_keys = [key.ascii_armored_key for key in result.scalars().all()]
 
@@ -94,7 +99,7 @@ def _signature_gpg_file(sig_file: BinaryIO, artifact_path: str, ascii_armored_ke
         "trust_level": verified.trust_level if hasattr(verified, "trust_level") else "Not available",
         "trust_text": verified.trust_text if hasattr(verified, "trust_text") else "Not available",
         "stderr": verified.stderr if hasattr(verified, "stderr") else "Not available",
-        "num_pmc_keys": len(ascii_armored_keys),
+        "num_committee_keys": len(ascii_armored_keys),
     }
 
     if not verified:

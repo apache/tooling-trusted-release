@@ -103,7 +103,7 @@ def send_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any,
     import asyncio
 
     import atr.mail
-    from atr.db.service import get_pmc_by_name
+    from atr.db.service import get_committee_by_name
 
     _LOGGER.info("Starting send_core")
     try:
@@ -136,10 +136,10 @@ def send_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any,
             # Must be a PMC member of tooling
             # Since get_pmc_by_name is async, we need to run it in an event loop
             # TODO: We could make a sync version
-            tooling_pmc = asyncio.run(get_pmc_by_name("tooling"))
+            tooling_committee = asyncio.run(get_committee_by_name("tooling"))
 
-            if not tooling_pmc:
-                error_msg = "Tooling PMC not found in database"
+            if not tooling_committee:
+                error_msg = "Tooling committee not found in database"
                 _LOGGER.error(error_msg)
                 return task.FAILED, error_msg, tuple()
 
@@ -148,12 +148,12 @@ def send_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any,
                 _LOGGER.error(error_msg)
                 return task.FAILED, error_msg, tuple()
 
-            if local_part not in tooling_pmc.pmc_members:
-                error_msg = f"Email recipient {local_part} is not a member of the tooling PMC"
+            if local_part not in tooling_committee.committee_members:
+                error_msg = f"Email recipient {local_part} is not a member of the tooling committee"
                 _LOGGER.error(error_msg)
                 return task.FAILED, error_msg, tuple()
 
-            _LOGGER.info(f"Recipient {email_recipient} is a tooling PMC member, allowed")
+            _LOGGER.info(f"Recipient {email_recipient} is a tooling committee member, allowed")
 
         # Load and set DKIM key
         try:

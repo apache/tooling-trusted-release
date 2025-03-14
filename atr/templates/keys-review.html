@@ -67,8 +67,8 @@
                 <tr>
                   <th class="p-2 text-dark">Associated projects</th>
                   <td class="text-break">
-                    {% if key.pmcs %}
-                      {{ key.pmcs|map(attribute='name') |join(', ') }}
+                    {% if key.committees %}
+                      {{ key.committees|map(attribute='name') |join(', ') }}
                     {% else %}
                       No projects associated
                     {% endif %}

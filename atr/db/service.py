@@ -26,21 +26,23 @@ import atr.db as db
 import atr.db.models as models
 
 
-async def get_pmc_by_name(name: str, session: sqlalchemy.ext.asyncio.AsyncSession | None = None) -> models.PMC | None:
-    """Returns a PMC object by name."""
+async def get_committee_by_name(
+    name: str, session: sqlalchemy.ext.asyncio.AsyncSession | None = None
+) -> models.Committee | None:
+    """Returns a Committee object by name."""
     async with db.create_async_db_session() if session is None else contextlib.nullcontext(session) as db_session:
-        statement = sqlmodel.select(models.PMC).where(models.PMC.name == name)
-        pmc = (await db_session.execute(statement)).scalar_one_or_none()
-        return pmc
+        statement = sqlmodel.select(models.Committee).where(models.Committee.name == name)
+        committee = (await db_session.execute(statement)).scalar_one_or_none()
+        return committee
 
 
-async def get_pmcs(session: sqlalchemy.ext.asyncio.AsyncSession | None = None) -> Sequence[models.PMC]:
-    """Returns a list of PMC objects."""
+async def get_committees(session: sqlalchemy.ext.asyncio.AsyncSession | None = None) -> Sequence[models.Committee]:
+    """Returns a list of Committee objects."""
     async with db.create_async_db_session() if session is None else contextlib.nullcontext(session) as db_session:
-        # Get all PMCs and their latest releases
-        statement = sqlmodel.select(models.PMC).order_by(models.PMC.name)
-        pmcs = (await db_session.execute(statement)).scalars().all()
-        return pmcs
+        # Get all Committees
+        statement = sqlmodel.select(models.Committee).order_by(models.Committee.name)
+        committees = (await db_session.execute(statement)).scalars().all()
+        return committees
 
 
 async def get_release_by_key(storage_key: str) -> models.Release | None:
@@ -50,7 +52,7 @@ async def get_release_by_key(storage_key: str) -> models.Release | None:
         query = (
             sqlmodel.select(models.Release)
             .where(models.Release.storage_key == storage_key)
-            .options(db.select_in_load_nested(models.Release.product, models.Product.project, models.Project.pmc))
+            .options(db.select_in_load_nested(models.Release.project, models.Project.committee))
         )
         result = await db_session.execute(query)
         return result.scalar_one_or_none()
@@ -63,7 +65,7 @@ def get_release_by_key_sync(storage_key: str) -> models.Release | None:
         query = (
             sqlmodel.select(models.Release)
             .where(models.Release.storage_key == storage_key)
-            .options(db.select_in_load_nested(models.Release.product, models.Product.project, models.Project.pmc))
+            .options(db.select_in_load_nested(models.Release.project, models.Project.committee))
         )
         result = session.execute(query)
         return result.scalar_one_or_none()

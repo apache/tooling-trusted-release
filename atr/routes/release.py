@@ -43,13 +43,15 @@ if asfquart.APP is ...:
 
 async def release_delete_validate(data: db.Session, release_key: str, session_uid: str) -> models.Release:
     """Validate release deletion request and return the release if valid."""
-    # if Release.pmc is None:
-    #     raise FlashError("Release has no associated PMC")
-    release = await data.release(storage_key=release_key, _pmc=True).demand(routes.FlashError("Release not found"))
+    release = await data.release(storage_key=release_key, _committee=True).demand(
+        routes.FlashError("Release not found")
+    )
 
     # Check permissions
-    if release.pmc:
-        if (session_uid not in release.pmc.pmc_members) and (session_uid not in release.pmc.committers):
+    if release.committee:
+        if (session_uid not in release.committee.committee_members) and (
+            session_uid not in release.committee.committers
+        ):
             raise routes.FlashError("You don't have permission to delete this release")
 
     return release
@@ -126,12 +128,14 @@ async def release_bulk_status(task_id: int) -> str | response.Response:
         # Debug print the task.task_args using the logger
         logging.debug(f"Task args: {task.task_args}")
         if task.task_args and isinstance(task.task_args, dict) and ("release_key" in task.task_args):
-            release = await data.release(storage_key=task.task_args["release_key"], _pmc=True).get()
+            release = await data.release(storage_key=task.task_args["release_key"], _committee=True).get()
 
             # Check whether the user has permission to view this task
             # Either they're a PMC member or committer for the release's PMC
-            if release and release.pmc:
-                if (web_session.uid not in release.pmc.pmc_members) and (web_session.uid not in release.pmc.committers):
+            if release and release.committee:
+                if (web_session.uid not in release.committee.committee_members) and (
+                    web_session.uid not in release.committee.committers
+                ):
                     await quart.flash("You don't have permission to view this task.", "error")
                     return quart.redirect(quart.url_for("root_candidate_review"))
 
@@ -170,11 +174,11 @@ async def root_release_vote() -> response.Response | str:
         # These fields are just for testing, we'll do something better in the real UI
         gpg_key_id = form.get("gpg_key_id", "")
         commit_hash = form.get("commit_hash", "")
-        if release.pmc is None:
-            raise base.ASFQuartException("Release has no associated PMC", errorcode=400)
+        if release.committee is None:
+            raise base.ASFQuartException("Release has no associated committee", errorcode=400)
 
         # Prepare email recipient
-        email_to = f"{mailing_list}@{release.pmc.name}.apache.org"
+        email_to = f"{mailing_list}@{release.committee.name}.apache.org"
 
         # Create a task for vote initiation
         task = models.Task(
@@ -214,26 +218,26 @@ def generate_vote_email_preview(release: models.Release) -> str:
     version = release.version
 
     # Get PMC details
-    if release.pmc is None:
-        raise base.ASFQuartException("Release has no associated PMC", errorcode=400)
-    pmc_name = release.pmc.name
-    pmc_display = release.pmc.display_name
+    if release.committee is None:
+        raise base.ASFQuartException("Release has no associated committee", errorcode=400)
+    committee_name = release.committee.name
+    committee_display = release.committee.display_name
 
-    # Get product information
-    product_name = release.product.product_name if release.product else "Unknown"
+    # Get project information
+    project_name = release.project.name if release.project else "Unknown"
 
     # Create email subject
-    subject = f"[VOTE] Release Apache {pmc_display} {product_name} {version}"
+    subject = f"[VOTE] Release Apache {committee_display} {project_name} {version}"
 
     # Create email body
-    body = f"""Hello {pmc_name},
+    body = f"""Hello {committee_name},
 
 I'd like to call a vote on releasing the following artifacts as
-Apache {pmc_display} {product_name} {version}.
+Apache {committee_display} {project_name} {version}.
 
 The release candidate can be found at:
 
-https://apache.example.org/{pmc_name}/{product_name}-{version}/
+https://apache.example.org/{committee_name}/{project_name}-{version}/
 
 The release artifacts are signed with my GPG key, [KEY_ID].
 

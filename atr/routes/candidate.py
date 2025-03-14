@@ -35,15 +35,17 @@ if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
 
 
-def format_artifact_name(project_name: str, product_name: str, version: str, is_podling: bool = False) -> str:
+def format_artifact_name(project_name: str, version: str, is_podling: bool = False) -> str:
     """Format an artifact name according to Apache naming conventions.
 
-    For regular projects: apache-${project}-${product}-${version}
-    For podlings: apache-${project}-incubating-${product}-${version}
+    For regular projects: apache-${project}-${version}
+    For podlings: apache-${project}-incubating-${version}
     """
+    # TODO: Format this better based on committee and project
+    # Must depend on whether project is a subproject or not
     if is_podling:
-        return f"apache-{project_name}-incubating-{product_name}-{version}"
-    return f"apache-{project_name}-{product_name}-{version}"
+        return f"apache-{project_name}-incubating-{version}"
+    return f"apache-{project_name}-{version}"
 
 
 # Release functions
@@ -53,57 +55,55 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
     """Handle POST request for creating a new release."""
     form = await routes.get_form(request)
 
-    project_name = form.get("project_name")
-    if not project_name:
-        raise base.ASFQuartException("Project name is required", errorcode=400)
-
-    product_name = form.get("product_name")
-    if not product_name:
-        raise base.ASFQuartException("Product name is required", errorcode=400)
+    committee_name = form.get("committee_name")
+    if not committee_name:
+        raise base.ASFQuartException("Committee name is required", errorcode=400)
 
     version = form.get("version")
     if not version:
         raise base.ASFQuartException("Version is required", errorcode=400)
 
-    # TODO: Forbid creating a release with an existing project, product, and version
+    project_name = form.get("project_name")
+    if not project_name:
+        raise base.ASFQuartException("Project name is required", errorcode=400)
+
+    # TODO: Forbid creating a release with an existing project and version
     # Create the release record in the database
     async with db.session() as data:
         async with data.begin():
-            pmc = await data.committee(name=project_name).get()
-            if not pmc:
-                asfquart.APP.logger.error(f"PMC not found for project {project_name}")
-                raise base.ASFQuartException("Project not found", errorcode=404)
+            committee = await data.committee(name=committee_name).get()
+            if not committee:
+                asfquart.APP.logger.error(f"Committee not found for project {committee_name}")
+                raise base.ASFQuartException("Committee not found", errorcode=404)
 
             # Verify user is a PMC member or committer of the project
-            # We use pmc.display_name, so this must come within the transaction
-            if pmc.name not in (session.committees + session.projects):
+            # We use committee.name, so this must come within the transaction
+            if committee.name not in (session.committees + session.projects):
                 raise base.ASFQuartException(
-                    f"You must be a PMC member or committer of {pmc.display_name} to submit a release candidate",
+                    f"You must be a PMC member or committer of {committee.display_name} to submit a release candidate",
                     errorcode=403,
                 )
 
             # Generate a 128-bit random token for the release storage key
             # TODO: Perhaps we should call this the release_key instead
             storage_key = secrets.token_hex(16)
-
-            # Create or get existing product line
-            product = await data.product(product_name=product_name, project_pmc_id=pmc.id).get()
-            if not product:
-                # Create new product line if it doesn't exist
-                project = await data.project(name=project_name, pmc_id=pmc.id).demand(
-                    base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
+            project = await data.project(name=project_name).get()
+            if not project:
+                # Create a new project record
+                project = models.Project(
+                    name=project_name,
+                    committee_id=committee.id,
                 )
-                product = models.Product(project_id=project.id, product_name=product_name, latest_version=version)
-                data.add(product)
-                # Flush to make the product.id available
+                data.add(project)
+                # Must flush to get the project ID
                 await data.flush()
 
-            # Create release record with product line
+            # Create release record with project
             release = models.Release(
                 storage_key=storage_key,
                 stage=models.ReleaseStage.CANDIDATE,
                 phase=models.ReleasePhase.RELEASE_CANDIDATE,
-                product_id=product.id,
+                project_id=project.id,
                 version=version,
                 created=datetime.datetime.now(datetime.UTC),
             )
@@ -131,13 +131,13 @@ async def root_candidate_create() -> response.Response | str:
     # Get PMC objects for all projects the user is a member of
     async with db.session() as data:
         project_list = web_session.committees + web_session.projects
-        user_pmcs = await data.committee(name_in=project_list).all()
+        user_committees = await data.committee(name_in=project_list).all()
 
     # For GET requests, show the form
     return await quart.render_template(
         "candidate-create.html",
         asf_id=web_session.uid,
-        user_pmcs=user_pmcs,
+        user_committees=user_committees,
     )
 
 
@@ -158,17 +158,17 @@ async def root_candidate_review() -> str:
         # TODO: This duplicates code in root_package_add
         releases = await data.release(
             stage=models.ReleaseStage.CANDIDATE,
-            _pmc=True,
+            _committee=True,
             _packages_tasks=True,
         ).all()
 
         # Filter to only show releases for PMCs or PPMCs where the user is a member or committer
         user_releases = []
         for r in releases:
-            if r.pmc is None:
+            if r.committee is None:
                 continue
             # For PPMCs the "members" are stored in the committers field
-            if web_session.uid in r.pmc.pmc_members or web_session.uid in r.pmc.committers:
+            if (web_session.uid in r.committee.committee_members) or (web_session.uid in r.committee.committers):
                 user_releases.append(r)
 
         # time.sleep(0.37)

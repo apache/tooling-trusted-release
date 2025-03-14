@@ -14,7 +14,7 @@
 
     <div class="px-3 pb-4 mb-4 bg-light border rounded">
       <h2 class="mt-4 mb-3 fs-5 border-0">
-        {{ release.pmc.display_name }} - {{ release.product.product_name if release.product else "Unknown" }} {{ release.version }}
+        {{ release.committee.display_name }} - {{ release.project.name if release.project else "Unknown" }} {{ release.version }}
       </h2>
       <p class="mb-0">
         Initiating a vote for this release candidate will prepare an email to be sent to the appropriate mailing list.
@@ -44,7 +44,7 @@
                        name="mailing_list"
                        value="dev"
                        checked />
-                <label class="form-check-label" for="list_dev">dev@{{ release.pmc.name }}.apache.org</label>
+                <label class="form-check-label" for="list_dev">dev@{{ release.committee.name }}.apache.org</label>
               </div>
               <div class="form-check">
                 <input type="radio"
@@ -52,7 +52,7 @@
                        id="list_private"
                        name="mailing_list"
                        value="private" />
-                <label class="form-check-label" for="list_private">private@{{ release.pmc.name }}.apache.org</label>
+                <label class="form-check-label" for="list_private">private@{{ release.committee.name }}.apache.org</label>
               </div>
             </div>
           </div>

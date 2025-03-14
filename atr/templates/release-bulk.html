@@ -23,8 +23,8 @@
              class="text-decoration-none">Release candidates</a>
         </li>
         {% if release %}
-          <li class="breadcrumb-item">{{ release.pmc.display_name }}</li>
-          <li class="breadcrumb-item">{{ release.product.product_name if release.product else "Unknown product" }}</li>
+          <li class="breadcrumb-item">{{ release.committee.display_name }}</li>
+          <li class="breadcrumb-item">{{ release.project.name if release.project else "Unknown project" }}</li>
           <li class="breadcrumb-item">{{ release.version }}</li>
         {% endif %}
         <li class="breadcrumb-item active">Bulk download status</li>

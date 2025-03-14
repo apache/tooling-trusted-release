@@ -44,7 +44,8 @@ input, textarea, button, select, option {
 
 label[for] {
     font-weight: 450;
-    border-bottom: 1px dashed #d1d2d3;
+
+    /* border-bottom: 1px dashed #d1d2d3; */
     cursor: pointer;
 }
 
@@ -161,6 +162,10 @@ textarea {
 textarea {
     width: 100%;
     min-height: 200px;
+}
+
+summary {
+    cursor: pointer;
 }
 
 form.striking {

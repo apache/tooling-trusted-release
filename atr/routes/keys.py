@@ -53,7 +53,7 @@ async def ephemeral_gpg_home() -> AsyncGenerator[str]:
 
 
 async def key_add_post(
-    web_session: session.ClientSession, request: quart.Request, user_pmcs: Sequence[models.PMC]
+    web_session: session.ClientSession, request: quart.Request, user_committees: Sequence[models.Committee]
 ) -> dict | None:
     form = await routes.get_form(request)
     public_key = form.get("public_key")
@@ -61,21 +61,25 @@ async def key_add_post(
         raise routes.FlashError("Public key is required")
 
     # Get selected PMCs from form
-    selected_pmcs = form.getlist("selected_pmcs")
-    if not selected_pmcs:
+    selected_committees = form.getlist("selected_committees")
+    if not selected_committees:
         raise routes.FlashError("You must select at least one PMC")
 
     # Ensure that the selected PMCs are ones of which the user is actually a member
-    invalid_pmcs = [
-        pmc for pmc in selected_pmcs if (pmc not in web_session.committees) and (pmc not in web_session.projects)
+    invalid_committees = [
+        committee
+        for committee in selected_committees
+        if (committee not in web_session.committees) and (committee not in web_session.projects)
     ]
-    if invalid_pmcs:
-        raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_pmcs)}")
+    if invalid_committees:
+        raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
 
-    return await key_user_add(web_session, public_key, selected_pmcs)
+    return await key_user_add(web_session, public_key, selected_committees)
 
 
-async def key_user_add(web_session: session.ClientSession, public_key: str, selected_pmcs: list[str]) -> dict | None:
+async def key_user_add(
+    web_session: session.ClientSession, public_key: str, selected_committees: list[str]
+) -> dict | None:
     if not public_key:
         raise routes.FlashError("Public key is required")
 
@@ -110,14 +114,14 @@ async def key_user_add(web_session: session.ClientSession, public_key: str, sele
 
     # Store key in database
     async with db.session() as data:
-        return await key_user_session_add(web_session, public_key, key, selected_pmcs, data)
+        return await key_user_session_add(web_session, public_key, key, selected_committees, data)
 
 
 async def key_user_session_add(
     web_session: session.ClientSession,
     public_key: str,
     key: dict,
-    selected_pmcs: list[str],
+    selected_committees: list[str],
     data: db.Session,
 ) -> dict | None:
     # TODO: Check if key already exists
@@ -151,10 +155,10 @@ async def key_user_session_add(
         data.add(key_record)
 
         # Link key to selected PMCs
-        for pmc_name in selected_pmcs:
-            pmc = await data.committee(name=pmc_name).get()
-            if pmc and pmc.id:
-                link = models.PMCKeyLink(pmc_id=pmc.id, key_fingerprint=key_record.fingerprint)
+        for committee_name in selected_committees:
+            committee = await data.committee(name=committee_name).get()
+            if committee and committee.id:
+                link = models.KeyLink(committee_id=committee.id, key_fingerprint=key_record.fingerprint)
                 data.add(link)
             else:
                 # TODO: Log? Add to "error"?
@@ -183,11 +187,11 @@ async def root_keys_add() -> str:
     # Get PMC objects for all projects the user is a member of
     async with db.session() as data:
         project_list = web_session.committees + web_session.projects
-        user_pmcs = await data.committee(name_in=project_list).all()
+        user_committees = await data.committee(name_in=project_list).all()
 
     if quart.request.method == "POST":
         try:
-            key_info = await key_add_post(web_session, quart.request, user_pmcs)
+            key_info = await key_add_post(web_session, quart.request, user_committees)
         except routes.FlashError as e:
             logging.exception("FlashError:")
             await quart.flash(str(e), "error")
@@ -198,7 +202,7 @@ async def root_keys_add() -> str:
     return await quart.render_template(
         "keys-add.html",
         asf_id=web_session.uid,
-        user_pmcs=user_pmcs,
+        user_committees=user_committees,
         key_info=key_info,
         algorithms=routes.algorithms,
     )
@@ -243,7 +247,7 @@ async def root_keys_review() -> str:
 
     # Get all existing keys for the user
     async with db.session() as data:
-        user_keys = await data.public_signing_key(apache_uid=web_session.uid, _pmcs=True).all()
+        user_keys = await data.public_signing_key(apache_uid=web_session.uid, _committees=True).all()
 
     status_message = quart.request.args.get("status_message")
     status_type = quart.request.args.get("status_type")
