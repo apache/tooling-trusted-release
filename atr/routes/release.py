@@ -22,8 +22,6 @@ import logging.handlers
 import pathlib
 
 import quart
-import sqlalchemy.ext.asyncio
-import sqlmodel
 import werkzeug.wrappers.response as response
 
 import asfquart
@@ -43,23 +41,11 @@ if asfquart.APP is ...:
 # Release functions
 
 
-async def release_delete_validate(
-    db_session: sqlalchemy.ext.asyncio.AsyncSession, release_key: str, session_uid: str
-) -> models.Release:
+async def release_delete_validate(data: db.Session, release_key: str, session_uid: str) -> models.Release:
     """Validate release deletion request and return the release if valid."""
     # if Release.pmc is None:
     #     raise FlashError("Release has no associated PMC")
-
-    statement = (
-        sqlmodel.select(models.Release)
-        .options(db.select_in_load(models.Release.pmc))
-        .where(models.Release.storage_key == release_key)
-    )
-    result = await db_session.execute(statement)
-    release = result.scalar_one_or_none()
-
-    if not release:
-        raise routes.FlashError("Release not found")
+    release = await data.release(storage_key=release_key, _pmc=True).demand(routes.FlashError("Release not found"))
 
     # Check permissions
     if release.pmc:
@@ -93,12 +79,12 @@ async def root_release_delete() -> response.Response:
         await quart.flash("Missing required parameters", "error")
         return quart.redirect(quart.url_for("root_candidate_review"))
 
-    async with db.create_async_db_session() as db_session:
-        async with db_session.begin():
+    async with db.session() as data:
+        async with data.begin():
             try:
-                release = await release_delete_validate(db_session, release_key, web_session.uid)
+                release = await release_delete_validate(data, release_key, web_session.uid)
                 await release_files_delete(release, pathlib.Path(util.get_release_storage_dir()))
-                await db_session.delete(release)
+                await data.delete(release)
             except routes.FlashError as e:
                 logging.exception("FlashError:")
                 await quart.flash(str(e), "error")
@@ -119,12 +105,9 @@ async def release_bulk_status(task_id: int) -> str | response.Response:
         await quart.flash("You must be logged in to view bulk download status.", "error")
         return quart.redirect(quart.url_for("root_login"))
 
-    async with db.create_async_db_session() as db_session:
+    async with db.session() as data:
         # Query for the task with the given ID
-        query = sqlmodel.select(models.Task).where(models.Task.id == task_id)
-        result = await db_session.execute(query)
-        task = result.scalar_one_or_none()
-
+        task = await data.task(id=task_id).get()
         if not task:
             await quart.flash(f"Task with ID {task_id} not found.", "error")
             return quart.redirect(quart.url_for("root_candidate_review"))
@@ -143,13 +126,7 @@ async def release_bulk_status(task_id: int) -> str | response.Response:
         # Debug print the task.task_args using the logger
         logging.debug(f"Task args: {task.task_args}")
         if task.task_args and isinstance(task.task_args, dict) and ("release_key" in task.task_args):
-            release_query = (
-                sqlmodel.select(models.Release)
-                .where(models.Release.storage_key == task.task_args["release_key"])
-                .options(db.select_in_load_nested(models.Release.product, models.Product.project, models.Project.pmc))
-            )
-            release_result = await db_session.execute(release_query)
-            release = release_result.scalar_one_or_none()
+            release = await data.release(storage_key=task.task_args["release_key"], _pmc=True).get()
 
             # Check whether the user has permission to view this task
             # Either they're a PMC member or committer for the release's PMC

@@ -19,13 +19,11 @@
 
 import quart
 import quart_wtf
-import sqlmodel
 import werkzeug.wrappers.response as response
 import wtforms
 
 import asfquart.session as session
 import atr.db as db
-import atr.db.models as models
 import atr.routes as routes
 from asfquart import base
 from asfquart.base import ASFQuartException
@@ -56,11 +54,10 @@ async def root_vote_policy_edit(vote_policy_id: str) -> response.Response | str:
     if web_session is None:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-    async with db.create_async_db_session() as db_session:
-        statement = sqlmodel.select(models.VotePolicy).where(models.VotePolicy.id == int(vote_policy_id))
-        vote_policy = (await db_session.execute(statement)).scalar_one_or_none()
-        if not vote_policy:
-            raise ASFQuartException("Vote policy not found", 404)
+    async with db.session() as data:
+        vote_policy = await data.vote_policy(id=int(vote_policy_id)).demand(
+            ASFQuartException("Vote policy not found", 404)
+        )
 
     form = await VotePolicyForm.create_form()
 

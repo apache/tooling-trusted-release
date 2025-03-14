@@ -18,13 +18,12 @@
 import collections
 import pathlib
 import statistics
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import aiofiles.os
 import httpx
 import quart
-import sqlmodel
 import werkzeug.wrappers.response as response
 
 import asfquart.base as base
@@ -33,7 +32,6 @@ import atr.blueprints.admin as admin
 import atr.datasources.apache as apache
 import atr.db as db
 import atr.db.models as models
-import atr.db.service as service
 
 
 @admin.BLUEPRINT.route("/performance")
@@ -119,30 +117,27 @@ async def admin_performance() -> str:
 
 @admin.BLUEPRINT.route("/data")
 @admin.BLUEPRINT.route("/data/<model>")
-async def admin_data(model: str = "PMC") -> str:
+async def admin_data(model: str = "Committee") -> str:
     """Browse all records in the database."""
+    async with db.session() as data:
+        # Map of model names to their classes
+        # TODO: Add distribution channel, pmc key link, and any others
+        model_methods: dict[str, Callable[[], db.Query[Any]]] = {
+            "Committee": data.committee,
+            "Package": data.package,
+            "Product": data.product,
+            "Project": data.project,
+            "PublicSigningKey": data.public_signing_key,
+            "Release": data.release,
+            "Task": data.task,
+            "VotePolicy": data.vote_policy,
+        }
 
-    # Map of model names to their classes
-    model_classes = {
-        "PMC": models.PMC,
-        "Project": models.Project,
-        "Release": models.Release,
-        "Package": models.Package,
-        "VotePolicy": models.VotePolicy,
-        "Product": models.Product,
-        "DistributionChannel": models.DistributionChannel,
-        "PublicSigningKey": models.PublicSigningKey,
-        "PMCKeyLink": models.PMCKeyLink,
-        "Task": models.Task,
-    }
+        if model not in model_methods:
+            raise base.ASFQuartException(f"Model type '{model}' not found", 404)
 
-    if model not in model_classes:
-        raise base.ASFQuartException(f"Model type '{model}' not found", 404)
-
-    async with db.create_async_db_session() as db_session:
         # Get all records for the selected model
-        statement = sqlmodel.select(model_classes[model])
-        records = (await db_session.execute(statement)).scalars().all()
+        records = await model_methods[model]().all()
 
         # Convert records to dictionaries for JSON serialization
         records_dict = []
@@ -161,7 +156,7 @@ async def admin_data(model: str = "PMC") -> str:
             records_dict.append(record_dict)
 
         return await quart.render_template(
-            "data-browser.html", model_classes=list(model_classes.keys()), model=model, records=records_dict
+            "data-browser.html", models=list(model_methods.keys()), model=model, records=records_dict
         )
 
 
@@ -197,8 +192,8 @@ async def _update_pmcs() -> int:
 
     updated_count = 0
 
-    async with db.create_async_db_session() as db_session:
-        async with db_session.begin():
+    async with db.session() as data:
+        async with data.begin():
             # First update PMCs
             for project in ldap_projects.projects:
                 name = project.name
@@ -207,12 +202,12 @@ async def _update_pmcs() -> int:
                     continue
 
                 # Get or create PMC
-                pmc = await service.get_pmc_by_name(name, db_session)
+                pmc = await data.committee(name=name).get()
                 if not pmc:
                     pmc = models.PMC(name=name)
-                    db_session.add(pmc)
+                    data.add(pmc)
                     pmc_core_project = models.Project(name=name, pmc=pmc)
-                    db_session.add(pmc_core_project)
+                    data.add(pmc_core_project)
 
                 # Update PMC data from groups.json
                 pmc_members = groups_data.get(f"{name}-pmc")
@@ -233,13 +228,12 @@ async def _update_pmcs() -> int:
             # Then add PPMCs (podlings)
             for podling_name, podling_data in podlings_data:
                 # Get or create PPMC
-                statement = sqlmodel.select(models.PMC).where(models.PMC.name == podling_name)
-                ppmc = (await db_session.execute(statement)).scalar_one_or_none()
+                ppmc = await data.committee(name=podling_name).get()
                 if not ppmc:
                     ppmc = models.PMC(name=podling_name, is_podling=True)
-                    db_session.add(ppmc)
+                    data.add(ppmc)
                     ppmc_core_project = models.Project(name=podling_name, is_podling=True, pmc=ppmc)
-                    db_session.add(ppmc_core_project)
+                    data.add(ppmc_core_project)
 
                 # Update PPMC data from groups.json
                 ppmc.is_podling = True
@@ -254,13 +248,12 @@ async def _update_pmcs() -> int:
 
             # Add special entry for Tooling PMC
             # Not clear why, but it's not in the Whimsy data
-            statement = sqlmodel.select(models.PMC).where(models.PMC.name == "tooling")
-            tooling_pmc = (await db_session.execute(statement)).scalar_one_or_none()
+            tooling_pmc = await data.committee(name="tooling").get()
             if not tooling_pmc:
                 tooling_pmc = models.PMC(name="tooling")
-                db_session.add(tooling_pmc)
+                data.add(tooling_pmc)
                 tooling_project = models.Project(name="tooling", pmc=tooling_pmc)
-                db_session.add(tooling_project)
+                data.add(tooling_project)
                 updated_count += 1
 
             # Update Tooling PMC data
@@ -285,18 +278,15 @@ async def admin_keys_delete_all() -> str:
     if web_session is None:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-    async with db.create_async_db_session() as db_session:
-        async with db_session.begin():
+    async with db.session() as data:
+        async with data.begin():
             # Get all keys for the user
             # TODO: Use session.apache_uid instead of session.uid?
-            statement = sqlmodel.select(models.PublicSigningKey).where(
-                models.PublicSigningKey.apache_uid == web_session.uid
-            )
-            keys = (await db_session.execute(statement)).scalars().all()
+            keys = await data.public_signing_key(apache_uid=web_session.uid).all()
             count = len(keys)
 
             # Delete all keys
             for key in keys:
-                await db_session.delete(key)
+                await data.delete(key)
 
         return f"Deleted {count} keys"

@@ -21,7 +21,6 @@ import http.client
 
 import quart
 import quart_wtf
-import sqlmodel
 import werkzeug.wrappers.response as response
 import wtforms
 
@@ -45,8 +44,8 @@ async def root_project_directory() -> str:
 @routes.app_route("/projects/<name>")
 async def root_project_view(name: str) -> str:
     async with db.session() as data:
-        pmc = await data.committee(name=name, _public_signing_keys=True, _vote_policy=True).one(
-            error=http.client.HTTPException(404)
+        pmc = await data.committee(name=name, _public_signing_keys=True, _vote_policy=True).demand(
+            http.client.HTTPException(404)
         )
         return await quart.render_template("project-view.html", project=pmc, algorithms=routes.algorithms)
 
@@ -57,13 +56,9 @@ async def root_project_voting_policy_add(name: str) -> response.Response | str:
     if web_session is None:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-    async with db.create_async_db_session() as db_session:
-        statement = sqlmodel.select(models.PMC).where(models.PMC.name == name)
-        pmc = (await db_session.execute(statement)).scalar_one_or_none()
-
-        if not pmc:
-            raise base.ASFQuartException("PMC not found", errorcode=404)
-        elif pmc.name not in web_session.committees:
+    async with db.session() as data:
+        pmc = await data.committee(name=name).demand(base.ASFQuartException("PMC not found", errorcode=404))
+        if pmc.name not in web_session.committees:
             raise base.ASFQuartException(
                 f"You must be a PMC member of {pmc.display_name} to submit a voting policy", errorcode=403
             )
@@ -106,13 +101,10 @@ class CreateVotePolicyForm(quart_wtf.QuartForm):
 async def add_voting_policy(session: session.ClientSession, form: CreateVotePolicyForm) -> response.Response:
     name = form.project_name.data
 
-    async with db.create_async_db_session() as db_session:
-        async with db_session.begin():
-            statement = sqlmodel.select(models.PMC).where(models.PMC.name == name)
-            pmc = (await db_session.execute(statement)).scalar_one_or_none()
-            if not pmc:
-                raise base.ASFQuartException("PMC not found", errorcode=404)
-            elif pmc.name not in session.committees:
+    async with db.session() as data:
+        async with data.begin():
+            pmc = await data.committee(name=name).demand(base.ASFQuartException("PMC not found", errorcode=404))
+            if pmc.name not in session.committees:
                 raise base.ASFQuartException(
                     f"You must be a PMC member of {pmc.display_name} to submit a voting policy", errorcode=403
                 )
@@ -124,7 +116,7 @@ async def add_voting_policy(session: session.ClientSession, form: CreateVotePoli
                 release_checklist=unwrap(form.release_checklist.data),
                 pause_for_rm=form.pause_for_rm.data,
             )
-            db_session.add(vote_policy)
+            data.add(vote_policy)
 
     # Redirect to the add package page with the storage token
     return quart.redirect(quart.url_for("root_project_view", project_name=name))

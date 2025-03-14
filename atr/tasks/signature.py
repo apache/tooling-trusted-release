@@ -48,6 +48,7 @@ def _check_core(pmc_name: str, artifact_path: str, signature_path: str) -> dict[
     # Using isinstance does not work here, with pyright
     name = db.validate_instrumented_attribute(models.PMC.name)
     with db.create_sync_db_session() as session:
+        # TODO: This is our only remaining use of select
         statement = sql.select(models.PublicSigningKey).join(models.PMCKeyLink).join(models.PMC).where(name == pmc_name)
         result = session.execute(statement)
         public_keys = [key.ascii_armored_key for key in result.scalars().all()]

@@ -69,7 +69,7 @@
   <p class="intro">Browse all records in the database.</p>
 
   <div class="model-nav">
-    {% for model_name in model_classes %}
+    {% for model_name in models %}
       <a href="{{ url_for('admin.admin_data', model=model_name) }}"
          {% if model == model_name %}class="active"{% endif %}>{{ model_name }}</a>
     {% endfor %}

@@ -21,7 +21,6 @@ import datetime
 import secrets
 
 import quart
-import sqlmodel
 import werkzeug.wrappers.response as response
 
 import asfquart
@@ -68,10 +67,9 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
 
     # TODO: Forbid creating a release with an existing project, product, and version
     # Create the release record in the database
-    async with db.create_async_db_session() as db_session:
-        async with db_session.begin():
-            statement = sqlmodel.select(models.PMC).where(models.PMC.name == project_name)
-            pmc = (await db_session.execute(statement)).scalar_one_or_none()
+    async with db.session() as data:
+        async with data.begin():
+            pmc = await data.committee(name=project_name).get()
             if not pmc:
                 asfquart.APP.logger.error(f"PMC not found for project {project_name}")
                 raise base.ASFQuartException("Project not found", errorcode=404)
@@ -89,29 +87,16 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
             storage_key = secrets.token_hex(16)
 
             # Create or get existing product line
-            on_clause = db.validate_instrumented_attribute(models.Product.project_id) == models.Project.id
-            statement = (
-                sqlmodel.select(models.Product)
-                .join(models.Project, on_clause)
-                .where(
-                    models.Project.pmc_id == pmc.id,
-                    models.Product.product_name == product_name,
-                )
-            )
-            product = (await db_session.execute(statement)).scalar_one_or_none()
-
+            product = await data.product(product_name=product_name, project_pmc_id=pmc.id).get()
             if not product:
                 # Create new product line if it doesn't exist
-                statement = sqlmodel.select(models.Project).where(
-                    models.Project.pmc_id == pmc.id, models.Project.name == project_name
+                project = await data.project(name=project_name, pmc_id=pmc.id).demand(
+                    base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
                 )
-                project = (await db_session.execute(statement)).scalar_one_or_none()
-                if not project:
-                    raise base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
                 product = models.Product(project_id=project.id, product_name=product_name, latest_version=version)
-                db_session.add(product)
+                data.add(product)
                 # Flush to make the product.id available
-                await db_session.flush()
+                await data.flush()
 
             # Create release record with product line
             release = models.Release(
@@ -122,7 +107,7 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
                 version=version,
                 created=datetime.datetime.now(datetime.UTC),
             )
-            db_session.add(release)
+            data.add(release)
 
     # Redirect to the add package page with the storage token
     return quart.redirect(quart.url_for("root_package_add", storage_key=storage_key))
@@ -144,12 +129,9 @@ async def root_candidate_create() -> response.Response | str:
         return await release_add_post(web_session, quart.request)
 
     # Get PMC objects for all projects the user is a member of
-    async with db.create_async_db_session() as db_session:
+    async with db.session() as data:
         project_list = web_session.committees + web_session.projects
-        # Using isinstance also works here
-        pmc_name = db.validate_instrumented_attribute(models.PMC.name)
-        statement = sqlmodel.select(models.PMC).where(pmc_name.in_(project_list))
-        user_pmcs = (await db_session.execute(statement)).scalars().all()
+        user_pmcs = await data.committee(name_in=project_list).all()
 
     # For GET requests, show the form
     return await quart.render_template(
@@ -176,7 +158,7 @@ async def root_candidate_review() -> str:
         # TODO: This duplicates code in root_package_add
         releases = await data.release(
             stage=models.ReleaseStage.CANDIDATE,
-            _product_project_pmc=True,
+            _pmc=True,
             _packages_tasks=True,
         ).all()
 

@@ -29,8 +29,6 @@ from collections.abc import Sequence
 import aiofiles
 import aiofiles.os
 import quart
-import sqlalchemy.ext.asyncio
-import sqlmodel
 import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
 
@@ -88,7 +86,7 @@ async def file_hash_save(base_dir: pathlib.Path, file: datastructures.FileStorag
 
 
 async def package_add_artifact_info_get(
-    db_session: sqlalchemy.ext.asyncio.AsyncSession,
+    data: db.Session,
     uploads_path: pathlib.Path,
     artifact_file: datastructures.FileStorage,
 ) -> tuple[str, str, int]:
@@ -101,8 +99,8 @@ async def package_add_artifact_info_get(
     artifact_sha3, artifact_size = await file_hash_save(uploads_path, artifact_file)
 
     # Check for duplicates by artifact_sha3 before proceeding
-    statement = sqlmodel.select(models.Package).where(models.Package.artifact_sha3 == artifact_sha3)
-    duplicate = (await db_session.execute(statement)).first()
+
+    duplicate = await data.package(artifact_sha3=artifact_sha3).get()
     if duplicate:
         # Remove the saved file since we won't be using it
         await aiofiles.os.remove(uploads_path / artifact_sha3)
@@ -113,7 +111,7 @@ async def package_add_artifact_info_get(
 
 
 async def package_add_session_process(
-    db_session: sqlalchemy.ext.asyncio.AsyncSession,
+    data: db.Session,
     release_key: str,
     artifact_file: datastructures.FileStorage,
     checksum_file: datastructures.FileStorage | None,
@@ -122,12 +120,7 @@ async def package_add_session_process(
     """Helper function for package_add_post."""
 
     # First check for duplicates by filename
-    statement = sqlmodel.select(models.Package).where(
-        models.Package.release_key == release_key,
-        models.Package.filename == artifact_file.filename,
-    )
-    duplicate = (await db_session.execute(statement)).first()
-
+    duplicate = await data.package(release_key=release_key, filename=artifact_file.filename).get()
     if duplicate:
         raise routes.FlashError("This release artifact has already been uploaded")
 
@@ -135,7 +128,7 @@ async def package_add_session_process(
     uploads_path = pathlib.Path(util.get_release_storage_dir())
     try:
         artifact_sha3, artifact_sha512, artifact_size = await package_add_artifact_info_get(
-            db_session, uploads_path, artifact_file
+            data, uploads_path, artifact_file
         )
     except Exception as e:
         raise routes.FlashError(f"Error saving artifact file: {e!s}")
@@ -201,26 +194,12 @@ async def package_add_validate(
     return release_key, artifact_file, checksum_file, signature_file, artifact_type
 
 
-async def package_data_get(
-    db_session: sqlalchemy.ext.asyncio.AsyncSession, artifact_sha3: str, release_key: str, session_uid: str
-) -> models.Package:
+async def package_data_get(data: db.Session, artifact_sha3: str, release_key: str, session_uid: str) -> models.Package:
     """Validate package deletion request and return the package if valid."""
     # Get the package and its associated release
-    statement = (
-        sqlmodel.select(models.Package)
-        .options(
-            db.select_in_load(models.Package.release),
-            db.select_in_load_nested(
-                models.Package.release, models.Release.product, models.Product.project, models.Project.pmc
-            ),
-        )
-        .where(models.Package.artifact_sha3 == artifact_sha3)
+    package = await data.package(artifact_sha3=artifact_sha3, _release_pmc=True).demand(
+        routes.FlashError("Package not found")
     )
-    result = await db_session.execute(statement)
-    package = result.scalar_one_or_none()
-
-    if not package:
-        raise routes.FlashError("Package not found")
 
     if package.release_key != release_key:
         raise routes.FlashError("Invalid release key")
@@ -290,13 +269,13 @@ async def package_add_single_post(form: datastructures.MultiDict, request: quart
         return quart.redirect(quart.url_for("root_package_add"))
 
     # Save files and create package record in one transaction
-    async with db.create_async_db_session() as db_session:
-        async with db_session.begin():
-            # Process and save the files
+    async with db.session() as data:
+        # Process and save the files
+        async with data.begin():
             try:
                 try:
                     artifact_sha3, artifact_size, artifact_sha512, signature_sha3 = await package_add_session_process(
-                        db_session, release_key, artifact_file, checksum_file, signature_file
+                        data, release_key, artifact_file, checksum_file, signature_file
                     )
                 except routes.FlashError as e:
                     logging.exception("FlashError:")
@@ -314,7 +293,7 @@ async def package_add_single_post(form: datastructures.MultiDict, request: quart
                     uploaded=datetime.datetime.now(datetime.UTC),
                     bytes_size=artifact_size,
                 )
-                db_session.add(package)
+                data.add(package)
 
             except Exception as e:
                 await quart.flash(f"Error processing files: {e!s}", "error")
@@ -335,8 +314,8 @@ async def package_add_bulk_post(form: datastructures.MultiDict, request: quart.R
 
     # Create a task for bulk downloading
     max_concurrency = 5
-    async with db.create_async_db_session() as db_session:
-        async with db_session.begin():
+    async with db.session() as data:
+        async with data.begin():
             task = models.Task(
                 status=models.TaskStatus.QUEUED,
                 task_type="package_bulk_download",
@@ -349,9 +328,9 @@ async def package_add_bulk_post(form: datastructures.MultiDict, request: quart.R
                     "max_concurrent": max_concurrency,
                 },
             )
-            db_session.add(task)
+            data.add(task)
             # Flush to get the task ID
-            await db_session.flush()
+            await data.flush()
 
     await quart.flash("Started downloading packages from URL", "success")
     return quart.redirect(quart.url_for("release_bulk_status", task_id=task.id))
@@ -379,17 +358,9 @@ async def root_package_add() -> response.Response | str:
     storage_key = quart.request.args.get("storage_key")
 
     # Get all releases where the user is a PMC member or committer of the associated PMC
-    async with db.create_async_db_session() as db_session:
+    async with db.session() as data:
         # Load all the necessary relationships for the pmc property to work
-        project_pmc = db.select_in_load_nested(models.Release.product, models.Product.project, models.Project.pmc)
-
-        # Only query releases in candidate stage
-        statement = (
-            sqlmodel.select(models.Release)
-            .options(project_pmc)
-            .where(models.Release.stage == models.ReleaseStage.CANDIDATE)
-        )
-        releases = (await db_session.execute(statement)).scalars().all()
+        releases = await data.release(stage=models.ReleaseStage.CANDIDATE, _pmc=True).all()
 
         # Filter to only show releases for PMCs or PPMCs where the user is a member or committer
         # Can we do this in sqlmodel using JSON container operators?
@@ -431,11 +402,11 @@ async def root_package_check() -> str | response.Response:
         await quart.flash("Missing required parameters", "error")
         return quart.redirect(quart.url_for("root_candidate_review"))
 
-    async with db.create_async_db_session() as db_session:
-        async with db_session.begin():
+    async with db.session() as data:
+        async with data.begin():
             # Get the package and verify permissions
             try:
-                package = await package_data_get(db_session, artifact_sha3, release_key, web_session.uid)
+                package = await package_data_get(data, artifact_sha3, release_key, web_session.uid)
             except routes.FlashError as e:
                 logging.exception("FlashError:")
                 await quart.flash(str(e), "error")
@@ -443,13 +414,13 @@ async def root_package_check() -> str | response.Response:
 
             if quart.request.method == "POST":
                 # Check if package already has active tasks
-                tasks, has_active_tasks = await task_package_status_get(db_session, artifact_sha3)
+                tasks, has_active_tasks = await task_package_status_get(data, artifact_sha3)
                 if has_active_tasks:
                     await quart.flash("Package verification is already in progress", "warning")
                     return quart.redirect(quart.url_for("root_candidate_review"))
 
                 try:
-                    await task_verification_create(db_session, package)
+                    await task_verification_create(data, package)
                 except routes.FlashError as e:
                     logging.exception("FlashError:")
                     await quart.flash(str(e), "error")
@@ -461,7 +432,7 @@ async def root_package_check() -> str | response.Response:
                 )
             else:
                 # Get all tasks for this package for GET request
-                tasks, _ = await task_package_status_get(db_session, artifact_sha3)
+                tasks, _ = await task_package_status_get(data, artifact_sha3)
                 all_tasks_completed = bool(tasks) and all(
                     task.status == models.TaskStatus.COMPLETED or task.status == models.TaskStatus.FAILED
                     for task in tasks
@@ -492,18 +463,18 @@ async def root_package_check_restart() -> response.Response:
         await quart.flash("Missing required parameters", "error")
         return quart.redirect(quart.url_for("root_candidate_review"))
 
-    async with db.create_async_db_session() as db_session:
-        async with db_session.begin():
+    async with db.session() as data:
+        async with data.begin():
             # Get the package and verify permissions
             try:
-                package = await package_data_get(db_session, artifact_sha3, release_key, web_session.uid)
+                package = await package_data_get(data, artifact_sha3, release_key, web_session.uid)
             except routes.FlashError as e:
                 logging.exception("FlashError:")
                 await quart.flash(str(e), "error")
                 return quart.redirect(quart.url_for("root_candidate_review"))
 
             # Check if package has any active tasks
-            tasks, has_active_tasks = await task_package_status_get(db_session, artifact_sha3)
+            tasks, has_active_tasks = await task_package_status_get(data, artifact_sha3)
             if has_active_tasks:
                 await quart.flash("Cannot restart checks while tasks are still in progress", "error")
                 return quart.redirect(
@@ -512,10 +483,10 @@ async def root_package_check_restart() -> response.Response:
 
             # Delete existing tasks
             for task in tasks:
-                await db_session.delete(task)
+                await data.delete(task)
 
             try:
-                await task_verification_create(db_session, package)
+                await task_verification_create(data, package)
             except routes.FlashError as e:
                 logging.exception("FlashError:")
                 await quart.flash(str(e), "error")
@@ -543,12 +514,12 @@ async def root_package_delete() -> response.Response:
         await quart.flash("Missing required parameters", "error")
         return quart.redirect(quart.url_for("root_candidate_review"))
 
-    async with db.create_async_db_session() as db_session:
-        async with db_session.begin():
+    async with db.session() as data:
+        async with data.begin():
             try:
-                package = await package_data_get(db_session, artifact_sha3, release_key, web_session.uid)
+                package = await package_data_get(data, artifact_sha3, release_key, web_session.uid)
                 await routes.package_files_delete(package, pathlib.Path(util.get_release_storage_dir()))
-                await db_session.delete(package)
+                await data.delete(package)
             except routes.FlashError as e:
                 logging.exception("FlashError:")
                 await quart.flash(str(e), "error")
@@ -561,23 +532,18 @@ async def root_package_delete() -> response.Response:
     return quart.redirect(quart.url_for("root_candidate_review"))
 
 
-async def task_package_status_get(
-    db_session: sqlalchemy.ext.asyncio.AsyncSession, artifact_sha3: str
-) -> tuple[Sequence[models.Task], bool]:
+async def task_package_status_get(data: db.Session, artifact_sha3: str) -> tuple[Sequence[models.Task], bool]:
     """
     Get all tasks for a package and determine if any are still in progress.
     Returns tuple[Sequence[Task], bool]: List of tasks and whether any are still in progress
     TODO: Could instead give active count and total count
     """
-    statement = sqlmodel.select(models.Task).where(models.Task.package_sha3 == artifact_sha3)
-    tasks = (await db_session.execute(statement)).scalars().all()
+    tasks = await data.task(package_sha3=artifact_sha3).all()
     has_active_tasks = any(task.status in [models.TaskStatus.QUEUED, models.TaskStatus.ACTIVE] for task in tasks)
     return tasks, has_active_tasks
 
 
-async def task_verification_create(
-    db_session: sqlalchemy.ext.asyncio.AsyncSession, package: models.Package
-) -> list[models.Task]:
+async def task_verification_create(data: db.Session, package: models.Package) -> list[models.Task]:
     """Create verification tasks for a package."""
     if not package.release or not package.release.pmc:
         raise routes.FlashError("Could not determine PMC for package")
@@ -635,6 +601,6 @@ async def task_verification_create(
         ),
     ]
     for task in tasks:
-        db_session.add(task)
+        data.add(task)
 
     return tasks

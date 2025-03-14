@@ -29,8 +29,6 @@ from collections.abc import AsyncGenerator, Sequence
 
 import gnupg
 import quart
-import sqlalchemy.ext.asyncio
-import sqlmodel
 import werkzeug.wrappers.response as response
 
 import asfquart as asfquart
@@ -111,8 +109,8 @@ async def key_user_add(web_session: session.ClientSession, public_key: str, sele
         raise routes.FlashError("Key is not long enough; must be at least 2048 bits")
 
     # Store key in database
-    async with db.create_async_db_session() as db_session:
-        return await key_user_session_add(web_session, public_key, key, selected_pmcs, db_session)
+    async with db.session() as data:
+        return await key_user_session_add(web_session, public_key, key, selected_pmcs, data)
 
 
 async def key_user_session_add(
@@ -120,7 +118,7 @@ async def key_user_session_add(
     public_key: str,
     key: dict,
     selected_pmcs: list[str],
-    db_session: sqlalchemy.ext.asyncio.AsyncSession,
+    data: db.Session,
 ) -> dict | None:
     # TODO: Check if key already exists
     # psk_statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
@@ -138,7 +136,7 @@ async def key_user_session_add(
         raise routes.FlashError("Invalid key fingerprint")
     fingerprint = fingerprint.lower()
     uids = key.get("uids")
-    async with db_session.begin():
+    async with data.begin():
         # Create new key record
         key_record = models.PublicSigningKey(
             fingerprint=fingerprint,
@@ -150,15 +148,14 @@ async def key_user_session_add(
             apache_uid=web_session.uid,
             ascii_armored_key=public_key,
         )
-        db_session.add(key_record)
+        data.add(key_record)
 
         # Link key to selected PMCs
         for pmc_name in selected_pmcs:
-            pmc_statement = sqlmodel.select(models.PMC).where(models.PMC.name == pmc_name)
-            pmc = (await db_session.execute(pmc_statement)).scalar_one_or_none()
+            pmc = await data.committee(name=pmc_name).get()
             if pmc and pmc.id:
                 link = models.PMCKeyLink(pmc_id=pmc.id, key_fingerprint=key_record.fingerprint)
-                db_session.add(link)
+                data.add(link)
             else:
                 # TODO: Log? Add to "error"?
                 continue
@@ -184,12 +181,9 @@ async def root_keys_add() -> str:
     key_info = None
 
     # Get PMC objects for all projects the user is a member of
-    async with db.create_async_db_session() as db_session:
+    async with db.session() as data:
         project_list = web_session.committees + web_session.projects
-        # Using isinstance also works here
-        pmc_name = db.validate_instrumented_attribute(models.PMC.name)
-        pmc_statement = sqlmodel.select(models.PMC).where(pmc_name.in_(project_list))
-        user_pmcs = (await db_session.execute(pmc_statement)).scalars().all()
+        user_pmcs = await data.committee(name_in=project_list).all()
 
     if quart.request.method == "POST":
         try:
@@ -224,21 +218,16 @@ async def root_keys_delete() -> response.Response:
         await quart.flash("No key fingerprint provided", "error")
         return quart.redirect(quart.url_for("root_keys_review"))
 
-    async with db.create_async_db_session() as db_session:
-        async with db_session.begin():
+    async with db.session() as data:
+        async with data.begin():
             # Get the key and verify ownership
-            psk_statement = sqlmodel.select(models.PublicSigningKey).where(
-                models.PublicSigningKey.fingerprint == fingerprint,
-                models.PublicSigningKey.apache_uid == web_session.uid,
-            )
-            key = (await db_session.execute(psk_statement)).scalar_one_or_none()
-
+            key = await data.public_signing_key(fingerprint=fingerprint, apache_uid=web_session.uid).get()
             if not key:
                 await quart.flash("Key not found or not owned by you", "error")
                 return quart.redirect(quart.url_for("root_keys_review"))
 
             # Delete the key
-            await db_session.delete(key)
+            await data.delete(key)
 
     await quart.flash("Key deleted successfully", "success")
     return quart.redirect(quart.url_for("root_keys_review"))
@@ -253,13 +242,8 @@ async def root_keys_review() -> str:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
 
     # Get all existing keys for the user
-    async with db.create_async_db_session() as db_session:
-        psk_statement = (
-            sqlmodel.select(models.PublicSigningKey)
-            .options(db.select_in_load(models.PublicSigningKey.pmcs))
-            .where(models.PublicSigningKey.apache_uid == web_session.uid)
-        )
-        user_keys = (await db_session.execute(psk_statement)).scalars().all()
+    async with db.session() as data:
+        user_keys = await data.public_signing_key(apache_uid=web_session.uid, _pmcs=True).all()
 
     status_message = quart.request.args.get("status_message")
     status_type = quart.request.args.get("status_type")
