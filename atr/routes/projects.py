@@ -20,17 +20,59 @@
 import http.client
 
 import quart
-import quart_wtf
 import werkzeug.wrappers.response as response
 import wtforms
 
+import asfquart.base as base
 import asfquart.session as session
 import atr.db as db
 import atr.db.models as models
 import atr.db.service as service
 import atr.routes as routes
-from asfquart import base
-from atr.util import unwrap
+import atr.util as util
+
+
+class CreateVotePolicyForm(util.QuartFormTyped):
+    project_name = wtforms.HiddenField("project_name")
+    mailto_addresses = wtforms.StringField(
+        "Email",
+        validators=[
+            wtforms.validators.InputRequired("Please provide a valid email address"),
+            wtforms.validators.Email(),
+        ],
+    )
+    min_hours = wtforms.IntegerField(
+        "Minimum Voting Period:", widget=wtforms.widgets.NumberInput(min=0, max=144), default=72
+    )
+    manual_vote = wtforms.BooleanField("Voting Process:")
+    release_checklist = wtforms.StringField("Release Checklist:", widget=wtforms.widgets.TextArea())
+    pause_for_rm = wtforms.BooleanField("Pause for RM:")
+
+    submit = wtforms.SubmitField("Add")
+
+
+async def add_voting_policy(session: session.ClientSession, form: CreateVotePolicyForm) -> response.Response:
+    name = form.project_name.data
+
+    async with db.session() as data:
+        async with data.begin():
+            pmc = await data.committee(name=name).demand(base.ASFQuartException("PMC not found", errorcode=404))
+            if pmc.name not in session.committees:
+                raise base.ASFQuartException(
+                    f"You must be a PMC member of {pmc.display_name} to submit a voting policy", errorcode=403
+                )
+
+            vote_policy = models.VotePolicy(
+                mailto_addresses=[util.unwrap(form.mailto_addresses.data)],
+                manual_vote=form.manual_vote.data,
+                min_hours=util.unwrap(form.min_hours.data),
+                release_checklist=util.unwrap(form.release_checklist.data),
+                pause_for_rm=form.pause_for_rm.data,
+            )
+            data.add(vote_policy)
+
+    # Redirect to the add package page with the storage token
+    return quart.redirect(quart.url_for("root_project_view", project_name=name))
 
 
 @routes.app_route("/projects")
@@ -63,12 +105,10 @@ async def root_project_voting_policy_add(name: str) -> response.Response | str:
                 f"You must be a PMC member of {pmc.display_name} to submit a voting policy", errorcode=403
             )
 
-    # TODO: the create_form method does not return the correct type but QuartForm
-    #       we should create our own baseclass that correctly add typing info
     form = await CreateVotePolicyForm.create_form(data={"project_name": pmc.name})
 
     if await form.validate_on_submit():
-        return await add_voting_policy(web_session, form)  # pyright: ignore [reportArgumentType]
+        return await add_voting_policy(web_session, form)
 
     # For GET requests, show the form
     return await quart.render_template(
@@ -77,46 +117,3 @@ async def root_project_voting_policy_add(name: str) -> response.Response | str:
         project=pmc,
         form=form,
     )
-
-
-class CreateVotePolicyForm(quart_wtf.QuartForm):
-    project_name = wtforms.HiddenField("project_name")
-    mailto_addresses = wtforms.StringField(
-        "Email",
-        validators=[
-            wtforms.validators.InputRequired("Please provide a valid email address"),
-            wtforms.validators.Email(),
-        ],
-    )
-    min_hours = wtforms.IntegerField(
-        "Minimum Voting Period:", widget=wtforms.widgets.NumberInput(min=0, max=144), default=72
-    )
-    manual_vote = wtforms.BooleanField("Voting Process:")
-    release_checklist = wtforms.StringField("Release Checklist:", widget=wtforms.widgets.TextArea())
-    pause_for_rm = wtforms.BooleanField("Pause for RM:")
-
-    submit = wtforms.SubmitField("Add")
-
-
-async def add_voting_policy(session: session.ClientSession, form: CreateVotePolicyForm) -> response.Response:
-    name = form.project_name.data
-
-    async with db.session() as data:
-        async with data.begin():
-            pmc = await data.committee(name=name).demand(base.ASFQuartException("PMC not found", errorcode=404))
-            if pmc.name not in session.committees:
-                raise base.ASFQuartException(
-                    f"You must be a PMC member of {pmc.display_name} to submit a voting policy", errorcode=403
-                )
-
-            vote_policy = models.VotePolicy(
-                mailto_addresses=[unwrap(form.mailto_addresses.data)],
-                manual_vote=form.manual_vote.data,
-                min_hours=unwrap(form.min_hours.data),
-                release_checklist=unwrap(form.release_checklist.data),
-                pause_for_rm=form.pause_for_rm.data,
-            )
-            data.add(vote_policy)
-
-    # Redirect to the add package page with the storage token
-    return quart.redirect(quart.url_for("root_project_view", project_name=name))
