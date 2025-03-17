@@ -186,6 +186,7 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
 
 async def _update_committees() -> int:
     ldap_projects = await apache.get_ldap_projects_data()
+    projects = await apache.get_projects_data()
     podlings_data = await apache.get_current_podlings_data()
     groups_data = await apache.get_groups_data()
 
@@ -206,13 +207,15 @@ async def _update_committees() -> int:
                     committee = models.Committee(name=name)
                     data.add(committee)
                     committee_core_project = models.Project(name=name, committee=committee)
+
+                    project_status = projects.get(name)
+                    if project_status is not None:
+                        committee_core_project.full_name = project_status.name
+
                     data.add(committee_core_project)
 
-                # Update PMC data from groups.json
-                pmc_members = groups_data.get(f"{name}-pmc")
-                committers = groups_data.get(name)
-                committee.committee_members = pmc_members if pmc_members is not None else []
-                committee.committers = committers if committers is not None else []
+                committee.committee_members = project.owners
+                committee.committers = project.members
                 # Ensure this is set for PMCs
                 committee.is_podling = False
 

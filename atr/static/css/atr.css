@@ -365,3 +365,7 @@ span.warning {
     margin: 0 0 2rem;
     border-radius: 4px;
 }
+
+.card:hover {
+    border-color: gray;
+}
