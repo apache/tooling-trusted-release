@@ -311,8 +311,8 @@ class WorkerManager:
                     return False
         except Exception as e:
             _LOGGER.error(f"Error checking task duration for worker {pid}: {e}")
-            # TODO: Return True? False? Maybe None would be more suitable, or propagate the error
-            return True
+            # TODO: Return False here to avoid over-reporting errors
+            return False
 
     async def maintain_worker_pool(self) -> None:
         """Ensure we maintain the minimum number of workers."""
