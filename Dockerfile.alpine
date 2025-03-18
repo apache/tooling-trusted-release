@@ -19,10 +19,14 @@ WORKDIR /opt/atr
 
 COPY . .
 
-RUN make sync PYTHON="$(which python3)"
+# install development dependencies to generate version
+RUN make sync-dev
 
 # generate a _version.py module from git information
 RUN make generate-version
+
+# only install runtime dependencies
+RUN make sync
 
 # final image
 FROM python:3.13.2-alpine3.21
