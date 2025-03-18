@@ -119,6 +119,7 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "atr/apache.py" = ["N815", "TC003"]
 "atr/db/__init__.py" = ["C901"]
+"scripts/release_path_parse.py" = ["C901", "RUF001"]
 
 [tool.mypy]
 python_version = "3.13"

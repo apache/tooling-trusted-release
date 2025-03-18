@@ -38,6 +38,34 @@ Configures and synchronises the main Poetry dependencies, only, for production e
 
 Builds a Docker container for the application using an Alpine Linux base image, and configures it to listen on port `4443` across all network interfaces (`0.0.0.0`). The resulting image is tagged as `tooling-trusted-release`.
 
+
+## release\_path\_parse.py
+
+Parses a list of filename paths obtained from running `find -type f | sort | sed 's%^[.]/%%'` in `https://dist.apache.org/repos/dist/release/` into a form where heuristically detected elements are replaced with `VARIABLE` names. The complete list of element variables is: `ASF`, `SUB`, `VERSION`, `CORE`, `VARIANT`, `TAG`, `ARCH`, `EXT`, and (when `LABEL_MODE=1` is set) `LABEL`.
+
+Excerpt from example output:
+
+```
+--- age ---
+
+  VERSIONS: 1.1.0, 1.5.0
+  SUBS: PG11, PG12, PG13, PG14, PG15, PG16, age-viewer
+
+   21 ASF-CORE-VERSION-VARIANT.EXT
+    3 ASF-SUB-TAG-rc2-incubating-VARIANT.EXT
+
+
+--- airavata ---
+
+  VERSIONS: 0.17, 1.1
+  SUBS: custos
+
+    8 ASF-CORE-SUB-VERSION-VARIANT.EXT
+    6 ASF-CORE-server-VERSION-VARIANT.EXT
+    3 CORE-VERSION-VARIANT.EXT
+    5 SUB-VERSION-VARIANT.EXT
+```
+
 ## run
 
 Runs the application, configured for production use, in a Docker container. It launches a detached container that removes itself when stopped, mounts a state directory from the host system to persist data, and uses host networking to simplify port access.
