@@ -1,7 +1,7 @@
 [project]
-name = "tooling-atr-experiment"
+name = "tooling-trusted-release"
 version = "0.0.1"
-description = "Some experiments with ATR"
+description = "Apache Trusted Release Platform"
 authors = [
   { name = "ASF Tooling", email = "dev@tooling.apache.org" }
 ]
@@ -60,10 +60,6 @@ package-mode = false
 # so we only need to enrich the dependencies with the source location of asfquart
 [tool.poetry.dependencies]
 asfquart = { path = "./asfquart", develop = true }
-python = "~=3.13"
-# dnspython = ">=2.7.0,<3.0.0"
-# dkimpy = { version = ">=1.1.8,<2.0.0", extras = ["dnspython"] }
-# dkimpy = { git = "https://github.com/sbp/dkimpy.git#subdirectory=src/dkimpy", branch = "main" }
 
 [tool.poetry.group.test.dependencies]
 pytest = ">=8.0"
@@ -77,12 +73,6 @@ pyright = ">=1.1.393"
 ruff = ">=0.9.4"
 types-aiofiles = ">=24.1.0.20241221,<25.0.0.0"
 decouple-types = ">=1.0"
-
-# UV specific configuration
-
-[tool.uv.sources]
-asfquart = { path = "./asfquart", editable = true }
-# dkimpy = { git = "https://github.com/sbp/dkimpy.git", branch = "main" }
 
 # Additional tools
 
