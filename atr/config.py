@@ -46,7 +46,7 @@ class AppConfig:
     SQLITE_DB_PATH = decouple.config("SQLITE_DB_PATH", default="/atr.db")
 
     # Apache RAT configuration
-    APACHE_RAT_JAR_PATH = decouple.config("APACHE_RAT_JAR_PATH", default="state/apache-rat-0.16.1.jar")
+    APACHE_RAT_JAR_PATH = decouple.config("APACHE_RAT_JAR_PATH", default="/opt/tools/apache-rat-0.16.1.jar")
     # Maximum size limit for archive extraction
     MAX_EXTRACT_SIZE: int = decouple.config("MAX_EXTRACT_SIZE", default=2 * _GB, cast=int)
     # Chunk size for reading files during extraction

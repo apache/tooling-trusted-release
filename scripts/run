@@ -1,2 +1,9 @@
 #!/bin/sh
-sudo docker run --rm -d -v "$HOME/tooling-trusted-release/state:/opt/atr/state" --network host tooling-trusted-release
+
+if [ -d "${HOME}/tooling-trusted-release" ]; then
+  MOUNT="${HOME}/tooling-trusted-release/state"
+else
+  MOUNT="./state"
+fi
+
+docker run --rm -d -v "${MOUNT}:/opt/atr/state" --network host --name tooling-trusted-release tooling-trusted-release

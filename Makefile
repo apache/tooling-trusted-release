@@ -1,14 +1,16 @@
-.PHONY: build build-alpine-ubuntu certs check docs report run serve sync sync-dev
+.PHONY: build build-alpine build-ubuntu certs check docs generate-version report run stop serve sync sync-dev
 
 BIND ?= 127.0.0.1:8080
 PYTHON ?= $(which python3)
 SCRIPTS ?= scripts/poetry
 
-build:
-	scripts/build
+build: build-alpine
 
-build-alpine-ubuntu:
-	$(SCRIPTS)/build
+build-alpine:
+	$(SCRIPTS)/build Dockerfile.alpine
+
+build-ubuntu:
+	$(SCRIPTS)/build Dockerfile.ubuntu
 
 certs:
 	if test ! -f state/cert.pem || test ! -f state/key.pem; \
@@ -23,11 +25,17 @@ docs:
 	do cmark "$$fn" > "$${fn%.md}.html"; \
 	done
 
+generate-version:
+	$(SCRIPTS)/run python atr/metadata.py > atr/_version.py
+
 report:
 	@echo SCRIPTS = $(SCRIPTS)
 
 run:
 	scripts/run
+
+stop:
+	scripts/stop
 
 serve:
 	$(SCRIPTS)/run hypercorn --bind $(BIND) --keyfile key.pem --certfile cert.pem atr.server:app --debug --reload

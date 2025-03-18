@@ -9,6 +9,7 @@
 .hypothesis/
 .mypy_cache/
 .nox/
+.poetry
 .pyre/
 .pytest_cache
 .pytype/

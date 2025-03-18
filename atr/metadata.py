@@ -15,10 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import os
 
-
-def _get_development_version() -> tuple[str, str] | None:
+def _get_version_from_git() -> tuple[str, str] | None:
     """Returns the version when within a development environment."""
 
     try:
@@ -29,10 +27,8 @@ def _get_development_version() -> tuple[str, str] | None:
         return None
 
     try:
-        from pathlib import Path
-
         # We start in state/, so we need to go up one level
-        version = Version.from_git(path=Path(".."))
+        version = Version.from_git()
         if version.distance > 0:
             # The development version number should reflect the next release that is going to be cut,
             # indicating how many commits have already going into that since the last release.
@@ -54,15 +50,32 @@ def _get_development_version() -> tuple[str, str] | None:
         return None
 
 
-def _get_version_from_env() -> tuple[str, str | None]:
-    """Returns the version from an environment variable."""
+def _get_version_from_version_module() -> tuple[str, str] | None:
+    """Returns the version from _version module if it exists."""
 
-    # Use the commit where dunamai was added by default
-    # TODO: Use a better default value
-    return os.environ.get("VERSION", "undefined"), os.environ.get("COMMIT", "4e5bff1")
+    try:
+        from atr._version import ATR_COMMIT, ATR_VERSION  # pyright: ignore [reportMissingImports]
+
+        return ATR_VERSION, ATR_COMMIT
+    except ImportError:
+        return None
+
+
+def _get_undefined() -> tuple[str, str]:
+    return "undefined", "undefined"
 
 
 # Try to determine the version from a development environment first.
 # If this fails, try to get it from environment variables that are set when building a docker image.
 # We don't use __version__ and __commit__ as these are not reserved words in Python
-version, commit = _get_development_version() or _get_version_from_env()
+version, commit = _get_version_from_git() or _get_version_from_version_module() or _get_undefined()
+
+
+if __name__ == "__main__":
+    """Will output version / commit info from git tags if available."""
+    version, commit = _get_version_from_git() or _get_undefined()
+
+    print(f"""
+ATR_VERSION = '{version}'
+ATR_COMMIT = '{commit}'
+""")
