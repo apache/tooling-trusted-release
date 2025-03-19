@@ -28,9 +28,9 @@ import aiofiles.os
 import asyncssh
 
 import atr.config as config
+import atr.db as db
 
 _LOGGER: Final = logging.getLogger(__name__)
-_AUTHORIZED_KEY_PATH: Final = "allowed_ssh_key.pub"
 _CONFIG: Final = config.get()
 
 
@@ -39,6 +39,8 @@ class _SSHServer(asyncssh.SSHServer):
 
     def connection_made(self, conn: asyncssh.SSHServerConnection) -> None:
         """Called when a connection is established."""
+        # Store connection for use in begin_auth
+        self._conn = conn
         peer_addr = conn.get_extra_info("peername")[0]
         _LOGGER.info(f"SSH connection received from {peer_addr}")
 
@@ -49,60 +51,45 @@ class _SSHServer(asyncssh.SSHServer):
         else:
             _LOGGER.info("SSH connection closed")
 
-    def begin_auth(self, username: str) -> bool:
+    async def begin_auth(self, username: str) -> bool:
         """Begin authentication for the specified user."""
         _LOGGER.info(f"Beginning auth for user {username}")
-        # Returning True means that we always require authentication
+
+        try:
+            # Load SSH keys for this user from the database
+            async with db.session() as data:
+                user_keys = await data.ssh_key(asf_uid=username).all()
+
+                if not user_keys:
+                    _LOGGER.warning(f"No SSH keys found for user: {username}")
+                    # Still require authentication, but it will fail
+                    return True
+
+                # Create an authorized_keys file as a string
+                auth_keys_lines = []
+                for user_key in user_keys:
+                    auth_keys_lines.append(user_key.key)
+
+                auth_keys_data = "\n".join(auth_keys_lines)
+                _LOGGER.info(f"Loaded {len(user_keys)} SSH keys for user {username}")
+
+                # Set the authorized keys in the connection
+                try:
+                    authorized_keys = asyncssh.import_authorized_keys(auth_keys_data)
+                    self._conn.set_authorized_keys(authorized_keys)
+                    _LOGGER.info(f"Successfully set authorized keys for {username}")
+                except Exception as e:
+                    _LOGGER.error(f"Error setting authorized keys: {e}")
+
+        except Exception as e:
+            _LOGGER.error(f"Database error loading SSH keys: {e}")
+
+        # Always require authentication
         return True
 
     def public_key_auth_supported(self) -> bool:
         """Indicate whether public key authentication is supported."""
         return True
-
-    async def validate_public_key(self, username: str, key: asyncssh.SSHKey) -> bool:
-        """Validate a public key against our authorized key."""
-        _LOGGER.info(f"Validating public key for user: {username}")
-
-        try:
-            return await self._validate_public_key_core(username, key)
-        except Exception as e:
-            _LOGGER.error(f"Error validating public key: {e}")
-            return False
-
-    async def _validate_public_key_core(self, username: str, key: asyncssh.SSHKey) -> bool:
-        # We'll be loading keys dynamically from our database
-        # Therefore we can't use the authorized_client_keys parameter to asyncssh.create_server
-
-        # Get the full path to the authorized keys file
-        auth_key_path = os.path.join(_CONFIG.STATE_DIR, _AUTHORIZED_KEY_PATH)
-
-        # Check whether the authorized key file exists
-        if not await aiofiles.os.path.exists(auth_key_path):
-            _LOGGER.error(f"Authorized key file not found at {auth_key_path}")
-            return False
-
-        # Read the authorized key from file
-        async with aiofiles.open(auth_key_path) as f:
-            authorized_key_data = await f.read()
-        authorized_key_data = authorized_key_data.strip()
-
-        # Create SSHKey object from the authorized key data
-        try:
-            authorized_key = asyncssh.import_public_key(authorized_key_data)
-        except Exception as e:
-            _LOGGER.error(f"Failed to import authorized key: {e}")
-            return False
-
-        # Compare the keys
-        # This is performing authorization, not authentication
-        # The authentication takes place in connection.py validate_public_key
-        # It calls key.verify
-        if key.get_fingerprint() == authorized_key.get_fingerprint():
-            _LOGGER.info(f"Public key validated for user: {username}")
-            return True
-        else:
-            _LOGGER.warning(f"Public key validation failed for user: {username}")
-            return False
 
 
 async def server_start() -> asyncssh.SSHAcceptor:
@@ -116,11 +103,6 @@ async def server_start() -> asyncssh.SSHAcceptor:
         private_key = asyncssh.generate_private_key("ssh-rsa")
         private_key.write_private_key(key_path)
         _LOGGER.info(f"Generated SSH host key at {key_path}")
-
-    # Check for authorized key
-    auth_key_path = os.path.join(_CONFIG.STATE_DIR, _AUTHORIZED_KEY_PATH)
-    if not await aiofiles.os.path.exists(auth_key_path):
-        _LOGGER.warning(f"No authorized key file found at {auth_key_path}. SSH authentication will fail.")
 
     server = await asyncssh.create_server(
         _SSHServer,
@@ -185,13 +167,19 @@ async def _command_validate(process: asyncssh.SSHServerProcess) -> list[str] | N
 
 async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
     """Process client command by executing it and redirecting I/O."""
+    username = process.get_extra_info("username")
+    _LOGGER.info(f"Handling command for authenticated user: {username}")
+
     argv = await _command_validate(process)
     if not argv:
         return
 
-    # TODO: We'll have to hook this up to the actual file areas
-    # Or, more likely, do post-processing to copy
-    argv[4] = os.path.join(_CONFIG.STATE_DIR, "rsync-files")
+    # Create a storage directory for this user if it doesn't exist
+    user_storage_dir = os.path.join(_CONFIG.STATE_DIR, "rsync-files", username)
+    await aiofiles.os.makedirs(user_storage_dir, exist_ok=True)
+
+    # Set the target directory to the user's storage directory
+    argv[4] = user_storage_dir
     _LOGGER.info(f"Modified command: {argv}")
 
     try:

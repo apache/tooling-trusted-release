@@ -263,11 +263,9 @@ async def root_keys_ssh_add() -> response.Response | str:
     if await form.validate_on_submit():
         key: str = util.unwrap(form.key.data)
         fingerprint = await asyncio.to_thread(key_ssh_fingerprint, key)
-        logging.info("Fingerprint: %s", fingerprint)
         async with db.session() as data:
-            logging.info("Adding SSH key to database")
-            data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=util.unwrap(web_session.uid)))
-            await data.commit()
+            async with data.begin():
+                data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=util.unwrap(web_session.uid)))
         await quart.flash(f"SSH key added successfully: {fingerprint}", "success")
         return quart.redirect(quart.url_for("root_keys_review"))
 
