@@ -15,17 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import enum
-from typing import Any, Final, Literal
+from typing import Any, Final
 
+from atr.db import models
 
-class Status(enum.Enum):
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
-COMPLETED: Final[Literal[Status.COMPLETED]] = Status.COMPLETED
-FAILED: Final[Literal[Status.FAILED]] = Status.FAILED
+QUEUED: Final = models.TaskStatus.QUEUED
+ACTIVE: Final = models.TaskStatus.ACTIVE
+COMPLETED: Final = models.TaskStatus.COMPLETED
+FAILED: Final = models.TaskStatus.FAILED
 
 
 class Error(Exception):

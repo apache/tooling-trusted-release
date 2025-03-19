@@ -22,6 +22,7 @@ import os
 from typing import Any, Final
 
 import atr.tasks.task as task
+from atr.db import models
 
 # Configure detailed logging
 _LOGGER: Final = logging.getLogger(__name__)
@@ -100,7 +101,7 @@ class Args:
         return args_obj
 
 
-def initiate(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+def initiate(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Initiate a vote for a release."""
     _LOGGER.info(f"Initiating vote with args: {args}")
     try:
@@ -113,7 +114,7 @@ def initiate(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]
         return task.FAILED, str(e), tuple()
 
 
-def initiate_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+def initiate_core(args_list: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Get arguments, create an email, and then send it to the recipient."""
     import atr.mail
     from atr.db.service import get_release_by_key_sync

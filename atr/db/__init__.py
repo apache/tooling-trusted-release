@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 _LOGGER: Final = logging.getLogger(__name__)
 
 _global_async_sessionmaker: sqlalchemy.ext.asyncio.async_sessionmaker | None = None
+_global_atr_sessionmaker: sqlalchemy.ext.asyncio.async_sessionmaker | None = None
 _global_sync_engine: sqlalchemy.Engine | None = None
 
 
@@ -490,8 +491,18 @@ def create_async_db_session() -> sqlalchemy.ext.asyncio.AsyncSession:
 
 def session() -> Session:
     """Create a new asynchronous database session."""
-    extensions = quart.current_app.extensions
-    return util.validate_as_type(extensions["atr_db_session"](), Session)
+    global _global_atr_sessionmaker
+
+    if quart.has_app_context():
+        extensions = quart.current_app.extensions
+        return util.validate_as_type(extensions["atr_db_session"](), Session)
+    else:
+        if _global_atr_sessionmaker is None:
+            engine = create_async_engine(config.get())
+            _global_atr_sessionmaker = sqlalchemy.ext.asyncio.async_sessionmaker(
+                bind=engine, class_=Session, expire_on_commit=False
+            )
+        return util.validate_as_type(_global_atr_sessionmaker(), Session)
 
 
 # FIXME: this method is deprecated and should be removed
@@ -510,7 +521,10 @@ def create_sync_db_engine() -> None:
 def create_sync_db_session() -> sqlalchemy.orm.Session:
     """Create a new synchronous database session."""
     global _global_sync_engine
-    assert _global_sync_engine is not None
+    if _global_sync_engine is None:
+        conf = config.get()
+        sqlite_url = f"sqlite://{conf.SQLITE_DB_PATH}"
+        _global_sync_engine = sqlalchemy.create_engine(sqlite_url, echo=False)
     return sqlalchemy.orm.Session(_global_sync_engine)
 
 

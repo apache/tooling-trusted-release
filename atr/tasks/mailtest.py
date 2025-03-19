@@ -21,6 +21,7 @@ import os
 from typing import Any, Final
 
 import atr.tasks.task as task
+from atr.db import models
 
 # Configure detailed logging
 _LOGGER: Final = logging.getLogger(__name__)
@@ -85,7 +86,7 @@ class Args:
         return args_obj
 
 
-def send(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+def send(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Send a test email."""
     _LOGGER.info(f"Sending with args: {args}")
     try:
@@ -98,7 +99,7 @@ def send(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
         return task.FAILED, str(e), tuple()
 
 
-def send_core(args_list: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+def send_core(args_list: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Send a test email."""
     import asyncio
 

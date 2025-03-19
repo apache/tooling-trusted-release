@@ -21,6 +21,7 @@ import asyncio
 import asyncio.subprocess
 import logging
 import os
+import uuid
 from typing import Final
 
 import aiofiles
@@ -29,6 +30,7 @@ import asyncssh
 
 import atr.config as config
 import atr.db as db
+from atr.db import models
 
 _LOGGER: Final = logging.getLogger(__name__)
 _CONFIG: Final = config.get()
@@ -167,15 +169,15 @@ async def _command_validate(process: asyncssh.SSHServerProcess) -> list[str] | N
 
 async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
     """Process client command by executing it and redirecting I/O."""
-    username = process.get_extra_info("username")
-    _LOGGER.info(f"Handling command for authenticated user: {username}")
+    asf_uid = process.get_extra_info("username")
+    _LOGGER.info(f"Handling command for authenticated user: {asf_uid}")
 
     argv = await _command_validate(process)
     if not argv:
         return
 
     # Create a storage directory for this user if it doesn't exist
-    user_storage_dir = os.path.join(_CONFIG.STATE_DIR, "rsync-files", username)
+    user_storage_dir = os.path.join(_CONFIG.STATE_DIR, "rsync-files", asf_uid)
     await aiofiles.os.makedirs(user_storage_dir, exist_ok=True)
 
     # Set the target directory to the user's storage directory
@@ -196,8 +198,25 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
         # Redirect I/O between SSH process and the subprocess
         await process.redirect(stdin=proc.stdin, stdout=proc.stdout, stderr=proc.stderr)
 
-        # Wait for the process to complete and exit with its status
+        # Wait for the process to complete
         exit_status = await proc.wait()
+        # Start a task to process the new files
+        async with db.session() as data:
+            async with data.begin():
+                from atr.tasks.rsync import Analyse
+
+                upload_uuid = str(uuid.uuid4()).replace("-", "")
+                project_name = "test"
+                data.add(
+                    models.Task(
+                        status=models.TaskStatus.QUEUED,
+                        task_type="rsync_analyse",
+                        task_args=Analyse(
+                            asf_uid=asf_uid, upload_uuid=upload_uuid, project_name=project_name
+                        ).model_dump(),
+                    )
+                )
+        # Exit the SSH process with the same status
         process.exit(exit_status)
 
     except Exception as e:

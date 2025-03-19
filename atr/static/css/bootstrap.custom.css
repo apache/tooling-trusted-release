@@ -11449,10 +11449,14 @@ th {
   font-weight: 525;
 }
 
-.btn {
+small, .small, .text-muted {
+  font-variation-settings: "opsz" 14;
+}
+
+.btn, input[type=submit] {
   font-family: "Inter", sans-serif;
   font-size: 17px;
-  font-weight: 475;
+  font-weight: 475 !important;
 }
 
 .btn:disabled {

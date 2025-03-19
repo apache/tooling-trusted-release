@@ -23,6 +23,7 @@ from typing import Any, Final
 
 import atr.tasks.archive as archive
 import atr.tasks.task as task
+from atr.db import models
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -168,7 +169,7 @@ under the License."""
 # Tasks
 
 
-def check_files(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+def check_files(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Check that the LICENSE and NOTICE files exist and are valid."""
     task_results = task.results_as_tuple(_files_check_core(*args))
     _LOGGER.info(f"Verified license files for {args}")
@@ -177,7 +178,7 @@ def check_files(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ..
     return status, error, task_results
 
 
-def check_headers(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+def check_headers(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Check that all source files have valid license headers."""
     task_results = task.results_as_tuple(_headers_check_core(*args))
     _LOGGER.info(f"Verified license headers for {args}")

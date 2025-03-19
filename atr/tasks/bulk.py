@@ -30,6 +30,7 @@ import sqlalchemy
 import sqlalchemy.ext.asyncio
 
 import atr.tasks.task as task
+from atr.db import models
 
 # Configure detailed logging
 _LOGGER: Final = logging.getLogger(__name__)
@@ -285,7 +286,7 @@ def database_progress_percentage_calculate(progress: tuple[int, int] | None) -> 
     return percentage
 
 
-async def download(args: dict[str, Any]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+async def download(args: dict[str, Any]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Download bulk package from URL."""
     # Returns (status, error, result)
     # This is the main task entry point, called by worker.py
@@ -302,7 +303,7 @@ async def download(args: dict[str, Any]) -> tuple[task.Status, str | None, tuple
         return task.FAILED, str(e), ({"message": f"Error: {e}", "progress": 0},)
 
 
-async def download_core(args_dict: dict[str, Any]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+async def download_core(args_dict: dict[str, Any]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Download bulk package from URL."""
     _LOGGER.info("Starting download_core")
     try:

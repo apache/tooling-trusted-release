@@ -30,9 +30,10 @@ import os
 import resource
 import signal
 import sys
+import traceback
 from typing import Any, Final
 
-import sqlalchemy
+import sqlmodel
 
 import atr.db as db
 import atr.tasks.archive as archive
@@ -40,10 +41,12 @@ import atr.tasks.bulk as bulk
 import atr.tasks.license as license
 import atr.tasks.mailtest as mailtest
 import atr.tasks.rat as rat
+import atr.tasks.rsync as rsync
 import atr.tasks.sbom as sbom
 import atr.tasks.signature as signature
 import atr.tasks.task as task
 import atr.tasks.vote as vote
+from atr.db import models
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -90,118 +93,89 @@ async def _task_error_handle(task_id: int, e: Exception) -> None:
     """Handle task error by updating the database with error information."""
     if isinstance(e, task.Error):
         _LOGGER.error(f"Task {task_id} failed: {e.message}")
+        _LOGGER.error("".join(traceback.format_exception(e)))
         result = json.dumps(e.result)
-        async with db.create_async_db_session() as session:
-            async with session.begin():
-                await session.execute(
-                    sqlalchemy.text("""
-                        UPDATE task
-                        SET status = 'FAILED', completed = :now, error = :error, result = :result
-                        WHERE id = :task_id
-                        """),
-                    {
-                        "now": datetime.datetime.now(datetime.UTC),
-                        "task_id": task_id,
-                        "error": e.message,
-                        "result": result,
-                    },
-                )
+
+        async with db.session() as data:
+            async with data.begin():
+                task_obj = await data.task(id=task_id).get()
+                if task_obj:
+                    task_obj.status = task.FAILED
+                    task_obj.completed = datetime.datetime.now(datetime.UTC)
+                    task_obj.error = e.message
+                    task_obj.result = result
     else:
         _LOGGER.error(f"Task {task_id} failed: {e}")
-        async with db.create_async_db_session() as session:
-            async with session.begin():
-                await session.execute(
-                    sqlalchemy.text("""
-                        UPDATE task
-                        SET status = 'FAILED', completed = :now, error = :error
-                        WHERE id = :task_id
-                        """),
-                    {"now": datetime.datetime.now(datetime.UTC), "task_id": task_id, "error": str(e)},
-                )
+        _LOGGER.error("".join(traceback.format_exception(e)))
+
+        async with db.session() as data:
+            async with data.begin():
+                task_obj = await data.task(id=task_id).get()
+                if task_obj:
+                    task_obj.status = task.FAILED
+                    task_obj.completed = datetime.datetime.now(datetime.UTC)
+                    task_obj.error = str(e)
 
 
-async def _task_next_claim() -> tuple[int, str, str] | None:
+async def _task_next_claim() -> tuple[int, str, list[str] | dict[str, Any]] | None:
     """
     Attempt to claim the oldest unclaimed task.
     Returns (task_id, task_type, task_args) if successful.
     Returns None if no tasks are available.
     """
-    async with db.create_async_db_session() as session:
-        async with session.begin():
-            # Find and claim the oldest unclaimed task
-            # We have an index on (status, added)
-            result = await session.execute(
-                sqlalchemy.text("""
-                    UPDATE task
-                    SET started = :now, pid = :pid, status = 'ACTIVE'
-                    WHERE id = (
-                        SELECT id FROM task
-                        WHERE status = 'QUEUED'
-                        ORDER BY added ASC LIMIT 1
-                    )
-                    AND status = 'QUEUED'
-                    RETURNING id, task_type, task_args
-                    """),
-                {"now": datetime.datetime.now(datetime.UTC), "pid": os.getpid()},
+    async with db.session() as data:
+        async with data.begin():
+            # Get all queued tasks and order by added date
+            query = (
+                sqlmodel.select(models.Task)
+                .where(models.Task.status == task.QUEUED)
+                .order_by(db.validate_instrumented_attribute(models.Task.added).asc())
+                .limit(1)
             )
-            task = result.first()
-            if task:
-                task_id, task_type, task_args = task
-                _LOGGER.info(f"Claimed task {task_id} ({task_type}) with args {task_args}")
-                return task_id, task_type, task_args
+
+            result = await data.execute(query)
+            task_obj = result.scalar_one_or_none()
+
+            if task_obj:
+                # Update the task to mark it as active
+                task_obj.status = task.ACTIVE
+                task_obj.started = datetime.datetime.now(datetime.UTC)
+                task_obj.pid = os.getpid()
+
+                _LOGGER.info(f"Claimed task {task_obj.id} ({task_obj.task_type}) with args {task_obj.task_args}")
+                return task_obj.id, task_obj.task_type, task_obj.task_args
 
             return None
 
 
 async def _task_result_process(
-    task_id: int, task_results: tuple[Any, ...], status: str = "COMPLETED", error: str | None = None
+    task_id: int, task_results: tuple[Any, ...], status: models.TaskStatus, error: str | None = None
 ) -> None:
     """Process and store task results in the database."""
-    async with db.create_async_db_session() as session:
-        result = json.dumps(task_results)
-        async with session.begin():
-            if status == "FAILED" and error:
-                await session.execute(
-                    sqlalchemy.text("""
-                        UPDATE task
-                        SET status = :status, completed = :now, result = :result, error = :error
-                        WHERE id = :task_id
-                        """),
-                    {
-                        "now": datetime.datetime.now(datetime.UTC),
-                        "task_id": task_id,
-                        "result": result,
-                        "status": status.upper(),
-                        "error": error,
-                    },
-                )
-            else:
-                await session.execute(
-                    sqlalchemy.text("""
-                        UPDATE task
-                        SET status = :status, completed = :now, result = :result
-                        WHERE id = :task_id
-                        """),
-                    {
-                        "now": datetime.datetime.now(datetime.UTC),
-                        "task_id": task_id,
-                        "result": result,
-                        "status": status.upper(),
-                    },
-                )
+    async with db.session() as data:
+        async with data.begin():
+            # Find the task by ID
+            task_obj = await data.task(id=task_id).get()
+            if task_obj:
+                # Update task properties
+                task_obj.status = status
+                task_obj.completed = datetime.datetime.now(datetime.UTC)
+                task_obj.result = task_results
+
+                if (status == task.FAILED) and error:
+                    task_obj.error = error
 
 
-async def _task_process(task_id: int, task_type: str, task_args: str) -> None:
+async def _task_process(task_id: int, task_type: str, task_args: list[str] | dict[str, Any]) -> None:
     """Process a claimed task."""
     _LOGGER.info(f"Processing task {task_id} ({task_type}) with args {task_args}")
     try:
-        args = json.loads(task_args)
-
         # Map task types to their handler functions
         # TODO: We should use a decorator to register these automatically
         dict_task_handlers = {
             "verify_archive_integrity": archive.check_integrity,
             "package_bulk_download": bulk.download,
+            "rsync_analyse": rsync.analyse,
         }
         # TODO: These are synchronous
         # We plan to convert these to async dict handlers
@@ -216,32 +190,25 @@ async def _task_process(task_id: int, task_type: str, task_args: str) -> None:
             "vote_initiate": vote.initiate,
         }
 
-        if isinstance(args, dict):
+        if isinstance(task_args, dict):
             dict_handler = dict_task_handlers.get(task_type)
             if not dict_handler:
                 msg = f"Unknown task type: {task_type}"
                 _LOGGER.error(msg)
                 raise Exception(msg)
-            status, error, task_results = await dict_handler(args)
+            status, error, task_results = await dict_handler(task_args)
         else:
             list_handler = list_task_handlers.get(task_type)
             if not list_handler:
                 msg = f"Unknown task type: {task_type}"
                 _LOGGER.error(msg)
                 raise Exception(msg)
-            status, error, task_results = list_handler(args)
-
-        await _task_result_process(task_id, task_results, status=status.value.upper(), error=error)
+            status, error, task_results = list_handler(task_args)
+        _LOGGER.info(f"Task {task_id} completed with status {status}, error {error}, results {task_results}")
+        await _task_result_process(task_id, task_results, status, error)
 
     except Exception as e:
         await _task_error_handle(task_id, e)
-
-
-async def _task_process_wrap(item: Any) -> tuple[Any, ...]:
-    """Ensure that returned results are structured as a tuple."""
-    if not isinstance(item, tuple):
-        return (item,)
-    return item
 
 
 # Worker functions

@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asyncio
 import logging
 import os.path
 import tarfile
@@ -23,6 +24,7 @@ from typing import Any, Final
 import pydantic
 
 import atr.tasks.task as task
+from atr.db import models
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -34,18 +36,18 @@ class CheckIntegrity(pydantic.BaseModel):
     chunk_size: int = pydantic.Field(default=4096, description="Size of chunks to read when checking the file")
 
 
-async def check_integrity(args: dict[str, Any]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+async def check_integrity(args: dict[str, Any]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Check the integrity of a .tar.gz file."""
     # TODO: We should standardise the "ERROR" mechanism here in the data
     # Then we can have a single task wrapper for all tasks
     # TODO: We should use task.TaskError as standard, and maybe typeguard each function
     data = CheckIntegrity(**args)
-    task_results = task.results_as_tuple(_check_integrity_core(data.path, data.chunk_size))
+    task_results = task.results_as_tuple(await asyncio.to_thread(_check_integrity_core, data.path, data.chunk_size))
     _LOGGER.info(f"Verified {data.path} and computed size {task_results[0]}")
     return task.COMPLETED, None, task_results
 
 
-def check_structure(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+def check_structure(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Check the structure of a .tar.gz file."""
     task_results = task.results_as_tuple(_check_structure_core(*args))
     _LOGGER.info(f"Verified archive structure for {args}")
@@ -73,7 +75,7 @@ def root_directory(tgz_path: str) -> str:
     return root
 
 
-async def _check_integrity_core(tgz_path: str, chunk_size: int = 4096) -> int:
+def _check_integrity_core(tgz_path: str, chunk_size: int = 4096) -> int:
     """Verify a .tar.gz file and compute its uncompressed size."""
     total_size = 0
 

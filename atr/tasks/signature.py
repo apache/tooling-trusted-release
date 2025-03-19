@@ -32,7 +32,7 @@ import atr.tasks.task as task
 _LOGGER = logging.getLogger(__name__)
 
 
-def check(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+def check(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Check a signature file."""
     task_results = task.results_as_tuple(_check_core(*args))
     _LOGGER.info(f"Verified {args} with result {task_results[0]}")

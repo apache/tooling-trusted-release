@@ -70,10 +70,14 @@ th {
   @extend .w-25;
 }
 
-.btn {
+small, .text-muted {
+  font-variation-settings: "opsz" 14;
+}
+
+.btn, input[type="submit"] {
   font-family: $font-family-sans-serif;
   font-size: 17px;
-  font-weight: 475;
+  font-weight: 475 !important;
 }
 
 .btn:disabled {

@@ -26,6 +26,7 @@ import atr.config as config
 import atr.tasks.archive as archive
 import atr.tasks.sbom as sbom
 import atr.tasks.task as task
+from atr.db import models
 
 _CONFIG: Final = config.get()
 _JAVA_MEMORY_ARGS: Final[list[str]] = []
@@ -41,7 +42,7 @@ _JAVA_MEMORY_ARGS: Final[list[str]] = []
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-def check_licenses(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+def check_licenses(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Use Apache RAT to check the licenses of the files in the artifact."""
     # First argument is the artifact path
     artifact_path = args[0]

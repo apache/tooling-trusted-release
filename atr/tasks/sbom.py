@@ -23,6 +23,7 @@ from typing import Any, Final
 import atr.config as config
 import atr.tasks.archive as archive
 import atr.tasks.task as task
+from atr.db import models
 
 _CONFIG: Final = config.get()
 _LOGGER: Final = logging.getLogger(__name__)
@@ -87,7 +88,7 @@ def archive_extract_safe(
     return total_extracted
 
 
-def generate_cyclonedx(args: list[str]) -> tuple[task.Status, str | None, tuple[Any, ...]]:
+def generate_cyclonedx(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Generate a CycloneDX SBOM for the given artifact."""
     # First argument should be the artifact path
     artifact_path = args[0]
