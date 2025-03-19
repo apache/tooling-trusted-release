@@ -46,6 +46,7 @@ ENV JAVA_TOOL_OPTIONS="-XX:MaxMetaspaceSize=32m -Xmx128m -XX:+UseSerialGC -XX:Ma
 # openjdk8 is required for Apache RAT
 RUN apk update && \
     apk add --no-cache \
+      bash \
       curl \
       file \
       git \
