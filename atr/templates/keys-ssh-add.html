@@ -1,0 +1,44 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Add SSH key ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Add an SSH public key to your account.
+{% endblock description %}
+
+{% block content %}
+  <h1>Add SSH key</h1>
+  <p class="intro">Add your SSH public key to use for rsync authentication.</p>
+
+  <div class="user-info">
+    <p>
+      Welcome, <strong>{{ asf_id }}</strong>! You are authenticated as an ASF committer.
+    </p>
+  </div>
+
+  {% if form.errors %}
+    <h2 class="text-danger">Form errors</h2>
+    <div class="error-message mt-3 mb-3">
+      {% for field, errors in form.errors.items() %}
+        {% for error in errors %}<p class="text-danger mb-1">{{ field }}: {{ error }}</p>{% endfor %}
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" class="striking">
+    {{ form.csrf_token }}
+    <div class="mb-4">
+      <div class="mb-3">
+        <label for="key" class="form-label">SSH public key:</label>
+      </div>
+      {{ form.key(class="form-control mb-2", rows=4, placeholder="Paste your SSH public key here (in the format used in authorized_keys files)", aria_describedby="key-help") }}
+      <small id="key-help" class="form-text text-muted">
+        Your SSH public key should be in the standard format, starting with a key type (like "ssh-rsa" or "ssh-ed25519") followed by the key data.
+      </small>
+    </div>
+
+    {{ form.submit(class="btn btn-primary") }}
+  </form>
+{% endblock content %}

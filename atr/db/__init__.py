@@ -303,6 +303,23 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
         return Query(self, query)
 
+    def ssh_key(
+        self,
+        fingerprint: Any = _DEFAULT,
+        key: Any = _DEFAULT,
+        asf_uid: Any = _DEFAULT,
+    ) -> Query[models.SSHKey]:
+        query = sqlmodel.select(models.SSHKey)
+
+        if fingerprint is not _DEFAULT:
+            query = query.where(models.SSHKey.fingerprint == fingerprint)
+        if key is not _DEFAULT:
+            query = query.where(models.SSHKey.key == key)
+        if asf_uid is not _DEFAULT:
+            query = query.where(models.SSHKey.asf_uid == asf_uid)
+
+        return Query(self, query)
+
     def task(
         self,
         id: Any = _DEFAULT,

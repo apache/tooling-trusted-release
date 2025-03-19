@@ -18,8 +18,10 @@
 """keys.py"""
 
 import asyncio
+import base64
 import contextlib
 import datetime
+import hashlib
 import logging
 import logging.handlers
 import pprint
@@ -27,9 +29,11 @@ import shutil
 import tempfile
 from collections.abc import AsyncGenerator, Sequence
 
+import cryptography.hazmat.primitives.serialization as serialization
 import gnupg
 import quart
 import werkzeug.wrappers.response as response
+import wtforms
 
 import asfquart as asfquart
 import asfquart.auth as auth
@@ -38,6 +42,12 @@ import asfquart.session as session
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
+import atr.util as util
+
+
+class AddSSHKeyForm(util.QuartFormTyped):
+    key = wtforms.StringField("SSH key", widget=wtforms.widgets.TextArea())
+    submit = wtforms.SubmitField("Add SSH key")
 
 
 @contextlib.asynccontextmanager
@@ -75,6 +85,33 @@ async def key_add_post(
         raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
 
     return await key_user_add(web_session, public_key, selected_committees)
+
+
+def key_ssh_fingerprint(ssh_key_string: str) -> str:
+    # The format should be as in *.pub or authorized_keys files
+    # I.e. TYPE DATA COMMENT
+    ssh_key_parts = ssh_key_string.strip().split()
+    if len(ssh_key_parts) >= 2:
+        key_type = ssh_key_parts[0]
+        key_data = ssh_key_parts[1]
+        # We discard the comment, which is ssh_key_parts[2]
+
+        # Parse the key
+        key = serialization.load_ssh_public_key(f"{key_type} {key_data}".encode())
+
+        # Get raw public key bytes
+        public_bytes = key.public_bytes(
+            encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+
+        # Calculate SHA256 hash
+        digest = hashlib.sha256(public_bytes).digest()
+        fingerprint = base64.b64encode(digest).decode("utf-8").rstrip("=")
+
+        # TODO: Do we really want to use a prefix?
+        return f"SHA256:{fingerprint}"
+
+    raise ValueError("Invalid SSH key format")
 
 
 async def key_user_add(
@@ -208,6 +245,40 @@ async def root_keys_add() -> str:
     )
 
 
+@routes.app_route("/keys/ssh/add", methods=["GET", "POST"])
+@auth.require(auth.Requirements.committer)
+async def root_keys_ssh_add() -> response.Response | str:
+    """Add a new SSH key to the user's account."""
+    # TODO: Make an auth.require wrapper that gives the session automatically
+    # And the form if it's a POST handler? Might be hard to type
+    # But we can use variants of the function
+    # GET, POST, GET_POST are all we need
+    # We could even include auth in the function names
+    web_session = await session.read()
+    if web_session is None:
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
+
+    form = await AddSSHKeyForm.create_form()
+    fingerprint = None
+    if await form.validate_on_submit():
+        key: str = util.unwrap(form.key.data)
+        fingerprint = await asyncio.to_thread(key_ssh_fingerprint, key)
+        logging.info("Fingerprint: %s", fingerprint)
+        async with db.session() as data:
+            logging.info("Adding SSH key to database")
+            data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=util.unwrap(web_session.uid)))
+            await data.commit()
+        await quart.flash(f"SSH key added successfully: {fingerprint}", "success")
+        return quart.redirect(quart.url_for("root_keys_review"))
+
+    return await quart.render_template(
+        "keys-ssh-add.html",
+        asf_id=web_session.uid,
+        form=form,
+        fingerprint=fingerprint,
+    )
+
+
 @routes.app_route("/keys/delete", methods=["POST"])
 @auth.require(auth.Requirements.committer)
 async def root_keys_delete() -> response.Response:
@@ -224,17 +295,25 @@ async def root_keys_delete() -> response.Response:
 
     async with db.session() as data:
         async with data.begin():
-            # Get the key and verify ownership
+            # Try to get a GPG key first
             key = await data.public_signing_key(fingerprint=fingerprint, apache_uid=web_session.uid).get()
-            if not key:
-                await quart.flash("Key not found or not owned by you", "error")
+            if key:
+                # Delete the GPG key
+                await data.delete(key)
+                await quart.flash("GPG key deleted successfully", "success")
                 return quart.redirect(quart.url_for("root_keys_review"))
 
-            # Delete the key
-            await data.delete(key)
+            # If not a GPG key, try to get an SSH key
+            ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=web_session.uid).get()
+            if ssh_key:
+                # Delete the SSH key
+                await data.delete(ssh_key)
+                await quart.flash("SSH key deleted successfully", "success")
+                return quart.redirect(quart.url_for("root_keys_review"))
 
-    await quart.flash("Key deleted successfully", "success")
-    return quart.redirect(quart.url_for("root_keys_review"))
+            # No key was found
+            await quart.flash("Key not found or not owned by you", "error")
+            return quart.redirect(quart.url_for("root_keys_review"))
 
 
 @routes.app_route("/keys/review")
@@ -248,6 +327,7 @@ async def root_keys_review() -> str:
     # Get all existing keys for the user
     async with db.session() as data:
         user_keys = await data.public_signing_key(apache_uid=web_session.uid, _committees=True).all()
+        user_ssh_keys = await data.ssh_key(asf_uid=web_session.uid).all()
 
     status_message = quart.request.args.get("status_message")
     status_type = quart.request.args.get("status_type")
@@ -256,6 +336,7 @@ async def root_keys_review() -> str:
         "keys-review.html",
         asf_id=web_session.uid,
         user_keys=user_keys,
+        user_ssh_keys=user_ssh_keys,
         algorithms=routes.algorithms,
         status_message=status_message,
         status_type=status_type,

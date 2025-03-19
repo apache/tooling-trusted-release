@@ -128,6 +128,7 @@ async def admin_data(model: str = "Committee") -> str:
             "Project": data.project,
             "PublicSigningKey": data.public_signing_key,
             "Release": data.release,
+            "SSHKey": data.ssh_key,
             "Task": data.task,
             "VotePolicy": data.vote_policy,
         }

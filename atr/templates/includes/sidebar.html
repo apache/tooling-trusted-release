@@ -70,6 +70,10 @@
           <a href="{{ url_for('root_keys_add') }}"
              {% if request.endpoint == 'root_keys_add' %}class="active"{% endif %}>Add signing key</a>
         </li>
+        <li>
+          <a href="{{ url_for('root_keys_ssh_add') }}"
+             {% if request.endpoint == 'root_keys_ssh_add' %}class="active"{% endif %}>Add SSH key</a>
+        </li>
       </ul>
 
       {% if is_admin(current_user.uid) %}

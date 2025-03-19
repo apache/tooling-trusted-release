@@ -300,3 +300,9 @@ class Release(sqlmodel.SQLModel, table=True):
         if project is None:
             return None
         return project.committee
+
+
+class SSHKey(sqlmodel.SQLModel, table=True):
+    fingerprint: str = sqlmodel.Field(primary_key=True)
+    key: str
+    asf_uid: str
