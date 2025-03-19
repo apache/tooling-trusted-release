@@ -4,6 +4,8 @@ BIND ?= 127.0.0.1:8080
 PYTHON ?= $(which python3)
 SCRIPTS ?= scripts/poetry
 
+GET_VERSION = $($(SCRIPTS)/run python atr/metadata.py)
+
 build: build-alpine
 
 build-alpine:
@@ -26,7 +28,10 @@ docs:
 	done
 
 generate-version:
-	$(SCRIPTS)/run python atr/metadata.py > atr/_version.py
+	@rm -f atr/_version.py
+	@$(SCRIPTS)/run python atr/metadata.py > /tmp/_version.py
+	@mv /tmp/_version.py atr/_version.py
+	@cat atr/_version.py
 
 report:
 	@echo SCRIPTS = $(SCRIPTS)
