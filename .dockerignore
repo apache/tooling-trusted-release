@@ -5,7 +5,6 @@
 .Python
 .coverage
 .dmypy.json
-.gitignore
 .hypothesis/
 .mypy_cache/
 .nox/
