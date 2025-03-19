@@ -1,7 +1,0 @@
-# Sample role account yaml for personal_access_tokens.py
-testrole:  # UID of role account
-  token: abcdefg1234567890   # The PAT that is used
-  name: Test Role Account    # Full name (description) of the role
-  scope:                     # Sample scopes to be user internally in determining access levels
-    - mailinglists
-    - something_else

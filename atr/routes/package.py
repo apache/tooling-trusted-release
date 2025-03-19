@@ -28,13 +28,13 @@ from collections.abc import Sequence
 
 import aiofiles
 import aiofiles.os
+import asfquart.auth as auth
+import asfquart.base as base
+import asfquart.session as session
 import quart
 import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
 
-import asfquart.auth as auth
-import asfquart.base as base
-import asfquart.session as session
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes

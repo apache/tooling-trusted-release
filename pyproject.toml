@@ -13,7 +13,7 @@ dependencies = [
   "aiofiles>=24.1.0,<25.0.0",
   "aiosqlite>=0.21.0,<0.22.0",
   "alembic~=1.14",
-  "asfquart", # TODO: convert asfquart from a source dependency to pypi or git dependency
+  "asfquart @ git+https://github.com/apache/infrastructure-asfquart.git@bump-asfpy", # TODO: change to main once the associated PR is merged
   "asyncssh>=2.20.0,<3.0.0",
   "blockbuster>=1.5.23,<2.0.0",
   "cryptography~=44.0",
@@ -28,7 +28,7 @@ dependencies = [
   "quart-schema[pydantic]~=0.21",
   "quart-wtforms~=1.0.3",
   "email-validator~=2.2.0",
-  "sqlmodel~=0.0",
+  "sqlmodel~=0.0.24",
 ]
 
 [dependency-groups]
@@ -54,13 +54,6 @@ test = [
 [tool.poetry]
 package-mode = false
 
-# When both project.dependencies and tool.poetry.dependencies are specified,
-# project.dependencies are used for metadata when building the project,
-# tool.poetry.dependencies is only used to enrich project.dependencies for locking.
-# so we only need to enrich the dependencies with the source location of asfquart
-[tool.poetry.dependencies]
-asfquart = { path = "./asfquart", develop = true }
-
 [tool.poetry.group.test.dependencies]
 pytest = ">=8.0"
 pytest-asyncio = ">=0.24"
@@ -83,7 +76,6 @@ exclude = [
   "**/node_modules",
   "**/__pycache__",
   ".venv*",
-  "asfquart",
   "tests",
   "atr/util.py"
 ]
@@ -98,7 +90,6 @@ executionEnvironments = [
 ]
 
 [tool.ruff]
-exclude = ["asfquart"]
 line-length = 120
 
 [tool.ruff.lint]
@@ -124,7 +115,7 @@ select = [
 
 [tool.mypy]
 python_version = "3.13"
-exclude = ["asfquart", "tests"]
+exclude = ["tests"]
 mypy_path = "typestubs"
 check_untyped_defs = false
 disallow_incomplete_defs = true

@@ -59,7 +59,6 @@ WORKDIR /opt/atr
 # copy app and wheels from builder
 COPY --from=builder /opt/atr/.venv ./.venv
 COPY --from=builder /opt/atr/atr ./atr
-COPY --from=builder /opt/atr/asfquart ./asfquart
 COPY --from=builder /opt/atr/migrations ./migrations
 COPY --from=builder /opt/atr/scripts ./scripts
 COPY --from=builder /opt/atr/Makefile .

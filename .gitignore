@@ -11,3 +11,4 @@ __pycache__/
 apptoken.txt
 bootstrap/build/
 state/
+atr/_version.py

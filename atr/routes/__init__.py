@@ -25,10 +25,10 @@ from typing import Any, ParamSpec, TypeVar
 
 import aiofiles
 import aiofiles.os
+import asfquart
 import quart
 import werkzeug.datastructures as datastructures
 
-import asfquart
 import atr.db.models as models
 
 if asfquart.APP is ...:
