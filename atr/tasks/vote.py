@@ -50,7 +50,7 @@ _LOGGER.info("Vote module imported")
 class Args:
     """Arguments for the vote_initiate task."""
 
-    release_key: str
+    release_name: str
     email_to: str
     vote_duration: str
     gpg_key_id: str
@@ -66,7 +66,7 @@ class Args:
             _LOGGER.error(f"Invalid number of arguments: {len(args)}, expected 6")
             raise ValueError("Invalid number of arguments")
 
-        release_key = args[0]
+        release_name = args[0]
         email_to = args[1]
         vote_duration = args[2]
         gpg_key_id = args[3]
@@ -75,7 +75,7 @@ class Args:
 
         # Type checking
         for arg_name, arg_value in [
-            ("release_key", release_key),
+            ("release_name", release_name),
             ("email_to", email_to),
             ("vote_duration", vote_duration),
             ("gpg_key_id", gpg_key_id),
@@ -89,7 +89,7 @@ class Args:
         _LOGGER.debug("All argument validations passed")
 
         args_obj = Args(
-            release_key=release_key,
+            release_name=release_name,
             email_to=email_to,
             vote_duration=vote_duration,
             gpg_key_id=gpg_key_id,
@@ -116,8 +116,8 @@ def initiate(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any,
 
 def initiate_core(args_list: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Get arguments, create an email, and then send it to the recipient."""
+    import atr.db.service as service
     import atr.mail
-    from atr.db.service import get_release_by_key_sync
 
     test_recipients = ["sbp"]
     _LOGGER.info("Starting initiate_core")
@@ -140,9 +140,9 @@ def initiate_core(args_list: list[str]) -> tuple[models.TaskStatus, str | None, 
         _LOGGER.info(f"Args parsed successfully: {args}")
 
         # Get the release information
-        release = get_release_by_key_sync(args.release_key)
+        release = service.get_release_by_name_sync(args.release_name)
         if not release:
-            error_msg = f"Release with key {args.release_key} not found"
+            error_msg = f"Release with key {args.release_name} not found"
             _LOGGER.error(error_msg)
             return task.FAILED, error_msg, tuple()
 
@@ -222,7 +222,7 @@ Thanks,
         # Create mail event with test recipient
         # Use test account instead of actual PMC list
         event = atr.mail.VoteEvent(
-            release_key=args.release_key,
+            release_name=args.release_name,
             email_recipient=test_recipient,
             subject=subject,
             body=body,

@@ -1,0 +1,129 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Add files ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Add files to editable ongoing releases using rsync.
+{% endblock description %}
+
+{% block content %}
+  <h1>Add files</h1>
+  <p class="intro">
+    Welcome, <strong>{{ asf_id }}</strong>! This page allows you to manage files for editable ongoing releases across your projects using rsync.
+    <ul>
+      <li>Projects can have multiple ongoing releases simultaneously</li>
+      <li>
+        An ongoing release is only editable during specific phases of its lifecycle, and frozen otherwise:
+        <ul class="mb-0">
+          <li>Candidate releases are editable until submitted for voting</li>
+          <li>Approved releases are editable until they've been officially announced</li>
+        </ul>
+      </li>
+      <li>You can only create a new release if you are a member of the project's committee</li>
+    </ul>
+  </p>
+
+  <h2>Projects</h2>
+  <div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
+    {% for project in projects %}
+      {% set editable_releases = project.editable_releases %}
+
+      {# Show card for creating a new release if allowed #}
+      {% if asf_id in project.committee.committee_members %}
+        <div class="col">
+          <div class="card h-100">
+            <div class="card-body position-relative">
+              <div class="position-absolute top-0 end-0 m-2">
+                <span class="badge bg-primary">Potential</span>
+              </div>
+              <h5 class="card-title">{{ project.display_name }}</h5>
+              {% if project.committee %}
+                <h6 class="card-subtitle mb-2 text-muted">{{ project.committee.display_name }}</h6>
+              {% endif %}
+              <p class="card-text">
+                {% if editable_releases|length > 0 %}
+                  This project already has ongoing releases:
+                  {% for release in editable_releases %}<a href="#{{ release.name }}">{{ release.version }}</a>;{% endfor %}
+                  to create another one, use the command below.
+                {% else %}
+                  This project does not have an editable ongoing release.
+                  To create one and add files, use the command below.
+                {% endif %}
+              </p>
+            </div>
+            <pre class="card-footer bg-transparent border-top-0 small">
+rsync -av -e 'ssh -p 2222' your/files/ \
+    {{ asf_id }}@{{ server_domain }}:/{{ project.name }}/VERSION/
+            </pre>
+          </div>
+        </div>
+      {% else %}
+        <div class="col">
+          <div class="card h-100">
+            <div class="card-body position-relative">
+              <div class="position-absolute top-0 end-0 m-2">
+                <span class="badge bg-secondary">Ask</span>
+              </div>
+              <h5 class="card-title">{{ project.display_name }}</h5>
+              {% if project.committee %}
+                <h6 class="card-subtitle mb-2 text-muted">{{ project.committee.display_name }}</h6>
+              {% endif %}
+              <p class="card-text">
+                {% if editable_releases|length > 0 %}
+                  This project already has ongoing releases:
+                  {% for release in editable_releases %}<a href="#{{ release.name }}">{{ release.version }}</a>;{% endfor %}
+                  to create another one, you must be a member of the project's committee.
+                {% else %}
+                  This project does not have an editable ongoing release.
+                  To create one, you must be a member of the project's committee.
+                {% endif %}
+              </p>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <h2>Editable ongoing releases</h2>
+  <div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
+    {% set ns = namespace(has_releases=false) %}
+    {% for project in projects %}
+      {% for release in project.editable_releases %}
+        {% set ns.has_releases = true %}
+        <div class="col" id="{{ release.name }}">
+          <div class="card h-100">
+            <div class="card-body position-relative">
+              <div class="position-absolute top-0 end-0 m-2">
+                <span class="badge bg-success">Ongoing</span>
+              </div>
+              <h5 class="card-title">{{ project.display_name }} {{ release.version or "?" }}</h5>
+              {% if project.committee %}
+                <h6 class="card-subtitle mb-2 text-muted">{{ project.committee.display_name }}</h6>
+              {% endif %}
+              <p class="card-text">
+                {% if number_of_release_files(release) > 0 %}
+                  This editable ongoing release has {{ number_of_release_files(release) }} file(s).
+                {% else %}
+                  This editable ongoing release doesn't have any files yet.
+                {% endif %}
+                Use the command below to add or modify files in this release:
+              </p>
+            </div>
+            <pre class="card-footer bg-transparent border-top-0 small">
+rsync -av -e 'ssh -p 2222' your/files/ \
+    {{ asf_id }}@{{ server_domain }}:/{{ project.name }}/{{ release.version }}/
+            </pre>
+          </div>
+        </div>
+      {% endfor %}
+    {% endfor %}
+    {% if not ns.has_releases %}
+      <div class="col-12">
+        <div class="alert alert-info">There are currently no editable ongoing releases.</div>
+      </div>
+    {% endif %}
+  </div>
+{% endblock content %}

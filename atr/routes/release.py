@@ -21,13 +21,13 @@ import logging
 import logging.handlers
 import pathlib
 
+import quart
+import werkzeug.wrappers.response as response
+
 import asfquart
 import asfquart.auth as auth
 import asfquart.base as base
 import asfquart.session as session
-import quart
-import werkzeug.wrappers.response as response
-
 import atr.db as db
 import atr.db.models as models
 import atr.db.service as service
@@ -41,11 +41,9 @@ if asfquart.APP is ...:
 # Release functions
 
 
-async def release_delete_validate(data: db.Session, release_key: str, session_uid: str) -> models.Release:
+async def release_delete_validate(data: db.Session, release_name: str, session_uid: str) -> models.Release:
     """Validate release deletion request and return the release if valid."""
-    release = await data.release(storage_key=release_key, _committee=True).demand(
-        routes.FlashError("Release not found")
-    )
+    release = await data.release(name=release_name, _committee=True).demand(routes.FlashError("Release not found"))
 
     # Check permissions
     if release.committee:
@@ -75,16 +73,16 @@ async def root_release_delete() -> response.Response:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
 
     form = await routes.get_form(quart.request)
-    release_key = form.get("release_key")
+    release_name = form.get("release_name")
 
-    if not release_key:
+    if not release_name:
         await quart.flash("Missing required parameters", "error")
         return quart.redirect(quart.url_for("root_candidate_review"))
 
     async with db.session() as data:
         async with data.begin():
             try:
-                release = await release_delete_validate(data, release_key, web_session.uid)
+                release = await release_delete_validate(data, release_name, web_session.uid)
                 await release_files_delete(release, pathlib.Path(util.get_release_storage_dir()))
                 await data.delete(release)
             except routes.FlashError as e:
@@ -127,8 +125,8 @@ async def release_bulk_status(task_id: int) -> str | response.Response:
         release = None
         # Debug print the task.task_args using the logger
         logging.debug(f"Task args: {task.task_args}")
-        if task.task_args and isinstance(task.task_args, dict) and ("release_key" in task.task_args):
-            release = await data.release(storage_key=task.task_args["release_key"], _committee=True).get()
+        if task.task_args and isinstance(task.task_args, dict) and ("release_name" in task.task_args):
+            release = await data.release(name=task.task_args["release_name"], _committee=True).get()
 
             # Check whether the user has permission to view this task
             # Either they're a PMC member or committer for the release's PMC
@@ -151,19 +149,19 @@ async def root_release_vote() -> response.Response | str:
     if web_session is None:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-    release_key = quart.request.args.get("release_key", "")
+    release_name = quart.request.args.get("release_name", "")
     form = None
     if quart.request.method == "POST":
         form = await routes.get_form(quart.request)
-        release_key = form.get("release_key", "")
+        release_name = form.get("release_name", "")
 
-    if not release_key:
+    if not release_name:
         await quart.flash("No release key provided", "error")
         return quart.redirect(quart.url_for("root_candidate_review"))
 
-    release = await service.get_release_by_key(release_key)
+    release = await service.get_release_by_name(release_name)
     if release is None:
-        await quart.flash(f"Release with key {release_key} not found", "error")
+        await quart.flash(f"Release with key {release_name} not found", "error")
         return quart.redirect(quart.url_for("root_candidate_review"))
 
     # If POST, process the form and create a vote_initiate task
@@ -185,7 +183,7 @@ async def root_release_vote() -> response.Response | str:
             status=models.TaskStatus.QUEUED,
             task_type="vote_initiate",
             task_args=[
-                release_key,
+                release_name,
                 email_to,
                 vote_duration,
                 gpg_key_id,

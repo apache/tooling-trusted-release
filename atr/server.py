@@ -22,15 +22,15 @@ import os
 from collections.abc import Iterable
 from typing import Any
 
-import asfquart
-import asfquart.base as base
-import asfquart.generics
-import asfquart.session
 import blockbuster
 import quart
 import quart_schema
 import werkzeug.routing as routing
 
+import asfquart
+import asfquart.base as base
+import asfquart.generics
+import asfquart.session
 import atr.blueprints as blueprints
 import atr.config as config
 import atr.db as db
@@ -60,6 +60,7 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
     import atr.routes.dev as dev
     import atr.routes.docs as docs
     import atr.routes.download as download
+    import atr.routes.files as files
     import atr.routes.keys as keys
     import atr.routes.package as package
     import atr.routes.projects as projects
@@ -97,12 +98,13 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
         dev.__name__,
         docs.__name__,
         download.__name__,
+        files.__name__,
         keys.__name__,
         package.__name__,
         projects.__name__,
         release.__name__,
-        vote_policy.__name__,
         root.__name__,
+        vote_policy.__name__,
     )
 
 

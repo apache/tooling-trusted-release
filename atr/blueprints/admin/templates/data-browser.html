@@ -80,7 +80,7 @@
       {% for record in records %}
         <div class="record">
           <div class="record-header">
-            <h3>{{ record.get('id', record.get('storage_key', 'Unknown ID') ) }}</h3>
+            <h3>{{ record.get("id", record.get("name", "Unknown ID")) }}</h3>
             <span class="record-meta">{{ model }}</span>
           </div>
           <pre>{{ record | tojson(indent=2) }}</pre>

@@ -17,10 +17,10 @@
 
 """docs.py"""
 
-import asfquart as asfquart
-import asfquart.auth as auth
 import quart
 
+import asfquart as asfquart
+import asfquart.auth as auth
 import atr.routes as routes
 
 

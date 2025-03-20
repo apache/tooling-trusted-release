@@ -19,12 +19,12 @@
 
 import http.client
 
-import asfquart.base as base
-import asfquart.session as session
 import quart
 import werkzeug.wrappers.response as response
 import wtforms
 
+import asfquart.base as base
+import asfquart.session as session
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes

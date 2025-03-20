@@ -11449,6 +11449,10 @@ th {
   font-weight: 525;
 }
 
+.atr-cursor-pointer {
+  cursor: pointer;
+}
+
 small, .small, .text-muted {
   font-variation-settings: "opsz" 14;
 }

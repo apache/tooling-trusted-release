@@ -22,12 +22,12 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 import aiofiles.os
-import asfquart.base as base
-import asfquart.session as session
 import httpx
 import quart
 import werkzeug.wrappers.response as response
 
+import asfquart.base as base
+import asfquart.session as session
 import atr.blueprints.admin as admin
 import atr.datasources.apache as apache
 import atr.db as db
@@ -149,7 +149,7 @@ async def admin_data(model: str = "Committee") -> str:
                 # Fallback for models without dict() method
                 record_dict = {
                     "id": getattr(record, "id", None),
-                    "storage_key": getattr(record, "storage_key", None),
+                    "name": getattr(record, "name", None),
                 }
                 for key in record.__dict__:
                     if not key.startswith("_"):

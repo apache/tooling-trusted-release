@@ -66,9 +66,9 @@ class VoteEvent:
     """Data class to represent a release vote event."""
 
     def __init__(
-        self, release_key: str, email_recipient: str, subject: str, body: str, vote_end: datetime.datetime
+        self, release_name: str, email_recipient: str, subject: str, body: str, vote_end: datetime.datetime
     ) -> None:
-        self.release_key = release_key
+        self.release_name = release_name
         self.email_recipient = email_recipient
         self.subject = subject
         self.body = body

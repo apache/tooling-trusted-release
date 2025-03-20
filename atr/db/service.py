@@ -45,26 +45,26 @@ async def get_committees(session: sqlalchemy.ext.asyncio.AsyncSession | None = N
         return committees
 
 
-async def get_release_by_key(storage_key: str) -> models.Release | None:
-    """Get a release by its storage key."""
+async def get_release_by_name(name: str) -> models.Release | None:
+    """Get a release by its name."""
     async with db.create_async_db_session() as db_session:
         # Get the release
         query = (
             sqlmodel.select(models.Release)
-            .where(models.Release.storage_key == storage_key)
+            .where(models.Release.name == name)
             .options(db.select_in_load_nested(models.Release.project, models.Project.committee))
         )
         result = await db_session.execute(query)
         return result.scalar_one_or_none()
 
 
-def get_release_by_key_sync(storage_key: str) -> models.Release | None:
-    """Synchronous version of get_release_by_key for use in background tasks."""
+def get_release_by_name_sync(name: str) -> models.Release | None:
+    """Synchronous version of get_release_by_name for use in background tasks."""
     with db.create_sync_db_session() as session:
         # Get the release
         query = (
             sqlmodel.select(models.Release)
-            .where(models.Release.storage_key == storage_key)
+            .where(models.Release.name == name)
             .options(db.select_in_load_nested(models.Release.project, models.Project.committee))
         )
         result = session.execute(query)

@@ -42,11 +42,11 @@
           </div>
           <div class="d-flex gap-3 align-items-center pt-2">
             <a class="btn btn-primary"
-               href="{{ url_for('root_package_add', storage_key=release.storage_key) }}">Add package</a>
+               href="{{ url_for('root_package_add', release_name=release.name) }}">Add package</a>
             <form method="post"
                   action="{{ url_for('root_release_delete') }}"
                   class="d-inline-block m-0">
-              <input type="hidden" name="release_key" value="{{ release.storage_key }}" />
+              <input type="hidden" name="release_name" value="{{ release.name }}" />
               <button type="submit"
                       class="btn btn-danger"
                       onclick="return confirm('Are you sure you want to delete this entire release? This will delete all packages and cannot be undone.')">
@@ -54,7 +54,7 @@
               </button>
             </form>
             <a class="btn btn-primary"
-               href="{{ url_for('root_release_vote', release_key=release.storage_key) }}">Start vote</a>
+               href="{{ url_for('root_release_vote', release_name=release.name) }}">Start vote</a>
           </div>
         </div>
       </div>
@@ -95,7 +95,7 @@
                   <input type="hidden"
                          name="artifact_sha3"
                          value="{{ package.artifact_sha3 }}" />
-                  <input type="hidden" name="release_key" value="{{ release.storage_key }}" />
+                  <input type="hidden" name="release_name" value="{{ release.name }}" />
                   <button type="submit" class="btn btn-primary">Check package</button>
                 </form>
               {% else %}
@@ -115,7 +115,7 @@
                 {{ status_parts|join(", ") }} ({{ completed_tasks }}/{{ total_tasks }} {{ "Check" if total_tasks == 1 else "Checks" }} Complete)
                 {% if package.tasks %}
                   <div class="mt-3">
-                    <a href="{{ url_for('root_package_check', artifact_sha3=package.artifact_sha3, release_key=release.storage_key) }}"
+                    <a href="{{ url_for('root_package_check', artifact_sha3=package.artifact_sha3, release_name=release.name) }}"
                        class="btn btn-primary">Show check status</a>
                   </div>
                 {% endif %}
@@ -126,10 +126,10 @@
             <th>Downloads</th>
             <td>
               <div class="d-flex flex-wrap gap-2 align-items-center">
-                <a href="{{ url_for('root_download_artifact', release_key=release.storage_key, artifact_sha3=package.artifact_sha3) }}"
+                <a href="{{ url_for('root_download_artifact', release_name=release.name, artifact_sha3=package.artifact_sha3) }}"
                    class="btn btn-success download-button">Download Artifact</a>
                 {% if package.signature_sha3 %}
-                  <a href="{{ url_for('root_download_signature', release_key=release.storage_key, signature_sha3=package.signature_sha3) }}"
+                  <a href="{{ url_for('root_download_signature', release_name=release.name, signature_sha3=package.signature_sha3) }}"
                      class="btn btn-success download-button">Download Signature</a>
                 {% endif %}
                 <a href="{{ url_for('root_docs_verify', filename=package.filename, artifact_sha3=package.artifact_sha3, sha512=package.sha512, has_signature='true' if package.signature_sha3 else 'false') }}"
@@ -146,7 +146,7 @@
                 <input type="hidden"
                        name="artifact_sha3"
                        value="{{ package.artifact_sha3 }}" />
-                <input type="hidden" name="release_key" value="{{ release.storage_key }}" />
+                <input type="hidden" name="release_name" value="{{ release.name }}" />
                 <button type="submit"
                         class="btn btn-danger"
                         onclick="return confirm('Are you sure you want to delete this package?')">

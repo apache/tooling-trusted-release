@@ -18,16 +18,15 @@
 """candidate.py"""
 
 import datetime
-import secrets
+
+import quart
+import werkzeug.wrappers.response as response
+import wtforms
 
 import asfquart
 import asfquart.auth as auth
 import asfquart.base as base
 import asfquart.session as session
-import quart
-import werkzeug.wrappers.response as response
-import wtforms
-
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
@@ -109,9 +108,7 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
                     errorcode=403,
                 )
 
-            # Generate a 128-bit random token for the release storage key
-            # TODO: Perhaps we should call this the release_key instead
-            storage_key = secrets.token_hex(16)
+            release_name = f"{project_name}-{version}"
             project = await data.project(name=project_name).get()
             if not project:
                 # Create a new project record
@@ -125,17 +122,18 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
 
             # Create release record with project
             release = models.Release(
-                storage_key=storage_key,
+                name=release_name,
                 stage=models.ReleaseStage.CANDIDATE,
                 phase=models.ReleasePhase.RELEASE_CANDIDATE,
                 project_id=project.id,
+                project=project,
                 version=version,
                 created=datetime.datetime.now(datetime.UTC),
             )
             data.add(release)
 
     # Redirect to the add package page with the storage token
-    return quart.redirect(quart.url_for("root_package_add", storage_key=storage_key))
+    return quart.redirect(quart.url_for("root_package_add", name=release_name))
 
 
 # Root functions

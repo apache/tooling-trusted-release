@@ -79,7 +79,7 @@
         <input type="hidden"
                name="artifact_sha3"
                value="{{ package.artifact_sha3 }}" />
-        <input type="hidden" name="release_key" value="{{ release.storage_key }}" />
+        <input type="hidden" name="release_name" value="{{ release.name }}" />
         <button type="submit" class="btn btn-primary">Restart all checks</button>
       </form>
     {% endif %}
@@ -111,9 +111,9 @@
             {% if task.result and task.result[0] is mapping and task.result|length == 1 %}
               <details class="mt-2 p-2 bg-light rounded">
                 {% if task.error %}
-                  <summary class="cursor-pointer user-select-none p-2">Issue: {{ task.error }}</summary>
+                  <summary class="atr-cursor-pointer user-select-none p-2">Issue: {{ task.error }}</summary>
                 {% else %}
-                  <summary class="cursor-pointer user-select-none p-2">View detailed results</summary>
+                  <summary class="atr-cursor-pointer user-select-none p-2">View detailed results</summary>
                 {% endif %}
 
                 {% if task.task_type == 'verify_rat_license' and task.result[0] is mapping %}

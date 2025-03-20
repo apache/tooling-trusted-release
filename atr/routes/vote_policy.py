@@ -17,12 +17,12 @@
 
 """vote_policy.py"""
 
-import asfquart.base as base
-import asfquart.session as session
 import quart
 import werkzeug.wrappers.response as response
 import wtforms
 
+import asfquart.base as base
+import asfquart.session as session
 import atr.db as db
 import atr.routes as routes
 import atr.util as util

@@ -28,7 +28,7 @@
     <form method="post"
           class="striking py-4 px-5"
           action="{{ url_for('root_release_vote') }}">
-      <input type="hidden" name="release_key" value="{{ release.storage_key }}" />
+      <input type="hidden" name="release_name" value="{{ release.name }}" />
 
       <div class="mb-4">
         <div class="row mb-3 pb-3 border-bottom">

@@ -38,7 +38,6 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     import asfquart.base as base
-
     from atr.db.models import ReleasePhase, ReleaseStage, TaskStatus, VoteEntry
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -168,7 +167,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         signature_sha3: Opt[str] = NotSet,
         uploaded: Opt[bool] = NotSet,
         bytes_size: Opt[int] = NotSet,
-        release_key: Opt[str] = NotSet,
+        release_name: Opt[str] = NotSet,
         _release: bool = False,
         _tasks: bool = False,
         _release_project: bool = False,
@@ -190,8 +189,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Package.uploaded == uploaded)
         if is_defined(bytes_size):
             query = query.where(models.Package.bytes_size == bytes_size)
-        if is_defined(release_key):
-            query = query.where(models.Package.release_key == release_key)
+        if is_defined(release_name):
+            query = query.where(models.Package.release_name == release_name)
         if _release:
             query = query.options(select_in_load(models.Package.release))
         if _tasks:
@@ -284,7 +283,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def release(
         self,
-        storage_key: Opt[str] = NotSet,
+        name: Opt[str] = NotSet,
         stage: Opt[ReleaseStage] = NotSet,
         phase: Opt[ReleasePhase] = NotSet,
         created: Opt[datetime] = NotSet,
@@ -302,8 +301,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
     ) -> Query[models.Release]:
         query = sqlmodel.select(models.Release)
 
-        if is_defined(storage_key):
-            query = query.where(models.Release.storage_key == storage_key)
+        if is_defined(name):
+            query = query.where(models.Release.name == name)
         if is_defined(stage):
             query = query.where(models.Release.stage == stage)
         if is_defined(phase):

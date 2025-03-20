@@ -21,14 +21,17 @@
       <tbody>
         <tr>
           <th class="text-end pe-3 align-top">
-            <label for="release_key">Release:</label>
+            <label for="release_name">Release:</label>
           </th>
           <td class="align-top">
-            <select id="release_key" name="release_key" class="form-select mb-2" required>
+            <select id="release_name"
+                    name="release_name"
+                    class="form-select mb-2"
+                    required>
               <option value="">Select a release...</option>
               {% for release in releases %}
-                <option value="{{ release.storage_key }}"
-                        {% if release.storage_key == selected_release %}selected{% endif %}>
+                <option value="{{ release.name }}"
+                        {% if release.name == selected_release %}selected{% endif %}>
                   {{ release.committee.display_name }} - {{ release.project.name if release.project else "unknown" }} - {{ release.version }}
                 </option>
               {% endfor %}
@@ -144,17 +147,17 @@
       <tbody>
         <tr>
           <th class="text-end pe-3 align-top">
-            <label for="bulk_release_key">Release:</label>
+            <label for="bulk_release_name">Release:</label>
           </th>
           <td class="align-top">
-            <select id="bulk_release_key"
-                    name="release_key"
+            <select id="bulk_release_name"
+                    name="release_name"
                     class="form-select mb-2"
                     required>
               <option value="">Select a release...</option>
               {% for release in releases %}
-                <option value="{{ release.storage_key }}"
-                        {% if release.storage_key == selected_release %}selected{% endif %}>
+                <option value="{{ release.name }}"
+                        {% if release.name == selected_release %}selected{% endif %}>
                   {{ release.committee.display_name }} - {{ release.project.name if release.project else "unknown" }} - {{ release.version }}
                 </option>
               {% endfor %}

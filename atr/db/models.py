@@ -17,6 +17,7 @@
 
 """The data models to be persisted in the database."""
 
+# NOTE: We can't use symbolic annotations here because sqlmodel doesn't support them
 # from __future__ import annotations
 
 import datetime
@@ -25,7 +26,10 @@ from typing import Any
 
 import pydantic
 import sqlalchemy
+import sqlalchemy.event as event
 import sqlmodel
+
+import atr.db as db
 
 
 class UserRole(str, enum.Enum):
@@ -117,6 +121,7 @@ class Committee(sqlmodel.SQLModel, table=True):
 class Project(sqlmodel.SQLModel, table=True):
     id: int = sqlmodel.Field(default=None, primary_key=True)
     name: str = sqlmodel.Field(unique=True)
+    # TODO: Ideally full_name would be unique for str only, but that's complex
     full_name: str | None = sqlmodel.Field(default=None)
 
     # True if this a podling project
@@ -142,6 +147,30 @@ class Project(sqlmodel.SQLModel, table=True):
         """Get the display name for the Project."""
         name = self.name if self.full_name is None else self.full_name
         return f"{name} (podling)" if self.is_podling else name
+
+    @property
+    async def editable_releases(self) -> list["Release"]:
+        """Get the editable ongoing releases for the project."""
+        # TODO: Improve our interface to use in_ automatically for lists
+        editable_phases = [
+            ReleasePhase.RELEASE_CANDIDATE,
+            ReleasePhase.EVALUATE_CLAIMS,
+            ReleasePhase.RELEASE,
+        ]
+        query = (
+            sqlmodel.select(Release)
+            .where(
+                Release.project_id == self.id,
+                db.validate_instrumented_attribute(Release.phase).in_(editable_phases),
+            )
+            .order_by(db.validate_instrumented_attribute(Release.created).desc())
+        )
+
+        async with db.session() as data:
+            results = []
+            for release in (await data.execute(query)).all():
+                results.append(release[0])
+            return results
 
 
 class DistributionChannel(sqlmodel.SQLModel, table=True):
@@ -175,7 +204,7 @@ class Package(sqlmodel.SQLModel, table=True):
     bytes_size: int
 
     # Many-to-one: A package belongs to one release
-    release_key: str = sqlmodel.Field(foreign_key="release.storage_key")
+    release_name: str = sqlmodel.Field(foreign_key="release.name")
     release: "Release" = sqlmodel.Relationship(back_populates="packages")
 
     # One-to-many: A package can have multiple tasks
@@ -201,17 +230,35 @@ class ReleaseStage(str, enum.Enum):
 
 
 class ReleasePhase(str, enum.Enum):
+    # [CANDIDATE]
+    # Step 1: The RC is received from external sources
     RELEASE_CANDIDATE = "release_candidate"
+    # Step 2: The ATR website evaluates claims about the RC
     EVALUATE_CLAIMS = "evaluate_claims"
+    # Step 3: The RC is distributed to project members for testing
     DISTRIBUTE_TEST = "distribute_test"
+    # Step 4: The project members are voting on the RC
     VOTE = "vote"
+    # Step 5: The project vote on the RC has passed
     PASSES = "passes"
+
+    # [CURRENT]
+    # Step 1: The release files are being put in place
     RELEASE = "release"
+    # Step 2: The release files are available but not yet announced
     DISTRIBUTE = "distribute"
+    # Step 3: The release has been announced but not yet released[?]
+    # TODO: Need to check the meaning of this phase
     ANNOUNCE_RELEASE = "announce_release"
+    # Step 4: The release has been announced
     RELEASED = "released"
+
+    # [Other]
+    # An existing release is being imported from ASF SVN dist
     MIGRATION = "migration"
+    # A release candidate has failed at any CANDIDATE stage
     FAILED = "failed"
+    # A previously CURRENT release has been archived
     ARCHIVED = "archived"
 
 
@@ -268,7 +315,9 @@ class Task(sqlmodel.SQLModel, table=True):
 
 
 class Release(sqlmodel.SQLModel, table=True):
-    storage_key: str = sqlmodel.Field(primary_key=True)
+    # We guarantee that "{project.name}-{version}" is unique
+    # Therefore we can use that for the name
+    name: str = sqlmodel.Field(primary_key=True, unique=True)
     stage: ReleaseStage
     phase: ReleasePhase
     created: datetime.datetime
@@ -293,6 +342,11 @@ class Release(sqlmodel.SQLModel, table=True):
 
     votes: list[VoteEntry] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
 
+    # The combination of project_id and version must be unique
+    # Technically we want (project.name, version) to be unique
+    # But project.name is already unique, so project_id works as a proxy thereof
+    __table_args__ = (sqlalchemy.UniqueConstraint("project_id", "version", name="unique_project_version"),)
+
     @property
     def committee(self) -> Committee | None:
         """Get the committee for the release."""
@@ -300,6 +354,12 @@ class Release(sqlmodel.SQLModel, table=True):
         if project is None:
             return None
         return project.committee
+
+
+@event.listens_for(Release, "before_insert")
+def check_release_name(_mapper: sqlalchemy.orm.Mapper, _connection: sqlalchemy.Connection, release: Release) -> None:
+    if release.name != f"{release.project.name}-{release.version}":
+        raise ValueError(f"Release name must be set to {release.project.name}-{release.version}")
 
 
 class SSHKey(sqlmodel.SQLModel, table=True):

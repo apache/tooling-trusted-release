@@ -59,7 +59,7 @@ global_task_id: int | None = None
 # TODO: Use a Pydantic model instead
 @dataclasses.dataclass
 class Args:
-    release_key: str
+    release_name: str
     base_url: str
     file_types: list[str]
     require_sigs: bool
@@ -75,7 +75,7 @@ class Args:
             _LOGGER.error(f"Invalid number of arguments: {len(args)}, expected 6")
             raise ValueError("Invalid number of arguments")
 
-        release_key = args["release_key"]
+        release_name = args["release_name"]
         base_url = args["base_url"]
         file_types = args["file_types"]
         require_sigs = args["require_sigs"]
@@ -83,13 +83,13 @@ class Args:
         max_concurrent = args["max_concurrent"]
 
         _LOGGER.debug(
-            f"Extracted values - release_key: {release_key}, base_url: {base_url}, "
+            f"Extracted values - release_name: {release_name}, base_url: {base_url}, "
             f"file_types: {file_types}, require_sigs: {require_sigs}, "
             f"max_depth: {max_depth}, max_concurrent: {max_concurrent}"
         )
 
-        if not isinstance(release_key, str):
-            _LOGGER.error(f"Release key must be a string, got {type(release_key)}")
+        if not isinstance(release_name, str):
+            _LOGGER.error(f"Release key must be a string, got {type(release_name)}")
             raise ValueError("Release key must be a string")
         if not isinstance(base_url, str):
             _LOGGER.error(f"Base URL must be a string, got {type(base_url)}")
@@ -114,7 +114,7 @@ class Args:
         _LOGGER.debug("All argument validations passed")
 
         args_obj = Args(
-            release_key=release_key,
+            release_name=release_name,
             base_url=base_url,
             file_types=file_types,
             require_sigs=require_sigs,
@@ -309,7 +309,7 @@ async def download_core(args_dict: dict[str, Any]) -> tuple[models.TaskStatus, s
     try:
         _LOGGER.debug(f"Parsing arguments: {args_dict}")
         args = Args.from_dict(args_dict)
-        _LOGGER.info(f"Args parsed successfully: release_key={args.release_key}, base_url={args.base_url}")
+        _LOGGER.info(f"Args parsed successfully: release_name={args.release_name}, base_url={args.base_url}")
 
         # Create async resources
         _LOGGER.debug("Creating async queue and semaphore")

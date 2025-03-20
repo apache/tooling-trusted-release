@@ -22,7 +22,7 @@
   <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
     {% for project in projects %}
       <div class="col">
-        <div class="card h-100 shadow-sm cursor-pointer hover-lift project-card"
+        <div class="card h-100 shadow-sm atr-cursor-pointer hover-lift project-card"
              data-project-url="{{ url_for('root_project_view', name=project.name) }}">
           <div class="card-body">
             <h2 class="card-title fs-4 mb-3">{{ project.display_name }}</h2>

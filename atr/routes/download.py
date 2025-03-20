@@ -21,20 +21,20 @@ import pathlib
 
 import aiofiles
 import aiofiles.os
-import asfquart.auth as auth
-import asfquart.base as base
-import asfquart.session as session
 import quart
 import werkzeug.wrappers.response as response
 
+import asfquart.auth as auth
+import asfquart.base as base
+import asfquart.session as session
 import atr.db as db
 import atr.routes as routes
 import atr.util as util
 
 
-@routes.app_route("/download/<release_key>/<artifact_sha3>")
+@routes.app_route("/download/<release_name>/<artifact_sha3>")
 @auth.require(auth.Requirements.committer)
-async def root_download_artifact(release_key: str, artifact_sha3: str) -> response.Response | quart.Response:
+async def root_download_artifact(release_name: str, artifact_sha3: str) -> response.Response | quart.Response:
     """Download an artifact file."""
     # TODO: This function is very similar to the signature download function
     # We should probably extract the common code into a helper function
@@ -46,7 +46,7 @@ async def root_download_artifact(release_key: str, artifact_sha3: str) -> respon
         # Find the package
         package = await data.package(
             artifact_sha3=artifact_sha3,
-            release_key=release_key,
+            release_name=release_name,
             _release_committee=True,
         ).get()
 
@@ -76,9 +76,9 @@ async def root_download_artifact(release_key: str, artifact_sha3: str) -> respon
         )
 
 
-@routes.app_route("/download/signature/<release_key>/<signature_sha3>")
+@routes.app_route("/download/signature/<release_name>/<signature_sha3>")
 @auth.require(auth.Requirements.committer)
-async def root_download_signature(release_key: str, signature_sha3: str) -> quart.Response | response.Response:
+async def root_download_signature(release_name: str, signature_sha3: str) -> quart.Response | response.Response:
     """Download a signature file."""
     web_session = await session.read()
     if (web_session is None) or (web_session.uid is None):
@@ -87,7 +87,7 @@ async def root_download_signature(release_key: str, signature_sha3: str) -> quar
     async with db.session() as data:
         # Find the package that has this signature
         package = await data.package(
-            signature_sha3=signature_sha3, release_key=release_key, _release_committee=True
+            signature_sha3=signature_sha3, release_name=release_name, _release_committee=True
         ).get()
         if not package:
             await quart.flash("Signature not found", "error")
