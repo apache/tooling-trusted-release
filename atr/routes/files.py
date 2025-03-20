@@ -19,21 +19,26 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, NoReturn, Protocol, TypeVar
+import os
+from typing import TYPE_CHECKING, Any, Final, NoReturn, Protocol, TypeVar
 
+import aiofiles.os
 import asfquart.auth as auth
 import asfquart.base as base
 import asfquart.session as session
 import quart
 
-import atr.db as db
+import atr.config as config
 import atr.db.models as models
 import atr.routes as routes
+import atr.user as user
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
 R = TypeVar("R", covariant=True)
+
+_CONFIG: Final = config.get()
 
 
 # This is the type of functions to which we apply @committer_get
@@ -51,6 +56,7 @@ class CommitterSession:
     """Session with extra information about committers."""
 
     def __init__(self, web_session: session.ClientSession) -> None:
+        self._projects: list[models.Project] | None = None
         self._session = web_session
 
     def __getattr__(self, name: str) -> Any:
@@ -69,33 +75,18 @@ class CommitterSession:
         return request_host
 
     @property
-    async def user_projects(self) -> list[Any]:
-        user_projects: list[models.Project] = []
-        async with db.session() as data:
-            projects = await data.project(_committee=True, _releases=True).all()
-            for p in projects:
-                if p.committee is None:
-                    continue
-                if (self.uid in p.committee.committee_members) or (self.uid in p.committee.committers):
-                    user_projects.append(p)
+    async def user_editable_releases(self) -> list[Any]:
+        return await user.editable_releases(self.uid, user_projects=self._projects)
 
-        return user_projects
+    @property
+    async def user_projects(self) -> list[Any]:
+        if self._projects is None:
+            self._projects = await user.projects(self.uid)
+        return self._projects
 
     @property
     async def user_releases(self) -> list[Any]:
-        user_releases: list[models.Release] = []
-        async with db.session() as data:
-            # TODO: We're limiting this to candidates
-            # We should either call this user_candidate_releases, or change the query
-            releases = await data.release(stage=models.ReleaseStage.CANDIDATE, _project=True, _committee=True).all()
-            user_releases = []
-            for r in releases:
-                if r.committee is None:
-                    continue
-                if (self.uid in r.committee.committee_members) or (self.uid in r.committee.committers):
-                    user_releases.append(r)
-
-        return user_releases
+        return await user.releases(self.uid)
 
 
 # This is the type of functions to which we apply @app_route
@@ -141,19 +132,33 @@ def committer_get(path: str) -> Callable[[CommitterRouteHandler[R]], RouteHandle
     return decorator
 
 
-def number_of_release_files(release: models.Release) -> int:
+async def number_of_release_files(release: models.Release) -> int:
     """Return the number of files in the release."""
-    # TODO: Return the number of files in the release
-    return 0
+    path_project = release.project.name
+    path_version = release.version
+    path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", path_project, path_version)
+    try:
+        filenames = await aiofiles.os.listdir(path)
+    except FileNotFoundError:
+        number = 0
+    else:
+        number = len(filenames)
+    return number
 
 
 @committer_get("/files/add")
 async def root_files_add(session: CommitterSession) -> str:
     """Show a page to allow the user to rsync files to editable releases."""
+    # Do them outside of the template rendering call to ensure order
+    # The user_editable_releases call can use cached results from user_projects
+    user_projects = await session.user_projects
+    user_editable_releases = await session.user_editable_releases
+
     return await quart.render_template(
         "files-add.html",
         asf_id=session.uid,
-        projects=await session.user_projects,
+        projects=user_projects,
         server_domain=session.host,
         number_of_release_files=number_of_release_files,
+        editable_releases=user_editable_releases,
     )

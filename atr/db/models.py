@@ -166,11 +166,15 @@ class Project(sqlmodel.SQLModel, table=True):
             .order_by(db.validate_instrumented_attribute(Release.created).desc())
         )
 
+        results = []
         async with db.session() as data:
-            results = []
-            for release in (await data.execute(query)).all():
-                results.append(release[0])
-            return results
+            for result in (await data.execute(query)).all():
+                release = result[0]
+                results.append(release)
+        for release in results:
+            # Don't need to eager load and lose it when the session closes
+            release.project = self
+        return results
 
 
 class DistributionChannel(sqlmodel.SQLModel, table=True):

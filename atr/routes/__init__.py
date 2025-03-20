@@ -21,14 +21,14 @@ import logging
 import pathlib
 import time
 from collections.abc import Awaitable, Callable, Coroutine
-from typing import Any, ParamSpec, TypeVar
+from typing import Any, Final, ParamSpec, TypeVar
 
 import aiofiles
 import aiofiles.os
+import asfquart
 import quart
 import werkzeug.datastructures as datastructures
 
-import asfquart
 import atr.db.models as models
 
 if asfquart.APP is ...:
@@ -40,6 +40,7 @@ T = TypeVar("T")
 # TODO: Should get this from config, checking debug there
 measure_performance: bool = True
 
+_LOGGER: Final = logging.getLogger(__name__)
 
 # |         1 | RSA (Encrypt or Sign) [HAC]                        |
 # |         2 | RSA Encrypt-Only [HAC]                             |
@@ -222,7 +223,7 @@ def app_route_performance_measure(route_path: str, http_methods: list[str] | Non
                     loop_time += loop_end - loop_start
 
                     # Raise exception if any
-                    future.result()
+                    # future.result()
             except StopIteration as e:
                 total_end = time.perf_counter()
                 total_time = total_end - total_start

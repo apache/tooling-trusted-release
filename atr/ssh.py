@@ -21,6 +21,7 @@ import asyncio
 import asyncio.subprocess
 import logging
 import os
+import string
 import uuid
 from typing import Final
 
@@ -30,7 +31,8 @@ import asyncssh
 
 import atr.config as config
 import atr.db as db
-from atr.db import models
+import atr.db.models as models
+import atr.user as user
 
 _LOGGER: Final = logging.getLogger(__name__)
 _CONFIG: Final = config.get()
@@ -126,10 +128,71 @@ async def server_stop(server: asyncssh.SSHAcceptor) -> None:
     _LOGGER.info("SSH server stopped")
 
 
+def _command_path_validate(path: str) -> tuple[str, str] | str:
+    if not path.startswith("/"):
+        return "The fifth argument should be an absolute path"
+
+    if not path.endswith("/"):
+        # Technically we could ignore this, because we rewrite the path anyway
+        # But we should enforce good rsync usage practices
+        return "The fifth argument should be a directory path, ending with a /"
+
+    if "//" in path:
+        return "The fifth argument should not contain //"
+
+    if path.count("/") != 3:
+        return "The fifth argument should be a /PROJECT/VERSION/ directory path"
+
+    path_project, path_version = path.strip("/").split("/", 1)
+    alphanum = set(string.ascii_letters + string.digits)
+    if not all(c in alphanum for c in path_project):
+        return "The project name should contain only alphanumeric characters"
+
+    # From a survey of version numbers we find that only . and - are used
+    # We also allow + which is in common use
+    version_punctuation = set(".-+")
+    if path_version[0] not in alphanum:
+        # Must certainly not allow the directory to be called "." or ".."
+        # And we also want to avoid patterns like ".htaccess"
+        return "The version should start with an alphanumeric character"
+    if path_version[-1] not in alphanum:
+        return "The version should end with an alphanumeric character"
+    if not all(c in (alphanum | version_punctuation) for c in path_version):
+        return "The version should contain only alphanumeric characters, dots, dashes, or pluses"
+
+    return path_project, path_version
+
+
+def _command_simple_validate(argv: list[str]) -> str | None:
+    if len(argv) != 5:
+        return "There should be 5 arguments"
+
+    if argv[0] != "rsync":
+        return "The first argument should be rsync"
+
+    if argv[1] != "--server":
+        return "The second argument should be --server"
+
+    # TODO: Might need to accept permutations of this
+    # Also certain versions of rsync might change the options
+    acceptable_options: Final[str] = "vlogDtpre"
+    if not argv[2].startswith(f"-{acceptable_options}."):
+        return f"The third argument should start with -{acceptable_options}."
+
+    if not argv[2][len(f"-{acceptable_options}.") :].isalpha():
+        return "The third argument should be a valid command"
+
+    if argv[3] != ".":
+        return "The fourth argument should be ."
+
+    return None
+
+
 async def _command_validate(process: asyncssh.SSHServerProcess) -> list[str] | None:
     def fail(message: str) -> list[str] | None:
         # NOTE: Changing the return type to just None really confuses mypy
         _LOGGER.error(message)
+        process.stderr.write(f"ATR SSH error: {message}\n\n".encode())
         process.exit(1)
         return None
 
@@ -140,29 +203,39 @@ async def _command_validate(process: asyncssh.SSHServerProcess) -> list[str] | N
     _LOGGER.info(f"Command received: {command}")
     argv = command.split()
 
-    if len(argv) != 5:
-        return fail("There should be 5 arguments")
+    error = _command_simple_validate(argv)
+    if error:
+        return fail(error)
 
-    if argv[0] != "rsync":
-        return fail("The first argument should be rsync")
+    result = _command_path_validate(argv[4])
+    if isinstance(result, str):
+        return fail(result)
+    path_project, path_version = result
 
-    if argv[1] != "--server":
-        return fail("The second argument should be --server")
+    # Ensure that the user has permission to upload to this project
+    async with db.session() as data:
+        project = await data.project(name=path_project, _committee=True).get()
+        if not project:
+            # Projects are public, so existence information is public
+            return fail("This project does not exist")
+        release = await data.release(project_id=project.id, version=path_version).get()
+        # The SSH UID has also been validated by SSH as being the ASF UID
+        # Since users can only set an SSH key when authenticated using ASF OAuth
+        ssh_uid = process.get_extra_info("username")
+        if not release:
+            # The user is requesting to create a new release
+            # Check if the user has permission to create a release for this project
+            if not user.is_committee_member(project.committee, ssh_uid):
+                return fail("You must be a member of this project's committee to create a release")
+        else:
+            # The user is requesting to upload to an existing release
+            # Check if the user has permission to upload to this release
+            if not user.is_committer(release.committee, ssh_uid):
+                return fail("You must be a member of this project's committee or a committer to upload to this release")
 
-    # TODO: Might need to accept permutations of this
-    # Also certain versions of rsync might change the options
-    acceptable_options: Final[str] = "vlogDtpre"
-    if not argv[2].startswith(f"-{acceptable_options}."):
-        return fail(f"The third argument should start with -{acceptable_options}.")
-
-    if not argv[2][len(f"-{acceptable_options}.") :].isalpha():
-        return fail("The third argument should be a valid command")
-
-    if argv[3] != ".":
-        return fail("The fourth argument should be .")
-
-    if argv[4] != "/":
-        return fail("The fifth argument should be /")
+    # Set the target directory to the release storage directory
+    argv[4] = os.path.join(_CONFIG.STATE_DIR, "rsync-files", path_project, path_version)
+    _LOGGER.info(f"Modified command: {argv}")
 
     return argv
 
@@ -176,13 +249,8 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
     if not argv:
         return
 
-    # Create a storage directory for this user if it doesn't exist
-    user_storage_dir = os.path.join(_CONFIG.STATE_DIR, "rsync-files", asf_uid)
-    await aiofiles.os.makedirs(user_storage_dir, exist_ok=True)
-
-    # Set the target directory to the user's storage directory
-    argv[4] = user_storage_dir
-    _LOGGER.info(f"Modified command: {argv}")
+    # Create the release's storage directory if it doesn't exist
+    await aiofiles.os.makedirs(argv[4], exist_ok=True)
 
     try:
         # Create subprocess to actually run the command
@@ -200,23 +268,27 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
 
         # Wait for the process to complete
         exit_status = await proc.wait()
-        # Start a task to process the new files
-        async with db.session() as data:
-            async with data.begin():
-                from atr.tasks.rsync import Analyse
 
-                upload_uuid = str(uuid.uuid4()).replace("-", "")
-                project_name = "test"
-                data.add(
-                    models.Task(
-                        status=models.TaskStatus.QUEUED,
-                        task_type="rsync_analyse",
-                        task_args=Analyse(
-                            asf_uid=asf_uid, upload_uuid=upload_uuid, project_name=project_name
-                        ).model_dump(),
+        # Start a task to process the new files
+        # TODO: Turned this off for now, because we need to decide on the workflow
+        start_task = False
+        if start_task:
+            async with db.session() as data:
+                async with data.begin():
+                    from atr.tasks.rsync import Analyse
+
+                    upload_uuid = str(uuid.uuid4()).replace("-", "")
+                    project_name = "test"
+                    data.add(
+                        models.Task(
+                            status=models.TaskStatus.QUEUED,
+                            task_type="rsync_analyse",
+                            task_args=Analyse(
+                                asf_uid=asf_uid, upload_uuid=upload_uuid, project_name=project_name
+                            ).model_dump(),
+                        )
                     )
-                )
-        # Exit the SSH process with the same status
+        # Exit the SSH process with the same status as the rsync process
         process.exit(exit_status)
 
     except Exception as e:
