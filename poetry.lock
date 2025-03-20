@@ -265,8 +265,8 @@ aioldap = ["bonsai"]
 [package.source]
 type = "git"
 url = "https://github.com/apache/infrastructure-asfquart.git"
-reference = "bump-asfpy"
-resolved_reference = "a4abe40f22135bfed3b945bf96c2c2a6ba9a7295"
+reference = "main"
+resolved_reference = "b2fbe33a65ec9de2ee138ce2ab95369129d40971"
 
 [[package]]
 name = "asyncssh"
@@ -2758,4 +2758,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = "~=3.13"
-content-hash = "cf228cf90230100969f7433a105d889cdb96428f3e0ac5954997b373f9818324"
+content-hash = "29329e4e21ece427687344476a493a09f3e128846a79f42ca850ebae5f4d6e7c"
