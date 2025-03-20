@@ -29,7 +29,6 @@ import shutil
 import tempfile
 from collections.abc import AsyncGenerator, Sequence
 
-import asfquart as asfquart
 import asfquart.auth as auth
 import asfquart.base as base
 import asfquart.session as session
@@ -284,6 +283,7 @@ async def root_keys_delete() -> response.Response:
     web_session = await session.read()
     if web_session is None:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
+    uid = util.unwrap(web_session.uid)
 
     form = await routes.get_form(quart.request)
     fingerprint = form.get("fingerprint")
@@ -294,7 +294,7 @@ async def root_keys_delete() -> response.Response:
     async with db.session() as data:
         async with data.begin():
             # Try to get a GPG key first
-            key = await data.public_signing_key(fingerprint=fingerprint, apache_uid=web_session.uid).get()
+            key = await data.public_signing_key(fingerprint=fingerprint, apache_uid=uid).get()
             if key:
                 # Delete the GPG key
                 await data.delete(key)
@@ -302,7 +302,7 @@ async def root_keys_delete() -> response.Response:
                 return quart.redirect(quart.url_for("root_keys_review"))
 
             # If not a GPG key, try to get an SSH key
-            ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=web_session.uid).get()
+            ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=uid).get()
             if ssh_key:
                 # Delete the SSH key
                 await data.delete(ssh_key)
@@ -321,11 +321,12 @@ async def root_keys_review() -> str:
     web_session = await session.read()
     if web_session is None:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
+    uid = util.unwrap(web_session.uid)
 
     # Get all existing keys for the user
     async with db.session() as data:
-        user_keys = await data.public_signing_key(apache_uid=web_session.uid, _committees=True).all()
-        user_ssh_keys = await data.ssh_key(asf_uid=web_session.uid).all()
+        user_keys = await data.public_signing_key(apache_uid=uid, _committees=True).all()
+        user_ssh_keys = await data.ssh_key(asf_uid=uid).all()
 
     status_message = quart.request.args.get("status_message")
     status_type = quart.request.args.get("status_type")

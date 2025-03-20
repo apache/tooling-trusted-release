@@ -88,7 +88,7 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
             form=form,
         )
 
-    committee_name = form.committee_name.data
+    committee_name = str(form.committee_name.data)
     version = not_none(form.version.data)
     project_name = not_none(form.project_name.data)
 

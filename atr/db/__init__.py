@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import TYPE_CHECKING, Any, Final, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Final, Generic, TypeGuard, TypeVar
 
 import quart
 import sqlalchemy
@@ -35,8 +35,11 @@ import atr.util as util
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from datetime import datetime
 
     import asfquart.base as base
+
+    from atr.db.models import ReleasePhase, ReleaseStage, TaskStatus, VoteEntry
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -45,13 +48,42 @@ _global_atr_sessionmaker: sqlalchemy.ext.asyncio.async_sessionmaker | None = Non
 _global_sync_engine: sqlalchemy.Engine | None = None
 
 
-class _DefaultArgument: ...
-
-
-_DEFAULT: Final = _DefaultArgument()
-
-
 T = TypeVar("T")
+
+
+class _NotSetType:
+    """
+    A marker class to indicate that a value is not set and thus should
+    not be considered. This is different to None.
+    """
+
+    _instance = None
+
+    def __new__(cls):  # type: ignore
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __repr__(self) -> str:
+        return "<NotSet>"
+
+    def __copy__(self):  # type: ignore
+        return NotSet
+
+    def __deepcopy__(self, memo: dict[int, Any]):  # type: ignore
+        return NotSet
+
+
+NotSet = _NotSetType()
+type Opt[T] = T | _NotSetType
+
+
+def is_defined(v: T | _NotSetType) -> TypeGuard[T]:
+    return not isinstance(v, _NotSetType)
+
+
+def is_undefined(v: T | _NotSetType) -> TypeGuard[_NotSetType]:  # pyright: ignore [reportInvalidTypeVarUse]
+    return isinstance(v, _NotSetType)
 
 
 class Query(Generic[T]):
@@ -82,41 +114,41 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
     # TODO: Need to type all of these arguments correctly
     def committee(
         self,
-        id: Any = _DEFAULT,
-        name: Any = _DEFAULT,
-        full_name: Any = _DEFAULT,
-        is_podling: Any = _DEFAULT,
-        parent_committee_id: Any = _DEFAULT,
-        committee_members: Any = _DEFAULT,
-        committers: Any = _DEFAULT,
-        release_managers: Any = _DEFAULT,
-        vote_policy_id: Any = _DEFAULT,
-        name_in: list[str] | _DefaultArgument = _DEFAULT,
+        id: Opt[int] = NotSet,
+        name: Opt[str] = NotSet,
+        full_name: Opt[str] = NotSet,
+        is_podling: Opt[bool] = NotSet,
+        parent_committee_id: Opt[int] = NotSet,
+        committee_members: Opt[list[str]] = NotSet,
+        committers: Opt[list[str]] = NotSet,
+        release_managers: Opt[list[str]] = NotSet,
+        vote_policy_id: Opt[int] = NotSet,
+        name_in: Opt[list[str]] = NotSet,
         _public_signing_keys: bool = False,
         _vote_policy: bool = False,
     ) -> Query[models.Committee]:
         query = sqlmodel.select(models.Committee)
 
-        if id is not _DEFAULT:
+        if is_defined(id):
             query = query.where(models.Committee.id == id)
-        if name is not _DEFAULT:
+        if is_defined(name):
             query = query.where(models.Committee.name == name)
-        if full_name is not _DEFAULT:
+        if is_defined(full_name):
             query = query.where(models.Committee.full_name == full_name)
-        if is_podling is not _DEFAULT:
+        if is_defined(is_podling):
             query = query.where(models.Committee.is_podling == is_podling)
-        if parent_committee_id is not _DEFAULT:
+        if is_defined(parent_committee_id):
             query = query.where(models.Committee.parent_committee_id == parent_committee_id)
-        if committee_members is not _DEFAULT:
+        if is_defined(committee_members):
             query = query.where(models.Committee.committee_members == committee_members)
-        if committers is not _DEFAULT:
+        if is_defined(committers):
             query = query.where(models.Committee.committers == committers)
-        if release_managers is not _DEFAULT:
+        if is_defined(release_managers):
             query = query.where(models.Committee.release_managers == release_managers)
-        if vote_policy_id is not _DEFAULT:
+        if is_defined(vote_policy_id):
             query = query.where(models.Committee.vote_policy_id == vote_policy_id)
 
-        if not isinstance(name_in, _DefaultArgument):
+        if is_defined(name_in):
             models_committee_name = validate_instrumented_attribute(models.Committee.name)
             query = query.where(models_committee_name.in_(name_in))
 
@@ -129,14 +161,14 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def package(
         self,
-        artifact_sha3: Any = _DEFAULT,
-        artifact_type: Any = _DEFAULT,
-        filename: Any = _DEFAULT,
-        sha512: Any = _DEFAULT,
-        signature_sha3: Any = _DEFAULT,
-        uploaded: Any = _DEFAULT,
-        bytes_size: Any = _DEFAULT,
-        release_key: Any = _DEFAULT,
+        artifact_sha3: Opt[str] = NotSet,
+        artifact_type: Opt[str] = NotSet,
+        filename: Opt[str] = NotSet,
+        sha512: Opt[str] = NotSet,
+        signature_sha3: Opt[str] = NotSet,
+        uploaded: Opt[bool] = NotSet,
+        bytes_size: Opt[int] = NotSet,
+        release_key: Opt[str] = NotSet,
         _release: bool = False,
         _tasks: bool = False,
         _release_project: bool = False,
@@ -144,21 +176,21 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
     ) -> Query[models.Package]:
         query = sqlmodel.select(models.Package)
 
-        if artifact_sha3 is not _DEFAULT:
+        if is_defined(artifact_sha3):
             query = query.where(models.Package.artifact_sha3 == artifact_sha3)
-        if artifact_type is not _DEFAULT:
+        if is_defined(artifact_type):
             query = query.where(models.Package.artifact_type == artifact_type)
-        if filename is not _DEFAULT:
+        if is_defined(filename):
             query = query.where(models.Package.filename == filename)
-        if sha512 is not _DEFAULT:
+        if is_defined(sha512):
             query = query.where(models.Package.sha512 == sha512)
-        if signature_sha3 is not _DEFAULT:
+        if is_defined(signature_sha3):
             query = query.where(models.Package.signature_sha3 == signature_sha3)
-        if uploaded is not _DEFAULT:
+        if is_defined(uploaded):
             query = query.where(models.Package.uploaded == uploaded)
-        if bytes_size is not _DEFAULT:
+        if is_defined(bytes_size):
             query = query.where(models.Package.bytes_size == bytes_size)
-        if release_key is not _DEFAULT:
+        if is_defined(release_key):
             query = query.where(models.Package.release_key == release_key)
         if _release:
             query = query.options(select_in_load(models.Package.release))
@@ -174,12 +206,12 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def project(
         self,
-        id: Any = _DEFAULT,
-        name: Any = _DEFAULT,
-        full_name: Any = _DEFAULT,
-        is_podling: Any = _DEFAULT,
-        committee_id: Any = _DEFAULT,
-        vote_policy_id: Any = _DEFAULT,
+        id: Opt[int] = NotSet,
+        name: Opt[str] = NotSet,
+        full_name: Opt[str] = NotSet,
+        is_podling: Opt[bool] = NotSet,
+        committee_id: Opt[int] = NotSet,
+        vote_policy_id: Opt[int] = NotSet,
         _committee: bool = False,
         _releases: bool = False,
         _distribution_channels: bool = False,
@@ -188,17 +220,17 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
     ) -> Query[models.Project]:
         query = sqlmodel.select(models.Project)
 
-        if id is not _DEFAULT:
+        if is_defined(id):
             query = query.where(models.Project.id == id)
-        if name is not _DEFAULT:
+        if is_defined(name):
             query = query.where(models.Project.name == name)
-        if full_name is not _DEFAULT:
+        if is_defined(full_name):
             query = query.where(models.Project.full_name == full_name)
-        if is_podling is not _DEFAULT:
+        if is_defined(is_podling):
             query = query.where(models.Project.is_podling == is_podling)
-        if committee_id is not _DEFAULT:
+        if is_defined(committee_id):
             query = query.where(models.Project.committee_id == committee_id)
-        if vote_policy_id is not _DEFAULT:
+        if is_defined(vote_policy_id):
             query = query.where(models.Project.vote_policy_id == vote_policy_id)
 
         if _committee:
@@ -216,33 +248,33 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def public_signing_key(
         self,
-        fingerprint: Any = _DEFAULT,
-        algorithm: Any = _DEFAULT,
-        length: Any = _DEFAULT,
-        created: Any = _DEFAULT,
-        expires: Any = _DEFAULT,
-        declared_uid: Any = _DEFAULT,
-        apache_uid: Any = _DEFAULT,
-        ascii_armored_key: Any = _DEFAULT,
+        fingerprint: Opt[str] = NotSet,
+        algorithm: Opt[str] = NotSet,
+        length: Opt[int] = NotSet,
+        created: Opt[datetime] = NotSet,
+        expires: Opt[datetime | None] = NotSet,
+        declared_uid: Opt[str | None] = NotSet,
+        apache_uid: Opt[str] = NotSet,
+        ascii_armored_key: Opt[str] = NotSet,
         _committees: bool = False,
     ) -> Query[models.PublicSigningKey]:
         query = sqlmodel.select(models.PublicSigningKey)
 
-        if fingerprint is not _DEFAULT:
+        if is_defined(fingerprint):
             query = query.where(models.PublicSigningKey.fingerprint == fingerprint)
-        if algorithm is not _DEFAULT:
+        if is_defined(algorithm):
             query = query.where(models.PublicSigningKey.algorithm == algorithm)
-        if length is not _DEFAULT:
+        if is_defined(length):
             query = query.where(models.PublicSigningKey.length == length)
-        if created is not _DEFAULT:
+        if is_defined(created):
             query = query.where(models.PublicSigningKey.created == created)
-        if expires is not _DEFAULT:
+        if is_defined(expires):
             query = query.where(models.PublicSigningKey.expires == expires)
-        if declared_uid is not _DEFAULT:
+        if is_defined(declared_uid):
             query = query.where(models.PublicSigningKey.declared_uid == declared_uid)
-        if apache_uid is not _DEFAULT:
+        if is_defined(apache_uid):
             query = query.where(models.PublicSigningKey.apache_uid == apache_uid)
-        if ascii_armored_key is not _DEFAULT:
+        if is_defined(ascii_armored_key):
             query = query.where(models.PublicSigningKey.ascii_armored_key == ascii_armored_key)
 
         if _committees:
@@ -252,16 +284,16 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def release(
         self,
-        storage_key: Any = _DEFAULT,
-        stage: Any = _DEFAULT,
-        phase: Any = _DEFAULT,
-        created: Any = _DEFAULT,
-        project_id: Any = _DEFAULT,
-        package_managers: Any = _DEFAULT,
-        version: Any = _DEFAULT,
-        sboms: Any = _DEFAULT,
-        vote_policy_id: Any = _DEFAULT,
-        votes: Any = _DEFAULT,
+        storage_key: Opt[str] = NotSet,
+        stage: Opt[ReleaseStage] = NotSet,
+        phase: Opt[ReleasePhase] = NotSet,
+        created: Opt[datetime] = NotSet,
+        project_id: Opt[int] = NotSet,
+        package_managers: Opt[list[str]] = NotSet,
+        version: Opt[str] = NotSet,
+        sboms: Opt[list[str]] = NotSet,
+        vote_policy_id: Opt[int] = NotSet,
+        votes: Opt[list[VoteEntry]] = NotSet,
         _project: bool = False,
         _packages: bool = False,
         _vote_policy: bool = False,
@@ -270,25 +302,25 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
     ) -> Query[models.Release]:
         query = sqlmodel.select(models.Release)
 
-        if storage_key is not _DEFAULT:
+        if is_defined(storage_key):
             query = query.where(models.Release.storage_key == storage_key)
-        if stage is not _DEFAULT:
+        if is_defined(stage):
             query = query.where(models.Release.stage == stage)
-        if phase is not _DEFAULT:
+        if is_defined(phase):
             query = query.where(models.Release.phase == phase)
-        if created is not _DEFAULT:
+        if is_defined(created):
             query = query.where(models.Release.created == created)
-        if project_id is not _DEFAULT:
+        if is_defined(project_id):
             query = query.where(models.Release.project_id == project_id)
-        if package_managers is not _DEFAULT:
+        if is_defined(package_managers):
             query = query.where(models.Release.package_managers == package_managers)
-        if version is not _DEFAULT:
+        if is_defined(version):
             query = query.where(models.Release.version == version)
-        if sboms is not _DEFAULT:
+        if is_defined(sboms):
             query = query.where(models.Release.sboms == sboms)
-        if vote_policy_id is not _DEFAULT:
+        if is_defined(vote_policy_id):
             query = query.where(models.Release.vote_policy_id == vote_policy_id)
-        if votes is not _DEFAULT:
+        if is_defined(votes):
             query = query.where(models.Release.votes == votes)
 
         if _project:
@@ -306,60 +338,60 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def ssh_key(
         self,
-        fingerprint: Any = _DEFAULT,
-        key: Any = _DEFAULT,
-        asf_uid: Any = _DEFAULT,
+        fingerprint: Opt[str] = NotSet,
+        key: Opt[str] = NotSet,
+        asf_uid: Opt[str] = NotSet,
     ) -> Query[models.SSHKey]:
         query = sqlmodel.select(models.SSHKey)
 
-        if fingerprint is not _DEFAULT:
+        if is_defined(fingerprint):
             query = query.where(models.SSHKey.fingerprint == fingerprint)
-        if key is not _DEFAULT:
+        if is_defined(key):
             query = query.where(models.SSHKey.key == key)
-        if asf_uid is not _DEFAULT:
+        if is_defined(asf_uid):
             query = query.where(models.SSHKey.asf_uid == asf_uid)
 
         return Query(self, query)
 
     def task(
         self,
-        id: Any = _DEFAULT,
-        status: Any = _DEFAULT,
-        task_type: Any = _DEFAULT,
-        task_args: Any = _DEFAULT,
-        added: Any = _DEFAULT,
-        started: Any = _DEFAULT,
-        pid: Any = _DEFAULT,
-        completed: Any = _DEFAULT,
-        result: Any = _DEFAULT,
-        error: Any = _DEFAULT,
-        package_sha3: Any = _DEFAULT,
+        id: Opt[int] = NotSet,
+        status: Opt[TaskStatus] = NotSet,
+        task_type: Opt[str] = NotSet,
+        task_args: Opt[Any] = NotSet,
+        added: Opt[datetime] = NotSet,
+        started: Opt[datetime | None] = NotSet,
+        pid: Opt[int | None] = NotSet,
+        completed: Opt[datetime | None] = NotSet,
+        result: Opt[Any | None] = NotSet,
+        error: Opt[str | None] = NotSet,
+        package_sha3: Opt[str | None] = NotSet,
         _package: bool = False,
         _package_release: bool = False,
     ) -> Query[models.Task]:
         query = sqlmodel.select(models.Task)
 
-        if id is not _DEFAULT:
+        if is_defined(id):
             query = query.where(models.Task.id == id)
-        if status is not _DEFAULT:
+        if is_defined(status):
             query = query.where(models.Task.status == status)
-        if task_type is not _DEFAULT:
+        if is_defined(task_type):
             query = query.where(models.Task.task_type == task_type)
-        if task_args is not _DEFAULT:
+        if is_defined(task_args):
             query = query.where(models.Task.task_args == task_args)
-        if added is not _DEFAULT:
+        if is_defined(added):
             query = query.where(models.Task.added == added)
-        if started is not _DEFAULT:
+        if is_defined(started):
             query = query.where(models.Task.started == started)
-        if pid is not _DEFAULT:
+        if is_defined(pid):
             query = query.where(models.Task.pid == pid)
-        if completed is not _DEFAULT:
+        if is_defined(completed):
             query = query.where(models.Task.completed == completed)
-        if result is not _DEFAULT:
+        if is_defined(result):
             query = query.where(models.Task.result == result)
-        if error is not _DEFAULT:
+        if is_defined(error):
             query = query.where(models.Task.error == error)
-        if package_sha3 is not _DEFAULT:
+        if is_defined(package_sha3):
             query = query.where(models.Task.package_sha3 == package_sha3)
 
         if _package:
@@ -371,29 +403,29 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def vote_policy(
         self,
-        id: Any = _DEFAULT,
-        mailto_addresses: Any = _DEFAULT,
-        manual_vote: Any = _DEFAULT,
-        min_hours: Any = _DEFAULT,
-        release_checklist: Any = _DEFAULT,
-        pause_for_rm: Any = _DEFAULT,
+        id: Opt[int] = NotSet,
+        mailto_addresses: Opt[list[str]] = NotSet,
+        manual_vote: Opt[bool] = NotSet,
+        min_hours: Opt[int] = NotSet,
+        release_checklist: Opt[str] = NotSet,
+        pause_for_rm: Opt[bool] = NotSet,
         _committees: bool = False,
         _projects: bool = False,
         _releases: bool = False,
     ) -> Query[models.VotePolicy]:
         query = sqlmodel.select(models.VotePolicy)
 
-        if id is not _DEFAULT:
+        if is_defined(id):
             query = query.where(models.VotePolicy.id == id)
-        if mailto_addresses is not _DEFAULT:
+        if is_defined(mailto_addresses):
             query = query.where(models.VotePolicy.mailto_addresses == mailto_addresses)
-        if manual_vote is not _DEFAULT:
+        if is_defined(manual_vote):
             query = query.where(models.VotePolicy.manual_vote == manual_vote)
-        if min_hours is not _DEFAULT:
+        if is_defined(min_hours):
             query = query.where(models.VotePolicy.min_hours == min_hours)
-        if release_checklist is not _DEFAULT:
+        if is_defined(release_checklist):
             query = query.where(models.VotePolicy.release_checklist == release_checklist)
-        if pause_for_rm is not _DEFAULT:
+        if is_defined(pause_for_rm):
             query = query.where(models.VotePolicy.pause_for_rm == pause_for_rm)
 
         if _committees:

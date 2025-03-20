@@ -32,6 +32,7 @@ import atr.blueprints.admin as admin
 import atr.datasources.apache as apache
 import atr.db as db
 import atr.db.models as models
+import atr.util as util
 
 
 @admin.BLUEPRINT.route("/performance")
@@ -280,12 +281,13 @@ async def admin_keys_delete_all() -> str:
     web_session = await session.read()
     if web_session is None:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
+    uid = util.unwrap(web_session.uid)
 
     async with db.session() as data:
         async with data.begin():
             # Get all keys for the user
             # TODO: Use session.apache_uid instead of session.uid?
-            keys = await data.public_signing_key(apache_uid=web_session.uid).all()
+            keys = await data.public_signing_key(apache_uid=uid).all()
             count = len(keys)
 
             # Delete all keys

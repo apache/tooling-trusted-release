@@ -120,7 +120,7 @@ async def package_add_session_process(
     """Helper function for package_add_post."""
 
     # First check for duplicates by filename
-    duplicate = await data.package(release_key=release_key, filename=artifact_file.filename).get()
+    duplicate = await data.package(release_key=release_key, filename=util.unwrap(artifact_file.filename)).get()
     if duplicate:
         raise routes.FlashError("This release artifact has already been uploaded")
 

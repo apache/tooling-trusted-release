@@ -51,7 +51,7 @@ class CreateVotePolicyForm(util.QuartFormTyped):
 
 
 async def add_voting_policy(session: session.ClientSession, form: CreateVotePolicyForm) -> response.Response:
-    name = form.project_name.data
+    name = str(form.project_name.data)
 
     async with db.session() as data:
         async with data.begin():
