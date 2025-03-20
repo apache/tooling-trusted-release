@@ -1,5 +1,3 @@
-meta:
-  nextgen: true
 github:
   description: "Apache Trusted Release Platform"
   homepage: https://tooling.apache.org/
