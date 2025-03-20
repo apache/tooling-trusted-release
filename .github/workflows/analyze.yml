@@ -1,11 +1,8 @@
-name: Build and test
+name: Analyze using pre-commit hooks
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,20 +12,15 @@ env:
   POETRY_VERSION: '2.1.1'
 
 jobs:
-  test:
+  analyze:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version:
-          - '3.13'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
       - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ env.LATEST_PY_VERSION }}
       - uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1.4.1
         with:
           virtualenvs-in-project: true
@@ -40,12 +32,17 @@ jobs:
         uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
         with:
           path: .venv
-          key: venv-${{ matrix.python-version }}-${{ hashFiles('poetry.lock') }}
+          key: venv-${{ env.LATEST_PY_VERSION }}-${{ hashFiles('poetry.lock') }}
       - name: Install dependencies
         #if: steps.cache.outputs.cache-hit != 'true'
-        run: poetry sync -v --without=dev
+        run: poetry sync -v --with=dev
 
-      # Run tests
-      - name: Run tests
+      - name: Cache pre-commit data
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-3|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run pre-commit
         run: |
-          poetry run pytest -rs tests
+          poetry run pre-commit run --show-diff-on-failure --color=always --all-files
