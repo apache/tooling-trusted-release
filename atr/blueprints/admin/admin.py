@@ -300,8 +300,8 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
                 #       maybe make that information configurable
                 project_model.is_retired = pmc.name == "attic"
 
-            # Add special entry for Tooling PMC
-            # Not clear why, but it's not in the Whimsy data
+            # Tooling is not a committee
+            # We add a special entry for Tooling, pretending to be a PMC, for debugging and testing
             tooling_committee = await data.committee(name="tooling").get()
             if not tooling_committee:
                 tooling_committee = models.Committee(name="tooling")
