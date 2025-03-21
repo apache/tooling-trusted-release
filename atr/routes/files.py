@@ -107,6 +107,34 @@ def _authentication_failed() -> NoReturn:
     raise base.ASFQuartException("Not authenticated", errorcode=401)
 
 
+async def _paths_recursive_list(base_path: str) -> list[str]:
+    """List all paths recursively in alphabetical order from a given base path."""
+    paths: list[str] = []
+
+    async def _recursive_list(current_path: str, relative_path: str = "") -> None:
+        try:
+            entries = await aiofiles.os.listdir(current_path)
+            for entry in entries:
+                entry_path = os.path.join(current_path, entry)
+                entry_rel_path = os.path.join(relative_path, entry) if relative_path else entry
+
+                try:
+                    stat_info = await aiofiles.os.stat(entry_path)
+                    # If the entry is a directory, recurse into it
+                    if stat_info.st_mode & 0o040000:
+                        await _recursive_list(entry_path, entry_rel_path)
+                    else:
+                        paths.append(entry_rel_path)
+                except (FileNotFoundError, PermissionError):
+                    continue
+        except FileNotFoundError:
+            pass
+
+    await _recursive_list(base_path)
+    paths.sort()
+    return paths
+
+
 # This decorator is an adaptor between @committer_get and @app_route functions
 def committer_get(path: str) -> Callable[[CommitterRouteHandler[R]], RouteHandler[R]]:
     """Decorator for committer GET routes that provides an enhanced session object."""
@@ -178,15 +206,8 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
-    # Get the file list
-    path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", project_name, version_name)
-    try:
-        # TODO: Recurse into subdirectories
-        filenames = await aiofiles.os.listdir(path)
-    except FileNotFoundError:
-        filenames = []
-    else:
-        filenames.sort()
+    base_path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", project_name, version_name)
+    paths = await _paths_recursive_list(base_path)
 
     return await quart.render_template(
         "files-list.html",
@@ -194,6 +215,6 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
         project_name=project_name,
         version_name=version_name,
         release=release,
-        files=filenames,
+        paths=paths,
         server_domain=session.host,
     )

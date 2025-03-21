@@ -51,7 +51,7 @@
          class="btn btn-sm btn-outline-primary">Back to Add files</a>
     </div>
     <div class="card-body">
-      {% if files|length > 0 %}
+      {% if paths|length > 0 %}
         <div class="table-responsive">
           <table class="table table-striped table-hover">
             <thead>
@@ -60,9 +60,9 @@
               </tr>
             </thead>
             <tbody>
-              {% for file in files %}
+              {% for path in paths %}
                 <tr>
-                  <td>{{ file }}</td>
+                  <td>{{ path }}</td>
                 </tr>
               {% endfor %}
             </tbody>
