@@ -40,7 +40,7 @@
             {% endif %}
             <p class="card-text">
               {% if number_of_release_files(release) > 0 %}
-                This editable ongoing release has {{ number_of_release_files(release) }} file(s).
+                This editable ongoing release has <a href="{{ url_for('root_files_list', project_name=release.project.name, version_name=release.version) }}">{{ number_of_release_files(release) }} file(s)</a>.
               {% else %}
                 This editable ongoing release doesn't have any files yet.
               {% endif %}

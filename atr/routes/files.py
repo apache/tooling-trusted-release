@@ -29,6 +29,7 @@ import asfquart.session as session
 import quart
 
 import atr.config as config
+import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.user as user
@@ -161,4 +162,38 @@ async def root_files_add(session: CommitterSession) -> str:
         server_domain=session.host,
         number_of_release_files=number_of_release_files,
         editable_releases=user_editable_releases,
+    )
+
+
+@committer_get("/files/list/<project_name>/<version_name>")
+async def root_files_list(session: CommitterSession, project_name: str, version_name: str) -> str:
+    """Show all the files in the rsync upload directory for a release."""
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
+    # Check that the release exists
+    async with db.session() as data:
+        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+
+    # Get the file list
+    path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", project_name, version_name)
+    try:
+        # TODO: Recurse into subdirectories
+        filenames = await aiofiles.os.listdir(path)
+    except FileNotFoundError:
+        filenames = []
+    else:
+        filenames.sort()
+
+    return await quart.render_template(
+        "files-list.html",
+        asf_id=session.uid,
+        project_name=project_name,
+        version_name=version_name,
+        release=release,
+        files=filenames,
+        server_domain=session.host,
     )
