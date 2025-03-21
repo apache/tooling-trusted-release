@@ -164,9 +164,6 @@ def _command_path_validate(path: str) -> tuple[str, str] | str:
 
 
 def _command_simple_validate(argv: list[str]) -> str | None:
-    if len(argv) != 5:
-        return "There should be 5 arguments"
-
     if argv[0] != "rsync":
         return "The first argument should be rsync"
 
@@ -182,8 +179,19 @@ def _command_simple_validate(argv: list[str]) -> str | None:
     if not argv[2][len(f"-{acceptable_options}.") :].isalpha():
         return "The third argument should be a valid command"
 
-    if argv[3] != ".":
-        return "The fourth argument should be ."
+    # Support --delete as an optional argument before the path
+    if argv[3] != "--delete":
+        # No --delete, short command
+        if argv[3] != ".":
+            return "The fourth argument should be ."
+        if len(argv) != 5:
+            return "There should be 5 arguments"
+    else:
+        # Has --delete, long command
+        if argv[4] != ".":
+            return "The fifth argument should be ."
+        if len(argv) != 6:
+            return "There should be 6 arguments"
 
     return None
 
@@ -192,7 +200,7 @@ async def _command_validate(process: asyncssh.SSHServerProcess) -> list[str] | N
     def fail(message: str) -> list[str] | None:
         # NOTE: Changing the return type to just None really confuses mypy
         _LOGGER.error(message)
-        process.stderr.write(f"ATR SSH error: {message}\n\n".encode())
+        process.stderr.write(f"ATR SSH error: {message}\nCommand: {process.command}\n".encode())
         process.exit(1)
         return None
 
@@ -207,7 +215,12 @@ async def _command_validate(process: asyncssh.SSHServerProcess) -> list[str] | N
     if error:
         return fail(error)
 
-    result = _command_path_validate(argv[4])
+    if argv[3] == "--delete":
+        path_index = 5
+    else:
+        path_index = 4
+
+    result = _command_path_validate(argv[path_index])
     if isinstance(result, str):
         return fail(result)
     path_project, path_version = result
@@ -234,8 +247,11 @@ async def _command_validate(process: asyncssh.SSHServerProcess) -> list[str] | N
                 return fail("You must be a member of this project's committee or a committer to upload to this release")
 
     # Set the target directory to the release storage directory
-    argv[4] = os.path.join(_CONFIG.STATE_DIR, "rsync-files", path_project, path_version)
+    argv[path_index] = os.path.join(_CONFIG.STATE_DIR, "rsync-files", path_project, path_version)
     _LOGGER.info(f"Modified command: {argv}")
+
+    # Create the release's storage directory if it doesn't exist
+    await aiofiles.os.makedirs(argv[path_index], exist_ok=True)
 
     return argv
 
@@ -248,9 +264,6 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
     argv = await _command_validate(process)
     if not argv:
         return
-
-    # Create the release's storage directory if it doesn't exist
-    await aiofiles.os.makedirs(argv[4], exist_ok=True)
 
     try:
         # Create subprocess to actually run the command
