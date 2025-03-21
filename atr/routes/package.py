@@ -22,6 +22,7 @@ import datetime
 import hashlib
 import logging
 import logging.handlers
+import os.path
 import pathlib
 import secrets
 from collections.abc import Sequence
@@ -38,7 +39,7 @@ import werkzeug.wrappers.response as response
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
-import atr.tasks.archive as archive
+import atr.tasks as tasks
 import atr.util as util
 
 
@@ -545,64 +546,20 @@ async def task_package_status_get(data: db.Session, artifact_sha3: str) -> tuple
     return tasks, has_active_tasks
 
 
-async def task_verification_create(data: db.Session, package: models.Package) -> list[models.Task]:
+async def task_verification_create(data: db.Session, package: models.Package) -> None:
     """Create verification tasks for a package."""
+    # NOTE: A database session must be open when calling this function
     if not package.release or not package.release.committee:
         raise routes.FlashError("Could not determine committee for package")
 
     if package.signature_sha3 is None:
         raise routes.FlashError("Package has no signature")
 
-    # TODO: We should probably use an enum for task_type
-    tasks = [
-        models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type="verify_archive_integrity",
-            task_args=archive.CheckIntegrity(path="releases/" + package.artifact_sha3).model_dump(),
-            package_sha3=package.artifact_sha3,
-        ),
-        models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type="verify_archive_structure",
-            task_args=["releases/" + package.artifact_sha3, package.filename],
-            package_sha3=package.artifact_sha3,
-        ),
-        models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type="verify_signature",
-            task_args=[
-                package.release.committee.name,
-                "releases/" + package.artifact_sha3,
-                "releases/" + package.signature_sha3,
-            ],
-            package_sha3=package.artifact_sha3,
-        ),
-        models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type="verify_license_files",
-            task_args=["releases/" + package.artifact_sha3],
-            package_sha3=package.artifact_sha3,
-        ),
-        models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type="verify_license_headers",
-            task_args=["releases/" + package.artifact_sha3],
-            package_sha3=package.artifact_sha3,
-        ),
-        models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type="verify_rat_license",
-            task_args=["releases/" + package.artifact_sha3],
-            package_sha3=package.artifact_sha3,
-        ),
-        models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type="generate_cyclonedx_sbom",
-            task_args=["releases/" + package.artifact_sha3],
-            package_sha3=package.artifact_sha3,
-        ),
-    ]
-    for task in tasks:
+    artifact_path = os.path.join("releases", package.artifact_sha3)
+    signature_path = os.path.join("releases", package.signature_sha3)
+    committee_name = package.release.committee.name
+    artifact_tasks = await tasks.artifact_checks(
+        artifact_path, signature_path=signature_path, committee_name=committee_name
+    )
+    for task in artifact_tasks:
         data.add(task)
-
-    return tasks

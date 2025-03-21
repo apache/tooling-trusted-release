@@ -16,14 +16,17 @@
 # under the License.
 
 import logging
+import os
 from typing import Any, Final
 
 import pydantic
 
+import atr.config as config
+import atr.db.models as models
 import atr.tasks.task as task
-from atr import analysis
-from atr.db import models
+import atr.util as util
 
+_CONFIG: Final = config.get()
 _LOGGER: Final = logging.getLogger(__name__)
 
 
@@ -49,6 +52,13 @@ async def analyse(args: dict[str, Any]) -> tuple[models.TaskStatus, str | None, 
     return task.COMPLETED, None, task_results
 
 
-async def _analyse_core(asf_uid: str, project_name: str, release_version: str) -> str:
+async def _analyse_core(asf_uid: str, project_name: str, release_version: str) -> dict[str, Any]:
     """Analyse an rsync upload."""
-    return analysis.perform.__name__
+    base_path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", project_name, release_version)
+    paths = await util.paths_recursive(base_path)
+    # for path in paths:
+    #     # Add new tasks for each path
+    #     # We could use the SHA3 in input and output
+    #     # Or, less securely, we could use path and mtime instead
+    #     ...
+    return {"paths": paths}

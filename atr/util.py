@@ -89,6 +89,17 @@ async def compute_sha512(file_path: pathlib.Path) -> str:
     return sha512.hexdigest()
 
 
+async def file_sha3(path: str) -> str:
+    """Compute SHA3-256 hash of a file."""
+    sha3 = hashlib.sha3_256()
+    async with aiofiles.open(path, "rb") as f:
+        chunk = await f.read(4096)
+        while chunk:
+            sha3.update(chunk)
+            chunk = await f.read(4096)
+    return sha3.hexdigest()
+
+
 @functools.cache
 def get_admin_users() -> set[str]:
     return set(config.get().ADMIN_USERS)
