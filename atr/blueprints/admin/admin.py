@@ -275,6 +275,7 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
                 #        the PMC seems to be identified by the key ws, but the associated projects use webservices
                 if project_name.startswith("webservices-"):
                     project_name = project_name.replace("webservices-", "ws-")
+                    project_status.pmc = "ws"
 
                 pmc = await data.committee(name=project_status.pmc).get()
                 if not pmc:
