@@ -1,26 +1,15 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Project ~ ATR
+  Committee ~ ATR
 {% endblock title %}
 
 {% block description %}
-  Information regarding an Apache Project.
+  Information regarding an Apache Committee.
 {% endblock description %}
 
 {% block content %}
-  <h1>{{ project.display_name | capitalize }}</h1>
-
-  <div class="card mb-4">
-    <div class="card-header bg-light">
-      <h3 class="mb-2">PMC</h3>
-    </div>
-    <div class="card-body">
-      <div class="d-flex flex-wrap gap-3 small mb-1">
-        <a href="{{ url_for('root_committee_view', name=project.committee.name) }}">{{ project.committee.display_name }}</a>
-      </div>
-    </div>
-  </div>
+  <h1>{{ committee.display_name | capitalize }}</h1>
 
   <div class="card mb-4">
     <div class="card-header bg-light">
@@ -28,11 +17,26 @@
     </div>
     <div class="card-body">
       <div class="d-flex flex-wrap gap-3 small mb-1">
-        <span>Committee members: {{ project.committee.committee_members|length }}</span>
+        <span>Committee members: {{ committee.committee_members|length }}</span>
         <span class="d-flex align-items-center">
-          <span>Committers: {{ project.committee.committers|length }}</span>
+          <span>Committers: {{ committee.committers|length }}</span>
         </span>
       </div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header bg-light">
+      <h3 class="mb-0">Projects</h3>
+    </div>
+    <div class="card-body">
+      <ul>
+        {% for project in committee.projects %}
+          <li>
+            <a href="{{ url_for('root_project_view', name=project.name) }}">{{ project.display_name }}</a>
+          </li>
+        {% endfor %}
+      </ul>
     </div>
   </div>
 
@@ -42,7 +46,7 @@
     </div>
     <div class="card-body">
       <div class="row row-cols-1 g-4">
-        {% for key in project.public_signing_keys %}
+        {% for key in committee.public_signing_keys %}
           <div class="col">
             <div class="card h-100 border">
               <div class="card-body">
@@ -102,12 +106,12 @@
       <h3 class="mb-0">Voting Policy</h3>
       <div>
         <a class="btn btn-primary"
-           href="{{ url_for('root_project_voting_policy_add', name=project.name) }}"><i class="fa-solid fa-plus"></i></a>
+           href="{{ url_for('root_project_voting_policy_add', name=committee.name) }}"><i class="fa-solid fa-plus"></i></a>
       </div>
     </div>
     <div class="card-body">
-      {% if project.vote_policy %}
-        {% set vp = project.vote_policy %}
+      {% if committee.vote_policy %}
+        {% set vp = committee.vote_policy %}
         <div class="card border">
           <div class="card-body">
             <table class="table mb-0">
@@ -123,15 +127,6 @@
       {% endif %}
     </div>
   </div>
-
-  <!-- TODO: Subprojects?
-  <div class="card mb-4">
-    <div class="card-header bg-light">
-      <h3 class="mb-0">Projects</h3>
-    </div>
-    <div class="card-body"></div>
-  </div>
-  -->
 
 {% endblock content %}
 

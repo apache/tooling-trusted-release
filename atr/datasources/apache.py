@@ -78,10 +78,10 @@ class RetiredCommitteeData(pydantic.BaseModel):
 class Committee(pydantic.BaseModel):
     name: str
     display_name: str
-    site: str
+    site: str | None
     description: str
     mail_list: str
-    established: str
+    established: str | None
     report: list[str]
     chair: Annotated[list[User], util.DictToList(key="id")]
     roster_count: int

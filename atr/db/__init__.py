@@ -128,6 +128,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         release_managers: Opt[list[str]] = NotSet,
         vote_policy_id: Opt[int] = NotSet,
         name_in: Opt[list[str]] = NotSet,
+        _projects: bool = False,
         _public_signing_keys: bool = False,
         _vote_policy: bool = False,
     ) -> Query[models.Committee]:
@@ -156,6 +157,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             models_committee_name = validate_instrumented_attribute(models.Committee.name)
             query = query.where(models_committee_name.in_(name_in))
 
+        if _projects:
+            query = query.options(select_in_load(models.Committee.projects))
         if _public_signing_keys:
             query = query.options(select_in_load(models.Committee.public_signing_keys))
         if _vote_policy:

@@ -172,9 +172,10 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
     """Update projects from remote data."""
     if quart.request.method == "POST":
         try:
-            updated_count = await _update_committees()
+            added_count, updated_count = await _update_committees()
             return {
-                "message": f"Successfully updated {updated_count} projects (PMCs and PPMCs) with membership data",
+                "message": f"Successfully added {added_count} and updated {updated_count} committees and projects "
+                f"(PMCs and PPMCs) with membership data",
                 "category": "success",
             }, 200
         except httpx.RequestError as e:
@@ -192,18 +193,21 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
     return await quart.render_template("update-committees.html")
 
 
-async def _update_committees() -> int:
+async def _update_committees() -> tuple[int, int]:  # noqa: C901
     ldap_projects = await apache.get_ldap_projects_data()
     projects = await apache.get_projects_data()
     podlings_data = await apache.get_current_podlings_data()
+    committees = await apache.get_active_committee_data()
 
     ldap_projects_by_name: Mapping[str, LDAPProject] = {p.name: p for p in ldap_projects.projects}
+    committees_by_name: Mapping[str, apache.Committee] = {c.name: c for c in committees.committees}
 
+    added_count = 0
     updated_count = 0
 
     async with db.session() as data:
         async with data.begin():
-            # First update PMCs
+            # First create PMC committees
             for project in ldap_projects.projects:
                 name = project.name
                 # Skip non-PMC committees
@@ -215,56 +219,72 @@ async def _update_committees() -> int:
                 if not committee:
                     committee = models.Committee(name=name)
                     data.add(committee)
-                    committee_core_project = models.Project(name=name, committee=committee)
-
-                    project_status = projects.get(name)
-                    if project_status is not None:
-                        committee_core_project.full_name = project_status.name
-
-                    data.add(committee_core_project)
+                    added_count += 1
+                else:
+                    updated_count += 1
 
                 committee.committee_members = project.owners
                 committee.committers = project.members
-                # Ensure this is set for PMCs
+                # We create PMCs for now
                 committee.is_podling = False
-
-                # For release managers, use PMC members for now
-                # TODO: Consider a more sophisticated way to determine release managers
-                #       from my POV, the list of release managers should be the list of people
-                #       that have actually cut a release for that project
-                committee.release_managers = committee.committee_members
+                committee_info = committees_by_name.get(name)
+                if committee_info:
+                    committee.full_name = committee_info.display_name
 
                 updated_count += 1
 
-            # Then add PPMCs (podlings)
+            # Then add PPMCs and their associated project (podlings)
             for podling_name, podling_data in podlings_data:
                 # Get or create PPMC
-                podling = await data.committee(name=podling_name).get()
-                if not podling:
-                    podling = models.Committee(name=podling_name, is_podling=True)
-                    data.add(podling)
-                    podling_core_project = models.Project(
-                        name=podling_name, full_name=podling_data.name, committee=podling
-                    )
-                    data.add(podling_core_project)
+                ppmc = await data.committee(name=podling_name).get()
+                if not ppmc:
+                    ppmc = models.Committee(name=podling_name, is_podling=True)
+                    data.add(ppmc)
+                    added_count += 1
+                else:
+                    updated_count += 1
 
-                # Update PPMC data from groups.json
-                podling.is_podling = True
-
+                # We create a PPMC
+                ppmc.is_podling = True
+                ppmc.full_name = podling_data.name.removesuffix("(Incubating)")
                 podling_project = ldap_projects_by_name.get(podling_name)
                 if podling_project is not None:
-                    podling.committee_members = podling_project.owners
-                    podling.committers = podling_project.members
+                    ppmc.committee_members = podling_project.owners
+                    ppmc.committers = podling_project.members
                 else:
                     _LOGGER.warning(f"could not find ldap data for podling {podling_name}")
 
-                # Use PPMC members as release managers
-                # TODO: Consider a more sophisticated way to determine release managers
-                #       from my POV, the list of release managers should be the list of people
-                #       that have actually cut a release for that project
-                podling.release_managers = podling.committee_members
+                podling = await data.project(name=podling_name).get()
+                if not podling:
+                    # create the associated podling project
+                    podling = models.Project(
+                        name=podling_name, full_name=podling_data.name, committee=ppmc, is_podling=True
+                    )
+                    data.add(podling)
+                    added_count += 1
+                else:
+                    updated_count += 1
 
-                updated_count += 1
+                podling.full_name = podling_data.name
+                podling.committee = ppmc
+                podling.is_podling = True
+
+            # Add projects and associated them to the right PMC
+            for project_name, project_status in projects.items():
+                pmc = await data.committee(name=project_status.pmc).get()
+                if not pmc:
+                    _LOGGER.warning(f"could not find PMC for project {project_name}: {project_status.pmc}")
+                    continue
+
+                project_model = await data.project(name=project_name).get()
+                if not project_model:
+                    project_model = models.Project(name=project_name, committee=pmc, is_podling=pmc.is_podling)
+                    data.add(project_model)
+                    added_count += 1
+                else:
+                    updated_count += 1
+
+                project_model.full_name = project_status.name
 
             # Add special entry for Tooling PMC
             # Not clear why, but it's not in the Whimsy data
@@ -272,8 +292,12 @@ async def _update_committees() -> int:
             if not tooling_committee:
                 tooling_committee = models.Committee(name="tooling")
                 data.add(tooling_committee)
-                tooling_project = models.Project(name="tooling", committee=tooling_committee)
+                tooling_project = models.Project(
+                    name="tooling", full_name="Apache Tooling", committee=tooling_committee
+                )
                 data.add(tooling_project)
+                added_count += 1
+            else:
                 updated_count += 1
 
             # Update Tooling PMC data
@@ -283,7 +307,7 @@ async def _update_committees() -> int:
             tooling_committee.release_managers = ["wave"]
             tooling_committee.is_podling = False
 
-    return updated_count
+    return added_count, updated_count
 
 
 @admin.BLUEPRINT.route("/tasks")
