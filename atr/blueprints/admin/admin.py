@@ -246,7 +246,7 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
 
                 # We create a PPMC
                 ppmc.is_podling = True
-                ppmc.full_name = podling_data.name.removesuffix("(Incubating)")
+                ppmc.full_name = podling_data.name.removesuffix("(Incubating)").removeprefix("Apache").strip()
                 podling_project = ldap_projects_by_name.get(podling_name)
                 if podling_project is not None:
                     ppmc.committee_members = podling_project.owners
@@ -271,6 +271,11 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
 
             # Add projects and associated them to the right PMC
             for project_name, project_status in projects.items():
+                # FIXME: this is a quick workaround for inconsistent data wrt webservices PMC / projects
+                #        the PMC seems to be identified by the key ws, but the associated projects use webservices
+                if project_name.startswith("webservices-"):
+                    project_name = project_name.replace("webservices-", "ws-")
+
                 pmc = await data.committee(name=project_status.pmc).get()
                 if not pmc:
                     _LOGGER.warning(f"could not find PMC for project {project_name}: {project_status.pmc}")
