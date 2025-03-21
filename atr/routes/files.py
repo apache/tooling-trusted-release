@@ -24,7 +24,6 @@ import pathlib
 import re
 from typing import TYPE_CHECKING, Any, Final, NoReturn, Protocol, TypeVar
 
-import aiofiles.os
 import asfquart.auth as auth
 import asfquart.base as base
 import asfquart.session as session
@@ -36,6 +35,7 @@ import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.user as user
+import atr.util as util
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -115,35 +115,7 @@ async def _number_of_release_files(release: models.Release) -> int:
     path_project = release.project.name
     path_version = release.version
     path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", path_project, path_version)
-    return len(await _paths_recursive_list(path))
-
-
-async def _paths_recursive_list(base_path: str) -> list[str]:
-    """List all paths recursively in alphabetical order from a given base path."""
-    paths: list[str] = []
-
-    async def _recursive_list(current_path: str, relative_path: str = "") -> None:
-        try:
-            entries = await aiofiles.os.listdir(current_path)
-            for entry in entries:
-                entry_path = os.path.join(current_path, entry)
-                entry_rel_path = os.path.join(relative_path, entry) if relative_path else entry
-
-                try:
-                    stat_info = await aiofiles.os.stat(entry_path)
-                    # If the entry is a directory, recurse into it
-                    if stat_info.st_mode & 0o040000:
-                        await _recursive_list(entry_path, entry_rel_path)
-                    else:
-                        paths.append(entry_rel_path)
-                except (FileNotFoundError, PermissionError):
-                    continue
-        except FileNotFoundError:
-            pass
-
-    await _recursive_list(base_path)
-    paths.sort()
-    return paths
+    return len(await util.paths_recursive(path))
 
 
 def _path_warnings_errors(
@@ -293,7 +265,7 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
         )
 
     base_path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", project_name, version_name)
-    paths = await _paths_recursive_list(base_path)
+    paths = await util.paths_recursive(base_path)
     paths_set = set(paths)
     path_templates = {}
     path_substitutions = {}

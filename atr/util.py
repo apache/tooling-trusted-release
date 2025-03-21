@@ -18,6 +18,7 @@
 import dataclasses
 import functools
 import hashlib
+import os
 import pathlib
 from collections.abc import Mapping
 from typing import Annotated, Any, TypeVar
@@ -102,6 +103,35 @@ def is_admin(user_id: str | None) -> bool:
     if user_id is None:
         return False
     return user_id in get_admin_users()
+
+
+async def paths_recursive(base_path: str, sort: bool = True) -> list[str]:
+    """List all paths recursively in alphabetical order from a given base path."""
+    paths: list[str] = []
+
+    async def _recursive_list(current_path: str, relative_path: str = "") -> None:
+        try:
+            entries = await aiofiles.os.listdir(current_path)
+            for entry in entries:
+                entry_path = os.path.join(current_path, entry)
+                entry_rel_path = os.path.join(relative_path, entry) if relative_path else entry
+
+                try:
+                    stat_info = await aiofiles.os.stat(entry_path)
+                    # If the entry is a directory, recurse into it
+                    if stat_info.st_mode & 0o040000:
+                        await _recursive_list(entry_path, entry_rel_path)
+                    else:
+                        paths.append(entry_rel_path)
+                except (FileNotFoundError, PermissionError):
+                    continue
+        except FileNotFoundError:
+            pass
+
+    await _recursive_list(base_path)
+    if sort is True:
+        paths.sort()
+    return paths
 
 
 def unwrap(value: T | None, error_message: str = "unexpected None when unwrapping value") -> T:
