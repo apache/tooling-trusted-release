@@ -200,7 +200,7 @@ async def _update_committees() -> int:
             for project in ldap_projects.projects:
                 name = project.name
                 # Skip non-PMC committees
-                if project.pmc is None:
+                if project.pmc is not True:
                     continue
 
                 # Get or create PMC
