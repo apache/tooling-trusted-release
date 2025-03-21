@@ -57,12 +57,16 @@
             <thead>
               <tr>
                 <th>Filename</th>
+                <th>Template</th>
+                <th>Substitutions</th>
               </tr>
             </thead>
             <tbody>
               {% for path in paths %}
                 <tr>
                   <td>{{ path }}</td>
+                  <td>{{ templates[path] }}</td>
+                  <td>{{ substitutions[path] }}</td>
                 </tr>
               {% endfor %}
             </tbody>

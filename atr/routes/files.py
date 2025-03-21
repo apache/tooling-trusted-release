@@ -28,6 +28,7 @@ import asfquart.base as base
 import asfquart.session as session
 import quart
 
+import atr.analysis as analysis
 import atr.config as config
 import atr.db as db
 import atr.db.models as models
@@ -202,6 +203,26 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
 
     base_path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", project_name, version_name)
     paths = await _paths_recursive_list(base_path)
+    path_templates = {}
+    path_substitutions = {}
+    for path in paths:
+        elements = {
+            "core": project_name,
+            "version": version_name,
+            "sub": None,
+            "template": None,
+            "substitutions": None,
+        }
+        template, substitutions = analysis.filename_parse(path, elements)
+        path_templates[path] = template
+        subs = []
+        for key, values in substitutions.items():
+            if values:
+                subs.append(f"{key.upper()}: {', '.join(values)}")
+        if subs:
+            path_substitutions[path] = ", ".join(subs)
+        else:
+            path_substitutions[path] = "none"
 
     return await quart.render_template(
         "files-list.html",
@@ -211,4 +232,6 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
         release=release,
         paths=paths,
         server_domain=session.host,
+        templates=path_templates,
+        substitutions=path_substitutions,
     )
