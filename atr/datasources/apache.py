@@ -146,6 +146,7 @@ class ProjectStatus(pydantic.BaseModel):
     category: str | None = None
     created: str | None = None
     description: str | None = None
+    programming_language: str | None = pydantic.Field(alias="programming-language", default=None)
     doap: str
     homepage: str
     name: str

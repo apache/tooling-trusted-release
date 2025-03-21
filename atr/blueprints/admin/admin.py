@@ -291,6 +291,9 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
                     updated_count += 1
 
                 project_model.full_name = project_status.name
+                project_model.category = project_status.category
+                project_model.description = project_status.description
+                project_model.programming_languages = project_status.programming_language
 
             # Add special entry for Tooling PMC
             # Not clear why, but it's not in the Whimsy data

@@ -366,6 +366,6 @@ span.warning {
     border-radius: 4px;
 }
 
-.card:hover {
+.card[data-project-url]:hover {
     border-color: gray;
 }

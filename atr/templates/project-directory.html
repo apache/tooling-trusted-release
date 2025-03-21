@@ -30,32 +30,26 @@
              data-project-url="{{ url_for('root_project_view', name=project.name) }}">
           <div class="card-body">
             <h3 class="card-title fs-4 mb-3">{{ project.display_name }}</h3>
-            <div class="row g-3">
-              <div class="col-4">
-                <div class="card h-100 bg-light border-0">
-                  <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
-                    <small class="text-secondary">Project committee members</small>
-                    <span class="fs-4 fw-medium mt-2">{{ project.committee.committee_members|length }}</span>
+            {% if project.category %}
+              <div class="row g-1">
+                {% set categories = project.category.split(', ') %}
+                {% for category in categories %}
+                  <div class="col-sm-auto">
+                    <span class="badge text-bg-primary">{{ category }}</span>
                   </div>
-                </div>
+                {% endfor %}
               </div>
-              <div class="col-4">
-                <div class="card h-100 bg-light border-0">
-                  <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
-                    <small class="text-secondary">Committers</small>
-                    <span class="fs-4 fw-medium mt-2">{{ project.committee.committers|length }}</span>
+            {% endif %}
+            {% if project.programming_languages %}
+              <div class="row g-1">
+                {% set langs = project.programming_languages.split(', ') %}
+                {% for lang in langs %}
+                  <div class="col-sm-auto">
+                    <span class="badge text-bg-success">{{ lang }}</span>
                   </div>
-                </div>
+                {% endfor %}
               </div>
-              <div class="col-4">
-                <div class="card h-100 bg-light border-0">
-                  <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
-                    <small class="text-secondary">Release Managers</small>
-                    <span class="fs-4 fw-medium mt-2">{{ project.release_managers|length }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {% endif %}
           </div>
         </div>
       </div>

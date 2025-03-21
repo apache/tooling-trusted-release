@@ -128,6 +128,10 @@ class Project(sqlmodel.SQLModel, table=True):
     # TODO: We should have this on Committee too, or instead
     is_podling: bool = sqlmodel.Field(default=False)
 
+    description: str | None = sqlmodel.Field(default=None)
+    category: str | None = sqlmodel.Field(default=None)
+    programming_languages: str | None = sqlmodel.Field(default=None)
+
     # Many-to-one: A project belongs to one committee, a committee can have multiple projects
     committee_id: int | None = sqlmodel.Field(default=None, foreign_key="committee.id")
     committee: Committee | None = sqlmodel.Relationship(back_populates="projects")

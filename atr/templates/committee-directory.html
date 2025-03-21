@@ -29,11 +29,25 @@
         <div class="card h-100 shadow-sm atr-cursor-pointer hover-lift project-card"
              data-project-url="{{ url_for('root_committee_view', name=committee.name) }}">
           <div class="card-body">
+            <h3 class="card-title fs-4 mb-3">{{ committee.display_name }}</h3>
             <div class="row g-3">
-              <div class="col-md">
-                <h3 class="card-title fs-4 mb-3 position-absolute top-50 translate-middle-y">{{ committee.display_name }}</h3>
+              <div class="col-4">
+                <div class="card h-100 bg-light border-0">
+                  <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
+                    <small class="text-secondary">PMC members</small>
+                    <span class="fs-4 fw-medium mt-2">{{ committee.committee_members|length }}</span>
+                  </div>
+                </div>
               </div>
-              <div class="col-3">
+              <div class="col-4">
+                <div class="card h-100 bg-light border-0">
+                  <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
+                    <small class="text-secondary">Committers</small>
+                    <span class="fs-4 fw-medium mt-2">{{ committee.committers|length }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="col-4">
                 <div class="card h-100 bg-light border-0">
                   <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
                     <small class="text-secondary">Projects</small>
