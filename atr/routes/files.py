@@ -107,6 +107,14 @@ def _authentication_failed() -> NoReturn:
     raise base.ASFQuartException("Not authenticated", errorcode=401)
 
 
+async def _number_of_release_files(release: models.Release) -> int:
+    """Return the number of files in the release."""
+    path_project = release.project.name
+    path_version = release.version
+    path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", path_project, path_version)
+    return len(await _paths_recursive_list(path))
+
+
 async def _paths_recursive_list(base_path: str) -> list[str]:
     """List all paths recursively in alphabetical order from a given base path."""
     paths: list[str] = []
@@ -161,20 +169,6 @@ def committer_get(path: str) -> Callable[[CommitterRouteHandler[R]], RouteHandle
     return decorator
 
 
-async def number_of_release_files(release: models.Release) -> int:
-    """Return the number of files in the release."""
-    path_project = release.project.name
-    path_version = release.version
-    path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", path_project, path_version)
-    try:
-        filenames = await aiofiles.os.listdir(path)
-    except FileNotFoundError:
-        number = 0
-    else:
-        number = len(filenames)
-    return number
-
-
 @committer_get("/files/add")
 async def root_files_add(session: CommitterSession) -> str:
     """Show a page to allow the user to rsync files to editable releases."""
@@ -188,7 +182,7 @@ async def root_files_add(session: CommitterSession) -> str:
         asf_id=session.uid,
         projects=user_projects,
         server_domain=session.host,
-        number_of_release_files=number_of_release_files,
+        number_of_release_files=_number_of_release_files,
         editable_releases=user_editable_releases,
     )
 
