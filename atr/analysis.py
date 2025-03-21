@@ -226,14 +226,12 @@ def extension_pattern() -> str:
     # https://learn.microsoft.com/en-us/visualstudio/extensibility/anatomy-of-a-vsix-package?view=vs-2022
     # What's the status of "pom"?
     # We've included "sh", so perhaps we should include "patch"
+    archive_pattern = r"(?P<archive>" + "|".join(["[.]" + re.escape(a) for a in ARCHIVE_SUFFIXES]) + r")"
+    metadata_pattern = r"(?P<metadata>" + "|".join(["[.]" + re.escape(m) for m in METADATA_SUFFIXES]) + r")"
+    archiveonly_pattern = r"(?P<archiveonly>" + "|".join(["[.]" + re.escape(a) for a in ARCHIVE_SUFFIXES]) + r")"
 
-    patterns = []
-    for archive in ARCHIVE_SUFFIXES:
-        for metadatum in METADATA_SUFFIXES:
-            patterns.append(f"[.]{archive}[.]{metadatum}")
-        # This must come after the metadata patterns
-        patterns.append(f"[.]{archive}")
-    return "(" + "|".join(patterns) + ")$"
+    pattern = rf"((?:{archive_pattern}{metadata_pattern})|{archiveonly_pattern})$"
+    return pattern
 
 
 def filename_parse(filename: str, elements: dict[str, str | None]) -> tuple[str, dict[str, list[str]]]:
@@ -250,7 +248,10 @@ def filename_parse(filename: str, elements: dict[str, str | None]) -> tuple[str,
 
     def sub(pattern: str, name: str, replacement: str, filename: str) -> str:
         matches = re.findall(pattern, filename)
-        substitutions[name] = matches
+        if matches:
+            substitutions[name] = matches if isinstance(matches[0], str) else [m[0] for m in matches]
+        else:
+            substitutions[name] = []
         return re.sub(pattern, replacement, filename)
 
     filename = sub(r"apache(?=[_.-])", "core", "α", filename)
