@@ -22,7 +22,6 @@ import asyncio.subprocess
 import logging
 import os
 import string
-import uuid
 from typing import Final
 
 import aiofiles
@@ -196,8 +195,8 @@ def _command_simple_validate(argv: list[str]) -> str | None:
     return None
 
 
-async def _command_validate(process: asyncssh.SSHServerProcess) -> list[str] | None:
-    def fail(message: str) -> list[str] | None:
+async def _command_validate(process: asyncssh.SSHServerProcess) -> tuple[str, str, list[str]] | None:
+    def fail(message: str) -> tuple[str, str, list[str]] | None:
         # NOTE: Changing the return type to just None really confuses mypy
         _LOGGER.error(message)
         process.stderr.write(f"ATR SSH error: {message}\nCommand: {process.command}\n".encode())
@@ -253,7 +252,7 @@ async def _command_validate(process: asyncssh.SSHServerProcess) -> list[str] | N
     # Create the release's storage directory if it doesn't exist
     await aiofiles.os.makedirs(argv[path_index], exist_ok=True)
 
-    return argv
+    return path_project, path_version, argv
 
 
 async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
@@ -261,9 +260,10 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
     asf_uid = process.get_extra_info("username")
     _LOGGER.info(f"Handling command for authenticated user: {asf_uid}")
 
-    argv = await _command_validate(process)
-    if not argv:
+    validation_results = await _command_validate(process)
+    if not validation_results:
         return
+    project_name, release_version, argv = validation_results
 
     try:
         # Create subprocess to actually run the command
@@ -283,24 +283,21 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
         exit_status = await proc.wait()
 
         # Start a task to process the new files
-        # TODO: Turned this off for now, because we need to decide on the workflow
-        start_task = False
-        if start_task:
-            async with db.session() as data:
-                async with data.begin():
-                    from atr.tasks.rsync import Analyse
+        async with db.session() as data:
+            async with data.begin():
+                from atr.tasks.rsync import Analyse
 
-                    upload_uuid = str(uuid.uuid4()).replace("-", "")
-                    project_name = "test"
-                    data.add(
-                        models.Task(
-                            status=models.TaskStatus.QUEUED,
-                            task_type="rsync_analyse",
-                            task_args=Analyse(
-                                asf_uid=asf_uid, upload_uuid=upload_uuid, project_name=project_name
-                            ).model_dump(),
-                        )
+                data.add(
+                    models.Task(
+                        status=models.TaskStatus.QUEUED,
+                        task_type="rsync_analyse",
+                        task_args=Analyse(
+                            asf_uid=asf_uid,
+                            project_name=project_name,
+                            release_version=release_version,
+                        ).model_dump(),
                     )
+                )
         # Exit the SSH process with the same status as the rsync process
         process.exit(exit_status)
 

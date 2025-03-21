@@ -31,18 +31,24 @@ class Analyse(pydantic.BaseModel):
     """Parameters for rsync analysis."""
 
     asf_uid: str = pydantic.Field(..., description="ASF UID of the user to rsync from")
-    upload_uuid: str = pydantic.Field(..., description="UUID of the upload to rsync")
     project_name: str = pydantic.Field(..., description="Name of the project to rsync")
+    release_version: str = pydantic.Field(..., description="Version of the release to rsync")
 
 
 async def analyse(args: dict[str, Any]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Analyse an rsync upload."""
     data = Analyse(**args)
-    task_results = task.results_as_tuple(await _analyse_core(data.asf_uid, data.upload_uuid, data.project_name))
-    _LOGGER.info(f"Analyse {data.upload_uuid} for {data.project_name}")
+    task_results = task.results_as_tuple(
+        await _analyse_core(
+            data.asf_uid,
+            data.project_name,
+            data.release_version,
+        )
+    )
+    _LOGGER.info(f"Analyse {data.project_name} {data.release_version}")
     return task.COMPLETED, None, task_results
 
 
-async def _analyse_core(asf_uid: str, upload_uuid: str, project_name: str) -> str:
+async def _analyse_core(asf_uid: str, project_name: str, release_version: str) -> str:
     """Analyse an rsync upload."""
     return analysis.perform.__name__
