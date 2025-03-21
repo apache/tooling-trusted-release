@@ -16,23 +16,29 @@
 # under the License.
 
 import collections
+import logging
 import pathlib
 import statistics
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiofiles.os
+import asfquart.base as base
+import asfquart.session as session
 import httpx
 import quart
 import werkzeug.wrappers.response as response
 
-import asfquart.base as base
-import asfquart.session as session
 import atr.blueprints.admin as admin
 import atr.datasources.apache as apache
 import atr.db as db
 import atr.db.models as models
 import atr.util as util
+
+if TYPE_CHECKING:
+    from atr.datasources.apache import LDAPProject
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @admin.BLUEPRINT.route("/performance")
@@ -190,7 +196,8 @@ async def _update_committees() -> int:
     ldap_projects = await apache.get_ldap_projects_data()
     projects = await apache.get_projects_data()
     podlings_data = await apache.get_current_podlings_data()
-    groups_data = await apache.get_groups_data()
+
+    ldap_projects_by_name: Mapping[str, LDAPProject] = {p.name: p for p in ldap_projects.projects}
 
     updated_count = 0
 
@@ -236,16 +243,25 @@ async def _update_committees() -> int:
                 if not podling:
                     podling = models.Committee(name=podling_name, is_podling=True)
                     data.add(podling)
-                    podling_core_project = models.Project(name=podling_name, committee=podling)
+                    podling_core_project = models.Project(
+                        name=podling_name, full_name=podling_data.name, committee=podling
+                    )
                     data.add(podling_core_project)
 
                 # Update PPMC data from groups.json
                 podling.is_podling = True
-                pmc_members = groups_data.get(f"{podling_name}-pmc")
-                committers = groups_data.get(podling_name)
-                podling.committee_members = pmc_members if pmc_members is not None else []
-                podling.committers = committers if committers is not None else []
+
+                podling_project = ldap_projects_by_name.get(podling_name)
+                if podling_project is not None:
+                    podling.committee_members = podling_project.owners
+                    podling.committers = podling_project.members
+                else:
+                    _LOGGER.warning(f"could not find ldap data for podling {podling_name}")
+
                 # Use PPMC members as release managers
+                # TODO: Consider a more sophisticated way to determine release managers
+                #       from my POV, the list of release managers should be the list of people
+                #       that have actually cut a release for that project
                 podling.release_managers = podling.committee_members
 
                 updated_count += 1
