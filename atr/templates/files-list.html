@@ -64,7 +64,15 @@
             <tbody>
               {% for path in paths %}
                 <tr>
-                  <td>{{ path }}</td>
+                  <td>
+                    {% if path in artifacts %}
+                      <strong>{{ path }}</strong>
+                    {% elif path in metadata %}
+                      <em>{{ path }}</em>
+                    {% else %}
+                      {{ path }}
+                    {% endif %}
+                  </td>
                   <td>{{ templates[path] }}</td>
                   <td>{{ substitutions[path] }}</td>
                 </tr>

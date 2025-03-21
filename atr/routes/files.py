@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import TYPE_CHECKING, Any, Final, NoReturn, Protocol, TypeVar
 
 import aiofiles.os
@@ -205,6 +206,8 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
     paths = await _paths_recursive_list(base_path)
     path_templates = {}
     path_substitutions = {}
+    path_artifacts = set()
+    path_metadata = set()
     for path in paths:
         elements = {
             "core": project_name,
@@ -223,6 +226,12 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
             path_substitutions[path] = ", ".join(subs)
         else:
             path_substitutions[path] = "none"
+        search = re.search(analysis.extension_pattern(), path)
+        if search:
+            if search.group("archiveonly"):
+                path_artifacts.add(path)
+            elif search.group("metadata"):
+                path_metadata.add(path)
 
     return await quart.render_template(
         "files-list.html",
@@ -234,4 +243,6 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
         server_domain=session.host,
         templates=path_templates,
         substitutions=path_substitutions,
+        artifacts=path_artifacts,
+        metadata=path_metadata,
     )
