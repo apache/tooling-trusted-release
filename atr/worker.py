@@ -125,25 +125,35 @@ async def _task_next_claim() -> tuple[int, str, list[str] | dict[str, Any]] | No
     """
     async with db.session() as data:
         async with data.begin():
-            # Get all queued tasks and order by added date
-            query = (
-                sqlmodel.select(models.Task)
+            # Get the ID of the oldest queued task
+            oldest_queued_task = (
+                sqlmodel.select(models.Task.id)
                 .where(models.Task.status == task.QUEUED)
                 .order_by(db.validate_instrumented_attribute(models.Task.added).asc())
                 .limit(1)
             )
 
-            result = await data.execute(query)
-            task_obj = result.scalar_one_or_none()
+            # Use an UPDATE with a WHERE clause to atomically claim the task
+            # This ensures that only one worker can claim a specific task
+            now = datetime.datetime.now(datetime.UTC)
+            update_stmt = (
+                sqlmodel.update(models.Task)
+                .where(sqlmodel.and_(models.Task.id == oldest_queued_task, models.Task.status == task.QUEUED))
+                .values(status=task.ACTIVE, started=now, pid=os.getpid())
+                .returning(
+                    db.validate_instrumented_attribute(models.Task.id),
+                    db.validate_instrumented_attribute(models.Task.task_type),
+                    db.validate_instrumented_attribute(models.Task.task_args),
+                )
+            )
 
-            if task_obj:
-                # Update the task to mark it as active
-                task_obj.status = task.ACTIVE
-                task_obj.started = datetime.datetime.now(datetime.UTC)
-                task_obj.pid = os.getpid()
+            result = await data.execute(update_stmt)
+            claimed_task = result.first()
 
-                _LOGGER.info(f"Claimed task {task_obj.id} ({task_obj.task_type}) with args {task_obj.task_args}")
-                return task_obj.id, task_obj.task_type, task_obj.task_args
+            if claimed_task:
+                task_id, task_type, task_args = claimed_task
+                _LOGGER.info(f"Claimed task {task_id} ({task_type}) with args {task_args}")
+                return task_id, task_type, task_args
 
             return None
 
