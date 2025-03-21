@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     import asfquart.base as base
+
     from atr.db.models import ReleasePhase, ReleaseStage, TaskStatus, VoteEntry
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -89,6 +90,10 @@ class Query(Generic[T]):
     def __init__(self, session: Session, query: expression.SelectOfScalar[T]):
         self.query = query
         self.session = session
+
+    def order_by(self, *args: Any, **kwargs: Any) -> Query[T]:
+        self.query = self.query.order_by(*args, **kwargs)
+        return self
 
     async def get(self) -> T | None:
         result = await self.session.execute(self.query)

@@ -19,11 +19,11 @@
 
 from typing import Final
 
-import quart
-
 import asfquart.auth as auth
 import asfquart.base as base
 import asfquart.session as session
+import quart
+
 import atr.util as util
 
 BLUEPRINT: Final = quart.Blueprint("admin", __name__, url_prefix="/admin", template_folder="templates")

@@ -16,12 +16,12 @@
 # under the License.
 
 
-import quart
-
 import asfquart as asfquart
 import asfquart.auth as auth
 import asfquart.base as base
 import asfquart.session as session
+import quart
+
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes

@@ -19,12 +19,12 @@
 
 import http.client
 
+import asfquart.base as base
+import asfquart.session as session
 import quart
 import werkzeug.wrappers.response as response
 import wtforms
 
-import asfquart.base as base
-import asfquart.session as session
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
@@ -81,7 +81,7 @@ async def add_voting_policy(session: session.ClientSession, form: CreateVotePoli
 async def root_project_directory() -> str:
     """Main project directory page."""
     async with db.session() as data:
-        projects = await data.project(_committee=True).all()
+        projects = await data.project(_committee=True).order_by(models.Project.name).all()
         return await quart.render_template("project-directory.html", projects=projects)
 
 

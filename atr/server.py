@@ -22,15 +22,15 @@ import os
 from collections.abc import Iterable
 from typing import Any
 
+import asfquart
+import asfquart.base as base
+import asfquart.generics
+import asfquart.session
 import blockbuster
 import quart
 import quart_schema
 import werkzeug.routing as routing
 
-import asfquart
-import asfquart.base as base
-import asfquart.generics
-import asfquart.session
 import atr.blueprints as blueprints
 import atr.config as config
 import atr.db as db
