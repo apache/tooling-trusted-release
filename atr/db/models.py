@@ -127,6 +127,7 @@ class Project(sqlmodel.SQLModel, table=True):
     # True if this a podling project
     # TODO: We should have this on Committee too, or instead
     is_podling: bool = sqlmodel.Field(default=False)
+    is_retired: bool = sqlmodel.Field(default=False)
 
     description: str | None = sqlmodel.Field(default=None)
     category: str | None = sqlmodel.Field(default=None)

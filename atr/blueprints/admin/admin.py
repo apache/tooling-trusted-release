@@ -295,6 +295,11 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
                 project_model.description = project_status.description
                 project_model.programming_languages = project_status.programming_language
 
+                # TODO: find a better way to declare a project retired
+                #       right now we assume that a project is retired if its assigned to the attic PMC
+                #       maybe make that information configurable
+                project_model.is_retired = pmc.name == "attic"
+
             # Add special entry for Tooling PMC
             # Not clear why, but it's not in the Whimsy data
             tooling_committee = await data.committee(name="tooling").get()

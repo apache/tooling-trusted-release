@@ -81,7 +81,7 @@ async def add_voting_policy(session: session.ClientSession, form: CreateVotePoli
 async def root_project_directory() -> str:
     """Main project directory page."""
     async with db.session() as data:
-        projects = await data.project(_committee=True).order_by(models.Project.name).all()
+        projects = await data.project(_committee=True).order_by(models.Project.full_name).all()
         return await quart.render_template("project-directory.html", projects=projects)
 
 
