@@ -23,7 +23,7 @@ import pathlib
 from collections.abc import Mapping
 from typing import Annotated, Any, TypeVar
 
-import aiofiles
+import aiofiles.os
 import pydantic
 import pydantic_core
 import quart_wtf
