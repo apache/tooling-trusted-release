@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import os
+import pathlib
 import re
 from typing import TYPE_CHECKING, Any, Final, NoReturn, Protocol, TypeVar
 
@@ -145,6 +146,95 @@ async def _paths_recursive_list(base_path: str) -> list[str]:
     return paths
 
 
+def _path_warnings_errors(
+    paths: set[str], path: str, ext_artifact: str | None, ext_metadata: str | None
+) -> tuple[list[str], list[str]]:
+    # NOTE: This is important institutional logic
+    # TODO: We should probably move this to somewhere more important than a routes module
+    warnings = []
+    errors = []
+    filename = os.path.basename(path)
+
+    # The Release Distribution Policy specifically allows README and CHANGES, etc.
+    # We assume that LICENSE and NOTICE are permitted also
+    if filename == "KEYS":
+        errors.append("Please upload KEYS to ATR directly instead of using rsync")
+    elif path.startswith(".") or ("/." in path):
+        # TODO: There is not a a policy for this
+        # We should enquire as to whether such a policy should be instituted
+        # We're forbidding dotfiles to catch accidental uploads of e.g. .git or .htaccess
+        # Such cases are likely to be in error, and could carry security risks
+        errors.append("Dotfiles are forbidden")
+
+    if ext_artifact:
+        updated_warnings, updated_errors = _path_warnings_errors_artifact(paths, path, ext_artifact)
+        warnings.extend(updated_warnings)
+        errors.extend(updated_errors)
+
+    if ext_metadata:
+        updated_warnings, updated_errors = _path_warnings_errors_metadata(paths, path, ext_metadata)
+        warnings.extend(updated_warnings)
+        errors.extend(updated_errors)
+
+    return warnings, errors
+
+
+def _path_warnings_errors_artifact(paths: set[str], path: str, ext_artifact: str) -> tuple[list[str], list[str]]:
+    # We refer to the following authoritative policies:
+    # - Release Creation Process (RCP)
+    # - Release Distribution Policy (RDP)
+
+    warnings: list[str] = []
+    errors: list[str] = []
+
+    # RDP says that .asc is required and one of .sha256 or .sha512
+    if (path + ".asc") not in paths:
+        errors.append("Missing an .asc counterpart")
+    no_sha256 = (path + ".sha256") not in paths
+    no_sha512 = (path + ".sha512") not in paths
+    if no_sha256 and no_sha512:
+        errors.append("Missing a .sha256 or .sha512 counterpart")
+
+    return warnings, errors
+
+
+def _path_warnings_errors_metadata(paths: set[str], path: str, ext_metadata: str) -> tuple[list[str], list[str]]:
+    # We refer to the following authoritative policies:
+    # - Release Creation Process (RCP)
+    # - Release Distribution Policy (RDP)
+
+    warnings: list[str] = []
+    errors: list[str] = []
+    suffixes = set(pathlib.Path(path).suffixes)
+
+    if ".md5" in suffixes:
+        # Forbidden by RCP, deprecated by RDP
+        errors.append("The use of .md5 is forbidden, please use .sha512")
+    if ".sha1" in suffixes:
+        # Deprecated by RDP
+        warnings.append("The use of .sha1 is deprecated, please use .sha512")
+    if ".sha" in suffixes:
+        # Discouraged by RDP
+        warnings.append("The use of .sha is discouraged, please use .sha512")
+    if ".sig" in suffixes:
+        # Forbidden by RCP, forbidden by RDP
+        errors.append("Binary signature files are forbidden, please use .asc")
+
+    # "Signature and checksum files for verifying distributed artifacts should
+    # not be provided, unless named as indicated above." (RDP)
+    # Also .mds is allowed, but we'll ignore that for now
+    # TODO: Is .mds supported in analysis.METADATA_SUFFIXES?
+    if ext_metadata not in {".asc", ".sha256", ".sha512", ".md5", ".sha", ".sha1"}:
+        warnings.append("The use of this metadata file is discouraged")
+
+    # If a metadata file is present, it must have an artifact counterpart
+    artifact_path = path.removesuffix(ext_metadata)
+    if artifact_path not in paths:
+        errors.append("Missing an artifact counterpart")
+
+    return warnings, errors
+
+
 # This decorator is an adaptor between @committer_get and @app_route functions
 def committer_get(path: str) -> Callable[[CommitterRouteHandler[R]], RouteHandler[R]]:
     """Decorator for committer GET routes that provides an enhanced session object."""
@@ -204,11 +294,15 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
 
     base_path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", project_name, version_name)
     paths = await _paths_recursive_list(base_path)
+    paths_set = set(paths)
     path_templates = {}
     path_substitutions = {}
     path_artifacts = set()
     path_metadata = set()
+    path_warnings = {}
+    path_errors = {}
     for path in paths:
+        # Get template and substitutions
         elements = {
             "core": project_name,
             "version": version_name,
@@ -219,12 +313,22 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
         template, substitutions = analysis.filename_parse(path, elements)
         path_templates[path] = template
         path_substitutions[path] = analysis.substitutions_format(substitutions) or "none"
+
+        # Get artifacts and metadata
         search = re.search(analysis.extension_pattern(), path)
+        ext_artifact = None
+        ext_metadata = None
         if search:
-            if search.group("artifact"):
+            ext_artifact = search.group("artifact")
+            # ext_metadata_artifact = search.group("metadata_artifact")
+            ext_metadata = search.group("metadata")
+            if ext_artifact:
                 path_artifacts.add(path)
-            elif search.group("metadata"):
+            elif ext_metadata:
                 path_metadata.add(path)
+
+        # Get warnings and errors
+        path_warnings[path], path_errors[path] = _path_warnings_errors(paths_set, path, ext_artifact, ext_metadata)
 
     return await quart.render_template(
         "files-list.html",
@@ -238,4 +342,6 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
         substitutions=path_substitutions,
         artifacts=path_artifacts,
         metadata=path_metadata,
+        warnings=path_warnings,
+        errors=path_errors,
     )

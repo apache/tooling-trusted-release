@@ -72,6 +72,8 @@
                     {% else %}
                       {{ path }}
                     {% endif %}
+                    {% for error in errors[path] %}<div class="alert alert-danger p-0 px-2 mt-2 mb-0">{{ error }}</div>{% endfor %}
+                    {% for warning in warnings[path] %}<div class="alert alert-warning p-0 px-2 mt-2 mb-0">{{ warning }}</div>{% endfor %}
                   </td>
                   <td>{{ templates[path] }}</td>
                   <td>{{ substitutions[path] }}</td>
