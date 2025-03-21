@@ -380,6 +380,14 @@ def print_data(analysis: Analysis) -> None:
     sys.stdout.flush()
 
 
+def substitutions_format(substitutions: dict[str, list[str]]) -> str:
+    subs = []
+    for key, values in substitutions.items():
+        if values:
+            subs.append(f"{key.upper()}: {', '.join(values)}")
+    return ", ".join(subs)
+
+
 def variant_pattern() -> str:
     # .bin can also be an EXT
     # For example in opennlp

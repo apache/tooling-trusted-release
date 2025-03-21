@@ -218,14 +218,7 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
         }
         template, substitutions = analysis.filename_parse(path, elements)
         path_templates[path] = template
-        subs = []
-        for key, values in substitutions.items():
-            if values:
-                subs.append(f"{key.upper()}: {', '.join(values)}")
-        if subs:
-            path_substitutions[path] = ", ".join(subs)
-        else:
-            path_substitutions[path] = "none"
+        path_substitutions[path] = analysis.substitutions_format(substitutions) or "none"
         search = re.search(analysis.extension_pattern(), path)
         if search:
             if search.group("artifact"):
