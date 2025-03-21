@@ -23,6 +23,115 @@ import pathlib
 import re
 import signal
 import sys
+from typing import Final
+
+ARCHIVE_SUFFIXES: Final[list[str]] = [
+    "bin",
+    "crate",
+    "deb",
+    "dmg",
+    "exe",
+    "far",
+    "gem",
+    "jar.pack.gz",
+    "jar",
+    "msi",
+    "nar",
+    "nbm",
+    "snupkg",
+    "nupkg",
+    "pkg",
+    "pom",
+    "rar",
+    "rpm",
+    "sh",
+    "slingosgifeature",
+    "taco",
+    "tar.bz2",
+    "tar.gz",
+    "tar.xz",
+    "tar",
+    "tgz",
+    "vsix",
+    "war",
+    "whl",
+    "zip",
+]
+
+# "mds" is used in ozone
+# "SHA256" and "SHA512" are used in ranger
+# "MD5" is used in samza
+# "asc.asc" is used in felix
+METADATA_SUFFIXES: Final[list[str]] = [
+    "asc.asc",
+    "asc.md5",
+    "asc.sha1",
+    "asc.sha256",
+    "asc.sha512",
+    "sha512.asc",
+    "sha512.md5",
+    "sha512.sha1",
+    "sha512.sha512",
+    "asc",
+    "MD5",
+    "md5",
+    "mds",
+    "prov",
+    "sh1",
+    "sha1",
+    "sha256",
+    "SHA256",
+    "SHA512",
+    "sha512sum",
+    "sha512",
+    "sha",
+    "sig",
+]
+
+# .license is used in high volume in netbeans
+SKIPPABLE_SUFFIXES: Final[list[str]] = [
+    ".bak",
+    ".css",
+    ".gif",
+    ".html",
+    ".json",
+    ".license",
+    ".md",
+    ".pdf",
+    ".png",
+    ".temp",
+    ".tmp",
+    ".txt",
+    ".xml",
+    ".yaml",
+]
+
+# Should perhaps not include javadoc
+# app
+# doc
+# docs
+# example
+# markdown
+# nodeps
+# release
+# sdk
+# tests
+VARIANT_PATTERNS: Final[list[str]] = [
+    "binary-assembly",
+    "binary",
+    "bin",
+    "dist",
+    "install_[a-z][a-z](?:-[A-Z][A-Z])?",
+    "javadoc",
+    "langpack_[a-z][a-z](?:-[A-Z][A-Z])?",
+    "lib-debug",
+    "lib",
+    "pkg",
+    "source-release",
+    "sources",
+    "source",
+    "src",
+]
 
 
 @dataclasses.dataclass
@@ -117,70 +226,10 @@ def extension_pattern() -> str:
     # https://learn.microsoft.com/en-us/visualstudio/extensibility/anatomy-of-a-vsix-package?view=vs-2022
     # What's the status of "pom"?
     # We've included "sh", so perhaps we should include "patch"
-    archives = [
-        "bin",
-        "crate",
-        "deb",
-        "dmg",
-        "exe",
-        "far",
-        "gem",
-        "jar.pack.gz",
-        "jar",
-        "msi",
-        "nar",
-        "nbm",
-        "snupkg",
-        "nupkg",
-        "pkg",
-        "pom",
-        "rar",
-        "rpm",
-        "sh",
-        "slingosgifeature",
-        "taco",
-        "tar.bz2",
-        "tar.gz",
-        "tar.xz",
-        "tar",
-        "tgz",
-        "vsix",
-        "war",
-        "whl",
-        "zip",
-    ]
-    # "mds" is used in ozone
-    # "SHA256" and "SHA512" are used in ranger
-    # "MD5" is used in samza
-    # "asc.asc" is used in felix
-    metadata = [
-        "asc.asc",
-        "asc.md5",
-        "asc.sha1",
-        "asc.sha256",
-        "asc.sha512",
-        "sha512.asc",
-        "sha512.md5",
-        "sha512.sha1",
-        "sha512.sha512",
-        "asc",
-        "MD5",
-        "md5",
-        "mds",
-        "prov",
-        "sh1",
-        "sha1",
-        "sha256",
-        "SHA256",
-        "SHA512",
-        "sha512sum",
-        "sha512",
-        "sha",
-        "sig",
-    ]
+
     patterns = []
-    for archive in archives:
-        for metadatum in metadata:
+    for archive in ARCHIVE_SUFFIXES:
+        for metadatum in METADATA_SUFFIXES:
             patterns.append(f"[.]{archive}[.]{metadatum}")
         # This must come after the metadata patterns
         patterns.append(f"[.]{archive}")
@@ -228,24 +277,7 @@ def is_skippable(path: pathlib.Path) -> bool:
         return True
     if path.name in {".htaccess"}:
         return True
-    # .license is used in high volume in netbeans
-    skippable = [
-        ".bak",
-        ".css",
-        ".gif",
-        ".html",
-        ".json",
-        ".license",
-        ".md",
-        ".pdf",
-        ".png",
-        ".temp",
-        ".tmp",
-        ".txt",
-        ".xml",
-        ".yaml",
-    ]
-    for suffix in skippable:
+    for suffix in SKIPPABLE_SUFFIXES:
         if suffix in path.suffixes:
             return True
     return False
@@ -329,36 +361,10 @@ def print_data(analysis: Analysis) -> None:
 
 
 def variant_pattern() -> str:
-    # Should perhaps not include javadoc
-    # app
-    # doc
-    # docs
-    # example
-    # markdown
-    # nodeps
-    # release
-    # sdk
-    # tests
-    variants = [
-        "binary-assembly",
-        "binary",
-        "bin",
-        "dist",
-        "install_[a-z][a-z](?:-[A-Z][A-Z])?",
-        "javadoc",
-        "langpack_[a-z][a-z](?:-[A-Z][A-Z])?",
-        "lib-debug",
-        "lib",
-        "pkg",
-        "source-release",
-        "sources",
-        "source",
-        "src",
-    ]
     # .bin can also be an EXT
     # For example in opennlp
     # Which is why we do (?<=[_-])
-    return "(?<=[_-])(" + "|".join(variants) + ")(?=[_.-])"
+    return "(?<=[_-])(" + "|".join(VARIANT_PATTERNS) + ")(?=[_.-])"
 
 
 def version_parse(version: str, elements: dict[str, str | None]) -> str:
