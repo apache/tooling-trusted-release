@@ -228,7 +228,7 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
             path_substitutions[path] = "none"
         search = re.search(analysis.extension_pattern(), path)
         if search:
-            if search.group("archiveonly"):
+            if search.group("artifact"):
                 path_artifacts.add(path)
             elif search.group("metadata"):
                 path_metadata.add(path)

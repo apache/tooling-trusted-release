@@ -25,7 +25,7 @@ import signal
 import sys
 from typing import Final
 
-ARCHIVE_SUFFIXES: Final[list[str]] = [
+ARTIFACT_SUFFIXES: Final[list[str]] = [
     "bin",
     "crate",
     "deb",
@@ -226,11 +226,13 @@ def extension_pattern() -> str:
     # https://learn.microsoft.com/en-us/visualstudio/extensibility/anatomy-of-a-vsix-package?view=vs-2022
     # What's the status of "pom"?
     # We've included "sh", so perhaps we should include "patch"
-    archive_pattern = r"(?P<archive>" + "|".join(["[.]" + re.escape(a) for a in ARCHIVE_SUFFIXES]) + r")"
+    metadata_artifact_pattern = (
+        r"(?P<metadata_artifact>" + "|".join(["[.]" + re.escape(a) for a in ARTIFACT_SUFFIXES]) + r")"
+    )
     metadata_pattern = r"(?P<metadata>" + "|".join(["[.]" + re.escape(m) for m in METADATA_SUFFIXES]) + r")"
-    archiveonly_pattern = r"(?P<archiveonly>" + "|".join(["[.]" + re.escape(a) for a in ARCHIVE_SUFFIXES]) + r")"
+    artifact_pattern = r"(?P<artifact>" + "|".join(["[.]" + re.escape(a) for a in ARTIFACT_SUFFIXES]) + r")"
 
-    pattern = rf"((?:{archive_pattern}{metadata_pattern})|{archiveonly_pattern})$"
+    pattern = rf"((?:{metadata_artifact_pattern}{metadata_pattern})|{artifact_pattern})$"
     return pattern
 
 
