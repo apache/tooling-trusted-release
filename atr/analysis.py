@@ -179,7 +179,7 @@ def component_parse(i: int, component: str, size: int, elements: dict[str, str |
         # Never starts with "apache-"
         elements["core"] = component
     elif (i == 1) and (size == 2):
-        elements["template"] = filename_parse(component, elements)
+        elements["template"] = filename_parse(component, elements)[0]
     elif i == 1:
         # SUB or VERSION
         # TODO: Check total depth to give an indication of SUB?
@@ -189,16 +189,16 @@ def component_parse(i: int, component: str, size: int, elements: dict[str, str |
             elements["sub"] = component
     elif (i == 2) and (size == 3):
         # CORE/VERSION/FILENAME
-        elements["template"] = filename_parse(component, elements)
+        elements["template"] = filename_parse(component, elements)[0]
     elif (i == 2) and (size == 4):
         # VERSION
         elements["version"] = version_parse(component, elements)
     elif (i == 3) and (size == 4):
         # CORE/VERSION/SUB/FILENAME
-        elements["template"] = filename_parse(component, elements)
+        elements["template"] = filename_parse(component, elements)[0]
     elif i == (size - 1):
         # FILENAME, but more deeply nested
-        elements["template"] = filename_parse(component, elements)
+        elements["template"] = filename_parse(component, elements)[0]
         # elements["missing"] += 1
 
 
@@ -236,23 +236,39 @@ def extension_pattern() -> str:
     return "(" + "|".join(patterns) + ")$"
 
 
-def filename_parse(filename: str, elements: dict[str, str | None]) -> str:
-    filename = re.sub(r"apache(?=[_.-])", "α", filename)
+def filename_parse(filename: str, elements: dict[str, str | None]) -> tuple[str, dict[str, list[str]]]:
+    substitutions: dict[str, list[str]] = {
+        "sub": [],
+        "core": [],
+        "version": [],
+        "variant": [],
+        "tag": [],
+        "arch": [],
+        "ext": [],
+        "label": [],
+    }
+
+    def sub(pattern: str, name: str, replacement: str, filename: str) -> str:
+        matches = re.findall(pattern, filename)
+        substitutions[name] = matches
+        return re.sub(pattern, replacement, filename)
+
+    filename = sub(r"apache(?=[_.-])", "core", "α", filename)
     # TODO: -incubating
     # There is no standard position for -incubating
     if elements["sub"]:
         # Replace SUB before CORE because CORE may contain SUB
-        filename = re.sub(elements["sub"] + r"(?=[_.-])", "σ", filename)
+        filename = sub(elements["sub"] + r"(?=[_.-])", "sub", "σ", filename)
     if elements["core"]:
-        filename = re.sub(elements["core"] + r"(?=[_.-])", "κ", filename)
+        filename = sub(elements["core"] + r"(?=[_.-])", "core", "κ", filename)
     if elements["version"]:
-        filename = re.sub(elements["version"] + r"(?=[_.-])", "β", filename)
-    filename = re.sub(variant_pattern(), "ρ", filename)
-    filename = re.sub(r"[0-9]+[.][0-9]+(?:[.][0-9]+(?:[.][0-9]+)?)?(?=[_.-])", "τ", filename)
-    filename = re.sub(architecture_pattern(), "ι", filename)
-    filename = re.sub(extension_pattern(), ".ε", filename)
+        filename = sub(elements["version"] + r"(?=[_.-])", "version", "β", filename)
+    filename = sub(variant_pattern(), "variant", "ρ", filename)
+    filename = sub(r"[0-9]+[.][0-9]+(?:[.][0-9]+(?:[.][0-9]+)?)?(?=[_.-])", "tag", "τ", filename)
+    filename = sub(architecture_pattern(), "arch", "ι", filename)
+    filename = sub(extension_pattern(), "ext", ".ε", filename)
     if "LABEL_MODE" in os.environ:
-        filename = re.sub(r"(?<=-)[a-z]+[0-9]*(?:-[a-z]+[0-9]*)*(?=-)", "λ", filename)
+        filename = sub(r"(?<=-)[a-z]+[0-9]*(?:-[a-z]+[0-9]*)*(?=-)", "label", "λ", filename)
 
     filename = filename.replace("α", "ASF")
     filename = filename.replace("σ", "SUB")
@@ -264,7 +280,7 @@ def filename_parse(filename: str, elements: dict[str, str | None]) -> str:
     filename = filename.replace("ε", "EXT")
     if "LABEL_MODE" in os.environ:
         filename = filename.replace("λ", "LABEL")
-    return filename
+    return filename, substitutions
 
 
 def is_skippable(path: pathlib.Path) -> bool:
@@ -322,6 +338,7 @@ def perform(path_lines: list[str]) -> Analysis:
             "version": None,
             "sub": None,
             "template": None,
+            "substitutions": None,
         }
         for i, component in enumerate(path.parts):
             component_parse(i, component, size, elements)
