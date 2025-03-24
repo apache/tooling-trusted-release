@@ -11,15 +11,16 @@ requires-python = "~=3.13"
 # https://bugs.launchpad.net/dkimpy/+bug/2024461
 dependencies = [
   "aiofiles>=24.1.0,<25.0.0",
+  "aioshutil (>=1.5,<2.0)",
   "aiosqlite>=0.21.0,<0.22.0",
   "alembic~=1.14",
   "asfquart @ git+https://github.com/apache/infrastructure-asfquart.git@main",
   "asyncssh>=2.20.0,<3.0.0",
   "blockbuster>=1.5.23,<2.0.0",
   "cryptography~=44.0",
-  # "dkimpy>=1.1.8,<2.0.0",  # Using GitHub fork instead
   "dkimpy @ git+https://github.com/sbp/dkimpy.git@main",
   "dnspython>=2.7.0,<3.0.0",
+  "email-validator~=2.2.0",
   "greenlet>=3.1.1,<4.0.0",
   "httpx~=0.27",
   "hypercorn~=0.17",
@@ -27,13 +28,12 @@ dependencies = [
   "python-gnupg~=0.5",
   "quart-schema[pydantic]~=0.21",
   "quart-wtforms~=1.0.3",
-  "email-validator~=2.2.0",
   "sqlmodel~=0.0.24",
-  "aioshutil (>=1.5,<2.0)",
 ]
 
 [dependency-groups]
 dev = [
+  "decouple-types>=1.0",
   "djlint>=1.36.4",
   "dunamai>=1.23.0",
   "mypy>=1.15.0",
@@ -41,7 +41,6 @@ dev = [
   "pyright>=1.1.393",
   "ruff>=0.9.4",
   "types-aiofiles>=24.1.0.20241221,<25.0.0.0",
-  "decouple-types>=1.0",
 ]
 test = [
   "pytest>=8.0",
@@ -60,6 +59,7 @@ pytest = ">=8.0"
 pytest-asyncio = ">=0.24"
 
 [tool.poetry.group.dev.dependencies]
+decouple-types = ">=1.0"
 djlint = "^1.36.4"
 dunamai = "^1.23.0"
 mypy = "^1.15.0"
@@ -67,7 +67,6 @@ pre-commit = ">=2.20.0"
 pyright = ">=1.1.393"
 ruff = ">=0.9.4"
 types-aiofiles = ">=24.1.0.20241221,<25.0.0.0"
-decouple-types = ">=1.0"
 
 # Additional tools
 
