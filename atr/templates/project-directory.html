@@ -29,11 +29,20 @@
         <div class="card h-100 shadow-sm atr-cursor-pointer hover-lift project-card {{ 'bg-body-secondary' if project.is_retired else '' }}"
              data-project-url="{{ url_for('root_project_view', name=project.name) }}">
           <div class="card-body">
-            <h3 class="card-title fs-4 mb-3">{{ project.display_name }}</h3>
+            <div class="row g-1">
+              <div class="col-sm">
+                <h3 class="card-title fs-4 mb-3">{{ project.display_name }}</h3>
+              </div>
+              {% if project.is_retired %}
+                <div class="col-sm-2">
+                  <span class="badge text-bg-secondary">retired</span>
+                </div>
+              {% endif %}
+            </div>
             {% if project.category %}
               <div class="row g-1">
                 {% set categories = project.category.split(', ') %}
-                {% for category in categories %}
+                {% for category in categories if category != "retired" %}
                   <div class="col-sm-auto">
                     <span class="badge text-bg-primary">{{ category }}</span>
                   </div>

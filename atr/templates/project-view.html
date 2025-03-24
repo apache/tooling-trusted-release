@@ -9,7 +9,17 @@
 {% endblock description %}
 
 {% block content %}
-  <h1>{{ project.display_name }}</h1>
+  <div class="row">
+    <div class="col-md">
+      <h1>{{ project.display_name }}</h1>
+    </div>
+    {% if project.is_retired %}
+      <div class="col-sm-auto">
+        <span class="badge text-bg-secondary">retired</span>
+      </div>
+    {% endif %}
+  </div>
+
   {% set is_project_lead = is_project_lead(project, current_user.uid) %}
 
   <div class="card mb-4">
@@ -98,16 +108,18 @@
   <div class="card mb-4">
     <div class="card-header bg-light d-flex justify-content-between align-items-center">
       <h3 class="mb-0">Voting Policy</h3>
-      {% if project.vote_policy and (is_project_lead or is_admin) %}
-        <div>
-          <a class="btn btn-primary btn-sm"
-             href="{{ url_for('root_projects_vote_policy_edit', project_name=project.name) }}"><i class="fa-solid fa-pen-to-square"></i></a>
-        </div>
-      {% elif (is_project_lead or is_admin) %}
-        <div>
-          <a class="btn btn-primary btn-sm"
-             href="{{ url_for('root_projects_vote_policy_add', project_name=project.name) }}"><i class="fa-solid fa-plus"></i></a>
-        </div>
+      {% if not project.is_retired %}
+        {% if project.vote_policy and (is_project_lead or is_admin) %}
+          <div>
+            <a class="btn btn-primary btn-sm"
+               href="{{ url_for('root_projects_vote_policy_edit', project_name=project.name) }}"><i class="fa-solid fa-pen-to-square"></i></a>
+          </div>
+        {% elif (is_project_lead or is_admin) %}
+          <div>
+            <a class="btn btn-primary btn-sm"
+               href="{{ url_for('root_projects_vote_policy_add', project_name=project.name) }}"><i class="fa-solid fa-plus"></i></a>
+          </div>
+        {% endif %}
       {% endif %}
     </div>
     <div class="card-body">
