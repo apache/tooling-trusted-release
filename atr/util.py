@@ -18,7 +18,6 @@
 import dataclasses
 import functools
 import hashlib
-import os
 import pathlib
 from collections.abc import Mapping
 from typing import Annotated, Any, TypeVar
@@ -114,8 +113,24 @@ def get_admin_users() -> set[str]:
     return set(config.get().ADMIN_USERS)
 
 
-def get_release_storage_dir() -> str:
-    return str(config.get().RELEASE_STORAGE_DIR)
+def get_phase_dir() -> pathlib.Path:
+    return pathlib.Path(config.get().PHASE_STORAGE_DIR)
+
+
+def get_candidate_draft_dir() -> pathlib.Path:
+    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "candidate-draft"
+
+
+def get_candidate_release_dir() -> pathlib.Path:
+    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "candidate-release"
+
+
+def get_distributable_draft_dir() -> pathlib.Path:
+    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "distributable-draft"
+
+
+def get_distributable_release_dir() -> pathlib.Path:
+    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "distributable-release"
 
 
 def is_admin(user_id: str | None) -> bool:
@@ -125,16 +140,16 @@ def is_admin(user_id: str | None) -> bool:
     return user_id in get_admin_users()
 
 
-async def paths_recursive(base_path: str, sort: bool = True) -> list[str]:
+async def paths_recursive(base_path: pathlib.Path, sort: bool = True) -> list[pathlib.Path]:
     """List all paths recursively in alphabetical order from a given base path."""
-    paths: list[str] = []
+    paths: list[pathlib.Path] = []
 
-    async def _recursive_list(current_path: str, relative_path: str = "") -> None:
+    async def _recursive_list(current_path: pathlib.Path, relative_path: pathlib.Path = pathlib.Path()) -> None:
         try:
             entries = await aiofiles.os.listdir(current_path)
             for entry in entries:
-                entry_path = os.path.join(current_path, entry)
-                entry_rel_path = os.path.join(relative_path, entry) if relative_path else entry
+                entry_path = current_path / entry
+                entry_rel_path = relative_path / entry
 
                 try:
                     stat_info = await aiofiles.os.stat(entry_path)

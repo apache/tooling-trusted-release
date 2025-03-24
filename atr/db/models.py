@@ -148,19 +148,19 @@ class Project(sqlmodel.SQLModel, table=True):
         return name
 
     @property
-    async def editable_releases(self) -> list["Release"]:
-        """Get the editable ongoing releases for the project."""
+    async def candidate_drafts(self) -> list["Release"]:
+        """Get the candidate drafts for the project."""
         # TODO: Improve our interface to use in_ automatically for lists
-        editable_phases = [
+        candidate_draft_phases = [
             ReleasePhase.RELEASE_CANDIDATE,
             ReleasePhase.EVALUATE_CLAIMS,
-            ReleasePhase.RELEASE,
+            # ReleasePhase.RELEASE,
         ]
         query = (
             sqlmodel.select(Release)
             .where(
                 Release.project_id == self.id,
-                db.validate_instrumented_attribute(Release.phase).in_(editable_phases),
+                db.validate_instrumented_attribute(Release.phase).in_(candidate_draft_phases),
             )
             .order_by(db.validate_instrumented_attribute(Release.created).desc())
         )

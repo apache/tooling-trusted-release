@@ -41,8 +41,6 @@
             <span class="candidate-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M UTC") }}</span>
           </div>
           <div class="d-flex gap-3 align-items-center pt-2">
-            <a class="btn btn-primary"
-               href="{{ url_for('root_package_add', release_name=release.name) }}">Add package</a>
             <form method="post"
                   action="{{ url_for('root_release_delete') }}"
                   class="d-inline-block m-0">
@@ -120,39 +118,6 @@
                   </div>
                 {% endif %}
               {% endif %}
-            </td>
-          </tr>
-          <tr>
-            <th>Downloads</th>
-            <td>
-              <div class="d-flex flex-wrap gap-2 align-items-center">
-                <a href="{{ url_for('root_download_artifact', release_name=release.name, artifact_sha3=package.artifact_sha3) }}"
-                   class="btn btn-success download-button">Download Artifact</a>
-                {% if package.signature_sha3 %}
-                  <a href="{{ url_for('root_download_signature', release_name=release.name, signature_sha3=package.signature_sha3) }}"
-                     class="btn btn-success download-button">Download Signature</a>
-                {% endif %}
-                <a href="{{ url_for('root_docs_verify', filename=package.filename, artifact_sha3=package.artifact_sha3, sha512=package.sha512, has_signature='true' if package.signature_sha3 else 'false') }}"
-                   class="btn btn-secondary">Verification Instructions</a>
-              </div>
-            </td>
-          </tr>
-          <tr>
-            <th>Actions</th>
-            <td>
-              <form method="post"
-                    action="{{ url_for('root_package_delete') }}"
-                    class="d-inline">
-                <input type="hidden"
-                       name="artifact_sha3"
-                       value="{{ package.artifact_sha3 }}" />
-                <input type="hidden" name="release_name" value="{{ release.name }}" />
-                <button type="submit"
-                        class="btn btn-danger"
-                        onclick="return confirm('Are you sure you want to delete this package?')">
-                  Delete package
-                </button>
-              </form>
             </td>
           </tr>
           <tr>

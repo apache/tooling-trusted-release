@@ -47,24 +47,16 @@
     </ul>
 
     {% if current_user %}
-      <h3>Candidate management</h3>
+      <h3>Candidate drafts</h3>
       <ul>
         <li>
-          <a href="{{ url_for('root_candidate_create') }}"
-             {% if request.endpoint == 'root_candidate_create' %}class="active"{% endif %}>Create candidate</a>
+          <a href="{{ url_for('root_files_add') }}"
+             {% if request.endpoint == 'root_files_add' %}class="active"{% endif %}>Create and modify</a>
         </li>
         <!-- TODO: Don't show this if the user doesn't have any release candidates? -->
         <li>
-          <a href="{{ url_for('root_package_add') }}"
-             {% if request.endpoint == 'root_package_add' %}class="active"{% endif %}>Add package</a>
-        </li>
-        <li>
-          <a href="{{ url_for('root_files_add') }}"
-             {% if request.endpoint == 'root_files_add' %}class="active"{% endif %}>Add files</a>
-        </li>
-        <li>
           <a href="{{ url_for('root_candidate_review') }}"
-             {% if request.endpoint == 'root_candidate_review' %}class="active"{% endif %}>Review candidates</a>
+             {% if request.endpoint == 'root_candidate_review' %}class="active"{% endif %}>Review all</a>
         </li>
       </ul>
 

@@ -19,15 +19,20 @@
 
 from __future__ import annotations
 
-import os
+import asyncio
+import logging
 import pathlib
 import re
 from typing import TYPE_CHECKING, Any, Final, NoReturn, Protocol, TypeVar
 
+import aiofiles
 import asfquart.auth as auth
 import asfquart.base as base
 import asfquart.session as session
 import quart
+import werkzeug.datastructures as datastructures
+import werkzeug.wrappers.response as response
+import wtforms
 
 import atr.analysis as analysis
 import atr.config as config
@@ -79,17 +84,17 @@ class CommitterSession:
         return request_host
 
     @property
-    async def user_editable_releases(self) -> list[Any]:
-        return await user.editable_releases(self.uid, user_projects=self._projects)
+    async def user_candidate_drafts(self) -> list[models.Release]:
+        return await user.candidate_drafts(self.uid, user_projects=self._projects)
 
     @property
-    async def user_projects(self) -> list[Any]:
+    async def user_projects(self) -> list[models.Project]:
         if self._projects is None:
             self._projects = await user.projects(self.uid)
         return self._projects
 
     @property
-    async def user_releases(self) -> list[Any]:
+    async def user_releases(self) -> list[models.Release]:
         return await user.releases(self.uid)
 
 
@@ -104,6 +109,14 @@ class RouteHandler(Protocol[R]):
     def __call__(self, *args: Any, **kwargs: Any) -> Awaitable[R]: ...
 
 
+class FilesAddOneForm(util.QuartFormTyped):
+    """Form for adding a single file to a release candidate."""
+
+    file_path = wtforms.StringField("File path (optional)", validators=[wtforms.validators.Optional()])
+    file_data = wtforms.FileField("File", validators=[wtforms.validators.InputRequired("File is required")])
+    submit = wtforms.SubmitField("Add file")
+
+
 def _authentication_failed() -> NoReturn:
     """Handle authentication failure with an exception."""
     # NOTE: This is a separate function to fix a problem with analysis flow in mypy
@@ -114,24 +127,23 @@ async def _number_of_release_files(release: models.Release) -> int:
     """Return the number of files in the release."""
     path_project = release.project.name
     path_version = release.version
-    path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", path_project, path_version)
+    path = util.get_candidate_draft_dir() / path_project / path_version
     return len(await util.paths_recursive(path))
 
 
 def _path_warnings_errors(
-    paths: set[str], path: str, ext_artifact: str | None, ext_metadata: str | None
+    paths: set[pathlib.Path], path: pathlib.Path, ext_artifact: str | None, ext_metadata: str | None
 ) -> tuple[list[str], list[str]]:
     # NOTE: This is important institutional logic
     # TODO: We should probably move this to somewhere more important than a routes module
     warnings = []
     errors = []
-    filename = os.path.basename(path)
 
     # The Release Distribution Policy specifically allows README and CHANGES, etc.
     # We assume that LICENSE and NOTICE are permitted also
-    if filename == "KEYS":
+    if path.name == "KEYS":
         errors.append("Please upload KEYS to ATR directly instead of using rsync")
-    elif path.startswith(".") or ("/." in path):
+    elif any(part.startswith(".") for part in path.parts):
         # TODO: There is not a a policy for this
         # We should enquire as to whether such a policy should be instituted
         # We're forbidding dotfiles to catch accidental uploads of e.g. .git or .htaccess
@@ -151,7 +163,9 @@ def _path_warnings_errors(
     return warnings, errors
 
 
-def _path_warnings_errors_artifact(paths: set[str], path: str, ext_artifact: str) -> tuple[list[str], list[str]]:
+def _path_warnings_errors_artifact(
+    paths: set[pathlib.Path], path: pathlib.Path, ext_artifact: str
+) -> tuple[list[str], list[str]]:
     # We refer to the following authoritative policies:
     # - Release Creation Process (RCP)
     # - Release Distribution Policy (RDP)
@@ -160,24 +174,26 @@ def _path_warnings_errors_artifact(paths: set[str], path: str, ext_artifact: str
     errors: list[str] = []
 
     # RDP says that .asc is required and one of .sha256 or .sha512
-    if (path + ".asc") not in paths:
+    if path.with_suffix(path.suffix + ".asc") not in paths:
         errors.append("Missing an .asc counterpart")
-    no_sha256 = (path + ".sha256") not in paths
-    no_sha512 = (path + ".sha512") not in paths
+    no_sha256 = path.with_suffix(path.suffix + ".sha256") not in paths
+    no_sha512 = path.with_suffix(path.suffix + ".sha512") not in paths
     if no_sha256 and no_sha512:
         errors.append("Missing a .sha256 or .sha512 counterpart")
 
     return warnings, errors
 
 
-def _path_warnings_errors_metadata(paths: set[str], path: str, ext_metadata: str) -> tuple[list[str], list[str]]:
+def _path_warnings_errors_metadata(
+    paths: set[pathlib.Path], path: pathlib.Path, ext_metadata: str
+) -> tuple[list[str], list[str]]:
     # We refer to the following authoritative policies:
     # - Release Creation Process (RCP)
     # - Release Distribution Policy (RDP)
 
     warnings: list[str] = []
     errors: list[str] = []
-    suffixes = set(pathlib.Path(path).suffixes)
+    suffixes = set(path.suffixes)
 
     if ".md5" in suffixes:
         # Forbidden by RCP, deprecated by RDP
@@ -200,7 +216,7 @@ def _path_warnings_errors_metadata(paths: set[str], path: str, ext_metadata: str
         warnings.append("The use of this metadata file is discouraged")
 
     # If a metadata file is present, it must have an artifact counterpart
-    artifact_path = path.removesuffix(ext_metadata)
+    artifact_path = path.with_name(path.name.removesuffix(ext_metadata))
     if artifact_path not in paths:
         errors.append("Missing an artifact counterpart")
 
@@ -208,7 +224,9 @@ def _path_warnings_errors_metadata(paths: set[str], path: str, ext_metadata: str
 
 
 # This decorator is an adaptor between @committer_get and @app_route functions
-def committer_get(path: str) -> Callable[[CommitterRouteHandler[R]], RouteHandler[R]]:
+def committer_route(
+    path: str, methods: list[str] | None = None
+) -> Callable[[CommitterRouteHandler[R]], RouteHandler[R]]:
     """Decorator for committer GET routes that provides an enhanced session object."""
 
     def decorator(func: CommitterRouteHandler[R]) -> RouteHandler[R]:
@@ -226,20 +244,20 @@ def committer_get(path: str) -> Callable[[CommitterRouteHandler[R]], RouteHandle
 
         # Apply decorators in reverse order
         decorated = auth.require(auth.Requirements.committer)(wrapper)
-        decorated = routes.app_route(path, methods=["GET"])(decorated)
+        decorated = routes.app_route(path, methods=methods or ["GET"])(decorated)
 
         return decorated
 
     return decorator
 
 
-@committer_get("/files/add")
+@committer_route("/files/add")
 async def root_files_add(session: CommitterSession) -> str:
-    """Show a page to allow the user to rsync files to editable releases."""
+    """Show a page to allow the user to rsync files to candidate drafts."""
     # Do them outside of the template rendering call to ensure order
-    # The user_editable_releases call can use cached results from user_projects
+    # The user_candidate_drafts call can use cached results from user_projects
     user_projects = await session.user_projects
-    user_editable_releases = await session.user_editable_releases
+    user_candidate_drafts = await session.user_candidate_drafts
 
     return await quart.render_template(
         "files-add.html",
@@ -247,11 +265,73 @@ async def root_files_add(session: CommitterSession) -> str:
         projects=user_projects,
         server_domain=session.host,
         number_of_release_files=_number_of_release_files,
-        editable_releases=user_editable_releases,
+        candidate_drafts=user_candidate_drafts,
     )
 
 
-@committer_get("/files/list/<project_name>/<version_name>")
+async def _add_one(
+    project_name: str,
+    version_name: str,
+    file_path: pathlib.Path | None,
+    file: datastructures.FileStorage,
+) -> None:
+    """Process and save the uploaded file."""
+    # Create target directory
+    target_dir = util.get_candidate_draft_dir() / project_name / version_name
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    # Use the original filename if no path is specified
+    if not file_path:
+        if not file.filename:
+            raise routes.FlashError("No filename provided")
+        file_path = pathlib.Path(file.filename)
+
+    # Save file to specified path
+    target_path = target_dir / file_path.relative_to(file_path.anchor)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiofiles.open(target_path, "wb") as f:
+        while True:
+            chunk = await asyncio.to_thread(file.stream.read, 8192)
+            if not chunk:
+                break
+            await f.write(chunk)
+
+
+@committer_route("/files/add/<project_name>/<version_name>", methods=["GET", "POST"])
+async def root_files_add_project(
+    session: CommitterSession, project_name: str, version_name: str
+) -> response.Response | str:
+    """Show a page to allow the user to add a single file to a candidate draft."""
+    form = await FilesAddOneForm.create_form()
+    if await form.validate_on_submit():
+        try:
+            file_path = None
+            if isinstance(form.file_path.data, str):
+                file_path = pathlib.Path(form.file_path.data)
+            file_data = form.file_data.data
+            if not isinstance(file_data, datastructures.FileStorage):
+                raise routes.FlashError("Invalid file upload")
+
+            await _add_one(project_name, version_name, file_path, file_data)
+            await quart.flash("File added successfully", "success")
+            return quart.redirect(
+                quart.url_for("root_files_list", project_name=project_name, version_name=version_name)
+            )
+        except Exception as e:
+            logging.exception("Error adding file:")
+            await quart.flash(f"Error adding file: {e!s}", "error")
+
+    return await quart.render_template(
+        "files-add-project.html",
+        asf_id=session.uid,
+        server_domain=session.host,
+        project_name=project_name,
+        version_name=version_name,
+        form=form,
+    )
+
+
+@committer_route("/files/list/<project_name>/<version_name>")
 async def root_files_list(session: CommitterSession, project_name: str, version_name: str) -> str:
     """Show all the files in the rsync upload directory for a release."""
     # Check that the user has access to the project
@@ -264,7 +344,7 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
-    base_path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", project_name, version_name)
+    base_path = util.get_candidate_draft_dir() / project_name / version_name
     paths = await util.paths_recursive(base_path)
     paths_set = set(paths)
     path_templates = {}
@@ -282,12 +362,12 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
             "template": None,
             "substitutions": None,
         }
-        template, substitutions = analysis.filename_parse(path, elements)
+        template, substitutions = analysis.filename_parse(str(path), elements)
         path_templates[path] = template
         path_substitutions[path] = analysis.substitutions_format(substitutions) or "none"
 
         # Get artifacts and metadata
-        search = re.search(analysis.extension_pattern(), path)
+        search = re.search(analysis.extension_pattern(), str(path))
         ext_artifact = None
         ext_metadata = None
         if search:

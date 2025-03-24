@@ -18,7 +18,6 @@
 import asyncio
 import functools
 import logging
-import pathlib
 import time
 from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, Final, ParamSpec, TypeVar
@@ -28,8 +27,6 @@ import aiofiles.os
 import asfquart
 import quart
 import werkzeug.datastructures as datastructures
-
-import atr.db.models as models
 
 if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
@@ -297,16 +294,3 @@ async def get_form(request: quart.Request) -> datastructures.MultiDict:
     if blockbuster is not None:
         blockbuster.activate()
     return form
-
-
-async def package_files_delete(package: models.Package, uploads_path: pathlib.Path) -> None:
-    """Delete the artifact and signature files associated with a package."""
-    if package.artifact_sha3:
-        artifact_path = uploads_path / package.artifact_sha3
-        if await aiofiles.os.path.exists(artifact_path):
-            await aiofiles.os.remove(artifact_path)
-
-    if package.signature_sha3:
-        signature_path = uploads_path / package.signature_sha3
-        if await aiofiles.os.path.exists(signature_path):
-            await aiofiles.os.remove(signature_path)

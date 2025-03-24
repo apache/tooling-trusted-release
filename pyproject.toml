@@ -29,6 +29,7 @@ dependencies = [
   "quart-wtforms~=1.0.3",
   "email-validator~=2.2.0",
   "sqlmodel~=0.0.24",
+  "aioshutil (>=1.5,<2.0)",
 ]
 
 [dependency-groups]

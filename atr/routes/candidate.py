@@ -133,7 +133,8 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
             data.add(release)
 
     # Redirect to the add package page with the storage token
-    return quart.redirect(quart.url_for("root_package_add", name=release_name))
+    await quart.flash("Release candidate created successfully", "success")
+    return quart.redirect(quart.url_for("root_candidate_review"))
 
 
 # Root functions

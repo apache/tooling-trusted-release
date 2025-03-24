@@ -19,8 +19,9 @@
 
 import logging
 import logging.handlers
-import pathlib
 
+import aiofiles.os
+import aioshutil
 import asfquart
 import asfquart.auth as auth
 import asfquart.base as base
@@ -43,7 +44,9 @@ if asfquart.APP is ...:
 
 async def release_delete_validate(data: db.Session, release_name: str, session_uid: str) -> models.Release:
     """Validate release deletion request and return the release if valid."""
-    release = await data.release(name=release_name, _committee=True).demand(routes.FlashError("Release not found"))
+    release = await data.release(name=release_name, _committee=True, _packages=True).demand(
+        routes.FlashError("Release not found")
+    )
 
     # Check permissions
     if release.committee:
@@ -55,19 +58,10 @@ async def release_delete_validate(data: db.Session, release_name: str, session_u
     return release
 
 
-async def release_files_delete(release: models.Release, uploads_path: pathlib.Path) -> None:
-    """Delete all files associated with a release."""
-    if not release.packages:
-        return
-
-    for package in release.packages:
-        await routes.package_files_delete(package, uploads_path)
-
-
 @routes.app_route("/release/delete", methods=["POST"])
 @auth.require(auth.Requirements.committer)
 async def root_release_delete() -> response.Response:
-    """Delete a release and all its associated packages."""
+    """Delete a release and all its associated files."""
     web_session = await session.read()
     if (web_session is None) or (web_session.uid is None):
         raise base.ASFQuartException("Not authenticated", errorcode=401)
@@ -82,17 +76,27 @@ async def root_release_delete() -> response.Response:
     async with db.session() as data:
         async with data.begin():
             try:
+                # First validate and get the release info
                 release = await release_delete_validate(data, release_name, web_session.uid)
-                await release_files_delete(release, pathlib.Path(util.get_release_storage_dir()))
+                project_name = release.project.name
+                version = release.version
+
+                # Delete all associated packages first
+                for package in release.packages:
+                    await data.delete(package)
                 await data.delete(release)
+
             except routes.FlashError as e:
                 logging.exception("FlashError:")
                 await quart.flash(str(e), "error")
                 return quart.redirect(quart.url_for("root_candidate_review"))
-            except Exception as e:
-                await quart.flash(f"Error deleting release: {e!s}", "error")
-                return quart.redirect(quart.url_for("root_candidate_review"))
+            # except Exception as e:
+            #     await quart.flash(f"Error deleting release: {e!s}", "error")
+            #     return quart.redirect(quart.url_for("root_candidate_review"))
 
+    release_dir = util.get_candidate_draft_dir() / project_name / version
+    if await aiofiles.os.path.exists(release_dir):
+        await aioshutil.rmtree(release_dir)
     await quart.flash("Release deleted successfully", "success")
     return quart.redirect(quart.url_for("root_candidate_review"))
 

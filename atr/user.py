@@ -21,14 +21,14 @@ import atr.db as db
 import atr.db.models as models
 
 
-async def editable_releases(uid: str, user_projects: list[models.Project] | None = None) -> list[models.Release]:
+async def candidate_drafts(uid: str, user_projects: list[models.Project] | None = None) -> list[models.Release]:
     if user_projects is None:
         user_projects = await projects(uid)
-    user_editable_releases: list[models.Release] = []
+    user_candidate_drafts: list[models.Release] = []
     for p in user_projects:
-        releases = await p.editable_releases
-        user_editable_releases.extend(releases)
-    return user_editable_releases
+        releases = await p.candidate_drafts
+        user_candidate_drafts.extend(releases)
+    return user_candidate_drafts
 
 
 def is_committer(committee: models.Committee | None, uid: str) -> bool:
@@ -46,7 +46,7 @@ def is_committee_member(committee: models.Committee | None, uid: str) -> bool:
 async def projects(uid: str) -> list[models.Project]:
     user_projects: list[models.Project] = []
     async with db.session() as data:
-        # Must have releases, because this is used in editable_releases
+        # Must have releases, because this is used in candidate_drafts
         projects = await data.project(_committee=True, _releases=True).all()
         for p in projects:
             if p.committee is None:

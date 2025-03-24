@@ -27,92 +27,33 @@ import asfquart.session as session
 import quart
 import werkzeug.wrappers.response as response
 
-import atr.db as db
 import atr.routes as routes
 import atr.util as util
 
 
-@routes.app_route("/download/<release_name>/<artifact_sha3>")
+@routes.app_route("/download/<phase>/<project>/<version>/<path>")
 @auth.require(auth.Requirements.committer)
-async def root_download_artifact(release_name: str, artifact_sha3: str) -> response.Response | quart.Response:
-    """Download an artifact file."""
-    # TODO: This function is very similar to the signature download function
-    # We should probably extract the common code into a helper function
+async def root_download(
+    phase: str, project: str, version: str, path: pathlib.Path
+) -> response.Response | quart.Response:
+    """Download a file from a release in any phase."""
     web_session = await session.read()
     if (web_session is None) or (web_session.uid is None):
         raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-    async with db.session() as data:
-        # Find the package
-        package = await data.package(
-            artifact_sha3=artifact_sha3,
-            release_name=release_name,
-            _release_committee=True,
-        ).get()
+    # Check that path is relative
+    path = pathlib.Path(path)
+    if not path.is_relative_to(path.anchor):
+        raise routes.FlashError("Path must be relative")
 
-        if not package:
-            await quart.flash("Artifact not found", "error")
-            return quart.redirect(quart.url_for("root_candidate_review"))
+    file_path = util.get_phase_dir() / phase / project / version / path
 
-        # Check permissions
-        if package.release and package.release.committee:
-            if (web_session.uid not in package.release.committee.committee_members) and (
-                web_session.uid not in package.release.committee.committers
-            ):
-                await quart.flash("You don't have permission to download this file", "error")
-                return quart.redirect(quart.url_for("root_candidate_review"))
+    # Check that the file exists
+    if not await aiofiles.os.path.exists(file_path):
+        await quart.flash("File not found", "error")
+        return quart.redirect(quart.url_for("root_candidate_review"))
 
-        # Construct file path
-        file_path = pathlib.Path(util.get_release_storage_dir()) / artifact_sha3
-
-        # Check that the file exists
-        if not await aiofiles.os.path.exists(file_path):
-            await quart.flash("Artifact file not found", "error")
-            return quart.redirect(quart.url_for("root_candidate_review"))
-
-        # Send the file with original filename
-        return await quart.send_file(
-            file_path, as_attachment=True, attachment_filename=package.filename, mimetype="application/octet-stream"
-        )
-
-
-@routes.app_route("/download/signature/<release_name>/<signature_sha3>")
-@auth.require(auth.Requirements.committer)
-async def root_download_signature(release_name: str, signature_sha3: str) -> quart.Response | response.Response:
-    """Download a signature file."""
-    web_session = await session.read()
-    if (web_session is None) or (web_session.uid is None):
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-
-    async with db.session() as data:
-        # Find the package that has this signature
-        package = await data.package(
-            signature_sha3=signature_sha3, release_name=release_name, _release_committee=True
-        ).get()
-        if not package:
-            await quart.flash("Signature not found", "error")
-            return quart.redirect(quart.url_for("root_candidate_review"))
-
-        # Check permissions
-        if package.release and package.release.committee:
-            if (web_session.uid not in package.release.committee.committee_members) and (
-                web_session.uid not in package.release.committee.committers
-            ):
-                await quart.flash("You don't have permission to download this file", "error")
-                return quart.redirect(quart.url_for("root_candidate_review"))
-
-        # Construct file path
-        file_path = pathlib.Path(util.get_release_storage_dir()) / signature_sha3
-
-        # Check that the file exists
-        if not await aiofiles.os.path.exists(file_path):
-            await quart.flash("Signature file not found", "error")
-            return quart.redirect(quart.url_for("root_candidate_review"))
-
-        # Send the file with original filename and .asc extension
-        return await quart.send_file(
-            file_path,
-            as_attachment=True,
-            attachment_filename=f"{package.filename}.asc",
-            mimetype="application/pgp-signature",
-        )
+    # Send the file with original filename
+    return await quart.send_file(
+        file_path, as_attachment=True, attachment_filename=path.name, mimetype="application/octet-stream"
+    )

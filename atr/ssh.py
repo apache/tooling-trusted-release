@@ -32,6 +32,7 @@ import atr.config as config
 import atr.db as db
 import atr.db.models as models
 import atr.user as user
+import atr.util as util
 
 _LOGGER: Final = logging.getLogger(__name__)
 _CONFIG: Final = config.get()
@@ -246,7 +247,7 @@ async def _command_validate(process: asyncssh.SSHServerProcess) -> tuple[str, st
                 return fail("You must be a member of this project's committee or a committer to upload to this release")
 
     # Set the target directory to the release storage directory
-    argv[path_index] = os.path.join(_CONFIG.STATE_DIR, "rsync-files", path_project, path_version)
+    argv[path_index] = str(util.get_candidate_draft_dir() / path_project / path_version)
     _LOGGER.info(f"Modified command: {argv}")
 
     # Create the release's storage directory if it doesn't exist

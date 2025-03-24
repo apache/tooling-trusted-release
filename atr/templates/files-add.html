@@ -1,33 +1,27 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Add files ~ ATR
+  Candidate drafts ~ ATR
 {% endblock title %}
 
 {% block description %}
-  Add files to editable ongoing releases using rsync.
+  Create and modify candidate drafts using rsync.
 {% endblock description %}
 
 {% block content %}
-  <h1>Add files</h1>
+  <h1>Candidate drafts</h1>
   <p class="intro">
-    Welcome, <strong>{{ asf_id }}</strong>! This page allows you to manage files for editable ongoing releases across your projects using rsync.
-    <ul>
-      <li>Projects can have multiple ongoing releases simultaneously</li>
-      <li>
-        An ongoing release is only editable during specific phases of its lifecycle, and frozen otherwise:
-        <ul class="mb-0">
-          <li>Candidate releases are editable until submitted for voting</li>
-          <li>Approved releases are editable until they've been officially announced</li>
-        </ul>
-      </li>
-      <li>You can only create a new release if you are a member of the project's committee</li>
-    </ul>
+    A <strong>candidate draft</strong> is an editable set of files which can be <strong>frozen into a candidate release</strong> for voting on by the project's committee.
   </p>
+  <ul>
+    <li>Projects can work on multiple candidate drafts for different versions simultaneously</li>
+    <li>A candidate draft is only editable until submitted for voting</li>
+    <li>You can only create a new candidate draft if you are a member of the project's committee</li>
+  </ul>
 
-  <h2>Editable ongoing releases</h2>
+  <h2>Modify existing draft</h2>
   <div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
-    {% for release in editable_releases %}
+    {% for release in candidate_drafts %}
       <div class="col" id="{{ release.name }}">
         <div class="card h-100">
           <div class="card-body position-relative">
@@ -40,11 +34,12 @@
             {% endif %}
             <p class="card-text">
               {% if number_of_release_files(release) > 0 %}
-                This editable ongoing release has <a href="{{ url_for('root_files_list', project_name=release.project.name, version_name=release.version) }}">{{ number_of_release_files(release) }} file(s)</a>.
+                This candidate draft has <a href="{{ url_for('root_files_list', project_name=release.project.name, version_name=release.version) }}">{{ number_of_release_files(release) }} file(s)</a>.
               {% else %}
-                This editable ongoing release doesn't have any files yet.
+                This candidate draft doesn't have any files yet.
               {% endif %}
-              Use the command below to add or modify files in this release:
+              <a href="{{ url_for('root_files_add_project', project_name=release.project.name, version_name=release.version) }}">Upload a file using the browser</a>,
+              or use the command below to add or modify files in this draft:
             </p>
           </div>
           <pre class="card-footer bg-light border-1 pt-4 small">
@@ -54,17 +49,17 @@ rsync -av -e 'ssh -p 2222' your/files/ \
         </div>
       </div>
     {% endfor %}
-    {% if editable_releases|length == 0 %}
+    {% if candidate_drafts|length == 0 %}
       <div class="col-12">
-        <div class="alert alert-info">There are currently no editable ongoing releases.</div>
+        <div class="alert alert-info">There are currently no candidate drafts.</div>
       </div>
     {% endif %}
   </div>
 
-  <h2>Projects</h2>
+  <h2>Create draft from project</h2>
   <div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
     {% for project in projects %}
-      {% set editable_releases = project.editable_releases %}
+      {% set candidate_drafts = project.candidate_drafts %}
 
       {# Show card for creating a new release if allowed #}
       {% if asf_id in project.committee.committee_members %}
@@ -79,14 +74,14 @@ rsync -av -e 'ssh -p 2222' your/files/ \
                 <h6 class="card-subtitle mb-2 text-muted">{{ project.committee.display_name }}</h6>
               {% endif %}
               <p class="card-text">
-                {% if editable_releases|length > 0 %}
-                  This project already has the ongoing releases
-                  {% for release in editable_releases %}
+                {% if candidate_drafts|length > 0 %}
+                  This project already has candidate drafts
+                  {% for release in candidate_drafts %}
                     <code><a href="#{{ release.name }}" class="border rounded px-2">{{ release.version }}</a></code>,
                   {% endfor %}
                   but to create another one, use the command below.
                 {% else %}
-                  This project does not have an editable ongoing release.
+                  This project does not have a candidate draft.
                   To create one and add files, use the command below.
                 {% endif %}
               </p>
@@ -109,14 +104,14 @@ rsync -av -e 'ssh -p 2222' your/files/ \
                 <h6 class="card-subtitle mb-2 text-muted">{{ project.committee.display_name }}</h6>
               {% endif %}
               <p class="card-text">
-                {% if editable_releases|length > 0 %}
-                  This project already has the ongoing releases
-                  {% for release in editable_releases %}
+                {% if candidate_drafts|length > 0 %}
+                  This project already has candidate drafts
+                  {% for release in candidate_drafts %}
                     <code><a href="#{{ release.name }}" class="border rounded px-2">{{ release.version }}</a></code>,
                   {% endfor %}
                   but to create another one, use the command below.
                 {% else %}
-                  This project does not have an editable ongoing release.
+                  This project does not have a candidate draft.
                   To create one, you must be a member of the project's committee.
                 {% endif %}
               </p>

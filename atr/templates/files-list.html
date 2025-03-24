@@ -66,7 +66,7 @@
                 <tr>
                   <td>
                     {% if path in artifacts %}
-                      <strong>{{ path }}</strong>
+                      <strong><a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a></strong>
                     {% elif path in metadata %}
                       <em>{{ path }}</em>
                     {% else %}
@@ -95,7 +95,9 @@
       <h5 class="mb-0">Add or modify files</h5>
     </div>
     <div class="card-body">
-      <p>Use the command below to add or modify files in this release using rsync:</p>
+      <p>
+        <a href="{{ url_for('root_files_add_project', project_name=release.project.name, version_name=release.version) }}">Upload a file in the browser</a>, or use the command below to add or modify files in this release using rsync:
+      </p>
     </div>
     <pre class="card-footer bg-light border-1 pt-4 small">
 rsync -av -e 'ssh -p 2222' your/files/ \

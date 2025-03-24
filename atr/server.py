@@ -37,6 +37,7 @@ import atr.db as db
 import atr.manager as manager
 import atr.preload as preload
 import atr.ssh as ssh
+import atr.util as util
 
 # TODO: Technically this is a global variable
 # We should probably find a cleaner way to do this
@@ -114,7 +115,10 @@ def app_dirs_setup(app_config: type[config.AppConfig]) -> None:
         raise RuntimeError(f"State directory not found: {app_config.STATE_DIR}")
     os.chdir(app_config.STATE_DIR)
     print(f"Working directory changed to: {os.getcwd()}")
-    os.makedirs(app_config.RELEASE_STORAGE_DIR, exist_ok=True)
+    util.get_candidate_draft_dir().mkdir(parents=True, exist_ok=True)
+    util.get_candidate_release_dir().mkdir(parents=True, exist_ok=True)
+    util.get_distributable_draft_dir().mkdir(parents=True, exist_ok=True)
+    util.get_distributable_release_dir().mkdir(parents=True, exist_ok=True)
 
 
 def app_create_base(app_config: type[config.AppConfig]) -> base.QuartApp:

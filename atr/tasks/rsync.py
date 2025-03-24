@@ -16,7 +16,6 @@
 # under the License.
 
 import logging
-import os
 from typing import Any, Final
 
 import pydantic
@@ -54,7 +53,7 @@ async def analyse(args: dict[str, Any]) -> tuple[models.TaskStatus, str | None, 
 
 async def _analyse_core(asf_uid: str, project_name: str, release_version: str) -> dict[str, Any]:
     """Analyse an rsync upload."""
-    base_path = os.path.join(_CONFIG.STATE_DIR, "rsync-files", project_name, release_version)
+    base_path = util.get_candidate_draft_dir() / project_name / release_version
     paths = await util.paths_recursive(base_path)
     # for path in paths:
     #     # Add new tasks for each path

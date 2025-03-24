@@ -18,7 +18,6 @@
 """package.py"""
 
 import asyncio
-import datetime
 import hashlib
 import logging
 import logging.handlers
@@ -40,7 +39,6 @@ import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.tasks as tasks
-import atr.util as util
 
 
 async def file_hash_save(base_dir: pathlib.Path, file: datastructures.FileStorage) -> tuple[str, int]:
@@ -86,115 +84,6 @@ async def file_hash_save(base_dir: pathlib.Path, file: datastructures.FileStorag
 # Package functions
 
 
-async def package_add_artifact_info_get(
-    data: db.Session,
-    uploads_path: pathlib.Path,
-    artifact_file: datastructures.FileStorage,
-) -> tuple[str, str, int]:
-    """Get artifact information during package addition process.
-
-    Returns a tuple of (sha3_hash, sha512_hash, size) for the artifact file.
-    Validates that the artifact hasn't already been uploaded to another release.
-    """
-    # In a separate function to appease the complexity checker
-    artifact_sha3, artifact_size = await file_hash_save(uploads_path, artifact_file)
-
-    # Check for duplicates by artifact_sha3 before proceeding
-
-    duplicate = await data.package(artifact_sha3=artifact_sha3).get()
-    if duplicate:
-        # Remove the saved file since we won't be using it
-        await aiofiles.os.remove(uploads_path / artifact_sha3)
-        raise routes.FlashError("This exact file has already been uploaded to another release")
-
-    # Compute SHA-512 of the artifact for the package record
-    return artifact_sha3, await util.compute_sha512(uploads_path / artifact_sha3), artifact_size
-
-
-async def package_add_session_process(
-    data: db.Session,
-    release_name: str,
-    artifact_file: datastructures.FileStorage,
-    checksum_file: datastructures.FileStorage | None,
-    signature_file: datastructures.FileStorage | None,
-) -> tuple[str, int, str, str | None]:
-    """Helper function for package_add_post."""
-
-    # First check for duplicates by filename
-    duplicate = await data.package(release_name=release_name, filename=util.unwrap(artifact_file.filename)).get()
-    if duplicate:
-        raise routes.FlashError("This release artifact has already been uploaded")
-
-    # Save files using their hashes as filenames
-    uploads_path = pathlib.Path(util.get_release_storage_dir())
-    try:
-        artifact_sha3, artifact_sha512, artifact_size = await package_add_artifact_info_get(
-            data, uploads_path, artifact_file
-        )
-    except Exception as e:
-        raise routes.FlashError(f"Error saving artifact file: {e!s}")
-    # Note: "error" is not permitted past this point
-    # Because we don't want to roll back saving the artifact
-
-    # Validate checksum file if provided
-    if checksum_file:
-        try:
-            # Read only the number of bytes required for the checksum
-            bytes_required: int = len(artifact_sha512)
-            checksum_content = checksum_file.read(bytes_required).decode().strip()
-            if checksum_content.lower() != artifact_sha512.lower():
-                await quart.flash("Warning: Provided checksum does not match computed SHA-512", "warning")
-        except UnicodeDecodeError:
-            await quart.flash("Warning: Could not read checksum file as text", "warning")
-        except Exception as e:
-            await quart.flash(f"Warning: Error validating checksum file: {e!s}", "warning")
-
-    # Process signature file if provided
-    signature_sha3 = None
-    if signature_file and signature_file.filename:
-        if not signature_file.filename.endswith(".asc"):
-            await quart.flash("Warning: Signature file should have .asc extension", "warning")
-        try:
-            signature_sha3, _ = await file_hash_save(uploads_path, signature_file)
-        except Exception as e:
-            await quart.flash(f"Warning: Could not save signature file: {e!s}", "warning")
-
-    return artifact_sha3, artifact_size, artifact_sha512, signature_sha3
-
-
-async def package_add_validate(
-    request: quart.Request,
-) -> tuple[str, datastructures.FileStorage, datastructures.FileStorage | None, datastructures.FileStorage | None, str]:
-    form = await routes.get_form(request)
-
-    # TODO: Check that the submitter is a committer of the project
-
-    release_name = form.get("release_name")
-    if (not release_name) or (not isinstance(release_name, str)):
-        raise routes.FlashError("Release key is required")
-
-    # Get all uploaded files
-    files = await request.files
-    artifact_file = files.get("release_artifact")
-    checksum_file = files.get("release_checksum")
-    signature_file = files.get("release_signature")
-    if not isinstance(artifact_file, datastructures.FileStorage):
-        raise routes.FlashError("Release artifact file is required")
-    if checksum_file is not None and not isinstance(checksum_file, datastructures.FileStorage):
-        raise routes.FlashError("Problem with checksum file")
-    if signature_file is not None and not isinstance(signature_file, datastructures.FileStorage):
-        raise routes.FlashError("Problem with signature file")
-
-    # Get and validate artifact type
-    artifact_type = form.get("artifact_type")
-    if (not artifact_type) or (not isinstance(artifact_type, str)):
-        raise routes.FlashError("Artifact type is required")
-    if artifact_type not in ["source", "binary", "reproducible"]:
-        raise routes.FlashError("Invalid artifact type")
-
-    return release_name, artifact_file, checksum_file, signature_file, artifact_type
-
-
 async def package_data_get(data: db.Session, artifact_sha3: str, release_name: str, session_uid: str) -> models.Package:
     """Validate package deletion request and return the package if valid."""
     # Get the package and its associated release
@@ -216,172 +105,6 @@ async def package_data_get(data: db.Session, artifact_sha3: str, release_name: s
 
 
 # Release functions
-
-
-async def package_add_bulk_validate(
-    form: datastructures.MultiDict, request: quart.Request
-) -> tuple[str, str, list[str], bool, int]:
-    """Validate bulk package addition form data."""
-    release_name = form.get("release_name")
-    if (not release_name) or (not isinstance(release_name, str)):
-        raise routes.FlashError("Release key is required")
-
-    url = form.get("url")
-    if (not url) or (not isinstance(url, str)):
-        raise routes.FlashError("URL is required")
-
-    # Validate URL format
-    if not url.startswith(("http://", "https://")):
-        raise routes.FlashError("URL must start with http:// or https://")
-
-    # Get selected file types
-    file_types = form.getlist("file_types")
-    if not file_types:
-        raise routes.FlashError("At least one file type must be selected")
-
-    # Validate file types
-    valid_types = {".tar.gz", ".tgz", ".zip", ".jar"}
-    if not all(ft in valid_types for ft in file_types):
-        raise routes.FlashError("Invalid file type selected")
-
-    # Get require signatures flag
-    require_signatures = bool(form.get("require_signatures"))
-
-    # Get max depth
-    try:
-        max_depth = int(form.get("max_depth", "1"))
-        if not 1 <= max_depth <= 10:
-            raise ValueError()
-    except (TypeError, ValueError):
-        raise routes.FlashError("Maximum depth must be between 1 and 10 inclusive")
-
-    return release_name, url, file_types, require_signatures, max_depth
-
-
-async def package_add_single_post(form: datastructures.MultiDict, request: quart.Request) -> response.Response:
-    """Process single package upload submission."""
-    try:
-        release_name, artifact_file, checksum_file, signature_file, artifact_type = await package_add_validate(request)
-    except routes.FlashError as e:
-        logging.exception("FlashError:")
-        await quart.flash(f"{e!s}", "error")
-        return quart.redirect(quart.url_for("root_package_add"))
-    # This must come here to appease the type checker
-    if artifact_file.filename is None:
-        await quart.flash("Release artifact filename is required", "error")
-        return quart.redirect(quart.url_for("root_package_add"))
-
-    # Save files and create package record in one transaction
-    async with db.session() as data:
-        # Process and save the files
-        async with data.begin():
-            try:
-                try:
-                    artifact_sha3, artifact_size, artifact_sha512, signature_sha3 = await package_add_session_process(
-                        data, release_name, artifact_file, checksum_file, signature_file
-                    )
-                except routes.FlashError as e:
-                    logging.exception("FlashError:")
-                    await quart.flash(f"{e!s}", "error")
-                    return quart.redirect(quart.url_for("root_package_add"))
-
-                # Create the package record
-                package = models.Package(
-                    artifact_sha3=artifact_sha3,
-                    artifact_type=artifact_type,
-                    filename=artifact_file.filename,
-                    signature_sha3=signature_sha3,
-                    sha512=artifact_sha512,
-                    release_name=release_name,
-                    uploaded=datetime.datetime.now(datetime.UTC),
-                    bytes_size=artifact_size,
-                )
-                data.add(package)
-
-            except Exception as e:
-                await quart.flash(f"Error processing files: {e!s}", "error")
-                return quart.redirect(quart.url_for("root_package_add"))
-
-    # Otherwise redirect to review page
-    return quart.redirect(quart.url_for("root_candidate_review"))
-
-
-async def package_add_bulk_post(form: datastructures.MultiDict, request: quart.Request) -> response.Response:
-    """Process bulk package URL submission."""
-    try:
-        release_name, url, file_types, require_signatures, max_depth = await package_add_bulk_validate(form, request)
-    except routes.FlashError as e:
-        logging.exception("FlashError:")
-        await quart.flash(f"{e!s}", "error")
-        return quart.redirect(quart.url_for("root_package_add"))
-
-    # Create a task for bulk downloading
-    max_concurrency = 5
-    async with db.session() as data:
-        async with data.begin():
-            task = models.Task(
-                status=models.TaskStatus.QUEUED,
-                task_type="package_bulk_download",
-                task_args={
-                    "release_name": release_name,
-                    "base_url": url,
-                    "file_types": file_types,
-                    "require_sigs": require_signatures,
-                    "max_depth": max_depth,
-                    "max_concurrent": max_concurrency,
-                },
-            )
-            data.add(task)
-            # Flush to get the task ID
-            await data.flush()
-
-    await quart.flash("Started downloading packages from URL", "success")
-    return quart.redirect(quart.url_for("release_bulk_status", task_id=task.id))
-
-
-@routes.app_route("/package/add", methods=["GET", "POST"])
-@auth.require(auth.Requirements.committer)
-async def root_package_add() -> response.Response | str:
-    """Add package artifacts to an existing release."""
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-
-    # For POST requests, handle the form submission
-    if quart.request.method == "POST":
-        form = await routes.get_form(quart.request)
-        form_type = form.get("form_type")
-
-        if form_type == "bulk":
-            return await package_add_bulk_post(form, quart.request)
-        else:
-            return await package_add_single_post(form, quart.request)
-
-    # Get the release name from the query parameters (if redirected from create)
-    release_name = quart.request.args.get("name")
-
-    # Get all releases where the user is a PMC member or committer of the associated PMC
-    async with db.session() as data:
-        # Load all the necessary relationships for the pmc property to work
-        releases = await data.release(stage=models.ReleaseStage.CANDIDATE, _committee=True).all()
-
-        # Filter to only show releases for PMCs or PPMCs where the user is a member or committer
-        # Can we do this in sqlmodel using JSON container operators?
-        user_releases = []
-        for r in releases:
-            if r.committee is None:
-                continue
-            # For PPMCs the "members" are stored in the committers field
-            if (web_session.uid in r.committee.committee_members) or (web_session.uid in r.committee.committers):
-                user_releases.append(r)
-
-    # For GET requests, show the form
-    return await quart.render_template(
-        "package-add.html",
-        asf_id=web_session.uid,
-        releases=user_releases,
-        selected_release=release_name,
-    )
 
 
 @routes.app_route("/package/check", methods=["GET", "POST"])
@@ -499,40 +222,6 @@ async def root_package_check_restart() -> response.Response:
             return quart.redirect(
                 quart.url_for("root_package_check", artifact_sha3=artifact_sha3, release_name=release_name)
             )
-
-
-@routes.app_route("/package/delete", methods=["POST"])
-@auth.require(auth.Requirements.committer)
-async def root_package_delete() -> response.Response:
-    """Delete a package from a release candidate."""
-    web_session = await session.read()
-    if (web_session is None) or (web_session.uid is None):
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-
-    form = await routes.get_form(quart.request)
-    artifact_sha3 = form.get("artifact_sha3")
-    release_name = form.get("release_name")
-
-    if not artifact_sha3 or not release_name:
-        await quart.flash("Missing required parameters", "error")
-        return quart.redirect(quart.url_for("root_candidate_review"))
-
-    async with db.session() as data:
-        async with data.begin():
-            try:
-                package = await package_data_get(data, artifact_sha3, release_name, web_session.uid)
-                await routes.package_files_delete(package, pathlib.Path(util.get_release_storage_dir()))
-                await data.delete(package)
-            except routes.FlashError as e:
-                logging.exception("FlashError:")
-                await quart.flash(str(e), "error")
-                return quart.redirect(quart.url_for("root_candidate_review"))
-            except Exception as e:
-                await quart.flash(f"Error deleting files: {e!s}", "error")
-                return quart.redirect(quart.url_for("root_candidate_review"))
-
-    await quart.flash("Package deleted successfully", "success")
-    return quart.redirect(quart.url_for("root_candidate_review"))
 
 
 async def task_package_status_get(data: db.Session, artifact_sha3: str) -> tuple[Sequence[models.Task], bool]:

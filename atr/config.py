@@ -42,7 +42,7 @@ class AppConfig:
     DEBUG = False
     TEMPLATES_AUTO_RELOAD = False
     USE_BLOCKBUSTER = False
-    RELEASE_STORAGE_DIR = os.path.join(STATE_DIR, "releases")
+    PHASE_STORAGE_DIR = os.path.join(STATE_DIR, "phase")
     SQLITE_DB_PATH = decouple.config("SQLITE_DB_PATH", default="/atr.db")
 
     # Apache RAT configuration
