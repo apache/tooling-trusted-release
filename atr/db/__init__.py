@@ -130,7 +130,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         name_in: Opt[list[str]] = NotSet,
         _projects: bool = False,
         _public_signing_keys: bool = False,
-        _vote_policy: bool = False,
     ) -> Query[models.Committee]:
         query = sqlmodel.select(models.Committee)
 
@@ -150,8 +149,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Committee.committers == committers)
         if is_defined(release_managers):
             query = query.where(models.Committee.release_managers == release_managers)
-        if is_defined(vote_policy_id):
-            query = query.where(models.Committee.vote_policy_id == vote_policy_id)
 
         if is_defined(name_in):
             models_committee_name = validate_instrumented_attribute(models.Committee.name)
@@ -161,8 +158,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.options(select_in_load(models.Committee.projects))
         if _public_signing_keys:
             query = query.options(select_in_load(models.Committee.public_signing_keys))
-        if _vote_policy:
-            query = query.options(select_in_load(models.Committee.vote_policy))
 
         return Query(self, query)
 
@@ -416,9 +411,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         min_hours: Opt[int] = NotSet,
         release_checklist: Opt[str] = NotSet,
         pause_for_rm: Opt[bool] = NotSet,
-        _committees: bool = False,
-        _projects: bool = False,
-        _releases: bool = False,
+        _project: bool = False,
     ) -> Query[models.VotePolicy]:
         query = sqlmodel.select(models.VotePolicy)
 
@@ -435,12 +428,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         if is_defined(pause_for_rm):
             query = query.where(models.VotePolicy.pause_for_rm == pause_for_rm)
 
-        if _committees:
-            query = query.options(select_in_load(models.VotePolicy.committees))
-        if _projects:
-            query = query.options(select_in_load(models.VotePolicy.projects))
-        if _releases:
-            query = query.options(select_in_load(models.VotePolicy.releases))
+        if _project:
+            query = query.options(select_in_load(models.VotePolicy.project))
 
         return Query(self, query)
 

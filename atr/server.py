@@ -67,7 +67,6 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
     import atr.routes.projects as projects
     import atr.routes.release as release
     import atr.routes.root as root
-    import atr.routes.vote_policy as vote_policy
 
     # Add a global error handler to show helpful error messages with tracebacks.
     @app.errorhandler(Exception)
@@ -106,7 +105,6 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
         projects.__name__,
         release.__name__,
         root.__name__,
-        vote_policy.__name__,
     )
 
 
@@ -152,12 +150,14 @@ def app_setup_context(app: base.QuartApp) -> None:
 
     @app.context_processor
     async def app_wide() -> dict[str, Any]:
+        import atr.db.service as service
         from atr.metadata import commit, version
         from atr.util import is_admin
 
         return {
             "current_user": await asfquart.session.read(),
             "is_admin": is_admin,
+            "is_project_lead": service.is_project_lead,
             "commit": commit,
             "version": version,
         }

@@ -37,7 +37,7 @@ async def root_committee_directory() -> str:
 @routes.app_route("/committees/<name>")
 async def root_committee_view(name: str) -> str:
     async with db.session() as data:
-        committee = await data.committee(
-            name=name, _projects=True, _public_signing_keys=True, _vote_policy=True
-        ).demand(http.client.HTTPException(404))
+        committee = await data.committee(name=name, _projects=True, _public_signing_keys=True).demand(
+            http.client.HTTPException(404)
+        )
         return await quart.render_template("committee-view.html", committee=committee, algorithms=routes.algorithms)

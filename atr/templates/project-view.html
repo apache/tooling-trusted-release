@@ -10,6 +10,7 @@
 
 {% block content %}
   <h1>{{ project.display_name }}</h1>
+  {% set is_project_lead = is_project_lead(project, current_user.uid) %}
 
   <div class="card mb-4">
     <div class="card-header bg-light">
@@ -97,38 +98,59 @@
   <div class="card mb-4">
     <div class="card-header bg-light d-flex justify-content-between align-items-center">
       <h3 class="mb-0">Voting Policy</h3>
-      <div>
-        <a class="btn btn-primary"
-           href="{{ url_for('root_project_voting_policy_add', name=project.name) }}"><i class="fa-solid fa-plus"></i></a>
-      </div>
+      {% if project.vote_policy and (is_project_lead or is_admin) %}
+        <div>
+          <a class="btn btn-primary btn-sm"
+             href="{{ url_for('root_projects_vote_policy_edit', project_name=project.name) }}"><i class="fa-solid fa-pen-to-square"></i></a>
+        </div>
+      {% elif (is_project_lead or is_admin) %}
+        <div>
+          <a class="btn btn-primary btn-sm"
+             href="{{ url_for('root_projects_vote_policy_add', project_name=project.name) }}"><i class="fa-solid fa-plus"></i></a>
+        </div>
+      {% endif %}
     </div>
     <div class="card-body">
       {% if project.vote_policy %}
         {% set vp = project.vote_policy %}
-        <div class="card border">
+        <div class="card h-100 border">
           <div class="card-body">
             <table class="table mb-0">
               <tbody>
                 <tr>
-                  <th class="border-0">Mailto Addresses</th>
-                  <td class="text-break border-0">{{ vp.mailto_addresses }}</td>
+                  <th class="border-0">Email</th>
+                  <td class="text-break border-0">
+                    <a href="mailto:{{ vp.mailto_addresses[0] }}">{{ vp.mailto_addresses[0] }}</a>
+                  </td>
                 </tr>
+                <tr>
+                  <th class="border-0">Manual Vote Process</th>
+                  <td class="text-break border-0">{{ vp.manual_vote }}</td>
+                </tr>
+                <tr>
+                  <th class="border-0">Minimum Voting Period</th>
+                  <td class="text-break border-0">{{ vp.min_hours }}h</td>
+                </tr>
+                <tr>
+                  <th class="border-0">Release checklist</th>
+                  <td class="text-break border-0">
+                    <textarea style="resize: vertical" readonly>{{ vp.release_checklist }}</textarea>
+                  </td>
+                </tr>
+                <tr>
+                  <th class="border-0">Pause for RM</th>
+                  <td class="text-break border-0">{{ vp.pause_for_rm }}</td>
+                </tr>
+
               </tbody>
             </table>
           </div>
         </div>
+      {% else %}
+        <div>None defined.</div>
       {% endif %}
     </div>
   </div>
-
-  <!-- TODO: Subprojects?
-  <div class="card mb-4">
-    <div class="card-header bg-light">
-      <h3 class="mb-0">Projects</h3>
-    </div>
-    <div class="card-body"></div>
-  </div>
-  -->
 
 {% endblock content %}
 

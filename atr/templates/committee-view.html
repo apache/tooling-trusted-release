@@ -101,33 +101,6 @@
     </div>
   </div>
 
-  <div class="card mb-4">
-    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-      <h3 class="mb-0">Voting Policy</h3>
-      <div>
-        <a class="btn btn-primary"
-           href="{{ url_for('root_project_voting_policy_add', name=committee.name) }}"><i class="fa-solid fa-plus"></i></a>
-      </div>
-    </div>
-    <div class="card-body">
-      {% if committee.vote_policy %}
-        {% set vp = committee.vote_policy %}
-        <div class="card border">
-          <div class="card-body">
-            <table class="table mb-0">
-              <tbody>
-                <tr>
-                  <th class="border-0">Mailto Addresses</th>
-                  <td class="text-break border-0">{{ vp.mailto_addresses }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      {% endif %}
-    </div>
-  </div>
-
 {% endblock content %}
 
 {% block javascripts %}

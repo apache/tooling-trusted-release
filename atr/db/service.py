@@ -26,6 +26,12 @@ import atr.db as db
 import atr.db.models as models
 
 
+def is_project_lead(project: models.Project, user_id: str) -> bool:
+    if project.committee is None:
+        raise RuntimeError(f"Committee for project {project.name} not set")
+    return user_id in project.committee.committee_members
+
+
 async def get_committee_by_name(
     name: str, session: sqlalchemy.ext.asyncio.AsyncSession | None = None
 ) -> models.Committee | None:

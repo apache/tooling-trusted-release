@@ -1,85 +1,21 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Edit a voting policy ~ ATR
+  Create a voting policy ~ ATR
 {% endblock title %}
 
 {% block description %}
-  Create a new vote policy.
+  Create a voting policy for a project.
 {% endblock description %}
 
 {% block content %}
-  <h1>Add vote policy</h1>
+  <h1>Create voting policy</h1>
   <p>
     Welcome, <strong>{{ asf_id }}</strong>!
-    Use this form to create a vote policy candidate for your project.
+    <br />
+    Use this form to create a voting policy for <code>{{ project.display_name }}</code>.
   </p>
 
-  <form method="post"
-        enctype="multipart/form-data"
-        class="striking py-4 px-5">
-    <input type="hidden" name="form_type" value="single" />
-    {{ form.hidden_tag() }}
-    <div class="mb-3 pb-3 row border-bottom">
-      <label for="project_name_text" class="col-sm-3 col-form-label text-sm-end">Project:</label>
-      <div class="col-sm-8">
-        <p id="project_name_text" class="form-control-plaintext">{{ project.display_name }}</p>
-      </div>
-    </div>
+  {% include "vote-policy-form.html" %}
 
-    <div class="mb-3 pb-3 row border-bottom">
-      <label for="{{ form.mailto_addresses.id }}"
-             class="col-sm-3 col-form-label text-sm-end">{{ form.mailto_addresses.label.text }}</label>
-      <div class="col-sm-8">
-        <div>{{ form.mailto_addresses(size=30, class_="form-control") }}</div>
-        {% if form.mailto_addresses.errors -%}
-          <span class="error-message">{{ form.mailto_addresses.errors[0] }}</span>
-        {%- endif %}
-      </div>
-    </div>
-
-    <div class="mb-3 pb-3 row border-bottom">
-      <label for="{{ form.manual_vote.id }}"
-             class="col-sm-3 col-form-label text-sm-end">{{ form.manual_vote.label.text }}</label>
-      <div class="col-sm-8">
-        {{ form.manual_vote(class_="form-check-input") }}
-        <label class="form-check-label">Manual</label>
-        <br />
-        <span id="manual_vote-help" class="form-text text-muted">If this is set then the vote will be completely manual and following policy is ignored.</span>
-      </div>
-    </div>
-
-    <div class="mb-3 pb-3 row border-bottom">
-      <label for="{{ form.min_hours.id }}"
-             class="col-sm-3 col-form-label text-sm-end">{{ form.min_hours.label.text }}</label>
-      <div class="col-sm-8">
-        {{ form.min_hours(class_="form-control") }}
-        <span id="min_hours-help" class="form-text text-muted">The minimum time to run the vote. If set to 0 then wait until 3 +1 votes and more +1 than -1.</span>
-      </div>
-    </div>
-
-    <div class="mb-3 pb-3 row border-bottom">
-      <label for="{{ form.release_checklist.id }}"
-             class="col-sm-3 col-form-label text-sm-end">{{ form.release_checklist.label.text }}</label>
-      <div class="col-sm-8">
-        {{ form.release_checklist(rows=10, style='resize: vertical', class_="form-control") }}
-        <span id="release_checklist-help" class="form-text text-muted">Markdown text describing how to test release candidates.</span>
-      </div>
-    </div>
-
-    <div class="mb-3 pb-3 row border-bottom">
-      <label for="{{ form.pause_for_rm.id }}"
-             class="col-sm-3 col-form-label text-sm-end">{{ form.pause_for_rm.label.text }}</label>
-      <div class="col-sm-8">
-        {{ form.pause_for_rm(class_="form-check-input") }}
-        <label class="form-check-label">Enabled</label>
-        <br />
-        <span id="pause_for_rm-help" class="form-text text-muted">If enabled, RM can confirm manually if the vote has passed.</span>
-      </div>
-    </div>
-
-    <div class="row">
-      <div class="col-sm-9 offset-sm-3">{{ form.submit(class_="btn btn-primary mt-2") }}</div>
-    </div>
-  </form>
 {% endblock content %}
