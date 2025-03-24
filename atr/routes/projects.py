@@ -51,6 +51,13 @@ async def root_project_view(name: str) -> str:
 
 
 class VotePolicyForm(util.QuartFormTyped):
+    """
+    A Form to create/edit a VotePolicy.
+
+    TODO: Currently only a single mailto_address is supported.
+          see: https://stackoverflow.com/questions/49066046/append-entry-to-fieldlist-with-flask-wtforms-using-ajax
+    """
+
     project_name = wtforms.HiddenField("project_name")
     mailto_addresses = wtforms.FieldList(
         wtforms.StringField(
