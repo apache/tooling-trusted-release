@@ -156,8 +156,8 @@ def app_setup_context(app: base.QuartApp) -> None:
 
         return {
             "current_user": await asfquart.session.read(),
-            "is_admin": is_admin,
-            "is_project_lead": service.is_project_lead,
+            "is_admin_fn": is_admin,
+            "is_project_lead_fn": service.is_project_lead,
             "commit": commit,
             "version": version,
         }

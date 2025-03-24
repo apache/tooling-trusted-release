@@ -20,7 +20,8 @@
     {% endif %}
   </div>
 
-  {% set is_project_lead = is_project_lead(project, current_user.uid) %}
+  {% set is_admin = is_admin_fn(current_user.uid) %}
+  {% set is_project_lead = is_project_lead_fn(project, current_user.uid) %}
 
   <div class="card mb-4">
     <div class="card-header bg-light">
