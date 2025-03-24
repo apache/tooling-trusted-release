@@ -24,6 +24,8 @@ from collections.abc import Mapping
 from typing import Annotated, Any, TypeVar
 
 import aiofiles.os
+import asfquart.base as base
+import asfquart.session as session
 import pydantic
 import pydantic_core
 import quart_wtf
@@ -33,6 +35,13 @@ import atr.config as config
 
 F = TypeVar("F", bound="QuartFormTyped")
 T = TypeVar("T")
+
+
+async def get_asf_id_or_die() -> str:
+    web_session = await session.read()
+    if web_session is None or web_session.uid is None:
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
+    return web_session.uid
 
 
 # from https://github.com/pydantic/pydantic/discussions/8755#discussioncomment-8417979

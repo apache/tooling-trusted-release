@@ -21,7 +21,6 @@ import http.client
 
 import asfquart.auth as auth
 import asfquart.base as base
-import asfquart.session as session
 import quart
 import werkzeug.wrappers.response as response
 import wtforms
@@ -31,6 +30,7 @@ import atr.db.models as models
 import atr.db.service as service
 import atr.routes as routes
 import atr.util as util
+from atr.util import get_asf_id_or_die
 
 
 @routes.app_route("/projects")
@@ -74,9 +74,7 @@ class VotePolicyForm(util.QuartFormTyped):
 
 @routes.app_route("/projects/<project_name>/voting-policy/add", methods=["GET", "POST"])
 async def root_projects_vote_policy_add(project_name: str) -> response.Response | str:
-    web_session = await session.read()
-    if web_session is None or web_session.uid is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
+    uid = await get_asf_id_or_die()
 
     async with db.session() as data:
         project = await data.project(name=project_name, _committee=True, _vote_policy=True).demand(
@@ -86,22 +84,22 @@ async def root_projects_vote_policy_add(project_name: str) -> response.Response 
         if project.committee is None:
             base.ASFQuartException(f"Committee for project {project_name} not found", errorcode=404)
 
-        if not (service.is_project_lead(project, web_session.uid) or util.is_admin(web_session.uid)):
+        if not (service.is_project_lead(project, uid) or util.is_admin(uid)):
             raise base.ASFQuartException(
                 f"You must be a committee member of {project.display_name} to submit a voting policy", errorcode=403
             )
 
-    form = await VotePolicyForm.create_form(data={"project_name": project.name})
+        form = await VotePolicyForm.create_form(data={"project_name": project.name})
 
-    if form.mailto_addresses.entries[0].data is None:
-        form.mailto_addresses.entries[0].data = f"dev@{util.unwrap(project.committee).name}.apache.org"
+        if form.mailto_addresses.entries[0].data is None:
+            form.mailto_addresses.entries[0].data = f"dev@{util.unwrap(project.committee).name}.apache.org"
 
-    if await form.validate_on_submit():
-        return await _add_voting_policy(project, form)
+        if await form.validate_on_submit():
+            return await _add_voting_policy(project, form, data)
 
     return await quart.render_template(
         "vote-policy-add.html",
-        asf_id=web_session.uid,
+        asf_id=uid,
         project=project,
         form=form,
     )
@@ -110,9 +108,7 @@ async def root_projects_vote_policy_add(project_name: str) -> response.Response 
 @routes.app_route("/projects/<project_name>/vote-policy/edit", methods=["GET", "POST"])
 @auth.require(auth.Requirements.committer)
 async def root_projects_vote_policy_edit(project_name: str) -> response.Response | str:
-    web_session = await session.read()
-    if web_session is None or web_session.uid is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
+    uid = await get_asf_id_or_die()
 
     async with db.session() as data:
         project = await data.project(name=project_name, _committee=True, _vote_policy=True).demand(
@@ -122,59 +118,58 @@ async def root_projects_vote_policy_edit(project_name: str) -> response.Response
         if project.vote_policy is None:
             base.ASFQuartException(f"Vote Policy for project {project_name} does not exist", errorcode=404)
 
-        if not (service.is_project_lead(project, web_session.uid) or util.is_admin(web_session.uid)):
+        if not (service.is_project_lead(project, uid) or util.is_admin(uid)):
             raise base.ASFQuartException(
                 f"You must be a committee member of {project.display_name} to submit a voting policy", errorcode=403
             )
 
-    form = await VotePolicyForm.create_form()
+        form = await VotePolicyForm.create_form()
 
-    # fill data
-    if quart.request.method == "GET":
-        form.process(obj=project.vote_policy)
-        form.project_name.data = project.name
+        # fill data
+        if quart.request.method == "GET":
+            form.process(obj=project.vote_policy)
+            form.project_name.data = project.name
 
-    if await form.validate_on_submit():
-        return await _edit_voting_policy(util.unwrap(project.vote_policy).id, form)
+        if await form.validate_on_submit():
+            return await _edit_voting_policy(util.unwrap(project.vote_policy), form, data)
 
     # For GET requests, show the form
     return await quart.render_template(
         "vote-policy-edit.html",
-        asf_id=web_session.uid,
+        asf_id=uid,
         project=project,
         form=form,
     )
 
 
-async def _add_voting_policy(project: models.Project, form: VotePolicyForm) -> response.Response:
+async def _add_voting_policy(project: models.Project, form: VotePolicyForm, data: db.Session) -> response.Response:
     project_name = str(form.project_name.data)
 
-    async with db.session() as data:
-        async with data.begin():
-            vote_policy = models.VotePolicy(
-                mailto_addresses=[util.unwrap(form.mailto_addresses.entries[0].data)],
-                manual_vote=form.manual_vote.data,
-                min_hours=util.unwrap(form.min_hours.data),
-                release_checklist=util.unwrap(form.release_checklist.data),
-                pause_for_rm=form.pause_for_rm.data,
-            )
+    vote_policy = models.VotePolicy(
+        mailto_addresses=[util.unwrap(form.mailto_addresses.entries[0].data)],
+        manual_vote=form.manual_vote.data,
+        min_hours=util.unwrap(form.min_hours.data),
+        release_checklist=util.unwrap(form.release_checklist.data),
+        pause_for_rm=form.pause_for_rm.data,
+    )
 
-            vote_policy.project = project
-            data.add(vote_policy)
+    vote_policy.project = project
+    data.add(vote_policy)
+    await data.commit()
 
     return quart.redirect(quart.url_for("root_project_view", name=project_name))
 
 
-async def _edit_voting_policy(vote_policy_id: int, form: VotePolicyForm) -> response.Response:
+async def _edit_voting_policy(
+    vote_policy: models.VotePolicy, form: VotePolicyForm, data: db.Session
+) -> response.Response:
     project_name = str(form.project_name.data)
 
-    async with db.session() as data:
-        async with data.begin():
-            vote_policy = await data.vote_policy(id=vote_policy_id).demand(http.client.HTTPException(404))
-            vote_policy.mailto_addresses = [util.unwrap(form.mailto_addresses.entries[0].data)]
-            vote_policy.manual_vote = form.manual_vote.data
-            vote_policy.min_hours = util.unwrap(form.min_hours.data)
-            vote_policy.release_checklist = util.unwrap(form.release_checklist.data)
-            vote_policy.pause_for_rm = form.pause_for_rm.data
+    vote_policy.mailto_addresses = [util.unwrap(form.mailto_addresses.entries[0].data)]
+    vote_policy.manual_vote = form.manual_vote.data
+    vote_policy.min_hours = util.unwrap(form.min_hours.data)
+    vote_policy.release_checklist = util.unwrap(form.release_checklist.data)
+    vote_policy.pause_for_rm = form.pause_for_rm.data
+    await data.commit()
 
     return quart.redirect(quart.url_for("root_project_view", name=project_name))
