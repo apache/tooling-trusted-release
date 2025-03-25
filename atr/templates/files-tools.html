@@ -30,6 +30,6 @@
   <p>This tool deletes the file from the candidate draft.</p>
   <form method="post"
         action="{{ url_for('root_files_delete', project_name=project_name, version_name=version_name, file_path=file_path) }}">
-    <button type="submit" class="btn btn-danger" disabled>Delete file</button>
+    <button type="submit" class="btn btn-danger">Delete file</button>
   </form>
 {% endblock content %}

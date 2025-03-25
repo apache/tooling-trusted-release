@@ -503,6 +503,28 @@ async def root_files_tools(session: CommitterSession, project_name: str, version
 
 
 @committer_route("/files/delete/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
-async def root_files_delete(session: CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
+async def root_files_delete(
+    session: CommitterSession, project_name: str, version_name: str, file_path: str
+) -> response.Response:
     """Delete a specific file from the release candidate."""
-    return ""
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
+    async with db.session() as data:
+        # Check that the release exists
+        await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+
+        full_path = str(util.get_candidate_draft_dir() / project_name / version_name / file_path)
+
+        # Check that the file exists
+        if not await aiofiles.os.path.exists(full_path):
+            raise base.ASFQuartException("File does not exist", errorcode=404)
+
+        # Delete the file
+        await aiofiles.os.remove(full_path)
+
+    await quart.flash("File deleted successfully", "success")
+    return quart.redirect(quart.url_for("root_files_list", project_name=project_name, version_name=version_name))
