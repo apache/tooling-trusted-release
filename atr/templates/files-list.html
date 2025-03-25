@@ -57,8 +57,7 @@
             <thead>
               <tr>
                 <th>Path</th>
-                <th>Warnings</th>
-                <th>Errors</th>
+                <th>Warnings and errors</th>
                 <th>Checks</th>
               </tr>
             </thead>
@@ -75,10 +74,8 @@
                     {% endif %}
                   </td>
                   <td>
-                    {% for warning in warnings[path] %}<div class="alert alert-warning p-0 px-2 mt-2 mb-0">{{ warning }}</div>{% endfor %}
-                  </td>
-                  <td>
-                    {% for error in errors[path] %}<div class="alert alert-danger p-0 px-2 mt-2 mb-0">{{ error }}</div>{% endfor %}
+                    {% for warning in warnings[path] %}<div class="alert alert-warning p-0 px-2 mt-0 mb-2">{{ warning }}</div>{% endfor %}
+                    {% for error in errors[path] %}<div class="alert alert-danger p-0 px-2 mt-0 mb-2">{{ error }}</div>{% endfor %}
                   </td>
                   <td>
                     {% if path in tasks and tasks[path]|length > 0 %}
@@ -121,36 +118,37 @@
           </table>
         </div>
 
-        <p>Debugging information:</p>
-
-        <div class="table-responsive mt-4">
-          <table class="table table-striped table-hover">
-            <thead>
-              <tr>
-                <th>Path</th>
-                <th>Template</th>
-                <th>Substitutions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for path in paths %}
+        <details>
+          <summary>Debugging information</summary>
+          <div class="table-responsive mt-4">
+            <table class="table table-striped table-hover">
+              <thead>
                 <tr>
-                  <td>
-                    {% if path in artifacts %}
-                      <strong><a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a></strong>
-                    {% elif path in metadata %}
-                      <em><a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a></em>
-                    {% else %}
-                      <a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a>
-                    {% endif %}
-                  </td>
-                  <td>{{ templates[path] }}</td>
-                  <td>{{ substitutions[path] }}</td>
+                  <th>Path</th>
+                  <th>Template</th>
+                  <th>Substitutions</th>
                 </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {% for path in paths %}
+                  <tr>
+                    <td>
+                      {% if path in artifacts %}
+                        <strong><a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a></strong>
+                      {% elif path in metadata %}
+                        <em><a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a></em>
+                      {% else %}
+                        <a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a>
+                      {% endif %}
+                    </td>
+                    <td>{{ templates[path] }}</td>
+                    <td>{{ substitutions[path] }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </details>
       {% else %}
         <div class="alert alert-info">
           This release does not have any files yet. You can add files using rsync from the <a href="{{ url_for('root_files_add') }}">add files</a> page.
