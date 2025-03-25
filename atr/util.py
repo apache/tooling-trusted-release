@@ -90,10 +90,8 @@ async def compute_sha512(file_path: pathlib.Path) -> str:
     """Compute SHA-512 hash of a file."""
     sha512 = hashlib.sha512()
     async with aiofiles.open(file_path, "rb") as f:
-        chunk = await f.read(4096)
-        while chunk:
+        while chunk := await f.read(4096):
             sha512.update(chunk)
-            chunk = await f.read(4096)
     return sha512.hexdigest()
 
 
@@ -101,10 +99,8 @@ async def file_sha3(path: str) -> str:
     """Compute SHA3-256 hash of a file."""
     sha3 = hashlib.sha3_256()
     async with aiofiles.open(path, "rb") as f:
-        chunk = await f.read(4096)
-        while chunk:
+        while chunk := await f.read(4096):
             sha3.update(chunk)
-            chunk = await f.read(4096)
     return sha3.hexdigest()
 
 

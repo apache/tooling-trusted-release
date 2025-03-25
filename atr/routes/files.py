@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import hashlib
 import logging
 import pathlib
 import re
@@ -39,6 +40,7 @@ import atr.analysis as analysis
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
+import atr.tasks as tasks
 import atr.user as user
 import atr.util as util
 
@@ -527,4 +529,60 @@ async def root_files_delete(
         await aiofiles.os.remove(full_path)
 
     await quart.flash("File deleted successfully", "success")
+    return quart.redirect(quart.url_for("root_files_list", project_name=project_name, version_name=version_name))
+
+
+@committer_route("/files/generate-hash/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+async def root_files_generate_hash(
+    session: CommitterSession, project_name: str, version_name: str, file_path: str
+) -> response.Response:
+    """Generate an sha256 or sha512 hash file for a candidate draft file."""
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
+    async with db.session() as data:
+        # Check that the release exists
+        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+
+        # Get the hash type from the form data
+        # This is just a button, so we don't make a whole form validation schema for it
+        form = await quart.request.form
+        hash_type = form.get("hash_type")
+        if hash_type not in {"sha256", "sha512"}:
+            raise base.ASFQuartException("Invalid hash type", errorcode=400)
+
+        # Construct paths
+        base_path = util.get_candidate_draft_dir() / project_name / version_name
+        full_path = base_path / file_path
+        hash_path = file_path + f".{hash_type}"
+        full_hash_path = base_path / hash_path
+
+        # Check that the source file exists
+        if not await aiofiles.os.path.exists(full_path):
+            raise base.ASFQuartException("Source file does not exist", errorcode=404)
+
+        # Check that the hash file does not already exist
+        if await aiofiles.os.path.exists(full_hash_path):
+            raise base.ASFQuartException(f"{hash_type} file already exists", errorcode=400)
+
+        # Read the file and compute the hash
+        hash_obj = hashlib.sha256() if hash_type == "sha256" else hashlib.sha512()
+        async with aiofiles.open(full_path, "rb") as f:
+            while chunk := await f.read(8192):
+                hash_obj.update(chunk)
+
+        # Write the hash file
+        hash_value = hash_obj.hexdigest()
+        async with aiofiles.open(full_hash_path, "w") as f:
+            await f.write(f"{hash_value}  {file_path}\n")
+
+        # Add any relevant tasks to the database
+        for task in await tasks.sha_checks(release, str(hash_path)):
+            data.add(task)
+        await data.commit()
+
+    await quart.flash(f"{hash_type} file generated successfully", "success")
     return quart.redirect(quart.url_for("root_files_list", project_name=project_name, version_name=version_name))

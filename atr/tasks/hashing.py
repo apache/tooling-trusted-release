@@ -55,17 +55,15 @@ async def _check_core(
         hash_func = hashlib.sha512
     else:
         raise task.Error(f"Unsupported hash algorithm: {algorithm}")
-    h = hash_func()
+    hash_obj = hash_func()
     async with aiofiles.open(original_file, mode="rb") as f:
-        while True:
-            chunk = await f.read(4096)
-            if not chunk:
-                break
-            h.update(chunk)
-    computed_hash = h.hexdigest()
+        while chunk := await f.read(4096):
+            hash_obj.update(chunk)
+    computed_hash = hash_obj.hexdigest()
     async with aiofiles.open(hash_file) as f:
         expected_hash = await f.read()
     # May be in the format "HASH FILENAME\n"
+    # TODO: Check the FILENAME part
     expected_hash = expected_hash.strip().split()[0]
     if secrets.compare_digest(computed_hash, expected_hash):
         return task.COMPLETED, None, ({"computed_hash": computed_hash, "expected_hash": expected_hash},)
