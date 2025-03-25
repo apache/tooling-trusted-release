@@ -1,0 +1,35 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  File tools ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Manage a file in the candidate draft using tools.
+{% endblock description %}
+
+{% block content %}
+  <a href="{{ url_for('root_files_list', project_name=project_name, version_name=version_name) }}"
+     class="back-link">← Back to Files List</a>
+
+  <div class="p-3 mb-4 bg-light border rounded">
+    <h2 class="mt-0">File details</h2>
+    <p>
+      <strong>Filename:</strong> {{ file_data.filename }}
+    </p>
+    <p>
+      <strong>Size:</strong> {{ format_file_size(file_data.bytes_size) }}
+    </p>
+    <p class="mb-0">
+      <strong>Uploaded:</strong> {{ file_data.uploaded.strftime("%Y-%m-%d %H:%M UTC") }}
+    </p>
+  </div>
+
+  <h2>Tools</h2>
+  <h3>Delete file</h3>
+  <p>This tool deletes the file from the candidate draft.</p>
+  <form method="post"
+        action="{{ url_for('root_files_delete', project_name=project_name, version_name=version_name, file_path=file_path) }}">
+    <button type="submit" class="btn btn-danger" disabled>Delete file</button>
+  </form>
+{% endblock content %}

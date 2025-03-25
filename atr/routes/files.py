@@ -461,3 +461,48 @@ async def root_files_checks(session: CommitterSession, project_name: str, versio
         all_tasks_completed=all_tasks_completed,
         format_file_size=routes.format_file_size,
     )
+
+
+@committer_route("/files/tools/<project_name>/<version_name>/<path:file_path>")
+async def root_files_tools(session: CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
+    """Show the tools for a specific file."""
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
+    async with db.session() as data:
+        # Check that the release exists
+        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+
+        full_path = str(util.get_candidate_draft_dir() / project_name / version_name / file_path)
+
+        # Check that the file exists
+        if not await aiofiles.os.path.exists(full_path):
+            raise base.ASFQuartException("File does not exist", errorcode=404)
+
+        modified = int(await aiofiles.os.path.getmtime(full_path))
+        file_size = await aiofiles.os.path.getsize(full_path)
+
+    file_data = {
+        "filename": pathlib.Path(file_path).name,
+        "bytes_size": file_size,
+        "uploaded": datetime.datetime.fromtimestamp(modified, tz=datetime.UTC),
+    }
+
+    return await quart.render_template(
+        "files-tools.html",
+        project_name=project_name,
+        version_name=version_name,
+        file_path=file_path,
+        file_data=file_data,
+        release=release,
+        format_file_size=routes.format_file_size,
+    )
+
+
+@committer_route("/files/delete/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+async def root_files_delete(session: CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
+    """Delete a specific file from the release candidate."""
+    return ""

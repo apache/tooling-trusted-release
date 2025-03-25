@@ -10,7 +10,9 @@
 
 {% block content %}
   <h1>Files for {{ release.project.display_name }} {{ version_name }}</h1>
-  <p class="intro">This page shows the files for the {{ project_name }} {{ version_name }} candidate draft.</p>
+  <p class="intro">
+    This page shows the files for the {{ project_name }} {{ version_name }} <strong>candidate draft</strong>.
+  </p>
 
   <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -57,8 +59,7 @@
             <thead>
               <tr>
                 <th>Path</th>
-                <th>Warnings and errors</th>
-                <th>Checks</th>
+                <th>Tools, checks, warnings, and errors</th>
               </tr>
             </thead>
             <tbody>
@@ -74,11 +75,9 @@
                     {% endif %}
                   </td>
                   <td>
-                    {% for warning in warnings[path] %}<div class="alert alert-warning p-0 px-2 mt-0 mb-2">{{ warning }}</div>{% endfor %}
-                    {% for error in errors[path] %}<div class="alert alert-danger p-0 px-2 mt-0 mb-2">{{ error }}</div>{% endfor %}
-                  </td>
-                  <td>
                     {% if path in tasks and tasks[path]|length > 0 %}
+                      <a href="{{ url_for('root_files_tools', project_name=project_name, version_name=version_name, file_path=path) }}">Tools</a> ·
+                      <a href="{{ url_for('root_files_checks', project_name=project_name, version_name=version_name, file_path=path) }}">Check results</a>
                       {% set completed_count = namespace(value=0) %}
                       {% set failed_count = namespace(value=0) %}
                       {% set active_count = namespace(value=0) %}
@@ -96,7 +95,7 @@
                         {% endif %}
                       {% endfor %}
 
-                      <div class="d-flex flex-wrap gap-2 mb-2">
+                      <div class="d-flex flex-wrap gap-2 mt-2 mb-3">
                         {% if completed_count.value > 0 %}<span class="badge bg-success">{{ completed_count.value }} Passed</span>{% endif %}
                         {% if failed_count.value > 0 %}
                           <span class="badge bg-danger">{{ failed_count.value }} {{ "Issue" if failed_count.value == 1 else "Issues" }}</span>
@@ -104,13 +103,20 @@
                         {% if active_count.value > 0 %}<span class="badge bg-info">{{ active_count.value }} Running</span>{% endif %}
                         {% if queued_count.value > 0 %}<span class="badge bg-secondary">{{ queued_count.value }} Pending</span>{% endif %}
                       </div>
-
-                      <a href="{{ url_for('root_files_checks', project_name=project_name, version_name=version_name, file_path=path) }}">
-                        View all check results
-                      </a>
                     {% else %}
+                      <a href="{{ url_for('root_files_tools', project_name=project_name, version_name=version_name, file_path=path) }}">Tools</a> ·
                       No check results
                     {% endif %}
+                    {% for warning in warnings[path] %}
+                      <div class="alert alert-warning p-1 px-2 mt-2 mb-2">
+                        <i class="fas fa-exclamation-triangle"></i> {{ warning }}
+                      </div>
+                    {% endfor %}
+                    {% for error in errors[path] %}
+                      <div class="alert alert-danger p-1 px-2 mt-2 mb-2">
+                        <i class="fas fa-exclamation-triangle"></i> {{ error }}
+                      </div>
+                    {% endfor %}
                   </td>
                 </tr>
               {% endfor %}
