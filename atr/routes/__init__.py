@@ -52,7 +52,7 @@ _LOGGER: Final = logging.getLogger(__name__)
 # |        22 | EdDSA [I-D.irtf-cfrg-eddsa]                        |
 # - https://lists.gnupg.org/pipermail/gnupg-devel/2017-April/032762.html
 # TODO: (Obviously we should move this, but where to?)
-algorithms: dict[int, str] = {
+algorithms: Final[dict[int, str]] = {
     1: "RSA",
     2: "RSA",
     3: "RSA",
