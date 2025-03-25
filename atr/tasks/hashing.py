@@ -23,8 +23,8 @@ from typing import Any, Final
 import aiofiles
 import pydantic
 
+import atr.db.models as models
 import atr.tasks.task as task
-from atr.db import models
 
 _LOGGER: Final = logging.getLogger(__name__)
 

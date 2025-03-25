@@ -21,8 +21,8 @@ import logging
 import os
 from typing import Any, Final
 
+import atr.db.models as models
 import atr.tasks.task as task
-from atr.db import models
 
 # Configure detailed logging
 _LOGGER: Final = logging.getLogger(__name__)

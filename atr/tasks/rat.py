@@ -23,10 +23,10 @@ import xml.etree.ElementTree as ElementTree
 from typing import Any, Final
 
 import atr.config as config
+import atr.db.models as models
 import atr.tasks.archive as archive
 import atr.tasks.sbom as sbom
 import atr.tasks.task as task
-from atr.db import models
 
 _CONFIG: Final = config.get()
 _JAVA_MEMORY_ARGS: Final[list[str]] = []

@@ -278,13 +278,13 @@ async def get_form(request: quart.Request) -> datastructures.MultiDict:
     # Which calls _write which calls tempfile, which is synchronous
     # It's getting a tempfile back from some prior call
     # We can't just make blockbuster ignore the call because then it ignores it everywhere
-    from asfquart import APP
+    app = asfquart.APP
 
-    if APP is ...:
+    if app is ...:
         raise RuntimeError("APP is not set")
 
     # Or quart.current_app?
-    blockbuster = APP.extensions.get("blockbuster")
+    blockbuster = app.extensions.get("blockbuster")
 
     # Turn blockbuster off
     if blockbuster is not None:

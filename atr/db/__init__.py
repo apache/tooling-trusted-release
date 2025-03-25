@@ -34,12 +34,10 @@ import atr.db.models as models
 import atr.util as util
 
 if TYPE_CHECKING:
+    import datetime
     from collections.abc import Sequence
-    from datetime import datetime
 
     import asfquart.base as base
-
-    from atr.db.models import ReleasePhase, ReleaseStage, TaskStatus, VoteEntry
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -168,7 +166,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         filename: Opt[str] = NotSet,
         sha512: Opt[str] = NotSet,
         signature_sha3: Opt[str | None] = NotSet,
-        uploaded: Opt[datetime] = NotSet,
+        uploaded: Opt[datetime.datetime] = NotSet,
         bytes_size: Opt[int] = NotSet,
         release_name: Opt[str] = NotSet,
         _release: bool = False,
@@ -252,8 +250,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         fingerprint: Opt[str] = NotSet,
         algorithm: Opt[str] = NotSet,
         length: Opt[int] = NotSet,
-        created: Opt[datetime] = NotSet,
-        expires: Opt[datetime | None] = NotSet,
+        created: Opt[datetime.datetime] = NotSet,
+        expires: Opt[datetime.datetime | None] = NotSet,
         declared_uid: Opt[str | None] = NotSet,
         apache_uid: Opt[str] = NotSet,
         ascii_armored_key: Opt[str] = NotSet,
@@ -286,15 +284,15 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
     def release(
         self,
         name: Opt[str] = NotSet,
-        stage: Opt[ReleaseStage] = NotSet,
-        phase: Opt[ReleasePhase] = NotSet,
-        created: Opt[datetime] = NotSet,
+        stage: Opt[models.ReleaseStage] = NotSet,
+        phase: Opt[models.ReleasePhase] = NotSet,
+        created: Opt[datetime.datetime] = NotSet,
         project_id: Opt[int] = NotSet,
         package_managers: Opt[list[str]] = NotSet,
         version: Opt[str] = NotSet,
         sboms: Opt[list[str]] = NotSet,
         vote_policy_id: Opt[int] = NotSet,
-        votes: Opt[list[VoteEntry]] = NotSet,
+        votes: Opt[list[models.VoteEntry]] = NotSet,
         _project: bool = False,
         _packages: bool = False,
         _vote_policy: bool = False,
@@ -357,13 +355,13 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
     def task(
         self,
         id: Opt[int] = NotSet,
-        status: Opt[TaskStatus] = NotSet,
+        status: Opt[models.TaskStatus] = NotSet,
         task_type: Opt[str] = NotSet,
         task_args: Opt[Any] = NotSet,
-        added: Opt[datetime] = NotSet,
-        started: Opt[datetime | None] = NotSet,
+        added: Opt[datetime.datetime] = NotSet,
+        started: Opt[datetime.datetime | None] = NotSet,
         pid: Opt[int | None] = NotSet,
-        completed: Opt[datetime | None] = NotSet,
+        completed: Opt[datetime.datetime | None] = NotSet,
         result: Opt[Any | None] = NotSet,
         error: Opt[str | None] = NotSet,
         release_name: Opt[str | None] = NotSet,

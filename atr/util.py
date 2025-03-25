@@ -217,14 +217,14 @@ def _get_dict_to_list_inner_type_adapter(source_type: Any, key: str) -> pydantic
 
 def _get_dict_to_list_validator(inner_adapter: pydantic.TypeAdapter[dict[Any, Any]], key: str) -> Any:
     def validator(val: Any) -> Any:
-        from pydantic.fields import FieldInfo
+        import pydantic.fields as fields
 
         if isinstance(val, dict):
             validated = inner_adapter.validate_python(val)
 
             # need to get the alias of the field in the nested model
             # as this will be fed into the actual model class
-            def get_alias(field_name: str, field_infos: Mapping[str, FieldInfo]) -> Any:
+            def get_alias(field_name: str, field_infos: Mapping[str, fields.FieldInfo]) -> Any:
                 field = field_infos[field_name]
                 return field.alias if field.alias else field_name
 

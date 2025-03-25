@@ -15,6 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from quart import Blueprint
+import quart
 
-BLUEPRINT = Blueprint("api_blueprint", __name__, url_prefix="/api")
+BLUEPRINT = quart.Blueprint("api_blueprint", __name__, url_prefix="/api")

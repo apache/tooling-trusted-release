@@ -21,9 +21,9 @@ import re
 import tarfile
 from typing import Any, Final
 
+import atr.db.models as models
 import atr.tasks.archive as archive
 import atr.tasks.task as task
-from atr.db import models
 
 _LOGGER = logging.getLogger(__name__)
 

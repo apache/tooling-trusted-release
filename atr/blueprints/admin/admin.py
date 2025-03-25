@@ -20,9 +20,10 @@ import logging
 import pathlib
 import statistics
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import aiofiles.os
+import asfquart
 import asfquart.base as base
 import asfquart.session as session
 import httpx
@@ -35,18 +36,15 @@ import atr.db as db
 import atr.db.models as models
 import atr.util as util
 
-if TYPE_CHECKING:
-    from atr.datasources.apache import LDAPProject
-
 _LOGGER = logging.getLogger(__name__)
 
 
 @admin.BLUEPRINT.route("/performance")
 async def admin_performance() -> str:
     """Display performance statistics for all routes."""
-    from asfquart import APP
+    app = asfquart.APP
 
-    if APP is ...:
+    if app is ...:
         raise base.ASFQuartException("APP is not set", errorcode=500)
 
     # Read and parse the performance log file
@@ -78,7 +76,7 @@ async def admin_performance() -> str:
                     }
                 )
             except (ValueError, IndexError):
-                APP.logger.error("Error parsing line: %s", line)
+                app.logger.error("Error parsing line: %s", line)
                 continue
 
     # Calculate summary statistics for each route
@@ -199,7 +197,7 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
     podlings_data = await apache.get_current_podlings_data()
     committees = await apache.get_active_committee_data()
 
-    ldap_projects_by_name: Mapping[str, LDAPProject] = {p.name: p for p in ldap_projects.projects}
+    ldap_projects_by_name: Mapping[str, apache.LDAPProject] = {p.name: p for p in ldap_projects.projects}
     committees_by_name: Mapping[str, apache.Committee] = {c.name: c for c in committees.committees}
 
     added_count = 0

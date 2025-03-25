@@ -153,15 +153,15 @@ def app_setup_context(app: base.QuartApp) -> None:
     @app.context_processor
     async def app_wide() -> dict[str, Any]:
         import atr.db.service as service
-        from atr.metadata import commit, version
-        from atr.util import is_admin
+        import atr.metadata as metadata
+        import atr.util as util
 
         return {
             "current_user": await asfquart.session.read(),
-            "is_admin_fn": is_admin,
+            "is_admin_fn": util.is_admin,
             "is_project_lead_fn": service.is_project_lead,
-            "commit": commit,
-            "version": version,
+            "commit": metadata.commit,
+            "version": metadata.version,
         }
 
 

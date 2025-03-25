@@ -36,6 +36,7 @@ from typing import Any, Final
 import sqlmodel
 
 import atr.db as db
+import atr.db.models as models
 import atr.tasks.archive as archive
 import atr.tasks.bulk as bulk
 import atr.tasks.hashing as hashing
@@ -47,7 +48,6 @@ import atr.tasks.sbom as sbom
 import atr.tasks.signature as signature
 import atr.tasks.task as task
 import atr.tasks.vote as vote
-from atr.db import models
 
 _LOGGER: Final = logging.getLogger(__name__)
 

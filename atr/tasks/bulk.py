@@ -29,8 +29,8 @@ import aiohttp
 import sqlalchemy
 import sqlalchemy.ext.asyncio
 
+import atr.db.models as models
 import atr.tasks.task as task
-from atr.db import models
 
 # Configure detailed logging
 _LOGGER: Final = logging.getLogger(__name__)
@@ -177,9 +177,7 @@ async def database_task_id_get() -> int | None:
         return global_task_id
 
     try:
-        from os import getpid
-
-        process_id = getpid()
+        process_id = os.getpid()
         _LOGGER.debug(f"Current process ID: {process_id}")
         task_id = await database_task_pid_lookup(process_id)
 

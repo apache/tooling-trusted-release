@@ -20,7 +20,7 @@ def _get_version_from_git() -> tuple[str, str] | None:
     """Returns the version when within a development environment."""
 
     try:
-        from dunamai import Version
+        import dunamai
     except ImportError:
         # dunamai is not installed, so probably we are not in
         # a development environment.
@@ -28,7 +28,7 @@ def _get_version_from_git() -> tuple[str, str] | None:
 
     try:
         # We start in state/, so we need to go up one level
-        version = Version.from_git()
+        version = dunamai.Version.from_git()
         if version.distance > 0:
             dirty = "+dirty" if version.dirty else ""
             # The development version number should reflect the next release that is going to be cut,
@@ -55,9 +55,9 @@ def _get_version_from_version_module() -> tuple[str, str] | None:
     """Returns the version from _version module if it exists."""
 
     try:
-        from atr._version import ATR_COMMIT, ATR_VERSION  # pyright: ignore [reportMissingImports]
+        import atr._version  # pyright: ignore [reportMissingImports]
 
-        return ATR_VERSION, ATR_COMMIT
+        return atr._version.ATR_VERSION, atr._version.ATR_COMMIT
     except ImportError:
         return None
 

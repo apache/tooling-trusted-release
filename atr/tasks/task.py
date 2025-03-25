@@ -17,7 +17,7 @@
 
 from typing import Any, Final
 
-from atr.db import models
+import atr.db.models as models
 
 QUEUED: Final = models.TaskStatus.QUEUED
 ACTIVE: Final = models.TaskStatus.ACTIVE

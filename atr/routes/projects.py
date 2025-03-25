@@ -30,7 +30,6 @@ import atr.db.models as models
 import atr.db.service as service
 import atr.routes as routes
 import atr.util as util
-from atr.util import get_asf_id_or_die
 
 
 @routes.app_route("/projects")
@@ -81,7 +80,7 @@ class VotePolicyForm(util.QuartFormTyped):
 
 @routes.app_route("/projects/<project_name>/voting-policy/add", methods=["GET", "POST"])
 async def root_projects_vote_policy_add(project_name: str) -> response.Response | str:
-    uid = await get_asf_id_or_die()
+    uid = await util.get_asf_id_or_die()
 
     async with db.session() as data:
         project = await data.project(name=project_name, _committee=True, _vote_policy=True).demand(
@@ -115,7 +114,7 @@ async def root_projects_vote_policy_add(project_name: str) -> response.Response 
 @routes.app_route("/projects/<project_name>/vote-policy/edit", methods=["GET", "POST"])
 @auth.require(auth.Requirements.committer)
 async def root_projects_vote_policy_edit(project_name: str) -> response.Response | str:
-    uid = await get_asf_id_or_die()
+    uid = await util.get_asf_id_or_die()
 
     async with db.session() as data:
         project = await data.project(name=project_name, _committee=True, _vote_policy=True).demand(

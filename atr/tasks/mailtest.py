@@ -20,8 +20,8 @@ import logging
 import os
 from typing import Any, Final
 
+import atr.db.models as models
 import atr.tasks.task as task
-from atr.db import models
 
 # Configure detailed logging
 _LOGGER: Final = logging.getLogger(__name__)
@@ -103,8 +103,8 @@ def send_core(args_list: list[str]) -> tuple[models.TaskStatus, str | None, tupl
     """Send a test email."""
     import asyncio
 
-    import atr.mail
-    from atr.db.service import get_committee_by_name
+    import atr.db.service as service
+    import atr.mail as mail
 
     _LOGGER.info("Starting send_core")
     try:
@@ -137,7 +137,7 @@ def send_core(args_list: list[str]) -> tuple[models.TaskStatus, str | None, tupl
             # Must be a PMC member of tooling
             # Since get_pmc_by_name is async, we need to run it in an event loop
             # TODO: We could make a sync version
-            tooling_committee = asyncio.run(get_committee_by_name("tooling"))
+            tooling_committee = asyncio.run(service.get_committee_by_name("tooling"))
 
             if not tooling_committee:
                 error_msg = "Tooling committee not found in database"
@@ -163,19 +163,19 @@ def send_core(args_list: list[str]) -> tuple[models.TaskStatus, str | None, tupl
 
             with open(dkim_path) as f:
                 dkim_key = f.read()
-                atr.mail.set_secret_key(dkim_key.strip())
+                mail.set_secret_key(dkim_key.strip())
                 _LOGGER.info("DKIM key loaded and set successfully")
         except Exception as e:
             error_msg = f"Failed to load DKIM key: {e}"
             _LOGGER.error(error_msg)
             return task.FAILED, error_msg, tuple()
 
-        event = atr.mail.ArtifactEvent(
+        event = mail.ArtifactEvent(
             artifact_name=args.artifact_name,
             email_recipient=args.email_recipient,
             token=args.token,
         )
-        atr.mail.send(event)
+        mail.send(event)
         _LOGGER.info(f"Email sent successfully to {args.email_recipient}")
 
         return task.COMPLETED, None, tuple()

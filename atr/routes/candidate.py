@@ -185,6 +185,7 @@ async def root_candidate_review() -> str:
         releases = await data.release(
             stage=models.ReleaseStage.CANDIDATE,
             _committee=True,
+            _packages=True,
         ).all()
 
         # Filter to only show releases for PMCs or PPMCs where the user is a member or committer
