@@ -16,8 +16,9 @@
 # under the License.
 
 import logging
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
+import aiofiles.os
 import pydantic
 
 import atr.db as db
@@ -25,6 +26,9 @@ import atr.db.models as models
 import atr.tasks as tasks
 import atr.tasks.task as task
 import atr.util as util
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
 
 # _CONFIG: Final = config.get()
 _LOGGER: Final = logging.getLogger(__name__)
@@ -57,18 +61,31 @@ async def _analyse_core(asf_uid: str, project_name: str, release_version: str) -
     base_path = util.get_candidate_draft_dir() / project_name / release_version
     paths = await util.paths_recursive(base_path)
     release_name = f"{project_name}-{release_version}"
+
     async with db.session() as data:
         release = await data.release(name=release_name, _committee=True).demand(RuntimeError("Release not found"))
         for path in paths:
+            # This works because path is relative
+            full_path = base_path / path
+
+            # We only want to analyse files that are new or have changed
+            # But rsync can set timestamps to the past, so we can't rely on them
+            # Instead, we can run any tasks when the file has a different modified time
+            # TODO: This may cause problems if the file is backdated
+            modified = int(await aiofiles.os.path.getmtime(full_path))
+            cached_tasks = await db.recent_tasks(data, release_name, str(path), modified)
+
             # Add new tasks for each path
-            if path.name.endswith(".asc"):
-                for task in await tasks.asc_checks(release, str(path)):
-                    data.add(task)
-            elif path.name.endswith(".sha256") or path.name.endswith(".sha512"):
-                for task in await tasks.sha_checks(release, str(path)):
-                    data.add(task)
-            elif path.name.endswith(".tar.gz"):
-                for task in await tasks.tar_gz_checks(release, str(path)):
-                    data.add(task)
+            task_functions: dict[str, Callable[..., Coroutine[Any, Any, list[models.Task]]]] = {
+                ".asc": tasks.asc_checks,
+                ".sha256": tasks.sha_checks,
+                ".sha512": tasks.sha_checks,
+                ".tar.gz": tasks.tar_gz_checks,
+            }
+            for task_type, task_function in task_functions.items():
+                if path.name.endswith(task_type):
+                    for task in await task_function(release, str(path)):
+                        if task.task_type not in cached_tasks:
+                            data.add(task)
         await data.commit()
     return {"paths": [str(path) for path in paths]}

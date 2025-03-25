@@ -517,22 +517,6 @@ def create_async_db_session() -> sqlalchemy.ext.asyncio.AsyncSession:
         return util.validate_as_type(_global_async_sessionmaker(), sqlalchemy.ext.asyncio.AsyncSession)
 
 
-def session() -> Session:
-    """Create a new asynchronous database session."""
-    global _global_atr_sessionmaker
-
-    if quart.has_app_context():
-        extensions = quart.current_app.extensions
-        return util.validate_as_type(extensions["atr_db_session"](), Session)
-    else:
-        if _global_atr_sessionmaker is None:
-            engine = create_async_engine(config.get())
-            _global_atr_sessionmaker = sqlalchemy.ext.asyncio.async_sessionmaker(
-                bind=engine, class_=Session, expire_on_commit=False
-            )
-        return util.validate_as_type(_global_atr_sessionmaker(), Session)
-
-
 # FIXME: this method is deprecated and should be removed
 def create_sync_db_engine() -> None:
     """Create a synchronous database engine."""
@@ -556,6 +540,25 @@ def create_sync_db_session() -> sqlalchemy.orm.Session:
     return sqlalchemy.orm.Session(_global_sync_engine)
 
 
+async def recent_tasks(data: Session, release_name: str, file_path: str, modified: int) -> dict[str, models.Task]:
+    """Get the most recent task for each task type for a specific file."""
+    tasks = await data.task(
+        release_name=release_name,
+        path=str(file_path),
+        modified=modified,
+    ).all()
+
+    # Group by task_type and keep the most recent one
+    # We use the highest id to determine the most recent task
+    recent_tasks: dict[str, models.Task] = {}
+    for task in tasks:
+        # If we haven't seen this task type before or if this task is newer
+        if (task.task_type not in recent_tasks) or (task.id > recent_tasks[task.task_type].id):
+            recent_tasks[task.task_type] = task
+
+    return recent_tasks
+
+
 def select_in_load(*entities: Any) -> orm.strategy_options._AbstractLoad:
     """Eagerly load the given entities from the query."""
     validated_entities = []
@@ -577,6 +580,22 @@ def select_in_load_nested(parent: Any, *descendants: Any) -> orm.strategy_option
     for descendant in descendants:
         result = result.selectinload(descendant)
     return result
+
+
+def session() -> Session:
+    """Create a new asynchronous database session."""
+    global _global_atr_sessionmaker
+
+    if quart.has_app_context():
+        extensions = quart.current_app.extensions
+        return util.validate_as_type(extensions["atr_db_session"](), Session)
+    else:
+        if _global_atr_sessionmaker is None:
+            engine = create_async_engine(config.get())
+            _global_atr_sessionmaker = sqlalchemy.ext.asyncio.async_sessionmaker(
+                bind=engine, class_=Session, expire_on_commit=False
+            )
+        return util.validate_as_type(_global_atr_sessionmaker(), Session)
 
 
 def validate_instrumented_attribute(obj: Any) -> orm.InstrumentedAttribute:
