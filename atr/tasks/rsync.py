@@ -64,6 +64,9 @@ async def _analyse_core(asf_uid: str, project_name: str, release_version: str) -
             if path.name.endswith(".asc"):
                 for task in await tasks.asc_checks(release, str(path)):
                     data.add(task)
+            elif path.name.endswith(".sha256") or path.name.endswith(".sha512"):
+                for task in await tasks.sha_checks(release, str(path)):
+                    data.add(task)
             elif path.name.endswith(".tar.gz"):
                 for task in await tasks.tar_gz_checks(release, str(path)):
                     data.add(task)

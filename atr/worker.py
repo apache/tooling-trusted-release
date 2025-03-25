@@ -38,6 +38,7 @@ import sqlmodel
 import atr.db as db
 import atr.tasks.archive as archive
 import atr.tasks.bulk as bulk
+import atr.tasks.hashing as hashing
 import atr.tasks.license as license
 import atr.tasks.mailtest as mailtest
 import atr.tasks.rat as rat
@@ -186,6 +187,7 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
             "verify_archive_integrity": archive.check_integrity,
             "package_bulk_download": bulk.download,
             "rsync_analyse": rsync.analyse,
+            "verify_file_hash": hashing.check,
         }
         # TODO: These are synchronous
         # We plan to convert these to async dict handlers

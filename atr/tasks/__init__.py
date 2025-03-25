@@ -21,6 +21,7 @@ import aiofiles.os
 
 import atr.db.models as models
 import atr.tasks.archive as archive
+import atr.tasks.hashing as hashing
 import atr.util as util
 
 
@@ -51,6 +52,36 @@ async def asc_checks(release: models.Release, signature_path: str) -> list[model
                 modified=modified,
             ),
         )
+
+    return tasks
+
+
+async def sha_checks(release: models.Release, hash_file: str) -> list[models.Task]:
+    tasks = []
+
+    full_hash_file_path = str(util.get_candidate_draft_dir() / release.project.name / release.version / hash_file)
+    modified = int(await aiofiles.os.path.getmtime(full_hash_file_path))
+    algorithm = "sha512"
+    if hash_file.endswith(".sha512"):
+        original_file = full_hash_file_path.removesuffix(".sha512")
+    elif hash_file.endswith(".sha256"):
+        original_file = full_hash_file_path.removesuffix(".sha256")
+        algorithm = "sha256"
+    else:
+        raise RuntimeError(f"Unsupported hash file: {hash_file}")
+
+    tasks.append(
+        models.Task(
+            status=models.TaskStatus.QUEUED,
+            task_type="verify_file_hash",
+            task_args=hashing.Check(
+                original_file=original_file, hash_file=full_hash_file_path, algorithm=algorithm
+            ).model_dump(),
+            release_name=release.name,
+            path=hash_file,
+            modified=modified,
+        ),
+    )
 
     return tasks
 
