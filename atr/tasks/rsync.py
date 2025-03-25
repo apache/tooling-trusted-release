@@ -61,12 +61,11 @@ async def _analyse_core(asf_uid: str, project_name: str, release_version: str) -
         release = await data.release(name=release_name, _committee=True).demand(RuntimeError("Release not found"))
         for path in paths:
             # Add new tasks for each path
-            # We could use the SHA3 in input and output
-            # Or, less securely, we could use path and mtime instead
-            if not path.name.endswith(".tar.gz"):
-                continue
-            _LOGGER.info(f"Analyse {release_name} {path} {path!s}")
-            for task in await tasks.tar_gz_checks(release, str(path)):
-                data.add(task)
+            if path.name.endswith(".asc"):
+                for task in await tasks.asc_checks(release, str(path)):
+                    data.add(task)
+            elif path.name.endswith(".tar.gz"):
+                for task in await tasks.tar_gz_checks(release, str(path)):
+                    data.add(task)
         await data.commit()
     return {"paths": [str(path) for path in paths]}

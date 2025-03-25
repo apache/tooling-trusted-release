@@ -124,6 +124,27 @@ def _authentication_failed() -> NoReturn:
     raise base.ASFQuartException("Not authenticated", errorcode=401)
 
 
+async def _get_recent_tasks_by_type(
+    data: db.Session, release_name: str, file_path: str, modified: int
+) -> dict[str, models.Task]:
+    """Get the most recent task for each task type for a specific file."""
+    tasks = await data.task(
+        release_name=release_name,
+        path=str(file_path),
+        modified=modified,
+    ).all()
+
+    # Group by task_type and keep the most recent one
+    # We use the highest id to determine the most recent task
+    recent_tasks: dict[str, models.Task] = {}
+    for task in tasks:
+        # If we haven't seen this task type before or if this task is newer
+        if (task.task_type not in recent_tasks) or (task.id > recent_tasks[task.task_type].id):
+            recent_tasks[task.task_type] = task
+
+    return recent_tasks
+
+
 async def _number_of_release_files(release: models.Release) -> int:
     """Return the number of files in the release."""
     path_project = release.project.name
@@ -330,27 +351,6 @@ async def root_files_add_project(
         version_name=version_name,
         form=form,
     )
-
-
-async def _get_recent_tasks_by_type(
-    data: db.Session, release_name: str, file_path: str, modified: int
-) -> dict[str, models.Task]:
-    """Get the most recent task for each task type for a specific file."""
-    tasks = await data.task(
-        release_name=release_name,
-        path=str(file_path),
-        modified=modified,
-    ).all()
-
-    # Group by task_type and keep the most recent one
-    # We use the highest id to determine the most recent task
-    recent_tasks: dict[str, models.Task] = {}
-    for task in tasks:
-        # If we haven't seen this task type before or if this task is newer
-        if (task.task_type not in recent_tasks) or (task.id > recent_tasks[task.task_type].id):
-            recent_tasks[task.task_type] = task
-
-    return recent_tasks
 
 
 @committer_route("/files/list/<project_name>/<version_name>")

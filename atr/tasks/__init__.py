@@ -24,15 +24,42 @@ import atr.tasks.archive as archive
 import atr.util as util
 
 
+async def asc_checks(release: models.Release, signature_path: str) -> list[models.Task]:
+    tasks = []
+
+    draft_dir = util.get_candidate_draft_dir() / release.project.name / release.version
+    full_signature_path = str(draft_dir / signature_path)
+    modified = int(await aiofiles.os.path.getmtime(full_signature_path))
+
+    artifact_path = signature_path.removesuffix(".asc")
+    full_artifact_path = str(draft_dir / artifact_path)
+    if not (await aiofiles.os.path.exists(full_artifact_path)):
+        raise RuntimeError(f"Artifact {full_artifact_path} does not exist")
+
+    if release.committee:
+        tasks.append(
+            models.Task(
+                status=models.TaskStatus.QUEUED,
+                task_type="verify_signature",
+                task_args=[
+                    release.committee.name,
+                    full_artifact_path,
+                    full_signature_path,
+                ],
+                release_name=release.name,
+                path=signature_path,
+                modified=modified,
+            ),
+        )
+
+    return tasks
+
+
 async def tar_gz_checks(release: models.Release, path: str, signature_path: str | None = None) -> list[models.Task]:
     # TODO: We should probably use an enum for task_type
     full_path = str(util.get_candidate_draft_dir() / release.project.name / release.version / path)
     filename = os.path.basename(path)
     modified = int(await aiofiles.os.path.getmtime(full_path))
-    if signature_path is None:
-        signature_path = path + ".asc"
-        if not (await aiofiles.os.path.exists(signature_path)):
-            signature_path = None
 
     tasks = [
         models.Task(
@@ -84,21 +111,5 @@ async def tar_gz_checks(release: models.Release, path: str, signature_path: str 
             modified=modified,
         ),
     ]
-
-    if signature_path and release.committee:
-        tasks.append(
-            models.Task(
-                status=models.TaskStatus.QUEUED,
-                task_type="verify_signature",
-                task_args=[
-                    release.committee.name,
-                    full_path,
-                    signature_path,
-                ],
-                release_name=release.name,
-                path=path,
-                modified=modified,
-            ),
-        )
 
     return tasks
