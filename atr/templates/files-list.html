@@ -50,7 +50,7 @@
     <div class="card-header d-flex justify-content-between align-items-center">
       <h5 class="mb-0">Files</h5>
       <a href="{{ url_for('root_files_add') }}"
-         class="btn btn-sm btn-outline-primary">Back to Add files</a>
+         class="btn btn-sm btn-outline-secondary">Back to Add files</a>
     </div>
     <div class="card-body">
       {% if paths|length > 0 %}
@@ -59,7 +59,8 @@
             <thead>
               <tr>
                 <th>Path</th>
-                <th>Tools, checks, errors, and warnings</th>
+                <th>Status</th>
+                <th>Actions and messages</th>
               </tr>
             </thead>
             <tbody>
@@ -67,35 +68,33 @@
                 <tr>
                   <td>
                     {% if path in artifacts %}
-                      <strong><a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a></strong>
+                      <strong>{{ path }}</strong>
                     {% elif path in metadata %}
-                      <em><a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a></em>
+                      <em>{{ path }}</em>
                     {% else %}
-                      <a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a>
+                      {{ path }}
                     {% endif %}
                   </td>
                   <td>
-                    {% if path in tasks and tasks[path]|length > 0 %}
-                      <a href="{{ url_for('root_files_tools', project_name=project_name, version_name=version_name, file_path=path) }}">Tools</a> ·
-                      <a href="{{ url_for('root_files_checks', project_name=project_name, version_name=version_name, file_path=path) }}">Check results</a>
-                      {% set completed_count = namespace(value=0) %}
-                      {% set failed_count = namespace(value=0) %}
-                      {% set active_count = namespace(value=0) %}
-                      {% set queued_count = namespace(value=0) %}
+                    {% set completed_count = namespace(value=0) %}
+                    {% set failed_count = namespace(value=0) %}
+                    {% set active_count = namespace(value=0) %}
+                    {% set queued_count = namespace(value=0) %}
 
-                      {% for task_type, task in tasks[path].items() %}
-                        {% if task.status.value == 'completed' %}
-                          {% set completed_count.value = completed_count.value + 1 %}
-                        {% elif task.status.value == 'failed' %}
-                          {% set failed_count.value = failed_count.value + 1 %}
-                        {% elif task.status.value == 'active' %}
-                          {% set active_count.value = active_count.value + 1 %}
-                        {% elif task.status.value == 'queued' %}
-                          {% set queued_count.value = queued_count.value + 1 %}
-                        {% endif %}
-                      {% endfor %}
+                    {% for task_type, task in tasks[path].items() %}
+                      {% if task.status.value == 'completed' %}
+                        {% set completed_count.value = completed_count.value + 1 %}
+                      {% elif task.status.value == 'failed' %}
+                        {% set failed_count.value = failed_count.value + 1 %}
+                      {% elif task.status.value == 'active' %}
+                        {% set active_count.value = active_count.value + 1 %}
+                      {% elif task.status.value == 'queued' %}
+                        {% set queued_count.value = queued_count.value + 1 %}
+                      {% endif %}
+                    {% endfor %}
 
-                      <div class="d-flex flex-wrap gap-2 mt-2 mb-3">
+                    {% if completed_count.value > 0 or failed_count.value > 0 or active_count.value > 0 or queued_count.value > 0 %}
+                      <div class="d-flex flex-wrap gap-2 mt-1 mb-2">
                         {% if completed_count.value > 0 %}<span class="badge bg-success">{{ completed_count.value }} Passed</span>{% endif %}
                         {% if failed_count.value > 0 %}
                           <span class="badge bg-danger">{{ failed_count.value }} {{ "Issue" if failed_count.value == 1 else "Issues" }}</span>
@@ -103,20 +102,37 @@
                         {% if active_count.value > 0 %}<span class="badge bg-info">{{ active_count.value }} Running</span>{% endif %}
                         {% if queued_count.value > 0 %}<span class="badge bg-secondary">{{ queued_count.value }} Pending</span>{% endif %}
                       </div>
-                    {% else %}
-                      <a href="{{ url_for('root_files_tools', project_name=project_name, version_name=version_name, file_path=path) }}">Tools</a> ·
-                      No check results
                     {% endif %}
-                    {% for error in errors[path] %}
-                      <div class="alert alert-danger p-1 px-2 mt-2 mb-2">
-                        <i class="fas fa-exclamation-triangle"></i> {{ error }}
-                      </div>
-                    {% endfor %}
-                    {% for warning in warnings[path] %}
-                      <div class="alert alert-warning p-1 px-2 mt-2 mb-2">
-                        <i class="fas fa-exclamation-triangle"></i> {{ warning }}
-                      </div>
-                    {% endfor %}
+                    {% if errors[path]|length > 0 %}
+                      <details>
+                        <summary>{{ errors[path]|length }} Errors</summary>
+                        {% for error in errors[path] %}
+                          <div class="alert alert-danger p-1 px-2 mt-0 mb-3">
+                            <i class="fas fa-exclamation-triangle"></i> {{ error }}
+                          </div>
+                        {% endfor %}
+                      </details>
+                    {% endif %}
+                    {% if warnings[path]|length > 0 %}
+                      <details>
+                        <summary>{{ warnings[path]|length }} Warnings</summary>
+                        {% for warning in warnings[path] %}
+                          <div class="alert alert-warning p-1 px-2 mt-0 mb-3">
+                            <i class="fas fa-exclamation-triangle"></i> {{ warning }}
+                          </div>
+                        {% endfor %}
+                      </details>
+                    {% endif %}
+                  </td>
+                  <td class="atr-sans">
+                    <a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}"
+                       class="btn btn-sm btn-outline-primary">Download</a>
+                    <a href="{{ url_for('root_files_tools', project_name=project_name, version_name=version_name, file_path=path) }}"
+                       class="btn btn-sm btn-outline-primary ms-2">Tools</a>
+                    {% if path in tasks and tasks[path]|length > 0 %}
+                      <a href="{{ url_for('root_files_checks', project_name=project_name, version_name=version_name, file_path=path) }}"
+                         class="btn btn-sm btn-outline-primary ms-2">Check results</a>
+                    {% endif %}
                   </td>
                 </tr>
               {% endfor %}

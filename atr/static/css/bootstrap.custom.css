@@ -11453,6 +11453,10 @@ th {
   cursor: pointer;
 }
 
+.atr-sans {
+  font-family: "Inter", sans-serif;
+}
+
 small, .small, .text-muted {
   font-variation-settings: "opsz" 14;
 }

@@ -75,6 +75,10 @@ th {
   cursor: pointer;
 }
 
+.atr-sans {
+  font-family: $font-family-sans-serif;
+}
+
 small, .text-muted {
   font-variation-settings: "opsz" 14;
 }
