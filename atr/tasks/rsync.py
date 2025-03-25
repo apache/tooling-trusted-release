@@ -20,12 +20,13 @@ from typing import Any, Final
 
 import pydantic
 
-import atr.config as config
+import atr.db as db
 import atr.db.models as models
+import atr.tasks as tasks
 import atr.tasks.task as task
 import atr.util as util
 
-_CONFIG: Final = config.get()
+# _CONFIG: Final = config.get()
 _LOGGER: Final = logging.getLogger(__name__)
 
 
@@ -55,9 +56,17 @@ async def _analyse_core(asf_uid: str, project_name: str, release_version: str) -
     """Analyse an rsync upload."""
     base_path = util.get_candidate_draft_dir() / project_name / release_version
     paths = await util.paths_recursive(base_path)
-    # for path in paths:
-    #     # Add new tasks for each path
-    #     # We could use the SHA3 in input and output
-    #     # Or, less securely, we could use path and mtime instead
-    #     ...
-    return {"paths": paths}
+    release_name = f"{project_name}-{release_version}"
+    async with db.session() as data:
+        release = await data.release(name=release_name, _committee=True).demand(RuntimeError("Release not found"))
+        for path in paths:
+            # Add new tasks for each path
+            # We could use the SHA3 in input and output
+            # Or, less securely, we could use path and mtime instead
+            if not path.name.endswith(".tar.gz"):
+                continue
+            _LOGGER.info(f"Analyse {release_name} {path} {path!s}")
+            for task in await tasks.tar_gz_checks(release, str(path)):
+                data.add(task)
+        await data.commit()
+    return {"paths": [str(path) for path in paths]}

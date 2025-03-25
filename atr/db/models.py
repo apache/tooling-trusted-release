@@ -22,7 +22,7 @@
 
 import datetime
 import enum
-from typing import Any
+from typing import Any, Optional
 
 import pydantic
 import sqlalchemy
@@ -210,11 +210,6 @@ class Package(sqlmodel.SQLModel, table=True):
     release_name: str = sqlmodel.Field(foreign_key="release.name")
     release: "Release" = sqlmodel.Relationship(back_populates="packages")
 
-    # One-to-many: A package can have multiple tasks
-    tasks: list["Task"] = sqlmodel.Relationship(
-        back_populates="package", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
-    )
-
 
 class VoteEntry(pydantic.BaseModel):
     result: bool
@@ -287,10 +282,10 @@ class Task(sqlmodel.SQLModel, table=True):
     completed: datetime.datetime | None = None
     result: Any | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
     error: str | None = None
-
-    # Package relationship
-    package_sha3: str | None = sqlmodel.Field(default=None, foreign_key="package.artifact_sha3")
-    package: Package | None = sqlmodel.Relationship(back_populates="tasks")
+    release_name: str | None = sqlmodel.Field(default=None, foreign_key="release.name")
+    release: Optional["Release"] = sqlmodel.Relationship(back_populates="tasks")
+    path: str | None = sqlmodel.Field(default=None)
+    modified: int | None = sqlmodel.Field(default=None)
 
     # Create an index on status and added for efficient task claiming
     __table_args__ = (
@@ -346,6 +341,11 @@ class Release(sqlmodel.SQLModel, table=True):
     )
 
     votes: list[VoteEntry] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
+
+    # One-to-many: A release can have multiple tasks
+    tasks: list["Task"] = sqlmodel.Relationship(
+        back_populates="release", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
     # The combination of project_id and version must be unique
     # Technically we want (project.name, version) to be unique

@@ -24,15 +24,11 @@ import atr.tasks.archive as archive
 import atr.util as util
 
 
-async def artifact_checks(
-    path: str, signature_path: str | None = None, committee_name: str | None = None
-) -> list[models.Task]:
+async def tar_gz_checks(release: models.Release, path: str, signature_path: str | None = None) -> list[models.Task]:
     # TODO: We should probably use an enum for task_type
-    if path.startswith("releases/"):
-        artifact_sha3 = path.split("/")[1]
-    else:
-        artifact_sha3 = await util.file_sha3(path)
+    full_path = str(util.get_candidate_draft_dir() / release.project.name / release.version / path)
     filename = os.path.basename(path)
+    modified = int(await aiofiles.os.path.getmtime(full_path))
     if signature_path is None:
         signature_path = path + ".asc"
         if not (await aiofiles.os.path.exists(signature_path)):
@@ -42,52 +38,66 @@ async def artifact_checks(
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type="verify_archive_integrity",
-            task_args=archive.CheckIntegrity(path=path).model_dump(),
-            package_sha3=artifact_sha3,
+            task_args=archive.CheckIntegrity(path=full_path).model_dump(),
+            release_name=release.name,
+            path=path,
+            modified=modified,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type="verify_archive_structure",
-            task_args=[path, filename],
-            package_sha3=artifact_sha3,
+            task_args=[full_path, filename],
+            release_name=release.name,
+            path=path,
+            modified=modified,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type="verify_license_files",
-            task_args=[path],
-            package_sha3=artifact_sha3,
+            task_args=[full_path],
+            release_name=release.name,
+            path=path,
+            modified=modified,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type="verify_license_headers",
-            task_args=[path],
-            package_sha3=artifact_sha3,
+            task_args=[full_path],
+            release_name=release.name,
+            path=path,
+            modified=modified,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type="verify_rat_license",
-            task_args=[path],
-            package_sha3=artifact_sha3,
+            task_args=[full_path],
+            release_name=release.name,
+            path=path,
+            modified=modified,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type="generate_cyclonedx_sbom",
-            task_args=[path],
-            package_sha3=artifact_sha3,
+            task_args=[full_path],
+            release_name=release.name,
+            path=path,
+            modified=modified,
         ),
     ]
 
-    if signature_path and committee_name:
+    if signature_path and release.committee:
         tasks.append(
             models.Task(
                 status=models.TaskStatus.QUEUED,
                 task_type="verify_signature",
                 task_args=[
-                    committee_name,
-                    path,
+                    release.committee.name,
+                    full_path,
                     signature_path,
                 ],
-                package_sha3=artifact_sha3,
+                release_name=release.name,
+                path=path,
+                modified=modified,
             ),
         )
 

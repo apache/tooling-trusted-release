@@ -59,6 +59,7 @@
                 <th>Path</th>
                 <th>Warnings</th>
                 <th>Errors</th>
+                <th>Tasks</th>
               </tr>
             </thead>
             <tbody>
@@ -78,6 +79,14 @@
                   </td>
                   <td>
                     {% for error in errors[path] %}<div class="alert alert-danger p-0 px-2 mt-2 mb-0">{{ error }}</div>{% endfor %}
+                  </td>
+                  <td>
+                    {% if path in tasks %}
+                      {% for task_type, task_result in tasks[path].items() %}
+                        <pre>{{ task_type }}</pre>
+                        <pre>{{ task_result }}</pre>
+                      {% endfor %}
+                    {% endif %}
                   </td>
                 </tr>
               {% endfor %}

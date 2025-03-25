@@ -167,12 +167,11 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         artifact_type: Opt[str] = NotSet,
         filename: Opt[str] = NotSet,
         sha512: Opt[str] = NotSet,
-        signature_sha3: Opt[str] = NotSet,
-        uploaded: Opt[bool] = NotSet,
+        signature_sha3: Opt[str | None] = NotSet,
+        uploaded: Opt[datetime] = NotSet,
         bytes_size: Opt[int] = NotSet,
         release_name: Opt[str] = NotSet,
         _release: bool = False,
-        _tasks: bool = False,
         _release_project: bool = False,
         _release_committee: bool = False,
     ) -> Query[models.Package]:
@@ -194,16 +193,16 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Package.bytes_size == bytes_size)
         if is_defined(release_name):
             query = query.where(models.Package.release_name == release_name)
+
         if _release:
             query = query.options(select_in_load(models.Package.release))
-        if _tasks:
-            query = query.options(select_in_load(models.Package.tasks))
         if _release_project:
-            query = query.options(select_in_load(models.Package.release, models.Release.project))
+            query = query.options(select_in_load_nested(models.Package.release, models.Release.project))
         if _release_committee:
             query = query.options(
                 select_in_load_nested(models.Package.release, models.Release.project, models.Project.committee)
             )
+
         return Query(self, query)
 
     def project(
@@ -300,7 +299,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         _packages: bool = False,
         _vote_policy: bool = False,
         _committee: bool = False,
-        _packages_tasks: bool = False,
+        _tasks: bool = False,
     ) -> Query[models.Release]:
         query = sqlmodel.select(models.Release)
 
@@ -333,8 +332,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.options(select_in_load(models.Release.vote_policy))
         if _committee:
             query = query.options(select_in_load_nested(models.Release.project, models.Project.committee))
-        if _packages_tasks:
-            query = query.options(select_in_load_nested(models.Release.packages, models.Package.tasks))
+        if _tasks:
+            query = query.options(select_in_load(models.Release.tasks))
 
         return Query(self, query)
 
@@ -367,9 +366,10 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         completed: Opt[datetime | None] = NotSet,
         result: Opt[Any | None] = NotSet,
         error: Opt[str | None] = NotSet,
-        package_sha3: Opt[str | None] = NotSet,
-        _package: bool = False,
-        _package_release: bool = False,
+        release_name: Opt[str | None] = NotSet,
+        path: Opt[str | None] = NotSet,
+        modified: Opt[int | None] = NotSet,
+        _release: bool = False,
     ) -> Query[models.Task]:
         query = sqlmodel.select(models.Task)
 
@@ -393,13 +393,15 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Task.result == result)
         if is_defined(error):
             query = query.where(models.Task.error == error)
-        if is_defined(package_sha3):
-            query = query.where(models.Task.package_sha3 == package_sha3)
+        if is_defined(release_name):
+            query = query.where(models.Task.release_name == release_name)
+        if is_defined(path):
+            query = query.where(models.Task.path == path)
+        if is_defined(modified):
+            query = query.where(models.Task.modified == modified)
 
-        if _package:
-            query = query.options(select_in_load(models.Task.package))
-        if _package_release:
-            query = query.options(select_in_load_nested(models.Task.package, models.Package.release))
+        if _release:
+            query = query.options(select_in_load(models.Task.release))
 
         return Query(self, query)
 

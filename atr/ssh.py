@@ -19,6 +19,7 @@
 
 import asyncio
 import asyncio.subprocess
+import datetime
 import logging
 import os
 import string
@@ -31,6 +32,7 @@ import asyncssh
 import atr.config as config
 import atr.db as db
 import atr.db.models as models
+import atr.tasks.rsync as rsync
 import atr.user as user
 import atr.util as util
 
@@ -284,25 +286,44 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
         exit_status = await proc.wait()
 
         # Start a task to process the new files
+        release_name = f"{project_name}-{release_version}"
         async with db.session() as data:
-            async with data.begin():
-                from atr.tasks.rsync import Analyse
-
-                data.add(
-                    models.Task(
-                        status=models.TaskStatus.QUEUED,
-                        task_type="rsync_analyse",
-                        task_args=Analyse(
-                            asf_uid=asf_uid,
-                            project_name=project_name,
-                            release_version=release_version,
-                        ).model_dump(),
-                    )
+            release = await data.release(name=release_name, _committee=True).get()
+            # Create the release if it does not already exist
+            if release is None:
+                project = await data.project(name=project_name, _committee=True).demand(
+                    RuntimeError("Project not found")
                 )
+                release = models.Release(
+                    name=release_name,
+                    project_id=project.id,
+                    project=project,
+                    version=release_version,
+                    stage=models.ReleaseStage.CANDIDATE,
+                    phase=models.ReleasePhase.RELEASE_CANDIDATE,
+                    created=datetime.datetime.now(),
+                )
+                data.add(release)
+                await data.commit()
+
+            # Add a task to analyse the new files
+            data.add(
+                models.Task(
+                    status=models.TaskStatus.QUEUED,
+                    task_type="rsync_analyse",
+                    task_args=rsync.Analyse(
+                        asf_uid=asf_uid,
+                        project_name=project_name,
+                        release_version=release_version,
+                    ).model_dump(),
+                )
+            )
+            await data.commit()
+
         # Exit the SSH process with the same status as the rsync process
         process.exit(exit_status)
 
     except Exception as e:
-        _LOGGER.error(f"Error executing command: {e}")
+        _LOGGER.exception(f"Error executing command {process.command}")
         process.stderr.write(f"Error: {e!s}\n")
         process.exit(1)

@@ -64,7 +64,6 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
     import atr.routes.download as download
     import atr.routes.files as files
     import atr.routes.keys as keys
-    import atr.routes.package as package
     import atr.routes.projects as projects
     import atr.routes.release as release
     import atr.routes.root as root
@@ -102,7 +101,6 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
         download.__name__,
         files.__name__,
         keys.__name__,
-        package.__name__,
         projects.__name__,
         release.__name__,
         root.__name__,

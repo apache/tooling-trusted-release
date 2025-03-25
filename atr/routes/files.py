@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""package.py"""
+"""files.py"""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ import pathlib
 import re
 from typing import TYPE_CHECKING, Any, Final, NoReturn, Protocol, TypeVar
 
-import aiofiles
+import aiofiles.os
 import asfquart.auth as auth
 import asfquart.base as base
 import asfquart.session as session
@@ -35,7 +35,6 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.analysis as analysis
-import atr.config as config
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
@@ -47,7 +46,8 @@ if TYPE_CHECKING:
 
 R = TypeVar("R", covariant=True)
 
-_CONFIG: Final = config.get()
+# _CONFIG: Final = config.get()
+_LOGGER: Final = logging.getLogger(__name__)
 
 
 # This is the type of functions to which we apply @committer_get
@@ -353,6 +353,8 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
     path_metadata = set()
     path_warnings = {}
     path_errors = {}
+    path_modified = {}
+    path_tasks: dict[pathlib.Path, dict[str, Any]] = {}
     for path in paths:
         # Get template and substitutions
         elements = {
@@ -382,6 +384,21 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
         # Get warnings and errors
         path_warnings[path], path_errors[path] = _path_warnings_errors(paths_set, path, ext_artifact, ext_metadata)
 
+        # Get modified time
+        full_path = str(util.get_candidate_draft_dir() / project_name / version_name / path)
+        path_modified[path] = int(await aiofiles.os.path.getmtime(full_path))
+
+        # Get tasks
+        tasks = await data.task(
+            status=models.TaskStatus.COMPLETED,
+            release_name=f"{project_name}-{version_name}",
+            path=str(path),
+            modified=path_modified[path],
+        ).all()
+        path_tasks[path] = {}
+        for task in tasks:
+            path_tasks[path][task.task_type] = task.result
+
     return await quart.render_template(
         "files-list.html",
         asf_id=session.uid,
@@ -396,4 +413,6 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
         metadata=path_metadata,
         warnings=path_warnings,
         errors=path_errors,
+        modified=path_modified,
+        tasks=path_tasks,
     )
