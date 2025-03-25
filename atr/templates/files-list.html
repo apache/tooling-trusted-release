@@ -59,7 +59,7 @@
             <thead>
               <tr>
                 <th>Path</th>
-                <th>Tools, checks, warnings, and errors</th>
+                <th>Tools, checks, errors, and warnings</th>
               </tr>
             </thead>
             <tbody>
@@ -107,14 +107,14 @@
                       <a href="{{ url_for('root_files_tools', project_name=project_name, version_name=version_name, file_path=path) }}">Tools</a> ·
                       No check results
                     {% endif %}
-                    {% for warning in warnings[path] %}
-                      <div class="alert alert-warning p-1 px-2 mt-2 mb-2">
-                        <i class="fas fa-exclamation-triangle"></i> {{ warning }}
-                      </div>
-                    {% endfor %}
                     {% for error in errors[path] %}
                       <div class="alert alert-danger p-1 px-2 mt-2 mb-2">
                         <i class="fas fa-exclamation-triangle"></i> {{ error }}
+                      </div>
+                    {% endfor %}
+                    {% for warning in warnings[path] %}
+                      <div class="alert alert-warning p-1 px-2 mt-2 mb-2">
+                        <i class="fas fa-exclamation-triangle"></i> {{ warning }}
                       </div>
                     {% endfor %}
                   </td>
