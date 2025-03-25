@@ -332,6 +332,27 @@ async def root_files_add_project(
     )
 
 
+async def _get_recent_tasks_by_type(
+    data: db.Session, release_name: str, file_path: str, modified: int
+) -> dict[str, models.Task]:
+    """Get the most recent task for each task type for a specific file."""
+    tasks = await data.task(
+        release_name=release_name,
+        path=str(file_path),
+        modified=modified,
+    ).all()
+
+    # Group by task_type and keep the most recent one
+    # We use the highest id to determine the most recent task
+    recent_tasks: dict[str, models.Task] = {}
+    for task in tasks:
+        # If we haven't seen this task type before or if this task is newer
+        if (task.task_type not in recent_tasks) or (task.id > recent_tasks[task.task_type].id):
+            recent_tasks[task.task_type] = task
+
+    return recent_tasks
+
+
 @committer_route("/files/list/<project_name>/<version_name>")
 async def root_files_list(session: CommitterSession, project_name: str, version_name: str) -> str:
     """Show all the files in the rsync upload directory for a release."""
@@ -355,7 +376,7 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
     path_warnings = {}
     path_errors = {}
     path_modified = {}
-    path_tasks: dict[pathlib.Path, int] = {}
+    path_tasks: dict[pathlib.Path, dict[str, models.Task]] = {}
     for path in paths:
         # Get template and substitutions
         elements = {
@@ -389,16 +410,9 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
         full_path = str(util.get_candidate_draft_dir() / project_name / version_name / path)
         path_modified[path] = int(await aiofiles.os.path.getmtime(full_path))
 
-        # Get tasks
-        tasks = await data.task(
-            release_name=f"{project_name}-{version_name}",
-            path=str(path),
-            modified=path_modified[path],
-        ).all()
-        path_tasks[path] = sum(
-            1
-            for task in tasks
-            if (task.status == models.TaskStatus.COMPLETED) or (task.status == models.TaskStatus.FAILED)
+        # Get the most recent task for each type
+        path_tasks[path] = await _get_recent_tasks_by_type(
+            data, f"{project_name}-{version_name}", str(path), path_modified[path]
         )
 
     return await quart.render_template(
@@ -417,6 +431,7 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
         errors=path_errors,
         modified=path_modified,
         tasks=path_tasks,
+        models=models,
     )
 
 
@@ -442,15 +457,12 @@ async def root_files_checks(session: CommitterSession, project_name: str, versio
         modified = int(await aiofiles.os.path.getmtime(full_path))
         file_size = await aiofiles.os.path.getsize(full_path)
 
-        # Get the tasks for this file
-        tasks = await data.task(
-            release_name=f"{project_name}-{version_name}",
-            path=str(file_path),
-            modified=modified,
-        ).all()
+        # Get the most recent task for each task type
+        recent_tasks = await _get_recent_tasks_by_type(data, f"{project_name}-{version_name}", file_path, modified)
 
-        # This shows all tasks, including repeated tasks
-        # TODO: Only show the most recent task for each task type
+        # Convert to a list for the template
+        tasks = list(recent_tasks.values())
+
         all_tasks_completed = all(
             task.status in (models.TaskStatus.COMPLETED, models.TaskStatus.FAILED) for task in tasks
         )

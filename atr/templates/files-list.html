@@ -59,7 +59,7 @@
                 <th>Path</th>
                 <th>Warnings</th>
                 <th>Errors</th>
-                <th>Tasks</th>
+                <th>Checks</th>
               </tr>
             </thead>
             <tbody>
@@ -81,11 +81,38 @@
                     {% for error in errors[path] %}<div class="alert alert-danger p-0 px-2 mt-2 mb-0">{{ error }}</div>{% endfor %}
                   </td>
                   <td>
-                    {% if path in tasks %}
-                      <a href="{{ url_for('root_files_checks', project_name=project_name, version_name=version_name, file_path=path) }}"
-                         class="btn btn-sm btn-outline-primary">View {{ tasks[path] }} check(s)</a>
+                    {% if path in tasks and tasks[path]|length > 0 %}
+                      {% set completed_count = namespace(value=0) %}
+                      {% set failed_count = namespace(value=0) %}
+                      {% set active_count = namespace(value=0) %}
+                      {% set queued_count = namespace(value=0) %}
+
+                      {% for task_type, task in tasks[path].items() %}
+                        {% if task.status.value == 'completed' %}
+                          {% set completed_count.value = completed_count.value + 1 %}
+                        {% elif task.status.value == 'failed' %}
+                          {% set failed_count.value = failed_count.value + 1 %}
+                        {% elif task.status.value == 'active' %}
+                          {% set active_count.value = active_count.value + 1 %}
+                        {% elif task.status.value == 'queued' %}
+                          {% set queued_count.value = queued_count.value + 1 %}
+                        {% endif %}
+                      {% endfor %}
+
+                      <div class="d-flex flex-wrap gap-2 mb-2">
+                        {% if completed_count.value > 0 %}<span class="badge bg-success">{{ completed_count.value }} Passed</span>{% endif %}
+                        {% if failed_count.value > 0 %}
+                          <span class="badge bg-danger">{{ failed_count.value }} {{ "Issue" if failed_count.value == 1 else "Issues" }}</span>
+                        {% endif %}
+                        {% if active_count.value > 0 %}<span class="badge bg-info">{{ active_count.value }} Running</span>{% endif %}
+                        {% if queued_count.value > 0 %}<span class="badge bg-secondary">{{ queued_count.value }} Pending</span>{% endif %}
+                      </div>
+
+                      <a href="{{ url_for('root_files_checks', project_name=project_name, version_name=version_name, file_path=path) }}">
+                        View all check results
+                      </a>
                     {% else %}
-                      No tasks
+                      No check results
                     {% endif %}
                   </td>
                 </tr>

@@ -37,15 +37,15 @@
       <div class="d-flex flex-wrap gap-3">
         {% with %}
           {% set status_counts = {
-                      'completed': tasks|selectattr("status.value", "equalto", "completed")|list|length,
-                      'failed': tasks|selectattr("status.value", "equalto", "failed")|list|length,
-                      'active': tasks|selectattr("status.value", "equalto", "active")|list|length,
-                      'queued': tasks|selectattr("status.value", "equalto", "queued")|list|length
+                      "completed": tasks|selectattr("status.value", "equalto", "completed")|list|length,
+                      "failed": tasks|selectattr("status.value", "equalto", "failed")|list|length,
+                      "active": tasks|selectattr("status.value", "equalto", "active")|list|length,
+                      "queued": tasks|selectattr("status.value", "equalto", "queued")|list|length
                     } %}
 
           {% for status, count in status_counts.items() %}
             {% if count > 0 %}
-              <div class="d-flex align-items-center gap-2 px-3 py-2 rounded fw-medium {% if status == 'completed' %}bg-success-subtle border border-success-subtle {% elif status == 'failed' %}bg-danger-subtle border border-danger-subtle {% elif status == 'active' %}bg-info-subtle border border-info-subtle {% else %}bg-light border{% endif %}">
+              <div class="d-flex align-items-center gap-2 px-3 py-2 rounded fw-medium {% if status == "completed" %}bg-success-subtle border border-success-subtle {% elif status == "failed" %}bg-danger-subtle border border-danger-subtle {% elif status == "active" %}bg-info-subtle border border-info-subtle {% else %}bg-light border{% endif %}">
                 <span class="fs-5">{{ count }}</span>
                 <span>
                   {%- if status == "queued" -%}
@@ -81,7 +81,7 @@
         <div class="border border-2 rounded p-3 mb-3">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="fw-bold">{{ task.task_type.replace('_', ' ').replace("verify ", "").title() }}</span>
-            <span class="badge rounded-pill {% if task.status.value == 'queued' %}bg-secondary {% elif task.status.value == 'active' %}bg-info {% elif task.status.value == 'completed' %}bg-success {% elif task.status.value == 'failed' %}bg-danger {% else %}bg-secondary{% endif %}">
+            <span class="badge rounded-pill {% if task.status.value == "queued" %}bg-secondary {% elif task.status.value == "active" %}bg-info {% elif task.status.value == "completed" %}bg-success {% elif task.status.value == "failed" %}bg-danger {% else %}bg-secondary{% endif %}">
               {%- if task.status.value == "queued" -%}
                 Pending
               {%- elif task.status.value == "active" -%}
@@ -106,7 +106,7 @@
                   <summary class="atr-cursor-pointer user-select-none p-2">View detailed results</summary>
                 {% endif %}
 
-                {% if task.task_type == 'verify_rat_license' and task.result[0] is mapping %}
+                {% if task.task_type == "verify_rat_license" and task.result[0] is mapping %}
                   <div class="d-flex gap-3 mb-2">
                     <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle px-2 py-1">
                       <strong>{{ task.result[0].approved_licenses }}</strong> files with approved licenses
