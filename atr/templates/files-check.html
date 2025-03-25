@@ -1,23 +1,21 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Package check status ~ ATR
+  File check status ~ ATR
 {% endblock title %}
 
 {% block description %}
-  View the status and results of package verification tasks.
+  View the status and results of file verification tasks.
 {% endblock description %}
 
 {% block content %}
-  <a href="{{ url_for('root_candidate_review') }}" class="back-link">← Back to Release Candidates</a>
+  <a href="{{ url_for('root_files_list', project_name=project_name, version_name=version_name) }}"
+     class="back-link">← Back to Files List</a>
 
   <div class="p-3 mb-4 bg-light border rounded">
-    <h2 class="mt-0">Package details</h2>
+    <h2 class="mt-0">File details</h2>
     <p>
       <strong>Filename:</strong> {{ package.filename }}
-    </p>
-    <p>
-      <strong>Type:</strong> {{ package.artifact_type }}
     </p>
     <p>
       <strong>Size:</strong> {{ format_file_size(package.bytes_size) }}
@@ -73,15 +71,7 @@
   <div class="d-flex gap-3 mb-3">
     <button type="button" onclick="toggleAllDetails()" class="btn btn-secondary">Toggle all details</button>
     {% if tasks and all_tasks_completed %}
-      <form method="post"
-            action="{{ url_for('root_package_check_restart') }}"
-            class="m-0">
-        <input type="hidden"
-               name="artifact_sha3"
-               value="{{ package.artifact_sha3 }}" />
-        <input type="hidden" name="release_name" value="{{ release.name }}" />
-        <button type="submit" class="btn btn-primary">Restart all checks</button>
-      </form>
+      <!-- Currently there's no direct way to restart file checks through the UI -->
     {% endif %}
   </div>
 
@@ -197,7 +187,7 @@
         </div>
       {% endfor %}
     {% else %}
-      <p>No verification tasks found for this package.</p>
+      <p>No verification tasks found for this file.</p>
     {% endif %}
   </div>
 {% endblock content %}

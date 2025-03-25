@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
 import logging
 import pathlib
 import re
@@ -354,7 +355,7 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
     path_warnings = {}
     path_errors = {}
     path_modified = {}
-    path_tasks: dict[pathlib.Path, dict[str, Any]] = {}
+    path_tasks: dict[pathlib.Path, int] = {}
     for path in paths:
         # Get template and substitutions
         elements = {
@@ -390,14 +391,15 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
 
         # Get tasks
         tasks = await data.task(
-            status=models.TaskStatus.COMPLETED,
             release_name=f"{project_name}-{version_name}",
             path=str(path),
             modified=path_modified[path],
         ).all()
-        path_tasks[path] = {}
-        for task in tasks:
-            path_tasks[path][task.task_type] = task.result
+        path_tasks[path] = sum(
+            1
+            for task in tasks
+            if (task.status == models.TaskStatus.COMPLETED) or (task.status == models.TaskStatus.FAILED)
+        )
 
     return await quart.render_template(
         "files-list.html",
@@ -415,4 +417,58 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
         errors=path_errors,
         modified=path_modified,
         tasks=path_tasks,
+    )
+
+
+@committer_route("/files/checks/<project_name>/<version_name>/<path:file_path>")
+async def root_files_checks(session: CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
+    """Show the status of all checks for a specific file."""
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
+    async with db.session() as data:
+        # Check that the release exists
+        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+
+        full_path = str(util.get_candidate_draft_dir() / project_name / version_name / file_path)
+
+        # Check that the file exists
+        if not await aiofiles.os.path.exists(full_path):
+            raise base.ASFQuartException("File does not exist", errorcode=404)
+
+        modified = int(await aiofiles.os.path.getmtime(full_path))
+        file_size = await aiofiles.os.path.getsize(full_path)
+
+        # Get the tasks for this file
+        tasks = await data.task(
+            release_name=f"{project_name}-{version_name}",
+            path=str(file_path),
+            modified=modified,
+        ).all()
+
+        # This shows all tasks, including repeated tasks
+        # TODO: Only show the most recent task for each task type
+        all_tasks_completed = all(
+            task.status in (models.TaskStatus.COMPLETED, models.TaskStatus.FAILED) for task in tasks
+        )
+
+    file_data = {
+        "filename": pathlib.Path(file_path).name,
+        "bytes_size": file_size,
+        "uploaded": datetime.datetime.fromtimestamp(modified, tz=datetime.UTC),
+    }
+
+    return await quart.render_template(
+        "files-check.html",
+        project_name=project_name,
+        version_name=version_name,
+        file_path=file_path,
+        package=file_data,
+        release=release,
+        tasks=tasks,
+        all_tasks_completed=all_tasks_completed,
+        format_file_size=routes.format_file_size,
     )

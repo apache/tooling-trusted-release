@@ -5,12 +5,12 @@
 {% endblock title %}
 
 {% block description %}
-  View the files for the {{ project_name }} {{ version_name }} release.
+  View the files for the {{ project_name }} {{ version_name }} candidate draft.
 {% endblock description %}
 
 {% block content %}
   <h1>Files for {{ release.project.display_name }} {{ version_name }}</h1>
-  <p class="intro">This page shows the files for the {{ project_name }} {{ version_name }} release.</p>
+  <p class="intro">This page shows the files for the {{ project_name }} {{ version_name }} candidate draft.</p>
 
   <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -26,7 +26,7 @@
             <strong>Version:</strong> {{ version_name }}
           </p>
           <p>
-            <strong>Full name:</strong> {{ release.name }}
+            <strong>Label:</strong> {{ release.name }}
           </p>
         </div>
         <div class="col-md-6">
@@ -82,10 +82,10 @@
                   </td>
                   <td>
                     {% if path in tasks %}
-                      {% for task_type, task_result in tasks[path].items() %}
-                        <pre>{{ task_type }}</pre>
-                        <pre>{{ task_result }}</pre>
-                      {% endfor %}
+                      <a href="{{ url_for('root_files_checks', project_name=project_name, version_name=version_name, file_path=path) }}"
+                         class="btn btn-sm btn-outline-primary">View {{ tasks[path] }} check(s)</a>
+                    {% else %}
+                      No tasks
                     {% endif %}
                   </td>
                 </tr>
