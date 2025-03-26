@@ -1,4 +1,4 @@
-.PHONY: build build-alpine build-ubuntu certs check docs generate-version report run stop serve sync sync-dev
+.PHONY: build build-alpine build-ubuntu certs check docs generate-version obvfix report run stop serve sync sync-dev
 
 BIND ?= 127.0.0.1:8080
 PYTHON ?= $(which python3)
@@ -32,6 +32,13 @@ generate-version:
 	@$(SCRIPTS)/run python atr/metadata.py > /tmp/_version.py
 	@mv /tmp/_version.py atr/_version.py
 	@cat atr/_version.py
+
+obvfix:
+	git add -A
+	make check || make check
+	git commit
+	git pull
+	git push
 
 report:
 	@echo SCRIPTS = $(SCRIPTS)

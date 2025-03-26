@@ -245,38 +245,6 @@ async def root_keys_add() -> str:
     )
 
 
-@routes.app_route("/keys/ssh/add", methods=["GET", "POST"])
-@auth.require(auth.Requirements.committer)
-async def root_keys_ssh_add() -> response.Response | str:
-    """Add a new SSH key to the user's account."""
-    # TODO: Make an auth.require wrapper that gives the session automatically
-    # And the form if it's a POST handler? Might be hard to type
-    # But we can use variants of the function
-    # GET, POST, GET_POST are all we need
-    # We could even include auth in the function names
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-
-    form = await AddSSHKeyForm.create_form()
-    fingerprint = None
-    if await form.validate_on_submit():
-        key: str = util.unwrap(form.key.data)
-        fingerprint = await asyncio.to_thread(key_ssh_fingerprint, key)
-        async with db.session() as data:
-            async with data.begin():
-                data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=util.unwrap(web_session.uid)))
-        await quart.flash(f"SSH key added successfully: {fingerprint}", "success")
-        return quart.redirect(quart.url_for("root_keys_review"))
-
-    return await quart.render_template(
-        "keys-ssh-add.html",
-        asf_id=web_session.uid,
-        form=form,
-        fingerprint=fingerprint,
-    )
-
-
 @routes.app_route("/keys/delete", methods=["POST"])
 @auth.require(auth.Requirements.committer)
 async def root_keys_delete() -> response.Response:
@@ -341,4 +309,36 @@ async def root_keys_review() -> str:
         status_message=status_message,
         status_type=status_type,
         now=datetime.datetime.now(datetime.UTC),
+    )
+
+
+@routes.app_route("/keys/ssh/add", methods=["GET", "POST"])
+@auth.require(auth.Requirements.committer)
+async def root_keys_ssh_add() -> response.Response | str:
+    """Add a new SSH key to the user's account."""
+    # TODO: Make an auth.require wrapper that gives the session automatically
+    # And the form if it's a POST handler? Might be hard to type
+    # But we can use variants of the function
+    # GET, POST, GET_POST are all we need
+    # We could even include auth in the function names
+    web_session = await session.read()
+    if web_session is None:
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
+
+    form = await AddSSHKeyForm.create_form()
+    fingerprint = None
+    if await form.validate_on_submit():
+        key: str = util.unwrap(form.key.data)
+        fingerprint = await asyncio.to_thread(key_ssh_fingerprint, key)
+        async with db.session() as data:
+            async with data.begin():
+                data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=util.unwrap(web_session.uid)))
+        await quart.flash(f"SSH key added successfully: {fingerprint}", "success")
+        return quart.redirect(quart.url_for("root_keys_review"))
+
+    return await quart.render_template(
+        "keys-ssh-add.html",
+        asf_id=web_session.uid,
+        form=form,
+        fingerprint=fingerprint,
     )
