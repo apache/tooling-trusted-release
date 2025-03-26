@@ -19,7 +19,6 @@
 
 import http.client
 
-import asfquart.auth as auth
 import asfquart.base as base
 import quart
 import werkzeug.wrappers.response as response
@@ -111,9 +110,8 @@ async def root_projects_vote_policy_add(project_name: str) -> response.Response 
     )
 
 
-@routes.app_route("/projects/<project_name>/vote-policy/edit", methods=["GET", "POST"])
-@auth.require(auth.Requirements.committer)
-async def root_projects_vote_policy_edit(project_name: str) -> response.Response | str:
+@routes.committer_route("/projects/<project_name>/vote-policy/edit", methods=["GET", "POST"])
+async def projects_vote_policy_edit(session: routes.CommitterSession, project_name: str) -> response.Response | str:
     uid = await util.get_asf_id_or_die()
 
     async with db.session() as data:

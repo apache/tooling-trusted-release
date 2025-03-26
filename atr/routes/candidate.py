@@ -167,7 +167,6 @@ async def review(session: routes.CommitterSession) -> str:
         # Get all releases where the user is a PMC member or committer
         # TODO: We don't actually record who uploaded the release candidate
         # We should probably add that information!
-        # TODO: This duplicates code in root_package_add
         releases = await data.release(
             stage=models.ReleaseStage.CANDIDATE,
             _committee=True,

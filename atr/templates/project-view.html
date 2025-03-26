@@ -113,7 +113,7 @@
         {% if project.vote_policy and (is_project_lead or is_admin) %}
           <div>
             <a class="btn btn-primary btn-sm"
-               href="{{ url_for('root_projects_vote_policy_edit', project_name=project.name) }}"><i class="fa-solid fa-pen-to-square"></i></a>
+               href="{{ as_url(routes.projects.vote_policy_edit, project_name=project.name) }}"><i class="fa-solid fa-pen-to-square"></i></a>
           </div>
         {% elif (is_project_lead or is_admin) %}
           <div>

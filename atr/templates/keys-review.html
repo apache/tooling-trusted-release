@@ -138,7 +138,7 @@
       <strong>You haven't added any SSH keys yet.</strong>
     </p>
     <p>
-      <a href="{{ url_for('root_keys_ssh_add') }}">Add an SSH key</a>
+      <a href="{{ as_url(routes._keys.ssh_add) }}">Add an SSH key</a>
     </p>
   {% endif %}
 {% endblock content %}

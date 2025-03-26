@@ -27,7 +27,7 @@
 
     <form method="post"
           class="striking py-4 px-5"
-          action="{{ url_for('root_release_vote') }}">
+          action="{{ as_url(routes.release.vote) }}">
       <input type="hidden" name="release_name" value="{{ release.name }}" />
 
       <div class="mb-4">

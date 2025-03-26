@@ -23,9 +23,7 @@ import logging.handlers
 import aiofiles.os
 import aioshutil
 import asfquart
-import asfquart.auth as auth
 import asfquart.base as base
-import asfquart.session as session
 import quart
 import werkzeug.wrappers.response as response
 
@@ -59,14 +57,9 @@ async def release_delete_validate(data: db.Session, release_name: str, session_u
     return release
 
 
-@routes.app_route("/release/delete", methods=["POST"])
-@auth.require(auth.Requirements.committer)
-async def root_release_delete() -> response.Response:
+@routes.committer_route("/release/delete", methods=["POST"])
+async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a release and all its associated files."""
-    web_session = await session.read()
-    if (web_session is None) or (web_session.uid is None):
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-
     form = await routes.get_form(quart.request)
     release_name = form.get("release_name")
 
@@ -78,7 +71,7 @@ async def root_release_delete() -> response.Response:
         async with data.begin():
             try:
                 # First validate and get the release info
-                release = await release_delete_validate(data, release_name, web_session.uid)
+                release = await release_delete_validate(data, release_name, session.uid)
                 project_name = release.project.name
                 version = release.version
 
@@ -99,14 +92,9 @@ async def root_release_delete() -> response.Response:
     return quart.redirect(util.as_url(candidate.review))
 
 
-@routes.app_route("/release/bulk/<int:task_id>", methods=["GET"])
-async def release_bulk_status(task_id: int) -> str | response.Response:
+@routes.committer_route("/release/bulk/<int:task_id>", methods=["GET"])
+async def release_bulk_status(session: routes.CommitterSession, task_id: int) -> str | response.Response:
     """Show status for a bulk download task."""
-    web_session = await session.read()
-    if (web_session is None) or (web_session.uid is None):
-        await quart.flash("You must be logged in to view bulk download status.", "error")
-        return quart.redirect(quart.url_for("root_login"))
-
     async with db.session() as data:
         # Query for the task with the given ID
         task = await data.task(id=task_id).get()
@@ -133,8 +121,8 @@ async def release_bulk_status(task_id: int) -> str | response.Response:
             # Check whether the user has permission to view this task
             # Either they're a PMC member or committer for the release's PMC
             if release and release.committee:
-                if (web_session.uid not in release.committee.committee_members) and (
-                    web_session.uid not in release.committee.committers
+                if (session.uid not in release.committee.committee_members) and (
+                    session.uid not in release.committee.committers
                 ):
                     await quart.flash("You don't have permission to view this task.", "error")
                     return quart.redirect(util.as_url(candidate.review))
@@ -142,15 +130,9 @@ async def release_bulk_status(task_id: int) -> str | response.Response:
     return await quart.render_template("release-bulk.html", task=task, release=release, TaskStatus=models.TaskStatus)
 
 
-@routes.app_route("/release/vote", methods=["GET", "POST"])
-@auth.require(auth.Requirements.committer)
-async def root_release_vote() -> response.Response | str:
+@routes.committer_route("/release/vote", methods=["GET", "POST"])
+async def vote(session: routes.CommitterSession) -> response.Response | str:
     """Show the vote initiation form for a release."""
-
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-
     release_name = quart.request.args.get("release_name", "")
     form = None
     if quart.request.method == "POST":
@@ -190,7 +172,7 @@ async def root_release_vote() -> response.Response | str:
                 vote_duration,
                 gpg_key_id,
                 commit_hash,
-                web_session.uid,
+                session.uid,
             ],
         )
         async with db.create_async_db_session() as db_session:
