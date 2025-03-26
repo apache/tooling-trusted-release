@@ -15,18 +15,30 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import annotations
+
 import asyncio
 import functools
 import logging
 import time
-from collections.abc import Awaitable, Callable, Coroutine
-from typing import Any, Final, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, Final, NoReturn, ParamSpec, Protocol, TypeVar
 
 import aiofiles
 import aiofiles.os
 import asfquart
+import asfquart.auth as auth
+import asfquart.base as base
+import asfquart.session as session
 import quart
-import werkzeug.datastructures as datastructures
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable, Coroutine
+    from types import ModuleType
+
+    import werkzeug.datastructures as datastructures
+
+import atr.db.models as models
+import atr.user as user
 
 if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
@@ -156,7 +168,7 @@ route_logger.setLevel(logging.INFO)
 route_logger.propagate = False
 
 
-def app_route(path: str, methods: list[str] | None = None) -> Callable:
+def app_route(path: str, methods: list[str] | None = None, endpoint: str | None = None) -> Callable:
     """Register a route with the Flask app with built-in performance logging."""
 
     def decorator(f: Callable[P, Coroutine[Any, Any, T]]) -> Callable[P, Awaitable[T]]:
@@ -166,7 +178,7 @@ def app_route(path: str, methods: list[str] | None = None) -> Callable:
         else:
             measured_func = f
         # Then apply the original route decorator
-        return asfquart.APP.route(path, methods=methods)(measured_func)
+        return asfquart.APP.route(path, methods=methods, endpoint=endpoint)(measured_func)
 
     return decorator
 
@@ -294,3 +306,130 @@ async def get_form(request: quart.Request) -> datastructures.MultiDict:
     if blockbuster is not None:
         blockbuster.activate()
     return form
+
+
+R = TypeVar("R", covariant=True)
+
+
+# This is the type of functions to which we apply @committer_get
+# In other words, functions which accept CommitterSession as their first arg
+class CommitterRouteHandler(Protocol[R]):
+    """Protocol for @committer_get decorated functions."""
+
+    __name__: str
+    __doc__: str | None
+
+    def __call__(self, session: CommitterSession, *args: Any, **kwargs: Any) -> Awaitable[R]: ...
+
+
+class CommitterSession:
+    """Session with extra information about committers."""
+
+    def __init__(self, web_session: session.ClientSession) -> None:
+        self._projects: list[models.Project] | None = None
+        self._session = web_session
+
+    def __getattr__(self, name: str) -> Any:
+        # TODO: Not type safe, should subclass properly if possible
+        # For example, we can access session.no_such_attr and the type checkers won't notice
+        return getattr(self._session, name)
+
+    @property
+    def host(self) -> str:
+        request_host = quart.request.host
+        if ":" in request_host:
+            domain, port = request_host.split(":")
+            # Could be an IPv6 address, so need to check whether port is a valid integer
+            if port.isdigit():
+                return domain
+        return request_host
+
+    @property
+    async def user_candidate_drafts(self) -> list[models.Release]:
+        return await user.candidate_drafts(self.uid, user_projects=self._projects)
+
+    @property
+    async def user_projects(self) -> list[models.Project]:
+        if self._projects is None:
+            self._projects = await user.projects(self.uid)
+        return self._projects
+
+    @property
+    async def user_releases(self) -> list[models.Release]:
+        return await user.releases(self.uid)
+
+
+# This is the type of functions to which we apply @app_route
+# In other words, functions which accept no session
+class RouteHandler(Protocol[R]):
+    """Protocol for @app_route decorated functions."""
+
+    __name__: str
+    __doc__: str | None
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Awaitable[R]: ...
+
+
+# This decorator is an adaptor between @committer_get and @app_route functions
+def committer_route(
+    path: str, methods: list[str] | None = None
+) -> Callable[[CommitterRouteHandler[R]], RouteHandler[R]]:
+    """Decorator for committer GET routes that provides an enhanced session object."""
+
+    def decorator(func: CommitterRouteHandler[R]) -> RouteHandler[R]:
+        async def wrapper(*args: Any, **kwargs: Any) -> R:
+            web_session = await session.read()
+            if web_session is None:
+                _authentication_failed()
+
+            enhanced_session = CommitterSession(web_session)
+            return await func(enhanced_session, *args, **kwargs)
+
+        # Generate a unique endpoint name
+        endpoint = func.__module__ + "_" + func.__name__
+
+        # Set the name before applying decorators
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        wrapper.__annotations__["endpoint"] = endpoint
+
+        # Apply decorators in reverse order
+        decorated = auth.require(auth.Requirements.committer)(wrapper)
+        decorated = app_route(path, methods=methods or ["GET"], endpoint=endpoint)(decorated)
+
+        return decorated
+
+    return decorator
+
+
+def _authentication_failed() -> NoReturn:
+    """Handle authentication failure with an exception."""
+    # NOTE: This is a separate function to fix a problem with analysis flow in mypy
+    raise base.ASFQuartException("Not authenticated", errorcode=401)
+
+
+def modules() -> dict[str, ModuleType]:
+    """Return a dictionary of all modules in the current package."""
+    import atr.routes.candidate as candidate
+    import atr.routes.candidate_draft as candidate_draft
+    import atr.routes.committees as committees
+    import atr.routes.dev as dev
+    import atr.routes.docs as docs
+    import atr.routes.download as download
+    import atr.routes.keys as keys
+    import atr.routes.projects as projects
+    import atr.routes.release as release
+    import atr.routes.root as root
+
+    return {
+        "candidate": candidate,
+        "candidate_draft": candidate_draft,
+        "committees": committees,
+        "dev": dev,
+        "docs": docs,
+        "download": download,
+        "keys": keys,
+        "projects": projects,
+        "release": release,
+        "root": root,
+    }

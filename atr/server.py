@@ -55,18 +55,11 @@ class ApiOnlyOpenAPIProvider(quart_schema.OpenAPIProvider):
                 yield rule
 
 
-def register_routes(app: base.QuartApp) -> tuple[str, ...]:
+def register_routes(app: base.QuartApp) -> None:
     # NOTE: These imports are for their side effects only
-    import atr.routes.candidate as candidate
-    import atr.routes.candidate_draft as candidate_draft
-    import atr.routes.committees as committees
-    import atr.routes.dev as dev
-    import atr.routes.docs as docs
-    import atr.routes.download as download
-    import atr.routes.keys as keys
-    import atr.routes.projects as projects
-    import atr.routes.release as release
-    import atr.routes.root as root
+    import atr.routes as routes
+
+    routes.modules()
 
     # Add a global error handler to show helpful error messages with tracebacks.
     @app.errorhandler(Exception)
@@ -91,20 +84,6 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
     @app.errorhandler(404)
     async def handle_not_found(error: Exception) -> Any:
         return await quart.render_template("notfound.html", error="404 Not Found", traceback="", status_code=404), 404
-
-    # Must do this otherwise ruff "fixes" this function by removing the imports
-    return (
-        candidate.__name__,
-        candidate_draft.__name__,
-        committees.__name__,
-        dev.__name__,
-        docs.__name__,
-        download.__name__,
-        keys.__name__,
-        projects.__name__,
-        release.__name__,
-        root.__name__,
-    )
 
 
 def app_dirs_setup(app_config: type[config.AppConfig]) -> None:
@@ -154,13 +133,16 @@ def app_setup_context(app: base.QuartApp) -> None:
     async def app_wide() -> dict[str, Any]:
         import atr.db.service as service
         import atr.metadata as metadata
+        import atr.routes as routes
         import atr.util as util
 
         return {
+            "as_url": util.as_url,
+            "commit": metadata.commit,
             "current_user": await asfquart.session.read(),
             "is_admin_fn": util.is_admin,
             "is_project_lead_fn": service.is_project_lead,
-            "commit": metadata.commit,
+            "routes": routes.modules(),
             "version": metadata.version,
         }
 

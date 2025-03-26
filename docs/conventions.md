@@ -91,7 +91,7 @@ from p.q.r import s
 s()
 ```
 
-The collections.abc and typing modules are an exception to this rule. Always import collections.abc and typing identifiers directly using the `from` syntax:
+The `collections.abc`, `types`, and `typing` modules are an exception to this rule. Always import `collections.abc`, `types` and `typing` interfaces directly using the `from` syntax:
 
 ```python
 # Preferred

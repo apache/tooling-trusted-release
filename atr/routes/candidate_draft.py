@@ -25,12 +25,11 @@ import hashlib
 import logging
 import pathlib
 import re
-from typing import TYPE_CHECKING, Any, Final, NoReturn, Protocol, TypeVar
+import sys
+from typing import Final
 
 import aiofiles.os
-import asfquart.auth as auth
 import asfquart.base as base
-import asfquart.session as session
 import quart
 import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
@@ -41,75 +40,10 @@ import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.tasks as tasks
-import atr.user as user
 import atr.util as util
-
-if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
-
-R = TypeVar("R", covariant=True)
 
 # _CONFIG: Final = config.get()
 _LOGGER: Final = logging.getLogger(__name__)
-
-
-# This is the type of functions to which we apply @committer_get
-# In other words, functions which accept CommitterSession as their first arg
-class CommitterRouteHandler(Protocol[R]):
-    """Protocol for @committer_get decorated functions."""
-
-    __name__: str
-    __doc__: str | None
-
-    def __call__(self, session: CommitterSession, *args: Any, **kwargs: Any) -> Awaitable[R]: ...
-
-
-class CommitterSession:
-    """Session with extra information about committers."""
-
-    def __init__(self, web_session: session.ClientSession) -> None:
-        self._projects: list[models.Project] | None = None
-        self._session = web_session
-
-    def __getattr__(self, name: str) -> Any:
-        # TODO: Not type safe, should subclass properly if possible
-        # For example, we can access session.no_such_attr and the type checkers won't notice
-        return getattr(self._session, name)
-
-    @property
-    def host(self) -> str:
-        request_host = quart.request.host
-        if ":" in request_host:
-            domain, port = request_host.split(":")
-            # Could be an IPv6 address, so need to check whether port is a valid integer
-            if port.isdigit():
-                return domain
-        return request_host
-
-    @property
-    async def user_candidate_drafts(self) -> list[models.Release]:
-        return await user.candidate_drafts(self.uid, user_projects=self._projects)
-
-    @property
-    async def user_projects(self) -> list[models.Project]:
-        if self._projects is None:
-            self._projects = await user.projects(self.uid)
-        return self._projects
-
-    @property
-    async def user_releases(self) -> list[models.Release]:
-        return await user.releases(self.uid)
-
-
-# This is the type of functions to which we apply @app_route
-# In other words, functions which accept no session
-class RouteHandler(Protocol[R]):
-    """Protocol for @app_route decorated functions."""
-
-    __name__: str
-    __doc__: str | None
-
-    def __call__(self, *args: Any, **kwargs: Any) -> Awaitable[R]: ...
 
 
 class FilesAddOneForm(util.QuartFormTyped):
@@ -118,12 +52,6 @@ class FilesAddOneForm(util.QuartFormTyped):
     file_path = wtforms.StringField("File path (optional)", validators=[wtforms.validators.Optional()])
     file_data = wtforms.FileField("File", validators=[wtforms.validators.InputRequired("File is required")])
     submit = wtforms.SubmitField("Add file")
-
-
-def _authentication_failed() -> NoReturn:
-    """Handle authentication failure with an exception."""
-    # NOTE: This is a separate function to fix a problem with analysis flow in mypy
-    raise base.ASFQuartException("Not authenticated", errorcode=401)
 
 
 async def _number_of_release_files(release: models.Release) -> int:
@@ -226,36 +154,8 @@ def _path_warnings_errors_metadata(
     return warnings, errors
 
 
-# This decorator is an adaptor between @committer_get and @app_route functions
-def committer_route(
-    path: str, methods: list[str] | None = None
-) -> Callable[[CommitterRouteHandler[R]], RouteHandler[R]]:
-    """Decorator for committer GET routes that provides an enhanced session object."""
-
-    def decorator(func: CommitterRouteHandler[R]) -> RouteHandler[R]:
-        async def wrapper(*args: Any, **kwargs: Any) -> R:
-            web_session = await session.read()
-            if web_session is None:
-                _authentication_failed()
-
-            enhanced_session = CommitterSession(web_session)
-            return await func(enhanced_session, *args, **kwargs)
-
-        # Set the name before applying decorators
-        wrapper.__name__ = func.__name__
-        wrapper.__doc__ = func.__doc__
-
-        # Apply decorators in reverse order
-        decorated = auth.require(auth.Requirements.committer)(wrapper)
-        decorated = routes.app_route(path, methods=methods or ["GET"])(decorated)
-
-        return decorated
-
-    return decorator
-
-
-@committer_route("/candidate/draft/add")
-async def root_candidate_draft_add(session: CommitterSession) -> str:
+@routes.committer_route("/candidate/draft/add")
+async def add(session: routes.CommitterSession) -> str:
     """Show a page to allow the user to rsync files to candidate drafts."""
     # Do them outside of the template rendering call to ensure order
     # The user_candidate_drafts call can use cached results from user_projects
@@ -269,6 +169,7 @@ async def root_candidate_draft_add(session: CommitterSession) -> str:
         server_domain=session.host,
         number_of_release_files=_number_of_release_files,
         candidate_drafts=user_candidate_drafts,
+        candidate_draft=sys.modules[__name__],
     )
 
 
@@ -300,9 +201,9 @@ async def _add_one(
             await f.write(chunk)
 
 
-@committer_route("/candidate/draft/add/<project_name>/<version_name>", methods=["GET", "POST"])
-async def root_candidate_draft_add_project(
-    session: CommitterSession, project_name: str, version_name: str
+@routes.committer_route("/candidate/draft/add/<project_name>/<version_name>", methods=["GET", "POST"])
+async def add_project(
+    session: routes.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
     """Show a page to allow the user to add a single file to a candidate draft."""
     form = await FilesAddOneForm.create_form()
@@ -317,9 +218,7 @@ async def root_candidate_draft_add_project(
 
             await _add_one(project_name, version_name, file_path, file_data)
             await quart.flash("File added successfully", "success")
-            return quart.redirect(
-                quart.url_for("root_candidate_draft_list", project_name=project_name, version_name=version_name)
-            )
+            return quart.redirect(util.as_url(files, project_name=project_name, version_name=version_name))
         except Exception as e:
             logging.exception("Error adding file:")
             await quart.flash(f"Error adding file: {e!s}", "error")
@@ -331,11 +230,12 @@ async def root_candidate_draft_add_project(
         project_name=project_name,
         version_name=version_name,
         form=form,
+        candidate_draft=sys.modules[__name__],
     )
 
 
-@committer_route("/candidate/draft/list/<project_name>/<version_name>")
-async def root_candidate_draft_list(session: CommitterSession, project_name: str, version_name: str) -> str:
+@routes.committer_route("/candidate/draft/files/<project_name>/<version_name>")
+async def files(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
     """Show all the files in the rsync upload directory for a release."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
@@ -411,13 +311,12 @@ async def root_candidate_draft_list(session: CommitterSession, project_name: str
         modified=path_modified,
         tasks=path_tasks,
         models=models,
+        candidate_draft=sys.modules[__name__],
     )
 
 
-@committer_route("/candidate/draft/checks/<project_name>/<version_name>/<path:file_path>")
-async def root_candidate_draft_checks(
-    session: CommitterSession, project_name: str, version_name: str, file_path: str
-) -> str:
+@routes.committer_route("/candidate/draft/checks/<project_name>/<version_name>/<path:file_path>")
+async def checks(session: routes.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
     """Show the status of all checks for a specific file."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
@@ -464,53 +363,13 @@ async def root_candidate_draft_checks(
         tasks=tasks,
         all_tasks_completed=all_tasks_completed,
         format_file_size=routes.format_file_size,
+        candidate_draft=sys.modules[__name__],
     )
 
 
-@committer_route("/candidate/draft/tools/<project_name>/<version_name>/<path:file_path>")
-async def root_candidate_draft_tools(
-    session: CommitterSession, project_name: str, version_name: str, file_path: str
-) -> str:
-    """Show the tools for a specific file."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
-
-    async with db.session() as data:
-        # Check that the release exists
-        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
-
-        full_path = str(util.get_candidate_draft_dir() / project_name / version_name / file_path)
-
-        # Check that the file exists
-        if not await aiofiles.os.path.exists(full_path):
-            raise base.ASFQuartException("File does not exist", errorcode=404)
-
-        modified = int(await aiofiles.os.path.getmtime(full_path))
-        file_size = await aiofiles.os.path.getsize(full_path)
-
-    file_data = {
-        "filename": pathlib.Path(file_path).name,
-        "bytes_size": file_size,
-        "uploaded": datetime.datetime.fromtimestamp(modified, tz=datetime.UTC),
-    }
-
-    return await quart.render_template(
-        "candidate-draft-tools.html",
-        project_name=project_name,
-        version_name=version_name,
-        file_path=file_path,
-        file_data=file_data,
-        release=release,
-        format_file_size=routes.format_file_size,
-    )
-
-
-@committer_route("/candidate/draft/delete/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
-async def root_candidate_draft_delete(
-    session: CommitterSession, project_name: str, version_name: str, file_path: str
+@routes.committer_route("/candidate/draft/delete/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+async def delete(
+    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
     """Delete a specific file from the release candidate."""
     # Check that the user has access to the project
@@ -533,14 +392,12 @@ async def root_candidate_draft_delete(
         await aiofiles.os.remove(full_path)
 
     await quart.flash("File deleted successfully", "success")
-    return quart.redirect(
-        quart.url_for("root_candidate_draft_list", project_name=project_name, version_name=version_name)
-    )
+    return quart.redirect(util.as_url(files, project_name=project_name, version_name=version_name))
 
 
-@committer_route("/candidate/draft/generate-hash/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
-async def root_candidate_draft_generate_hash(
-    session: CommitterSession, project_name: str, version_name: str, file_path: str
+@routes.committer_route("/candidate/draft/hashgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+async def hashgen(
+    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
     """Generate an sha256 or sha512 hash file for a candidate draft file."""
     # Check that the user has access to the project
@@ -591,6 +448,45 @@ async def root_candidate_draft_generate_hash(
         await data.commit()
 
     await quart.flash(f"{hash_type} file generated successfully", "success")
-    return quart.redirect(
-        quart.url_for("root_candidate_draft_list", project_name=project_name, version_name=version_name)
+    return quart.redirect(util.as_url(files, project_name=project_name, version_name=version_name))
+
+
+@routes.committer_route("/candidate/draft/tools/<project_name>/<version_name>/<path:file_path>")
+async def tools(session: routes.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
+    """Show the tools for a specific file."""
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
+    async with db.session() as data:
+        # Check that the release exists
+        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+
+        full_path = str(util.get_candidate_draft_dir() / project_name / version_name / file_path)
+
+        # Check that the file exists
+        if not await aiofiles.os.path.exists(full_path):
+            raise base.ASFQuartException("File does not exist", errorcode=404)
+
+        modified = int(await aiofiles.os.path.getmtime(full_path))
+        file_size = await aiofiles.os.path.getsize(full_path)
+
+    file_data = {
+        "filename": pathlib.Path(file_path).name,
+        "bytes_size": file_size,
+        "uploaded": datetime.datetime.fromtimestamp(modified, tz=datetime.UTC),
+    }
+
+    return await quart.render_template(
+        "candidate-draft-tools.html",
+        asf_id=session.uid,
+        project_name=project_name,
+        version_name=version_name,
+        file_path=file_path,
+        file_data=file_data,
+        release=release,
+        format_file_size=routes.format_file_size,
+        candidate_draft=sys.modules[__name__],
     )

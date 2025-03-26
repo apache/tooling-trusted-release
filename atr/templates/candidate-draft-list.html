@@ -49,7 +49,7 @@
   <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
       <h5 class="mb-0">Files</h5>
-      <a href="{{ url_for('root_candidate_draft_add') }}"
+      <a href="{{ as_url(routes.candidate_draft.add) }}"
          class="btn btn-sm btn-outline-secondary">Back to Create and modify</a>
     </div>
     <div class="card-body">
@@ -127,10 +127,10 @@
                   <td class="atr-sans">
                     <a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}"
                        class="btn btn-sm btn-outline-primary fs-6">Download</a>
-                    <a href="{{ url_for('root_candidate_draft_tools', project_name=project_name, version_name=version_name, file_path=path) }}"
+                    <a href="{{ as_url(routes.candidate_draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
                        class="btn btn-sm btn-outline-primary fs-6 small ms-2">Tools</a>
                     {% if path in tasks and tasks[path]|length > 0 %}
-                      <a href="{{ url_for('root_candidate_draft_checks', project_name=project_name, version_name=version_name, file_path=path) }}"
+                      <a href="{{ as_url(routes.candidate_draft.checks, project_name=project_name, version_name=version_name, file_path=path) }}"
                          class="btn btn-sm btn-outline-primary fs-6 small ms-2">Check results</a>
                     {% endif %}
                   </td>
@@ -173,7 +173,7 @@
         </details>
       {% else %}
         <div class="alert alert-info">
-          This release does not have any files yet. You can add files using rsync from the <a href="{{ url_for('root_candidate_draft_add') }}">add files</a> page.
+          This release does not have any files yet. You can add files using rsync from the <a href="{{ as_url(routes.candidate_draft.add) }}">add files</a> page.
         </div>
       {% endif %}
     </div>
@@ -185,7 +185,7 @@
     </div>
     <div class="card-body">
       <p>
-        <a href="{{ url_for('root_candidate_draft_add_project', project_name=release.project.name, version_name=release.version) }}">Upload a file in the browser</a>, or use the command below to add or modify files in this release using rsync:
+        <a href="{{ as_url(routes.candidate_draft.add_project, project_name=release.project.name, version_name=release.version) }}">Upload a file in the browser</a>, or use the command below to add or modify files in this release using rsync:
       </p>
     </div>
     <pre class="card-footer bg-light border-1 pt-4 small">

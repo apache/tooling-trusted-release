@@ -19,7 +19,7 @@ import dataclasses
 import functools
 import hashlib
 import pathlib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Annotated, Any, TypeVar
 
 import aiofiles.os
@@ -27,6 +27,7 @@ import asfquart.base as base
 import asfquart.session as session
 import pydantic
 import pydantic_core
+import quart
 import quart_wtf
 import quart_wtf.typing
 
@@ -79,6 +80,11 @@ class QuartFormTyped(quart_wtf.QuartForm):
         if not isinstance(form, cls):
             raise TypeError(f"Form is not of type {cls.__name__}")
         return form
+
+
+def as_url(func: Callable, **kwargs: Any) -> str:
+    """Return the URL for a function."""
+    return quart.url_for(func.__annotations__["endpoint"], **kwargs)
 
 
 def compute_sha3_256(file_data: bytes) -> str:
