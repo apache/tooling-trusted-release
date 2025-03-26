@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""files.py"""
+"""candidate_draft.py"""
 
 from __future__ import annotations
 
@@ -254,8 +254,8 @@ def committer_route(
     return decorator
 
 
-@committer_route("/files/add")
-async def root_files_add(session: CommitterSession) -> str:
+@committer_route("/candidate/draft/add")
+async def root_candidate_draft_add(session: CommitterSession) -> str:
     """Show a page to allow the user to rsync files to candidate drafts."""
     # Do them outside of the template rendering call to ensure order
     # The user_candidate_drafts call can use cached results from user_projects
@@ -263,7 +263,7 @@ async def root_files_add(session: CommitterSession) -> str:
     user_candidate_drafts = await session.user_candidate_drafts
 
     return await quart.render_template(
-        "files-add.html",
+        "candidate-draft-add.html",
         asf_id=session.uid,
         projects=user_projects,
         server_domain=session.host,
@@ -300,8 +300,8 @@ async def _add_one(
             await f.write(chunk)
 
 
-@committer_route("/files/add/<project_name>/<version_name>", methods=["GET", "POST"])
-async def root_files_add_project(
+@committer_route("/candidate/draft/add/<project_name>/<version_name>", methods=["GET", "POST"])
+async def root_candidate_draft_add_project(
     session: CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
     """Show a page to allow the user to add a single file to a candidate draft."""
@@ -318,14 +318,14 @@ async def root_files_add_project(
             await _add_one(project_name, version_name, file_path, file_data)
             await quart.flash("File added successfully", "success")
             return quart.redirect(
-                quart.url_for("root_files_list", project_name=project_name, version_name=version_name)
+                quart.url_for("root_candidate_draft_list", project_name=project_name, version_name=version_name)
             )
         except Exception as e:
             logging.exception("Error adding file:")
             await quart.flash(f"Error adding file: {e!s}", "error")
 
     return await quart.render_template(
-        "files-add-project.html",
+        "candidate-draft-add-project.html",
         asf_id=session.uid,
         server_domain=session.host,
         project_name=project_name,
@@ -334,8 +334,8 @@ async def root_files_add_project(
     )
 
 
-@committer_route("/files/list/<project_name>/<version_name>")
-async def root_files_list(session: CommitterSession, project_name: str, version_name: str) -> str:
+@committer_route("/candidate/draft/list/<project_name>/<version_name>")
+async def root_candidate_draft_list(session: CommitterSession, project_name: str, version_name: str) -> str:
     """Show all the files in the rsync upload directory for a release."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
@@ -395,7 +395,7 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
         path_tasks[path] = await db.recent_tasks(data, f"{project_name}-{version_name}", str(path), path_modified[path])
 
     return await quart.render_template(
-        "files-list.html",
+        "candidate-draft-list.html",
         asf_id=session.uid,
         project_name=project_name,
         version_name=version_name,
@@ -414,8 +414,10 @@ async def root_files_list(session: CommitterSession, project_name: str, version_
     )
 
 
-@committer_route("/files/checks/<project_name>/<version_name>/<path:file_path>")
-async def root_files_checks(session: CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
+@committer_route("/candidate/draft/checks/<project_name>/<version_name>/<path:file_path>")
+async def root_candidate_draft_checks(
+    session: CommitterSession, project_name: str, version_name: str, file_path: str
+) -> str:
     """Show the status of all checks for a specific file."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
@@ -453,7 +455,7 @@ async def root_files_checks(session: CommitterSession, project_name: str, versio
     }
 
     return await quart.render_template(
-        "files-check.html",
+        "candidate-draft-check.html",
         project_name=project_name,
         version_name=version_name,
         file_path=file_path,
@@ -465,8 +467,10 @@ async def root_files_checks(session: CommitterSession, project_name: str, versio
     )
 
 
-@committer_route("/files/tools/<project_name>/<version_name>/<path:file_path>")
-async def root_files_tools(session: CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
+@committer_route("/candidate/draft/tools/<project_name>/<version_name>/<path:file_path>")
+async def root_candidate_draft_tools(
+    session: CommitterSession, project_name: str, version_name: str, file_path: str
+) -> str:
     """Show the tools for a specific file."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
@@ -494,7 +498,7 @@ async def root_files_tools(session: CommitterSession, project_name: str, version
     }
 
     return await quart.render_template(
-        "files-tools.html",
+        "candidate-draft-tools.html",
         project_name=project_name,
         version_name=version_name,
         file_path=file_path,
@@ -504,8 +508,8 @@ async def root_files_tools(session: CommitterSession, project_name: str, version
     )
 
 
-@committer_route("/files/delete/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
-async def root_files_delete(
+@committer_route("/candidate/draft/delete/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+async def root_candidate_draft_delete(
     session: CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
     """Delete a specific file from the release candidate."""
@@ -529,11 +533,13 @@ async def root_files_delete(
         await aiofiles.os.remove(full_path)
 
     await quart.flash("File deleted successfully", "success")
-    return quart.redirect(quart.url_for("root_files_list", project_name=project_name, version_name=version_name))
+    return quart.redirect(
+        quart.url_for("root_candidate_draft_list", project_name=project_name, version_name=version_name)
+    )
 
 
-@committer_route("/files/generate-hash/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
-async def root_files_generate_hash(
+@committer_route("/candidate/draft/generate-hash/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+async def root_candidate_draft_generate_hash(
     session: CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
     """Generate an sha256 or sha512 hash file for a candidate draft file."""
@@ -585,4 +591,6 @@ async def root_files_generate_hash(
         await data.commit()
 
     await quart.flash(f"{hash_type} file generated successfully", "success")
-    return quart.redirect(quart.url_for("root_files_list", project_name=project_name, version_name=version_name))
+    return quart.redirect(
+        quart.url_for("root_candidate_draft_list", project_name=project_name, version_name=version_name)
+    )

@@ -9,7 +9,7 @@
 {% endblock description %}
 
 {% block content %}
-  <a href="{{ url_for('root_files_list', project_name=project_name, version_name=version_name) }}"
+  <a href="{{ url_for('root_candidate_draft_list', project_name=project_name, version_name=version_name) }}"
      class="back-link">← Back to Files List</a>
 
   <div class="p-3 mb-4 bg-light border rounded">
@@ -35,12 +35,12 @@
   </div>
   <div class="d-flex gap-2 mb-4">
     <form method="post"
-          action="{{ url_for('root_files_generate_hash', project_name=project_name, version_name=version_name, file_path=file_path) }}">
+          action="{{ url_for('root_candidate_draft_generate_hash', project_name=project_name, version_name=version_name, file_path=file_path) }}">
       <input type="hidden" name="hash_type" value="sha256" />
       <button type="submit" class="btn btn-outline-secondary">Generate SHA256</button>
     </form>
     <form method="post"
-          action="{{ url_for('root_files_generate_hash', project_name=project_name, version_name=version_name, file_path=file_path) }}">
+          action="{{ url_for('root_candidate_draft_generate_hash', project_name=project_name, version_name=version_name, file_path=file_path) }}">
       <input type="hidden" name="hash_type" value="sha512" />
       <button type="submit" class="btn btn-outline-secondary">Generate SHA512</button>
     </form>
@@ -49,7 +49,7 @@
   <h3>Delete file</h3>
   <p>This tool deletes the file from the candidate draft.</p>
   <form method="post"
-        action="{{ url_for('root_files_delete', project_name=project_name, version_name=version_name, file_path=file_path) }}">
+        action="{{ url_for('root_candidate_draft_delete', project_name=project_name, version_name=version_name, file_path=file_path) }}">
     <button type="submit"
             class="btn btn-danger"
             onclick="return confirm('Are you sure you want to delete this file?')">Delete file</button>

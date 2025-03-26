@@ -58,11 +58,11 @@ class ApiOnlyOpenAPIProvider(quart_schema.OpenAPIProvider):
 def register_routes(app: base.QuartApp) -> tuple[str, ...]:
     # NOTE: These imports are for their side effects only
     import atr.routes.candidate as candidate
+    import atr.routes.candidate_draft as candidate_draft
     import atr.routes.committees as committees
     import atr.routes.dev as dev
     import atr.routes.docs as docs
     import atr.routes.download as download
-    import atr.routes.files as files
     import atr.routes.keys as keys
     import atr.routes.projects as projects
     import atr.routes.release as release
@@ -95,11 +95,11 @@ def register_routes(app: base.QuartApp) -> tuple[str, ...]:
     # Must do this otherwise ruff "fixes" this function by removing the imports
     return (
         candidate.__name__,
+        candidate_draft.__name__,
         committees.__name__,
         dev.__name__,
         docs.__name__,
         download.__name__,
-        files.__name__,
         keys.__name__,
         projects.__name__,
         release.__name__,

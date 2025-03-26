@@ -34,11 +34,11 @@
             {% endif %}
             <p class="card-text">
               {% if number_of_release_files(release) > 0 %}
-                This candidate draft has <a href="{{ url_for('root_files_list', project_name=release.project.name, version_name=release.version) }}">{{ number_of_release_files(release) }} file(s)</a>.
+                This candidate draft has <a href="{{ url_for('root_candidate_draft_list', project_name=release.project.name, version_name=release.version) }}">{{ number_of_release_files(release) }} file(s)</a>.
               {% else %}
                 This candidate draft doesn't have any files yet.
               {% endif %}
-              <a href="{{ url_for('root_files_add_project', project_name=release.project.name, version_name=release.version) }}">Upload a file using the browser</a>,
+              <a href="{{ url_for('root_candidate_draft_add_project', project_name=release.project.name, version_name=release.version) }}">Upload a file using the browser</a>,
               or use the command below to add or modify files in this draft:
             </p>
           </div>
