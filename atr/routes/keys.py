@@ -31,9 +31,6 @@ import tempfile
 from collections.abc import AsyncGenerator, Sequence
 
 import asfquart as asfquart
-import asfquart.auth as auth
-import asfquart.base as base
-import asfquart.session as session
 import cryptography.hazmat.primitives.serialization as serialization
 import gnupg
 import quart
@@ -65,7 +62,7 @@ async def ephemeral_gpg_home() -> AsyncGenerator[str]:
 
 
 async def key_add_post(
-    web_session: session.ClientSession, request: quart.Request, user_committees: Sequence[models.Committee]
+    session: routes.CommitterSession, request: quart.Request, user_committees: Sequence[models.Committee]
 ) -> dict | None:
     form = await routes.get_form(request)
     public_key = form.get("public_key")
@@ -81,12 +78,12 @@ async def key_add_post(
     invalid_committees = [
         committee
         for committee in selected_committees
-        if (committee not in web_session.committees) and (committee not in web_session.projects)
+        if (committee not in session.committees) and (committee not in session.projects)
     ]
     if invalid_committees:
         raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
 
-    return await key_user_add(util.unwrap(web_session.uid), public_key, selected_committees)
+    return await key_user_add(session.uid, public_key, selected_committees)
 
 
 def key_ssh_fingerprint(ssh_key_string: str) -> str:
@@ -222,24 +219,19 @@ async def key_user_session_add(
     }
 
 
-@routes.app_route("/keys/add", methods=["GET", "POST"])
-@auth.require(auth.Requirements.committer)
-async def root_keys_add() -> str:
+@routes.committer_route("/keys/add", methods=["GET", "POST"])
+async def add(session: routes.CommitterSession) -> str:
     """Add a new public signing key to the user's account."""
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-
     key_info = None
 
     # Get committees for all projects the user is a member of
     async with db.session() as data:
-        project_list = web_session.committees + web_session.projects
+        project_list = session.committees + session.projects
         user_committees = await data.committee(name_in=project_list).all()
 
     if quart.request.method == "POST":
         try:
-            key_info = await key_add_post(web_session, quart.request, user_committees)
+            key_info = await key_add_post(session, quart.request, user_committees)
         except routes.FlashError as e:
             logging.exception("FlashError:")
             await quart.flash(str(e), "error")
@@ -249,71 +241,59 @@ async def root_keys_add() -> str:
 
     return await quart.render_template(
         "keys-add.html",
-        asf_id=web_session.uid,
+        asf_id=session.uid,
         user_committees=user_committees,
         key_info=key_info,
         algorithms=routes.algorithms,
     )
 
 
-@routes.app_route("/keys/delete", methods=["POST"])
-@auth.require(auth.Requirements.committer)
-async def root_keys_delete() -> response.Response:
+@routes.committer_route("/keys/delete", methods=["POST"])
+async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a public signing key from the user's account."""
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-    uid = util.unwrap(web_session.uid)
-
     form = await routes.get_form(quart.request)
     fingerprint = form.get("fingerprint")
     if not fingerprint:
         await quart.flash("No key fingerprint provided", "error")
-        return quart.redirect(quart.url_for("root_keys_review"))
+        return quart.redirect(util.as_url(review))
 
     async with db.session() as data:
         async with data.begin():
             # Try to get a GPG key first
-            key = await data.public_signing_key(fingerprint=fingerprint, apache_uid=uid).get()
+            key = await data.public_signing_key(fingerprint=fingerprint, apache_uid=session.uid).get()
             if key:
                 # Delete the GPG key
                 await data.delete(key)
                 await quart.flash("GPG key deleted successfully", "success")
-                return quart.redirect(quart.url_for("root_keys_review"))
+                return quart.redirect(util.as_url(review))
 
             # If not a GPG key, try to get an SSH key
-            ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=uid).get()
+            ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=session.uid).get()
             if ssh_key:
                 # Delete the SSH key
                 await data.delete(ssh_key)
                 await quart.flash("SSH key deleted successfully", "success")
-                return quart.redirect(quart.url_for("root_keys_review"))
+                return quart.redirect(util.as_url(review))
 
             # No key was found
             await quart.flash("Key not found or not owned by you", "error")
-            return quart.redirect(quart.url_for("root_keys_review"))
+            return quart.redirect(util.as_url(review))
 
 
-@routes.app_route("/keys/review")
-@auth.require(auth.Requirements.committer)
-async def root_keys_review() -> str:
+@routes.committer_route("/keys/review")
+async def review(session: routes.CommitterSession) -> str:
     """Show all keys associated with the user's account."""
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-    uid = util.unwrap(web_session.uid)
-
     # Get all existing keys for the user
     async with db.session() as data:
-        user_keys = await data.public_signing_key(apache_uid=uid, _committees=True).all()
-        user_ssh_keys = await data.ssh_key(asf_uid=uid).all()
+        user_keys = await data.public_signing_key(apache_uid=session.uid, _committees=True).all()
+        user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
 
     status_message = quart.request.args.get("status_message")
     status_type = quart.request.args.get("status_type")
 
     return await quart.render_template(
         "keys-review.html",
-        asf_id=web_session.uid,
+        asf_id=session.uid,
         user_keys=user_keys,
         user_ssh_keys=user_ssh_keys,
         algorithms=routes.algorithms,
@@ -323,20 +303,14 @@ async def root_keys_review() -> str:
     )
 
 
-@routes.app_route("/keys/ssh/add", methods=["GET", "POST"])
-@auth.require(auth.Requirements.committer)
-async def root_keys_ssh_add() -> response.Response | str:
+@routes.committer_route("/keys/ssh/add", methods=["GET", "POST"])
+async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
     """Add a new SSH key to the user's account."""
     # TODO: Make an auth.require wrapper that gives the session automatically
     # And the form if it's a POST handler? Might be hard to type
     # But we can use variants of the function
     # GET, POST, GET_POST are all we need
     # We could even include auth in the function names
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-    uid = util.unwrap(web_session.uid)
-
     form = await AddSSHKeyForm.create_form()
     fingerprint = None
     if await form.validate_on_submit():
@@ -344,29 +318,24 @@ async def root_keys_ssh_add() -> response.Response | str:
         fingerprint = await asyncio.to_thread(key_ssh_fingerprint, key)
         async with db.session() as data:
             async with data.begin():
-                data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=uid))
+                data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=session.uid))
         await quart.flash(f"SSH key added successfully: {fingerprint}", "success")
-        return quart.redirect(quart.url_for("root_keys_review"))
+        return quart.redirect(util.as_url(review))
 
     return await quart.render_template(
         "keys-ssh-add.html",
-        asf_id=web_session.uid,
+        asf_id=session.uid,
         form=form,
         fingerprint=fingerprint,
     )
 
 
-@routes.app_route("/keys/upload", methods=["GET", "POST"])
-@auth.require(auth.Requirements.committer)
-async def root_keys_upload() -> str:
+@routes.committer_route("/keys/upload", methods=["GET", "POST"])
+async def upload(session: routes.CommitterSession) -> str:
     """Upload a KEYS file containing multiple GPG keys."""
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-
     # Get committees for all projects the user is a member of
     async with db.session() as data:
-        project_list = web_session.committees + web_session.projects
+        project_list = session.committees + session.projects
         user_committees = await data.committee(name_in=project_list).all()
 
     class UploadKeyForm(util.QuartFormTyped):
@@ -383,7 +352,7 @@ async def root_keys_upload() -> str:
             await quart.flash(error, "error")
         return await quart.render_template(
             "keys-upload.html",
-            asf_id=web_session.uid,
+            asf_id=session.uid,
             user_committees=user_committees,
             form=form,
             results=results,
@@ -407,7 +376,7 @@ async def root_keys_upload() -> str:
             return await render(error="You must select at least one committee")
 
         # Ensure that the selected committee is one of which the user is actually a member
-        if selected_committee not in (web_session.committees + web_session.projects):
+        if selected_committee not in (session.committees + session.projects):
             return await render(error=f"You are not a member of {selected_committee}")
 
         # Process each key block

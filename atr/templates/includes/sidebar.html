@@ -62,20 +62,16 @@
       <ul>
         <li>
           <i class="fa-solid fa-key"></i>
-          <a href="{{ url_for('root_keys_review') }}"
-             {% if request.endpoint == 'root_keys_review' %}class="active"{% endif %}>Your signing keys</a>
+          <a href="{{ as_url(routes._keys.review) }}">Your signing keys</a>
         </li>
         <li>
-          <a href="{{ url_for('root_keys_add') }}"
-             {% if request.endpoint == 'root_keys_add' %}class="active"{% endif %}>Add your signing key</a>
+          <a href="{{ as_url(routes._keys.add) }}">Add your signing key</a>
         </li>
         <li>
-          <a href="{{ url_for('root_keys_upload') }}"
-             {% if request.endpoint == 'root_keys_upload' %}class="active"{% endif %}>Upload a KEYS file</a>
+          <a href="{{ as_url(routes._keys.upload) }}">Upload a KEYS file</a>
         </li>
         <li>
-          <a href="{{ url_for('root_keys_ssh_add') }}"
-             {% if request.endpoint == 'root_keys_ssh_add' %}class="active"{% endif %}>Add SSH key</a>
+          <a href="{{ as_url(routes._keys.ssh_add) }}">Add SSH key</a>
         </li>
       </ul>
 

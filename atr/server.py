@@ -136,13 +136,17 @@ def app_setup_context(app: base.QuartApp) -> None:
         import atr.routes as routes
         import atr.util as util
 
+        modules = routes.modules()
+        # In Jinja, keys is a keyword when used in the form .keys
+        modules["_keys"] = modules["keys"]
+        del modules["keys"]
         return {
             "as_url": util.as_url,
             "commit": metadata.commit,
             "current_user": await asfquart.session.read(),
             "is_admin_fn": util.is_admin,
             "is_project_lead_fn": service.is_project_lead,
-            "routes": routes.modules(),
+            "routes": modules,
             "version": metadata.version,
         }
 

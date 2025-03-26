@@ -83,7 +83,7 @@
               <pre class="mt-3">{{ key.ascii_armored_key }}</pre>
             </details>
 
-            <form method="post" action="{{ url_for('root_keys_delete') }}" class="mt-3">
+            <form method="post" action="{{ as_url(routes._keys.delete) }}" class="mt-3">
               <input type="hidden" name="fingerprint" value="{{ key.fingerprint }}" />
               <button type="submit" class="btn btn-danger">Delete key</button>
             </form>
@@ -97,7 +97,7 @@
       <strong>You haven't added any signing keys yet.</strong>
     </p>
     <p>
-      <a href="{{ url_for('root_keys_add') }}">Add a key</a>
+      <a href="{{ as_url(routes._keys.add) }}">Add a key</a>
     </p>
   {% endif %}
 
@@ -125,7 +125,7 @@
               <pre class="mt-3">{{ key.key }}</pre>
             </details>
 
-            <form method="post" action="{{ url_for('root_keys_delete') }}" class="mt-3">
+            <form method="post" action="{{ as_url(routes._keys.delete) }}" class="mt-3">
               <input type="hidden" name="fingerprint" value="{{ key.fingerprint }}" />
               <button type="submit" class="btn btn-danger">Delete key</button>
             </form>
