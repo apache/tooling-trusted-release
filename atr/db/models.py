@@ -149,17 +149,11 @@ class Project(sqlmodel.SQLModel, table=True):
     @property
     async def candidate_drafts(self) -> list["Release"]:
         """Get the candidate drafts for the project."""
-        # TODO: Improve our interface to use in_ automatically for lists
-        candidate_draft_phases = [
-            ReleasePhase.RELEASE_CANDIDATE,
-            ReleasePhase.EVALUATE_CLAIMS,
-            # ReleasePhase.RELEASE,
-        ]
         query = (
             sqlmodel.select(Release)
             .where(
                 Release.project_id == self.id,
-                db.validate_instrumented_attribute(Release.phase).in_(candidate_draft_phases),
+                Release.phase == ReleasePhase.CANDIDATE_DRAFT,
             )
             .order_by(db.validate_instrumented_attribute(Release.created).desc())
         )
@@ -220,43 +214,34 @@ class VoteEntry(pydantic.BaseModel):
 
 
 class ReleaseStage(str, enum.Enum):
-    BUILD = "build"
+    # A release candidate is being prepared
     CANDIDATE = "candidate"
-    CURRENT = "current"
-    ARCHIVED = "archived"
-
-
-class ReleasePhase(str, enum.Enum):
-    # [CANDIDATE]
-    # Step 1: The RC is received from external sources
-    RELEASE_CANDIDATE = "release_candidate"
-    # Step 2: The ATR website evaluates claims about the RC
-    EVALUATE_CLAIMS = "evaluate_claims"
-    # Step 3: The RC is distributed to project members for testing
-    DISTRIBUTE_TEST = "distribute_test"
-    # Step 4: The project members are voting on the RC
-    VOTE = "vote"
-    # Step 5: The project vote on the RC has passed
-    PASSES = "passes"
-
-    # [CURRENT]
-    # Step 1: The release files are being put in place
+    # A release is being prepared
     RELEASE = "release"
-    # Step 2: The release files are available but not yet announced
-    DISTRIBUTE = "distribute"
-    # Step 3: The release has been announced but not yet released[?]
-    # TODO: Need to check the meaning of this phase
-    ANNOUNCE_RELEASE = "announce_release"
-    # Step 4: The release has been announced
-    RELEASED = "released"
-
-    # [Other]
     # An existing release is being imported from ASF SVN dist
     MIGRATION = "migration"
     # A release candidate has failed at any CANDIDATE stage
     FAILED = "failed"
-    # A previously CURRENT release has been archived
-    ARCHIVED = "archived"
+
+
+class ReleasePhase(str, enum.Enum):
+    # [CANDIDATE]
+    # Step 1: The candidate files are added from external sources and checked by ATR
+    CANDIDATE_DRAFT = "candidate_draft"
+    # Step 2: The candidate files are frozen and promoted into a candidate release
+    CANDIDATE_BEFORE_VOTE = "candidate_before_vote"
+    # Step 3: The project members are voting on the candidate release
+    CANDIDATE_DURING_VOTE = "candidate_during_vote"
+    # Step 4: The project vote on the candidate release has passed
+    CANDIDATE_AFTER_VOTE = "candidate_after_vote"
+
+    # [RELEASE]
+    # Step 1: The release files are being put in place
+    RELEASE_DRAFT = "release_draft"
+    # Step 2: The release files are available but not yet announced
+    RELEASE_BEFORE_ANNOUNCEMENT = "release_before_announcement"
+    # Step 3: The release has been announced
+    RELEASE_AFTER_ANNOUNCEMENT = "release_after_announcement"
 
 
 class TaskStatus(str, enum.Enum):

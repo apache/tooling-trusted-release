@@ -124,7 +124,7 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
             release = models.Release(
                 name=release_name,
                 stage=models.ReleaseStage.CANDIDATE,
-                phase=models.ReleasePhase.RELEASE_CANDIDATE,
+                phase=models.ReleasePhase.CANDIDATE_DRAFT,
                 project_id=project.id,
                 project=project,
                 version=version,

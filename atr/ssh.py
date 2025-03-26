@@ -300,7 +300,7 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
                     project=project,
                     version=release_version,
                     stage=models.ReleaseStage.CANDIDATE,
-                    phase=models.ReleasePhase.RELEASE_CANDIDATE,
+                    phase=models.ReleasePhase.CANDIDATE_DRAFT,
                     created=datetime.datetime.now(),
                 )
                 data.add(release)
