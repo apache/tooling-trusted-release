@@ -69,7 +69,11 @@
         </li>
         <li>
           <a href="{{ url_for('root_keys_add') }}"
-             {% if request.endpoint == 'root_keys_add' %}class="active"{% endif %}>Add signing key</a>
+             {% if request.endpoint == 'root_keys_add' %}class="active"{% endif %}>Add your signing key</a>
+        </li>
+        <li>
+          <a href="{{ url_for('root_keys_upload') }}"
+             {% if request.endpoint == 'root_keys_upload' %}class="active"{% endif %}>Upload a KEYS file</a>
         </li>
         <li>
           <a href="{{ url_for('root_keys_ssh_add') }}"

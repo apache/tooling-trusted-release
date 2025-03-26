@@ -1,0 +1,106 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Upload KEYS file ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Upload a KEYS file containing multiple GPG public keys.
+{% endblock description %}
+
+{% block content %}
+  <h1>Upload KEYS file</h1>
+  <p class="intro">Upload a KEYS file containing multiple GPG public keys.</p>
+
+  {% if form.errors %}
+    <h2 class="text-danger">Form errors</h2>
+    <div class="error-message mt-3 mb-3">
+      {% for field, errors in form.errors.items() %}
+        {% for error in errors %}<p class="text-danger mb-1">{{ field }}: {{ error }}</p>{% endfor %}
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if results %}
+    <h2>KEYS processing results</h2>
+    <p>The following keys were found in your KEYS file:</p>
+
+    {% for key_info in results %}
+      <div class="my-3 p-3 rounded {% if key_info.status == 'success' %}bg-light{% else %}bg-danger-subtle{% endif %}">
+        <h3 class="mt-0">
+          {% if key_info.status == 'success' %}
+            Success: Added Key
+          {% else %}
+            Error: Failed to add key
+          {% endif %}
+        </h3>
+        <dl class="row mb-0">
+          <dt class="col-sm-3 fw-bold">Key ID</dt>
+          <dd class="col-sm-9 mb-2">
+            {{ key_info.key_id }}
+          </dd>
+          <dt class="col-sm-3 fw-bold">Fingerprint</dt>
+          <dd class="col-sm-9 mb-2">
+            {{ key_info.fingerprint }}
+          </dd>
+          <dt class="col-sm-3 fw-bold">User ID</dt>
+          <dd class="col-sm-9 mb-2">
+            {{ key_info.user_id }}
+          </dd>
+          {% if key_info.status == 'success' %}
+            <dt class="col-sm-3 fw-bold">Created</dt>
+            <dd class="col-sm-9 mb-2">
+              {{ key_info.creation_date }}
+            </dd>
+            <dt class="col-sm-3 fw-bold">Expires</dt>
+            <dd class="col-sm-9 mb-2">
+              {{ key_info.expiration_date or 'Never' }}
+            </dd>
+          {% endif %}
+          <dt class="col-sm-3 fw-bold">Status</dt>
+          <dd class="col-sm-9 mb-2">
+            {{ key_info.message }}
+          </dd>
+          {% if key_info.status == 'success' and key_info.data %}
+            <details>
+              <summary>Key Data</summary>
+              <pre class="mb-0">{{ key_info.data }}</pre>
+            </details>
+          {% endif %}
+        </dl>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" class="striking" enctype="multipart/form-data">
+    {{ form.csrf_token }}
+
+    <div class="mb-4">
+      <div class="mb-3">
+        <label for="key" class="form-label">KEYS file:</label>
+      </div>
+      {{ form.key(class="form-control mb-2", aria_describedby="keys-help") }}
+      <small id="keys-help" class="form-text text-muted">
+        Upload a KEYS file containing multiple PGP public keys. The file should contain keys in ASCII-armored format, starting with "-----BEGIN PGP PUBLIC KEY BLOCK-----".
+      </small>
+    </div>
+
+    {% if user_committees %}
+      <div class="mb-4">
+        <div class="mb-3">
+          <label for="selected_committee" class="form-label">Associate with project:</label>
+        </div>
+        {{ form.selected_committee(class="form-select", aria_describedby="committees-help") }}
+        <small id="committees-help" class="form-text text-muted mt-2">
+          Select the committee to associate these keys with. You must be a member of the selected committee.
+        </small>
+      </div>
+    {% else %}
+      <div class="text-danger mt-1">
+        <p>You must be a member of at least one committee to add signing keys.</p>
+      </div>
+    {% endif %}
+
+    {{ form.submit(class="btn btn-primary") }}
+  </form>
+{% endblock content %}

@@ -25,6 +25,7 @@ import hashlib
 import logging
 import logging.handlers
 import pprint
+import re
 import shutil
 import tempfile
 from collections.abc import AsyncGenerator, Sequence
@@ -36,6 +37,7 @@ import asfquart.session as session
 import cryptography.hazmat.primitives.serialization as serialization
 import gnupg
 import quart
+import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
 import wtforms
 
@@ -84,7 +86,7 @@ async def key_add_post(
     if invalid_committees:
         raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
 
-    return await key_user_add(web_session, public_key, selected_committees)
+    return await key_user_add(util.unwrap(web_session.uid), public_key, selected_committees)
 
 
 def key_ssh_fingerprint(ssh_key_string: str) -> str:
@@ -114,9 +116,7 @@ def key_ssh_fingerprint(ssh_key_string: str) -> str:
     raise ValueError("Invalid SSH key format")
 
 
-async def key_user_add(
-    web_session: session.ClientSession, public_key: str, selected_committees: list[str]
-) -> dict | None:
+async def key_user_add(asf_uid: str | None, public_key: str, selected_committees: list[str]) -> dict | None:
     if not public_key:
         raise routes.FlashError("Public key is required")
 
@@ -148,14 +148,25 @@ async def key_user_add(
         # https://infra.apache.org/release-signing.html#note
         # Says that keys must be at least 2048 bits
         raise routes.FlashError("Key is not long enough; must be at least 2048 bits")
+    if asf_uid is None:
+        for uid in key["uids"]:
+            match = re.search(r"([A-Za-z0-9]+)@apache.org", uid)
+            if match:
+                asf_uid = match.group(1).lower()
+                break
+        else:
+            logging.warning(f"key_user_add called with no ASF UID: {keys}")
+    if asf_uid is None:
+        # We place this here to make it easier on the type checkers
+        raise routes.FlashError("No Apache UID found in the key UIDs")
 
     # Store key in database
     async with db.session() as data:
-        return await key_user_session_add(web_session, public_key, key, selected_committees, data)
+        return await key_user_session_add(asf_uid, public_key, key, selected_committees, data)
 
 
 async def key_user_session_add(
-    web_session: session.ClientSession,
+    asf_uid: str,
     public_key: str,
     key: dict,
     selected_committees: list[str],
@@ -169,15 +180,15 @@ async def key_user_session_add(
     # if existing_key:
     #     return ("You already have a key registered", None)
 
-    if not web_session.uid:
-        raise routes.FlashError("You must be signed in to add a key")
-
     fingerprint = key.get("fingerprint")
     if not isinstance(fingerprint, str):
         raise routes.FlashError("Invalid key fingerprint")
     fingerprint = fingerprint.lower()
     uids = key.get("uids")
     async with data.begin():
+        if existing := await data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid).get():
+            raise routes.FlashError(f"Key already exists: {existing.fingerprint}")
+
         # Create new key record
         key_record = models.PublicSigningKey(
             fingerprint=fingerprint,
@@ -186,7 +197,7 @@ async def key_user_session_add(
             created=datetime.datetime.fromtimestamp(int(key["date"])),
             expires=datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
             declared_uid=uids[0] if uids else None,
-            apache_uid=web_session.uid,
+            apache_uid=asf_uid,
             ascii_armored_key=public_key,
         )
         data.add(key_record)
@@ -221,7 +232,7 @@ async def root_keys_add() -> str:
 
     key_info = None
 
-    # Get PMC objects for all projects the user is a member of
+    # Get committees for all projects the user is a member of
     async with db.session() as data:
         project_list = web_session.committees + web_session.projects
         user_committees = await data.committee(name_in=project_list).all()
@@ -324,6 +335,7 @@ async def root_keys_ssh_add() -> response.Response | str:
     web_session = await session.read()
     if web_session is None:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
+    uid = util.unwrap(web_session.uid)
 
     form = await AddSSHKeyForm.create_form()
     fingerprint = None
@@ -332,7 +344,7 @@ async def root_keys_ssh_add() -> response.Response | str:
         fingerprint = await asyncio.to_thread(key_ssh_fingerprint, key)
         async with db.session() as data:
             async with data.begin():
-                data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=util.unwrap(web_session.uid)))
+                data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=uid))
         await quart.flash(f"SSH key added successfully: {fingerprint}", "success")
         return quart.redirect(quart.url_for("root_keys_review"))
 
@@ -342,3 +354,123 @@ async def root_keys_ssh_add() -> response.Response | str:
         form=form,
         fingerprint=fingerprint,
     )
+
+
+@routes.app_route("/keys/upload", methods=["GET", "POST"])
+@auth.require(auth.Requirements.committer)
+async def root_keys_upload() -> str:
+    """Upload a KEYS file containing multiple GPG keys."""
+    web_session = await session.read()
+    if web_session is None:
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
+
+    # Get committees for all projects the user is a member of
+    async with db.session() as data:
+        project_list = web_session.committees + web_session.projects
+        user_committees = await data.committee(name_in=project_list).all()
+
+    class UploadKeyForm(util.QuartFormTyped):
+        key = wtforms.FileField("KEYS file")
+        submit = wtforms.SubmitField("Upload KEYS file")
+        selected_committee = wtforms.SelectField("PMCs", choices=[(c.name, c.name) for c in user_committees])
+
+    form = await UploadKeyForm.create_form()
+    results: list[dict] = []
+
+    async def render(error: str | None = None) -> str:
+        # For easier happy pathing
+        if error is not None:
+            await quart.flash(error, "error")
+        return await quart.render_template(
+            "keys-upload.html",
+            asf_id=web_session.uid,
+            user_committees=user_committees,
+            form=form,
+            results=results,
+            algorithms=routes.algorithms,
+        )
+
+    if await form.validate_on_submit():
+        key_file = form.key.data
+        if not isinstance(key_file, datastructures.FileStorage):
+            return await render(error="Invalid file upload")
+
+        # This is a KEYS file of multiple GPG keys
+        # We need to parse it and add each key to the user's account
+        key_blocks = await _upload_key_blocks(key_file)
+        if not key_blocks:
+            return await render(error="No valid GPG keys found in the uploaded file")
+
+        # Get selected committee from the form
+        selected_committee = form.selected_committee.data
+        if not selected_committee:
+            return await render(error="You must select at least one committee")
+
+        # Ensure that the selected committee is one of which the user is actually a member
+        if selected_committee not in (web_session.committees + web_session.projects):
+            return await render(error=f"You are not a member of {selected_committee}")
+
+        # Process each key block
+        results = await _upload_process_key_blocks(key_blocks, selected_committee)
+        if not results:
+            return await render(error="No keys were added")
+
+        success_count = sum(1 for r in results if r["status"] == "success")
+        error_count = len(results) - success_count
+        await quart.flash(
+            f"Processed {len(results)} keys: {success_count} successful, {error_count} failed",
+            "success" if success_count > 0 else "error",
+        )
+    return await render()
+
+
+async def _upload_key_blocks(key_file: datastructures.FileStorage) -> list[str]:
+    """Extract GPG key blocks from a KEYS file."""
+    # Read the file content
+    keys_content = await asyncio.to_thread(key_file.read)
+    keys_text = keys_content.decode("utf-8", errors="replace")
+
+    # Extract GPG key blocks
+    key_blocks = []
+    current_block = []
+    in_key_block = False
+
+    for line in keys_text.splitlines():
+        if line.strip() == "-----BEGIN PGP PUBLIC KEY BLOCK-----":
+            in_key_block = True
+            current_block = [line]
+        elif (line.strip() == "-----END PGP PUBLIC KEY BLOCK-----") and in_key_block:
+            current_block.append(line)
+            key_blocks.append("\n".join(current_block))
+            in_key_block = False
+        elif in_key_block:
+            current_block.append(line)
+
+    return key_blocks
+
+
+async def _upload_process_key_blocks(key_blocks: list[str], selected_committee: str) -> list[dict]:
+    """Process GPG key blocks and add them to the user's account."""
+    results: list[dict] = []
+
+    # Process each key block
+    for i, key_block in enumerate(key_blocks):
+        try:
+            key_info = await key_user_add(None, key_block, [selected_committee])
+            if key_info:
+                key_info["status"] = "success"
+                key_info["message"] = "Key added successfully"
+                results.append(key_info)
+        except Exception as e:
+            logging.exception("Exception adding key:")
+            results.append(
+                {
+                    "status": "error",
+                    "message": f"Exception: {e}",
+                    "key_id": f"Key #{i + 1}",
+                    "fingerprint": "Error",
+                    "user_id": "Unknown",
+                }
+            )
+
+    return results
