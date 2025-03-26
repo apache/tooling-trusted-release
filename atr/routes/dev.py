@@ -17,9 +17,6 @@
 
 
 import asfquart as asfquart
-import asfquart.auth as auth
-import asfquart.base as base
-import asfquart.session as session
 import quart
 
 import atr.db as db
@@ -30,14 +27,10 @@ if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
 
 
-@routes.app_route("/dev/send-email", methods=["GET", "POST"])
-@auth.require(auth.Requirements.committer)
-async def dev_email_send() -> quart.ResponseReturnValue:
+@routes.committer_route("/dev/send-email", methods=["GET", "POST"])
+async def send_email(session: routes.CommitterSession) -> quart.ResponseReturnValue:
     """Simple endpoint for testing email functionality."""
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-    asf_id = web_session.uid
+    asf_id = session.uid
 
     if quart.request.method == "POST":
         form = await routes.get_form(quart.request)
