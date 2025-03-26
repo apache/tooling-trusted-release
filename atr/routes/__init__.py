@@ -414,7 +414,6 @@ def modules() -> dict[str, ModuleType]:
     import atr.routes.candidate_draft as candidate_draft
     import atr.routes.committees as committees
     import atr.routes.dev as dev
-    import atr.routes.docs as docs
     import atr.routes.download as download
     import atr.routes.keys as keys
     import atr.routes.projects as projects
@@ -426,7 +425,6 @@ def modules() -> dict[str, ModuleType]:
         "candidate_draft": candidate_draft,
         "committees": committees,
         "dev": dev,
-        "docs": docs,
         "download": download,
         "keys": keys,
         "projects": projects,
