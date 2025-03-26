@@ -20,9 +20,7 @@
 import datetime
 
 import asfquart
-import asfquart.auth as auth
 import asfquart.base as base
-import asfquart.session as session
 import quart
 import werkzeug.wrappers.response as response
 import wtforms
@@ -63,7 +61,7 @@ def format_artifact_name(project_name: str, version: str, is_podling: bool = Fal
 # Release functions
 
 
-async def release_add_post(session: session.ClientSession, request: quart.Request) -> str | response.Response:
+async def release_add_post(session: routes.CommitterSession, request: quart.Request) -> str | response.Response:
     """Handle POST request for creating a new release."""
 
     def not_none(value: str | None) -> str:
@@ -134,49 +132,37 @@ async def release_add_post(session: session.ClientSession, request: quart.Reques
 
     # Redirect to the add package page with the storage token
     await quart.flash("Release candidate created successfully", "success")
-    return quart.redirect(quart.url_for("root_candidate_review"))
+    return quart.redirect(util.as_url(review))
 
 
 # Root functions
 
 
-@routes.app_route("/candidate/create", methods=["GET", "POST"])
-@auth.require(auth.Requirements.committer)
-async def root_candidate_create() -> response.Response | str:
+@routes.committer_route("/candidate/create", methods=["GET", "POST"])
+async def create(session: routes.CommitterSession) -> response.Response | str:
     """Create a new release in the database."""
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-
     # For POST requests, handle the release creation
     if quart.request.method == "POST":
-        return await release_add_post(web_session, quart.request)
+        return await release_add_post(session, quart.request)
 
     # Get PMC objects for all projects the user is a member of
     async with db.session() as data:
-        project_list = web_session.committees + web_session.projects
+        project_list = session.committees + session.projects
         user_committees = await data.committee(name_in=project_list).all()
 
     # For GET requests, show the form
     form = await ReleaseAddForm.create_form()
     return await quart.render_template(
         "candidate-create.html",
-        asf_id=web_session.uid,
+        asf_id=session.uid,
         user_committees=user_committees,
         form=form,
     )
 
 
-@routes.app_route("/candidate/review")
-@auth.require(auth.Requirements.committer)
-async def root_candidate_review() -> str:
+@routes.committer_route("/candidate/review")
+async def review(session: routes.CommitterSession) -> str:
     """Show all release candidates to which the user has access."""
-    # time.sleep(0.37)
-    # await asyncio.sleep(0.73)
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-
     async with db.session() as data:
         # Get all releases where the user is a PMC member or committer
         # TODO: We don't actually record who uploaded the release candidate
@@ -194,7 +180,7 @@ async def root_candidate_review() -> str:
             if r.committee is None:
                 continue
             # For PPMCs the "members" are stored in the committers field
-            if (web_session.uid in r.committee.committee_members) or (web_session.uid in r.committee.committers):
+            if (session.uid in r.committee.committee_members) or (session.uid in r.committee.committers):
                 user_releases.append(r)
 
         # time.sleep(0.37)

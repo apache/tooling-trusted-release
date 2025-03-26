@@ -33,6 +33,7 @@ import atr.db as db
 import atr.db.models as models
 import atr.db.service as service
 import atr.routes as routes
+import atr.routes.candidate as candidate
 import atr.util as util
 
 if asfquart.APP is ...:
@@ -71,7 +72,7 @@ async def root_release_delete() -> response.Response:
 
     if not release_name:
         await quart.flash("Missing required parameters", "error")
-        return quart.redirect(quart.url_for("root_candidate_review"))
+        return quart.redirect(util.as_url(candidate.review))
 
     async with db.session() as data:
         async with data.begin():
@@ -89,16 +90,13 @@ async def root_release_delete() -> response.Response:
             except routes.FlashError as e:
                 logging.exception("FlashError:")
                 await quart.flash(str(e), "error")
-                return quart.redirect(quart.url_for("root_candidate_review"))
-            # except Exception as e:
-            #     await quart.flash(f"Error deleting release: {e!s}", "error")
-            #     return quart.redirect(quart.url_for("root_candidate_review"))
+                return quart.redirect(util.as_url(candidate.review))
 
     release_dir = util.get_candidate_draft_dir() / project_name / version
     if await aiofiles.os.path.exists(release_dir):
         await aioshutil.rmtree(release_dir)
     await quart.flash("Release deleted successfully", "success")
-    return quart.redirect(quart.url_for("root_candidate_review"))
+    return quart.redirect(util.as_url(candidate.review))
 
 
 @routes.app_route("/release/bulk/<int:task_id>", methods=["GET"])
@@ -114,12 +112,12 @@ async def release_bulk_status(task_id: int) -> str | response.Response:
         task = await data.task(id=task_id).get()
         if not task:
             await quart.flash(f"Task with ID {task_id} not found.", "error")
-            return quart.redirect(quart.url_for("root_candidate_review"))
+            return quart.redirect(util.as_url(candidate.review))
 
         # Verify this is a bulk download task
         if task.task_type != "package_bulk_download":
             await quart.flash(f"Task with ID {task_id} is not a bulk download task.", "error")
-            return quart.redirect(quart.url_for("root_candidate_review"))
+            return quart.redirect(util.as_url(candidate.review))
 
         # If result is a list or tuple with a single item, extract it
         if isinstance(task.result, list | tuple) and (len(task.result) == 1):
@@ -139,7 +137,7 @@ async def release_bulk_status(task_id: int) -> str | response.Response:
                     web_session.uid not in release.committee.committers
                 ):
                     await quart.flash("You don't have permission to view this task.", "error")
-                    return quart.redirect(quart.url_for("root_candidate_review"))
+                    return quart.redirect(util.as_url(candidate.review))
 
     return await quart.render_template("release-bulk.html", task=task, release=release, TaskStatus=models.TaskStatus)
 
@@ -161,12 +159,12 @@ async def root_release_vote() -> response.Response | str:
 
     if not release_name:
         await quart.flash("No release key provided", "error")
-        return quart.redirect(quart.url_for("root_candidate_review"))
+        return quart.redirect(util.as_url(candidate.review))
 
     release = await service.get_release_by_name(release_name)
     if release is None:
         await quart.flash(f"Release with key {release_name} not found", "error")
-        return quart.redirect(quart.url_for("root_candidate_review"))
+        return quart.redirect(util.as_url(candidate.review))
 
     # If POST, process the form and create a vote_initiate task
     if (quart.request.method == "POST") and (form is not None):
@@ -205,7 +203,7 @@ async def root_release_vote() -> response.Response | str:
                 f"Vote initiation task queued as task #{task.id}. You'll receive an email confirmation when complete.",
                 "success",
             )
-            return quart.redirect(quart.url_for("root_candidate_review"))
+            return quart.redirect(util.as_url(candidate.review))
 
     # For GET
     return await quart.render_template(

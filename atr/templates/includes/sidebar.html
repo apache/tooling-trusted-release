@@ -50,13 +50,11 @@
       <h3>Candidate drafts</h3>
       <ul>
         <li>
-          <a href="{{ as_url(routes.candidate_draft.add) }}"
-             {% if request.endpoint == 'root_candidate_draft_add' %}class="active"{% endif %}>Create and modify</a>
+          <a href="{{ as_url(routes.candidate_draft.add) }}">Create and modify</a>
         </li>
         <!-- TODO: Don't show this if the user doesn't have any release candidates? -->
         <li>
-          <a href="{{ url_for('root_candidate_review') }}"
-             {% if request.endpoint == 'root_candidate_review' %}class="active"{% endif %}>Review all</a>
+          <a href="{{ as_url(routes.candidate.review) }}">Review all</a>
         </li>
       </ul>
 
