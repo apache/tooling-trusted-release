@@ -125,7 +125,7 @@
                     {% endif %}
                   </td>
                   <td class="atr-sans">
-                    <a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}"
+                    <a href="{{ as_url(routes.download.phase, phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}"
                        class="btn btn-sm btn-outline-primary fs-6">Download</a>
                     <a href="{{ as_url(routes.candidate_draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
                        class="btn btn-sm btn-outline-primary fs-6 small ms-2">Tools</a>
@@ -156,11 +156,11 @@
                   <tr>
                     <td>
                       {% if path in artifacts %}
-                        <strong><a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a></strong>
+                        <strong><a href="{{ as_url(routes.download.phase, phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a></strong>
                       {% elif path in metadata %}
-                        <em><a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a></em>
+                        <em><a href="{{ as_url(routes.download.phase, phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a></em>
                       {% else %}
-                        <a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a>
+                        <a href="{{ as_url(routes.download.phase, phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}">{{ path }}</a>
                       {% endif %}
                     </td>
                     <td>{{ templates[path] }}</td>

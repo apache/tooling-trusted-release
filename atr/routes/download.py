@@ -21,9 +21,6 @@ import pathlib
 
 import aiofiles
 import aiofiles.os
-import asfquart.auth as auth
-import asfquart.base as base
-import asfquart.session as session
 import quart
 import werkzeug.wrappers.response as response
 
@@ -32,16 +29,11 @@ import atr.routes.candidate as candidate
 import atr.util as util
 
 
-@routes.app_route("/download/<phase>/<project>/<version>/<path>")
-@auth.require(auth.Requirements.committer)
-async def root_download(
-    phase: str, project: str, version: str, path: pathlib.Path
+@routes.committer_route("/download/<phase>/<project>/<version>/<path>")
+async def phase(
+    session: routes.CommitterSession, phase: str, project: str, version: str, path: pathlib.Path
 ) -> response.Response | quart.Response:
     """Download a file from a release in any phase."""
-    web_session = await session.read()
-    if (web_session is None) or (web_session.uid is None):
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-
     # Check that path is relative
     path = pathlib.Path(path)
     if not path.is_relative_to(path.anchor):
