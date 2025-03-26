@@ -33,10 +33,10 @@
         </div>
         <div class="col-md-6">
           <p>
-            <strong>Stage:</strong> <span class="badge bg-{% if release.stage == 'CURRENT' %}success{% elif release.stage == 'CANDIDATE' %}warning{% elif release.stage == 'BUILD' %}info{% else %}secondary{% endif %}">{{ release.stage }}</span>
+            <strong>Stage:</strong> <span class="badge bg-{% if release.stage == 'CURRENT' %}success{% elif release.stage == 'CANDIDATE' %}warning{% elif release.stage == 'BUILD' %}info{% else %}secondary{% endif %}">{{ release.stage.value.upper() }}</span>
           </p>
           <p>
-            <strong>Phase:</strong> <span class="badge bg-info">{{ release.phase }}</span>
+            <strong>Phase:</strong> <span class="badge bg-info">{{ release.phase.value.upper() }}</span>
           </p>
           <p>
             <strong>Created:</strong> {{ release.created.strftime("%Y-%m-%d %H:%M") }}
@@ -50,7 +50,7 @@
     <div class="card-header d-flex justify-content-between align-items-center">
       <h5 class="mb-0">Files</h5>
       <a href="{{ url_for('root_files_add') }}"
-         class="btn btn-sm btn-outline-secondary">Back to Add files</a>
+         class="btn btn-sm btn-outline-secondary">Back to Create and modify</a>
     </div>
     <div class="card-body">
       {% if paths|length > 0 %}
@@ -58,9 +58,9 @@
           <table class="table table-striped table-hover">
             <thead>
               <tr>
-                <th>Path</th>
+                <th>File path</th>
                 <th>Status</th>
-                <th>Actions and messages</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -126,12 +126,12 @@
                   </td>
                   <td class="atr-sans">
                     <a href="{{ url_for('root_download', phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}"
-                       class="btn btn-sm btn-outline-primary">Download</a>
+                       class="btn btn-sm btn-outline-primary fs-6">Download</a>
                     <a href="{{ url_for('root_files_tools', project_name=project_name, version_name=version_name, file_path=path) }}"
-                       class="btn btn-sm btn-outline-primary ms-2">Tools</a>
+                       class="btn btn-sm btn-outline-primary fs-6 small ms-2">Tools</a>
                     {% if path in tasks and tasks[path]|length > 0 %}
                       <a href="{{ url_for('root_files_checks', project_name=project_name, version_name=version_name, file_path=path) }}"
-                         class="btn btn-sm btn-outline-primary ms-2">Check results</a>
+                         class="btn btn-sm btn-outline-primary fs-6 small ms-2">Check results</a>
                     {% endif %}
                   </td>
                 </tr>
@@ -146,7 +146,7 @@
             <table class="table table-striped table-hover">
               <thead>
                 <tr>
-                  <th>Path</th>
+                  <th>File path</th>
                   <th>Template</th>
                   <th>Substitutions</th>
                 </tr>
