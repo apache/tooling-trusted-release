@@ -106,7 +106,7 @@ class Committee(sqlmodel.SQLModel, table=True):
     @property
     def display_name(self) -> str:
         """Get the display name for the committee."""
-        name = self.name if self.full_name is None else self.full_name
+        name = self.full_name or self.name
         return f"{name} (PPMC)" if self.is_podling else name
 
 
@@ -144,8 +144,7 @@ class Project(sqlmodel.SQLModel, table=True):
     @property
     def display_name(self) -> str:
         """Get the display name for the Project."""
-        name = self.name if self.full_name is None else self.full_name
-        return name
+        return self.full_name or self.name
 
     @property
     async def candidate_drafts(self) -> list["Release"]:
