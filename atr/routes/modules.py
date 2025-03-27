@@ -26,3 +26,49 @@ import atr.routes.preview as preview
 import atr.routes.projects as projects
 import atr.routes.release as release
 import atr.routes.root as root
+
+
+# Export data for a custom linter script
+def _export_routes() -> None:
+    import asyncio
+
+    async def _export_routes_async() -> None:
+        """Export all routes to a JSON file for static analysis."""
+        import json
+        import sys
+
+        import aiofiles
+
+        route_paths: list[str] = []
+        current_module = sys.modules[__name__]
+
+        for module_name in dir(current_module):
+            if module_name.startswith("_"):
+                # Not intended for external use
+                continue
+
+            module = getattr(current_module, module_name)
+            if not hasattr(module, "__file__"):
+                # Not a module
+                continue
+
+            # Get all callable interfaces that do not begin with an underscore
+            for attr_name in dir(module):
+                if attr_name.startswith("_"):
+                    # Not intended for external use
+                    continue
+                if not callable(getattr(module, attr_name)):
+                    # Not callable
+                    continue
+                route_path = f"{module_name}.{attr_name}"
+                route_paths.append(route_path)
+
+        async with aiofiles.open("routes.json", "w", encoding="utf-8") as f:
+            await f.write(json.dumps(route_paths, indent=2))
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(_export_routes_async())
+
+
+_export_routes()
+del _export_routes

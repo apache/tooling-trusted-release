@@ -35,12 +35,12 @@
   </div>
   <div class="d-flex gap-2 mb-4">
     <form method="post"
-          action="{{ as_url(routes.draft.generate_hash, project_name=project_name, version_name=version_name, file_path=file_path) }}">
+          action="{{ as_url(routes.draft.hashgen, project_name=project_name, version_name=version_name, file_path=file_path) }}">
       <input type="hidden" name="hash_type" value="sha256" />
       <button type="submit" class="btn btn-outline-secondary">Generate SHA256</button>
     </form>
     <form method="post"
-          action="{{ as_url(routes.draft.generate_hash, project_name=project_name, version_name=version_name, file_path=file_path) }}">
+          action="{{ as_url(routes.draft.hashgen, project_name=project_name, version_name=version_name, file_path=file_path) }}">
       <input type="hidden" name="hash_type" value="sha512" />
       <button type="submit" class="btn btn-outline-secondary">Generate SHA512</button>
     </form>

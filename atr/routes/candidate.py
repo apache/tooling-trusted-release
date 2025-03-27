@@ -160,6 +160,12 @@ async def create(session: routes.CommitterSession) -> response.Response | str:
     )
 
 
+@routes.committer("/candidate/delete", methods=["POST"])
+async def delete(session: routes.CommitterSession) -> response.Response:
+    """Delete a release candidate."""
+    return await session.redirect(vote, error="Not yet implemented")
+
+
 @routes.committer("/candidate/vote")
 async def vote(session: routes.CommitterSession) -> str:
     """Show all release candidates to which the user has access."""
