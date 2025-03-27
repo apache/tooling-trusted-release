@@ -1,0 +1,100 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Modify candidate draft ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Modify candidate drafts using rsync.
+{% endblock description %}
+
+{% block content %}
+  <h1>Modify a candidate draft</h1>
+  <p class="intro">
+    A <strong>candidate draft</strong> is an editable set of files which can be <strong>frozen and promoted into a candidate release</strong> for voting on by the project's committee.
+  </p>
+  <ul>
+    <li>You can only create a new candidate draft if you are a member of the project's committee</li>
+    <li>Projects can work on multiple candidate drafts for different versions simultaneously</li>
+    <li>A candidate draft is only editable until submitted for voting</li>
+  </ul>
+
+  <div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
+    {% for release in candidate_drafts %}
+      <div class="col" id="{{ release.name }}">
+        <div class="card h-100">
+          <div class="card-body position-relative">
+            <div class="position-absolute top-0 end-0 m-2">
+              <span class="badge bg-success">Draft</span>
+            </div>
+            <h5 class="card-title">{{ release.project.display_name }} {{ release.version }}</h5>
+            {% if release.project.committee %}
+              <h6 class="card-subtitle mb-2 text-muted">{{ release.project.committee.display_name }}</h6>
+            {% endif %}
+            <p class="card-text">
+              {% if number_of_release_files(release) > 0 %}
+                This candidate draft has <a href="{{ as_url(routes.candidate_draft.files, project_name=release.project.name, version_name=release.version) }}">{{ number_of_release_files(release) }} file(s)</a>.
+              {% else %}
+                This candidate draft doesn't have any files yet.
+              {% endif %}
+              <a href="{{ as_url(routes.candidate_draft.add_project, project_name=release.project.name, version_name=release.version) }}">Upload a file using the browser</a>,
+              or use the command below to add or modify files in this draft:
+            </p>
+          </div>
+          <div class="card-footer bg-light border-1 pt-4 pb-4 position-relative">
+            <button class="btn btn-sm btn-outline-secondary atr-copy-btn fs-6 position-absolute top-0 end-0 m-2"
+                    data-clipboard-target="#cmd-{{ release.name|replace('.', '-') }}">
+              <i class="bi bi-clipboard"></i> Copy
+            </button>
+            <pre class="small mb-0" id="cmd-{{ release.name|replace('.', '-') }}">rsync -av -e 'ssh -p 2222' your/files/ \
+    {{ asf_id }}@{{ server_domain }}:/{{ release.project.name }}/{{ release.version }}/</pre>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+    {% if candidate_drafts|length == 0 %}
+      <div class="col-12">
+        <div class="alert alert-info">There are currently no candidate drafts.</div>
+      </div>
+    {% endif %}
+  </div>
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+  <script>
+      document.addEventListener("DOMContentLoaded", function() {
+          const copyButtons = document.querySelectorAll(".atr-copy-btn");
+
+          copyButtons.forEach(button => {
+              button.addEventListener("click", function() {
+                  const targetId = this.getAttribute("data-clipboard-target");
+                  const targetElement = document.querySelector(targetId);
+
+                  if (targetElement) {
+                      const textToCopy = targetElement.textContent;
+
+                      navigator.clipboard.writeText(textToCopy)
+                          .then(() => {
+                              const originalText = this.innerHTML;
+                              this.innerHTML = '<i class="bi bi-check2"></i> Copied!';
+
+                              // Reset the button text after 2000ms
+                              setTimeout(() => {
+                                  this.innerHTML = originalText;
+                              }, 2000);
+                          })
+                          .catch(err => {
+                              console.error("Failed to copy: ", err);
+                              this.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Failed!';
+
+                              setTimeout(() => {
+                                  this.innerHTML = '<i class="bi bi-clipboard"></i> Copy';
+                              }, 2000);
+                          });
+                  }
+              });
+          });
+      });
+  </script>
+{% endblock javascripts %}

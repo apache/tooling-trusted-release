@@ -25,7 +25,6 @@ import hashlib
 import logging
 import pathlib
 import re
-import sys
 from typing import Final
 
 import aiofiles.os
@@ -169,7 +168,6 @@ async def add(session: routes.CommitterSession) -> str:
         server_domain=session.host,
         number_of_release_files=_number_of_release_files,
         candidate_drafts=user_candidate_drafts,
-        candidate_draft=sys.modules[__name__],
     )
 
 
@@ -230,7 +228,6 @@ async def add_project(
         project_name=project_name,
         version_name=version_name,
         form=form,
-        candidate_draft=sys.modules[__name__],
     )
 
 
@@ -311,7 +308,6 @@ async def files(session: routes.CommitterSession, project_name: str, version_nam
         modified=path_modified,
         tasks=path_tasks,
         models=models,
-        candidate_draft=sys.modules[__name__],
     )
 
 
@@ -363,7 +359,6 @@ async def checks(session: routes.CommitterSession, project_name: str, version_na
         tasks=tasks,
         all_tasks_completed=all_tasks_completed,
         format_file_size=routes.format_file_size,
-        candidate_draft=sys.modules[__name__],
     )
 
 
@@ -451,6 +446,24 @@ async def hashgen(
     return quart.redirect(util.as_url(files, project_name=project_name, version_name=version_name))
 
 
+@routes.committer("/candidate-draft/modify")
+async def modify(session: routes.CommitterSession) -> str:
+    """Show a page to allow the user to modify a candidate draft."""
+    # Do them outside of the template rendering call to ensure order
+    # The user_candidate_drafts call can use cached results from user_projects
+    user_projects = await session.user_projects
+    user_candidate_drafts = await session.user_candidate_drafts
+
+    return await quart.render_template(
+        "candidate-draft-modify.html",
+        asf_id=session.uid,
+        projects=user_projects,
+        server_domain=session.host,
+        number_of_release_files=_number_of_release_files,
+        candidate_drafts=user_candidate_drafts,
+    )
+
+
 @routes.committer("/candidate-draft/tools/<project_name>/<version_name>/<path:file_path>")
 async def tools(session: routes.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
     """Show the tools for a specific file."""
@@ -488,5 +501,4 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
         file_data=file_data,
         release=release,
         format_file_size=routes.format_file_size,
-        candidate_draft=sys.modules[__name__],
     )

@@ -27,28 +27,14 @@
     {% endif %}
   </div>
   <nav>
-    <h3>Main pages</h3>
-    <ul>
-      <li>
-        <i class="fa-solid fa-house"></i>
-        <a href="{{ url_for('root') }}"
-           {% if request.endpoint == 'root' %}class="active"{% endif %}>About</a>
-      </li>
-      <li>
-        <i class="fa-solid fa-diagram-project"></i>
-        <a href="{{ as_url(routes.committees.directory) }}">Committees</a>
-      </li>
-      <li>
-        <i class="fa-solid fa-diagram-project"></i>
-        <a href="{{ as_url(routes.projects.directory) }}">Projects</a>
-      </li>
-    </ul>
-
     {% if current_user %}
       <h3>Candidate drafts</h3>
       <ul>
         <li>
-          <a href="{{ as_url(routes.candidate_draft.add) }}">Create and modify</a>
+          <a href="{{ as_url(routes.candidate_draft.add) }}">Add draft</a>
+        </li>
+        <li>
+          <a href="{{ as_url(routes.candidate_draft.modify) }}">Modify draft</a>
         </li>
         <!-- TODO: Don't show this if the user doesn't have any release candidates? -->
         <li>
@@ -70,6 +56,23 @@
         </li>
         <li>
           <a href="{{ as_url(routes.keys.ssh_add) }}">Add SSH key</a>
+        </li>
+      </ul>
+
+      <h3>Organisation</h3>
+      <ul>
+        <li>
+          <i class="fa-solid fa-house"></i>
+          <a href="{{ url_for('root') }}"
+             {% if request.endpoint == 'root' %}class="active"{% endif %}>About</a>
+        </li>
+        <li>
+          <i class="fa-solid fa-diagram-project"></i>
+          <a href="{{ as_url(routes.committees.directory) }}">Committees</a>
+        </li>
+        <li>
+          <i class="fa-solid fa-diagram-project"></i>
+          <a href="{{ as_url(routes.projects.directory) }}">Projects</a>
         </li>
       </ul>
 
