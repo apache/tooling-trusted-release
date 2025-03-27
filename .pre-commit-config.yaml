@@ -50,6 +50,13 @@ repos:
       args: ['--fix']
 - repo: local
   hooks:
+    - id: poetry-check
+      name: poetry-check
+      description: run poetry check to validate config
+      entry: poetry check
+      language: python
+      pass_filenames: false
+      files: ^(.*/)?(poetry\.lock|pyproject\.toml)$
     - id: ruff
       name: Ruff Linter
       entry: ruff check --fix
