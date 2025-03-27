@@ -254,8 +254,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     form = await routes.get_form(quart.request)
     fingerprint = form.get("fingerprint")
     if not fingerprint:
-        await quart.flash("No key fingerprint provided", "error")
-        return quart.redirect(util.as_url(review))
+        return await session.redirect(review, error="No key fingerprint provided")
 
     async with db.session() as data:
         async with data.begin():
@@ -264,20 +263,17 @@ async def delete(session: routes.CommitterSession) -> response.Response:
             if key:
                 # Delete the GPG key
                 await data.delete(key)
-                await quart.flash("GPG key deleted successfully", "success")
-                return quart.redirect(util.as_url(review))
+                return await session.redirect(review, success="GPG key deleted successfully")
 
             # If not a GPG key, try to get an SSH key
             ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=session.uid).get()
             if ssh_key:
                 # Delete the SSH key
                 await data.delete(ssh_key)
-                await quart.flash("SSH key deleted successfully", "success")
-                return quart.redirect(util.as_url(review))
+                return await session.redirect(review, success="SSH key deleted successfully")
 
             # No key was found
-            await quart.flash("Key not found or not owned by you", "error")
-            return quart.redirect(util.as_url(review))
+            return await session.redirect(review, error="Key not found or not owned by you")
 
 
 @routes.committer("/keys/review")
@@ -319,8 +315,7 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
         async with db.session() as data:
             async with data.begin():
                 data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=session.uid))
-        await quart.flash(f"SSH key added successfully: {fingerprint}", "success")
-        return quart.redirect(util.as_url(review))
+        return await session.redirect(review, success=f"SSH key added successfully: {fingerprint}")
 
     return await quart.render_template(
         "keys-ssh-add.html",

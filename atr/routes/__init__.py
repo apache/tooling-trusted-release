@@ -31,11 +31,13 @@ import asfquart.base as base
 import asfquart.session as session
 import quart
 
+import atr.util as util
+
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Coroutine
 
     import werkzeug.datastructures as datastructures
-
+    import werkzeug.wrappers.response as response
 import atr.db.models as models
 import atr.user as user
 
@@ -342,6 +344,16 @@ class CommitterSession:
             if port.isdigit():
                 return domain
         return request_host
+
+    async def redirect(
+        self, route: CommitterRouteHandler[R], success: str | None = None, error: str | None = None, **kwargs: Any
+    ) -> response.Response:
+        """Redirect to a route with a success or error message."""
+        if success is not None:
+            await quart.flash(success, "success")
+        elif error is not None:
+            await quart.flash(error, "error")
+        return quart.redirect(util.as_url(route, **kwargs))
 
     @property
     async def user_candidate_drafts(self) -> list[models.Release]:

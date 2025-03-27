@@ -43,12 +43,11 @@ async def phase(
 
     # Check that the file exists
     if not await aiofiles.os.path.exists(file_path):
-        await quart.flash("File not found", "error")
         # Even using the following type declaration, mypy does not know the type
         # The same pattern is used in release.py, so this is a bug in mypy
         # TODO: Report the bug upstream to mypy
-        # review: routes.RouteHandler[str] = candidate.review
-        return quart.redirect(util.as_url(candidate.review))  # type: ignore[has-type]
+        # review: routes.RouteHandler[str] = candidate.vote
+        return await session.redirect(candidate.vote, error="File not found")  # type: ignore[has-type]
 
     # Send the file with original filename
     return await quart.send_file(

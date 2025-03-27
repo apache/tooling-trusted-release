@@ -28,7 +28,7 @@
   </div>
   <nav>
     {% if current_user %}
-      <h3>Candidate drafts</h3>
+      <h3>Release candidate drafts</h3>
       <ul>
         <li>
           <a href="{{ as_url(routes.candidate_draft.add) }}">Add draft</a>
@@ -39,6 +39,13 @@
         <!-- TODO: Don't show this if the user doesn't have any release candidates? -->
         <li>
           <a href="{{ as_url(routes.candidate_draft.promote) }}">Promote draft</a>
+        </li>
+      </ul>
+
+      <h3>Release candidates</h3>
+      <ul>
+        <li>
+          <a href="{{ as_url(routes.candidate.vote) }}">Start vote</a>
         </li>
       </ul>
 

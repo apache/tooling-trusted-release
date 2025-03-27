@@ -305,10 +305,10 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
                 )
                 data.add(release)
                 await data.commit()
-            if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-                raise RuntimeError("Release is not in the candidate draft phase")
             if release.stage != models.ReleaseStage.RELEASE_CANDIDATE:
                 raise RuntimeError("Release is not in the candidate stage")
+            if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+                raise RuntimeError("Release is not in the candidate draft phase")
 
             # Add a task to analyse the new files
             data.add(

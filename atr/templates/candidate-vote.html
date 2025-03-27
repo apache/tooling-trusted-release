@@ -1,11 +1,11 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Release candidates ~ ATR
+  Start release candidate vote ~ ATR
 {% endblock title %}
 
 {% block description %}
-  Release candidates to which you have access.
+  Start a vote on a release candidate.
 {% endblock description %}
 
 {% block stylesheets %}
@@ -24,41 +24,41 @@
 {% endblock stylesheets %}
 
 {% block content %}
-  <h1>Release candidates</h1>
+  <h1>Start release candidate vote</h1>
 
   <p>Here are all the release candidates to which you have access.</p>
 
-  {% if releases %}
-    {% for release in releases %}
+  {% if candidates %}
+    {% for candidate in candidates %}
       <div class="card mb-3 bg-light">
         <div class="card-body">
-          <h3 class="card-title mb-2">{{ release.committee.display_name }}</h3>
+          <h3 class="card-title mb-2">{{ candidate.committee.display_name }}</h3>
           <div class="d-flex flex-wrap gap-3 pb-3 mb-2 border-bottom candidate-meta text-secondary fs-6">
-            <span class="candidate-meta-item">Version: {{ release.version }}</span>
-            <span class="candidate-meta-item">Stage: {{ release.stage.value }}</span>
-            <span class="candidate-meta-item">Phase: {{ release.phase.value }}</span>
-            <span class="candidate-meta-item">Project: {{ release.project.name if release.project else "unknown" }}</span>
-            <span class="candidate-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M UTC") }}</span>
+            <span class="candidate-meta-item">Version: {{ candidate.version }}</span>
+            <span class="candidate-meta-item">Stage: {{ candidate.stage.value.upper() }}</span>
+            <span class="candidate-meta-item">Phase: {{ candidate.phase.value.upper() }}</span>
+            <!-- <span class="candidate-meta-item">Project: {{ candidate.project.name if candidate.project else "unknown" }}</span> -->
+            <span class="candidate-meta-item">Created: {{ candidate.created.strftime("%Y-%m-%d %H:%M UTC") }}</span>
           </div>
           <div class="d-flex gap-3 align-items-center pt-2">
             <form method="post"
                   action="{{ as_url(routes.release.delete) }}"
                   class="d-inline-block m-0">
-              <input type="hidden" name="release_name" value="{{ release.name }}" />
+              <input type="hidden" name="candidate_name" value="{{ candidate.name }}" />
               <button type="submit"
                       class="btn btn-danger"
                       onclick="return confirm('Are you sure you want to delete this entire release? This will delete all packages and cannot be undone.')">
-                Delete release
+                Delete release candidate
               </button>
             </form>
             <a class="btn btn-primary"
-               href="{{ as_url(routes.release.vote, release_name=release.name) }}">Start vote</a>
+               href="{{ as_url(routes.candidate.vote_project, project_name=candidate.project.name, version=candidate.version) }}">Start vote</a>
           </div>
         </div>
       </div>
     {% endfor %}
   {% else %}
-    <p class="text-secondary fst-italic">You haven't created any releases yet.</p>
+    <p class="text-secondary fst-italic">You haven't created any release candidates yet.</p>
   {% endif %}
 
   <h2>Other actions</h2>

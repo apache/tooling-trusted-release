@@ -216,8 +216,9 @@ async def add_project(
                 raise routes.FlashError("Invalid file upload")
 
             await _add_one(project_name, version_name, file_path, file_data)
-            await quart.flash("File added successfully", "success")
-            return quart.redirect(util.as_url(files, project_name=project_name, version_name=version_name))
+            return await session.redirect(
+                files, success="File added successfully", project_name=project_name, version_name=version_name
+            )
         except Exception as e:
             logging.exception("Error adding file:")
             await quart.flash(f"Error adding file: {e!s}", "error")
@@ -257,21 +258,21 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         for _field, errors in form.errors.items():
             for error in errors:
                 await quart.flash(f"{error}", "error")
-        return quart.redirect(util.as_url(promote))
+        return await session.redirect(promote)
 
     candidate_draft_name = form.candidate_draft_name.data
     if not candidate_draft_name:
-        raise routes.FlashError("Missing required parameters")
+        return await session.redirect(promote, error="Missing required parameters")
 
     # Extract project name and version
     try:
         project_name, version = candidate_draft_name.rsplit("-", 1)
     except ValueError:
-        raise routes.FlashError("Invalid candidate draft name format")
+        return await session.redirect(promote, error="Invalid candidate draft name format")
 
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
-        raise routes.FlashError("You do not have access to this project")
+        return await session.redirect(promote, error="You do not have access to this project")
 
     # Delete the metadata from the database
     async with db.session() as data:
@@ -280,7 +281,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
                 await _delete_candidate_draft(data, candidate_draft_name)
             except Exception as e:
                 logging.exception("Error deleting candidate draft:")
-                raise routes.FlashError(f"Error deleting candidate draft: {e!s}")
+                return await session.redirect(promote, error=f"Error deleting candidate draft: {e!s}")
 
     # Delete the files on disk
     draft_dir = util.get_release_candidate_draft_dir() / project_name / version
@@ -289,16 +290,15 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         # TODO: Confirm that this is a bug, and report upstream
         await aioshutil.rmtree(draft_dir)  # type: ignore[call-arg]
 
-    await quart.flash("Candidate draft deleted successfully", "success")
-    return quart.redirect(util.as_url(promote))
+    return await session.redirect(promote, success="Candidate draft deleted successfully")
 
 
 @routes.committer("/candidate-draft/files/<project_name>/<version_name>")
-async def files(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
+async def files(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show all the files in the rsync upload directory for a release."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
-        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+        return await session.redirect(add, error="You do not have access to this project")
 
     # Check that the release exists
     async with db.session() as data:
@@ -448,8 +448,9 @@ async def delete_file(
         # Delete the file
         await aiofiles.os.remove(full_path)
 
-    await quart.flash("File deleted successfully", "success")
-    return quart.redirect(util.as_url(files, project_name=project_name, version_name=version_name))
+    return await session.redirect(
+        files, success="File deleted successfully", project_name=project_name, version_name=version_name
+    )
 
 
 @routes.committer("/candidate-draft/hashgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
@@ -504,8 +505,9 @@ async def hashgen(
             data.add(task)
         await data.commit()
 
-    await quart.flash(f"{hash_type} file generated successfully", "success")
-    return quart.redirect(util.as_url(files, project_name=project_name, version_name=version_name))
+    return await session.redirect(
+        files, success=f"{hash_type} file generated successfully", project_name=project_name, version_name=version_name
+    )
 
 
 @routes.committer("/candidate-draft/modify")
@@ -552,17 +554,17 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
     if (quart.request.method == "POST") and (await promote_form.validate_on_submit()):
         candidate_draft_name = promote_form.candidate_draft_name.data
         if not candidate_draft_name:
-            raise routes.FlashError("Missing required parameters")
+            return await session.redirect(promote, error="Missing required parameters")
 
         # Extract project name and version
         try:
             project_name, version_name = candidate_draft_name.rsplit("-", 1)
         except ValueError:
-            raise routes.FlashError("Invalid candidate draft name format")
+            return await session.redirect(promote, error="Invalid candidate draft name format")
 
         # Check that the user has access to the project
         if not any((p.name == project_name) for p in (await session.user_projects)):
-            raise routes.FlashError("You do not have access to this project")
+            return await session.redirect(promote, error="You do not have access to this project")
 
         async with db.session() as data:
             try:
@@ -573,24 +575,23 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
 
                 # Verify that it's in the correct phase
                 if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-                    raise routes.FlashError("This release is not in the candidate draft phase")
+                    return await session.redirect(promote, error="This release is not in the candidate draft phase")
 
                 # Promote it to a candidate
                 # TODO: Obtain a lock for this
                 source = str(util.get_release_candidate_draft_dir() / project_name / version_name)
                 target = str(util.get_release_candidate_dir() / project_name / version_name)
                 if await aiofiles.os.path.exists(target):
-                    raise routes.FlashError("Candidate already exists")
+                    return await session.redirect(promote, error="Candidate already exists")
                 release.phase = models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE
                 await data.commit()
                 await aioshutil.move(source, target)
 
-                await quart.flash("Candidate draft successfully promoted to candidate", "success")
-                return quart.redirect(util.as_url(promote))
+                return await session.redirect(promote, success="Candidate draft successfully promoted to candidate")
 
             except Exception as e:
                 logging.exception("Error promoting candidate draft:")
-                raise routes.FlashError(f"Error promoting candidate draft: {e!s}")
+                return await session.redirect(promote, error=f"Error promoting candidate draft: {e!s}")
 
     return await quart.render_template(
         "candidate-draft-promote.html",
