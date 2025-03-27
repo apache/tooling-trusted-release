@@ -58,7 +58,7 @@ async def _number_of_release_files(release: models.Release) -> int:
     """Return the number of files in the release."""
     path_project = release.project.name
     path_version = release.version
-    path = util.get_candidate_draft_dir() / path_project / path_version
+    path = util.get_release_candidate_draft_dir() / path_project / path_version
     return len(await util.paths_recursive(path))
 
 
@@ -181,7 +181,7 @@ async def _add_one(
 ) -> None:
     """Process and save the uploaded file."""
     # Create target directory
-    target_dir = util.get_candidate_draft_dir() / project_name / version_name
+    target_dir = util.get_release_candidate_draft_dir() / project_name / version_name
     target_dir.mkdir(parents=True, exist_ok=True)
 
     # Use the original filename if no path is specified
@@ -247,7 +247,7 @@ async def files(session: routes.CommitterSession, project_name: str, version_nam
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
-    base_path = util.get_candidate_draft_dir() / project_name / version_name
+    base_path = util.get_release_candidate_draft_dir() / project_name / version_name
     paths = await util.paths_recursive(base_path)
     paths_set = set(paths)
     path_templates = {}
@@ -288,7 +288,7 @@ async def files(session: routes.CommitterSession, project_name: str, version_nam
         path_warnings[path], path_errors[path] = _path_warnings_errors(paths_set, path, ext_artifact, ext_metadata)
 
         # Get modified time
-        full_path = str(util.get_candidate_draft_dir() / project_name / version_name / path)
+        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / path)
         path_modified[path] = int(await aiofiles.os.path.getmtime(full_path))
 
         # Get the most recent task for each type
@@ -328,7 +328,7 @@ async def checks(session: routes.CommitterSession, project_name: str, version_na
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
-        full_path = str(util.get_candidate_draft_dir() / project_name / version_name / file_path)
+        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / file_path)
 
         # Check that the file exists
         if not await aiofiles.os.path.exists(full_path):
@@ -382,7 +382,7 @@ async def delete(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
-        full_path = str(util.get_candidate_draft_dir() / project_name / version_name / file_path)
+        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / file_path)
 
         # Check that the file exists
         if not await aiofiles.os.path.exists(full_path):
@@ -418,7 +418,7 @@ async def hashgen(
             raise base.ASFQuartException("Invalid hash type", errorcode=400)
 
         # Construct paths
-        base_path = util.get_candidate_draft_dir() / project_name / version_name
+        base_path = util.get_release_candidate_draft_dir() / project_name / version_name
         full_path = base_path / file_path
         hash_path = file_path + f".{hash_type}"
         full_hash_path = base_path / hash_path
@@ -464,7 +464,7 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
-        full_path = str(util.get_candidate_draft_dir() / project_name / version_name / file_path)
+        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / file_path)
 
         # Check that the file exists
         if not await aiofiles.os.path.exists(full_path):

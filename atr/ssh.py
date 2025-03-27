@@ -249,7 +249,7 @@ async def _command_validate(process: asyncssh.SSHServerProcess) -> tuple[str, st
                 return fail("You must be a member of this project's committee or a committer to upload to this release")
 
     # Set the target directory to the release storage directory
-    argv[path_index] = str(util.get_candidate_draft_dir() / path_project / path_version)
+    argv[path_index] = str(util.get_release_candidate_draft_dir() / path_project / path_version)
     _LOGGER.info(f"Modified command: {argv}")
 
     # Create the release's storage directory if it doesn't exist
@@ -299,8 +299,8 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
                     project_id=project.id,
                     project=project,
                     version=release_version,
-                    stage=models.ReleaseStage.CANDIDATE,
-                    phase=models.ReleasePhase.CANDIDATE_DRAFT,
+                    stage=models.ReleaseStage.RELEASE_CANDIDATE,
+                    phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
                     created=datetime.datetime.now(),
                 )
                 data.add(release)

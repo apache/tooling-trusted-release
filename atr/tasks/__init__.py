@@ -28,7 +28,7 @@ import atr.util as util
 async def asc_checks(release: models.Release, signature_path: str) -> list[models.Task]:
     tasks = []
 
-    draft_dir = util.get_candidate_draft_dir() / release.project.name / release.version
+    draft_dir = util.get_release_candidate_draft_dir() / release.project.name / release.version
     full_signature_path = str(draft_dir / signature_path)
     modified = int(await aiofiles.os.path.getmtime(full_signature_path))
 
@@ -59,7 +59,9 @@ async def asc_checks(release: models.Release, signature_path: str) -> list[model
 async def sha_checks(release: models.Release, hash_file: str) -> list[models.Task]:
     tasks = []
 
-    full_hash_file_path = str(util.get_candidate_draft_dir() / release.project.name / release.version / hash_file)
+    full_hash_file_path = str(
+        util.get_release_candidate_draft_dir() / release.project.name / release.version / hash_file
+    )
     modified = int(await aiofiles.os.path.getmtime(full_hash_file_path))
     algorithm = "sha512"
     if hash_file.endswith(".sha512"):
@@ -88,7 +90,7 @@ async def sha_checks(release: models.Release, hash_file: str) -> list[models.Tas
 
 async def tar_gz_checks(release: models.Release, path: str, signature_path: str | None = None) -> list[models.Task]:
     # TODO: We should probably use an enum for task_type
-    full_path = str(util.get_candidate_draft_dir() / release.project.name / release.version / path)
+    full_path = str(util.get_release_candidate_draft_dir() / release.project.name / release.version / path)
     filename = os.path.basename(path)
     modified = int(await aiofiles.os.path.getmtime(full_path))
 

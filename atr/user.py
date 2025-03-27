@@ -61,7 +61,7 @@ async def releases(uid: str) -> list[models.Release]:
     async with db.session() as data:
         # TODO: We're limiting this to candidates
         # We should either call this user_candidate_releases, or change the query
-        releases = await data.release(stage=models.ReleaseStage.CANDIDATE, _project=True, _committee=True).all()
+        releases = await data.release(stage=models.ReleaseStage.RELEASE_CANDIDATE, _project=True, _committee=True).all()
         user_releases = []
         for r in releases:
             if r.committee is None:

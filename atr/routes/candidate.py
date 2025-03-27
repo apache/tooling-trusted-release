@@ -121,8 +121,8 @@ async def release_add_post(session: routes.CommitterSession, request: quart.Requ
             # Create release record with project
             release = models.Release(
                 name=release_name,
-                stage=models.ReleaseStage.CANDIDATE,
-                phase=models.ReleasePhase.CANDIDATE_DRAFT,
+                stage=models.ReleaseStage.RELEASE_CANDIDATE,
+                phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
                 project_id=project.id,
                 project=project,
                 version=version,
@@ -168,7 +168,7 @@ async def review(session: routes.CommitterSession) -> str:
         # TODO: We don't actually record who uploaded the release candidate
         # We should probably add that information!
         releases = await data.release(
-            stage=models.ReleaseStage.CANDIDATE,
+            stage=models.ReleaseStage.RELEASE_CANDIDATE,
             _committee=True,
             _packages=True,
         ).all()

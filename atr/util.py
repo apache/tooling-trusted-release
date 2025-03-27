@@ -119,20 +119,20 @@ def get_phase_dir() -> pathlib.Path:
     return pathlib.Path(config.get().PHASE_STORAGE_DIR)
 
 
-def get_candidate_draft_dir() -> pathlib.Path:
-    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "candidate-draft"
+def get_release_candidate_draft_dir() -> pathlib.Path:
+    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "release-candidate-draft"
 
 
-def get_candidate_release_dir() -> pathlib.Path:
-    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "candidate-release"
+def get_release_candidate_dir() -> pathlib.Path:
+    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "release-candidate"
 
 
-def get_distributable_draft_dir() -> pathlib.Path:
-    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "distributable-draft"
+def get_release_draft_dir() -> pathlib.Path:
+    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "release-draft"
 
 
-def get_distributable_release_dir() -> pathlib.Path:
-    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "distributable-release"
+def get_release_dir() -> pathlib.Path:
+    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "release"
 
 
 def is_admin(user_id: str | None) -> bool:

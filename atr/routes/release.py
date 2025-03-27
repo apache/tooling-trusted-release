@@ -85,7 +85,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
                 await quart.flash(str(e), "error")
                 return quart.redirect(util.as_url(candidate.review))
 
-    release_dir = util.get_candidate_draft_dir() / project_name / version
+    release_dir = util.get_release_candidate_dir() / project_name / version
     if await aiofiles.os.path.exists(release_dir):
         await aioshutil.rmtree(release_dir)
     await quart.flash("Release deleted successfully", "success")

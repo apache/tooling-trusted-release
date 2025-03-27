@@ -153,7 +153,7 @@ class Project(sqlmodel.SQLModel, table=True):
             sqlmodel.select(Release)
             .where(
                 Release.project_id == self.id,
-                Release.phase == ReleasePhase.CANDIDATE_DRAFT,
+                Release.phase == ReleasePhase.RELEASE_CANDIDATE_DRAFT,
             )
             .order_by(db.validate_instrumented_attribute(Release.created).desc())
         )
@@ -215,7 +215,7 @@ class VoteEntry(pydantic.BaseModel):
 
 class ReleaseStage(str, enum.Enum):
     # A release candidate is being prepared
-    CANDIDATE = "candidate"
+    RELEASE_CANDIDATE = "release_candidate"
     # A release is being prepared
     RELEASE = "release"
     # An existing release is being imported from ASF SVN dist
@@ -227,13 +227,13 @@ class ReleaseStage(str, enum.Enum):
 class ReleasePhase(str, enum.Enum):
     # [CANDIDATE]
     # Step 1: The candidate files are added from external sources and checked by ATR
-    CANDIDATE_DRAFT = "candidate_draft"
+    RELEASE_CANDIDATE_DRAFT = "release_candidate_draft"
     # Step 2: The candidate files are frozen and promoted into a candidate release
-    CANDIDATE_BEFORE_VOTE = "candidate_before_vote"
+    RELEASE_CANDIDATE_BEFORE_VOTE = "release_candidate_before_vote"
     # Step 3: The project members are voting on the candidate release
-    CANDIDATE_DURING_VOTE = "candidate_during_vote"
+    RELEASE_CANDIDATE_DURING_VOTE = "release_candidate_during_vote"
     # Step 4: The project vote on the candidate release has passed
-    CANDIDATE_AFTER_VOTE = "candidate_after_vote"
+    RELEASE_CANDIDATE_AFTER_VOTE = "release_candidate_after_vote"
 
     # [RELEASE]
     # Step 1: The release files are being put in place

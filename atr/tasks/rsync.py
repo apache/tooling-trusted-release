@@ -58,7 +58,7 @@ async def analyse(args: dict[str, Any]) -> tuple[models.TaskStatus, str | None, 
 
 async def _analyse_core(asf_uid: str, project_name: str, release_version: str) -> dict[str, Any]:
     """Analyse an rsync upload."""
-    base_path = util.get_candidate_draft_dir() / project_name / release_version
+    base_path = util.get_release_candidate_draft_dir() / project_name / release_version
     paths = await util.paths_recursive(base_path)
     release_name = f"{project_name}-{release_version}"
 
