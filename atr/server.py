@@ -95,7 +95,7 @@ def app_dirs_setup(app_config: type[config.AppConfig]) -> None:
     print(f"Working directory changed to: {os.getcwd()}")
     util.get_release_candidate_draft_dir().mkdir(parents=True, exist_ok=True)
     util.get_release_candidate_dir().mkdir(parents=True, exist_ok=True)
-    util.get_release_draft_dir().mkdir(parents=True, exist_ok=True)
+    util.get_release_preview_dir().mkdir(parents=True, exist_ok=True)
     util.get_release_dir().mkdir(parents=True, exist_ok=True)
 
 

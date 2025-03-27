@@ -125,10 +125,10 @@
                   <td class="atr-sans">
                     <a href="{{ as_url(routes.download.phase, phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}"
                        class="btn btn-sm btn-outline-primary fs-6">Download</a>
-                    <a href="{{ as_url(routes.candidate_draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
+                    <a href="{{ as_url(routes.draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
                        class="btn btn-sm btn-outline-primary fs-6 small ms-2">Tools</a>
                     {% if path in tasks and tasks[path]|length > 0 %}
-                      <a href="{{ as_url(routes.candidate_draft.checks, project_name=project_name, version_name=version_name, file_path=path) }}"
+                      <a href="{{ as_url(routes.draft.checks, project_name=project_name, version_name=version_name, file_path=path) }}"
                          class="btn btn-sm btn-outline-primary fs-6 small ms-2">Check results</a>
                     {% endif %}
                   </td>
@@ -171,7 +171,7 @@
         </details>
       {% else %}
         <div class="alert alert-info">
-          This release does not have any files yet. You can add files using rsync from the <a href="{{ as_url(routes.candidate_draft.add) }}">add files</a> page.
+          This release does not have any files yet. You can add files using rsync from the <a href="{{ as_url(routes.draft.add) }}">add files</a> page.
         </div>
       {% endif %}
     </div>
@@ -183,7 +183,7 @@
     </div>
     <div class="card-body">
       <p>
-        <a href="{{ as_url(routes.candidate_draft.add_project, project_name=release.project.name, version_name=release.version) }}">Upload a file in the browser</a>, or use the command below to add or modify files in this release using rsync:
+        <a href="{{ as_url(routes.draft.add_project, project_name=release.project.name, version_name=release.version) }}">Upload a file in the browser</a>, or use the command below to add or modify files in this release using rsync:
       </p>
     </div>
     <pre class="card-footer bg-light border-1 pt-4 small">

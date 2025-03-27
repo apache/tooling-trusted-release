@@ -17,10 +17,10 @@
 
 # These are imported for their side effects and for access in templates
 import atr.routes.candidate as candidate
-import atr.routes.candidate_draft as candidate_draft
 import atr.routes.committees as committees
 import atr.routes.dev as dev
 import atr.routes.download as download
+import atr.routes.draft as draft
 import atr.routes.keys as keys
 import atr.routes.projects as projects
 import atr.routes.release as release

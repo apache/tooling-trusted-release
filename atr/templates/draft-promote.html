@@ -51,7 +51,7 @@
                 </div>
                 <div class="card-body">
                   <p class="text-muted mb-3">Promoting will freeze this candidate draft into a candidate that can be voted on.</p>
-                  <form method="post" action="{{ as_url(routes.candidate_draft.promote) }}">
+                  <form method="post" action="{{ as_url(routes.draft.promote) }}">
                     {{ promote_form.hidden_tag() }}
                     <input type="hidden"
                            name="candidate_draft_name"
@@ -83,7 +83,7 @@
                 </div>
                 <div class="card-body">
                   <p class="text-muted mb-3">Warning: This action will permanently delete this candidate draft and cannot be undone.</p>
-                  <form method="post" action="{{ as_url(routes.candidate_draft.delete) }}">
+                  <form method="post" action="{{ as_url(routes.draft.delete) }}">
                     {{ delete_form.hidden_tag() }}
                     <input type="hidden"
                            name="candidate_draft_name"

@@ -127,8 +127,8 @@ def get_release_candidate_dir() -> pathlib.Path:
     return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "release-candidate"
 
 
-def get_release_draft_dir() -> pathlib.Path:
-    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "release-draft"
+def get_release_preview_dir() -> pathlib.Path:
+    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "release-preview"
 
 
 def get_release_dir() -> pathlib.Path:

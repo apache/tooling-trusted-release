@@ -31,21 +31,21 @@
       <h3>Release candidate drafts</h3>
       <ul>
         <li>
-          <a href="{{ as_url(routes.candidate_draft.add) }}">Add draft</a>
+          <a href="{{ as_url(routes.draft.add) }}">Add draft</a>
         </li>
         <li>
-          <a href="{{ as_url(routes.candidate_draft.modify) }}">Modify draft</a>
+          <a href="{{ as_url(routes.draft.modify) }}">Modify draft</a>
         </li>
         <!-- TODO: Don't show this if the user doesn't have any release candidates? -->
         <li>
-          <a href="{{ as_url(routes.candidate_draft.promote) }}">Promote draft</a>
+          <a href="{{ as_url(routes.draft.promote) }}">Promote draft</a>
         </li>
       </ul>
 
       <h3>Release candidates</h3>
       <ul>
         <li>
-          <a href="{{ as_url(routes.candidate.vote) }}">Start vote</a>
+          <a href="{{ as_url(routes.candidate.vote) }}">Start candidate vote</a>
         </li>
       </ul>
 

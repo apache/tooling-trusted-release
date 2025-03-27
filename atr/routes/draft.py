@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""candidate_draft.py"""
+"""draft.py"""
 
 from __future__ import annotations
 
@@ -146,7 +146,7 @@ def _path_warnings_errors_metadata(
     return warnings, errors
 
 
-@routes.committer("/candidate-draft/add")
+@routes.committer("/draft/add")
 async def add(session: routes.CommitterSession) -> str:
     """Show a page to allow the user to rsync files to candidate drafts."""
     # Do them outside of the template rendering call to ensure order
@@ -155,7 +155,7 @@ async def add(session: routes.CommitterSession) -> str:
     user_candidate_drafts = await session.user_candidate_drafts
 
     return await quart.render_template(
-        "candidate-draft-add.html",
+        "draft-add.html",
         asf_id=session.uid,
         projects=user_projects,
         server_domain=session.host,
@@ -192,7 +192,7 @@ async def _add_one(
             await f.write(chunk)
 
 
-@routes.committer("/candidate-draft/add/<project_name>/<version_name>", methods=["GET", "POST"])
+@routes.committer("/draft/add/<project_name>/<version_name>", methods=["GET", "POST"])
 async def add_project(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
@@ -224,7 +224,7 @@ async def add_project(
             await quart.flash(f"Error adding file: {e!s}", "error")
 
     return await quart.render_template(
-        "candidate-draft-add-project.html",
+        "draft-add-project.html",
         asf_id=session.uid,
         server_domain=session.host,
         project_name=project_name,
@@ -249,7 +249,7 @@ class DeleteForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Delete candidate draft")
 
 
-@routes.committer("/candidate-draft/delete", methods=["POST"])
+@routes.committer("/draft/delete", methods=["POST"])
 async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a candidate draft and all its associated files."""
     form = await DeleteForm.create_form(data=await quart.request.form)
@@ -293,7 +293,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     return await session.redirect(promote, success="Candidate draft deleted successfully")
 
 
-@routes.committer("/candidate-draft/files/<project_name>/<version_name>")
+@routes.committer("/draft/files/<project_name>/<version_name>")
 async def files(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show all the files in the rsync upload directory for a release."""
     # Check that the user has access to the project
@@ -354,7 +354,7 @@ async def files(session: routes.CommitterSession, project_name: str, version_nam
         path_tasks[path] = await db.recent_tasks(data, f"{project_name}-{version_name}", str(path), path_modified[path])
 
     return await quart.render_template(
-        "candidate-draft-list.html",
+        "draft-list.html",
         asf_id=session.uid,
         project_name=project_name,
         version_name=version_name,
@@ -373,7 +373,7 @@ async def files(session: routes.CommitterSession, project_name: str, version_nam
     )
 
 
-@routes.committer("/candidate-draft/checks/<project_name>/<version_name>/<path:file_path>")
+@routes.committer("/draft/checks/<project_name>/<version_name>/<path:file_path>")
 async def checks(session: routes.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
     """Show the status of all checks for a specific file."""
     # Check that the user has access to the project
@@ -412,7 +412,7 @@ async def checks(session: routes.CommitterSession, project_name: str, version_na
     }
 
     return await quart.render_template(
-        "candidate-draft-check.html",
+        "draft-check.html",
         project_name=project_name,
         version_name=version_name,
         file_path=file_path,
@@ -424,7 +424,7 @@ async def checks(session: routes.CommitterSession, project_name: str, version_na
     )
 
 
-@routes.committer("/candidate-draft/delete-file/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+@routes.committer("/draft/delete-file/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
 async def delete_file(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
@@ -453,7 +453,7 @@ async def delete_file(
     )
 
 
-@routes.committer("/candidate-draft/hashgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+@routes.committer("/draft/hashgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
 async def hashgen(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
@@ -510,7 +510,7 @@ async def hashgen(
     )
 
 
-@routes.committer("/candidate-draft/modify")
+@routes.committer("/draft/modify")
 async def modify(session: routes.CommitterSession) -> str:
     """Allow the user to modify a candidate draft."""
     # Do them outside of the template rendering call to ensure order
@@ -519,7 +519,7 @@ async def modify(session: routes.CommitterSession) -> str:
     user_candidate_drafts = await session.user_candidate_drafts
 
     return await quart.render_template(
-        "candidate-draft-modify.html",
+        "draft-modify.html",
         asf_id=session.uid,
         projects=user_projects,
         server_domain=session.host,
@@ -528,7 +528,7 @@ async def modify(session: routes.CommitterSession) -> str:
     )
 
 
-@routes.committer("/candidate-draft/promote", methods=["GET", "POST"])
+@routes.committer("/draft/promote", methods=["GET", "POST"])
 async def promote(session: routes.CommitterSession) -> str | response.Response:
     """Allow the user to promote a candidate draft."""
 
@@ -594,14 +594,14 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
                 return await session.redirect(promote, error=f"Error promoting candidate draft: {e!s}")
 
     return await quart.render_template(
-        "candidate-draft-promote.html",
+        "draft-promote.html",
         candidate_drafts=user_candidate_drafts,
         promote_form=promote_form,
         delete_form=delete_form,
     )
 
 
-@routes.committer("/candidate-draft/tools/<project_name>/<version_name>/<path:file_path>")
+@routes.committer("/draft/tools/<project_name>/<version_name>/<path:file_path>")
 async def tools(session: routes.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
     """Show the tools for a specific file."""
     # Check that the user has access to the project
@@ -630,7 +630,7 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
     }
 
     return await quart.render_template(
-        "candidate-draft-tools.html",
+        "draft-tools.html",
         asf_id=session.uid,
         project_name=project_name,
         version_name=version_name,

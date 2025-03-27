@@ -237,7 +237,7 @@ class ReleasePhase(str, enum.Enum):
 
     # [RELEASE]
     # Step 1: The release files are being put in place
-    RELEASE_DRAFT = "release_draft"
+    RELEASE_PREVIEW = "release_preview"
     # Step 2: The release files are available but not yet announced
     RELEASE_BEFORE_ANNOUNCEMENT = "release_before_announcement"
     # Step 3: The release has been announced
