@@ -111,6 +111,7 @@ select = [
 "atr/analysis.py" = ["RUF001"]
 "atr/apache.py" = ["N815", "TC003"]
 "atr/db/__init__.py" = ["C901"]
+"atr/routes/modules.py" = ["F401"]
 "scripts/release_path_parse.py" = ["C901", "RUF001"]
 
 [tool.mypy]

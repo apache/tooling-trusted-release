@@ -33,7 +33,6 @@ import quart
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Coroutine
-    from types import ModuleType
 
     import werkzeug.datastructures as datastructures
 
@@ -406,28 +405,3 @@ def _authentication_failed() -> NoReturn:
     """Handle authentication failure with an exception."""
     # NOTE: This is a separate function to fix a problem with analysis flow in mypy
     raise base.ASFQuartException("Not authenticated", errorcode=401)
-
-
-def modules() -> dict[str, ModuleType]:
-    """Return a dictionary of all modules in the current package."""
-    import atr.routes.candidate as candidate
-    import atr.routes.candidate_draft as candidate_draft
-    import atr.routes.committees as committees
-    import atr.routes.dev as dev
-    import atr.routes.download as download
-    import atr.routes.keys as keys
-    import atr.routes.projects as projects
-    import atr.routes.release as release
-    import atr.routes.root as root
-
-    return {
-        "candidate": candidate,
-        "candidate_draft": candidate_draft,
-        "committees": committees,
-        "dev": dev,
-        "download": download,
-        "keys": keys,
-        "projects": projects,
-        "release": release,
-        "root": root,
-    }

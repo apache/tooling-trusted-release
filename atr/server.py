@@ -20,6 +20,7 @@
 import logging
 import os
 from collections.abc import Iterable
+from types import ModuleType
 from typing import Any
 
 import asfquart
@@ -55,11 +56,9 @@ class ApiOnlyOpenAPIProvider(quart_schema.OpenAPIProvider):
                 yield rule
 
 
-def register_routes(app: base.QuartApp) -> None:
+def register_routes(app: base.QuartApp) -> ModuleType:
     # NOTE: These imports are for their side effects only
-    import atr.routes as routes
-
-    routes.modules()
+    import atr.routes.modules as modules
 
     # Add a global error handler to show helpful error messages with tracebacks.
     @app.errorhandler(Exception)
@@ -84,6 +83,8 @@ def register_routes(app: base.QuartApp) -> None:
     @app.errorhandler(404)
     async def handle_not_found(error: Exception) -> Any:
         return await quart.render_template("notfound.html", error="404 Not Found", traceback="", status_code=404), 404
+
+    return modules
 
 
 def app_dirs_setup(app_config: type[config.AppConfig]) -> None:
@@ -133,13 +134,9 @@ def app_setup_context(app: base.QuartApp) -> None:
     async def app_wide() -> dict[str, Any]:
         import atr.db.service as service
         import atr.metadata as metadata
-        import atr.routes as routes
+        import atr.routes.modules as modules
         import atr.util as util
 
-        modules = routes.modules()
-        # In Jinja, keys is a keyword when used in the form .keys
-        modules["_keys"] = modules["keys"]
-        del modules["keys"]
         return {
             "as_url": util.as_url,
             "commit": metadata.commit,
