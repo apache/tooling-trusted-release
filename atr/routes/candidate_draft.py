@@ -28,6 +28,7 @@ import re
 from typing import Final
 
 import aiofiles.os
+import aioshutil
 import asfquart.base as base
 import quart
 import werkzeug.datastructures as datastructures
@@ -43,14 +44,6 @@ import atr.util as util
 
 # _CONFIG: Final = config.get()
 _LOGGER: Final = logging.getLogger(__name__)
-
-
-class FilesAddOneForm(util.QuartFormTyped):
-    """Form for adding a single file to a release candidate."""
-
-    file_path = wtforms.StringField("File path (optional)", validators=[wtforms.validators.Optional()])
-    file_data = wtforms.FileField("File", validators=[wtforms.validators.InputRequired("File is required")])
-    submit = wtforms.SubmitField("Add file")
 
 
 async def _number_of_release_files(release: models.Release) -> int:
@@ -204,7 +197,15 @@ async def add_project(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
     """Show a page to allow the user to add a single file to a candidate draft."""
-    form = await FilesAddOneForm.create_form()
+
+    class AddProjectForm(util.QuartFormTyped):
+        """Form for adding a single file to a release candidate."""
+
+        file_path = wtforms.StringField("File path (optional)", validators=[wtforms.validators.Optional()])
+        file_data = wtforms.FileField("File", validators=[wtforms.validators.InputRequired("File is required")])
+        submit = wtforms.SubmitField("Add file")
+
+    form = await AddProjectForm.create_form()
     if await form.validate_on_submit():
         try:
             file_path = None
@@ -229,6 +230,67 @@ async def add_project(
         version_name=version_name,
         form=form,
     )
+
+
+class DeleteForm(util.QuartFormTyped):
+    """Form for deleting a candidate draft."""
+
+    candidate_draft_name = wtforms.StringField(
+        "Candidate draft name", validators=[wtforms.validators.InputRequired("Candidate draft name is required")]
+    )
+    confirm_delete = wtforms.StringField(
+        "Confirmation",
+        validators=[
+            wtforms.validators.InputRequired("Confirmation is required"),
+            wtforms.validators.Regexp("^DELETE$", message="Please type DELETE to confirm"),
+        ],
+    )
+    submit = wtforms.SubmitField("Delete candidate draft")
+
+
+@routes.committer("/candidate-draft/delete", methods=["POST"])
+async def delete(session: routes.CommitterSession) -> response.Response:
+    """Delete a candidate draft and all its associated files."""
+    form = await DeleteForm.create_form(data=await quart.request.form)
+
+    if not await form.validate_on_submit():
+        for _field, errors in form.errors.items():
+            for error in errors:
+                await quart.flash(f"{error}", "error")
+        return quart.redirect(util.as_url(promote))
+
+    candidate_draft_name = form.candidate_draft_name.data
+    if not candidate_draft_name:
+        raise routes.FlashError("Missing required parameters")
+
+    # Extract project name and version
+    try:
+        project_name, version = candidate_draft_name.rsplit("-", 1)
+    except ValueError:
+        raise routes.FlashError("Invalid candidate draft name format")
+
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        raise routes.FlashError("You do not have access to this project")
+
+    # Delete the metadata from the database
+    async with db.session() as data:
+        async with data.begin():
+            try:
+                await _delete_candidate_draft(data, candidate_draft_name)
+            except Exception as e:
+                logging.exception("Error deleting candidate draft:")
+                raise routes.FlashError(f"Error deleting candidate draft: {e!s}")
+
+    # Delete the files on disk
+    draft_dir = util.get_release_candidate_draft_dir() / project_name / version
+    if await aiofiles.os.path.exists(draft_dir):
+        # Believe this to be another bug in mypy Protocol handling
+        # TODO: Confirm that this is a bug, and report upstream
+        await aioshutil.rmtree(draft_dir)  # type: ignore[call-arg]
+
+    await quart.flash("Candidate draft deleted successfully", "success")
+    return quart.redirect(util.as_url(promote))
 
 
 @routes.committer("/candidate-draft/files/<project_name>/<version_name>")
@@ -362,8 +424,8 @@ async def checks(session: routes.CommitterSession, project_name: str, version_na
     )
 
 
-@routes.committer("/candidate-draft/delete/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
-async def delete(
+@routes.committer("/candidate-draft/delete-file/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+async def delete_file(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
     """Delete a specific file from the release candidate."""
@@ -448,7 +510,7 @@ async def hashgen(
 
 @routes.committer("/candidate-draft/modify")
 async def modify(session: routes.CommitterSession) -> str:
-    """Show a page to allow the user to modify a candidate draft."""
+    """Allow the user to modify a candidate draft."""
     # Do them outside of the template rendering call to ensure order
     # The user_candidate_drafts call can use cached results from user_projects
     user_projects = await session.user_projects
@@ -461,6 +523,80 @@ async def modify(session: routes.CommitterSession) -> str:
         server_domain=session.host,
         number_of_release_files=_number_of_release_files,
         candidate_drafts=user_candidate_drafts,
+    )
+
+
+@routes.committer("/candidate-draft/promote", methods=["GET", "POST"])
+async def promote(session: routes.CommitterSession) -> str | response.Response:
+    """Allow the user to promote a candidate draft."""
+
+    class PromoteForm(util.QuartFormTyped):
+        """Form for promoting a candidate draft."""
+
+        candidate_draft_name = wtforms.StringField(
+            "Candidate draft name", validators=[wtforms.validators.InputRequired("Candidate draft name is required")]
+        )
+        confirm_promote = wtforms.BooleanField(
+            "Confirmation", validators=[wtforms.validators.DataRequired("You must confirm to proceed with promotion")]
+        )
+        submit = wtforms.SubmitField("Promote to candidate")
+
+    user_candidate_drafts = await session.user_candidate_drafts
+
+    # Create the forms
+    promote_form = await PromoteForm.create_form(
+        data=await quart.request.form if (quart.request.method == "POST") else None
+    )
+    delete_form = await DeleteForm.create_form()
+
+    if (quart.request.method == "POST") and (await promote_form.validate_on_submit()):
+        candidate_draft_name = promote_form.candidate_draft_name.data
+        if not candidate_draft_name:
+            raise routes.FlashError("Missing required parameters")
+
+        # Extract project name and version
+        try:
+            project_name, version_name = candidate_draft_name.rsplit("-", 1)
+        except ValueError:
+            raise routes.FlashError("Invalid candidate draft name format")
+
+        # Check that the user has access to the project
+        if not any((p.name == project_name) for p in (await session.user_projects)):
+            raise routes.FlashError("You do not have access to this project")
+
+        async with db.session() as data:
+            try:
+                # Get the release
+                release = await data.release(name=candidate_draft_name, _project=True).demand(
+                    routes.FlashError("Candidate draft not found")
+                )
+
+                # Verify that it's in the correct phase
+                if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+                    raise routes.FlashError("This release is not in the candidate draft phase")
+
+                # Promote it to a candidate
+                # TODO: Obtain a lock for this
+                source = str(util.get_release_candidate_draft_dir() / project_name / version_name)
+                target = str(util.get_release_candidate_dir() / project_name / version_name)
+                if await aiofiles.os.path.exists(target):
+                    raise routes.FlashError("Candidate already exists")
+                release.phase = models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE
+                await data.commit()
+                await aioshutil.move(source, target)
+
+                await quart.flash("Candidate draft successfully promoted to candidate", "success")
+                return quart.redirect(util.as_url(promote))
+
+            except Exception as e:
+                logging.exception("Error promoting candidate draft:")
+                raise routes.FlashError(f"Error promoting candidate draft: {e!s}")
+
+    return await quart.render_template(
+        "candidate-draft-promote.html",
+        candidate_drafts=user_candidate_drafts,
+        promote_form=promote_form,
+        delete_form=delete_form,
     )
 
 
@@ -502,3 +638,20 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
         release=release,
         format_file_size=routes.format_file_size,
     )
+
+
+async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -> None:
+    """Delete a candidate draft and all its associated files."""
+    # Check that the release exists
+    release = await data.release(name=candidate_draft_name, _project=True, _packages=True).get()
+    if not release:
+        raise routes.FlashError("Candidate draft not found")
+    if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+        raise routes.FlashError("Candidate draft is not in the release candidate draft phase")
+
+    # Delete all associated packages first
+    for package in release.packages:
+        await data.delete(package)
+
+    # Delete the release record
+    await data.delete(release)

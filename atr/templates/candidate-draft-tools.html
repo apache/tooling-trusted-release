@@ -49,7 +49,7 @@
   <h3>Delete file</h3>
   <p>This tool deletes the file from the candidate draft.</p>
   <form method="post"
-        action="{{ as_url(routes.candidate_draft.delete, project_name=project_name, version_name=version_name, file_path=file_path) }}">
+        action="{{ as_url(routes.candidate_draft.delete_file, project_name=project_name, version_name=version_name, file_path=file_path) }}">
     <button type="submit"
             class="btn btn-danger"
             onclick="return confirm('Are you sure you want to delete this file?')">Delete file</button>
