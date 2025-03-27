@@ -1,6 +1,6 @@
 <aside class="sidebar">
   <div class="sidebar-header">
-    <a href="{{ url_for('root') }}" class="site-title">
+    <a href="{{ as_url(routes.root.index) }}" class="site-title">
       <h1>
         <span class="apache">A<span class="rest">pache</span></span>
         <br />
@@ -63,7 +63,7 @@
       <ul>
         <li>
           <i class="fa-solid fa-house"></i>
-          <a href="{{ url_for('root') }}"
+          <a href="{{ as_url(routes.root.index) }}"
              {% if request.endpoint == 'root' %}class="active"{% endif %}>About</a>
         </li>
         <li>

@@ -22,7 +22,7 @@ import quart
 import atr.routes as routes
 
 
-@routes.app_route("/")
-async def root() -> str:
+@routes.public("/")
+async def index() -> str:
     """Main page."""
     return await quart.render_template("index.html")
