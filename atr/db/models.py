@@ -232,8 +232,6 @@ class ReleasePhase(str, enum.Enum):
     RELEASE_CANDIDATE_BEFORE_VOTE = "release_candidate_before_vote"
     # Step 3: The project members are voting on the candidate release
     RELEASE_CANDIDATE_DURING_VOTE = "release_candidate_during_vote"
-    # Step 4: The project vote on the candidate release has passed
-    RELEASE_CANDIDATE_AFTER_VOTE = "release_candidate_after_vote"
 
     # [RELEASE]
     # Step 1: The release files are being put in place

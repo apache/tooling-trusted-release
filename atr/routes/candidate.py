@@ -21,33 +21,45 @@ import asfquart
 import asfquart.base as base
 import quart
 import werkzeug.wrappers.response as response
+import wtforms
 
 import atr.db as db
 import atr.db.models as models
-import atr.db.service as service
 import atr.routes as routes
+import atr.util as util
 
 if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
 
 
-def format_artifact_name(project_name: str, version: str, is_podling: bool = False) -> str:
-    """Format an artifact name according to Apache naming conventions.
+class ResolveForm(util.QuartFormTyped):
+    """Form for resolving a vote on a release candidate."""
 
-    For regular projects: apache-${project}-${version}
-    For podlings: apache-${project}-incubating-${version}
-    """
-    # TODO: Format this better based on committee and project
-    # Must depend on whether project is a subproject or not
-    if is_podling:
-        return f"apache-{project_name}-incubating-{version}"
-    return f"apache-{project_name}-{version}"
+    candidate_name = wtforms.StringField(
+        "Candidate name", validators=[wtforms.validators.InputRequired("Candidate name is required")]
+    )
+    vote_result = wtforms.RadioField(
+        "Vote result",
+        choices=[("passed", "Passed"), ("failed", "Failed")],
+        validators=[wtforms.validators.InputRequired("Vote result is required")],
+    )
+    submit = wtforms.SubmitField("Resolve vote")
 
 
 @routes.committer("/candidate/delete", methods=["POST"])
 async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a release candidate."""
     return await session.redirect(vote, error="Not yet implemented")
+
+
+@routes.committer("/candidate/resolve", methods=["GET", "POST"])
+async def resolve(session: routes.CommitterSession) -> response.Response | str:
+    """Resolve the vote on a release candidate."""
+    # For GET requests, show the list of candidates with ongoing votes
+    if quart.request.method == "GET":
+        return await _resolve_get(session)
+    # For POST requests, process the form
+    return await _resolve_post(session)
 
 
 @routes.committer("/candidate/vote")
@@ -79,7 +91,7 @@ async def vote(session: routes.CommitterSession) -> str:
             "candidate-vote.html",
             candidates=user_candidates,
             format_file_size=routes.format_file_size,
-            format_artifact_name=format_artifact_name,
+            format_artifact_name=_format_artifact_name,
         )
 
 
@@ -87,12 +99,18 @@ async def vote(session: routes.CommitterSession) -> str:
 async def vote_project(session: routes.CommitterSession, project_name: str, version: str) -> response.Response | str:
     """Show the vote initiation form for a release."""
     release_name = f"{project_name}-{version}"
-    release = await service.get_release_by_name(release_name)
-    if release is None:
-        return await session.redirect(vote, error=f"Release with key {release_name} not found")
+    async with db.session() as data:
+        release = await data.release(name=release_name, _project=True, _committee=True).demand(
+            routes.FlashError("Release candidate not found")
+        )
+        if quart.request.method == "GET":
+            return await quart.render_template(
+                "release-vote.html",
+                release=release,
+                email_preview=_generate_vote_email_preview(release),
+            )
 
-    # If POST, process the form and create a vote_initiate task
-    if quart.request.method == "POST":
+        # If POST, process the form and create a vote_initiate task
         form = await routes.get_form(quart.request)
         # Extract form data
         mailing_list = form.get("mailing_list", "dev")
@@ -102,6 +120,7 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
         commit_hash = form.get("commit_hash", "")
         if release.committee is None:
             raise base.ASFQuartException("Release has no associated committee", errorcode=400)
+        release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE
 
         # Prepare email recipient
         email_to = f"{mailing_list}@{release.committee.name}.apache.org"
@@ -119,11 +138,11 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
                 session.uid,
             ],
         )
-        async with db.create_async_db_session() as db_session:
-            db_session.add(task)
-            # Flush to get the task ID
-            await db_session.flush()
-            await db_session.commit()
+
+        data.add(task)
+        # Flush to get the task ID
+        await data.flush()
+        await data.commit()
 
         return await session.redirect(
             vote,
@@ -131,12 +150,18 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
             f" You'll receive an email confirmation when complete.",
         )
 
-    # For GET
-    return await quart.render_template(
-        "release-vote.html",
-        release=release,
-        email_preview=_generate_vote_email_preview(release),
-    )
+
+def _format_artifact_name(project_name: str, version: str, is_podling: bool = False) -> str:
+    """Format an artifact name according to Apache naming conventions.
+
+    For regular projects: apache-${project}-${version}
+    For podlings: apache-${project}-incubating-${version}
+    """
+    # TODO: Format this better based on committee and project
+    # Must depend on whether project is a subproject or not
+    if is_podling:
+        return f"apache-{project_name}-incubating-{version}"
+    return f"apache-{project_name}-{version}"
 
 
 def _generate_vote_email_preview(release: models.Release) -> str:
@@ -183,3 +208,96 @@ Thanks,
 [YOUR_NAME]
 """
     return f"{subject}\n\n{body}"
+
+
+async def _resolve_get(session: routes.CommitterSession) -> str:
+    async with db.session() as data:
+        # Get all RELEASE_CANDIDATE_DURING_VOTE releases
+        releases = await data.release(
+            stage=models.ReleaseStage.RELEASE_CANDIDATE,
+            phase=models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE,
+            _committee=True,
+            _project=True,
+        ).all()
+
+        # Ensure that the user is a committee member or committer
+        user_candidates = []
+        for r in releases:
+            if r.committee is None:
+                continue
+            if (session.uid in r.committee.committee_members) or (session.uid in r.committee.committers):
+                user_candidates.append(r)
+
+        # Create a unique form for each candidate
+        candidate_forms = {}
+        for candidate in user_candidates:
+            form = await ResolveForm.create_form()
+            candidate_forms[candidate.name] = form
+
+        return await quart.render_template(
+            "candidate-resolve.html",
+            candidates=user_candidates,
+            candidate_forms=candidate_forms,
+            format_artifact_name=_format_artifact_name,
+        )
+
+
+async def _resolve_post(session: routes.CommitterSession) -> response.Response:
+    form = await ResolveForm.create_form(data=await quart.request.form)
+    if not await form.validate_on_submit():
+        for _field, errors in form.errors.items():
+            for error in errors:
+                await quart.flash(f"{error}", "error")
+        return await session.redirect(resolve)
+
+    candidate_name = form.candidate_name.data
+    vote_result = form.vote_result.data
+
+    if not candidate_name:
+        return await session.redirect(resolve, error="Missing candidate name")
+
+    # Extract project name
+    try:
+        project_name = candidate_name.rsplit("-", 1)[0]
+    except ValueError:
+        return await session.redirect(resolve, error="Invalid candidate name format")
+
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        return await session.redirect(resolve, error="You do not have access to this project")
+
+    # Update release status in the database
+    async with db.session() as data:
+        async with data.begin():
+            release = await data.release(name=candidate_name, _project=True).demand(
+                routes.FlashError("Release candidate not found")
+            )
+
+            # Verify that it's in the correct phase
+            if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE:
+                return await session.redirect(resolve, error="This release is not in the voting phase")
+
+            # Update the release phase based on vote result
+            if vote_result == "passed":
+                release.stage = models.ReleaseStage.RELEASE
+                release.phase = models.ReleasePhase.RELEASE_PREVIEW
+                success_message = "Vote marked as passed"
+            else:
+                release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+                success_message = "Vote marked as failed"
+
+            # # Create a task for vote resolution notification
+            # task = models.Task(
+            #     status=models.TaskStatus.QUEUED,
+            #     task_type="vote_resolve",
+            #     task_args=[
+            #         candidate_name,
+            #         vote_result,
+            #         session.uid,
+            #     ],
+            # )
+            # data.add(task)
+
+            await data.commit()
+
+    return await session.redirect(resolve, success=success_message)
