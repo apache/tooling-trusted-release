@@ -87,43 +87,76 @@
       {% endif %}
     {% endfor %}
   </div>
-{% endblock content %}
 
-{% block javascripts %}
-  {{ super() }}
-  <script>
-      document.addEventListener("DOMContentLoaded", function() {
-          const copyButtons = document.querySelectorAll(".atr-copy-btn");
+  <p>Or use the following form to create an empty release candidate draft.</p>
 
-          copyButtons.forEach(button => {
-              button.addEventListener("click", function() {
-                  const targetId = this.getAttribute("data-clipboard-target");
-                  const targetElement = document.querySelector(targetId);
+  <form method="post"
+        enctype="multipart/form-data"
+        class="striking py-4 px-5">
+    <input type="hidden" name="form_type" value="single" />
+    {{ form.hidden_tag() }}
+    <div class="mb-3 pb-3 row border-bottom">
+      <label for="{{ form.project_name.id }}"
+             class="col-sm-3 col-form-label text-sm-end">{{ form.project_name.label.text }}:</label>
+      <div class="col-sm-8">
+        {{ form.project_name(class_="mb-2 form-select") }}
+        {% if form.project_name.errors -%}<span class="error-message">{{ form.project_name.errors[0] }}</span>{%- endif %}
+          {% if not user_projects %}
+            <p class="text-danger">You must be a participant of a project to submit a release candidate.</p>
+          {% endif %}
+        </div>
+      </div>
 
-                  if (targetElement) {
-                      const textToCopy = targetElement.textContent;
+      <div class="mb-3 pb-3 row border-bottom">
+        <label for="{{ form.version_name.id }}"
+               class="col-sm-3 col-form-label text-sm-end">{{ form.version_name.label.text }}:</label>
+        <div class="col-sm-8">
+          {{ form.version_name(class_="form-control") }}
+          {% if form.version_name.errors -%}<span class="error-message">{{ form.version_name.errors[0] }}</span>{%- endif %}
+          </div>
+        </div>
 
-                      navigator.clipboard.writeText(textToCopy)
-                          .then(() => {
-                              const originalText = this.innerHTML;
-                              this.innerHTML = '<i class="bi bi-check2"></i> Copied!';
+        <div class="row">
+          <div class="col-sm-9 offset-sm-3">{{ form.submit(class_="btn btn-primary mt-3") }}</div>
+        </div>
+      </form>
+    {% endblock content %}
 
-                              // Reset the button text after 2000ms
-                              setTimeout(() => {
-                                  this.innerHTML = originalText;
-                              }, 2000);
-                          })
-                          .catch(err => {
-                              console.error("Failed to copy: ", err);
-                              this.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Failed!';
+    {% block javascripts %}
+      {{ super() }}
+      <script>
+          document.addEventListener("DOMContentLoaded", function() {
+              const copyButtons = document.querySelectorAll(".atr-copy-btn");
 
-                              setTimeout(() => {
-                                  this.innerHTML = '<i class="bi bi-clipboard"></i> Copy';
-                              }, 2000);
-                          });
-                  }
+              copyButtons.forEach(button => {
+                  button.addEventListener("click", function() {
+                      const targetId = this.getAttribute("data-clipboard-target");
+                      const targetElement = document.querySelector(targetId);
+
+                      if (targetElement) {
+                          const textToCopy = targetElement.textContent;
+
+                          navigator.clipboard.writeText(textToCopy)
+                              .then(() => {
+                                  const originalText = this.innerHTML;
+                                  this.innerHTML = '<i class="bi bi-check2"></i> Copied!';
+
+                                  // Reset the button text after 2000ms
+                                  setTimeout(() => {
+                                      this.innerHTML = originalText;
+                                  }, 2000);
+                              })
+                              .catch(err => {
+                                  console.error("Failed to copy: ", err);
+                                  this.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Failed!';
+
+                                  setTimeout(() => {
+                                      this.innerHTML = '<i class="bi bi-clipboard"></i> Copy';
+                                  }, 2000);
+                              });
+                      }
+                  });
               });
           });
-      });
-  </script>
-{% endblock javascripts %}
+      </script>
+    {% endblock javascripts %}

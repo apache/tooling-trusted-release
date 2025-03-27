@@ -17,33 +17,18 @@
 
 """candidate.py"""
 
-import datetime
-
 import asfquart
 import asfquart.base as base
 import quart
 import werkzeug.wrappers.response as response
-import wtforms
 
 import atr.db as db
 import atr.db.models as models
 import atr.db.service as service
 import atr.routes as routes
-import atr.util as util
 
 if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
-
-
-class ReleaseAddForm(util.QuartFormTyped):
-    committee_name = wtforms.StringField(
-        "Committee", validators=[wtforms.validators.InputRequired("Committee name is required")]
-    )
-    version = wtforms.StringField("Version", validators=[wtforms.validators.InputRequired("Version is required")])
-    project_name = wtforms.StringField(
-        "Project name", validators=[wtforms.validators.InputRequired("Project name is required")]
-    )
-    submit = wtforms.SubmitField("Create release candidate")
 
 
 def format_artifact_name(project_name: str, version: str, is_podling: bool = False) -> str:
@@ -57,107 +42,6 @@ def format_artifact_name(project_name: str, version: str, is_podling: bool = Fal
     if is_podling:
         return f"apache-{project_name}-incubating-{version}"
     return f"apache-{project_name}-{version}"
-
-
-# Release functions
-
-
-async def release_add_post(session: routes.CommitterSession, request: quart.Request) -> str | response.Response:
-    """Handle POST request for creating a new release."""
-
-    def not_none(value: str | None) -> str:
-        if value is None:
-            raise ValueError("This field is required")
-        return value
-
-    form = await ReleaseAddForm.create_form(data=await request.form)
-
-    if not await form.validate():
-        # Get Committee objects for all committees and projects the user is a member of
-        async with db.session() as data:
-            committee_and_project_list = session.committees + session.projects
-            user_committees = await data.committee(name_in=committee_and_project_list).all()
-
-        # Return the form with validation errors
-        return await quart.render_template(
-            "candidate-create.html",
-            asf_id=session.uid,
-            user_committees=user_committees,
-            form=form,
-        )
-
-    committee_name = str(form.committee_name.data)
-    version = not_none(form.version.data)
-    project_name = not_none(form.project_name.data)
-
-    # TODO: Forbid creating a release with an existing project and version
-    # Create the release record in the database
-    async with db.session() as data:
-        async with data.begin():
-            committee = await data.committee(name=committee_name).get()
-            if not committee:
-                asfquart.APP.logger.error(f"Committee not found for project {committee_name}")
-                raise base.ASFQuartException("Committee not found", errorcode=404)
-
-            # Verify user is a PMC member or committer of the project
-            # We use committee.name, so this must come within the transaction
-            if committee.name not in (session.committees + session.projects):
-                raise base.ASFQuartException(
-                    f"You must be a PMC member or committer of {committee.display_name} to submit a release candidate",
-                    errorcode=403,
-                )
-
-            release_name = f"{project_name}-{version}"
-            project = await data.project(name=project_name).get()
-            if not project:
-                # Create a new project record
-                project = models.Project(
-                    name=project_name,
-                    committee_id=committee.id,
-                )
-                data.add(project)
-                # Must flush to get the project ID
-                await data.flush()
-
-            # Create release record with project
-            release = models.Release(
-                name=release_name,
-                stage=models.ReleaseStage.RELEASE_CANDIDATE,
-                phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
-                project_id=project.id,
-                project=project,
-                version=version,
-                created=datetime.datetime.now(datetime.UTC),
-            )
-            data.add(release)
-
-    # Redirect to the add package page with the storage token
-    return await session.redirect(vote, success="Release candidate created successfully")
-
-
-# Root functions
-
-
-@routes.committer("/candidate/create", methods=["GET", "POST"])
-async def create(session: routes.CommitterSession) -> response.Response | str:
-    """Create a new release in the database."""
-    # For POST requests, handle the release creation
-    if quart.request.method == "POST":
-        return await release_add_post(session, quart.request)
-
-    # Get PMC objects for all projects the user is a member of
-    async with db.session() as data:
-        project_list = session.committees + session.projects
-        user_committees = await data.committee(name_in=project_list).all()
-
-    # For GET requests, show the form
-    form = await ReleaseAddForm.create_form()
-    return await quart.render_template(
-        "candidate-create.html",
-        asf_id=session.uid,
-        user_committees=user_committees,
-        form=form,
-    )
 
 
 @routes.committer("/candidate/delete", methods=["POST"])

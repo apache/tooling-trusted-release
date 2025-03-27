@@ -25,7 +25,7 @@ import hashlib
 import logging
 import pathlib
 import re
-from typing import Final
+from typing import Protocol, TypeVar
 
 import aiofiles.os
 import aioshutil
@@ -43,7 +43,17 @@ import atr.tasks as tasks
 import atr.util as util
 
 # _CONFIG: Final = config.get()
-_LOGGER: Final = logging.getLogger(__name__)
+# _LOGGER: Final = logging.getLogger(__name__)
+
+
+T = TypeVar("T")
+
+
+class AddProtocol(Protocol):
+    """Protocol for forms that create release candidate drafts."""
+
+    version_name: wtforms.StringField
+    project_name: wtforms.SelectField
 
 
 async def _number_of_release_files(release: models.Release) -> int:
@@ -146,13 +156,28 @@ def _path_warnings_errors_metadata(
     return warnings, errors
 
 
-@routes.committer("/draft/add")
-async def add(session: routes.CommitterSession) -> str:
+@routes.committer("/draft/add", methods=["GET", "POST"])
+async def add(session: routes.CommitterSession) -> response.Response | str:
     """Show a page to allow the user to rsync files to candidate drafts."""
     # Do them outside of the template rendering call to ensure order
     # The user_candidate_drafts call can use cached results from user_projects
     user_projects = await session.user_projects
     user_candidate_drafts = await session.user_candidate_drafts
+
+    class AddForm(util.QuartFormTyped):
+        project_name = wtforms.SelectField("Project", choices=[(p.name, p.full_name or p.name) for p in user_projects])
+        version_name = wtforms.StringField(
+            "Version", validators=[wtforms.validators.InputRequired("Version is required")]
+        )
+        submit = wtforms.SubmitField("Create candidate draft")
+
+    form = await AddForm.create_form()
+    if quart.request.method == "POST":
+        if not await form.validate_on_submit():
+            # TODO: Show the form with errors
+            return await session.redirect(add, error="Invalid form data")
+        await _add(session, form)
+        return await session.redirect(add, success="Release candidate created successfully")
 
     return await quart.render_template(
         "draft-add.html",
@@ -161,35 +186,9 @@ async def add(session: routes.CommitterSession) -> str:
         server_domain=session.host,
         number_of_release_files=_number_of_release_files,
         candidate_drafts=user_candidate_drafts,
+        user_projects=user_projects,
+        form=form,
     )
-
-
-async def _add_one(
-    project_name: str,
-    version_name: str,
-    file_path: pathlib.Path | None,
-    file: datastructures.FileStorage,
-) -> None:
-    """Process and save the uploaded file."""
-    # Create target directory
-    target_dir = util.get_release_candidate_draft_dir() / project_name / version_name
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    # Use the original filename if no path is specified
-    if not file_path:
-        if not file.filename:
-            raise routes.FlashError("No filename provided")
-        file_path = pathlib.Path(file.filename)
-
-    # Save file to specified path
-    target_path = target_dir / file_path.relative_to(file_path.anchor)
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    async with aiofiles.open(target_path, "wb") as f:
-        while True:
-            chunk = await asyncio.to_thread(file.stream.read, 8192)
-            if not chunk:
-                break
-            await f.write(chunk)
 
 
 @routes.committer("/draft/add/<project_name>/<version_name>", methods=["GET", "POST"])
@@ -656,3 +655,65 @@ async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -
 
     # Delete the release record
     await data.delete(release)
+
+
+async def _add(session: routes.CommitterSession, form: AddProtocol) -> None:
+    """Handle POST request for creating a new release candidate draft."""
+    version = str(form.version_name.data)
+    project_name = str(form.project_name.data)
+
+    # Create the release record in the database
+    async with db.session() as data:
+        async with data.begin():
+            project = await data.project(name=project_name).get()
+            if not project:
+                raise routes.FlashError("Project not found")
+
+            # Verify user is a committee member or committer of the project
+            if project_name not in (p.name for p in await session.user_projects):
+                raise routes.FlashError(
+                    f"You must be a participant of {project_name} to submit a release candidate",
+                )
+
+            release_name = f"{project_name}-{version}"
+            # Check that the release does not already exist
+            if await data.release(name=release_name).get():
+                raise routes.FlashError("Release candidate already exists")
+
+            # Create release record with project
+            release = models.Release(
+                name=release_name,
+                stage=models.ReleaseStage.RELEASE_CANDIDATE,
+                phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+                project_id=project.id,
+                project=project,
+                version=version,
+                created=datetime.datetime.now(datetime.UTC),
+            )
+            data.add(release)
+
+
+async def _add_one(
+    project_name: str,
+    version_name: str,
+    file_path: pathlib.Path | None,
+    file: datastructures.FileStorage,
+) -> None:
+    """Process and save the uploaded file."""
+    # TODO: Rename to upload or file-upload
+    # Create target directory
+    target_dir = util.get_release_candidate_draft_dir() / project_name / version_name
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    # Use the original filename if no path is specified
+    if not file_path:
+        if not file.filename:
+            raise routes.FlashError("No filename provided")
+        file_path = pathlib.Path(file.filename)
+
+    # Save file to specified path
+    target_path = target_dir / file_path.relative_to(file_path.anchor)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiofiles.open(target_path, "wb") as f:
+        while chunk := await asyncio.to_thread(file.stream.read, 8192):
+            await f.write(chunk)
