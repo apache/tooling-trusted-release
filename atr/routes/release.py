@@ -20,8 +20,6 @@
 import logging
 import logging.handlers
 
-import aiofiles.os
-import aioshutil
 import asfquart
 import quart
 import werkzeug.wrappers.response as response
@@ -30,61 +28,9 @@ import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.routes.candidate as candidate
-import atr.util as util
 
 if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
-
-
-# Release functions
-
-
-async def release_delete_validate(data: db.Session, release_name: str, session_uid: str) -> models.Release:
-    """Validate release deletion request and return the release if valid."""
-    release = await data.release(name=release_name, _committee=True, _packages=True).demand(
-        routes.FlashError("Release not found")
-    )
-
-    # Check permissions
-    if release.committee:
-        if (session_uid not in release.committee.committee_members) and (
-            session_uid not in release.committee.committers
-        ):
-            raise routes.FlashError("You don't have permission to delete this release")
-
-    return release
-
-
-@routes.committer("/release/delete", methods=["POST"])
-async def delete(session: routes.CommitterSession) -> response.Response:
-    """Delete a release and all its associated files."""
-    form = await routes.get_form(quart.request)
-    release_name = form.get("release_name")
-
-    if not release_name:
-        return await session.redirect(candidate.vote, error="Missing required parameters")
-
-    async with db.session() as data:
-        async with data.begin():
-            try:
-                # First validate and get the release info
-                release = await release_delete_validate(data, release_name, session.uid)
-                project_name = release.project.name
-                version = release.version
-
-                # Delete all associated packages first
-                for package in release.packages:
-                    await data.delete(package)
-                await data.delete(release)
-
-            except routes.FlashError as e:
-                logging.exception("FlashError:")
-                return await session.redirect(candidate.vote, error=str(e))
-
-    release_dir = util.get_release_candidate_dir() / project_name / version
-    if await aiofiles.os.path.exists(release_dir):
-        await aioshutil.rmtree(release_dir)
-    return await session.redirect(candidate.vote, success="Release deleted successfully")
 
 
 @routes.committer("/release/bulk/<int:task_id>", methods=["GET"])
@@ -120,3 +66,22 @@ async def release_bulk_status(session: routes.CommitterSession, task_id: int) ->
                     return await session.redirect(candidate.vote, error="You don't have permission to view this task.")
 
     return await quart.render_template("release-bulk.html", task=task, release=release, TaskStatus=models.TaskStatus)
+
+
+@routes.committer("/release/review")
+async def review(session: routes.CommitterSession) -> str:
+    """Show all releases."""
+    # Releases are public, so we don't need to filter by user
+    # TODO: Add RELEASE_BEFORE_ANNOUNCEMENT releases?
+    async with db.session() as data:
+        releases = await data.release(
+            stage=models.ReleaseStage.RELEASE,
+            phase=models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT,
+            _committee=True,
+            _packages=True,
+        ).all()
+
+    return await quart.render_template(
+        "release-review.html",
+        releases=releases,
+    )
