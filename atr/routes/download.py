@@ -29,7 +29,7 @@ import atr.routes.candidate as candidate
 import atr.util as util
 
 
-@routes.committer_route("/download/<phase>/<project>/<version>/<path>")
+@routes.committer("/download/<phase>/<project>/<version>/<path>")
 async def phase(
     session: routes.CommitterSession, phase: str, project: str, version: str, path: pathlib.Path
 ) -> response.Response | quart.Response:

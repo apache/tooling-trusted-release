@@ -26,16 +26,16 @@ import atr.db.models as models
 import atr.routes as routes
 
 
-@routes.app_route("/committees")
-async def root_committee_directory() -> str:
+@routes.public("/committees")
+async def directory() -> str:
     """Main committee directory page."""
     async with db.session() as data:
         committees = await data.committee(_projects=True).order_by(models.Committee.name).all()
         return await quart.render_template("committee-directory.html", committees=committees)
 
 
-@routes.app_route("/committees/<name>")
-async def root_committee_view(name: str) -> str:
+@routes.public("/committees/<name>")
+async def view(name: str) -> str:
     async with db.session() as data:
         committee = await data.committee(name=name, _projects=True, _public_signing_keys=True).demand(
             http.client.HTTPException(404)

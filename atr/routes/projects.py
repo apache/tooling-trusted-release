@@ -31,16 +31,16 @@ import atr.routes as routes
 import atr.util as util
 
 
-@routes.app_route("/projects")
-async def root_project_directory() -> str:
+@routes.public("/projects")
+async def directory() -> str:
     """Main project directory page."""
     async with db.session() as data:
         projects = await data.project(_committee=True).order_by(models.Project.full_name).all()
         return await quart.render_template("project-directory.html", projects=projects)
 
 
-@routes.app_route("/projects/<name>")
-async def root_project_view(name: str) -> str:
+@routes.public("/projects/<name>")
+async def view(name: str) -> str:
     async with db.session() as data:
         project = await data.project(name=name, _committee_public_signing_keys=True, _vote_policy=True).demand(
             http.client.HTTPException(404)
@@ -77,8 +77,8 @@ class VotePolicyForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Save")
 
 
-@routes.app_route("/projects/<project_name>/voting-policy/add", methods=["GET", "POST"])
-async def root_projects_vote_policy_add(project_name: str) -> response.Response | str:
+@routes.committer("/projects/<project_name>/vote-policy/add", methods=["GET", "POST"])
+async def vote_policy_add(session: routes.CommitterSession, project_name: str) -> response.Response | str:
     uid = await util.get_asf_id_or_die()
 
     async with db.session() as data:
@@ -110,8 +110,8 @@ async def root_projects_vote_policy_add(project_name: str) -> response.Response 
     )
 
 
-@routes.committer_route("/projects/<project_name>/vote-policy/edit", methods=["GET", "POST"])
-async def projects_vote_policy_edit(session: routes.CommitterSession, project_name: str) -> response.Response | str:
+@routes.committer("/projects/<project_name>/vote-policy/edit", methods=["GET", "POST"])
+async def vote_policy_edit(session: routes.CommitterSession, project_name: str) -> response.Response | str:
     uid = await util.get_asf_id_or_die()
 
     async with db.session() as data:
@@ -161,7 +161,7 @@ async def _add_voting_policy(project: models.Project, form: VotePolicyForm, data
     data.add(vote_policy)
     await data.commit()
 
-    return quart.redirect(quart.url_for("root_project_view", name=project_name))
+    return quart.redirect(util.as_url(view, name=project_name))
 
 
 async def _edit_voting_policy(
@@ -176,4 +176,4 @@ async def _edit_voting_policy(
     vote_policy.pause_for_rm = form.pause_for_rm.data
     await data.commit()
 
-    return quart.redirect(quart.url_for("root_project_view", name=project_name))
+    return quart.redirect(util.as_url(view, name=project_name))

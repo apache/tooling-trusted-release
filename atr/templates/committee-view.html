@@ -33,7 +33,7 @@
       <ul>
         {% for project in committee.projects %}
           <li>
-            <a href="{{ url_for('root_project_view', name=project.name) }}">{{ project.display_name }}</a>
+            <a href="{{ as_url(routes.projects.view, name=project.name) }}">{{ project.display_name }}</a>
           </li>
         {% endfor %}
       </ul>

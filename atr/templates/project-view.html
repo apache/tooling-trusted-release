@@ -29,7 +29,7 @@
     </div>
     <div class="card-body">
       <div class="d-flex flex-wrap gap-3 small mb-1">
-        <a href="{{ url_for('root_committee_view', name=project.committee.name) }}">{{ project.committee.display_name }}</a>
+        <a href="{{ as_url(routes.committees.view, name=project.committee.name) }}">{{ project.committee.display_name }}</a>
       </div>
     </div>
   </div>
@@ -118,7 +118,7 @@
         {% elif (is_project_lead or is_admin) %}
           <div>
             <a class="btn btn-primary btn-sm"
-               href="{{ url_for('root_projects_vote_policy_add', project_name=project.name) }}"><i class="fa-solid fa-plus"></i></a>
+               href="{{ as_url(routes.projects.vote_policy_add, project_name=project.name) }}"><i class="fa-solid fa-plus"></i></a>
           </div>
         {% endif %}
       {% endif %}

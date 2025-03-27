@@ -370,9 +370,7 @@ class RouteHandler(Protocol[R]):
 
 
 # This decorator is an adaptor between @committer_get and @app_route functions
-def committer_route(
-    path: str, methods: list[str] | None = None
-) -> Callable[[CommitterRouteHandler[R]], RouteHandler[R]]:
+def committer(path: str, methods: list[str] | None = None) -> Callable[[CommitterRouteHandler[R]], RouteHandler[R]]:
     """Decorator for committer GET routes that provides an enhanced session object."""
 
     def decorator(func: CommitterRouteHandler[R]) -> RouteHandler[R]:
@@ -395,6 +393,29 @@ def committer_route(
         # Apply decorators in reverse order
         decorated = auth.require(auth.Requirements.committer)(wrapper)
         decorated = app_route(path, methods=methods or ["GET"], endpoint=endpoint)(decorated)
+
+        return decorated
+
+    return decorator
+
+
+def public(path: str, methods: list[str] | None = None) -> Callable[[RouteHandler[R]], RouteHandler[R]]:
+    """Decorator for public GET routes that provides an enhanced session object."""
+
+    def decorator(func: RouteHandler[R]) -> RouteHandler[R]:
+        async def wrapper(*args: Any, **kwargs: Any) -> R:
+            return await func(*args, **kwargs)
+
+        # Generate a unique endpoint name
+        endpoint = func.__module__ + "_" + func.__name__
+
+        # Set the name before applying decorators
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        wrapper.__annotations__["endpoint"] = endpoint
+
+        # Apply decorators in reverse order
+        decorated = app_route(path, methods=methods or ["GET"], endpoint=endpoint)(wrapper)
 
         return decorated
 

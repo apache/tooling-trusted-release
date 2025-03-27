@@ -27,7 +27,7 @@ if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
 
 
-@routes.committer_route("/dev/send-email", methods=["GET", "POST"])
+@routes.committer("/dev/send-email", methods=["GET", "POST"])
 async def send_email(session: routes.CommitterSession) -> quart.ResponseReturnValue:
     """Simple endpoint for testing email functionality."""
     asf_id = session.uid

@@ -138,7 +138,7 @@ async def release_add_post(session: routes.CommitterSession, request: quart.Requ
 # Root functions
 
 
-@routes.committer_route("/candidate/create", methods=["GET", "POST"])
+@routes.committer("/candidate/create", methods=["GET", "POST"])
 async def create(session: routes.CommitterSession) -> response.Response | str:
     """Create a new release in the database."""
     # For POST requests, handle the release creation
@@ -160,7 +160,7 @@ async def create(session: routes.CommitterSession) -> response.Response | str:
     )
 
 
-@routes.committer_route("/candidate/review")
+@routes.committer("/candidate/review")
 async def review(session: routes.CommitterSession) -> str:
     """Show all release candidates to which the user has access."""
     async with db.session() as data:

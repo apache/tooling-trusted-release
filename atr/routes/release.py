@@ -57,7 +57,7 @@ async def release_delete_validate(data: db.Session, release_name: str, session_u
     return release
 
 
-@routes.committer_route("/release/delete", methods=["POST"])
+@routes.committer("/release/delete", methods=["POST"])
 async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a release and all its associated files."""
     form = await routes.get_form(quart.request)
@@ -92,7 +92,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     return quart.redirect(util.as_url(candidate.review))
 
 
-@routes.committer_route("/release/bulk/<int:task_id>", methods=["GET"])
+@routes.committer("/release/bulk/<int:task_id>", methods=["GET"])
 async def release_bulk_status(session: routes.CommitterSession, task_id: int) -> str | response.Response:
     """Show status for a bulk download task."""
     async with db.session() as data:
@@ -130,7 +130,7 @@ async def release_bulk_status(session: routes.CommitterSession, task_id: int) ->
     return await quart.render_template("release-bulk.html", task=task, release=release, TaskStatus=models.TaskStatus)
 
 
-@routes.committer_route("/release/vote", methods=["GET", "POST"])
+@routes.committer("/release/vote", methods=["GET", "POST"])
 async def vote(session: routes.CommitterSession) -> response.Response | str:
     """Show the vote initiation form for a release."""
     release_name = quart.request.args.get("release_name", "")

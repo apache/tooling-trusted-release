@@ -219,7 +219,7 @@ async def key_user_session_add(
     }
 
 
-@routes.committer_route("/keys/add", methods=["GET", "POST"])
+@routes.committer("/keys/add", methods=["GET", "POST"])
 async def add(session: routes.CommitterSession) -> str:
     """Add a new public signing key to the user's account."""
     key_info = None
@@ -248,7 +248,7 @@ async def add(session: routes.CommitterSession) -> str:
     )
 
 
-@routes.committer_route("/keys/delete", methods=["POST"])
+@routes.committer("/keys/delete", methods=["POST"])
 async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a public signing key from the user's account."""
     form = await routes.get_form(quart.request)
@@ -280,7 +280,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
             return quart.redirect(util.as_url(review))
 
 
-@routes.committer_route("/keys/review")
+@routes.committer("/keys/review")
 async def review(session: routes.CommitterSession) -> str:
     """Show all keys associated with the user's account."""
     # Get all existing keys for the user
@@ -303,7 +303,7 @@ async def review(session: routes.CommitterSession) -> str:
     )
 
 
-@routes.committer_route("/keys/ssh/add", methods=["GET", "POST"])
+@routes.committer("/keys/ssh/add", methods=["GET", "POST"])
 async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
     """Add a new SSH key to the user's account."""
     # TODO: Make an auth.require wrapper that gives the session automatically
@@ -330,7 +330,7 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
     )
 
 
-@routes.committer_route("/keys/upload", methods=["GET", "POST"])
+@routes.committer("/keys/upload", methods=["GET", "POST"])
 async def upload(session: routes.CommitterSession) -> str:
     """Upload a KEYS file containing multiple GPG keys."""
     # Get committees for all projects the user is a member of

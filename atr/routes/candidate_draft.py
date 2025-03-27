@@ -154,7 +154,7 @@ def _path_warnings_errors_metadata(
     return warnings, errors
 
 
-@routes.committer_route("/candidate/draft/add")
+@routes.committer("/candidate/draft/add")
 async def add(session: routes.CommitterSession) -> str:
     """Show a page to allow the user to rsync files to candidate drafts."""
     # Do them outside of the template rendering call to ensure order
@@ -201,7 +201,7 @@ async def _add_one(
             await f.write(chunk)
 
 
-@routes.committer_route("/candidate/draft/add/<project_name>/<version_name>", methods=["GET", "POST"])
+@routes.committer("/candidate/draft/add/<project_name>/<version_name>", methods=["GET", "POST"])
 async def add_project(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
@@ -234,7 +234,7 @@ async def add_project(
     )
 
 
-@routes.committer_route("/candidate/draft/files/<project_name>/<version_name>")
+@routes.committer("/candidate/draft/files/<project_name>/<version_name>")
 async def files(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
     """Show all the files in the rsync upload directory for a release."""
     # Check that the user has access to the project
@@ -315,7 +315,7 @@ async def files(session: routes.CommitterSession, project_name: str, version_nam
     )
 
 
-@routes.committer_route("/candidate/draft/checks/<project_name>/<version_name>/<path:file_path>")
+@routes.committer("/candidate/draft/checks/<project_name>/<version_name>/<path:file_path>")
 async def checks(session: routes.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
     """Show the status of all checks for a specific file."""
     # Check that the user has access to the project
@@ -367,7 +367,7 @@ async def checks(session: routes.CommitterSession, project_name: str, version_na
     )
 
 
-@routes.committer_route("/candidate/draft/delete/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+@routes.committer("/candidate/draft/delete/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
 async def delete(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
@@ -395,7 +395,7 @@ async def delete(
     return quart.redirect(util.as_url(files, project_name=project_name, version_name=version_name))
 
 
-@routes.committer_route("/candidate/draft/hashgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+@routes.committer("/candidate/draft/hashgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
 async def hashgen(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
@@ -451,7 +451,7 @@ async def hashgen(
     return quart.redirect(util.as_url(files, project_name=project_name, version_name=version_name))
 
 
-@routes.committer_route("/candidate/draft/tools/<project_name>/<version_name>/<path:file_path>")
+@routes.committer("/candidate/draft/tools/<project_name>/<version_name>/<path:file_path>")
 async def tools(session: routes.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
     """Show the tools for a specific file."""
     # Check that the user has access to the project

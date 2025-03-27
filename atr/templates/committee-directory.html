@@ -27,7 +27,7 @@
     {% for committee in committees %}
       <div class="col">
         <div class="card h-100 shadow-sm atr-cursor-pointer hover-lift project-card"
-             data-project-url="{{ url_for('root_committee_view', name=committee.name) }}">
+             data-project-url="{{ as_url(routes.committees.view, name=committee.name) }}">
           <div class="card-body">
             <h3 class="card-title fs-4 mb-3">{{ committee.display_name }}</h3>
             <div class="row g-3">

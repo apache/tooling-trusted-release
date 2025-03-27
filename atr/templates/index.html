@@ -29,7 +29,7 @@
   <h2>Documentation</h2>
   <ul>
     <li>
-      <a href="{{ url_for('root_project_directory') }}">Project directory and release manager assignments</a>
+      <a href="{{ as_url(routes.projects.directory) }}">Project directory and release manager assignments</a>
     </li>
     {% if current_user %}
       <li>

@@ -36,13 +36,11 @@
       </li>
       <li>
         <i class="fa-solid fa-diagram-project"></i>
-        <a href="{{ url_for('root_committee_directory') }}"
-           {% if request.endpoint == 'root_committee_directory' %}class="active"{% endif %}>Committees</a>
+        <a href="{{ as_url(routes.committees.directory) }}">Committees</a>
       </li>
       <li>
         <i class="fa-solid fa-diagram-project"></i>
-        <a href="{{ url_for('root_project_directory') }}"
-           {% if request.endpoint == 'root_project_directory' %}class="active"{% endif %}>Projects</a>
+        <a href="{{ as_url(routes.projects.directory) }}">Projects</a>
       </li>
     </ul>
 
