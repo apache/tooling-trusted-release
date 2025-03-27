@@ -72,9 +72,15 @@ async def release_bulk_status(session: routes.CommitterSession, task_id: int) ->
 async def review(session: routes.CommitterSession) -> str:
     """Show all releases."""
     # Releases are public, so we don't need to filter by user
-    # TODO: Add RELEASE_BEFORE_ANNOUNCEMENT releases?
     async with db.session() as data:
-        releases = await data.release(
+        # TODO: Improve this query
+        releases_before_announcement = await data.release(
+            stage=models.ReleaseStage.RELEASE,
+            phase=models.ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT,
+            _committee=True,
+            _packages=True,
+        ).all()
+        releases_after_announcement = await data.release(
             stage=models.ReleaseStage.RELEASE,
             phase=models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT,
             _committee=True,
@@ -83,5 +89,5 @@ async def review(session: routes.CommitterSession) -> str:
 
     return await quart.render_template(
         "release-review.html",
-        releases=releases,
+        releases=list(releases_before_announcement) + list(releases_after_announcement),
     )

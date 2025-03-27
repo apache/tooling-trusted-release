@@ -142,10 +142,9 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
         # Check that the user has access to the project
         async with db.session() as data:
             project = await data.project(name=project_name).get()
-            if not project or not any(
-                (c.id == project.committee_id and (session.uid in c.committee_members or session.uid in c.committers))
-                for c in (await session.user_committees)
-            ):
+            if not project:
+                return await session.redirect(promote, error="Project not found")
+            if not any((p.id == project.id) for p in (await session.user_projects)):
                 return await session.redirect(promote, error="You do not have access to this project")
 
             try:
