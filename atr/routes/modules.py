@@ -22,6 +22,7 @@ import atr.routes.dev as dev
 import atr.routes.download as download
 import atr.routes.draft as draft
 import atr.routes.keys as keys
+import atr.routes.preview as preview
 import atr.routes.projects as projects
 import atr.routes.release as release
 import atr.routes.root as root
