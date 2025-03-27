@@ -75,15 +75,7 @@ async def vote(session: routes.CommitterSession) -> str:
             _committee=True,
             _packages=True,
         ).all()
-
-        # Filter to only show releases for PMCs or PPMCs where the user is a member or committer
-        user_candidates = []
-        for r in releases:
-            if r.committee is None:
-                continue
-            # For PPMCs the "members" are stored in the committers field
-            if (session.uid in r.committee.committee_members) or (session.uid in r.committee.committers):
-                user_candidates.append(r)
+        user_candidates = session.only_user_releases(releases)
 
         # time.sleep(0.37)
         # await asyncio.sleep(0.73)
@@ -219,14 +211,7 @@ async def _resolve_get(session: routes.CommitterSession) -> str:
             _committee=True,
             _project=True,
         ).all()
-
-        # Ensure that the user is a committee member or committer
-        user_candidates = []
-        for r in releases:
-            if r.committee is None:
-                continue
-            if (session.uid in r.committee.committee_members) or (session.uid in r.committee.committers):
-                user_candidates.append(r)
+        user_candidates = session.only_user_releases(releases)
 
         # Create a unique form for each candidate
         candidate_forms = {}

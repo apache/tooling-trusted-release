@@ -31,15 +31,15 @@ import asfquart.base as base
 import asfquart.session as session
 import quart
 
+import atr.db.models as models
+import atr.user as user
 import atr.util as util
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Coroutine
+    from collections.abc import Awaitable, Callable, Coroutine, Sequence
 
     import werkzeug.datastructures as datastructures
     import werkzeug.wrappers.response as response
-import atr.db.models as models
-import atr.user as user
 
 if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
@@ -344,6 +344,9 @@ class CommitterSession:
             if port.isdigit():
                 return domain
         return request_host
+
+    def only_user_releases(self, releases: Sequence[models.Release]) -> list[models.Release]:
+        return util.user_releases(self.uid, releases)
 
     async def redirect(
         self, route: CommitterRouteHandler[R], success: str | None = None, error: str | None = None, **kwargs: Any

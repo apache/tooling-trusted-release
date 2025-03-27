@@ -19,7 +19,7 @@ import dataclasses
 import functools
 import hashlib
 import pathlib
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Annotated, Any, TypeVar
 
 import aiofiles.os
@@ -32,6 +32,7 @@ import quart_wtf
 import quart_wtf.typing
 
 import atr.config as config
+import atr.db.models as models
 
 F = TypeVar("F", bound="QuartFormTyped")
 T = TypeVar("T")
@@ -183,6 +184,18 @@ def unwrap(value: T | None, error_message: str = "unexpected None when unwrappin
         raise ValueError(error_message)
     else:
         return value
+
+
+def user_releases(asf_uid: str, releases: Sequence[models.Release]) -> list[models.Release]:
+    """Return a list of releases for which the user is a committee member or committer."""
+    # TODO: This should probably be a session method instead
+    user_releases = []
+    for release in releases:
+        if release.committee is None:
+            continue
+        if (asf_uid in release.committee.committee_members) or (asf_uid in release.committee.committers):
+            user_releases.append(release)
+    return user_releases
 
 
 def validate_as_type(value: Any, t: type[T]) -> T:

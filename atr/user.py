@@ -19,6 +19,7 @@
 
 import atr.db as db
 import atr.db.models as models
+import atr.util as util
 
 
 async def candidate_drafts(uid: str, user_projects: list[models.Project] | None = None) -> list[models.Release]:
@@ -62,10 +63,5 @@ async def releases(uid: str) -> list[models.Release]:
         # TODO: We're limiting this to candidates
         # We should either call this user_candidate_releases, or change the query
         releases = await data.release(stage=models.ReleaseStage.RELEASE_CANDIDATE, _project=True, _committee=True).all()
-        user_releases = []
-        for r in releases:
-            if r.committee is None:
-                continue
-            if (uid in r.committee.committee_members) or (uid in r.committee.committers):
-                user_releases.append(r)
+        user_releases = util.user_releases(uid, releases)
     return user_releases

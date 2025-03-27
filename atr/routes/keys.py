@@ -379,7 +379,7 @@ async def upload(session: routes.CommitterSession) -> str:
         if not results:
             return await render(error="No keys were added")
 
-        success_count = sum(1 for r in results if r["status"] == "success")
+        success_count = sum(1 for result in results if result["status"] == "success")
         error_count = len(results) - success_count
         await quart.flash(
             f"Processed {len(results)} keys: {success_count} successful, {error_count} failed",
