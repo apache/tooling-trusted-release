@@ -28,6 +28,7 @@ import wtforms
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
+import atr.user as user
 import atr.util as util
 
 if asfquart.APP is ...:
@@ -126,6 +127,10 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
         release = await data.release(name=release_name, _project=True, _committee=True).demand(
             routes.FlashError("Release candidate not found")
         )
+        # Check that the user is on the release project committee
+        if not user.is_committee_member(release.committee, session.uid):
+            return await session.redirect(vote, error="You do not have access to this project")
+
         if quart.request.method == "GET":
             return await quart.render_template(
                 "release-vote.html",

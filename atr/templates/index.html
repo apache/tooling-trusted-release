@@ -13,28 +13,64 @@
     verify, and track release candidates.
   </p>
 
-  <h2>Key Features</h2>
-  <ul>
-    <li>Automated PMC roster synchronization with Whimsy</li>
-    <li>Release candidate tracking and state management</li>
-    <li>Secure key management for release managers</li>
-    <li>Signature verification for release artifacts</li>
-  </ul>
-
-  <h2>Getting Started</h2>
+  <h2>Quick tutorial</h2>
   <p>
-    To create a release candidate draft, you must be a committee member of the target project. First, <a href="{{ as_url(routes.keys.ssh_add) }}">add your SSH key</a>, then <a href="{{ as_url(routes.draft.add) }}">add a release candidate draft</a>.
+    This is a preview of an early version of ATR, and we would like testers to try it out and give us feedback. This section provides a quick tutorial for using ATR. The basic workflow on ATR is Release Candidate Draft -> Release Candidate -> Release Preview -> Release. Note that, as the header says on every page, this is a preview and you cannot yet create actual releases with ATR.
   </p>
 
-  <h2>Documentation</h2>
+  <h3>Release candidate draft</h3>
+
+  <p>
+    We recommend that you start by <a href="{{ as_url(routes.keys.ssh_add) }}">uploading your SSH key</a>. This gives you rsync access which makes it easier to upload your files. We plan to obtain your SSH key from your ASF account via LDAP in the long run.
+  </p>
+
+  <p>
+    Once you've uploaded your SSH key, you may be able to <a href="{{ as_url(routes.draft.add) }}">add a release candidate draft</a>. Only committee members can do this. Once a draft has been created, all committee members and committers can add files to the draft or delete files from it.
+  </p>
+
+  <p>
+    When you add files, ATR automatically runs some checks on the files. You'll be able to browse the results of those checks. Note that our checks are currently very basic, and we'll be adding more checks as we get feedback from testers.
+  </p>
+
+  <p>
+    When you're happy with the files in the draft, you can <a href="{{ as_url(routes.draft.promote) }}">promote the draft</a> to a release candidate.
+  </p>
+
+  <h3>Release candidate</h3>
+
+  <p>
+    When you've promoted the draft to a release candidate, you can use ATR to <a href="{{ as_url(routes.candidate.vote) }}">start a vote on the release candidate</a>. Currently we allow any committee member to start the vote, but in the future we may limit this to designated release managers. The ATR is designed to send the vote email itself, but we understand that projects send very detailed vote announcement emails. We plan to make it easier for you to send such announcement emails. We also plan to allow users to send the vote email themselves and record the fact on the ATR manually.
+  </p>
+
+  <p>
+    The vote email is not actually sent out, because ATR cannot yet be used to create releases. We are only testing the workflow.
+  </p>
+
+  <p>
+    When you're happy with the release candidate, you can <a href="{{ as_url(routes.candidate.resolve) }}">record the vote resolution</a> to promote the release candidate to a release preview.
+  </p>
+
+  <h3>Release preview</h3>
+
+  <p>
+    When you've promoted the release candidate to a release preview, you can review the files. We plan to make it possible to adjust the release preview before it's promoted to a release.
+  </p>
+
+  <p>
+    When you're happy with the release preview, you can <a href="{{ as_url(routes.preview.promote) }}">promote the release preview</a> to a release. This, again, should be an action limited to designated release managers.
+  </p>
+
+  <h3>Release</h3>
+
+  <p>
+    When you've promoted the release preview to a release, you can <a href="{{ as_url(routes.release.review) }}">browse the release</a>.
+  </p>
+
+  <h2>Key features</h2>
   <ul>
-    <li>
-      <a href="{{ as_url(routes.projects.directory) }}">Project directory and release manager assignments</a>
-    </li>
-    {% if current_user %}
-      <li>
-        <a href="{{ as_url(routes.candidate.vote) }}">Track your release candidates</a>
-      </li>
-    {% endif %}
+    <li>Support for rsync or HTML form based file uploads</li>
+    <li>Automatic checks of release artifacts</li>
+    <li>Templated email vote announcements</li>
   </ul>
+
 {% endblock content %}

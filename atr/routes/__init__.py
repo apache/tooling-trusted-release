@@ -410,6 +410,10 @@ class CommitterSession:
     async def user_candidate_drafts(self) -> list[models.Release]:
         return await user.candidate_drafts(self.uid, user_projects=self._projects)
 
+    # @property
+    # async def user_committees(self) -> list[models.Committee]:
+    #     return ...
+
     @property
     async def user_projects(self) -> list[models.Project]:
         if self._projects is None:
