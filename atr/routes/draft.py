@@ -406,6 +406,9 @@ async def modify(session: routes.CommitterSession) -> str:
     user_projects = await session.user_projects
     user_candidate_drafts = await session.user_candidate_drafts
 
+    # Create the delete form
+    delete_form = await DeleteForm.create_form()
+
     return await quart.render_template(
         "draft-modify.html",
         asf_id=session.uid,
@@ -413,6 +416,7 @@ async def modify(session: routes.CommitterSession) -> str:
         server_domain=session.host,
         number_of_release_files=_number_of_release_files,
         candidate_drafts=user_candidate_drafts,
+        delete_form=delete_form,
     )
 
 

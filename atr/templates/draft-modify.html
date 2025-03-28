@@ -21,6 +21,7 @@
 
   <div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
     {% for release in candidate_drafts %}
+      {% set release_id = release.name.replace('.', '_') %}
       <div class="col" id="{{ release.name }}">
         <div class="card h-100">
           <div class="card-body position-relative">
@@ -38,6 +39,9 @@
                  class="btn btn-sm btn-outline-primary">View files</a>
               <a href="{{ as_url(routes.draft.add_project, project_name=release.project.name, version_name=release.version) }}"
                  class="btn btn-sm btn-outline-primary">Upload file</a>
+              <button class="btn btn-sm btn-outline-danger"
+                      data-bs-toggle="modal"
+                      data-bs-target="#delete-{{ release_id }}">Delete draft</button>
             </div>
             <p class="card-text mt-3">
               {% if number_of_release_files(release) > 0 %}
@@ -55,6 +59,50 @@
             </button>
             <pre class="small mb-0" id="cmd-{{ release.name|replace('.', '-') }}">rsync -av -e 'ssh -p 2222' your/files/ \
     {{ asf_id }}@{{ server_domain }}:/{{ release.project.name }}/{{ release.version }}/</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal modal-lg fade"
+           id="delete-{{ release_id }}"
+           data-bs-backdrop="static"
+           data-bs-keyboard="false"
+           tabindex="-1"
+           aria-labelledby="delete-{{ release_id }}-label"
+           aria-hidden="true">
+        <div class="modal-dialog border-primary">
+          <div class="modal-content">
+            <div class="modal-header bg-danger bg-opacity-10 text-danger">
+              <h1 class="modal-title fs-5" id="delete-{{ release_id }}-label">Delete candidate draft</h1>
+              <button type="button"
+                      class="btn-close"
+                      data-bs-dismiss="modal"
+                      aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p class="text-muted mb-3">Warning: This action will permanently delete this candidate draft and cannot be undone.</p>
+              <form method="post" action="{{ as_url(routes.draft.delete) }}">
+                {{ delete_form.hidden_tag() }}
+                <input type="hidden" name="candidate_draft_name" value="{{ release.name }}" />
+                <div class="mb-3">
+                  <label for="confirm_delete_{{ release_id }}" class="form-label">
+                    Type <strong>DELETE</strong> to confirm:
+                  </label>
+                  <input class="form-control mt-2"
+                         id="confirm_delete_{{ release_id }}"
+                         name="confirm_delete"
+                         placeholder="DELETE"
+                         required=""
+                         type="text"
+                         value=""
+                         onkeyup="updateDeleteButton(this, 'delete-button-{{ release_id }}')" />
+                </div>
+                <button type="submit"
+                        id="delete-button-{{ release_id }}"
+                        disabled
+                        class="btn btn-danger">Delete candidate draft</button>
+              </form>
+            </div>
           </div>
         </div>
       </div>
@@ -103,5 +151,10 @@
               });
           });
       });
+
+      function updateDeleteButton(inputElement, buttonId) {
+          let button = document.getElementById(buttonId);
+          button.disabled = inputElement.value !== "DELETE";
+      }
   </script>
 {% endblock javascripts %}
