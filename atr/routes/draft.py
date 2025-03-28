@@ -172,6 +172,26 @@ def _path_warnings_errors_metadata(
     return warnings, errors
 
 
+@routes.committer("/drafts")
+async def directory(session: routes.CommitterSession) -> str:
+    user_projects = await session.user_projects
+    user_candidate_drafts = await session.user_candidate_drafts
+
+    promote_form = await PromoteForm.create_form()
+    delete_form = await DeleteForm.create_form()
+
+    return await quart.render_template(
+        "draft-directory.html",
+        asf_id=session.uid,
+        projects=user_projects,
+        server_domain=session.host,
+        number_of_release_files=_number_of_release_files,
+        candidate_drafts=user_candidate_drafts,
+        promote_form=promote_form,
+        delete_form=delete_form,
+    )
+
+
 @routes.committer("/draft/add", methods=["GET", "POST"])
 async def add(session: routes.CommitterSession) -> response.Response | str:
     """Show a page to allow the user to rsync files to candidate drafts."""
@@ -193,7 +213,7 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
             # TODO: Show the form with errors
             return await session.redirect(add, error="Invalid form data")
         await _add(session, form)
-        return await session.redirect(add, success="Release candidate created successfully")
+        return await session.redirect(directory, success="Release candidate created successfully")
 
     return await quart.render_template(
         "draft-add.html",
@@ -289,7 +309,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         # TODO: Confirm that this is a bug, and report upstream
         await aioshutil.rmtree(draft_dir)  # type: ignore[call-arg]
 
-    return await session.redirect(promote, success="Candidate draft deleted successfully")
+    return await session.redirect(directory, success="Candidate draft deleted successfully")
 
 
 @routes.committer("/draft/delete-file/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
@@ -396,21 +416,21 @@ async def modify(session: routes.CommitterSession) -> str:
     )
 
 
+class PromoteForm(util.QuartFormTyped):
+    """Form for promoting a candidate draft."""
+
+    candidate_draft_name = wtforms.StringField(
+        "Candidate draft name", validators=[wtforms.validators.InputRequired("Candidate draft name is required")]
+    )
+    confirm_promote = wtforms.BooleanField(
+        "Confirmation", validators=[wtforms.validators.DataRequired("You must confirm to proceed with promotion")]
+    )
+    submit = wtforms.SubmitField("Promote to candidate")
+
+
 @routes.committer("/draft/promote", methods=["GET", "POST"])
 async def promote(session: routes.CommitterSession) -> str | response.Response:
     """Allow the user to promote a candidate draft."""
-
-    class PromoteForm(util.QuartFormTyped):
-        """Form for promoting a candidate draft."""
-
-        candidate_draft_name = wtforms.StringField(
-            "Candidate draft name", validators=[wtforms.validators.InputRequired("Candidate draft name is required")]
-        )
-        confirm_promote = wtforms.BooleanField(
-            "Confirmation", validators=[wtforms.validators.DataRequired("You must confirm to proceed with promotion")]
-        )
-        submit = wtforms.SubmitField("Promote to candidate")
-
     user_candidate_drafts = await session.user_candidate_drafts
 
     # Create the forms
@@ -455,7 +475,7 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
                 await data.commit()
                 await aioshutil.move(source, target)
 
-                return await session.redirect(promote, success="Candidate draft successfully promoted to candidate")
+                return await session.redirect(directory, success="Candidate draft successfully promoted to candidate")
 
             except Exception as e:
                 logging.exception("Error promoting candidate draft:")
