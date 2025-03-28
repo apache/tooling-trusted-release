@@ -1,19 +1,19 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  File check status ~ ATR
+  Review {{ project_name }} {{ version_name }} {{ package.filename }} ~ ATR
 {% endblock title %}
 
 {% block description %}
-  View the status and results of file verification tasks.
+  Review the {{ project_name }} {{ version_name }} {{ package.filename }} candidate draft file.
 {% endblock description %}
 
 {% block content %}
-  <a href="{{ as_url(routes.draft.files, project_name=project_name, version_name=version_name) }}"
-     class="back-link">← Back to Files List</a>
+  <a href="{{ as_url(routes.draft.review, project_name=project_name, version_name=version_name) }}"
+     class="back-link">← Back to Review</a>
 
   <div class="p-3 mb-4 bg-light border rounded">
-    <h2 class="mt-0">File details</h2>
+    <h2 class="mt-0">Review file</h2>
     <p>
       <strong>Filename:</strong> {{ package.filename }}
     </p>

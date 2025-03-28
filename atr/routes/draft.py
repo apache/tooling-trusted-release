@@ -232,7 +232,7 @@ async def add_project(
 
             await _add_one(project_name, version_name, file_path, file_data)
             return await session.redirect(
-                files, success="File added successfully", project_name=project_name, version_name=version_name
+                review, success="File added successfully", project_name=project_name, version_name=version_name
             )
         except Exception as e:
             logging.exception("Error adding file:")
@@ -292,137 +292,6 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     return await session.redirect(promote, success="Candidate draft deleted successfully")
 
 
-@routes.committer("/draft/files/<project_name>/<version_name>")
-async def files(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
-    """Show all the files in the rsync upload directory for a release."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(add, error="You do not have access to this project")
-
-    # Check that the release exists
-    async with db.session() as data:
-        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
-
-    base_path = util.get_release_candidate_draft_dir() / project_name / version_name
-    paths = await util.paths_recursive(base_path)
-    paths_set = set(paths)
-    path_templates = {}
-    path_substitutions = {}
-    path_artifacts = set()
-    path_metadata = set()
-    path_warnings = {}
-    path_errors = {}
-    path_modified = {}
-    path_tasks: dict[pathlib.Path, dict[str, models.Task]] = {}
-    for path in paths:
-        # Get template and substitutions
-        elements = {
-            "core": project_name,
-            "version": version_name,
-            "sub": None,
-            "template": None,
-            "substitutions": None,
-        }
-        template, substitutions = analysis.filename_parse(str(path), elements)
-        path_templates[path] = template
-        path_substitutions[path] = analysis.substitutions_format(substitutions) or "none"
-
-        # Get artifacts and metadata
-        search = re.search(analysis.extension_pattern(), str(path))
-        ext_artifact = None
-        ext_metadata = None
-        if search:
-            ext_artifact = search.group("artifact")
-            # ext_metadata_artifact = search.group("metadata_artifact")
-            ext_metadata = search.group("metadata")
-            if ext_artifact:
-                path_artifacts.add(path)
-            elif ext_metadata:
-                path_metadata.add(path)
-
-        # Get warnings and errors
-        path_warnings[path], path_errors[path] = _path_warnings_errors(paths_set, path, ext_artifact, ext_metadata)
-
-        # Get modified time
-        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / path)
-        path_modified[path] = int(await aiofiles.os.path.getmtime(full_path))
-
-        # Get the most recent task for each type
-        path_tasks[path] = await db.recent_tasks(data, f"{project_name}-{version_name}", str(path), path_modified[path])
-
-    return await quart.render_template(
-        "draft-files.html",
-        asf_id=session.uid,
-        project_name=project_name,
-        version_name=version_name,
-        release=release,
-        paths=paths,
-        server_domain=session.host,
-        templates=path_templates,
-        substitutions=path_substitutions,
-        artifacts=path_artifacts,
-        metadata=path_metadata,
-        warnings=path_warnings,
-        errors=path_errors,
-        modified=path_modified,
-        tasks=path_tasks,
-        models=models,
-    )
-
-
-@routes.committer("/draft/checks/<project_name>/<version_name>/<path:file_path>")
-async def checks(session: routes.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
-    """Show the status of all checks for a specific file."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
-
-    async with db.session() as data:
-        # Check that the release exists
-        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
-
-        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / file_path)
-
-        # Check that the file exists
-        if not await aiofiles.os.path.exists(full_path):
-            raise base.ASFQuartException("File does not exist", errorcode=404)
-
-        modified = int(await aiofiles.os.path.getmtime(full_path))
-        file_size = await aiofiles.os.path.getsize(full_path)
-
-        # Get the most recent task for each task type
-        recent_tasks = await db.recent_tasks(data, f"{project_name}-{version_name}", file_path, modified)
-
-        # Convert to a list for the template
-        tasks = list(recent_tasks.values())
-
-        all_tasks_completed = all(
-            task.status in (models.TaskStatus.COMPLETED, models.TaskStatus.FAILED) for task in tasks
-        )
-
-    file_data = {
-        "filename": pathlib.Path(file_path).name,
-        "bytes_size": file_size,
-        "uploaded": datetime.datetime.fromtimestamp(modified, tz=datetime.UTC),
-    }
-
-    return await quart.render_template(
-        "draft-check.html",
-        project_name=project_name,
-        version_name=version_name,
-        file_path=file_path,
-        package=file_data,
-        release=release,
-        tasks=tasks,
-        all_tasks_completed=all_tasks_completed,
-        format_file_size=routes.format_file_size,
-    )
-
-
 @routes.committer("/draft/delete-file/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
 async def delete_file(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
@@ -448,7 +317,7 @@ async def delete_file(
         await aiofiles.os.remove(full_path)
 
     return await session.redirect(
-        files, success="File deleted successfully", project_name=project_name, version_name=version_name
+        review, success="File deleted successfully", project_name=project_name, version_name=version_name
     )
 
 
@@ -505,7 +374,7 @@ async def hashgen(
         await data.commit()
 
     return await session.redirect(
-        files, success=f"{hash_type} file generated successfully", project_name=project_name, version_name=version_name
+        review, success=f"{hash_type} file generated successfully", project_name=project_name, version_name=version_name
     )
 
 
@@ -597,6 +466,137 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
         candidate_drafts=user_candidate_drafts,
         promote_form=promote_form,
         delete_form=delete_form,
+    )
+
+
+@routes.committer("/draft/review/<project_name>/<version_name>")
+async def review(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+    """Show all the files in the rsync upload directory for a release."""
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        return await session.redirect(add, error="You do not have access to this project")
+
+    # Check that the release exists
+    async with db.session() as data:
+        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+
+    base_path = util.get_release_candidate_draft_dir() / project_name / version_name
+    paths = await util.paths_recursive(base_path)
+    paths_set = set(paths)
+    path_templates = {}
+    path_substitutions = {}
+    path_artifacts = set()
+    path_metadata = set()
+    path_warnings = {}
+    path_errors = {}
+    path_modified = {}
+    path_tasks: dict[pathlib.Path, dict[str, models.Task]] = {}
+    for path in paths:
+        # Get template and substitutions
+        elements = {
+            "core": project_name,
+            "version": version_name,
+            "sub": None,
+            "template": None,
+            "substitutions": None,
+        }
+        template, substitutions = analysis.filename_parse(str(path), elements)
+        path_templates[path] = template
+        path_substitutions[path] = analysis.substitutions_format(substitutions) or "none"
+
+        # Get artifacts and metadata
+        search = re.search(analysis.extension_pattern(), str(path))
+        ext_artifact = None
+        ext_metadata = None
+        if search:
+            ext_artifact = search.group("artifact")
+            # ext_metadata_artifact = search.group("metadata_artifact")
+            ext_metadata = search.group("metadata")
+            if ext_artifact:
+                path_artifacts.add(path)
+            elif ext_metadata:
+                path_metadata.add(path)
+
+        # Get warnings and errors
+        path_warnings[path], path_errors[path] = _path_warnings_errors(paths_set, path, ext_artifact, ext_metadata)
+
+        # Get modified time
+        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / path)
+        path_modified[path] = int(await aiofiles.os.path.getmtime(full_path))
+
+        # Get the most recent task for each type
+        path_tasks[path] = await db.recent_tasks(data, f"{project_name}-{version_name}", str(path), path_modified[path])
+
+    return await quart.render_template(
+        "draft-review.html",
+        asf_id=session.uid,
+        project_name=project_name,
+        version_name=version_name,
+        release=release,
+        paths=paths,
+        server_domain=session.host,
+        templates=path_templates,
+        substitutions=path_substitutions,
+        artifacts=path_artifacts,
+        metadata=path_metadata,
+        warnings=path_warnings,
+        errors=path_errors,
+        modified=path_modified,
+        tasks=path_tasks,
+        models=models,
+    )
+
+
+@routes.committer("/draft/review/<project_name>/<version_name>/<path:file_path>")
+async def review_path(session: routes.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
+    """Show the status of all checks for a specific file."""
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
+    async with db.session() as data:
+        # Check that the release exists
+        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+
+        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / file_path)
+
+        # Check that the file exists
+        if not await aiofiles.os.path.exists(full_path):
+            raise base.ASFQuartException("File does not exist", errorcode=404)
+
+        modified = int(await aiofiles.os.path.getmtime(full_path))
+        file_size = await aiofiles.os.path.getsize(full_path)
+
+        # Get the most recent task for each task type
+        recent_tasks = await db.recent_tasks(data, f"{project_name}-{version_name}", file_path, modified)
+
+        # Convert to a list for the template
+        tasks = list(recent_tasks.values())
+
+        all_tasks_completed = all(
+            task.status in (models.TaskStatus.COMPLETED, models.TaskStatus.FAILED) for task in tasks
+        )
+
+    file_data = {
+        "filename": pathlib.Path(file_path).name,
+        "bytes_size": file_size,
+        "uploaded": datetime.datetime.fromtimestamp(modified, tz=datetime.UTC),
+    }
+
+    return await quart.render_template(
+        "draft-review-path.html",
+        project_name=project_name,
+        version_name=version_name,
+        file_path=file_path,
+        package=file_data,
+        release=release,
+        tasks=tasks,
+        all_tasks_completed=all_tasks_completed,
+        format_file_size=routes.format_file_size,
     )
 
 
