@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
 import functools
 import logging
 import time
@@ -265,6 +266,11 @@ def app_route_performance_measure(route_path: str, http_methods: list[str] | Non
     return decorator
 
 
+def format_datetime(timestamp: int) -> str:
+    """Format a Unix timestamp into a human readable datetime string."""
+    return datetime.datetime.fromtimestamp(timestamp, tz=datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+
+
 def format_file_size(size_in_bytes: int) -> str:
     """Format a file size with appropriate units and comma-separated digits."""
     # Format the raw bytes with commas
@@ -282,6 +288,48 @@ def format_file_size(size_in_bytes: int) -> str:
         return f"{size_in_kb:,} KB ({formatted_bytes} bytes)"
     else:
         return f"{formatted_bytes} bytes"
+
+
+def format_permissions(mode: int) -> str:
+    """Format Unix file permissions in ls -l style."""
+    # File type
+    if mode & 0o040000:
+        # Directory
+        perms = "d"
+    elif mode & 0o0100000:
+        # Regular file
+        perms = "-"
+    elif mode & 0o020000:
+        # Character special
+        perms = "c"
+    elif mode & 0o060000:
+        # Block special
+        perms = "b"
+    elif mode & 0o010000:
+        # FIFO
+        perms = "p"
+    elif mode & 0o0140000:
+        # Socket
+        perms = "s"
+    else:
+        perms = "?"
+
+    # Owner permissions
+    perms += "r" if mode & 0o400 else "-"
+    perms += "w" if mode & 0o200 else "-"
+    perms += "x" if mode & 0o100 else "-"
+
+    # Group permissions
+    perms += "r" if mode & 0o040 else "-"
+    perms += "w" if mode & 0o020 else "-"
+    perms += "x" if mode & 0o010 else "-"
+
+    # Others permissions
+    perms += "r" if mode & 0o004 else "-"
+    perms += "w" if mode & 0o002 else "-"
+    perms += "x" if mode & 0o001 else "-"
+
+    return perms
 
 
 async def get_form(request: quart.Request) -> datastructures.MultiDict:

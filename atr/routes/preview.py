@@ -22,6 +22,7 @@ import logging
 import aiofiles.os
 import aioshutil
 import asfquart
+import asfquart.base as base
 import quart
 import werkzeug.wrappers.response as response
 import wtforms
@@ -197,6 +198,33 @@ async def review(session: routes.CommitterSession) -> str:
     return await quart.render_template(
         "preview-review.html",
         previews=user_previews,
+    )
+
+
+@routes.committer("/preview/viewer/<project_name>/<version_name>")
+async def viewer(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+    """Show all the files in the rsync upload directory for a release."""
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        return await session.redirect(review, error="You do not have access to this project")
+
+    # Check that the release exists
+    async with db.session() as data:
+        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+
+    # Convert async generator to list
+    file_stats = [stat async for stat in util.content_list(util.get_release_preview_dir(), project_name, version_name)]
+
+    return await quart.render_template(
+        "phase-viewer.html",
+        file_stats=file_stats,
+        release=release,
+        format_datetime=routes.format_datetime,
+        format_file_size=routes.format_file_size,
+        format_permissions=routes.format_permissions,
+        phase="release preview",
     )
 
 

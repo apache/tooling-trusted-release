@@ -18,7 +18,7 @@
 import dataclasses
 import hashlib
 import pathlib
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from typing import Annotated, Any, TypeVar
 
 import aiofiles.os
@@ -62,6 +62,16 @@ class DictToList:
         )
 
 
+@dataclasses.dataclass
+class FileStat:
+    path: str
+    modified: int
+    size: int
+    permissions: int
+    is_file: bool
+    is_dir: bool
+
+
 class QuartFormTyped(quart_wtf.QuartForm):
     """Quart form with type annotations."""
 
@@ -99,6 +109,21 @@ async def compute_sha512(file_path: pathlib.Path) -> str:
         while chunk := await f.read(4096):
             sha512.update(chunk)
     return sha512.hexdigest()
+
+
+async def content_list(phase_subdir: pathlib.Path, project_name: str, version_name: str) -> AsyncGenerator[FileStat]:
+    """List all the files in the given path."""
+    base_path = phase_subdir / project_name / version_name
+    for path in await paths_recursive(base_path):
+        stat = await aiofiles.os.stat(base_path / path)
+        yield FileStat(
+            path=str(path),
+            modified=int(stat.st_mtime),
+            size=stat.st_size,
+            permissions=stat.st_mode,
+            is_file=bool(stat.st_mode & 0o0100000),
+            is_dir=bool(stat.st_mode & 0o040000),
+        )
 
 
 async def file_sha3(path: str) -> str:

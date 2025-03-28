@@ -56,6 +56,22 @@ class AddProtocol(Protocol):
     project_name: wtforms.SelectField
 
 
+class DeleteForm(util.QuartFormTyped):
+    """Form for deleting a candidate draft."""
+
+    candidate_draft_name = wtforms.StringField(
+        "Candidate draft name", validators=[wtforms.validators.InputRequired("Candidate draft name is required")]
+    )
+    confirm_delete = wtforms.StringField(
+        "Confirmation",
+        validators=[
+            wtforms.validators.InputRequired("Confirmation is required"),
+            wtforms.validators.Regexp("^DELETE$", message="Please type DELETE to confirm"),
+        ],
+    )
+    submit = wtforms.SubmitField("Delete candidate draft")
+
+
 async def _number_of_release_files(release: models.Release) -> int:
     """Return the number of files in the release."""
     path_project = release.project.name
@@ -232,22 +248,6 @@ async def add_project(
     )
 
 
-class DeleteForm(util.QuartFormTyped):
-    """Form for deleting a candidate draft."""
-
-    candidate_draft_name = wtforms.StringField(
-        "Candidate draft name", validators=[wtforms.validators.InputRequired("Candidate draft name is required")]
-    )
-    confirm_delete = wtforms.StringField(
-        "Confirmation",
-        validators=[
-            wtforms.validators.InputRequired("Confirmation is required"),
-            wtforms.validators.Regexp("^DELETE$", message="Please type DELETE to confirm"),
-        ],
-    )
-    submit = wtforms.SubmitField("Delete candidate draft")
-
-
 @routes.committer("/draft/delete", methods=["POST"])
 async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a candidate draft and all its associated files."""
@@ -353,7 +353,7 @@ async def files(session: routes.CommitterSession, project_name: str, version_nam
         path_tasks[path] = await db.recent_tasks(data, f"{project_name}-{version_name}", str(path), path_modified[path])
 
     return await quart.render_template(
-        "draft-list.html",
+        "draft-files.html",
         asf_id=session.uid,
         project_name=project_name,
         version_name=version_name,
@@ -637,6 +637,35 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
         file_data=file_data,
         release=release,
         format_file_size=routes.format_file_size,
+    )
+
+
+@routes.committer("/draft/viewer/<project_name>/<version_name>")
+async def viewer(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+    """Show all the files in the rsync upload directory for a release."""
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        return await session.redirect(add, error="You do not have access to this project")
+
+    # Check that the release exists
+    async with db.session() as data:
+        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+
+    # Convert async generator to list
+    file_stats = [
+        stat async for stat in util.content_list(util.get_release_candidate_draft_dir(), project_name, version_name)
+    ]
+
+    return await quart.render_template(
+        "phase-viewer.html",
+        file_stats=file_stats,
+        release=release,
+        format_datetime=routes.format_datetime,
+        format_file_size=routes.format_file_size,
+        format_permissions=routes.format_permissions,
+        phase="release candidate draft",
     )
 
 
