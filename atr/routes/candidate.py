@@ -17,6 +17,8 @@
 
 """candidate.py"""
 
+import aiofiles.os
+import aioshutil
 import asfquart
 import asfquart.base as base
 import quart
@@ -284,5 +286,12 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
             # data.add(task)
 
             await data.commit()
+
+    # TODO: Obtain a lock for this
+    source = str(util.get_release_candidate_dir() / project_name / release.version)
+    target = str(util.get_release_preview_dir() / project_name / release.version)
+    if await aiofiles.os.path.exists(target):
+        return await session.redirect(resolve, error="Release already exists")
+    await aioshutil.move(source, target)
 
     return await session.redirect(resolve, success=success_message)
