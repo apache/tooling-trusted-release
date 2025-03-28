@@ -137,7 +137,7 @@
           <div class="card-body position-relative">
             <p class="card-text">
               {% if number_of_release_files(release) > 0 %}
-                This candidate draft has <a href="{{ as_url(routes.draft.files, project_name=release.project.name, version_name=release.version) }}">{{ number_of_release_files(release) }} file(s)</a>.
+                This candidate draft has <a href="{{ as_url(routes.draft.review, project_name=release.project.name, version_name=release.version) }}">{{ number_of_release_files(release) }} file(s)</a>.
               {% else %}
                 This candidate draft doesn't have any files yet.
               {% endif %}
