@@ -17,6 +17,9 @@
 
 """user.py"""
 
+import functools
+
+import atr.config as config
 import atr.db as db
 import atr.db.models as models
 import atr.util as util
@@ -30,6 +33,18 @@ async def candidate_drafts(uid: str, user_projects: list[models.Project] | None 
         releases = await p.candidate_drafts
         user_candidate_drafts.extend(releases)
     return user_candidate_drafts
+
+
+@functools.cache
+def get_admin_users() -> set[str]:
+    return set(config.get().ADMIN_USERS)
+
+
+def is_admin(user_id: str | None) -> bool:
+    """Check whether a user is an admin."""
+    if user_id is None:
+        return False
+    return user_id in get_admin_users()
 
 
 def is_committer(committee: models.Committee | None, uid: str) -> bool:

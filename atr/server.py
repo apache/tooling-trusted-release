@@ -38,6 +38,7 @@ import atr.db as db
 import atr.manager as manager
 import atr.preload as preload
 import atr.ssh as ssh
+import atr.user as user
 import atr.util as util
 
 # TODO: Technically this is a global variable
@@ -132,17 +133,15 @@ def app_setup_context(app: base.QuartApp) -> None:
 
     @app.context_processor
     async def app_wide() -> dict[str, Any]:
-        import atr.db.service as service
         import atr.metadata as metadata
         import atr.routes.modules as modules
-        import atr.util as util
 
         return {
             "as_url": util.as_url,
             "commit": metadata.commit,
             "current_user": await asfquart.session.read(),
-            "is_admin_fn": util.is_admin,
-            "is_project_lead_fn": service.is_project_lead,
+            "is_admin_fn": user.is_admin,
+            "is_committee_member_fn": user.is_committee_member,
             "routes": modules,
             "version": metadata.version,
         }

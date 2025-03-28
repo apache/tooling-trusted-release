@@ -16,7 +16,6 @@
 # under the License.
 
 import dataclasses
-import functools
 import hashlib
 import pathlib
 from collections.abc import Callable, Mapping, Sequence
@@ -111,11 +110,6 @@ async def file_sha3(path: str) -> str:
     return sha3.hexdigest()
 
 
-@functools.cache
-def get_admin_users() -> set[str]:
-    return set(config.get().ADMIN_USERS)
-
-
 def get_phase_dir() -> pathlib.Path:
     return pathlib.Path(config.get().PHASE_STORAGE_DIR)
 
@@ -134,13 +128,6 @@ def get_release_preview_dir() -> pathlib.Path:
 
 def get_release_dir() -> pathlib.Path:
     return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "release"
-
-
-def is_admin(user_id: str | None) -> bool:
-    """Check whether a user is an admin."""
-    if user_id is None:
-        return False
-    return user_id in get_admin_users()
 
 
 async def paths_recursive(base_path: pathlib.Path, sort: bool = True) -> list[pathlib.Path]:

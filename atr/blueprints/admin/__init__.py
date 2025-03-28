@@ -24,7 +24,7 @@ import asfquart.base as base
 import asfquart.session as session
 import quart
 
-import atr.util as util
+import atr.user as user
 
 BLUEPRINT: Final = quart.Blueprint("admin", __name__, url_prefix="/admin", template_folder="templates")
 
@@ -37,7 +37,7 @@ async def before_request_func() -> None:
         if web_session is None:
             raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-        if web_session.uid not in util.get_admin_users():
+        if web_session.uid not in user.get_admin_users():
             raise base.ASFQuartException("You are not authorized to access the admin interface", errorcode=403)
 
     await check_logged_in()

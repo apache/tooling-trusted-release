@@ -26,8 +26,8 @@ import wtforms
 
 import atr.db as db
 import atr.db.models as models
-import atr.db.service as service
 import atr.routes as routes
+import atr.user as user
 import atr.util as util
 
 
@@ -86,10 +86,7 @@ async def vote_policy_add(session: routes.CommitterSession, project_name: str) -
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
         )
 
-        if project.committee is None:
-            base.ASFQuartException(f"Committee for project {project_name} not found", errorcode=404)
-
-        if not (service.is_project_lead(project, uid) or util.is_admin(uid)):
+        if not (user.is_committee_member(project.committee, uid) or user.is_admin(uid)):
             raise base.ASFQuartException(
                 f"You must be a committee member of {project.display_name} to submit a voting policy", errorcode=403
             )
@@ -122,7 +119,7 @@ async def vote_policy_edit(session: routes.CommitterSession, project_name: str) 
         if project.vote_policy is None:
             base.ASFQuartException(f"Vote Policy for project {project_name} does not exist", errorcode=404)
 
-        if not (service.is_project_lead(project, uid) or util.is_admin(uid)):
+        if not (user.is_committee_member(project.committee, uid) or user.is_admin(uid)):
             raise base.ASFQuartException(
                 f"You must be a committee member of {project.display_name} to submit a voting policy", errorcode=403
             )
