@@ -208,7 +208,7 @@ async def add_project(
     if await form.validate_on_submit():
         try:
             file_path = None
-            if isinstance(form.file_path.data, str):
+            if isinstance(form.file_path.data, str) and form.file_path.data:
                 file_path = pathlib.Path(form.file_path.data)
             file_data = form.file_data.data
             if not isinstance(file_data, datastructures.FileStorage):
