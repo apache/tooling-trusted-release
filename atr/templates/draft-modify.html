@@ -31,14 +31,21 @@
             {% if release.project.committee %}
               <h6 class="card-subtitle mb-2 text-muted">{{ release.project.committee.display_name }}</h6>
             {% endif %}
-            <p class="card-text">
+            <div class="d-flex gap-2">
+              <a href="{{ as_url(routes.draft.files, project_name=release.project.name, version_name=release.version) }}"
+                 class="btn btn-sm btn-outline-primary">Checks and actions</a>
+              <a href="{{ as_url(routes.draft.viewer, project_name=release.project.name, version_name=release.version) }}"
+                 class="btn btn-sm btn-outline-primary">View files</a>
+              <a href="{{ as_url(routes.draft.add_project, project_name=release.project.name, version_name=release.version) }}"
+                 class="btn btn-sm btn-outline-primary">Upload file</a>
+            </div>
+            <p class="card-text mt-3">
               {% if number_of_release_files(release) > 0 %}
-                This candidate draft has <a href="{{ as_url(routes.draft.files, project_name=release.project.name, version_name=release.version) }}">{{ number_of_release_files(release) }} file(s)</a>.
+                This candidate draft has {{ number_of_release_files(release) }} file(s).
               {% else %}
                 This candidate draft doesn't have any files yet.
               {% endif %}
-              <a href="{{ as_url(routes.draft.add_project, project_name=release.project.name, version_name=release.version) }}">Upload a file using the browser</a>,
-              or use the command below to add or modify files in this draft:
+              Use the command below to add or modify files in this draft:
             </p>
           </div>
           <div class="card-footer bg-light border-1 pt-4 pb-4 position-relative">

@@ -37,6 +37,10 @@
             <span class="release-meta-item">Phase: {{ release.phase.value.upper() }}</span>
             <span class="release-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M UTC") }}</span>
           </div>
+          <div class="d-flex gap-3 align-items-center pt-2">
+            <a class="btn btn-outline-primary"
+               href="{{ as_url(routes.release.viewer, project_name=release.project.name, version_name=release.version) }}">View files</a>
+          </div>
           <!--
           <div class="d-flex gap-3 align-items-center pt-2">
             <a class="btn btn-primary" href="[[ as_url{routes.release.review_detail, release_id=release.id} ]]">Review release</a>
