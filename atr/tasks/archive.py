@@ -25,6 +25,7 @@ import pydantic
 
 import atr.db.models as models
 import atr.tasks.task as task
+import atr.util as util
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -42,6 +43,16 @@ async def check_integrity(args: dict[str, Any]) -> tuple[models.TaskStatus, str 
     # Then we can have a single task wrapper for all tasks
     # TODO: We should use task.TaskError as standard, and maybe typeguard each function
     data = CheckIntegrity(**args)
+    # TODO: Check arguments should have release_name and path as standard
+    # Followed by any necessary additional arguments
+    release_name, rel_path = util.abs_path_to_release_and_rel_path(data.path)
+    check = await task.Check.create(checker=check_integrity, release_name=release_name, path=rel_path)
+    try:
+        size = await asyncio.to_thread(_check_integrity_core, data.path, data.chunk_size)
+        await check.success("Able to read all entries of the archive using tarfile", {"size": size})
+    except Exception as e:
+        await check.failure("Unable to read all entries of the archive using tarfile", {"error": str(e)})
+        return task.FAILED, str(e), ()
     task_results = task.results_as_tuple(await asyncio.to_thread(_check_integrity_core, data.path, data.chunk_size))
     _LOGGER.info(f"Verified {data.path} and computed size {task_results[0]}")
     return task.COMPLETED, None, task_results

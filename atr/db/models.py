@@ -329,6 +329,9 @@ class Release(sqlmodel.SQLModel, table=True):
         back_populates="release", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
 
+    # One-to-many: A release can have multiple check results
+    check_results: list["CheckResult"] = sqlmodel.Relationship(back_populates="release")
+
     # The combination of project_id and version must be unique
     # Technically we want (project.name, version) to be unique
     # But project.name is already unique, so project_id works as a proxy thereof
@@ -353,3 +356,22 @@ class SSHKey(sqlmodel.SQLModel, table=True):
     fingerprint: str = sqlmodel.Field(primary_key=True)
     key: str
     asf_uid: str
+
+
+class CheckResultStatus(str, enum.Enum):
+    EXCEPTION = "exception"
+    FAILURE = "failure"
+    SUCCESS = "success"
+    WARNING = "warning"
+
+
+class CheckResult(sqlmodel.SQLModel, table=True):
+    id: int = sqlmodel.Field(default=None, primary_key=True)
+    release_name: str = sqlmodel.Field(foreign_key="release.name")
+    release: Release = sqlmodel.Relationship(back_populates="check_results")
+    checker: str
+    path: str | None = None
+    created: datetime.datetime
+    status: CheckResultStatus
+    message: str
+    data: Any = sqlmodel.Field(sa_column=sqlalchemy.Column(sqlalchemy.JSON))

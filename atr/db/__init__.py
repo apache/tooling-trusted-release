@@ -114,6 +114,43 @@ class Query(Generic[T]):
 
 class Session(sqlalchemy.ext.asyncio.AsyncSession):
     # TODO: Need to type all of these arguments correctly
+
+    def check_result(
+        self,
+        id: Opt[int] = NotSet,
+        release_name: Opt[str] = NotSet,
+        checker: Opt[str] = NotSet,
+        path: Opt[str | None] = NotSet,
+        created: Opt[datetime.datetime] = NotSet,
+        status: Opt[models.CheckResultStatus] = NotSet,
+        message: Opt[str] = NotSet,
+        data: Opt[Any] = NotSet,
+        _release: bool = False,
+    ) -> Query[models.CheckResult]:
+        query = sqlmodel.select(models.CheckResult)
+
+        if is_defined(id):
+            query = query.where(models.CheckResult.id == id)
+        if is_defined(release_name):
+            query = query.where(models.CheckResult.release_name == release_name)
+        if is_defined(checker):
+            query = query.where(models.CheckResult.checker == checker)
+        if is_defined(path):
+            query = query.where(models.CheckResult.path == path)
+        if is_defined(created):
+            query = query.where(models.CheckResult.created == created)
+        if is_defined(status):
+            query = query.where(models.CheckResult.status == status)
+        if is_defined(message):
+            query = query.where(models.CheckResult.message == message)
+        if is_defined(data):
+            query = query.where(models.CheckResult.data == data)
+
+        if _release:
+            query = query.options(select_in_load(models.CheckResult.release))
+
+        return Query(self, query)
+
     def committee(
         self,
         id: Opt[int] = NotSet,
