@@ -38,7 +38,9 @@ import sqlmodel
 import atr.db as db
 import atr.db.models as models
 import atr.tasks.bulk as bulk
-import atr.tasks.hashing as hashing
+import atr.tasks.checks as checks
+import atr.tasks.checks.archive as archive
+import atr.tasks.checks.hashing as hashing
 import atr.tasks.license as license
 import atr.tasks.mailtest as mailtest
 import atr.tasks.rat as rat
@@ -181,22 +183,18 @@ async def _task_result_process(
 
 async def _task_process(task_id: int, task_type: str, task_args: list[str] | dict[str, Any]) -> None:
     """Process a claimed task."""
-    import atr.tasks.checks as checks
-    import atr.tasks.checks.archive as checks_archive
-
     _LOGGER.info(f"Processing task {task_id} ({task_type}) with args {task_args}")
     try:
         # Map task types to their handler functions
         modern_task_handlers: dict[str, Callable[..., Awaitable[str | None]]] = {
-            checks.function_key(checks_archive.integrity): checks_archive.integrity,
-            checks.function_key(checks_archive.structure): checks_archive.structure,
+            checks.function_key(archive.integrity): archive.integrity,
+            checks.function_key(archive.structure): archive.structure,
+            checks.function_key(hashing.check): hashing.check,
         }
         # TODO: We should use a decorator to register these automatically
         dict_task_handlers = {
-            # "verify_archive_integrity": archive.check_integrity,
             "package_bulk_download": bulk.download,
             "rsync_analyse": rsync.analyse,
-            "verify_file_hash": hashing.check,
         }
         # TODO: These are synchronous
         # We plan to convert these to async dict handlers

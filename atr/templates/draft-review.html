@@ -94,10 +94,8 @@
                        class="btn btn-sm btn-outline-primary fs-6">Download</a>
                     <a href="{{ as_url(routes.draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
                        class="btn btn-sm btn-outline-primary fs-6 small ms-2">Tools</a>
-                    {% if path in tasks and tasks[path]|length > 0 %}
-                      <a href="{{ as_url(routes.draft.review_path, project_name=project_name, version_name=version_name, file_path=path) }}"
-                         class="btn btn-sm btn-outline-primary fs-6 small ms-2">Review file</a>
-                    {% endif %}
+                    <a href="{{ as_url(routes.draft.review_path, project_name=project_name, version_name=version_name, file_path=path) }}"
+                       class="btn btn-sm btn-outline-primary fs-6 small ms-2">Review file</a>
                   </td>
                 </tr>
               {% endfor %}

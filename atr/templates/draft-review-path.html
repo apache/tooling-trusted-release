@@ -31,31 +31,31 @@
 
   <h2>Verification tasks</h2>
 
-  {% if tasks %}
+  {% if check_results %}
     <div class="d-flex align-items-center p-3 mb-3 bg-light border rounded">
       <span class="fw-bold me-3">Status summary:</span>
       <div class="d-flex flex-wrap gap-3">
         {% with %}
           {% set status_counts = {
-                      "completed": tasks|selectattr("status.value", "equalto", "completed")|list|length,
-                      "failed": tasks|selectattr("status.value", "equalto", "failed")|list|length,
-                      "active": tasks|selectattr("status.value", "equalto", "active")|list|length,
-                      "queued": tasks|selectattr("status.value", "equalto", "queued")|list|length
+                      "success": check_results|selectattr("status.value", "equalto", "success")|list|length,
+                      "failure": check_results|selectattr("status.value", "equalto", "failure")|list|length,
+                      "warning": check_results|selectattr("status.value", "equalto", "warning")|list|length,
+                      "exception": check_results|selectattr("status.value", "equalto", "exception")|list|length
                     } %}
 
           {% for status, count in status_counts.items() %}
             {% if count > 0 %}
-              <div class="d-flex align-items-center gap-2 px-3 py-2 rounded fw-medium {% if status == "completed" %}bg-success-subtle border border-success-subtle {% elif status == "failed" %}bg-danger-subtle border border-danger-subtle {% elif status == "active" %}bg-info-subtle border border-info-subtle {% else %}bg-light border{% endif %}">
+              <div class="d-flex align-items-center gap-2 px-3 py-2 rounded fw-medium {% if status == "success" %}bg-success-subtle border border-success-subtle {% elif status == "failure" %}bg-danger-subtle border border-danger-subtle {% elif status == "warning" %}bg-warning-subtle border border-warning-subtle {% elif status == "exception" %}bg-danger-subtle border border-danger-subtle {% endif %}">
                 <span class="fs-5">{{ count }}</span>
                 <span>
-                  {%- if status == "queued" -%}
-                    Pending
-                  {%- elif status == "active" -%}
-                    Running
-                  {%- elif status == "completed" -%}
+                  {%- if status == "success" -%}
                     Passed
-                  {%- elif status == "failed" -%}
+                  {%- elif status == "failure" -%}
                     Issues
+                  {%- elif status == "warning" -%}
+                    Warning
+                  {%- elif status == "exception" -%}
+                    Error
                   {%- else -%}
                     {{ status|title }}
                   {%- endif -%}
@@ -70,55 +70,59 @@
 
   <div class="d-flex gap-3 mb-3">
     <button type="button" onclick="toggleAllDetails()" class="btn btn-secondary">Toggle all details</button>
-    {% if tasks and all_tasks_completed %}
-      <!-- Currently there's no direct way to restart file checks through the UI -->
-    {% endif %}
+    <!-- TODO: Currently there's no direct way to restart file checks through the UI -->
   </div>
 
   <div class="mb-3">
-    {% if tasks %}
-      {% for task in tasks %}
+    {% if check_results %}
+      {% for check_result in check_results %}
         <div class="border border-2 rounded p-3 mb-3">
           <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="fw-bold">{{ task.task_type.replace('_', ' ').replace("verify ", "").title() }}</span>
-            <span class="badge rounded-pill {% if task.status.value == "queued" %}bg-secondary {% elif task.status.value == "active" %}bg-info {% elif task.status.value == "completed" %}bg-success {% elif task.status.value == "failed" %}bg-danger {% else %}bg-secondary{% endif %}">
-              {%- if task.status.value == "queued" -%}
-                Pending
-              {%- elif task.status.value == "active" -%}
-                Running
-              {%- elif task.status.value == "completed" -%}
+            <span class="fw-bold">{{ function_name_from_key(check_result.checker) }}</span>
+            <span class="badge rounded-pill {% if check_result.status.value == "success" %}bg-success {% elif check_result.status.value == "failure" %}bg-danger {% elif check_result.status.value == "warning" %}bg-warning {% elif check_result.status.value == "exception" %}bg-danger {% else %}bg-secondary{% endif %}">
+              {%- if check_result.status.value == "success" -%}
                 Passed
-              {%- elif task.status.value == "failed" -%}
+              {%- elif check_result.status.value == "failure" -%}
                 Issue
+              {%- elif check_result.status.value == "warning" -%}
+                Warning
+              {%- elif check_result.status.value == "exception" -%}
+                Error
               {%- else -%}
-                {{ task.status.value }}
+                {{ check_result.status.value|title }}
               {%- endif -%}
             </span>
           </div>
           <div class="small">
-            <div>Started: {{ task.started.strftime("%Y-%m-%d %H:%M UTC") if task.started else "Not started" }}</div>
-            <div>Completed: {{ task.completed.strftime("%Y-%m-%d %H:%M UTC") if task.completed else "Not completed" }}</div>
-            {% if task.result and task.result[0] is mapping and task.result|length == 1 %}
+            <div>
+              Checked: {{ check_result.created.strftime("%Y-%m-%d %H:%M UTC") if check_result.created else "Not checked" }}
+            </div>
+
+            {% if check_result.message %}<div class="mt-2">{{ check_result.message }}</div>{% endif %}
+
+            {% if check_result.data is mapping %}
               <details class="mt-2 p-2 bg-light rounded">
-                {% if task.error %}
-                  <summary class="atr-cursor-pointer user-select-none p-2">Issue: {{ task.error }}</summary>
+                {% if check_result.status.value in ["failure", "exception"] %}
+                  <summary class="atr-cursor-pointer user-select-none p-2">View details ({{ check_result.status.value|title }})</summary>
+                {% elif check_result.status.value == "warning" %}
+                  <summary class="atr-cursor-pointer user-select-none p-2">View details (Warning)</summary>
                 {% else %}
                   <summary class="atr-cursor-pointer user-select-none p-2">View detailed results</summary>
                 {% endif %}
 
-                {% if task.task_type == "verify_rat_license" and task.result[0] is mapping %}
+                {% if check_result.checker.endswith("rat.check_licenses") %}
                   <div class="d-flex gap-3 mb-2">
                     <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle px-2 py-1">
-                      <strong>{{ task.result[0].approved_licenses }}</strong> files with approved licenses
+                      <strong>{{ check_result.data.get('approved_licenses', 0) }}</strong> files with approved licenses
                     </span>
-                    {% if task.result[0].unapproved_licenses > 0 %}
+                    {% if check_result.data.get("unapproved_licenses", 0) > 0 %}
                       <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle px-2 py-1">
-                        <strong>{{ task.result[0].unapproved_licenses }}</strong> files with unapproved licenses
+                        <strong>{{ check_result.data.get('unapproved_licenses', 0) }}</strong> files with unapproved licenses
                       </span>
                     {% endif %}
-                    {% if task.result[0].unknown_licenses > 0 %}
+                    {% if check_result.data.get("unknown_licenses", 0) > 0 %}
                       <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
-                        <strong>{{ task.result[0].unknown_licenses }}</strong> files with unknown licenses
+                        <strong>{{ check_result.data.get('unknown_licenses', 0) }}</strong> files with unknown licenses
                       </span>
                     {% endif %}
                   </div>
@@ -126,10 +130,10 @@
 
                 <table class="table table-bordered mt-2">
                   <tbody>
-                    {% for key, value in task.result[0].items() %}
+                    {% for key, value in check_result.data.items() %}
                       {% if key != "debug_info" %}
                         <tr>
-                          <th class="bg-light fw-bold">{{ key|replace('_', ' ') |title }}</th>
+                          <th class="bg-light fw-bold align-top">{{ key|replace('_', ' ') |title }}</th>
                           <td>
                             {% if value is boolean %}
                               {{ "Yes" if value else "No" }}
@@ -175,13 +179,6 @@
                   </tbody>
                 </table>
               </details>
-            {% else %}
-              {% if task.error %}<div class="mt-2 p-2 bg-light rounded">Issue: {{ task.error }}</div>{% endif %}
-              {% if task.result %}
-                <div class="mt-2 p-2 bg-light rounded">
-                  <pre class="mb-0">{{ task.result }}</pre>
-                </div>
-              {% endif %}
             {% endif %}
           </div>
         </div>
@@ -205,3 +202,7 @@
       }
   </script>
 {% endblock javascripts %}
+
+{% macro function_name_from_key(key) -%}
+  {{- key.split(".")[-1] .replace("_", " ") | title -}}
+{%- endmacro %}

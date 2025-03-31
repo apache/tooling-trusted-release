@@ -580,15 +580,21 @@ async def review_path(session: routes.CommitterSession, project_name: str, versi
         modified = int(await aiofiles.os.path.getmtime(full_path))
         file_size = await aiofiles.os.path.getsize(full_path)
 
-        # Get the most recent task for each task type
-        recent_tasks = await db.recent_tasks(data, f"{project_name}-{version_name}", file_path, modified)
+        # Get all check results for this file
+        query = data.check_result(release_name=release.name, path=file_path).order_by(
+            db.validate_instrumented_attribute(models.CheckResult.checker).asc(),
+            db.validate_instrumented_attribute(models.CheckResult.created).desc(),
+        )
+        all_results = await query.all()
+
+        # Filter to get only the most recent result for each checker
+        latest_check_results: dict[str, models.CheckResult] = {}
+        for result in all_results:
+            if result.checker not in latest_check_results:
+                latest_check_results[result.checker] = result
 
         # Convert to a list for the template
-        tasks = list(recent_tasks.values())
-
-        all_tasks_completed = all(
-            task.status in (models.TaskStatus.COMPLETED, models.TaskStatus.FAILED) for task in tasks
-        )
+        check_results_list = list(latest_check_results.values())
 
     file_data = {
         "filename": pathlib.Path(file_path).name,
@@ -603,8 +609,7 @@ async def review_path(session: routes.CommitterSession, project_name: str, versi
         file_path=file_path,
         package=file_data,
         release=release,
-        tasks=tasks,
-        all_tasks_completed=all_tasks_completed,
+        check_results=check_results_list,
         format_file_size=routes.format_file_size,
     )
 

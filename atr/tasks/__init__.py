@@ -20,7 +20,7 @@ import aiofiles.os
 import atr.db.models as models
 import atr.tasks.checks as checks
 import atr.tasks.checks.archive as archive
-import atr.tasks.hashing as hashing
+import atr.tasks.checks.hashing as hashing
 import atr.util as util
 
 
@@ -74,9 +74,12 @@ async def sha_checks(release: models.Release, hash_file: str) -> list[models.Tas
     tasks.append(
         models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type="verify_file_hash",
+            task_type=checks.function_key(hashing.check),
             task_args=hashing.Check(
-                original_file=original_file, hash_file=full_hash_file_path, algorithm=algorithm
+                release_name=release.name,
+                abs_path=original_file,
+                abs_hash_file=full_hash_file_path,
+                algorithm=algorithm,
             ).model_dump(),
             release_name=release.name,
             path=hash_file,
@@ -87,7 +90,7 @@ async def sha_checks(release: models.Release, hash_file: str) -> list[models.Tas
     return tasks
 
 
-async def tar_gz_checks(release: models.Release, path: str, signature_path: str | None = None) -> list[models.Task]:
+async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]:
     # TODO: We should probably use an enum for task_type
     full_path = str(util.get_release_candidate_draft_dir() / release.project.name / release.version / path)
     # filename = os.path.basename(path)
