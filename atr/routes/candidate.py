@@ -321,11 +321,17 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
 
             await data.commit()
 
+    await _resolve_post_files(project_name, release, vote_result)
+    return await session.redirect(resolve, success=success_message)
+
+
+async def _resolve_post_files(project_name: str, release: models.Release, vote_result: str) -> None:
     # TODO: Obtain a lock for this
     source = str(util.get_release_candidate_dir() / project_name / release.version)
-    target = str(util.get_release_preview_dir() / project_name / release.version)
+    if vote_result == "passed":
+        target = str(util.get_release_preview_dir() / project_name / release.version)
+    else:
+        target = str(util.get_release_candidate_draft_dir() / project_name / release.version)
     if await aiofiles.os.path.exists(target):
-        return await session.redirect(resolve, error="Release already exists")
+        raise base.ASFQuartException("Release already exists", errorcode=400)
     await aioshutil.move(source, target)
-
-    return await session.redirect(resolve, success=success_message)
