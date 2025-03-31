@@ -15,16 +15,16 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asyncio
 import datetime
 import email.utils as utils
 import io
 import logging
 import smtplib
-import ssl
 import time
 import uuid
-from typing import Any
 
+import aiosmtplib
 import dkim
 import dns.rdtypes.ANY.MX as MX
 import dns.resolver as resolver
@@ -43,25 +43,6 @@ global_email_contact: str = f"contact@{global_domain}"
 global_secret_key: str | None = None
 
 
-class ArtifactEvent:
-    """Simple data class to represent an artifact send event."""
-
-    def __init__(self, email_recipient: str, artifact_name: str, token: str) -> None:
-        self.artifact_name = artifact_name
-        self.email_recipient = email_recipient
-        self.token = token
-
-
-class LoggingSMTP(smtplib.SMTP):
-    def _print_debug(self, *args: Any) -> None:
-        template = ["%s"] * len(args)
-        if self.debuglevel > 1:
-            template.append("%s")
-            _LOGGER.info(" ".join(template), datetime.datetime.now().time(), *args)
-        else:
-            _LOGGER.info(" ".join(template), *args)
-
-
 class VoteEvent:
     """Data class to represent a release vote event."""
 
@@ -75,7 +56,7 @@ class VoteEvent:
         self.vote_end = vote_end
 
 
-def send(event: ArtifactEvent | VoteEvent) -> None:
+async def send(event: VoteEvent) -> None:
     """Send an email notification about an artifact or a vote."""
     _LOGGER.info(f"Sending email for event: {event}")
     from_addr = global_email_contact
@@ -87,8 +68,7 @@ def send(event: ArtifactEvent | VoteEvent) -> None:
     mid = f"<{uuid.uuid4()}@{global_domain}>"
 
     # Different message format depending on event type
-    if isinstance(event, VoteEvent):
-        msg_text = f"""
+    msg_text = f"""
 From: {from_addr}
 To: {to_addr}
 Subject: {event.subject}
@@ -96,27 +76,6 @@ Date: {utils.formatdate(localtime=True)}
 Message-ID: {mid}
 
 {event.body}
-"""
-    else:
-        # ArtifactEvent
-        # This was just for testing
-        msg_text = f"""
-From: {from_addr}
-To: {to_addr}
-Subject: {event.artifact_name}
-Date: {utils.formatdate(localtime=True)}
-Message-ID: {mid}
-
-The {event.artifact_name} artifact has been uploaded.
-
-The artifact is available for download at:
-
-https://{global_domain}/artifact/{event.token}
-
-If you have any questions, please reply to this email.
-
---\x20
-[NAME GOES HERE]
 """
 
     # Convert Unix line endings to CRLF
@@ -126,7 +85,7 @@ If you have any questions, please reply to this email.
     _LOGGER.info(f"sending message: {msg_text}")
 
     try:
-        _send_many(from_addr, [to_addr], msg_text)
+        await _send_many(from_addr, [to_addr], msg_text)
     except Exception as e:
         _LOGGER.error(f"send error: {e}")
         raise e
@@ -143,10 +102,10 @@ def set_secret_key(key: str) -> None:
     global_secret_key = key
 
 
-def _resolve_mx_records(domain: str) -> list[tuple[str, int]]:
+async def _resolve_mx_records(domain: str) -> list[tuple[str, int]]:
+    """Resolve MX records."""
     try:
-        # Query MX records
-        mx_records = resolver.resolve(domain, "MX")
+        mx_records = await asyncio.to_thread(resolver.resolve, domain, "MX")
         mxs = []
 
         for rdata in mx_records:
@@ -154,7 +113,7 @@ def _resolve_mx_records(domain: str) -> list[tuple[str, int]]:
                 raise ValueError(f"Unexpected MX record type: {type(rdata)}")
             mx = rdata
             mxs.append((mx.exchange.to_text(True), mx.preference))
-        # Sort by preference, array position one
+        # Sort by preference
         mxs.sort(key=lambda x: x[1])
 
         if not mxs:
@@ -164,7 +123,7 @@ def _resolve_mx_records(domain: str) -> list[tuple[str, int]]:
     return mxs
 
 
-def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None:
+async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None:
     """Send an email to multiple recipients with DKIM signing."""
     message_bytes = bytes(msg_text, "utf-8")
 
@@ -195,13 +154,13 @@ def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None:
         if domain == "localhost":
             mxs = [("127.0.0.1", 0)]
         else:
-            mxs = _resolve_mx_records(domain)
+            mxs = await _resolve_mx_records(domain)
 
         # Try each MX server
         errors = []
         for mx_host, _ in mxs:
             try:
-                _send_one(mx_host, from_addr, addr, dkim_reader)
+                await _send_one(mx_host, from_addr, addr, dkim_reader)
                 # Success, no need to try other MX servers
                 break
             except Exception as e:
@@ -213,7 +172,7 @@ def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None:
             raise Exception("; ".join(errors))
 
 
-def _send_one(mx_host: str, from_addr: str, to_addr: str, msg_reader: io.StringIO) -> None:
+async def _send_one(mx_host: str, from_addr: str, to_addr: str, msg_reader: io.StringIO) -> None:
     """Send an email to a single recipient via the ASF mail relay."""
     default_timeout_seconds = 30
     _validate_recipient(to_addr)
@@ -222,28 +181,29 @@ def _send_one(mx_host: str, from_addr: str, to_addr: str, msg_reader: io.StringI
         # Connect to the ASF mail relay
         # TODO: Use asfpy for sending mail
         mail_relay = "mail-relay.apache.org"
-        _LOGGER.info(f"Connecting to {mail_relay}:587")
-        smtp = LoggingSMTP(mail_relay, 587, timeout=default_timeout_seconds)
-        smtp.set_debuglevel(2)
+        _LOGGER.info(f"Connecting async to {mail_relay}:587")
+        smtp = aiosmtplib.SMTP(hostname=mail_relay, port=587, timeout=default_timeout_seconds)
+        await smtp.connect()
+        _LOGGER.info(f"Connected to {smtp.hostname}:{smtp.port}")
 
         # Identify ourselves to the server
-        smtp.ehlo(global_domain)
+        await smtp.ehlo()
 
-        # Use STARTTLS for port 587
-        context = ssl.create_default_context()
-        context.minimum_version = ssl.TLSVersion.TLSv1_2
-        smtp.starttls(context=context)
-        smtp.ehlo(global_domain)
+        # # Use STARTTLS for port 587
+        # context = ssl.create_default_context()
+        # context.minimum_version = ssl.TLSVersion.TLSv1_2
+        # await smtp.starttls(tls_context=context)
+        await smtp.ehlo()
 
         # Send the message
-        smtp.mail(from_addr)
-        smtp.rcpt(to_addr)
-        smtp.data(msg_reader.read())
+        await smtp.sendmail(from_addr, [to_addr], msg_reader.read())
 
         # Close the connection
-        smtp.quit()
+        await smtp.quit()
 
     except (OSError, smtplib.SMTPException) as e:
+        # TODO: Check whether aiosmtplib raises different exceptions
+        _LOGGER.error(f"Async SMTP error: {e}")
         raise Exception(f"SMTP error: {e}")
 
 

@@ -44,7 +44,6 @@ import atr.tasks.checks.hashing as hashing
 import atr.tasks.checks.license as license
 import atr.tasks.checks.rat as rat
 import atr.tasks.checks.signature as signature
-import atr.tasks.mailtest as mailtest
 import atr.tasks.rsync as rsync
 import atr.tasks.sbom as sbom
 import atr.tasks.task as task
@@ -195,6 +194,7 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
             checks.function_key(rat.check): rat.check,
             checks.function_key(signature.check): signature.check,
             checks.function_key(rsync.analyse): rsync.analyse,
+            checks.function_key(vote.initiate): vote.initiate,
         }
         # TODO: We should use a decorator to register these automatically
         dict_task_handlers = {
@@ -204,8 +204,6 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
         # We plan to convert these to async dict handlers
         list_task_handlers = {
             "generate_cyclonedx_sbom": sbom.generate_cyclonedx,
-            "mailtest_send": mailtest.send,
-            "vote_initiate": vote.initiate,
         }
 
         task_results: tuple[Any, ...]
@@ -224,6 +222,7 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
                 task_results = tuple()
                 status = task.FAILED
                 error = str(e)
+                _LOGGER.exception(f"Task {task_id} ({task_type}) failed: {e}")
         elif isinstance(task_args, dict):
             dict_handler = dict_task_handlers.get(task_type)
             if not dict_handler:

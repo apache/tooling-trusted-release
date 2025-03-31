@@ -12,6 +12,7 @@ requires-python = "~=3.13"
 dependencies = [
   "aiofiles>=24.1.0,<25.0.0",
   "aioshutil (>=1.5,<2.0)",
+  "aiosmtplib (>=4.0.0,<5.0.0)",
   "aiosqlite>=0.21.0,<0.22.0",
   "alembic~=1.14",
   "asfquart @ git+https://github.com/apache/infrastructure-asfquart.git@main",

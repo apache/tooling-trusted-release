@@ -15,14 +15,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import dataclasses
 import datetime
 import logging
 import os
 from typing import Any, Final
 
-import atr.db.models as models
-import atr.tasks.task as task
+import aiofiles
+import pydantic
+
+import atr.db as db
+import atr.mail as mail
+import atr.tasks.checks as checks
 
 # Configure detailed logging
 _LOGGER: Final = logging.getLogger(__name__)
@@ -46,147 +49,96 @@ _LOGGER.propagate = False
 _LOGGER.info("Vote module imported")
 
 
-@dataclasses.dataclass
-class Args:
-    """Arguments for the vote_initiate task."""
-
-    release_name: str
-    email_to: str
-    vote_duration: str
-    gpg_key_id: str
-    commit_hash: str
-    initiator_id: str
-
-    @staticmethod
-    def from_list(args: list[str]) -> "Args":
-        """Parse task arguments."""
-        _LOGGER.debug(f"Parsing arguments: {args}")
-
-        if len(args) != 6:
-            _LOGGER.error(f"Invalid number of arguments: {len(args)}, expected 6")
-            raise ValueError("Invalid number of arguments")
-
-        release_name = args[0]
-        email_to = args[1]
-        vote_duration = args[2]
-        gpg_key_id = args[3]
-        commit_hash = args[4]
-        initiator_id = args[5]
-
-        # Type checking
-        for arg_name, arg_value in [
-            ("release_name", release_name),
-            ("email_to", email_to),
-            ("vote_duration", vote_duration),
-            ("gpg_key_id", gpg_key_id),
-            ("commit_hash", commit_hash),
-            ("initiator_id", initiator_id),
-        ]:
-            if not isinstance(arg_value, str):
-                _LOGGER.error(f"{arg_name} must be a string, got {type(arg_value)}")
-                raise ValueError(f"{arg_name} must be a string")
-
-        _LOGGER.debug("All argument validations passed")
-
-        args_obj = Args(
-            release_name=release_name,
-            email_to=email_to,
-            vote_duration=vote_duration,
-            gpg_key_id=gpg_key_id,
-            commit_hash=commit_hash,
-            initiator_id=initiator_id,
-        )
-
-        _LOGGER.info(f"Args object created: {args_obj}")
-        return args_obj
+class VoteInitiationError(Exception): ...
 
 
-def initiate(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
+class Initiate(pydantic.BaseModel):
+    """Arguments for the task to start a vote."""
+
+    release_name: str = pydantic.Field(..., description="The name of the release to vote on")
+    email_to: str = pydantic.Field(..., description="The mailing list address to send the vote email to")
+    vote_duration: str = pydantic.Field(..., description="Duration of the vote in hours, as a string")
+    gpg_key_id: str = pydantic.Field(..., description="GPG Key ID of the initiator")
+    commit_hash: str = pydantic.Field(..., description="Commit hash the artifacts were built from")
+    initiator_id: str = pydantic.Field(..., description="ASF ID of the vote initiator")
+
+
+@checks.with_model(Initiate)
+async def initiate(args: Initiate) -> str | None:
     """Initiate a vote for a release."""
-    _LOGGER.info(f"Initiating vote with args: {args}")
     try:
-        _LOGGER.debug("Delegating to initiate_core function")
-        status, error, result = initiate_core(args)
-        _LOGGER.info(f"Vote initiation completed with status: {status}")
-        return status, error, result
+        result_data = await _initiate_core_logic(args)
+        success_message = result_data.get("message", "Vote initiated successfully, but message missing")
+        if not isinstance(success_message, str):
+            raise VoteInitiationError("Success message is not a string")
+        return success_message
+
+    except VoteInitiationError as e:
+        _LOGGER.error(f"Vote initiation failed: {e}")
+        raise
     except Exception as e:
-        _LOGGER.exception(f"Error in initiate function: {e}")
-        return task.FAILED, str(e), tuple()
+        _LOGGER.exception(f"Unexpected error during vote initiation: {e}")
+        raise
 
 
-def initiate_core(args_list: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
+async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     """Get arguments, create an email, and then send it to the recipient."""
-    import atr.db.service as service
-    import atr.mail
-
     test_recipients = ["sbp"]
     _LOGGER.info("Starting initiate_core")
-    try:
-        # Configure root _LOGGER to also write to our log file
-        # This ensures logs from mail.py, using the root _LOGGER, are captured
-        root_logger = logging.getLogger()
-        # Check whether our file handler is already added, to avoid duplicates
-        has_our_handler = any(
-            (isinstance(h, logging.FileHandler) and h.baseFilename.endswith("tasks-vote.log"))
-            for h in root_logger.handlers
+
+    root_logger = logging.getLogger()
+    has_our_handler = any(
+        (isinstance(h, logging.FileHandler) and h.baseFilename.endswith("tasks-vote.log")) for h in root_logger.handlers
+    )
+    if not has_our_handler:
+        root_logger.addHandler(_HANDLER)
+
+    async with db.session() as data:
+        release = await data.release(name=args.release_name, _project=True, _committee=True).demand(
+            VoteInitiationError(f"Release {args.release_name} not found")
         )
-        if not has_our_handler:
-            # Add our file handler to the root _LOGGER
-            root_logger.addHandler(_HANDLER)
-            _LOGGER.info("Added file handler to root _LOGGER to capture mail.py logs")
 
-        _LOGGER.debug(f"Parsing arguments: {args_list}")
-        args = Args.from_list(args_list)
-        _LOGGER.info(f"Args parsed successfully: {args}")
+    # GPG key ID, just for testing the UI
+    gpg_key_id = args.gpg_key_id
 
-        # Get the release information
-        release = service.get_release_by_name_sync(args.release_name)
-        if not release:
-            error_msg = f"Release with key {args.release_name} not found"
-            _LOGGER.error(error_msg)
-            return task.FAILED, error_msg, tuple()
+    # Calculate vote end date
+    vote_duration_hours = int(args.vote_duration)
+    vote_start = datetime.datetime.now(datetime.UTC)
+    vote_end = vote_start + datetime.timedelta(hours=vote_duration_hours)
 
-        # GPG key ID, just for testing the UI
-        gpg_key_id = args.gpg_key_id
+    # Format dates for email
+    vote_end_str = vote_end.strftime("%Y-%m-%d %H:%M:%S UTC")
 
-        # Calculate vote end date
-        vote_duration_hours = int(args.vote_duration)
-        vote_start = datetime.datetime.now(datetime.UTC)
-        vote_end = vote_start + datetime.timedelta(hours=vote_duration_hours)
+    # Load and set DKIM key
+    try:
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        dkim_path = os.path.join(project_root, "state", "dkim.private")
 
-        # Format dates for email
-        vote_end_str = vote_end.strftime("%Y-%m-%d %H:%M:%S UTC")
+        async with aiofiles.open(dkim_path) as f:
+            dkim_key = await f.read()
+            mail.set_secret_key(dkim_key.strip())
+            _LOGGER.info("DKIM key loaded and set successfully")
+    except Exception as e:
+        error_msg = f"Failed to load DKIM key: {e}"
+        _LOGGER.error(error_msg)
+        raise VoteInitiationError(error_msg)
 
-        # Load and set DKIM key
-        try:
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            dkim_path = os.path.join(project_root, "state", "dkim.private")
+    # Get PMC and project details
+    if release.committee is None:
+        error_msg = "Release has no associated committee"
+        _LOGGER.error(error_msg)
+        raise VoteInitiationError(error_msg)
 
-            with open(dkim_path) as f:
-                dkim_key = f.read()
-                atr.mail.set_secret_key(dkim_key.strip())
-                _LOGGER.info("DKIM key loaded and set successfully")
-        except Exception as e:
-            error_msg = f"Failed to load DKIM key: {e}"
-            _LOGGER.error(error_msg)
-            return task.FAILED, error_msg, tuple()
+    committee_name = release.committee.name
+    committee_display = release.committee.display_name
+    project_name = release.project.name if release.project else "Unknown"
+    version = release.version
 
-        # Get PMC and project details
-        if release.committee is None:
-            error_msg = "Release has no associated committee"
-            _LOGGER.error(error_msg)
-            return task.FAILED, error_msg, tuple()
+    # Create email subject
+    subject = f"[VOTE] Release Apache {committee_display} {project_name} {version}"
 
-        committee_name = release.committee.name
-        committee_display = release.committee.display_name
-        project_name = release.project.name if release.project else "Unknown"
-        version = release.version
-
-        # Create email subject
-        subject = f"[VOTE] Release Apache {committee_display} {project_name} {version}"
-
-        # Create email body with initiator ID
-        body = f"""Hello {committee_name},
+    # Create email body with initiator ID
+    body = f"""Hello {committee_name},
 
 I'd like to call a vote on releasing the following artifacts as
 Apache {committee_display} {project_name} {version}.
@@ -213,44 +165,32 @@ Thanks,
 {args.initiator_id}
 """
 
-        # Store the original recipient for logging
-        original_recipient = args.email_to
-        # Only one test recipient is required for now
-        test_recipient = test_recipients[0] + "@apache.org"
-        _LOGGER.info(f"TEMPORARY: Overriding recipient from {original_recipient} to {test_recipient}")
+    # Store the original recipient for logging
+    original_recipient = args.email_to
+    # Only one test recipient is required for now
+    test_recipient = test_recipients[0] + "@apache.org"
+    _LOGGER.info(f"TEMPORARY: Overriding recipient from {original_recipient} to {test_recipient}")
 
-        # Create mail event with test recipient
-        # Use test account instead of actual PMC list
-        event = atr.mail.VoteEvent(
-            release_name=args.release_name,
-            email_recipient=test_recipient,
-            subject=subject,
-            body=body,
-            vote_end=vote_end,
-        )
+    # Create mail event with test recipient
+    # Use test account instead of actual PMC list
+    event = mail.VoteEvent(
+        release_name=args.release_name,
+        email_recipient=test_recipient,
+        subject=subject,
+        body=body,
+        vote_end=vote_end,
+    )
 
-        # Send the email
-        atr.mail.send(event)
-        _LOGGER.info(
-            f"Vote email sent successfully to test account {test_recipient} (would have been {original_recipient})"
-        )
+    # Send the email
+    await mail.send(event)
+    _LOGGER.info(
+        f"Vote email sent successfully to test account {test_recipient} (would have been {original_recipient})"
+    )
 
-        # TODO: Update release status to indicate a vote is in progress
-        # This would involve updating the database with the vote details somehow
-        return (
-            task.COMPLETED,
-            None,
-            (
-                {
-                    "message": "Vote initiated successfully (sent to test account)",
-                    "original_email_to": original_recipient,
-                    "actual_email_to": test_recipient,
-                    "vote_end": vote_end_str,
-                    "subject": subject,
-                },
-            ),
-        )
-
-    except Exception as e:
-        _LOGGER.exception(f"Error in initiate_core: {e}")
-        return task.FAILED, str(e), tuple()
+    return {
+        "message": "Vote initiated successfully (sent to test account)",
+        "original_email_to": original_recipient,
+        "actual_email_to": test_recipient,
+        "vote_end": vote_end_str,
+        "subject": subject,
+    }
