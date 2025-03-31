@@ -22,6 +22,7 @@ import atr.tasks.checks as checks
 import atr.tasks.checks.archive as archive
 import atr.tasks.checks.hashing as hashing
 import atr.tasks.checks.license as license
+import atr.tasks.checks.rat as rat
 import atr.util as util
 
 
@@ -132,8 +133,8 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type="verify_rat_license",
-            task_args=[full_path],
+            task_type=checks.function_key(rat.check),
+            task_args=rat.Check(release_name=release.name, abs_path=full_path).model_dump(),
             release_name=release.name,
             path=path,
             modified=modified,

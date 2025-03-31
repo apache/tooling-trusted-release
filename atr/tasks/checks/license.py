@@ -231,7 +231,7 @@ async def headers(args: Headers) -> str | None:
             await check_instance.success(result_data["message"], result_data)
 
     except Exception as e:
-        await check_instance.failure("Error checking license headers", {"error": str(e)})
+        await check_instance.exception("Error checking license headers", {"error": str(e)})
 
     return None
 

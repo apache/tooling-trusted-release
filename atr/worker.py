@@ -42,8 +42,8 @@ import atr.tasks.checks as checks
 import atr.tasks.checks.archive as archive
 import atr.tasks.checks.hashing as hashing
 import atr.tasks.checks.license as license
+import atr.tasks.checks.rat as rat
 import atr.tasks.mailtest as mailtest
-import atr.tasks.rat as rat
 import atr.tasks.rsync as rsync
 import atr.tasks.sbom as sbom
 import atr.tasks.signature as signature
@@ -192,6 +192,7 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
             checks.function_key(hashing.check): hashing.check,
             checks.function_key(license.files): license.files,
             checks.function_key(license.headers): license.headers,
+            checks.function_key(rat.check): rat.check,
         }
         # TODO: We should use a decorator to register these automatically
         dict_task_handlers = {
@@ -202,7 +203,6 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
         # We plan to convert these to async dict handlers
         list_task_handlers = {
             "verify_signature": signature.check,
-            "verify_rat_license": rat.check_licenses,
             "generate_cyclonedx_sbom": sbom.generate_cyclonedx,
             "mailtest_send": mailtest.send,
             "vote_initiate": vote.initiate,

@@ -79,5 +79,5 @@ async def check(args: Check) -> str | None:
                 {"computed_hash": computed_hash, "expected_hash": expected_hash},
             )
     except Exception as e:
-        await check_instance.failure("Unable to verify hash", {"error": str(e)})
+        await check_instance.exception("Unable to verify hash", {"error": str(e)})
     return None

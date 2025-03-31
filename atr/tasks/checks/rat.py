@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asyncio
 import logging
 import os
 import subprocess
@@ -22,11 +23,12 @@ import tempfile
 import xml.etree.ElementTree as ElementTree
 from typing import Any, Final
 
+import pydantic
+
 import atr.config as config
-import atr.db.models as models
+import atr.tasks.checks as checks
 import atr.tasks.checks.archive as archive
 import atr.tasks.sbom as sbom
-import atr.tasks.task as task
 
 _CONFIG: Final = config.get()
 _JAVA_MEMORY_ARGS: Final[list[str]] = []
@@ -42,60 +44,54 @@ _JAVA_MEMORY_ARGS: Final[list[str]] = []
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-def check_licenses(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
-    """Use Apache RAT to check the licenses of the files in the artifact."""
-    # First argument is the artifact path
-    artifact_path = args[0]
+class Check(pydantic.BaseModel):
+    """Parameters for Apache RAT license checking."""
 
-    # Optional argument, with a default
-    rat_jar_path = args[1] if len(args) > 1 else _CONFIG.APACHE_RAT_JAR_PATH
-
-    # Make sure that the JAR path is absolute, handling various cases
-    # We WILL find that JAR path!
-    # In other words, we only run these heuristics when the configuration path is relative
-    if not os.path.isabs(rat_jar_path):
-        # If JAR path is relative to the state dir and we're already in it
-        # I.e. we're already in state and the relative file is here too
-        if os.path.basename(os.getcwd()) == "state" and os.path.exists(os.path.basename(rat_jar_path)):
-            rat_jar_path = os.path.join(os.getcwd(), os.path.basename(rat_jar_path))
-        # If JAR path starts with "state/" but we're not in state dir
-        # E.g. the configuration path is "state/apache-rat-0.16.1.jar" but we're not in the state dir
-        elif rat_jar_path.startswith("state/") and os.path.basename(os.getcwd()) != "state":
-            potential_path = os.path.join(os.getcwd(), rat_jar_path)
-            if os.path.exists(potential_path):
-                rat_jar_path = potential_path
-        # Try parent directory if JAR is not found
-        # P.S. Don't put the JAR in the parent of the state dir
-        if not os.path.exists(rat_jar_path) and os.path.basename(os.getcwd()) == "state":
-            parent_path = os.path.join(os.path.dirname(os.getcwd()), os.path.basename(rat_jar_path))
-            if os.path.exists(parent_path):
-                rat_jar_path = parent_path
-
-    # Log the actual JAR path being used
-    _LOGGER.info(f"Using Apache RAT JAR at: {rat_jar_path} (exists: {os.path.exists(rat_jar_path)})")
-
-    max_extract_size = int(args[2]) if len(args) > 2 else _CONFIG.MAX_EXTRACT_SIZE
-    chunk_size = int(args[3]) if len(args) > 3 else _CONFIG.EXTRACT_CHUNK_SIZE
-
-    task_results = task.results_as_tuple(
-        _check_licenses_core(
-            artifact_path=artifact_path,
-            rat_jar_path=rat_jar_path,
-            max_extract_size=max_extract_size,
-            chunk_size=chunk_size,
-        )
+    release_name: str = pydantic.Field(..., description="Release name")
+    abs_path: str = pydantic.Field(..., description="Absolute path to the .tar.gz file to check")
+    rat_jar_path: str = pydantic.Field(
+        default=_CONFIG.APACHE_RAT_JAR_PATH, description="Path to the Apache RAT JAR file"
     )
-
-    _LOGGER.info(f"Verified license headers with Apache RAT for {artifact_path}")
-
-    # Determine whether the task was successful based on the results
-    status = task.FAILED if not task_results[0]["valid"] else task.COMPLETED
-    error = task_results[0]["message"] if not task_results[0]["valid"] else None
-
-    return status, error, task_results
+    max_extract_size: int = pydantic.Field(
+        default=_CONFIG.MAX_EXTRACT_SIZE, description="Maximum extraction size in bytes"
+    )
+    chunk_size: int = pydantic.Field(default=_CONFIG.EXTRACT_CHUNK_SIZE, description="Chunk size for extraction")
 
 
-def _check_licenses_core(
+@checks.with_model(Check)
+async def check(args: Check) -> str | None:
+    """Use Apache RAT to check the licenses of the files in the artifact."""
+    rel_path = checks.rel_path(args.abs_path)
+    check_instance = await checks.Check.create(checker=check, release_name=args.release_name, path=rel_path)
+    _LOGGER.info(f"Checking RAT licenses for {args.abs_path} (rel: {rel_path})")
+
+    try:
+        result_data = await asyncio.to_thread(
+            _check_core_logic,
+            artifact_path=args.abs_path,
+            rat_jar_path=args.rat_jar_path,
+            max_extract_size=args.max_extract_size,
+            chunk_size=args.chunk_size,
+        )
+
+        if result_data.get("error"):
+            # Handle errors from within the core logic
+            await check_instance.failure(result_data["message"], result_data)
+        elif not result_data["valid"]:
+            # Handle RAT validation failures
+            await check_instance.failure(result_data["message"], result_data)
+        else:
+            # Handle success
+            await check_instance.success(result_data["message"], result_data)
+
+    except Exception as e:
+        # TODO: Or bubble for task failure?
+        await check_instance.exception("Error running Apache RAT check", {"error": str(e)})
+
+    return None
+
+
+def _check_core_logic(
     artifact_path: str,
     rat_jar_path: str = _CONFIG.APACHE_RAT_JAR_PATH,
     max_extract_size: int = _CONFIG.MAX_EXTRACT_SIZE,
@@ -149,7 +145,7 @@ def _check_licenses_core(
         }
 
     # Verify RAT JAR exists and is accessible
-    rat_jar_path, jar_error = _jar_exists(rat_jar_path)
+    rat_jar_path, jar_error = _check_core_logic_jar_exists(rat_jar_path)
     if jar_error:
         return jar_error
 
@@ -162,7 +158,7 @@ def _check_licenses_core(
             # Find and validate the root directory
             try:
                 root_dir = archive.root_directory(artifact_path)
-            except task.Error as e:
+            except ValueError as e:
                 error_msg = str(e)
                 _LOGGER.error(f"Archive root directory issue: {error_msg}")
                 return {
@@ -187,7 +183,7 @@ def _check_licenses_core(
             _LOGGER.info(f"Extracted {extracted_size} bytes")
 
             # Execute RAT and get results or error
-            error_result, xml_output_path = _execute_process(rat_jar_path, extract_dir, temp_dir)
+            error_result, xml_output_path = _check_core_logic_execute_rat(rat_jar_path, extract_dir, temp_dir)
             if error_result:
                 return error_result
 
@@ -198,7 +194,7 @@ def _check_licenses_core(
                 if xml_output_path is None:
                     raise ValueError("XML output path is None")
 
-                results = _output_parse(xml_output_path, extract_dir)
+                results = _check_core_logic_parse_output(xml_output_path, extract_dir)
                 _LOGGER.info(f"Successfully parsed RAT output with {results.get('total_files', 0)} files")
                 return results
             except Exception as e:
@@ -232,7 +228,9 @@ def _check_licenses_core(
         }
 
 
-def _execute_process(rat_jar_path: str, extract_dir: str, temp_dir: str) -> tuple[dict[str, Any] | None, str | None]:
+def _check_core_logic_execute_rat(
+    rat_jar_path: str, extract_dir: str, temp_dir: str
+) -> tuple[dict[str, Any] | None, str | None]:
     """Execute Apache RAT and process its output."""
     # Define output file path
     xml_output_path = os.path.join(temp_dir, "rat-report.xml")
@@ -355,7 +353,7 @@ def _execute_process(rat_jar_path: str, extract_dir: str, temp_dir: str) -> tupl
         }, None
 
 
-def _jar_exists(rat_jar_path: str) -> tuple[str, dict[str, Any] | None]:
+def _check_core_logic_jar_exists(rat_jar_path: str) -> tuple[str, dict[str, Any] | None]:
     """Verify that the Apache RAT JAR file exists and is accessible."""
     # Check that the RAT JAR exists
     if not os.path.exists(rat_jar_path):
@@ -405,7 +403,7 @@ def _jar_exists(rat_jar_path: str) -> tuple[str, dict[str, Any] | None]:
     return rat_jar_path, None
 
 
-def _output_parse(xml_file: str, base_dir: str) -> dict[str, Any]:
+def _check_core_logic_parse_output(xml_file: str, base_dir: str) -> dict[str, Any]:
     """Parse the XML output from Apache RAT."""
     try:
         tree = ElementTree.parse(xml_file)
