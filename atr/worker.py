@@ -194,11 +194,11 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
             checks.function_key(license.headers): license.headers,
             checks.function_key(rat.check): rat.check,
             checks.function_key(signature.check): signature.check,
+            checks.function_key(rsync.analyse): rsync.analyse,
         }
         # TODO: We should use a decorator to register these automatically
         dict_task_handlers = {
             "package_bulk_download": bulk.download,
-            "rsync_analyse": rsync.analyse,
         }
         # TODO: These are synchronous
         # We plan to convert these to async dict handlers

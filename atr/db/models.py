@@ -37,7 +37,7 @@ class UTCDateTime(sqlalchemy.types.TypeDecorator):
     A custom column type to store datetime in sqlite.
 
     As sqlite does not have timezone support, we ensure that all datetimes stored
-    within sqlite are converted to UTC. When retrieved, the datetimes are constructred
+    within sqlite are converted to UTC. When retrieved, the datetimes are constructed
     as offset-aware datetime with UTC as their timezone.
     """
 

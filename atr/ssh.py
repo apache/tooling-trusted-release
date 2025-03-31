@@ -32,6 +32,7 @@ import asyncssh
 import atr.config as config
 import atr.db as db
 import atr.db.models as models
+import atr.tasks.checks as checks
 import atr.tasks.rsync as rsync
 import atr.user as user
 import atr.util as util
@@ -314,9 +315,8 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
             data.add(
                 models.Task(
                     status=models.TaskStatus.QUEUED,
-                    task_type="rsync_analyse",
+                    task_type=checks.function_key(rsync.analyse),
                     task_args=rsync.Analyse(
-                        asf_uid=asf_uid,
                         project_name=project_name,
                         release_version=release_version,
                     ).model_dump(),

@@ -24,7 +24,7 @@ import pydantic
 import atr.db as db
 import atr.db.models as models
 import atr.tasks as tasks
-import atr.tasks.task as task
+import atr.tasks.checks as checks
 import atr.util as util
 
 if TYPE_CHECKING:
@@ -37,27 +37,30 @@ _LOGGER: Final = logging.getLogger(__name__)
 class Analyse(pydantic.BaseModel):
     """Parameters for rsync analysis."""
 
-    asf_uid: str = pydantic.Field(..., description="ASF UID of the user to rsync from")
     project_name: str = pydantic.Field(..., description="Name of the project to rsync")
     release_version: str = pydantic.Field(..., description="Version of the release to rsync")
 
 
-async def analyse(args: dict[str, Any]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
-    """Analyse an rsync upload."""
-    data = Analyse(**args)
-    task_results = task.results_as_tuple(
-        await _analyse_core(
-            data.asf_uid,
-            data.project_name,
-            data.release_version,
+@checks.with_model(Analyse)
+async def analyse(args: Analyse) -> str | None:
+    """Analyse an rsync upload by queuing specific checks for discovered files."""
+    _LOGGER.info(f"Starting rsync analysis for {args.project_name} {args.release_version}")
+    try:
+        result_data = await _analyse_core(
+            args.project_name,
+            args.release_version,
         )
-    )
-    _LOGGER.info(f"Analyse {data.project_name} {data.release_version}")
-    return task.COMPLETED, None, task_results
+        num_paths = len(result_data.get("paths", []))
+        _LOGGER.info(f"Finished rsync analysis for {args.project_name} {args.release_version}, found {num_paths} paths")
+    except Exception as e:
+        _LOGGER.exception(f"Rsync analysis failed for {args.project_name} {args.release_version}: {e}")
+        raise e
+
+    return None
 
 
-async def _analyse_core(asf_uid: str, project_name: str, release_version: str) -> dict[str, Any]:
-    """Analyse an rsync upload."""
+async def _analyse_core(project_name: str, release_version: str) -> dict[str, Any]:
+    """Core logic to analyse an rsync upload and queue checks."""
     base_path = util.get_release_candidate_draft_dir() / project_name / release_version
     paths = await util.paths_recursive(base_path)
     release_name = f"{project_name}-{release_version}"
