@@ -32,6 +32,39 @@ import sqlmodel
 import atr.db as db
 
 
+class UTCDateTime(sqlalchemy.types.TypeDecorator):
+    """
+    A custom column type to store datetime in sqlite.
+
+    As sqlite does not have timezone support, we ensure that all datetimes stored
+    within sqlite are converted to UTC. When retrieved, the datetimes are constructred
+    as offset-aware datetime with UTC as their timezone.
+    """
+
+    impl = sqlalchemy.types.TIMESTAMP(timezone=True)
+
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):  # type: ignore
+        if value:
+            if not isinstance(value, datetime.datetime):
+                raise ValueError(f"unexpected value type {type(value)}")
+
+            if value.tzinfo is None:
+                raise ValueError("encountered offset-naive datetime")
+
+            # store the datetime in UTC in sqlite as it does not support timezones
+            return value.astimezone(datetime.UTC)
+        else:
+            return value
+
+    def process_result_value(self, value, dialect):  # type: ignore
+        if isinstance(value, datetime.datetime):
+            return value.replace(tzinfo=datetime.UTC)
+        else:
+            return value
+
+
 class UserRole(str, enum.Enum):
     COMMITTEE_MEMBER = "committee_member"
     RELEASE_MANAGER = "release_manager"
@@ -258,10 +291,19 @@ class Task(sqlmodel.SQLModel, table=True):
     status: TaskStatus = sqlmodel.Field(default=TaskStatus.QUEUED, index=True)
     task_type: str
     task_args: Any = sqlmodel.Field(sa_column=sqlalchemy.Column(sqlalchemy.JSON))
-    added: datetime.datetime = sqlmodel.Field(default_factory=lambda: datetime.datetime.now(datetime.UTC), index=True)
-    started: datetime.datetime | None = None
+    added: datetime.datetime = sqlmodel.Field(
+        default_factory=lambda: datetime.datetime.now(datetime.UTC),
+        sa_column=sqlalchemy.Column(UTCDateTime, index=True),
+    )
+    started: datetime.datetime | None = sqlmodel.Field(
+        default=None,
+        sa_column=sqlalchemy.Column(UTCDateTime),
+    )
     pid: int | None = None
-    completed: datetime.datetime | None = None
+    completed: datetime.datetime | None = sqlmodel.Field(
+        default=None,
+        sa_column=sqlalchemy.Column(UTCDateTime),
+    )
     result: Any | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
     error: str | None = None
     release_name: str | None = sqlmodel.Field(default=None, foreign_key="release.name")
