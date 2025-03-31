@@ -74,52 +74,19 @@
                     {% endif %}
                   </td>
                   <td>
-                    {% set completed_count = namespace(value=0) %}
-                    {% set failed_count = namespace(value=0) %}
-                    {% set active_count = namespace(value=0) %}
-                    {% set queued_count = namespace(value=0) %}
-
-                    {% for task_type, task in tasks[path].items() %}
-                      {% if task.status.value == 'completed' %}
-                        {% set completed_count.value = completed_count.value + 1 %}
-                      {% elif task.status.value == 'failed' %}
-                        {% set failed_count.value = failed_count.value + 1 %}
-                      {% elif task.status.value == 'active' %}
-                        {% set active_count.value = active_count.value + 1 %}
-                      {% elif task.status.value == 'queued' %}
-                        {% set queued_count.value = queued_count.value + 1 %}
-                      {% endif %}
-                    {% endfor %}
-
-                    {% if completed_count.value > 0 or failed_count.value > 0 or active_count.value > 0 or queued_count.value > 0 %}
+                    <!-- TODO: Show number of tasks which are currently running -->
+                    {% if successes[path] or warnings[path] or errors[path] %}
                       <div class="d-flex flex-wrap gap-2 mt-1 mb-2">
-                        {% if completed_count.value > 0 %}<span class="badge bg-success">{{ completed_count.value }} Passed</span>{% endif %}
-                        {% if failed_count.value > 0 %}
-                          <span class="badge bg-danger">{{ failed_count.value }} {{ "Issue" if failed_count.value == 1 else "Issues" }}</span>
+                        {% if successes[path]|length > 0 %}
+                          <span class="badge bg-success">{{ successes[path]|length }} Passed</span>
                         {% endif %}
-                        {% if active_count.value > 0 %}<span class="badge bg-info">{{ active_count.value }} Running</span>{% endif %}
-                        {% if queued_count.value > 0 %}<span class="badge bg-secondary">{{ queued_count.value }} Pending</span>{% endif %}
+                        {% if warnings[path]|length > 0 %}
+                          <span class="badge bg-warning">{{ warnings[path]|length }} {{ "Issue" if warnings[path]|length == 1 else "Issues" }}</span>
+                        {% endif %}
+                        {% if errors[path]|length > 0 %}
+                          <span class="badge bg-danger">{{ errors[path]|length }} {{ "Issue" if errors[path]|length == 1 else "Issues" }}</span>
+                        {% endif %}
                       </div>
-                    {% endif %}
-                    {% if errors[path]|length > 0 %}
-                      <details>
-                        <summary>{{ errors[path]|length }} Errors</summary>
-                        {% for error in errors[path] %}
-                          <div class="alert alert-danger p-1 px-2 mt-0 mb-3">
-                            <i class="fas fa-exclamation-triangle"></i> {{ error }}
-                          </div>
-                        {% endfor %}
-                      </details>
-                    {% endif %}
-                    {% if warnings[path]|length > 0 %}
-                      <details>
-                        <summary>{{ warnings[path]|length }} Warnings</summary>
-                        {% for warning in warnings[path] %}
-                          <div class="alert alert-warning p-1 px-2 mt-0 mb-3">
-                            <i class="fas fa-exclamation-triangle"></i> {{ warning }}
-                          </div>
-                        {% endfor %}
-                      </details>
                     {% endif %}
                   </td>
                   <td class="atr-sans">

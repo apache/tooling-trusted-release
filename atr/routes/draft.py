@@ -488,15 +488,15 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
 
     base_path = util.get_release_candidate_draft_dir() / project_name / version_name
     paths = await util.paths_recursive(base_path)
-    paths_set = set(paths)
+    # paths_set = set(paths)
     path_templates = {}
     path_substitutions = {}
     path_artifacts = set()
     path_metadata = set()
+    path_modified = {}
+    path_successes = {}
     path_warnings = {}
     path_errors = {}
-    path_modified = {}
-    path_tasks: dict[pathlib.Path, dict[str, models.Task]] = {}
     for path in paths:
         # Get template and substitutions
         elements = {
@@ -523,15 +523,20 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
             elif ext_metadata:
                 path_metadata.add(path)
 
-        # Get warnings and errors
-        path_warnings[path], path_errors[path] = _path_warnings_errors(paths_set, path, ext_artifact, ext_metadata)
-
         # Get modified time
         full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / path)
         path_modified[path] = int(await aiofiles.os.path.getmtime(full_path))
 
-        # Get the most recent task for each type
-        path_tasks[path] = await db.recent_tasks(data, f"{project_name}-{version_name}", str(path), path_modified[path])
+        # Get successes, warnings, and errors
+        path_successes[path] = await data.check_result(
+            release_name=f"{project_name}-{version_name}", path=str(path), status=models.CheckResultStatus.SUCCESS
+        ).all()
+        path_warnings[path] = await data.check_result(
+            release_name=f"{project_name}-{version_name}", path=str(path), status=models.CheckResultStatus.WARNING
+        ).all()
+        path_errors[path] = await data.check_result(
+            release_name=f"{project_name}-{version_name}", path=str(path), status=models.CheckResultStatus.FAILURE
+        ).all()
 
     return await quart.render_template(
         "draft-review.html",
@@ -545,10 +550,10 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
         substitutions=path_substitutions,
         artifacts=path_artifacts,
         metadata=path_metadata,
+        successes=path_successes,
         warnings=path_warnings,
         errors=path_errors,
         modified=path_modified,
-        tasks=path_tasks,
         models=models,
     )
 

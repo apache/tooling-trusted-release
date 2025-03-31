@@ -15,12 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import os.path
-
 import aiofiles.os
 
 import atr.db.models as models
-import atr.tasks.archive as archive
+import atr.tasks.checks as checks
+import atr.tasks.checks.archive as archive
 import atr.tasks.hashing as hashing
 import atr.util as util
 
@@ -91,22 +90,22 @@ async def sha_checks(release: models.Release, hash_file: str) -> list[models.Tas
 async def tar_gz_checks(release: models.Release, path: str, signature_path: str | None = None) -> list[models.Task]:
     # TODO: We should probably use an enum for task_type
     full_path = str(util.get_release_candidate_draft_dir() / release.project.name / release.version / path)
-    filename = os.path.basename(path)
+    # filename = os.path.basename(path)
     modified = int(await aiofiles.os.path.getmtime(full_path))
 
     tasks = [
         models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type="verify_archive_integrity",
-            task_args=archive.CheckIntegrity(path=full_path).model_dump(),
+            task_type=checks.function_key(archive.integrity),
+            task_args=archive.Integrity(release_name=release.name, abs_path=full_path).model_dump(),
             release_name=release.name,
             path=path,
             modified=modified,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type="verify_archive_structure",
-            task_args=[full_path, filename],
+            task_type=checks.function_key(archive.structure),
+            task_args=archive.Structure(release_name=release.name, abs_path=full_path).model_dump(),
             release_name=release.name,
             path=path,
             modified=modified,

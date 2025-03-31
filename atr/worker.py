@@ -31,13 +31,12 @@ import resource
 import signal
 import sys
 import traceback
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import sqlmodel
 
 import atr.db as db
 import atr.db.models as models
-import atr.tasks.archive as archive
 import atr.tasks.bulk as bulk
 import atr.tasks.hashing as hashing
 import atr.tasks.license as license
@@ -48,6 +47,9 @@ import atr.tasks.sbom as sbom
 import atr.tasks.signature as signature
 import atr.tasks.task as task
 import atr.tasks.vote as vote
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -179,12 +181,19 @@ async def _task_result_process(
 
 async def _task_process(task_id: int, task_type: str, task_args: list[str] | dict[str, Any]) -> None:
     """Process a claimed task."""
+    import atr.tasks.checks as checks
+    import atr.tasks.checks.archive as checks_archive
+
     _LOGGER.info(f"Processing task {task_id} ({task_type}) with args {task_args}")
     try:
         # Map task types to their handler functions
+        modern_task_handlers: dict[str, Callable[..., Awaitable[str | None]]] = {
+            checks.function_key(checks_archive.integrity): checks_archive.integrity,
+            checks.function_key(checks_archive.structure): checks_archive.structure,
+        }
         # TODO: We should use a decorator to register these automatically
         dict_task_handlers = {
-            "verify_archive_integrity": archive.check_integrity,
+            # "verify_archive_integrity": archive.check_integrity,
             "package_bulk_download": bulk.download,
             "rsync_analyse": rsync.analyse,
             "verify_file_hash": hashing.check,
@@ -192,7 +201,7 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
         # TODO: These are synchronous
         # We plan to convert these to async dict handlers
         list_task_handlers = {
-            "verify_archive_structure": archive.check_structure,
+            # "verify_archive_structure": archive.check_structure,
             "verify_license_files": license.check_files,
             "verify_signature": signature.check,
             "verify_license_headers": license.check_headers,
@@ -202,7 +211,23 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
             "vote_initiate": vote.initiate,
         }
 
-        if isinstance(task_args, dict):
+        task_results: tuple[Any, ...]
+        if task_type in modern_task_handlers:
+            # NOTE: The other two branches below are deprecated
+            # This is transitional code, which we will tidy up significantly
+            handler = modern_task_handlers[task_type]
+            try:
+                handler_result = await handler(task_args)
+                task_results = tuple()
+                if handler_result is not None:
+                    task_results = (handler_result,)
+                status = task.COMPLETED
+                error = None
+            except Exception as e:
+                task_results = tuple()
+                status = task.FAILED
+                error = str(e)
+        elif isinstance(task_args, dict):
             dict_handler = dict_task_handlers.get(task_type)
             if not dict_handler:
                 msg = f"Unknown task type: {task_type}"

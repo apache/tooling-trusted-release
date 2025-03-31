@@ -22,7 +22,7 @@ from typing import Any, Final
 
 import atr.config as config
 import atr.db.models as models
-import atr.tasks.archive as archive
+import atr.tasks.checks.archive as archive
 import atr.tasks.task as task
 
 _CONFIG: Final = config.get()
