@@ -25,14 +25,12 @@ import hashlib
 import logging
 import pathlib
 import re
-from typing import Protocol, TypeVar
+from typing import TYPE_CHECKING, Protocol, TypeVar
 
 import aiofiles.os
 import aioshutil
 import asfquart.base as base
 import quart
-import werkzeug.datastructures as datastructures
-import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.analysis as analysis
@@ -41,6 +39,12 @@ import atr.db.models as models
 import atr.routes as routes
 import atr.tasks as tasks
 import atr.util as util
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    import werkzeug.datastructures as datastructures
+    import werkzeug.wrappers.response as response
 
 # _CONFIG: Final = config.get()
 # _LOGGER: Final = logging.getLogger(__name__)
@@ -70,6 +74,13 @@ class DeleteForm(util.QuartFormTyped):
         ],
     )
     submit = wtforms.SubmitField("Delete candidate draft")
+
+
+class DeleteFileForm(util.QuartFormTyped):
+    """Form for deleting a file."""
+
+    file_path = wtforms.StringField("File path", validators=[wtforms.validators.InputRequired("File path is required")])
+    submit = wtforms.SubmitField("Delete file")
 
 
 async def _number_of_release_files(release: models.Release) -> int:
@@ -193,7 +204,7 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
             # TODO: Show the form with errors
             return await session.redirect(add, error="Invalid form data")
         await _add(session, form)
-        return await session.redirect(add, success="Release candidate created successfully")
+        return await session.redirect(directory, success="Release candidate created successfully")
 
     return await quart.render_template(
         "draft-add.html",
@@ -208,38 +219,40 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
 
 
 @routes.committer("/draft/add/<project_name>/<version_name>", methods=["GET", "POST"])
-async def add_project(
-    session: routes.CommitterSession, project_name: str, version_name: str
-) -> response.Response | str:
+async def add_file(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show a page to allow the user to add a single file to a candidate draft."""
 
-    class AddProjectForm(util.QuartFormTyped):
-        """Form for adding a single file to a release candidate."""
+    class AddFilesForm(util.QuartFormTyped):
+        """Form for adding file(s) to a release candidate."""
 
-        file_path = wtforms.StringField("File path (optional)", validators=[wtforms.validators.Optional()])
-        file_data = wtforms.FileField("File", validators=[wtforms.validators.InputRequired("File is required")])
-        submit = wtforms.SubmitField("Add file")
+        file_name = wtforms.StringField("File name (optional)", validators=[wtforms.validators.Optional()])
+        file_data = wtforms.MultipleFileField(
+            "File", validators=[wtforms.validators.InputRequired("File(s) are required")]
+        )
+        submit = wtforms.SubmitField("Add file(s)")
 
-    form = await AddProjectForm.create_form()
+    form = await AddFilesForm.create_form()
     if await form.validate_on_submit():
         try:
-            file_path = None
-            if isinstance(form.file_path.data, str) and form.file_path.data:
-                file_path = pathlib.Path(form.file_path.data)
+            file_name = None
+            if isinstance(form.file_name.data, str) and form.file_name.data:
+                file_name = pathlib.Path(form.file_name.data)
             file_data = form.file_data.data
-            if not isinstance(file_data, datastructures.FileStorage):
+            if not file_data or len(file_data) == 0:
                 raise routes.FlashError("Invalid file upload")
+            if file_name is not None and len(file_data) > 1:
+                raise routes.FlashError("File name can only be used when uploading a single file")
 
-            await _add_one(project_name, version_name, file_path, file_data)
+            await _upload_files(project_name, version_name, file_name, file_data)
             return await session.redirect(
-                review, success="File added successfully", project_name=project_name, version_name=version_name
+                review, success="File(s) added successfully", project_name=project_name, version_name=version_name
             )
         except Exception as e:
-            logging.exception("Error adding file:")
-            await quart.flash(f"Error adding file: {e!s}", "error")
+            logging.exception("Error adding file(s):")
+            await quart.flash(f"Error adding file(s): {e!s}", "error")
 
     return await quart.render_template(
-        "draft-add-project.html",
+        "draft-add-files.html",
         asf_id=session.uid,
         server_domain=session.host,
         project_name=project_name,
@@ -252,12 +265,11 @@ async def add_project(
 async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a candidate draft and all its associated files."""
     form = await DeleteForm.create_form(data=await quart.request.form)
-
     if not await form.validate_on_submit():
         for _field, errors in form.errors.items():
             for error in errors:
                 await quart.flash(f"{error}", "error")
-        return await session.redirect(promote)
+        return await session.redirect(directory)
 
     candidate_draft_name = form.candidate_draft_name.data
     if not candidate_draft_name:
@@ -289,14 +301,16 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         # TODO: Confirm that this is a bug, and report upstream
         await aioshutil.rmtree(draft_dir)  # type: ignore[call-arg]
 
-    return await session.redirect(promote, success="Candidate draft deleted successfully")
+    return await session.redirect(directory, success="Candidate draft deleted successfully")
 
 
-@routes.committer("/draft/delete-file/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
-async def delete_file(
-    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
-) -> response.Response:
+@routes.committer("/draft/delete-file/<project_name>/<version_name>", methods=["POST"])
+async def delete_file(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
     """Delete a specific file from the release candidate."""
+    form = await DeleteFileForm.create_form(data=await quart.request.form)
+    if not await form.validate_on_submit():
+        return await session.redirect(review, project_name=project_name, version_name=version_name)
+
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
         raise base.ASFQuartException("You do not have access to this project", errorcode=403)
@@ -307,6 +321,7 @@ async def delete_file(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
+        file_path = str(form.file_path.data)
         full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / file_path)
 
         # Check that the file exists
@@ -378,11 +393,12 @@ async def hashgen(
     )
 
 
-@routes.committer("/draft/modify")
-async def modify(session: routes.CommitterSession) -> str:
-    """Allow the user to modify a candidate draft."""
+@routes.committer("/drafts")
+async def directory(session: routes.CommitterSession) -> str:
+    """Allow the user to view current candidate drafts."""
     # Do them outside of the template rendering call to ensure order
     # The user_candidate_drafts call can use cached results from user_projects
+    # TODO: admin users should be able to view and manipulate all candidates if needed
     user_projects = await session.user_projects
     user_candidate_drafts = await session.user_candidate_drafts
 
@@ -390,7 +406,7 @@ async def modify(session: routes.CommitterSession) -> str:
     delete_form = await DeleteForm.create_form()
 
     return await quart.render_template(
-        "draft-modify.html",
+        "draft-directory.html",
         asf_id=session.uid,
         projects=user_projects,
         server_domain=session.host,
@@ -538,6 +554,8 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
             release_name=f"{project_name}-{version_name}", path=str(path), status=models.CheckResultStatus.FAILURE
         ).all()
 
+    delete_file_form = await DeleteFileForm.create_form()
+
     return await quart.render_template(
         "draft-review.html",
         asf_id=session.uid,
@@ -555,6 +573,7 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
         errors=path_errors,
         modified=path_modified,
         models=models,
+        delete_file_form=delete_file_form,
     )
 
 
@@ -736,27 +755,36 @@ async def _add(session: routes.CommitterSession, form: AddProtocol) -> None:
             data.add(release)
 
 
-async def _add_one(
+async def _upload_files(
     project_name: str,
     version_name: str,
-    file_path: pathlib.Path | None,
-    file: datastructures.FileStorage,
+    file_name: pathlib.Path | None,
+    files: Sequence[datastructures.FileStorage],
 ) -> None:
-    """Process and save the uploaded file."""
-    # TODO: Rename to upload or file-upload
+    """Process and save the uploaded files."""
     # Create target directory
     target_dir = util.get_release_candidate_draft_dir() / project_name / version_name
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use the original filename if no path is specified
-    if not file_path:
-        if not file.filename:
-            raise routes.FlashError("No filename provided")
-        file_path = pathlib.Path(file.filename)
+    def get_filepath(file: datastructures.FileStorage) -> pathlib.Path:
+        # Use the original filename if no path is specified
+        if not file_name:
+            if not file.filename:
+                raise routes.FlashError("No filename provided")
+            return pathlib.Path(file.filename)
+        else:
+            return file_name
 
-    # Save file to specified path
-    target_path = target_dir / file_path.relative_to(file_path.anchor)
-    target_path.parent.mkdir(parents=True, exist_ok=True)
+    for file in files:
+        # Save file to specified path
+        file_path = get_filepath(file)
+        target_path = target_dir / file_path.relative_to(file_path.anchor)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+
+        await _save_file(file, target_path)
+
+
+async def _save_file(file: datastructures.FileStorage, target_path: pathlib.Path) -> None:
     async with aiofiles.open(target_path, "wb") as f:
         while chunk := await asyncio.to_thread(file.stream.read, 8192):
             await f.write(chunk)

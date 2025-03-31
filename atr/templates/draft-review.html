@@ -8,6 +8,8 @@
   Review the files for the {{ project_name }} {{ version_name }} candidate draft.
 {% endblock description %}
 
+{% import 'macros/dialog.html' as dialog %}
+
 {% block content %}
   <h1>Review of {{ release.project.display_name }} {{ version_name }}</h1>
   <p class="intro">
@@ -96,8 +98,13 @@
                        class="btn btn-sm btn-outline-primary fs-6 small ms-2">Tools</a>
                     <a href="{{ as_url(routes.draft.review_path, project_name=project_name, version_name=version_name, file_path=path) }}"
                        class="btn btn-sm btn-outline-primary fs-6 small ms-2">Review file</a>
+                    <button class="btn btn-sm btn-outline-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#delete-{{ path }}">Delete file</button>
                   </td>
                 </tr>
+                {% set file_id = path|string %}
+                {{ dialog.delete_modal_with_confirm(file_id, "Delete file", "file", as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
               {% endfor %}
             </tbody>
           </table>
@@ -148,7 +155,7 @@
     </div>
     <div class="card-body">
       <p>
-        <a href="{{ as_url(routes.draft.add_project, project_name=release.project.name, version_name=release.version) }}">Upload a file in the browser</a>, or use the command below to add or modify files in this release using rsync:
+        <a href="{{ as_url(routes.draft.add_file, project_name=release.project.name, version_name=release.version) }}">Upload a file in the browser</a>, or use the command below to add or modify files in this release using rsync:
       </p>
     </div>
     <pre class="card-footer bg-light border-1 pt-4 small">
