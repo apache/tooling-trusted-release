@@ -21,6 +21,7 @@ import atr.db.models as models
 import atr.tasks.checks as checks
 import atr.tasks.checks.archive as archive
 import atr.tasks.checks.hashing as hashing
+import atr.tasks.checks.license as license
 import atr.util as util
 
 
@@ -115,16 +116,16 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type="verify_license_files",
-            task_args=[full_path],
+            task_type=checks.function_key(license.files),
+            task_args=license.Files(release_name=release.name, abs_path=full_path).model_dump(),
             release_name=release.name,
             path=path,
             modified=modified,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type="verify_license_headers",
-            task_args=[full_path],
+            task_type=checks.function_key(license.headers),
+            task_args=license.Headers(release_name=release.name, abs_path=full_path).model_dump(),
             release_name=release.name,
             path=path,
             modified=modified,

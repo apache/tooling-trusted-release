@@ -15,15 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asyncio
+import hashlib
 import logging
 import os
 import re
 import tarfile
 from typing import Any, Final
 
-import atr.db.models as models
+import pydantic
+
+import atr.tasks.checks as checks
 import atr.tasks.checks.archive as archive
-import atr.tasks.task as task
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -169,28 +172,74 @@ under the License."""
 # Tasks
 
 
-def check_files(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
+class Files(pydantic.BaseModel):
+    """Parameters for LICENSE and NOTICE file checks."""
+
+    release_name: str = pydantic.Field(..., description="Release name")
+    abs_path: str = pydantic.Field(..., description="Absolute path to the .tar.gz file to check")
+
+
+@checks.with_model(Files)
+async def files(args: Files) -> str | None:
     """Check that the LICENSE and NOTICE files exist and are valid."""
-    task_results = task.results_as_tuple(_files_check_core(*args))
-    _LOGGER.info(f"Verified license files for {args}")
-    status = task.FAILED if not task_results[0]["files_found"] else task.COMPLETED
-    error = "Required license files not found" if not task_results[0]["files_found"] else None
-    return status, error, task_results
+    rel_path = checks.rel_path(args.abs_path)
+    check_instance = await checks.Check.create(checker=files, release_name=args.release_name, path=rel_path)
+    _LOGGER.info(f"Checking license files for {args.abs_path} (rel: {rel_path})")
+
+    try:
+        result_data = await asyncio.to_thread(_files_check_core_logic, args.abs_path)
+
+        if result_data.get("error"):
+            await check_instance.failure(result_data["error"], result_data)
+        elif result_data["license_valid"] and result_data["notice_valid"]:
+            await check_instance.success("LICENSE and NOTICE files present and valid", result_data)
+        else:
+            # TODO: Be more specific about the issues
+            await check_instance.failure("Issues found with LICENSE or NOTICE files", result_data)
+
+    except Exception as e:
+        await check_instance.failure("Error checking license files", {"error": str(e)})
+
+    return None
 
 
-def check_headers(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
+class Headers(pydantic.BaseModel):
+    """Parameters for license header checks."""
+
+    release_name: str = pydantic.Field(..., description="Release name")
+    abs_path: str = pydantic.Field(..., description="Absolute path to the .tar.gz file to check")
+
+
+@checks.with_model(Headers)
+async def headers(args: Headers) -> str | None:
     """Check that all source files have valid license headers."""
-    task_results = task.results_as_tuple(_headers_check_core(*args))
-    _LOGGER.info(f"Verified license headers for {args}")
-    status = task.FAILED if not task_results[0]["valid"] else task.COMPLETED
-    error = task_results[0]["message"] if not task_results[0]["valid"] else None
-    return status, error, task_results
+    rel_path = checks.rel_path(args.abs_path)
+    check_instance = await checks.Check.create(checker=headers, release_name=args.release_name, path=rel_path)
+    _LOGGER.info(f"Checking license headers for {args.abs_path} (rel: {rel_path})")
+
+    try:
+        result_data = await asyncio.to_thread(_headers_check_core_logic, args.abs_path)
+
+        if result_data.get("error_message"):
+            # Handle errors during the check process itself
+            await check_instance.failure(result_data["error_message"], result_data)
+        elif not result_data["valid"]:
+            # Handle validation failures
+            await check_instance.failure(result_data["message"], result_data)
+        else:
+            # Handle success
+            await check_instance.success(result_data["message"], result_data)
+
+    except Exception as e:
+        await check_instance.failure("Error checking license headers", {"error": str(e)})
+
+    return None
 
 
 # File helpers
 
 
-def _files_check_core(artifact_path: str) -> dict[str, Any]:
+def _files_check_core_logic(artifact_path: str) -> dict[str, Any]:
     """Verify that LICENSE and NOTICE files exist and are placed and formatted correctly."""
     files_found = []
     license_ok = False
@@ -200,13 +249,13 @@ def _files_check_core(artifact_path: str) -> dict[str, Any]:
     # First find and validate the root directory
     try:
         root_dir = archive.root_directory(artifact_path)
-    except task.Error as e:
+    except ValueError as e:
         return {
             "files_checked": ["LICENSE", "NOTICE"],
             "files_found": [],
             "license_valid": False,
             "notice_valid": False,
-            "message": str(e),
+            "error": f"Could not determine root directory: {e!s}",
         }
 
     # Check for license files in the root directory
@@ -217,10 +266,10 @@ def _files_check_core(artifact_path: str) -> dict[str, Any]:
                 files_found.append(filename)
                 if filename == "LICENSE":
                     # TODO: Check length, should be 11,358 bytes
-                    license_ok = _files_license(tf, member)
+                    license_ok = _files_check_core_logic_license(tf, member)
                 elif filename == "NOTICE":
                     # TODO: Check length doesn't exceed some preset
-                    notice_ok, notice_issues = _files_notice(tf, member)
+                    notice_ok, notice_issues = _files_check_core_logic_notice(tf, member)
 
     messages = _files_messages_build(root_dir, files_found, license_ok, notice_ok, notice_issues)
 
@@ -234,10 +283,8 @@ def _files_check_core(artifact_path: str) -> dict[str, Any]:
     }
 
 
-def _files_license(tf: tarfile.TarFile, member: tarfile.TarInfo) -> bool:
+def _files_check_core_logic_license(tf: tarfile.TarFile, member: tarfile.TarInfo) -> bool:
     """Verify that the LICENSE file matches the Apache 2.0 license."""
-    import hashlib
-
     f = tf.extractfile(member)
     if not f:
         return False
@@ -273,10 +320,8 @@ def _files_messages_build(
     return messages
 
 
-def _files_notice(tf: tarfile.TarFile, member: tarfile.TarInfo) -> tuple[bool, list[str]]:
+def _files_check_core_logic_notice(tf: tarfile.TarFile, member: tarfile.TarInfo) -> tuple[bool, list[str]]:
     """Verify that the NOTICE file follows the required format."""
-    import re
-
     f = tf.extractfile(member)
     if not f:
         return False, ["Could not read NOTICE file"]
@@ -299,7 +344,7 @@ def _files_notice(tf: tarfile.TarFile, member: tarfile.TarInfo) -> tuple[bool, l
 # Header helpers
 
 
-def _headers_check_core(artifact_path: str) -> dict[str, Any]:
+def _headers_check_core_logic(artifact_path: str) -> dict[str, Any]:
     """Verify Apache License headers in source files within an archive."""
     # We could modify @Lucas-C/pre-commit-hooks instead for this
     # But hopefully this will be robust enough, at least for testing
@@ -310,19 +355,19 @@ def _headers_check_core(artifact_path: str) -> dict[str, Any]:
     # First find and validate the root directory
     try:
         root_dir = archive.root_directory(artifact_path)
-    except task.Error as e:
+    except ValueError as e:
         return {
             "files_checked": 0,
             "files_with_valid_headers": 0,
-            "errors": [str(e)],
-            "message": str(e),
+            "errors": [],
+            "error_message": f"Could not determine root directory: {e!s}",
             "valid": False,
         }
 
     # Check files in the archive
     with tarfile.open(artifact_path, mode="r|gz") as tf:
         for member in tf:
-            processed, result = _headers_file_process(tf, member, root_dir)
+            processed, result = _headers_check_core_logic_process_file(tf, member, root_dir)
             if not processed:
                 continue
 
@@ -354,7 +399,7 @@ def _headers_check_core(artifact_path: str) -> dict[str, Any]:
     }
 
 
-def _headers_file_process(
+def _headers_check_core_logic_process_file(
     tf: tarfile.TarFile,
     member: tarfile.TarInfo,
     root_dir: str,
@@ -364,7 +409,7 @@ def _headers_file_process(
         return False, {}
 
     # Check if we should verify this file, based on extension
-    if not _headers_file_should_check(member.name):
+    if not _headers_check_core_logic_should_check(member.name):
         return False, {}
 
     # Get relative path for display purposes only
@@ -380,7 +425,7 @@ def _headers_file_process(
 
         # Allow for some extra content at the start of the file
         # That may be shebangs, encoding declarations, etc.
-        content = f.read(len(_APACHE_LICENSE_HEADER) * 2)
+        content = f.read(len(_APACHE_LICENSE_HEADER) + 512)
         is_valid, error = _headers_validate(content, member.name)
         if is_valid:
             return True, {"valid": True}
@@ -390,9 +435,9 @@ def _headers_file_process(
         return True, {"error": f"Error processing {display_path}: {e!s}"}
 
 
-def _headers_file_should_check(filepath: str) -> bool:
+def _headers_check_core_logic_should_check(filepath: str) -> bool:
     """Determine if a file should be checked for license headers."""
-    ext = _headers_file_type_get(filepath)
+    ext = _get_file_extension(filepath)
     if ext is None:
         return False
 
@@ -408,7 +453,7 @@ def _headers_file_should_check(filepath: str) -> bool:
     return False
 
 
-def _headers_file_type_get(filename: str) -> str | None:
+def _get_file_extension(filename: str) -> str | None:
     """Get the file extension without the dot."""
     _, ext = os.path.splitext(filename)
     if not ext:
@@ -416,7 +461,7 @@ def _headers_file_type_get(filename: str) -> str | None:
     return ext[1:].lower()
 
 
-def _headers_strip_comments(content: bytes, file_ext: str) -> bytes:
+def _strip_comments(content: bytes, file_ext: str) -> bytes:
     """Strip comment prefixes from the content based on the file extension."""
     if file_ext not in _COMMENT_STYLES:
         return content
@@ -467,12 +512,12 @@ def _headers_strip_comments(content: bytes, file_ext: str) -> bytes:
 def _headers_validate(content: bytes, filename: str) -> tuple[bool, str | None]:
     """Validate that the content contains the Apache License header after removing comments."""
     # Get the file extension from the filename
-    file_ext = _headers_file_type_get(filename)
+    file_ext = _get_file_extension(filename)
     if not file_ext or file_ext not in _COMMENT_STYLES:
         return False, "Could not determine file type from extension"
 
     # Strip comments, removing empty lines in the process
-    cleaned_header = _headers_strip_comments(content, file_ext)
+    cleaned_header = _strip_comments(content, file_ext)
 
     # Normalise the expected header in the same way as directly above
     expected_lines = [line.strip() for line in _APACHE_LICENSE_HEADER.split(b"\n")]
