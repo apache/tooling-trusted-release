@@ -113,38 +113,56 @@ def key_ssh_fingerprint(ssh_key_string: str) -> str:
     raise ValueError("Invalid SSH key format")
 
 
-async def key_user_add(asf_uid: str | None, public_key: str, selected_committees: list[str]) -> dict | None:
-    if not public_key:
-        raise routes.FlashError("Public key is required")
-
-    # Import the key into GPG to validate and extract info
-    # TODO: We'll just assume for now that gnupg.GPG() doesn't need to be async
+async def _key_user_add_validate_key_properties(public_key: str) -> tuple[dict, str]:
+    """Validate GPG key string, import it, and return its properties and fingerprint."""
     async with ephemeral_gpg_home() as gpg_home:
         gpg = gnupg.GPG(gnupghome=gpg_home)
         import_result = await asyncio.to_thread(gpg.import_keys, public_key)
 
         if not import_result.fingerprints:
-            raise routes.FlashError("Invalid public key format")
+            raise routes.FlashError("Invalid public key format or failed import")
 
         fingerprint = import_result.fingerprints[0]
-        if fingerprint is not None:
-            fingerprint = fingerprint.lower()
-        # APP.logger.info("Import result: %s", vars(import_result))
-        # Get key details
-        # We could probably use import_result instead
-        # But this way it shows that they've really been imported
+        if fingerprint is None:
+            # Should be unreachable given the previous check, but satisfy type checker
+            raise routes.FlashError("Failed to get fingerprint after import")
+        fingerprint_lower = fingerprint.lower()
+
+        # List keys to get details
         keys = await asyncio.to_thread(gpg.list_keys)
 
-    # Then we have the properties listed here:
-    # https://gnupg.readthedocs.io/en/latest/#listing-keys
-    # Note that "fingerprint" is not listed there, but we have it anyway...
-    key = next((k for k in keys if (k["fingerprint"] is not None) and (k["fingerprint"].lower() == fingerprint)), None)
-    if not key:
-        raise routes.FlashError("Failed to import key")
-    if (key.get("algo") == "1") and (int(key.get("length", "0")) < 2048):
-        # https://infra.apache.org/release-signing.html#note
-        # Says that keys must be at least 2048 bits
-        raise routes.FlashError("Key is not long enough; must be at least 2048 bits")
+    # Find the specific key details from the list using the fingerprint
+    key_details = None
+    for k in keys:
+        if k.get("fingerprint") is not None and k["fingerprint"].lower() == fingerprint_lower:
+            key_details = k
+            break
+
+    if not key_details:
+        # This might indicate an issue with gpg.list_keys or the environment
+        logging.error(
+            f"Could not find key details for fingerprint {fingerprint_lower}"
+            f" after successful import. Keys listed: {keys}"
+        )
+        raise routes.FlashError("Failed to retrieve key details after import")
+
+    # Validate key algorithm and length
+    # https://infra.apache.org/release-signing.html#note
+    # Says that keys must be at least 2048 bits
+    if (key_details.get("algo") == "1") and (int(key_details.get("length", "0")) < 2048):
+        raise routes.FlashError("RSA Key is not long enough; must be at least 2048 bits")
+
+    return key_details, fingerprint_lower
+
+
+async def key_user_add(asf_uid: str | None, public_key: str, selected_committees: list[str]) -> dict | None:
+    if not public_key:
+        raise routes.FlashError("Public key is required")
+
+    # Validate the key using GPG and get its properties
+    key, _fingerprint = await _key_user_add_validate_key_properties(public_key)
+
+    # Determine ASF UID if not provided
     if asf_uid is None:
         for uid in key["uids"]:
             match = re.search(r"([A-Za-z0-9]+)@apache.org", uid)
@@ -152,7 +170,7 @@ async def key_user_add(asf_uid: str | None, public_key: str, selected_committees
                 asf_uid = match.group(1).lower()
                 break
         else:
-            logging.warning(f"key_user_add called with no ASF UID: {keys}")
+            logging.warning(f"key_user_add called with no ASF UID found in key UIDs: {key.get('uids')}")
     if asf_uid is None:
         # We place this here to make it easier on the type checkers
         raise routes.FlashError("No Apache UID found in the key UIDs")
@@ -178,6 +196,13 @@ async def key_user_session_add(
     #     return ("You already have a key registered", None)
 
     fingerprint = key.get("fingerprint")
+    # for subkey in key.get("subkeys", []):
+    #     if subkey[1] == "s":
+    #         # It's a signing key, so use its fingerprint instead
+    #         # TODO: Not sure that we should do this
+    #         # TODO: Check for multiple signing subkeys
+    #         fingerprint = subkey[2]
+    #         break
     if not isinstance(fingerprint, str):
         raise routes.FlashError("Invalid key fingerprint")
     fingerprint = fingerprint.lower()

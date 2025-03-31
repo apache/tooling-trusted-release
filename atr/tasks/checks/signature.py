@@ -15,68 +15,89 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import contextlib
+import asyncio
 import logging
-import shutil
 import tempfile
-from collections.abc import Generator
-from typing import Any, BinaryIO, Final
+from typing import Any, Final
 
 import gnupg
-import sqlalchemy.sql as sql
+import pydantic
+import sqlmodel
 
 import atr.db as db
 import atr.db.models as models
-import atr.tasks.task as task
+import atr.tasks.checks as checks
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def check(args: list[str]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
+class Check(pydantic.BaseModel):
+    """Parameters for signature checking."""
+
+    release_name: str = pydantic.Field(..., description="Release name")
+    committee_name: str = pydantic.Field(..., description="Name of the committee whose keys should be used")
+    abs_artifact_path: str = pydantic.Field(..., description="Absolute path to the artifact file")
+    abs_signature_path: str = pydantic.Field(..., description="Absolute path to the signature file (.asc)")
+
+
+@checks.with_model(Check)
+async def check(args: Check) -> str | None:
     """Check a signature file."""
-    task_results = task.results_as_tuple(_check_core(*args))
-    _LOGGER.info(f"Verified {args} with result {task_results[0]}")
-    status = task.FAILED if task_results[0].get("error") else task.COMPLETED
-    error = task_results[0].get("error")
-    return status, error, task_results
+    rel_path = checks.rel_path(args.abs_signature_path)
+    check_instance = await checks.Check.create(checker=check, release_name=args.release_name, path=rel_path)
+    _LOGGER.info(
+        f"Checking signature {args.abs_signature_path} for {args.abs_artifact_path}"
+        f" using {args.committee_name} keys (rel: {rel_path})"
+    )
+
+    try:
+        result_data = await _check_core_logic(
+            committee_name=args.committee_name,
+            artifact_path=args.abs_artifact_path,
+            signature_path=args.abs_signature_path,
+        )
+        if result_data.get("error"):
+            await check_instance.failure(result_data["error"], result_data)
+        elif result_data.get("verified"):
+            await check_instance.success("Signature verified successfully", result_data)
+        else:
+            # Shouldn't happen
+            await check_instance.exception("Signature verification failed for unknown reasons", result_data)
+
+    except Exception as e:
+        await check_instance.exception("Error during signature check execution", {"error": str(e)})
+
+    return None
 
 
-def _check_core(committee_name: str, artifact_path: str, signature_path: str) -> dict[str, Any]:
+async def _check_core_logic(committee_name: str, artifact_path: str, signature_path: str) -> dict[str, Any]:
     """Verify a signature file using the committee's public signing keys."""
-    # Query only the signing keys associated with this committee
-    # TODO: Rename create_sync_db_session to create_session_sync
-    # Using isinstance does not work here, with pyright
+    _LOGGER.info(f"Attempting to fetch keys for committee_name: '{committee_name}'")
     name = db.validate_instrumented_attribute(models.Committee.name)
-    with db.create_sync_db_session() as session:
-        # TODO: This is our only remaining use of select
+    async with db.session() as session:
         statement = (
-            sql.select(models.PublicSigningKey)
+            sqlmodel.select(models.PublicSigningKey)
             .join(models.KeyLink)
             .join(models.Committee)
             .where(name == committee_name)
         )
-        result = session.execute(statement)
+        result = await session.execute(statement)
         public_keys = [key.ascii_armored_key for key in result.scalars().all()]
 
-    with open(signature_path, "rb") as sig_file:
-        return _signature_gpg_file(sig_file, artifact_path, public_keys)
+    return await asyncio.to_thread(
+        _check_core_logic_verify_signature,
+        signature_path=signature_path,
+        artifact_path=artifact_path,
+        ascii_armored_keys=public_keys,
+    )
 
 
-@contextlib.contextmanager
-def _ephemeral_gpg_home() -> Generator[str]:
-    # TODO: Deduplicate, and move somewhere more appropriate
-    """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
-    temp_dir = tempfile.mkdtemp(prefix="gpg-")
-    try:
-        yield temp_dir
-    finally:
-        shutil.rmtree(temp_dir)
-
-
-def _signature_gpg_file(sig_file: BinaryIO, artifact_path: str, ascii_armored_keys: list[str]) -> dict[str, Any]:
+def _check_core_logic_verify_signature(
+    signature_path: str, artifact_path: str, ascii_armored_keys: list[str]
+) -> dict[str, Any]:
     """Verify a GPG signature for a file."""
-    with _ephemeral_gpg_home() as gpg_home:
-        gpg: Final[gnupg.GPG] = gnupg.GPG(gnupghome=gpg_home)
+    with tempfile.TemporaryDirectory(prefix="gpg-") as gpg_dir, open(signature_path, "rb") as sig_file:
+        gpg: Final[gnupg.GPG] = gnupg.GPG(gnupghome=gpg_dir)
 
         # Import all PMC public signing keys
         for key in ascii_armored_keys:
@@ -103,14 +124,18 @@ def _signature_gpg_file(sig_file: BinaryIO, artifact_path: str, ascii_armored_ke
     }
 
     if not verified:
-        raise task.Error("No valid signature found", debug_info)
+        return {
+            "verified": False,
+            "error": "No valid signature found",
+            "debug_info": debug_info,
+        }
 
     return {
         "verified": True,
         "key_id": verified.key_id,
         "timestamp": verified.timestamp,
         "username": verified.username or "Unknown",
-        "email": verified.pubkey_fingerprint.lower() or "Unknown",
+        "fingerprint": verified.pubkey_fingerprint.lower() or "Unknown",
         "status": "Valid signature",
         "debug_info": debug_info,
     }

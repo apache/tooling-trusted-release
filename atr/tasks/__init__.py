@@ -23,6 +23,7 @@ import atr.tasks.checks.archive as archive
 import atr.tasks.checks.hashing as hashing
 import atr.tasks.checks.license as license
 import atr.tasks.checks.rat as rat
+import atr.tasks.checks.signature as signature
 import atr.util as util
 
 
@@ -42,12 +43,13 @@ async def asc_checks(release: models.Release, signature_path: str) -> list[model
         tasks.append(
             models.Task(
                 status=models.TaskStatus.QUEUED,
-                task_type="verify_signature",
-                task_args=[
-                    release.committee.name,
-                    full_artifact_path,
-                    full_signature_path,
-                ],
+                task_type=checks.function_key(signature.check),
+                task_args=signature.Check(
+                    release_name=release.name,
+                    committee_name=release.committee.name,
+                    abs_artifact_path=full_artifact_path,
+                    abs_signature_path=full_signature_path,
+                ).model_dump(),
                 release_name=release.name,
                 path=signature_path,
                 modified=modified,
@@ -139,14 +141,14 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
             path=path,
             modified=modified,
         ),
-        models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type="generate_cyclonedx_sbom",
-            task_args=[full_path],
-            release_name=release.name,
-            path=path,
-            modified=modified,
-        ),
+        # models.Task(
+        #     status=models.TaskStatus.QUEUED,
+        #     task_type="generate_cyclonedx_sbom",
+        #     task_args=[full_path],
+        #     release_name=release.name,
+        #     path=path,
+        #     modified=modified,
+        # ),
     ]
 
     return tasks

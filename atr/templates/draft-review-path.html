@@ -176,6 +176,27 @@
                         </tr>
                       {% endif %}
                     {% endfor %}
+
+                    {% if check_result.data.get("debug_info") is mapping %}
+                      {% for debug_key, debug_value in check_result.data.debug_info.items() %}
+                        <tr>
+                          <th class="bg-light fw-bold align-top">
+                            <span class="text-muted">(Debug)</span> {{ debug_key|replace('_', ' ') |title }}
+                          </th>
+                          <td>
+                            {% if debug_key == 'stderr' %}
+                              <pre class="mb-0 small"><code class="small">{{ debug_value }}</code></pre>
+                            {% elif debug_value is boolean %}
+                              {{ "Yes" if debug_value else "No" }}
+                            {% elif debug_value is none %}
+                              <span class="text-muted">(None)</span>
+                            {% else %}
+                              {{ debug_value }}
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    {% endif %}
                   </tbody>
                 </table>
               </details>
