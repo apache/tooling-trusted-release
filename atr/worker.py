@@ -87,6 +87,10 @@ def main() -> None:
 
     asyncio.run(_start())
 
+    # If the worker decides to stop running (see #230 in _worker_loop_run()), shutdown the database gracefully
+    asyncio.run(db.shutdown_database())
+    _LOGGER.info("Exiting worker process")
+
 
 def _setup_logging() -> None:
     # Configure logging
