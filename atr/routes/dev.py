@@ -54,16 +54,16 @@ async def send_email(session: routes.CommitterSession) -> quart.ResponseReturnVa
             )
 
         # Create a task for mail testing
-        async with db.create_async_db_session() as db_session:
-            async with db_session.begin():
+        async with db.session() as data:
+            async with data.begin():
                 task = models.Task(
                     status=models.TaskStatus.QUEUED,
                     task_type="mailtest_send",
                     task_args=[name, email, token],
                 )
-                db_session.add(task)
+                data.add(task)
                 # Flush to get the task ID
-                await db_session.flush()
+                await data.flush()
 
         return await quart.render_template(
             "dev-send-email.html",

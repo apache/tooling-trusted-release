@@ -170,6 +170,8 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
         if ssh_server:
             await ssh.server_stop(ssh_server)
 
+        await db.shutdown_database()
+
         app.background_tasks.clear()
 
 

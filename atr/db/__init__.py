@@ -21,7 +21,6 @@ import logging
 import os
 from typing import TYPE_CHECKING, Any, Final, Generic, TypeGuard, TypeVar
 
-import quart
 import sqlalchemy
 import sqlalchemy.ext.asyncio
 import sqlalchemy.orm as orm
@@ -41,9 +40,8 @@ if TYPE_CHECKING:
 
 _LOGGER: Final = logging.getLogger(__name__)
 
-_global_async_sessionmaker: sqlalchemy.ext.asyncio.async_sessionmaker | None = None
+_global_atr_engine: sqlalchemy.ext.asyncio.AsyncEngine | None = None
 _global_atr_sessionmaker: sqlalchemy.ext.asyncio.async_sessionmaker | None = None
-_global_sync_engine: sqlalchemy.Engine | None = None
 
 
 T = TypeVar("T")
@@ -481,24 +479,15 @@ def init_database(app: base.QuartApp) -> None:
 
     @app.before_serving
     async def create() -> None:
-        app_config = config.get()
-        engine = create_async_engine(app_config)
+        global _global_atr_engine, _global_atr_sessionmaker
 
-        app.extensions["async_session"] = sqlalchemy.ext.asyncio.async_sessionmaker(
-            bind=engine, class_=sqlalchemy.ext.asyncio.AsyncSession, expire_on_commit=False
-        )
-        app.extensions["atr_db_session"] = sqlalchemy.ext.asyncio.async_sessionmaker(
+        app_config = config.get()
+        engine = await create_async_engine(app_config)
+        _global_atr_engine = engine
+
+        _global_atr_sessionmaker = sqlalchemy.ext.asyncio.async_sessionmaker(
             bind=engine, class_=Session, expire_on_commit=False
         )
-
-        # Set SQLite pragmas for better performance
-        # Use 64 MB for the cache_size, and 5000ms for busy_timeout
-        async with engine.begin() as conn:
-            await conn.execute(sql.text("PRAGMA journal_mode=WAL"))
-            await conn.execute(sql.text("PRAGMA synchronous=NORMAL"))
-            await conn.execute(sql.text("PRAGMA cache_size=-64000"))
-            await conn.execute(sql.text("PRAGMA foreign_keys=ON"))
-            await conn.execute(sql.text("PRAGMA busy_timeout=5000"))
 
         # Run any pending migrations
         # In dev we'd do this first:
@@ -519,17 +508,26 @@ def init_database(app: base.QuartApp) -> None:
             await conn.run_sync(sqlmodel.SQLModel.metadata.create_all)
 
 
-def init_database_for_worker() -> None:
-    global _global_async_sessionmaker
+async def init_database_for_worker() -> None:
+    global _global_atr_engine, _global_atr_sessionmaker
 
     _LOGGER.info(f"Creating database for worker {os.getpid()}")
-    engine = create_async_engine(config.get())
-    _global_async_sessionmaker = sqlalchemy.ext.asyncio.async_sessionmaker(
-        bind=engine, class_=sqlalchemy.ext.asyncio.AsyncSession, expire_on_commit=False
+    engine = await create_async_engine(config.get())
+    _global_atr_engine = engine
+    _global_atr_sessionmaker = sqlalchemy.ext.asyncio.async_sessionmaker(
+        bind=engine, class_=Session, expire_on_commit=False
     )
 
 
-def create_async_engine(app_config: type[config.AppConfig]) -> sqlalchemy.ext.asyncio.AsyncEngine:
+async def shutdown_database() -> None:
+    if _global_atr_engine:
+        _LOGGER.info("Closing database")
+        await _global_atr_engine.dispose()
+    else:
+        _LOGGER.info("No database to close")
+
+
+async def create_async_engine(app_config: type[config.AppConfig]) -> sqlalchemy.ext.asyncio.AsyncEngine:
     sqlite_url = f"sqlite+aiosqlite://{app_config.SQLITE_DB_PATH}"
     # Use aiosqlite for async SQLite access
     engine = sqlalchemy.ext.asyncio.create_async_engine(
@@ -540,18 +538,16 @@ def create_async_engine(app_config: type[config.AppConfig]) -> sqlalchemy.ext.as
         },
     )
 
+    # Set SQLite pragmas for better performance
+    # Use 64 MB for the cache_size, and 5000ms for busy_timeout
+    async with engine.begin() as conn:
+        await conn.execute(sql.text("PRAGMA journal_mode=WAL"))
+        await conn.execute(sql.text("PRAGMA synchronous=NORMAL"))
+        await conn.execute(sql.text("PRAGMA cache_size=-64000"))
+        await conn.execute(sql.text("PRAGMA foreign_keys=ON"))
+        await conn.execute(sql.text("PRAGMA busy_timeout=5000"))
+
     return engine
-
-
-def create_async_db_session() -> sqlalchemy.ext.asyncio.AsyncSession:
-    """Create a new asynchronous database session."""
-    if quart.has_app_context():
-        extensions = quart.current_app.extensions
-        return util.validate_as_type(extensions["async_session"](), sqlalchemy.ext.asyncio.AsyncSession)
-    else:
-        if _global_async_sessionmaker is None:
-            raise RuntimeError("Global async_sessionmaker not initialized, run init_database() first.")
-        return util.validate_as_type(_global_async_sessionmaker(), sqlalchemy.ext.asyncio.AsyncSession)
 
 
 async def recent_tasks(data: Session, release_name: str, file_path: str, modified: int) -> dict[str, models.Task]:
@@ -598,17 +594,23 @@ def select_in_load_nested(parent: Any, *descendants: Any) -> orm.strategy_option
 
 def session() -> Session:
     """Create a new asynchronous database session."""
-    global _global_atr_sessionmaker
 
-    if quart.has_app_context():
-        extensions = quart.current_app.extensions
-        return util.validate_as_type(extensions["atr_db_session"](), Session)
+    # FIXME: occasionally you see this in the console output
+    # <sys>:0: SAWarning: The garbage collector is trying to clean up non-checked-in connection <AdaptedConnection
+    # <Connection(Thread-291, started daemon 138838634661440)>>, which will be dropped, as it cannot be safely
+    # terminated. Please ensure that SQLAlchemy pooled connections are returned to the pool explicitly, either by
+    # calling ``close()`` or by using appropriate context managers to manage their lifecycle.
+
+    # Not fully clear where this is coming from, but we could experiment by returning a session like that:
+    # async def session() -> AsyncGenerator[Session, None]:
+    #     async with _global_atr_sessionmaker() as session:
+    #         yield session
+
+    # from FastAPI documentation: https://fastapi-users.github.io/fastapi-users/latest/configuration/databases/sqlalchemy/
+
+    if _global_atr_sessionmaker is None:
+        raise RuntimeError("database not initialized")
     else:
-        if _global_atr_sessionmaker is None:
-            engine = create_async_engine(config.get())
-            _global_atr_sessionmaker = sqlalchemy.ext.asyncio.async_sessionmaker(
-                bind=engine, class_=Session, expire_on_commit=False
-            )
         return util.validate_as_type(_global_atr_sessionmaker(), Session)
 
 

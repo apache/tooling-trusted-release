@@ -206,18 +206,19 @@ class WorkerManager:
         """Check worker processes and restart if needed."""
         exited_workers = []
 
-        # Check each worker first
-        for pid, worker in list(self.workers.items()):
-            # Check if process is running
-            if not await worker.is_running():
-                exited_workers.append(pid)
-                _LOGGER.info(f"Worker {pid} has exited")
-                continue
+        async with db.session() as data:
+            # Check each worker first
+            for pid, worker in list(self.workers.items()):
+                # Check if process is running
+                if not await worker.is_running():
+                    exited_workers.append(pid)
+                    _LOGGER.info(f"Worker {pid} has exited")
+                    continue
 
-            # Check if worker has been processing its task for too long
-            # This also stops tasks if they have indeed been running for too long
-            if await self.check_task_duration(pid, worker):
-                exited_workers.append(pid)
+                # Check if worker has been processing its task for too long
+                # This also stops tasks if they have indeed been running for too long
+                if await self.check_task_duration(data, pid, worker):
+                    exited_workers.append(pid)
 
         # Remove exited workers
         for pid in exited_workers:
@@ -265,24 +266,23 @@ class WorkerManager:
         except Exception as e:
             _LOGGER.error(f"Error stopping long-running worker {pid}: {e}")
 
-    async def check_task_duration(self, pid: int, worker: WorkerProcess) -> bool:
+    async def check_task_duration(self, data: db.Session, pid: int, worker: WorkerProcess) -> bool:
         """
         Check if a worker has been processing its task for too long.
         Returns True if the worker has been terminated.
         """
         try:
-            async with db.session() as data:
-                async with data.begin():
-                    task = await data.task(pid=pid, status=models.TaskStatus.ACTIVE).get()
-                    if not task or not task.started:
-                        return False
-
-                    task_duration = (datetime.datetime.now(datetime.UTC) - task.started).total_seconds()
-                    if task_duration > self.max_task_seconds:
-                        await self.terminate_long_running_task(task, worker, task.id, pid)
-                        return True
-
+            async with data.begin():
+                task = await data.task(pid=pid, status=models.TaskStatus.ACTIVE).get()
+                if not task or not task.started:
                     return False
+
+                task_duration = (datetime.datetime.now(datetime.UTC) - task.started).total_seconds()
+                if task_duration > self.max_task_seconds:
+                    await self.terminate_long_running_task(task, worker, task.id, pid)
+                    return True
+
+                return False
         except Exception as e:
             _LOGGER.error(f"Error checking task duration for worker {pid}: {e}")
             # TODO: Return False here to avoid over-reporting errors

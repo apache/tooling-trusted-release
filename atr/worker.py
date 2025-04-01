@@ -29,7 +29,6 @@ import logging
 import os
 import resource
 import signal
-import sys
 import traceback
 from typing import TYPE_CHECKING, Any, Final
 
@@ -66,9 +65,6 @@ def main() -> None:
     """Main entry point."""
     import atr.config as config
 
-    signal.signal(signal.SIGTERM, _worker_signal_handle)
-    signal.signal(signal.SIGINT, _worker_signal_handle)
-
     conf = config.get()
     if os.path.isdir(conf.STATE_DIR):
         os.chdir(conf.STATE_DIR)
@@ -76,10 +72,32 @@ def main() -> None:
     _setup_logging()
 
     _LOGGER.info(f"Starting worker process with pid {os.getpid()}")
-    db.init_database_for_worker()
+
+    tasks: list[asyncio.Task] = []
+
+    async def _handle_signal(signum: int) -> None:
+        _LOGGER.info(f"Received signal {signum}, shutting down...")
+
+        await db.shutdown_database()
+
+        for t in tasks:
+            t.cancel()
+
+        _LOGGER.debug("Cancelled all running tasks")
+        asyncio.get_event_loop().stop()
+        _LOGGER.debug("Stopped event loop")
+
+    for s in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(s, lambda signum, frame: asyncio.create_task(_handle_signal(signum)))
 
     _worker_resources_limit_set()
-    asyncio.run(_worker_loop_run())
+
+    async def _start() -> None:
+        await asyncio.create_task(db.init_database_for_worker())
+        tasks.append(asyncio.create_task(_worker_loop_run()))
+        await asyncio.gather(*tasks)
+
+    asyncio.run(_start())
 
 
 def _setup_logging() -> None:
@@ -284,17 +302,8 @@ def _worker_resources_limit_set() -> None:
         _LOGGER.warning(f"Could not set memory limit: {e}")
 
 
-def _worker_signal_handle(signum: int, frame: object) -> None:
-    """Handle termination signals gracefully."""
-    # For RLIMIT_AS we'll generally get a SIGKILL
-    # For RLIMIT_CPU we'll get a SIGXCPU, which we can catch
-    _LOGGER.info(f"Received signal {signum}, shutting down...")
-    sys.exit(0)
-
-
 if __name__ == "__main__":
     _LOGGER.info("Starting ATR worker...")
-    print("Starting ATR worker...")
     try:
         main()
     except Exception as e:
