@@ -221,6 +221,8 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     if await aiofiles.os.path.exists(draft_dir):
         # Believe this to be another bug in mypy Protocol handling
         # TODO: Confirm that this is a bug, and report upstream
+        # Changing it to str(...) doesn't work either
+        # Yet it works in preview.py
         await aioshutil.rmtree(draft_dir)  # type: ignore[call-arg]
 
     return await session.redirect(directory, success="Candidate draft deleted successfully")

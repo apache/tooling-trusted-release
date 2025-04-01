@@ -130,6 +130,11 @@
             <a href="{{ url_for('admin.admin_performance') }}"
                {% if request.endpoint == 'admin.admin_performance' %}class="active"{% endif %}>Performance dashboard</a>
           </li>
+          <li>
+            <i class="fa-solid fa-trash"></i>
+            <a href="{{ url_for('admin.admin_delete_release') }}"
+               {% if request.endpoint == 'admin.admin_delete_release' %}class="active"{% endif %}>Delete release</a>
+          </li>
         </ul>
       {% endif %}
     {% endif %}

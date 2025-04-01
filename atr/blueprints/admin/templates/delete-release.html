@@ -1,0 +1,57 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Delete release ~ ATR Admin
+{% endblock title %}
+
+{% block description %}
+  Permanently delete a release and all associated data.
+{% endblock description %}
+
+{% block content %}
+  <h1>Delete release</h1>
+
+  <div class="alert alert-danger" role="alert">
+    <strong>Warning:</strong> This action is irreversible. Deleting a release will permanently remove its database records, including tasks and check results, and its associated files from the filesystem.
+  </div>
+
+  <form method="post" class="needs-validation" novalidate>
+    {{ form.csrf_token }}
+
+    <div class="mb-3">
+      <label class="form-label">Select Release(s) to Delete:</label>
+      {% if releases %}
+        <div class="list-group overflow-y-auto border rounded">
+          {% for release in releases %}
+            <label class="list-group-item list-group-item-action d-flex gap-3">
+              <input class="form-check-input flex-shrink-0"
+                     type="checkbox"
+                     name="releases_to_delete"
+                     value="{{ release.name }}" />
+              <span>
+                <strong>{{ release.name }}</strong> ({{ release.project.display_name }}, Phase: {{ release.phase.value.upper() }})
+              </span>
+            </label>
+          {% endfor %}
+        </div>
+        <div class="form-text">Select one or more releases to delete permanently.</div>
+      {% else %}
+        <p class="text-muted">No releases found in the database.</p>
+      {% endif %}
+    </div>
+
+    <div class="mb-3">
+      {{ form.confirm_delete.label(class="form-label") }}
+      {{ form.confirm_delete(class="form-control" + (" is-invalid" if form.confirm_delete.errors else "") , placeholder="DELETE") }}
+      {% if form.confirm_delete.errors %}
+        <div class="invalid-feedback">{{ form.confirm_delete.errors[0] }}</div>
+      {% else %}
+        <div class="form-text">Please type DELETE exactly to confirm deletion.</div>
+      {% endif %}
+    </div>
+
+    {{ form.submit(class="btn btn-danger") }}
+
+  </form>
+
+{% endblock content %}

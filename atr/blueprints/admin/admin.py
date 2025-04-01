@@ -23,12 +23,14 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 import aiofiles.os
+import aioshutil
 import asfquart
 import asfquart.base as base
 import asfquart.session as session
 import httpx
 import quart
 import werkzeug.wrappers.response as response
+import wtforms
 
 import atr.blueprints.admin as admin
 import atr.datasources.apache as apache
@@ -37,6 +39,70 @@ import atr.db.models as models
 import atr.util as util
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class DeleteReleaseForm(util.QuartFormTyped):
+    """Form for deleting releases."""
+
+    confirm_delete = wtforms.StringField(
+        "Confirmation",
+        validators=[
+            wtforms.validators.InputRequired("Confirmation is required"),
+            wtforms.validators.Regexp("^DELETE$", message="Please type DELETE to confirm"),
+        ],
+    )
+    submit = wtforms.SubmitField("Delete selected releases permanently")
+
+
+@admin.BLUEPRINT.route("/delete-release", methods=["GET", "POST"])
+async def admin_delete_release() -> str | response.Response:
+    """Page to delete selected releases and their associated data and files."""
+    form = await DeleteReleaseForm.create_form()
+
+    if quart.request.method == "POST":
+        if await form.validate_on_submit():
+            form_data = await quart.request.form
+            releases_to_delete = form_data.getlist("releases_to_delete")
+
+            if not releases_to_delete:
+                await quart.flash("No releases selected for deletion.", "warning")
+                return quart.redirect(quart.url_for("admin.admin_delete_release"))
+
+            success_count = 0
+            fail_count = 0
+            error_messages = []
+
+            for release_name in releases_to_delete:
+                try:
+                    await _delete_release_data(release_name)
+                    success_count += 1
+                except base.ASFQuartException as e:
+                    _LOGGER.error("Error deleting release %s: %s", release_name, e)
+                    fail_count += 1
+                    error_messages.append(f"{release_name}: {e}")
+                except Exception:
+                    _LOGGER.exception("Unexpected error deleting release %s:", release_name)
+                    fail_count += 1
+                    error_messages.append(f"{release_name}: Unexpected error")
+
+            if success_count > 0:
+                await quart.flash(f"Successfully deleted {success_count} release(s).", "success")
+            if fail_count > 0:
+                errors_str = "\n".join(error_messages)
+                await quart.flash(f"Failed to delete {fail_count} release(s):\n{errors_str}", "error")
+
+            # Redirecting back to the deletion page will refresh the list of releases too
+            return quart.redirect(quart.url_for("admin.admin_delete_release"))
+
+        # It's unlikely that form validation failed due to spurious release names
+        # Therefore we assume that the user forgot to type DELETE to confirm
+        await quart.flash("Form validation failed. Please type DELETE to confirm.", "warning")
+        # Fall through to the combined GET and failed form validation handling below
+
+    # For GET request or failed form validation
+    async with db.session() as data:
+        releases = await data.release(_project=True).order_by(models.Release.name).all()
+    return await quart.render_template("delete-release.html", form=form, releases=releases, stats=None)
 
 
 @admin.BLUEPRINT.route("/performance")
@@ -348,3 +414,46 @@ async def admin_keys_delete_all() -> str:
                 await data.delete(key)
 
         return f"Deleted {count} keys"
+
+
+async def _delete_release_data(release_name: str) -> None:
+    """Handle the deletion of database records and filesystem data for a release."""
+    async with db.session() as data:
+        release = await data.release(name=release_name).demand(
+            base.ASFQuartException(f"Release '{release_name}' not found.", 404)
+        )
+        release_dir = util.release_directory(release)
+
+        # Delete from the database
+        _LOGGER.info("Deleting database records for release: %s", release_name)
+        # Cascade should handle this, but we delete manually anyway
+        tasks_to_delete = await data.task(release_name=release_name).all()
+        for task in tasks_to_delete:
+            await data.delete(task)
+        _LOGGER.debug("Deleted %d tasks for %s", len(tasks_to_delete), release_name)
+
+        checks_to_delete = await data.check_result(release_name=release_name).all()
+        for check in checks_to_delete:
+            await data.delete(check)
+        _LOGGER.debug("Deleted %d check results for %s", len(checks_to_delete), release_name)
+
+        await data.delete(release)
+        _LOGGER.info("Deleted release record: %s", release_name)
+        await data.commit()
+
+    # Delete from the filesystem
+    try:
+        if await aiofiles.os.path.isdir(release_dir):
+            _LOGGER.info("Deleting filesystem directory: %s", release_dir)
+            # Believe this to be another bug in mypy Protocol handling
+            # TODO: Confirm that this is a bug, and report upstream
+            await aioshutil.rmtree(release_dir)  # type: ignore[call-arg]
+            _LOGGER.info("Successfully deleted directory: %s", release_dir)
+        else:
+            _LOGGER.warning("Filesystem directory not found, skipping deletion: %s", release_dir)
+    except Exception as e:
+        _LOGGER.exception("Error deleting filesystem directory %s:", release_dir)
+        await quart.flash(
+            f"Database records for '{release_name}' deleted, but failed to delete filesystem directory: {e!s}",
+            "warning",
+        )

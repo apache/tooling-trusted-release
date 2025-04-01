@@ -202,6 +202,29 @@ async def paths_recursive(base_path: pathlib.Path, sort: bool = True) -> list[pa
     return paths
 
 
+def release_directory(release: models.Release) -> pathlib.Path:
+    """Determine the filesystem directory for a given release based on its phase."""
+    phase = release.phase
+    try:
+        project_name, version_name = release.name.rsplit("-", 1)
+    except ValueError:
+        raise base.ASFQuartException(f"Invalid release name format '{release.name}'", 500)
+
+    base_dir: pathlib.Path | None = None
+    match phase:
+        case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+            base_dir = get_release_candidate_draft_dir()
+        case models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE | models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE:
+            base_dir = get_release_candidate_dir()
+        case models.ReleasePhase.RELEASE_PREVIEW:
+            base_dir = get_release_preview_dir()
+        case models.ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT | models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT:
+            base_dir = get_release_dir()
+        # NOTE: Do NOT add "case _" here
+
+    return base_dir / project_name / version_name
+
+
 def unwrap(value: T | None, error_message: str = "unexpected None when unwrapping value") -> T:
     """
     Will unwrap the given value or raise a ValueError if it is None

@@ -238,8 +238,16 @@ Do:
 (a or b) and (c == d) or e
 ```
 
+### Use terse comments on their own lines
+
+Place comments on dedicated lines preceding the relevant code block. Comments at the ends of lines are strictly reserved for linter or type checker directives. This convention enhances code scannability for such directives. General comments must not appear at the end of code lines. Keep comments concise, using sentence case without terminal punctuation. Each sentence forming a comment must occupy its own line.
+
 ## HTML
 
 ### Use sentence case for headings
 
 We write headings like "This is a heading", and not "This is a Heading" or "This Is A Heading". This follows the [Wikipedia style for headings](https://en.wikipedia.org/wiki/Wikipedia:Manual_of_Style#Section_headings). The same goes for button texts.
+
+### Use Bootstrap classes for all style
+
+We use Bootstrap classes for style, and avoid custom classes unless absolutely necessary. If you think that you have to resort to a custom class, consult the list of [Bootstrap classes](https://bootstrapclasses.com/) for guidance. There is usually a class for what you want to achieve, and if there isn't then you may be making things too complicated. Complicated, custom style is difficult for a team to maintain. If you still believe that a new class is strictly warranted, then the class must be prefixed with `atr-`. Classes can go in `<style>` elements in `stylesheet` template blocks in such cases. The use of the `style` attribute on any HTML element is forbidden.

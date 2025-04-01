@@ -150,6 +150,10 @@ def _verify_archive_integrity_do_something():
 <p>Do:</p>
 <pre><code class="language-python">(a or b) and (c == d) or e
 </code></pre>
+<h3>Use terse comments on their own lines</h3>
+<p>Place comments on dedicated lines preceding the relevant code block. Comments at the ends of lines are strictly reserved for linter or type checker directives. This convention enhances code scannability for such directives. General comments must not appear at the end of code lines. Keep comments concise, using sentence case without terminal punctuation. Each sentence forming a comment must occupy its own line.</p>
 <h2>HTML</h2>
 <h3>Use sentence case for headings</h3>
 <p>We write headings like &quot;This is a heading&quot;, and not &quot;This is a Heading&quot; or &quot;This Is A Heading&quot;. This follows the <a href="https://en.wikipedia.org/wiki/Wikipedia:Manual_of_Style#Section_headings">Wikipedia style for headings</a>. The same goes for button texts.</p>
+<h3>Use Bootstrap classes for all style</h3>
+<p>We use Bootstrap classes for style, and avoid custom classes unless absolutely necessary. If you think that you have to resort to a custom class, consult the list of <a href="https://bootstrapclasses.com/">Bootstrap classes</a> for guidance. There is usually a class for what you want to achieve, and if there isn't then you may be making things too complicated. Complicated, custom style is difficult for a team to maintain. If you still believe that a new class is strictly warranted, then the class must be prefixed with <code>atr-</code>. Classes can go in <code>&lt;style&gt;</code> elements in <code>stylesheet</code> template blocks in such cases. The use of the <code>style</code> attribute on any HTML element is forbidden.</p>
