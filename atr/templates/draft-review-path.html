@@ -32,38 +32,37 @@
   <h2>Verification tasks</h2>
 
   {% if check_results %}
+    {# Define status_counts here so it's available globally in this block #}
+    {% set status_counts = {
+          "success": check_results|selectattr("status.value", "equalto", "success")|list|length,
+          "failure": check_results|selectattr("status.value", "equalto", "failure")|list|length,
+          "warning": check_results|selectattr("status.value", "equalto", "warning")|list|length,
+          "exception": check_results|selectattr("status.value", "equalto", "exception")|list|length
+        } %}
+
     <div class="d-flex align-items-center p-3 mb-3 bg-light border rounded">
       <span class="fw-bold me-3">Status summary:</span>
       <div class="d-flex flex-wrap gap-3">
-        {% with %}
-          {% set status_counts = {
-                      "success": check_results|selectattr("status.value", "equalto", "success")|list|length,
-                      "failure": check_results|selectattr("status.value", "equalto", "failure")|list|length,
-                      "warning": check_results|selectattr("status.value", "equalto", "warning")|list|length,
-                      "exception": check_results|selectattr("status.value", "equalto", "exception")|list|length
-                    } %}
-
-          {% for status, count in status_counts.items() %}
-            {% if count > 0 %}
-              <div class="d-flex align-items-center gap-2 px-3 py-2 rounded fw-medium {% if status == "success" %}bg-success-subtle border border-success-subtle {% elif status == "failure" %}bg-danger-subtle border border-danger-subtle {% elif status == "warning" %}bg-warning-subtle border border-warning-subtle {% elif status == "exception" %}bg-danger-subtle border border-danger-subtle {% endif %}">
-                <span class="fs-5">{{ count }}</span>
-                <span>
-                  {%- if status == "success" -%}
-                    Passed
-                  {%- elif status == "failure" -%}
-                    Issues
-                  {%- elif status == "warning" -%}
-                    Warning
-                  {%- elif status == "exception" -%}
-                    Error
-                  {%- else -%}
-                    {{ status|title }}
-                  {%- endif -%}
-                </span>
-              </div>
-            {% endif %}
-          {% endfor %}
-        {% endwith %}
+        {% for status, count in status_counts.items() %}
+          {% if count > 0 %}
+            <div class="d-flex align-items-center gap-2 px-3 py-2 rounded fw-medium {% if status == "success" %}bg-success-subtle border border-success-subtle {% elif status == "failure" %}bg-danger-subtle border border-danger-subtle {% elif status == "warning" %}bg-warning-subtle border border-warning-subtle {% elif status == "exception" %}bg-danger-subtle border border-danger-subtle {% endif %}">
+              <span class="fs-5">{{ count }}</span>
+              <span>
+                {%- if status == "success" -%}
+                  Passed
+                {%- elif status == "failure" -%}
+                  Issues
+                {%- elif status == "warning" -%}
+                  Warning
+                {%- elif status == "exception" -%}
+                  Error
+                {%- else -%}
+                  {{ status|title }}
+                {%- endif -%}
+              </span>
+            </div>
+          {% endif %}
+        {% endfor %}
       </div>
     </div>
   {% endif %}
@@ -83,11 +82,23 @@
               {%- if check_result.status.value == "success" -%}
                 Passed
               {%- elif check_result.status.value == "failure" -%}
-                Issue
+                {% if status_counts['failure'] == 1 %}
+                  Issue
+                {% else %}
+                  Issues
+                {% endif %}
               {%- elif check_result.status.value == "warning" -%}
-                Warning
+                {% if status_counts['warning'] == 1 %}
+                  Warning
+                {% else %}
+                  Warnings
+                {% endif %}
               {%- elif check_result.status.value == "exception" -%}
-                Error
+                {% if status_counts['exception'] == 1 %}
+                  Exception
+                {% else %}
+                  Exceptions
+                {% endif %}
               {%- else -%}
                 {{ check_result.status.value|title }}
               {%- endif -%}

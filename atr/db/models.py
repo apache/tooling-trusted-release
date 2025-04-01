@@ -290,7 +290,7 @@ class TaskType(str, enum.Enum):
     HASHING_CHECK = "hashing_check"
     LICENSE_FILES = "license_files"
     LICENSE_HEADERS = "license_headers"
-    # PATHS_CHECK = "paths_check"
+    PATHS_CHECK = "paths_check"
     RAT_CHECK = "rat_check"
     RSYNC_ANALYSE = "rsync_analyse"
     SIGNATURE_CHECK = "signature_check"

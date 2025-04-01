@@ -23,6 +23,7 @@ import atr.db.models as models
 import atr.tasks.checks.archive as archive
 import atr.tasks.checks.hashing as hashing
 import atr.tasks.checks.license as license
+import atr.tasks.checks.paths as paths
 import atr.tasks.checks.rat as rat
 import atr.tasks.checks.signature as signature
 import atr.tasks.rsync as rsync
@@ -75,8 +76,8 @@ def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:
             return license.files
         case models.TaskType.LICENSE_HEADERS:
             return license.headers
-        # case models.TaskType.PATHS_CHECK:
-        #     return paths.check
+        case models.TaskType.PATHS_CHECK:
+            return paths.check
         case models.TaskType.RAT_CHECK:
             return rat.check
         case models.TaskType.RSYNC_ANALYSE:
@@ -173,17 +174,6 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
             path=path,
             modified=modified,
         ),
-        # models.Task(
-        #     status=models.TaskStatus.QUEUED,
-        #     task_type=models.TaskType.SBOM_GENERATE_CYCLONEDX,
-        #     task_args=tasks.SbomGenerateCyclonedx(
-        #         artifact_path=str(full_path),
-        #         output_path=str(full_sbom_path),
-        #     ).model_dump(),
-        #     release_name=release.name,
-        #     path=path,
-        #     modified=modified,
-        # ),
     ]
 
     return tasks

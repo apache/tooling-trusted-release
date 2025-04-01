@@ -83,7 +83,7 @@
                           <span class="badge bg-success">{{ successes[path]|length }} Passed</span>
                         {% endif %}
                         {% if warnings[path]|length > 0 %}
-                          <span class="badge bg-warning">{{ warnings[path]|length }} {{ "Issue" if warnings[path]|length == 1 else "Issues" }}</span>
+                          <span class="badge bg-warning">{{ warnings[path]|length }} {{ "Warning" if warnings[path]|length == 1 else "Warnings" }}</span>
                         {% endif %}
                         {% if errors[path]|length > 0 %}
                           <span class="badge bg-danger">{{ errors[path]|length }} {{ "Issue" if errors[path]|length == 1 else "Issues" }}</span>
@@ -98,7 +98,7 @@
                        class="btn btn-sm btn-outline-primary fs-6 small ms-2">Tools</a>
                     <a href="{{ as_url(routes.draft.review_path, project_name=project_name, version_name=version_name, file_path=path) }}"
                        class="btn btn-sm btn-outline-primary fs-6 small ms-2">Review file</a>
-                    <button class="btn btn-sm btn-outline-danger"
+                    <button class="btn btn-sm btn-outline-danger ms-2"
                             data-bs-toggle="modal"
                             data-bs-target="#delete-{{ path|slugify }}">Delete file</button>
                   </td>

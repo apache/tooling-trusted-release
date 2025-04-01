@@ -25,8 +25,7 @@ import atr.db as db
 import atr.db.models as models
 import atr.tasks as tasks
 import atr.tasks.checks as checks
-
-# import atr.tasks.checks.paths as paths
+import atr.tasks.checks.paths as paths
 import atr.util as util
 
 if TYPE_CHECKING:
@@ -93,23 +92,15 @@ async def _analyse_core(project_name: str, release_version: str) -> dict[str, An
                         if task.task_type not in cached_tasks:
                             data.add(task)
 
-            # # Add the generic path check task for every file
-            # if path_check_task_key not in cached_tasks:
-            #     path_check_task_args = paths.Check(
-            #         release_name=release_name,
-            #         base_release_dir=str(base_path),
-            #         path=str(path),
-            #     ).model_dump()
-
-        #     path_check_task = models.Task(
-        #         status=models.TaskStatus.QUEUED,
-        #         task_type=tasks.Type.PATHS_CHECK,
-        #         task_args=paths.Check(
-        #             release_name=release_name,
-        #             base_release_dir=str(base_path),
-        #             path=str(path),
-        #         ).model_dump(),
-        #     )
+        path_check_task = models.Task(
+            status=models.TaskStatus.QUEUED,
+            task_type=models.TaskType.PATHS_CHECK,
+            task_args=paths.Check(
+                release_name=release_name,
+                base_release_dir=str(base_path),
+            ).model_dump(),
+        )
+        data.add(path_check_task)
 
         await data.commit()
     return {"paths": [str(path) for path in paths_recursive]}

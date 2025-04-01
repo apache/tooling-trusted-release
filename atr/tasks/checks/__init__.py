@@ -20,6 +20,7 @@ from __future__ import annotations
 import datetime
 import pathlib
 from functools import wraps
+from types import FunctionType
 from typing import TYPE_CHECKING, Any, TypeVar
 
 import pydantic
@@ -35,9 +36,13 @@ import atr.db.models as models
 
 class Check:
     def __init__(
-        self, checker: Callable[..., Any], release_name: str, path: str | None = None, afresh: bool = True
+        self, checker: str | Callable[..., Any], release_name: str, path: str | None = None, afresh: bool = True
     ) -> None:
-        self.checker = function_key(checker)
+        if isinstance(checker, FunctionType):
+            checker = function_key(checker)
+        if not isinstance(checker, str):
+            raise ValueError("Checker must be a string or a callable")
+        self.checker = checker
         self.release_name = release_name
         self.path = path
         self.afresh = afresh
@@ -45,12 +50,12 @@ class Check:
 
     @classmethod
     async def create(
-        cls, checker: Callable[..., Any], release_name: str, path: str | None = None, afresh: bool = True
+        cls, checker: str | Callable[..., Any], release_name: str, path: str | None = None, afresh: bool = True
     ) -> Check:
         check = cls(checker, release_name, path, afresh)
         if afresh is True:
             # Clear outer path whether it's specified or not
-            await check._clear(path)
+            await check.clear(path)
         check._constructed = True
         return check
 
@@ -64,7 +69,7 @@ class Check:
                 raise ValueError("Cannot specify path twice")
             if self.afresh is True:
                 # Clear inner path only if it's specified
-                await self._clear(path)
+                await self.clear(path)
 
         result = models.CheckResult(
             release_name=self.release_name,
@@ -84,7 +89,7 @@ class Check:
             await session.commit()
         return result
 
-    async def _clear(self, path: str | None = None) -> None:
+    async def clear(self, path: str | None = None) -> None:
         async with db.session() as data:
             stmt = sqlmodel.delete(models.CheckResult).where(
                 db.validate_instrumented_attribute(models.CheckResult.release_name) == self.release_name,
