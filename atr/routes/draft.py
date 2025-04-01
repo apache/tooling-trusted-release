@@ -225,11 +225,16 @@ async def add_file(session: routes.CommitterSession, project_name: str, version_
     class AddFilesForm(util.QuartFormTyped):
         """Form for adding file(s) to a release candidate."""
 
-        file_name = wtforms.StringField("File name (optional)", validators=[wtforms.validators.Optional()])
+        file_name = wtforms.StringField("File name (optional)")
         file_data = wtforms.MultipleFileField(
             "File", validators=[wtforms.validators.InputRequired("File(s) are required")]
         )
         submit = wtforms.SubmitField("Add file(s)")
+
+        def validate_file_name(self, field: wtforms.Field) -> bool:
+            if field.data and len(self.file_data.data) > 1:
+                raise wtforms.validators.ValidationError("File name can only be used when uploading a single file")
+            return True
 
     form = await AddFilesForm.create_form()
     if await form.validate_on_submit():
@@ -238,10 +243,6 @@ async def add_file(session: routes.CommitterSession, project_name: str, version_
             if isinstance(form.file_name.data, str) and form.file_name.data:
                 file_name = pathlib.Path(form.file_name.data)
             file_data = form.file_data.data
-            if not file_data or len(file_data) == 0:
-                raise routes.FlashError("Invalid file upload")
-            if file_name is not None and len(file_data) > 1:
-                raise routes.FlashError("File name can only be used when uploading a single file")
 
             await _upload_files(project_name, version_name, file_name, file_data)
             return await session.redirect(

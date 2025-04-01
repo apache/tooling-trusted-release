@@ -64,7 +64,6 @@ select, input[type="file"] {
 
 input:not([type="submit"]), textarea, select, option {
     border-width: 2px !important;
-    border-color: #cccccc !important;
 }
 
 a {
