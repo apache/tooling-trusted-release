@@ -29,6 +29,7 @@ dependencies = [
   "python-gnupg~=0.5",
   "quart-schema[pydantic]~=0.21",
   "quart-wtforms~=1.0.3",
+  "rich~=14.0.0",
   "sqlmodel~=0.0.24",
 ]
 

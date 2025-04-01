@@ -30,8 +30,10 @@ import asfquart.session
 import blockbuster
 import quart
 import quart_schema
+import rich.logging as rich_logging
 import werkzeug.routing as routing
 
+import atr
 import atr.blueprints as blueprints
 import atr.config as config
 import atr.db as db
@@ -177,11 +179,21 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
 
 def app_setup_logging(app: base.QuartApp, config_mode: config.Mode, app_config: type[config.AppConfig]) -> None:
     """Setup application logging."""
+
+    # remove any existing handlers, hypercorn might have set them up already
+    for handler in logging.root.handlers:
+        logging.root.removeHandler(handler)
+
     logging.basicConfig(
-        format="[%(asctime)s.%(msecs)03d  ] [%(process)d] [%(levelname)s] %(message)s",
+        format="[%(asctime)s.%(msecs)03d  ] [%(process)d] %(message)s",
         level=logging.INFO,
         datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[rich_logging.RichHandler(rich_tracebacks=True, show_time=False)],
     )
+
+    # enable debug output for atr.* in DEBUG mode
+    if config_mode == config.Mode.Debug:
+        logging.getLogger(atr.__name__).setLevel(logging.DEBUG)
 
     # Only log in the worker process
     @app.before_serving
