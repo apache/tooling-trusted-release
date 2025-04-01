@@ -20,12 +20,14 @@ from collections.abc import Mapping
 
 import quart
 import quart_schema
+import sqlalchemy
+import sqlalchemy.ext.asyncio
+import sqlmodel
 import werkzeug.exceptions as exceptions
 
 import atr.blueprints.api as api
 import atr.db as db
 import atr.db.models as models
-import atr.db.service as service
 
 # FIXME: we need to return the dumped model instead of the actual pydantic class
 #        as otherwise pyright will complain about the return type
@@ -59,6 +61,14 @@ class Pagination:
 @api.BLUEPRINT.route("/tasks")
 @quart_schema.validate_querystring(Pagination)
 async def api_tasks(query_args: Pagination) -> quart.Response:
-    paged_tasks, count = await service.get_tasks(limit=query_args.limit, offset=query_args.offset)
-    result = {"data": [x.model_dump(exclude={"result"}) for x in paged_tasks], "count": count}
-    return quart.jsonify(result)
+    async with db.session() as data:
+        statement = (
+            sqlmodel.select(models.Task)
+            .limit(query_args.limit)
+            .offset(query_args.offset)
+            .order_by(models.Task.id.desc())  # type: ignore
+        )
+        paged_tasks = (await data.execute(statement)).scalars().all()
+        count = (await data.execute(sqlalchemy.select(sqlalchemy.func.count(models.Task.id)))).scalar_one()  # type: ignore
+        result = {"data": [x.model_dump(exclude={"result"}) for x in paged_tasks], "count": count}
+        return quart.jsonify(result)

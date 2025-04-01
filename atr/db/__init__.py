@@ -554,29 +554,6 @@ def create_async_db_session() -> sqlalchemy.ext.asyncio.AsyncSession:
         return util.validate_as_type(_global_async_sessionmaker(), sqlalchemy.ext.asyncio.AsyncSession)
 
 
-# FIXME: this method is deprecated and should be removed
-def create_sync_db_engine() -> None:
-    """Create a synchronous database engine."""
-
-    global _global_sync_engine
-
-    conf = config.get()
-    sqlite_url = f"sqlite://{conf.SQLITE_DB_PATH}"
-    _LOGGER.debug(f"Creating sync database engine in process {os.getpid()}")
-    _global_sync_engine = sqlalchemy.create_engine(sqlite_url, echo=False)
-
-
-# FIXME: this method is deprecated and should be removed
-def create_sync_db_session() -> sqlalchemy.orm.Session:
-    """Create a new synchronous database session."""
-    global _global_sync_engine
-    if _global_sync_engine is None:
-        conf = config.get()
-        sqlite_url = f"sqlite://{conf.SQLITE_DB_PATH}"
-        _global_sync_engine = sqlalchemy.create_engine(sqlite_url, echo=False)
-    return sqlalchemy.orm.Session(_global_sync_engine)
-
-
 async def recent_tasks(data: Session, release_name: str, file_path: str, modified: int) -> dict[str, models.Task]:
     """Get the most recent task for each task type for a specific file."""
     tasks = await data.task(

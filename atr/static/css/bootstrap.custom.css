@@ -7131,7 +7131,7 @@ textarea.form-control-lg {
   --bs-border-opacity: 1;
 }
 
-.w-25, th {
+.w-25 {
   width: 25% !important;
 }
 

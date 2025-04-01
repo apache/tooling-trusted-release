@@ -29,22 +29,36 @@
   <script>
     new gridjs.Grid({
       columns: [
-        'ID',
-        'Task Type',
-        'Task Status',
+        {
+            name: 'ID',
+            width: '40px'
+        },
+        {
+            name: 'Task Type',
+            width: '140px'
+        },
+        {
+            name: 'Task Status',
+            width: '60px'
+        },
         {
           name: 'Added',
+          width: '100px',
           formatter: (cell) => `${new Date(cell).toISOString()}`
         },
         {
           name: 'Started',
+          width: '100px',
           formatter: (cell) => `${new Date(cell).toISOString()}`
         },
         {
           name: 'Completed',
+          width: '100px',
           formatter: (cell) => `${new Date(cell).toISOString()}`
         }
       ],
+      autoWidth: false,
+      resizable: true,
       style: {
         table: {
           // TODO: Need a better fix here
