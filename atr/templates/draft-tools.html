@@ -54,13 +54,4 @@
       <button type="submit" class="btn btn-outline-secondary">Generate CycloneDX SBOM (.cdx.json)</button>
     </form>
   {% endif %}
-
-  <h3>Delete file</h3>
-  <p>This tool deletes the file from the candidate draft.</p>
-  <form method="post"
-        action="{{ as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name, file_path=file_path) }}">
-    <button type="submit"
-            class="btn btn-danger"
-            onclick="return confirm('Are you sure you want to delete this file?')">Delete file</button>
-  </form>
 {% endblock content %}
