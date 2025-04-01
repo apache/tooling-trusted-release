@@ -1,7 +1,8 @@
 
 <form method="post"
       enctype="multipart/form-data"
-      class="striking py-4 px-5">
+      class="striking py-4 px-5 needs-validation"
+      novalidate>
   <input type="hidden" name="form_type" value="single" />
   {{ form.hidden_tag() }}
   <div class="mb-3 pb-3 row border-bottom">
@@ -15,10 +16,10 @@
     <label for="{{ form.mailto_addresses.entries[0].id }}"
            class="col-sm-3 col-form-label text-sm-end">{{ form.mailto_addresses.entries[0].label.text }}</label>
     <div class="col-sm-8">
-      <div>{{ form.mailto_addresses.entries[0](size=30, class_="form-control") }}</div>
-      {% if form.mailto_addresses.entries[0].errors -%}
-        <span class="error-message">{{ form.mailto_addresses.entries[0].errors[0] }}</span>
-      {%- endif %}
+      {{ form.mailto_addresses.entries[0](size=30, class_="form-control" + (" is-invalid" if form.mailto_addresses[0].errors else "")) }}
+      {% if form.mailto_addresses[0].errors %}
+        {% for error in form.mailto_addresses[0].errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+      {% endif %}
     </div>
   </div>
 
@@ -37,8 +38,11 @@
     <label for="{{ form.min_hours.id }}"
            class="col-sm-3 col-form-label text-sm-end">{{ form.min_hours.label.text }}</label>
     <div class="col-sm-8">
-      {{ form.min_hours(class_="form-control") }}
+      {{ form.min_hours(class_="form-control" + (" is-invalid" if form.min_hours.errors else "") ) }}
       <span id="min_hours-help" class="form-text text-muted">The minimum time to run the vote. If set to 0 then wait until 3 +1 votes and more +1 than -1.</span>
+      {% if form.min_hours.errors %}
+        {% for error in form.min_hours.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+      {% endif %}
     </div>
   </div>
 

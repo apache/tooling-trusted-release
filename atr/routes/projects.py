@@ -68,7 +68,11 @@ class VotePolicyForm(util.QuartFormTyped):
         min_entries=1,
     )
     min_hours = wtforms.IntegerField(
-        "Minimum Voting Period:", widget=wtforms.widgets.NumberInput(min=0, max=144), default=72
+        "Minimum Voting Period:",
+        validators=[
+            wtforms.validators.NumberRange(min=0, max=144, message="Voting period must be between 0h and 144h")
+        ],
+        default=72,
     )
     manual_vote = wtforms.BooleanField("Voting Process:")
     release_checklist = wtforms.StringField("Release Checklist:", widget=wtforms.widgets.TextArea())
