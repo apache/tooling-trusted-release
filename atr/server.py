@@ -40,6 +40,7 @@ import atr.preload as preload
 import atr.ssh as ssh
 import atr.user as user
 import atr.util as util
+from atr.filters import register_filters
 
 # TODO: Technically this is a global variable
 # We should probably find a cleaner way to do this
@@ -199,6 +200,8 @@ def create_app(app_config: type[config.AppConfig]) -> base.QuartApp:
     db.init_database(app)
     register_routes(app)
     blueprints.register(app)
+
+    register_filters(app)
 
     config_mode = config.get_mode()
 

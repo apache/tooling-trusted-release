@@ -100,11 +100,11 @@
                        class="btn btn-sm btn-outline-primary fs-6 small ms-2">Review file</a>
                     <button class="btn btn-sm btn-outline-danger"
                             data-bs-toggle="modal"
-                            data-bs-target="#delete-{{ path }}">Delete file</button>
+                            data-bs-target="#delete-{{ path|slugify }}">Delete file</button>
                   </td>
                 </tr>
                 {% set file_id = path|string %}
-                {{ dialog.delete_modal_with_confirm(file_id, "Delete file", "file", as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
+                {{ dialog.delete_modal(file_id, "Delete file", "file", as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
               {% endfor %}
             </tbody>
           </table>
@@ -158,9 +158,22 @@
         <a href="{{ as_url(routes.draft.add_file, project_name=release.project.name, version_name=release.version) }}">Upload a file in the browser</a>, or use the command below to add or modify files in this release using rsync:
       </p>
     </div>
-    <pre class="card-footer bg-light border-1 pt-4 small">
+    <div class="card-footer bg-light border-1 pt-4 pb-4 position-relative">
+      <button class="btn btn-sm btn-outline-secondary atr-copy-btn fs-6 position-absolute top-0 end-0 m-2"
+              data-clipboard-target="#cmd-newdraft-{{ release.project.name|slugify }}">
+        <i class="bi bi-clipboard"></i> Copy
+      </button>
+      <pre class="small mb-0" id="cmd-newdraft-{{ release.project.name|slugify }}">
 rsync -av -e 'ssh -p 2222' your/files/ \
     {{ asf_id }}@{{ server_domain }}:/{{ project_name }}/{{ version_name }}/
-    </pre>
+      </pre>
+    </div>
   </div>
 {% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+  <script>
+      init();
+  </script>
+{% endblock javascripts %}

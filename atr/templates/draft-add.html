@@ -50,10 +50,10 @@
             </div>
             <div class="card-footer bg-light border-1 pt-4 pb-4 position-relative">
               <button class="btn btn-sm btn-outline-secondary atr-copy-btn fs-6 position-absolute top-0 end-0 m-2"
-                      data-clipboard-target="#cmd-newdraft-{{ project.name|replace('.', '-') }}">
+                      data-clipboard-target="#cmd-newdraft-{{ project.name|slugify }}">
                 <i class="bi bi-clipboard"></i> Copy
               </button>
-              <pre class="small mb-0" id="cmd-newdraft-{{ project.name|replace('.', '-') }}">rsync -av -e 'ssh -p 2222' your/files/ \
+              <pre class="small mb-0" id="cmd-newdraft-{{ project.name|slugify }}">rsync -av -e 'ssh -p 2222' your/files/ \
     {{ asf_id }}@{{ server_domain }}:/{{ project.name }}/VERSION/</pre>
             </div>
           </div>
@@ -125,38 +125,6 @@
     {% block javascripts %}
       {{ super() }}
       <script>
-          document.addEventListener("DOMContentLoaded", function() {
-              const copyButtons = document.querySelectorAll(".atr-copy-btn");
-
-              copyButtons.forEach(button => {
-                  button.addEventListener("click", function() {
-                      const targetId = this.getAttribute("data-clipboard-target");
-                      const targetElement = document.querySelector(targetId);
-
-                      if (targetElement) {
-                          const textToCopy = targetElement.textContent;
-
-                          navigator.clipboard.writeText(textToCopy)
-                              .then(() => {
-                                  const originalText = this.innerHTML;
-                                  this.innerHTML = '<i class="bi bi-check2"></i> Copied!';
-
-                                  // Reset the button text after 2000ms
-                                  setTimeout(() => {
-                                      this.innerHTML = originalText;
-                                  }, 2000);
-                              })
-                              .catch(err => {
-                                  console.error("Failed to copy: ", err);
-                                  this.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Failed!';
-
-                                  setTimeout(() => {
-                                      this.innerHTML = '<i class="bi bi-clipboard"></i> Copy';
-                                  }, 2000);
-                              });
-                      }
-                  });
-              });
-          });
+          init();
       </script>
     {% endblock javascripts %}

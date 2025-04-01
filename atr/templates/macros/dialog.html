@@ -1,15 +1,16 @@
 {% macro delete_modal_with_confirm(id, title, item, action, form, field_name) %}
+  {% set element_id = id|slugify %}
   <div class="modal modal-lg fade"
-       id="delete-{{ id }}"
+       id="delete-{{ element_id }}"
        data-bs-backdrop="static"
        data-bs-keyboard="false"
        tabindex="-1"
-       aria-labelledby="delete-{{ id }}-label"
+       aria-labelledby="delete-{{ element_id }}-label"
        aria-hidden="true">
     <div class="modal-dialog border-primary">
       <div class="modal-content">
         <div class="modal-header bg-danger bg-opacity-10 text-danger">
-          <h1 class="modal-title fs-5" id="delete-{{ id }}-label">{{ title }}</h1>
+          <h1 class="modal-title fs-5" id="delete-{{ element_id }}-label">{{ title }}</h1>
           <button type="button"
                   class="btn-close"
                   data-bs-dismiss="modal"
@@ -21,19 +22,50 @@
             {{ form.hidden_tag() }}
             {{ form[field_name](value_=id, hidden=True) }}
             <div class="mb-3">
-              <label for="confirm_delete_{{ id }}" class="form-label">
+              <label for="confirm_delete_{{ element_id }}" class="form-label">
                 Type <strong>DELETE</strong> to confirm:
               </label>
               <input class="form-control mt-2"
-                     id="confirm_delete_{{ id }}"
+                     id="confirm_delete_{{ element_id }}"
                      name="confirm_delete"
                      placeholder="DELETE"
                      required=""
                      type="text"
                      value=""
-                     onkeyup="updateDeleteButton(this, 'delete-button-{{ id }}')" />
+                     onkeyup="updateDeleteButton(this, 'delete-button-{{ element_id }}')" />
             </div>
-            {{ form.submit(class_="btn btn-danger", id_="delete-button-" + id, disabled=True) }}
+            {{ form.submit(class_="btn btn-danger", id_="delete-button-" + element_id, disabled=True) }}
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro delete_modal(id, title, item, action, form, field_name) %}
+  {% set element_id = id|slugify %}
+  <div class="modal modal-lg fade"
+       id="delete-{{ element_id }}"
+       data-bs-backdrop="static"
+       data-bs-keyboard="false"
+       tabindex="-1"
+       aria-labelledby="delete-{{ element_id }}-label"
+       aria-hidden="true">
+    <div class="modal-dialog border-primary">
+      <div class="modal-content">
+        <div class="modal-header bg-danger bg-opacity-10 text-danger">
+          <h1 class="modal-title fs-5" id="delete-{{ element_id }}-label">{{ title }}</h1>
+          <button type="button"
+                  class="btn-close"
+                  data-bs-dismiss="modal"
+                  aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted mb-3">Warning: This action will permanently delete this {{ item }} and cannot be undone.</p>
+          <form method="post" action="{{ action }}">
+            {{ form.hidden_tag() }}
+            {{ form[field_name](value_=id, hidden=True) }}
+            {{ form.submit(class_="btn btn-danger", id_="delete-button-" + element_id) }}
           </form>
         </div>
       </div>
