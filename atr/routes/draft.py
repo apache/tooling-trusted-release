@@ -227,7 +227,7 @@ async def add_file(session: routes.CommitterSession, project_name: str, version_
 
         file_name = wtforms.StringField("File name (optional)")
         file_data = wtforms.MultipleFileField(
-            "File", validators=[wtforms.validators.InputRequired("File(s) are required")]
+            "File(s)", validators=[wtforms.validators.InputRequired("File(s) are required")]
         )
         submit = wtforms.SubmitField("Add file(s)")
 
