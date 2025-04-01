@@ -16,6 +16,7 @@
 # under the License.
 
 import asyncio
+import binascii
 import contextlib
 import dataclasses
 import hashlib
@@ -292,3 +293,60 @@ async def async_temporary_directory(
         yield pathlib.Path(temp_dir_path)
     finally:
         await asyncio.to_thread(shutil.rmtree, temp_dir_path, ignore_errors=True)
+
+
+async def read_file_for_viewer(full_path: pathlib.Path, max_size: int) -> tuple[str | None, bool, bool, str | None]:
+    """Read file content for viewer."""
+    content: str | None = None
+    is_text = False
+    is_truncated = False
+    error_message: str | None = None
+
+    try:
+        if not await aiofiles.os.path.exists(full_path):
+            return None, False, False, "File does not exist"
+        if not await aiofiles.os.path.isfile(full_path):
+            return None, False, False, "Path is not a file"
+
+        file_size = await aiofiles.os.path.getsize(full_path)
+        read_size = min(file_size, max_size)
+
+        if file_size > max_size:
+            is_truncated = True
+
+        if file_size == 0:
+            is_text = True
+            content = "(Empty file)"
+            raw_content = b""
+        else:
+            async with aiofiles.open(full_path, "rb") as f:
+                raw_content = await f.read(read_size)
+
+        if file_size > 0:
+            try:
+                if b"\x00" in raw_content:
+                    raise UnicodeDecodeError("utf-8", b"", 0, 1, "Null byte found")
+                content = raw_content.decode("utf-8")
+                is_text = True
+            except UnicodeDecodeError:
+                is_text = False
+                content = _generate_hexdump(raw_content)
+
+    except Exception as e:
+        error_message = f"An error occurred reading the file: {e!s}"
+
+    return content, is_text, is_truncated, error_message
+
+
+def _generate_hexdump(data: bytes) -> str:
+    """Generate a formatted hexdump string from bytes."""
+    hex_lines = []
+    for i in range(0, len(data), 16):
+        chunk = data[i : i + 16]
+        hex_part = binascii.hexlify(chunk).decode("ascii")
+        hex_part = hex_part.ljust(32)
+        hex_part_spaced = " ".join(hex_part[j : j + 2] for j in range(0, len(hex_part), 2))
+        ascii_part = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
+        line_num = f"{i:08x}"
+        hex_lines.append(f"{line_num}  {hex_part_spaced}  |{ascii_part}|")
+    return "\n".join(hex_lines)

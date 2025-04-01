@@ -1,0 +1,58 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  View {{ project_name }}/{{ version_name }}/{{ file_path }} ~ ATR
+{% endblock title %}
+
+{% block description %}
+  View the content of the {{ project_name }} {{ version_name }} {{ file_path }} file.
+{% endblock description %}
+
+{% block content %}
+  {# Generate back link based on phase_key #}
+  {% if phase_key == "draft" %}
+    {% set back_url = as_url(routes.draft.viewer, project_name=project_name, version_name=version_name) %}
+  {% elif phase_key == "candidate" %}
+    {% set back_url = as_url(routes.candidate.viewer, project_name=project_name, version_name=version_name) %}
+  {% elif phase_key == "preview" %}
+    {% set back_url = as_url(routes.preview.viewer, project_name=project_name, version_name=version_name) %}
+  {% elif phase_key == "release" %}
+    {% set back_url = as_url(routes.release.viewer, project_name=project_name, version_name=version_name) %}
+  {% endif %}
+  <a href="{{ back_url }}" class="back-link">← Back to Viewer</a>
+
+  <div class="p-3 mb-4 bg-light border rounded">
+    <h2 class="mt-0">Viewing file: {{ file_path }}</h2>
+    <p class="mb-0">
+      <strong>Release:</strong> {{ release.name }}
+    </p>
+  </div>
+
+  {% if error_message %}
+    <div class="alert alert-danger">{{ error_message }}</div>
+  {% elif size_limit_exceeded %}
+    <div class="alert alert-warning">{{ content }}</div>
+  {% elif content is not none %}
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="mb-0">
+          File content
+          {% if not is_text %}(Hexdump){% endif %}
+        </h5>
+      </div>
+      <div class="card-body p-0">
+        {% if is_text %}
+          <pre class="bg-light p-4 rounded-bottom mb-0 text-break">{{ content }}</pre>
+        {% else %}
+          <pre class="bg-light p-4 rounded-bottom mb-0 text-break"><code>{{ content }}</code></pre>
+        {% endif %}
+      </div>
+      {% if is_truncated %}
+        <div class="card-footer text-muted small">Note: File content truncated to the first 1 MB.</div>
+      {% endif %}
+    </div>
+  {% else %}
+    {# Shouldn't happen #}
+    <div class="alert alert-secondary">No content available for this file.</div>
+  {% endif %}
+{% endblock content %}

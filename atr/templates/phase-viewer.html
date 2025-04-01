@@ -68,7 +68,19 @@
                   <td>{{ format_permissions(stat.permissions) }}</td>
                   <td>
                     {% if stat.is_file %}
-                      {{ stat.path }}
+                      {% if phase_key == "draft" %}
+                        {% set file_url = as_url(routes.draft.viewer_path, project_name=release.project.name, version_name=release.version, file_path=stat.path) %}
+                      {% elif phase_key == "candidate" %}
+                        {% set file_url = as_url(routes.candidate.viewer_path, project_name=release.project.name, version_name=release.version, file_path=stat.path) %}
+                      {% elif phase_key == "preview" %}
+                        {% set file_url = as_url(routes.preview.viewer_path, project_name=release.project.name, version_name=release.version, file_path=stat.path) %}
+                      {% elif phase_key == "release" %}
+                        {% set file_url = as_url(routes.release.viewer_path, project_name=release.project.name, version_name=release.version, file_path=stat.path) %}
+                      {% else %}
+                        {# TODO: Should probably disable the link here #}
+                        {% set file_url = "#" %}
+                      {% endif %}
+                      <a href="{{ file_url }}">{{ stat.path }}</a>
                     {% else %}
                       <strong>{{ stat.path }}/</strong>
                     {% endif %}

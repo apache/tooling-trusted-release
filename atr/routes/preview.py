@@ -225,6 +225,41 @@ async def viewer(session: routes.CommitterSession, project_name: str, version_na
         format_file_size=routes.format_file_size,
         format_permissions=routes.format_permissions,
         phase="release preview",
+        phase_key="preview",
+    )
+
+
+@routes.committer("/preview/viewer/<project_name>/<version_name>/<path:file_path>")
+async def viewer_path(
+    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
+) -> response.Response | str:
+    """Show the content of a specific file in the release preview."""
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        return await session.redirect(
+            viewer, error="You do not have access to this project", project_name=project_name, version_name=version_name
+        )
+
+    async with db.session() as data:
+        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+
+    _max_view_size = 1 * 1024 * 1024
+    full_path = util.get_release_preview_dir() / project_name / version_name / file_path
+    content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
+    return await quart.render_template(
+        "phase-viewer-path.html",
+        release=release,
+        project_name=project_name,
+        version_name=version_name,
+        file_path=file_path,
+        content=content,
+        is_text=is_text,
+        is_truncated=is_truncated,
+        error_message=error_message,
+        format_file_size=routes.format_file_size,
+        phase_key="preview",
     )
 
 
