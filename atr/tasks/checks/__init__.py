@@ -33,10 +33,6 @@ import atr.db as db
 import atr.db.models as models
 
 
-def function_key(func: Callable[..., Any]) -> str:
-    return func.__module__ + "." + func.__name__
-
-
 class Check:
     def __init__(
         self, checker: Callable[..., Any], release_name: str, path: str | None = None, afresh: bool = True
@@ -109,6 +105,10 @@ class Check:
 
     async def warning(self, message: str, data: Any, path: str | None = None) -> models.CheckResult:
         return await self._add(models.CheckResultStatus.WARNING, message, data, path=path)
+
+
+def function_key(func: Callable[..., Any]) -> str:
+    return func.__module__ + "." + func.__name__
 
 
 def rel_path(abs_path: str) -> str:

@@ -15,15 +15,19 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from collections.abc import Awaitable, Callable
+
 import aiofiles.os
 
 import atr.db.models as models
-import atr.tasks.checks as checks
 import atr.tasks.checks.archive as archive
 import atr.tasks.checks.hashing as hashing
 import atr.tasks.checks.license as license
 import atr.tasks.checks.rat as rat
 import atr.tasks.checks.signature as signature
+import atr.tasks.rsync as rsync
+import atr.tasks.sbom as sbom
+import atr.tasks.vote as vote
 import atr.util as util
 
 
@@ -43,7 +47,7 @@ async def asc_checks(release: models.Release, signature_path: str) -> list[model
         tasks.append(
             models.Task(
                 status=models.TaskStatus.QUEUED,
-                task_type=checks.function_key(signature.check),
+                task_type=models.TaskType.SIGNATURE_CHECK,
                 task_args=signature.Check(
                     release_name=release.name,
                     committee_name=release.committee.name,
@@ -57,6 +61,34 @@ async def asc_checks(release: models.Release, signature_path: str) -> list[model
         )
 
     return tasks
+
+
+def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:  # noqa: C901
+    match task_type:
+        case models.TaskType.ARCHIVE_INTEGRITY:
+            return archive.integrity
+        case models.TaskType.ARCHIVE_STRUCTURE:
+            return archive.structure
+        case models.TaskType.HASHING_CHECK:
+            return hashing.check
+        case models.TaskType.LICENSE_FILES:
+            return license.files
+        case models.TaskType.LICENSE_HEADERS:
+            return license.headers
+        # case models.TaskType.PATHS_CHECK:
+        #     return paths.check
+        case models.TaskType.RAT_CHECK:
+            return rat.check
+        case models.TaskType.RSYNC_ANALYSE:
+            return rsync.analyse
+        case models.TaskType.SIGNATURE_CHECK:
+            return signature.check
+        case models.TaskType.VOTE_INITIATE:
+            return vote.initiate
+        case models.TaskType.SBOM_GENERATE_CYCLONEDX:
+            return sbom.generate_cyclonedx
+        # NOTE: Do NOT add "case _" here
+        # Otherwise we lose exhaustiveness checking
 
 
 async def sha_checks(release: models.Release, hash_file: str) -> list[models.Task]:
@@ -78,7 +110,7 @@ async def sha_checks(release: models.Release, hash_file: str) -> list[models.Tas
     tasks.append(
         models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type=checks.function_key(hashing.check),
+            task_type=models.TaskType.HASHING_CHECK,
             task_args=hashing.Check(
                 release_name=release.name,
                 abs_path=original_file,
@@ -103,7 +135,7 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
     tasks = [
         models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type=checks.function_key(archive.integrity),
+            task_type=models.TaskType.ARCHIVE_INTEGRITY,
             task_args=archive.Integrity(release_name=release.name, abs_path=full_path).model_dump(),
             release_name=release.name,
             path=path,
@@ -111,7 +143,7 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type=checks.function_key(archive.structure),
+            task_type=models.TaskType.ARCHIVE_STRUCTURE,
             task_args=archive.Structure(release_name=release.name, abs_path=full_path).model_dump(),
             release_name=release.name,
             path=path,
@@ -119,7 +151,7 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type=checks.function_key(license.files),
+            task_type=models.TaskType.LICENSE_FILES,
             task_args=license.Files(release_name=release.name, abs_path=full_path).model_dump(),
             release_name=release.name,
             path=path,
@@ -127,7 +159,7 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type=checks.function_key(license.headers),
+            task_type=models.TaskType.LICENSE_HEADERS,
             task_args=license.Headers(release_name=release.name, abs_path=full_path).model_dump(),
             release_name=release.name,
             path=path,
@@ -135,7 +167,7 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type=checks.function_key(rat.check),
+            task_type=models.TaskType.RAT_CHECK,
             task_args=rat.Check(release_name=release.name, abs_path=full_path).model_dump(),
             release_name=release.name,
             path=path,
@@ -143,8 +175,11 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
         ),
         # models.Task(
         #     status=models.TaskStatus.QUEUED,
-        #     task_type="generate_cyclonedx_sbom",
-        #     task_args=[full_path],
+        #     task_type=models.TaskType.SBOM_GENERATE_CYCLONEDX,
+        #     task_args=tasks.SbomGenerateCyclonedx(
+        #         artifact_path=str(full_path),
+        #         output_path=str(full_sbom_path),
+        #     ).model_dump(),
         #     release_name=release.name,
         #     path=path,
         #     modified=modified,

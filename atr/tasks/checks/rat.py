@@ -177,7 +177,7 @@ def _check_core_logic(
 
             # Extract the archive to the temporary directory
             _LOGGER.info(f"Extracting {artifact_path} to {temp_dir}")
-            extracted_size = sbom.archive_extract_safe(
+            extracted_size = sbom._archive_extract_safe(
                 artifact_path, temp_dir, max_size=max_extract_size, chunk_size=chunk_size
             )
             _LOGGER.info(f"Extracted {extracted_size} bytes")

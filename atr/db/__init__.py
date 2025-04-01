@@ -563,8 +563,8 @@ async def recent_tasks(data: Session, release_name: str, file_path: str, modifie
     recent_tasks: dict[str, models.Task] = {}
     for task in tasks:
         # If we haven't seen this task type before or if this task is newer
-        if (task.task_type not in recent_tasks) or (task.id > recent_tasks[task.task_type].id):
-            recent_tasks[task.task_type] = task
+        if (task.task_type.value not in recent_tasks) or (task.id > recent_tasks[task.task_type.value].id):
+            recent_tasks[task.task_type.value] = task
 
     return recent_tasks
 

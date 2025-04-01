@@ -30,26 +30,14 @@ import os
 import resource
 import signal
 import traceback
-from typing import TYPE_CHECKING, Any, Final
+from typing import Any, Final
 
 import sqlmodel
 
 import atr.db as db
 import atr.db.models as models
-import atr.tasks.bulk as bulk
-import atr.tasks.checks as checks
-import atr.tasks.checks.archive as archive
-import atr.tasks.checks.hashing as hashing
-import atr.tasks.checks.license as license
-import atr.tasks.checks.rat as rat
-import atr.tasks.checks.signature as signature
-import atr.tasks.rsync as rsync
-import atr.tasks.sbom as sbom
+import atr.tasks as tasks
 import atr.tasks.task as task
-import atr.tasks.vote as vote
-
-if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -202,64 +190,24 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
     """Process a claimed task."""
     _LOGGER.info(f"Processing task {task_id} ({task_type}) with args {task_args}")
     try:
-        # Map task types to their handler functions
-        modern_task_handlers: dict[str, Callable[..., Awaitable[str | None]]] = {
-            checks.function_key(archive.integrity): archive.integrity,
-            checks.function_key(archive.structure): archive.structure,
-            checks.function_key(hashing.check): hashing.check,
-            checks.function_key(license.files): license.files,
-            checks.function_key(license.headers): license.headers,
-            checks.function_key(rat.check): rat.check,
-            checks.function_key(signature.check): signature.check,
-            checks.function_key(rsync.analyse): rsync.analyse,
-            checks.function_key(vote.initiate): vote.initiate,
-        }
-        # TODO: We should use a decorator to register these automatically
-        dict_task_handlers = {
-            "package_bulk_download": bulk.download,
-        }
-        # TODO: These are synchronous
-        # We plan to convert these to async dict handlers
-        list_task_handlers = {
-            "generate_cyclonedx_sbom": sbom.generate_cyclonedx,
-        }
+        task_type_member = models.TaskType(task_type)
+    except ValueError as e:
+        _LOGGER.error(f"Invalid task type: {task_type}")
+        await _task_result_process(task_id, tuple(), task.FAILED, str(e))
+        return
 
-        task_results: tuple[Any, ...]
-        if task_type in modern_task_handlers:
-            # NOTE: The other two branches below are deprecated
-            # This is transitional code, which we will tidy up significantly
-            handler = modern_task_handlers[task_type]
-            try:
-                handler_result = await handler(task_args)
-                task_results = tuple()
-                if handler_result is not None:
-                    task_results = (handler_result,)
-                status = task.COMPLETED
-                error = None
-            except Exception as e:
-                task_results = tuple()
-                status = task.FAILED
-                error = str(e)
-                _LOGGER.exception(f"Task {task_id} ({task_type}) failed: {e}")
-        elif isinstance(task_args, dict):
-            dict_handler = dict_task_handlers.get(task_type)
-            if not dict_handler:
-                msg = f"Unknown task type: {task_type}"
-                _LOGGER.error(msg)
-                raise Exception(msg)
-            status, error, task_results = await dict_handler(task_args)
-        else:
-            list_handler = list_task_handlers.get(task_type)
-            if not list_handler:
-                msg = f"Unknown task type: {task_type}"
-                _LOGGER.error(msg)
-                raise Exception(msg)
-            status, error, task_results = list_handler(task_args)
-        _LOGGER.info(f"Task {task_id} completed with status {status}, error {error}, results {task_results}")
-        await _task_result_process(task_id, task_results, status, error)
-
+    task_results: tuple[Any, ...]
+    try:
+        handler = tasks.resolve(task_type_member)
+        handler_result = await handler(task_args)
+        task_results = (handler_result,)
+        status = task.COMPLETED
+        error = None
     except Exception as e:
-        await _task_error_handle(task_id, e)
+        task_results = tuple()
+        status = task.FAILED
+        error = str(e)
+    await _task_result_process(task_id, task_results, status, error)
 
 
 # Worker functions

@@ -28,7 +28,6 @@ import wtforms
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
-import atr.tasks.checks as checks
 import atr.tasks.vote as tasks_vote
 import atr.user as user
 import atr.util as util
@@ -158,7 +157,7 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
         # Create a task for vote initiation
         task = models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type=checks.function_key(tasks_vote.initiate),
+            task_type=models.TaskType.VOTE_INITIATE,
             task_args=tasks_vote.Initiate(
                 release_name=release_name,
                 email_to=email_to,

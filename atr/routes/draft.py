@@ -38,6 +38,7 @@ import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.tasks as tasks
+import atr.tasks.sbom as sbom
 import atr.util as util
 
 if TYPE_CHECKING:
@@ -81,6 +82,18 @@ class DeleteFileForm(util.QuartFormTyped):
 
     file_path = wtforms.StringField("File path", validators=[wtforms.validators.InputRequired("File path is required")])
     submit = wtforms.SubmitField("Delete file")
+
+
+class PromoteForm(util.QuartFormTyped):
+    """Form for promoting a candidate draft."""
+
+    candidate_draft_name = wtforms.StringField(
+        "Candidate draft name", validators=[wtforms.validators.InputRequired("Candidate draft name is required")]
+    )
+    confirm_promote = wtforms.BooleanField(
+        "Confirmation", validators=[wtforms.validators.DataRequired("You must confirm to proceed with promotion")]
+    )
+    submit = wtforms.SubmitField("Promote to candidate")
 
 
 async def _number_of_release_files(release: models.Release) -> int:
@@ -417,18 +430,6 @@ async def directory(session: routes.CommitterSession) -> str:
     )
 
 
-class PromoteForm(util.QuartFormTyped):
-    """Form for promoting a candidate draft."""
-
-    candidate_draft_name = wtforms.StringField(
-        "Candidate draft name", validators=[wtforms.validators.InputRequired("Candidate draft name is required")]
-    )
-    confirm_promote = wtforms.BooleanField(
-        "Confirmation", validators=[wtforms.validators.DataRequired("You must confirm to proceed with promotion")]
-    )
-    submit = wtforms.SubmitField("Promote to candidate")
-
-
 @routes.committer("/draft/promote", methods=["GET", "POST"])
 async def promote(session: routes.CommitterSession) -> str | response.Response:
     """Allow the user to promote a candidate draft."""
@@ -631,6 +632,63 @@ async def review_path(session: routes.CommitterSession, project_name: str, versi
         release=release,
         check_results=check_results_list,
         format_file_size=routes.format_file_size,
+    )
+
+
+@routes.committer("/draft/sbomgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+async def sbomgen(
+    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
+) -> response.Response:
+    """Generate a CycloneDX SBOM file for a candidate draft file."""
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
+    async with db.session() as data:
+        # Check that the release exists
+        release_name = f"{project_name}-{version_name}"
+        await data.release(name=release_name, _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+
+        # Construct paths
+        base_path = util.get_release_candidate_draft_dir() / project_name / version_name
+        full_path = base_path / file_path
+        # Standard CycloneDX extension
+        sbom_path_rel = file_path + ".cdx.json"
+        full_sbom_path = base_path / sbom_path_rel
+
+        # Check that the source file exists
+        if not await aiofiles.os.path.exists(full_path):
+            raise base.ASFQuartException("Source artifact file does not exist", errorcode=404)
+
+        # Check that the file is a .tar.gz archive
+        if not file_path.endswith(".tar.gz"):
+            raise base.ASFQuartException("SBOM generation is only supported for .tar.gz files", errorcode=400)
+
+        # Check that the SBOM file does not already exist
+        if await aiofiles.os.path.exists(full_sbom_path):
+            raise base.ASFQuartException("SBOM file already exists", errorcode=400)
+
+        # Create and queue the task
+        sbom_task = models.Task(
+            task_type=models.TaskType.SBOM_GENERATE_CYCLONEDX,
+            task_args=sbom.GenerateCycloneDX(
+                artifact_path=str(full_path),
+                output_path=str(full_sbom_path),
+            ).model_dump(),
+            added=datetime.datetime.now(datetime.UTC),
+            status=models.TaskStatus.QUEUED,
+            release_name=release_name,
+        )
+        data.add(sbom_task)
+        await data.commit()
+
+    return await session.redirect(
+        review,
+        success=f"SBOM generation task queued for {pathlib.Path(file_path).name}",
+        project_name=project_name,
+        version_name=version_name,
     )
 
 

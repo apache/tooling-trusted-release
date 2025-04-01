@@ -225,5 +225,5 @@
 {% endblock javascripts %}
 
 {% macro function_name_from_key(key) -%}
-  {{- key.split(".")[-1] .replace("_", " ") | title -}}
+  {{- key.removeprefix("atr.tasks.checks.").replace("_", " ").replace(".", " ") | title -}}
 {%- endmacro %}

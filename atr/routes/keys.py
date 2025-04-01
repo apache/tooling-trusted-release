@@ -26,8 +26,6 @@ import logging
 import logging.handlers
 import pprint
 import re
-import shutil
-import tempfile
 from collections.abc import AsyncGenerator, Sequence
 
 import asfquart as asfquart
@@ -52,13 +50,8 @@ class AddSSHKeyForm(util.QuartFormTyped):
 @contextlib.asynccontextmanager
 async def ephemeral_gpg_home() -> AsyncGenerator[str]:
     """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
-    # TODO: This is only used in key_user_add
-    # We could even inline it there
-    temp_dir = await asyncio.to_thread(tempfile.mkdtemp, prefix="gpg-")
-    try:
-        yield temp_dir
-    finally:
-        await asyncio.to_thread(shutil.rmtree, temp_dir)
+    async with util.async_temporary_directory(prefix="gpg-") as temp_dir:
+        yield str(temp_dir)
 
 
 async def key_add_post(

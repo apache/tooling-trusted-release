@@ -46,6 +46,15 @@
     </form>
   </div>
 
+  {% if file_path.endswith(".tar.gz") %}
+    <h3>Generate SBOM</h3>
+    <p>Generate a CycloneDX Software Bill of Materials (SBOM) file for this artifact.</p>
+    <form method="post"
+          action="{{ as_url(routes.draft.sbomgen, project_name=project_name, version_name=version_name, file_path=file_path) }}">
+      <button type="submit" class="btn btn-outline-secondary">Generate CycloneDX SBOM (.cdx.json)</button>
+    </form>
+  {% endif %}
+
   <h3>Delete file</h3>
   <p>This tool deletes the file from the candidate draft.</p>
   <form method="post"

@@ -284,12 +284,26 @@ class TaskStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class TaskType(str, enum.Enum):
+    ARCHIVE_INTEGRITY = "archive_integrity"
+    ARCHIVE_STRUCTURE = "archive_structure"
+    HASHING_CHECK = "hashing_check"
+    LICENSE_FILES = "license_files"
+    LICENSE_HEADERS = "license_headers"
+    # PATHS_CHECK = "paths_check"
+    RAT_CHECK = "rat_check"
+    RSYNC_ANALYSE = "rsync_analyse"
+    SIGNATURE_CHECK = "signature_check"
+    VOTE_INITIATE = "vote_initiate"
+    SBOM_GENERATE_CYCLONEDX = "sbom_generate_cyclonedx"
+
+
 class Task(sqlmodel.SQLModel, table=True):
     """A task in the task queue."""
 
     id: int = sqlmodel.Field(default=None, primary_key=True)
     status: TaskStatus = sqlmodel.Field(default=TaskStatus.QUEUED, index=True)
-    task_type: str
+    task_type: TaskType
     task_args: Any = sqlmodel.Field(sa_column=sqlalchemy.Column(sqlalchemy.JSON))
     added: datetime.datetime = sqlmodel.Field(
         default_factory=lambda: datetime.datetime.now(datetime.UTC),

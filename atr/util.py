@@ -15,9 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asyncio
+import contextlib
 import dataclasses
 import hashlib
 import pathlib
+import shutil
+import tempfile
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from typing import Annotated, Any, TypeVar
 
@@ -276,3 +280,15 @@ def _get_dict_to_list_validator(inner_adapter: pydantic.TypeAdapter[dict[Any, An
         return val
 
     return validator
+
+
+@contextlib.asynccontextmanager
+async def async_temporary_directory(
+    suffix: str | None = None, prefix: str | None = None, dir: str | pathlib.Path | None = None
+) -> AsyncGenerator[pathlib.Path]:
+    """Create an async temporary directory similar to tempfile.TemporaryDirectory."""
+    temp_dir_path: str = await asyncio.to_thread(tempfile.mkdtemp, suffix=suffix, prefix=prefix, dir=dir)
+    try:
+        yield pathlib.Path(temp_dir_path)
+    finally:
+        await asyncio.to_thread(shutil.rmtree, temp_dir_path, ignore_errors=True)

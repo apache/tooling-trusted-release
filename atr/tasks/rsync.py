@@ -25,6 +25,8 @@ import atr.db as db
 import atr.db.models as models
 import atr.tasks as tasks
 import atr.tasks.checks as checks
+
+# import atr.tasks.checks.paths as paths
 import atr.util as util
 
 if TYPE_CHECKING:
@@ -62,12 +64,12 @@ async def analyse(args: Analyse) -> str | None:
 async def _analyse_core(project_name: str, release_version: str) -> dict[str, Any]:
     """Core logic to analyse an rsync upload and queue checks."""
     base_path = util.get_release_candidate_draft_dir() / project_name / release_version
-    paths = await util.paths_recursive(base_path)
+    paths_recursive = await util.paths_recursive(base_path)
     release_name = f"{project_name}-{release_version}"
 
     async with db.session() as data:
         release = await data.release(name=release_name, _committee=True).demand(RuntimeError("Release not found"))
-        for path in paths:
+        for path in paths_recursive:
             # This works because path is relative
             full_path = base_path / path
 
@@ -90,5 +92,24 @@ async def _analyse_core(project_name: str, release_version: str) -> dict[str, An
                     for task in await task_function(release, str(path)):
                         if task.task_type not in cached_tasks:
                             data.add(task)
+
+            # # Add the generic path check task for every file
+            # if path_check_task_key not in cached_tasks:
+            #     path_check_task_args = paths.Check(
+            #         release_name=release_name,
+            #         base_release_dir=str(base_path),
+            #         path=str(path),
+            #     ).model_dump()
+
+        #     path_check_task = models.Task(
+        #         status=models.TaskStatus.QUEUED,
+        #         task_type=tasks.Type.PATHS_CHECK,
+        #         task_args=paths.Check(
+        #             release_name=release_name,
+        #             base_release_dir=str(base_path),
+        #             path=str(path),
+        #         ).model_dump(),
+        #     )
+
         await data.commit()
-    return {"paths": [str(path) for path in paths]}
+    return {"paths": [str(path) for path in paths_recursive]}

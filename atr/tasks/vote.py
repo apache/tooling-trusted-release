@@ -31,23 +31,6 @@ import atr.tasks.checks as checks
 _LOGGER: Final = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.DEBUG)
 
-# Create file handler for tasks-vote.log
-_HANDLER: Final = logging.FileHandler("tasks-vote.log")
-_HANDLER.setLevel(logging.DEBUG)
-
-# Create formatter with detailed information
-_HANDLER.setFormatter(
-    logging.Formatter(
-        "[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] [%(name)s:%(funcName)s:%(lineno)d] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-)
-_LOGGER.addHandler(_HANDLER)
-# Ensure parent loggers don't duplicate messages
-_LOGGER.propagate = False
-
-_LOGGER.info("Vote module imported")
-
 
 class VoteInitiationError(Exception): ...
 
@@ -85,13 +68,6 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     """Get arguments, create an email, and then send it to the recipient."""
     test_recipients = ["sbp"]
     _LOGGER.info("Starting initiate_core")
-
-    root_logger = logging.getLogger()
-    has_our_handler = any(
-        (isinstance(h, logging.FileHandler) and h.baseFilename.endswith("tasks-vote.log")) for h in root_logger.handlers
-    )
-    if not has_our_handler:
-        root_logger.addHandler(_HANDLER)
 
     async with db.session() as data:
         release = await data.release(name=args.release_name, _project=True, _committee=True).demand(
