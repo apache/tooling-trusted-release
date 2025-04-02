@@ -166,55 +166,89 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
         # Check that the user is on the release project committee
         if not user.is_committee_member(release.committee, session.uid):
             return await session.redirect(vote, error="You do not have access to this project")
+        committee = util.unwrap(release.committee)
 
-        if quart.request.method == "GET":
-            return await quart.render_template(
-                "release-vote.html",
-                release=release,
-                email_preview=_generate_vote_email_preview(release),
+        class VoteInitiateForm(util.QuartFormTyped):
+            """Form for initiating a release vote."""
+
+            release_name = wtforms.HiddenField("Release Name")
+            mailing_list = wtforms.RadioField(
+                "Send vote email to",
+                choices=[
+                    ("dev", f"dev@{committee.name}.apache.org"),
+                    ("private", f"private@{committee.name}.apache.org"),
+                ],
+                validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
+                default="dev",
+            )
+            vote_duration = wtforms.SelectField(
+                "Vote duration",
+                choices=[
+                    ("72", "72 hours (minimum)"),
+                    ("120", "5 days"),
+                    ("168", "7 days"),
+                ],
+                validators=[wtforms.validators.InputRequired("Vote duration is required")],
+                default="72",
+            )
+            gpg_key_id = wtforms.StringField("Your GPG key ID", validators=[wtforms.validators.Optional()])
+            commit_hash = wtforms.StringField("Commit hash", validators=[wtforms.validators.Optional()])
+            submit = wtforms.SubmitField("Prepare vote email")
+
+        form = await VoteInitiateForm.create_form(
+            data=await quart.request.form if quart.request.method == "POST" else None,
+        )
+        # Set hidden field data explicitly
+        form.release_name.data = release_name
+
+        if await form.validate_on_submit():
+            # If POST and valid, process the form and create a vote_initiate task
+            mailing_list_choice = util.unwrap(form.mailing_list.data)
+            vote_duration_choice = util.unwrap(form.vote_duration.data)
+            gpg_key_id_data = form.gpg_key_id.data or ""
+            commit_hash_data = form.commit_hash.data or ""
+
+            if committee is None:
+                raise base.ASFQuartException("Release has no associated committee", errorcode=400)
+            release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE
+            email_to = f"{mailing_list_choice}@{committee.name}.apache.org"
+
+            # Create a task for vote initiation
+            task = models.Task(
+                status=models.TaskStatus.QUEUED,
+                task_type=models.TaskType.VOTE_INITIATE,
+                task_args=tasks_vote.Initiate(
+                    release_name=release_name,
+                    email_to=email_to,
+                    vote_duration=vote_duration_choice,
+                    gpg_key_id=gpg_key_id_data,
+                    commit_hash=commit_hash_data,
+                    initiator_id=session.uid,
+                ).model_dump(),
+                release_name=release_name,
             )
 
-        # If POST, process the form and create a vote_initiate task
-        form = await routes.get_form(quart.request)
-        # Extract form data
-        mailing_list = form.get("mailing_list", "dev")
-        vote_duration = form.get("vote_duration", "72")
-        # These fields are just for testing, we'll do something better in the real UI
-        gpg_key_id = form.get("gpg_key_id", "")
-        commit_hash = form.get("commit_hash", "")
-        if release.committee is None:
-            raise base.ASFQuartException("Release has no associated committee", errorcode=400)
-        release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE
+            data.add(task)
+            # Flush to get the task ID
+            await data.flush()
+            await data.commit()
 
-        # Prepare email recipient
-        email_to = f"{mailing_list}@{release.committee.name}.apache.org"
+            # NOTE: During debugging, this email is actually sent elsewhere
+            # TODO: We should perhaps move that logic here, so that we can show the debugging address
+            # We should also log all outgoing email and the session so that users can confirm
+            # And can be warned if there was a failure
+            # (The message should be shown on the vote resolution page)
+            return await session.redirect(
+                vote,
+                success=f"The vote announcement email will soon be sent to {email_to} by background task #{task.id}.",
+            )
 
-        # Create a task for vote initiation
-        task = models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type=models.TaskType.VOTE_INITIATE,
-            task_args=tasks_vote.Initiate(
-                release_name=release_name,
-                email_to=email_to,
-                vote_duration=vote_duration,
-                gpg_key_id=gpg_key_id,
-                commit_hash=commit_hash,
-                initiator_id=session.uid,
-            ).model_dump(),
-        )
-
-        data.add(task)
-        # Flush to get the task ID
-        await data.flush()
-        await data.commit()
-
-        # NOTE: During debugging, this email is actually sent elsewhere
-        # TODO: We should perhaps move that logic here, so that we can show the debugging address
-        # We should also log all outgoing email and the session so that users can confirm
-        # And can be warned if there was a failure
-        # (The message should be shown on the vote resolution page)
-        return await session.redirect(
-            vote, success=f"The vote announcement email will soon be sent to {email_to} by background task #{task.id}."
+        # For GET requests or failed POST validation
+        return await quart.render_template(
+            "candidate-vote-project.html",
+            release=release,
+            email_preview=_generate_vote_email_preview(release),
+            form=form,
         )
 
 

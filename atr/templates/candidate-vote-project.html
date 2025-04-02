@@ -1,0 +1,115 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Start release vote ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Initiate a vote for a release candidate.
+{% endblock description %}
+
+{% block content %}
+  <div class="my-4">
+    <h1 class="mb-4">Start release vote</h1>
+
+    <div class="px-3 pb-4 mb-4 bg-light border rounded">
+      <h2 class="mt-4 mb-3 fs-5 border-0">
+        {{ release.committee.display_name }} - {{ release.project.name if release.project else "Unknown" }} {{ release.version }}
+      </h2>
+      <p class="mb-0">
+        Initiating a vote for this release candidate will prepare an email to be sent to the appropriate mailing list.
+      </p>
+    </div>
+
+    <div class="p-3 mb-4 bg-warning-subtle border border-warning rounded">
+      <strong>Note:</strong> This feature is currently in development. The form below only sends email to a test account.
+    </div>
+
+    {% if form.errors %}
+      <div class="alert alert-danger">
+        Please correct the errors below:
+        {# Optional: list general errors not tied to fields, if applicable #}
+        {% if form.non_field_errors() %}
+          <ul>
+            {% for error in form.non_field_errors() %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <form method="post"
+          class="striking py-4 px-5"
+          action="{{ as_url(routes.candidate.vote_project, project_name=release.project.name, version=release.version) }}">
+      {{ form.hidden_tag() if form.hidden_tag }}
+      {{ form.release_name }}
+
+      <div class="mb-4">
+        <div class="row mb-3 pb-3 border-bottom{% if form.mailing_list.errors %} has-danger{% endif %}">
+          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.mailing_list.label }}</div>
+          <div class="col-md-9">
+            <div class="d-flex gap-4">
+              {% for subfield in form.mailing_list %}
+                <div class="form-check">
+                  {{ subfield(class_='form-check-input') }}
+                  {{ subfield.label(class_='form-check-label') }}
+                </div>
+              {% endfor %}
+            </div>
+            {% if form.mailing_list.errors %}
+              <div class="invalid-feedback d-block">
+                {% for error in form.mailing_list.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="row mb-3 pb-3 border-bottom{% if form.vote_duration.errors %} has-danger{% endif %}">
+          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.vote_duration.label }}</div>
+          <div class="col-md-9">
+            {{ form.vote_duration(class_='form-select w-75') }}
+            {% if form.vote_duration.errors %}
+              <div class="invalid-feedback d-block">
+                {% for error in form.vote_duration.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="row mb-3 pb-3 border-bottom{% if form.gpg_key_id.errors %} has-danger{% endif %}">
+          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.gpg_key_id.label }}</div>
+          <div class="col-md-9">
+            {{ form.gpg_key_id(class_='form-control w-75', placeholder='e.g., 0x1A2B3C4D') }}
+            {% if form.gpg_key_id.errors %}
+              <div class="invalid-feedback d-block">
+                {% for error in form.gpg_key_id.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="row mb-3 pb-3 border-bottom{% if form.commit_hash.errors %} has-danger{% endif %}">
+          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.commit_hash.label }}</div>
+          <div class="col-md-9">
+            {{ form.commit_hash(class_='form-control w-75', placeholder='Git commit hash used for this release') }}
+            {% if form.commit_hash.errors %}
+              <div class="invalid-feedback d-block">
+                {% for error in form.commit_hash.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="fw-medium mb-2">Email preview:</label>
+        <pre class="p-3 bg-white border rounded font-monospace overflow-auto">{{ email_preview }}</pre>
+      </div>
+
+      <div class="mt-4">
+        {{ form.submit(class_='btn btn-primary') }}
+        <a href="{{ as_url(routes.candidate.vote) }}"
+           class="btn btn-link text-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock content %}
