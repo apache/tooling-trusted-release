@@ -27,7 +27,9 @@
           <div class="col-md-9">
             {{ form.public_key(class_='form-control font-monospace', rows=10, placeholder='Paste your ASCII-armored public GPG key here...') }}
             <small class="form-text text-muted">
-              Your public key should be in ASCII-armored format, starting with "-----BEGIN PGP PUBLIC KEY BLOCK-----"
+              Your public key should be in ASCII-armored format, starting with:
+              <br />
+              "-----BEGIN PGP PUBLIC KEY BLOCK-----"
             </small>
             {% if form.public_key.errors %}
               <div class="invalid-feedback d-block">
@@ -55,7 +57,7 @@
                       id="toggleCommitteesBtn"
                       class="btn btn-sm btn-outline-secondary">Select all</button>
             </div>
-            <small class="form-text text-muted">Select the committees you are a member of.</small>
+            <small class="form-text text-muted">Select the committees with which to associate your key.</small>
             {% if form.selected_committees.errors %}
               <div class="invalid-feedback d-block">
                 {% for error in form.selected_committees.errors %}{{ error }}{% endfor %}

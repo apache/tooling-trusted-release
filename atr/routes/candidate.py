@@ -193,7 +193,40 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
             )
             gpg_key_id = wtforms.StringField("Your GPG key ID", validators=[wtforms.validators.Optional()])
             commit_hash = wtforms.StringField("Commit hash", validators=[wtforms.validators.Optional()])
+            subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
+            body = wtforms.TextAreaField("Body", validators=[wtforms.validators.Optional()])
             submit = wtforms.SubmitField("Prepare vote email")
+
+        version = release.version
+        committee_name = committee.name
+        committee_display = committee.display_name
+        project_name = release.project.name if release.project else "Unknown"
+
+        default_subject = f"[VOTE] Release Apache {committee_display} {project_name} {version}"
+        default_body = f"""Hello {committee_name},
+
+I'd like to call a vote on releasing the following artifacts as
+Apache {committee_display} {project_name} {version}.
+
+The release candidate can be found at:
+
+https://apache.example.org/{committee_name}/{project_name}-{version}/
+
+The release artifacts are signed with GPG key: [KEY_ID].
+
+The artifacts were built from commit: [COMMIT_HASH].
+
+Please review the release candidate and vote accordingly.
+
+[ ] +1 Release this package
+[ ] +0 Abstain
+[ ] -1 Do not release this package (please provide specific comments)
+
+This vote will remain open for [DURATION] hours.
+
+Thanks,
+[YOUR_NAME]
+"""
 
         form = await VoteInitiateForm.create_form(
             data=await quart.request.form if quart.request.method == "POST" else None,
@@ -201,12 +234,18 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
         # Set hidden field data explicitly
         form.release_name.data = release_name
 
+        if quart.request.method == "GET":
+            form.subject.data = default_subject
+            form.body.data = default_body
+
         if await form.validate_on_submit():
             # If POST and valid, process the form and create a vote_initiate task
             mailing_list_choice = util.unwrap(form.mailing_list.data)
             vote_duration_choice = util.unwrap(form.vote_duration.data)
             gpg_key_id_data = form.gpg_key_id.data or ""
             commit_hash_data = form.commit_hash.data or ""
+            subject_data = util.unwrap(form.subject.data)
+            body_data = util.unwrap(form.body.data)
 
             if committee is None:
                 raise base.ASFQuartException("Release has no associated committee", errorcode=400)
@@ -224,6 +263,8 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
                     gpg_key_id=gpg_key_id_data,
                     commit_hash=commit_hash_data,
                     initiator_id=session.uid,
+                    subject=subject_data,
+                    body=body_data,
                 ).model_dump(),
                 release_name=release_name,
             )
@@ -243,12 +284,19 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
                 success=f"The vote announcement email will soon be sent to {email_to} by background task #{task.id}.",
             )
 
+        preview_data = {
+            "initiator_id": session.uid,
+            "vote_duration": form.vote_duration.data or "72",
+            "gpg_key_id": form.gpg_key_id.data or "0xFFFFFFFFFFFFFFFF",
+            "commit_hash": form.commit_hash.data or "0000000000000000000000000000000000000000",
+        }
+
         # For GET requests or failed POST validation
         return await quart.render_template(
             "candidate-vote-project.html",
             release=release,
-            email_preview=_generate_vote_email_preview(release),
             form=form,
+            preview_data=preview_data,
         )
 
 
@@ -263,52 +311,6 @@ def _format_artifact_name(project_name: str, version: str, is_podling: bool = Fa
     if is_podling:
         return f"apache-{project_name}-incubating-{version}"
     return f"apache-{project_name}-{version}"
-
-
-def _generate_vote_email_preview(release: models.Release) -> str:
-    """Generate a preview of the vote email."""
-    version = release.version
-
-    # Get PMC details
-    if release.committee is None:
-        raise base.ASFQuartException("Release has no associated committee", errorcode=400)
-    committee_name = release.committee.name
-    committee_display = release.committee.display_name
-
-    # Get project information
-    project_name = release.project.name if release.project else "Unknown"
-
-    # Create email subject
-    subject = f"[VOTE] Release Apache {committee_display} {project_name} {version}"
-
-    # Create email body
-    body = f"""Hello {committee_name},
-
-I'd like to call a vote on releasing the following artifacts as
-Apache {committee_display} {project_name} {version}.
-
-The release candidate can be found at:
-
-https://apache.example.org/{committee_name}/{project_name}-{version}/
-
-The release artifacts are signed with my GPG key, [KEY_ID].
-
-The artifacts were built from commit:
-
-[COMMIT_HASH]
-
-Please review the release candidate and vote accordingly.
-
-[ ] +1 Release this package
-[ ] +0 Abstain
-[ ] -1 Do not release this package (please provide specific comments)
-
-This vote will remain open for at least 72 hours.
-
-Thanks,
-[YOUR_NAME]
-"""
-    return f"{subject}\n\n{body}"
 
 
 async def _resolve_get(session: routes.CommitterSession) -> str:

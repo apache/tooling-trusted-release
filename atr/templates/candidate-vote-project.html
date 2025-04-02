@@ -98,11 +98,46 @@
             {% endif %}
           </div>
         </div>
-      </div>
 
-      <div class="mb-4">
-        <label class="fw-medium mb-2">Email preview:</label>
-        <pre class="p-3 bg-white border rounded font-monospace overflow-auto">{{ email_preview }}</pre>
+        <div class="row mb-3 pb-3 border-bottom{% if form.subject.errors %} has-danger{% endif %}">
+          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.subject.label }}</div>
+          <div class="col-md-9">
+            {{ form.subject(class_='form-control w-75') }}
+            {% if form.subject.errors %}
+              <div class="invalid-feedback d-block">
+                {% for error in form.subject.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="row mb-3 pb-3{% if form.body.errors %} has-danger{% endif %}">
+          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.body.label }}</div>
+          <div class="col-md-9">
+            {{ form.body(class_='form-control font-monospace', rows='20') }}
+            {% if form.body.errors %}
+              <div class="invalid-feedback d-block">
+                {% for error in form.body.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+            <small class="form-text text-muted">Edit the vote email content as needed. Placeholders like [KEY_ID], [COMMIT_HASH], [DURATION], and [YOUR_NAME] will be filled in automatically when the email is sent.</small>
+          </div>
+        </div>
+
+        <div class="row mb-3 pb-3">
+          <div class="col-md-9 offset-md-3">
+            <details>
+              <summary class="text-muted">Show live preview</summary>
+              <pre id="email-body-preview"
+                   class="mt-2 p-3 bg-white border rounded font-monospace overflow-auto"
+                   data-key-id="{{ preview_data.gpg_key_id }}"
+                   data-commit-hash="{{ preview_data.commit_hash }}"
+                   data-duration="{{ preview_data.vote_duration }}"
+                   data-your-name="{{ preview_data.initiator_id }}"></pre>
+            </details>
+          </div>
+        </div>
+
       </div>
 
       <div class="mt-4">
@@ -113,3 +148,34 @@
     </form>
   </div>
 {% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+  <script>
+      document.addEventListener("DOMContentLoaded", () => {
+          const bodyTextarea = document.getElementById("body");
+          const previewPre = document.getElementById("email-body-preview");
+
+          if (!bodyTextarea || !previewPre) return;
+
+          const previewData = {
+              keyId: previewPre.dataset.keyId,
+              commitHash: previewPre.dataset.commitHash,
+              duration: previewPre.dataset.duration,
+              yourName: previewPre.dataset.yourName
+          };
+
+          function updatePreview() {
+              let bodyContent = bodyTextarea.value;
+              bodyContent = bodyContent.replace(/\[KEY_ID\]/g, previewData.keyId || "(Not provided)");
+              bodyContent = bodyContent.replace(/\[COMMIT_HASH\]/g, previewData.commitHash || "(Not provided)");
+              bodyContent = bodyContent.replace(/\[DURATION\]/g, previewData.duration);
+              bodyContent = bodyContent.replace(/\[YOUR_NAME\]/g, previewData.yourName);
+              previewPre.textContent = bodyContent;
+          }
+
+          bodyTextarea.addEventListener("input", updatePreview);
+          updatePreview();
+      });
+  </script>
+{% endblock javascripts %}

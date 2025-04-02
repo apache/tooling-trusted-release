@@ -44,6 +44,8 @@ class Initiate(pydantic.BaseModel):
     gpg_key_id: str = pydantic.Field(..., description="GPG Key ID of the initiator")
     commit_hash: str = pydantic.Field(..., description="Commit hash the artifacts were built from")
     initiator_id: str = pydantic.Field(..., description="ASF ID of the vote initiator")
+    subject: str = pydantic.Field(..., description="Subject line for the vote email")
+    body: str = pydantic.Field(..., description="Body content for the vote email")
 
 
 @checks.with_model(Initiate)
@@ -105,41 +107,19 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
         _LOGGER.error(error_msg)
         raise VoteInitiationError(error_msg)
 
-    committee_name = release.committee.name
-    committee_display = release.committee.display_name
-    project_name = release.project.name if release.project else "Unknown"
-    version = release.version
+    # committee_name = release.committee.name
+    # committee_display = release.committee.display_name
+    # project_name = release.project.name if release.project else "Unknown"
+    # version = release.version
 
-    # Create email subject
-    subject = f"[VOTE] Release Apache {committee_display} {project_name} {version}"
+    subject = args.subject
+    body = args.body
 
-    # Create email body with initiator ID
-    body = f"""Hello {committee_name},
-
-I'd like to call a vote on releasing the following artifacts as
-Apache {committee_display} {project_name} {version}.
-
-The release candidate can be found at:
-
-https://apache.example.org/{committee_name}/{project_name}-{version}/
-
-The release artifacts are signed with my GPG key, {gpg_key_id}.
-
-The artifacts were built from commit:
-
-{args.commit_hash}
-
-Please review the release candidate and vote accordingly.
-
-[ ] +1 Release this package
-[ ] +0 Abstain
-[ ] -1 Do not release this package (please provide specific comments)
-
-This vote will remain open until {vote_end_str} ({vote_duration_hours} hours).
-
-Thanks,
-{args.initiator_id}
-"""
+    # Perform substitutions in the body
+    body = body.replace("[KEY_ID]", gpg_key_id or "(Not provided)")
+    body = body.replace("[COMMIT_HASH]", args.commit_hash or "(Not provided)")
+    body = body.replace("[DURATION]", args.vote_duration)
+    body = body.replace("[YOUR_NAME]", args.initiator_id)
 
     # Store the original recipient for logging
     original_recipient = args.email_to
