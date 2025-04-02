@@ -208,10 +208,13 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
         await data.flush()
         await data.commit()
 
+        # NOTE: During debugging, this email is actually sent elsewhere
+        # TODO: We should perhaps move that logic here, so that we can show the debugging address
+        # We should also log all outgoing email and the session so that users can confirm
+        # And can be warned if there was a failure
+        # (The message should be shown on the vote resolution page)
         return await session.redirect(
-            vote,
-            success=f"Vote initiation task queued as task #{task.id}."
-            f" You'll receive an email confirmation when complete.",
+            vote, success=f"The vote announcement email will soon be sent to {email_to} by background task #{task.id}."
         )
 
 
