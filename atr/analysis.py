@@ -286,6 +286,13 @@ def filename_parse(filename: str, elements: dict[str, str | None]) -> tuple[str,
     return filename, substitutions
 
 
+def is_artifact(file_path: str | pathlib.Path) -> bool:
+    """Check whether a file path represents a release artifact based on its extension."""
+    filename = str(file_path)
+    search = re.search(extension_pattern(), filename)
+    return bool(search and search.group("artifact"))
+
+
 def is_skippable(path: pathlib.Path) -> bool:
     if len(path.parts) < 2:
         return True

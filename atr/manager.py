@@ -268,7 +268,7 @@ class WorkerManager:
 
     async def check_task_duration(self, data: db.Session, pid: int, worker: WorkerProcess) -> bool:
         """
-        Check if a worker has been processing its task for too long.
+        Check whether a worker has been processing its task for too long.
         Returns True if the worker has been terminated.
         """
         try:

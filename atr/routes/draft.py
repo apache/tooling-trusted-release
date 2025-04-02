@@ -271,21 +271,35 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
         )
 
         file_path = str(form.file_path.data)
-        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / file_path)
+        full_path_obj = util.get_release_candidate_draft_dir() / project_name / version_name / file_path
+        full_path = str(full_path_obj)
 
         # Check that the file exists
         if not await aiofiles.os.path.exists(full_path):
             raise base.ASFQuartException("File does not exist", errorcode=404)
+
+        # Check whether the file is an artifact
+        metadata_files = 0
+        if analysis.is_artifact(full_path_obj):
+            # If so, delete all associated metadata files
+            for p in await util.paths_recursive(full_path_obj.parent):
+                if p.name.startswith(full_path_obj.name + "."):
+                    await aiofiles.os.remove(full_path_obj.parent / p.name)
+                    metadata_files += 1
 
         # Delete the file
         await aiofiles.os.remove(full_path)
 
         # Ensure that checks are queued again
         await tasks.draft_checks(project_name, version_name, caller_data=data)
+        await data.commit()
 
-    return await session.redirect(
-        review, success="File deleted successfully", project_name=project_name, version_name=version_name
-    )
+    success_message = "File deleted successfully"
+    if metadata_files:
+        success_message += (
+            f", and {metadata_files} associated metadata file{'' if metadata_files == 1 else 's'} deleted"
+        )
+    return await session.redirect(review, success=success_message, project_name=project_name, version_name=version_name)
 
 
 @routes.committer("/draft/hashgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])

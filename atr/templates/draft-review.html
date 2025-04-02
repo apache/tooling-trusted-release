@@ -104,7 +104,7 @@
                   </td>
                 </tr>
                 {% set file_id = path|string %}
-                {{ dialog.delete_modal(file_id, "Delete file", "file", as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
+                {{ dialog.delete_modal(file_id, "Delete file", "file, and any associated metadata files,", as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
               {% endfor %}
             </tbody>
           </table>

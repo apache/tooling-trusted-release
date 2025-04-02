@@ -1,4 +1,5 @@
 {% macro delete_modal_with_confirm(id, title, item, action, form, field_name) %}
+  {# TODO: Make ESC close this modal #}
   {% set element_id = id|slugify %}
   <div class="modal modal-lg fade"
        id="delete-{{ element_id }}"
