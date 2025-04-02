@@ -91,6 +91,8 @@ async def draft_checks(project_name: str, release_version: str, caller_data: db.
             ).model_dump(),
         )
         data.add(path_check_task)
+        if caller_data is None:
+            await data.commit()
 
     return len(paths_recursive)
 
