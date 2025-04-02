@@ -93,7 +93,17 @@ class PromoteForm(util.QuartFormTyped):
     confirm_promote = wtforms.BooleanField(
         "Confirmation", validators=[wtforms.validators.DataRequired("You must confirm to proceed with promotion")]
     )
-    submit = wtforms.SubmitField("Promote to candidate")
+    target_phase = wtforms.RadioField(
+        "Target phase",
+        choices=[
+            (models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE.value, "Release candidate (before vote) - RECOMMENDED"),
+            (models.ReleasePhase.RELEASE_PREVIEW.value, "Release preview"),
+            (models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT.value, "Release (after announcement)"),
+        ],
+        default=models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE.value,
+        validators=[wtforms.validators.InputRequired("Target phase selection is required")],
+    )
+    submit = wtforms.SubmitField("Promote candidate draft")
 
 
 async def _number_of_release_files(release: models.Release) -> int:
@@ -366,29 +376,17 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
         if not any((p.name == project_name) for p in (await session.user_projects)):
             return await session.redirect(promote, error="You do not have access to this project")
 
+        selected_target_phase_value = promote_form.target_phase.data
+        try:
+            target_phase_enum = models.ReleasePhase(selected_target_phase_value)
+        except ValueError:
+            return await session.redirect(promote, error="Invalid target phase selected")
+
         async with db.session() as data:
             try:
-                # Get the release
-                release = await data.release(name=candidate_draft_name, _project=True).demand(
-                    routes.FlashError("Candidate draft not found")
+                return await _promote(
+                    data, candidate_draft_name, session, target_phase_enum, project_name, version_name
                 )
-
-                # Verify that it's in the correct phase
-                if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-                    return await session.redirect(promote, error="This release is not in the candidate draft phase")
-
-                # Promote it to a candidate
-                # TODO: Obtain a lock for this
-                source = str(util.get_release_candidate_draft_dir() / project_name / version_name)
-                target = str(util.get_release_candidate_dir() / project_name / version_name)
-                if await aiofiles.os.path.exists(target):
-                    return await session.redirect(promote, error="Candidate already exists")
-                release.phase = models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE
-                await data.commit()
-                await aioshutil.move(source, target)
-
-                return await session.redirect(promote, success="Candidate draft successfully promoted to candidate")
-
             except Exception as e:
                 logging.exception("Error promoting candidate draft:")
                 return await session.redirect(promote, error=f"Error promoting candidate draft: {e!s}")
@@ -757,6 +755,57 @@ async def _add(session: routes.CommitterSession, form: AddProtocol) -> None:
                 created=datetime.datetime.now(datetime.UTC),
             )
             data.add(release)
+
+
+async def _promote(
+    data: db.Session,
+    candidate_draft_name: str,
+    session: routes.CommitterSession,
+    target_phase_enum: models.ReleasePhase,
+    project_name: str,
+    version_name: str,
+) -> str | response.Response:
+    # Get the release
+    release = await data.release(name=candidate_draft_name, _project=True).demand(
+        routes.FlashError("Candidate draft not found")
+    )
+
+    # Verify that it's in the correct phase
+    if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+        return await session.redirect(promote, error="This release is not in the candidate draft phase")
+
+    source_dir = util.get_release_candidate_draft_dir() / project_name / version_name
+    target_dir: pathlib.Path
+    success_message: str
+
+    # Promote it to the target phase
+    # TODO: Obtain a lock for this
+    if target_phase_enum == models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE:
+        release.stage = models.ReleaseStage.RELEASE_CANDIDATE
+        release.phase = models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE
+        target_dir = util.get_release_candidate_dir() / project_name / version_name
+        success_message = "Candidate draft successfully promoted to candidate (before vote)"
+    elif target_phase_enum == models.ReleasePhase.RELEASE_PREVIEW:
+        release.stage = models.ReleaseStage.RELEASE
+        release.phase = models.ReleasePhase.RELEASE_PREVIEW
+        target_dir = util.get_release_preview_dir() / project_name / version_name
+        success_message = "Candidate draft successfully promoted to release preview"
+    elif target_phase_enum == models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT:
+        release.stage = models.ReleaseStage.RELEASE
+        release.phase = models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT
+        target_dir = util.get_release_dir() / project_name / version_name
+        success_message = "Candidate draft successfully promoted to release (after announcement)"
+    else:
+        # Should not happen due to form validation
+        return await session.redirect(promote, error="Unsupported target phase")
+
+    if await aiofiles.os.path.exists(target_dir):
+        return await session.redirect(promote, error=f"Target directory {target_dir.name} already exists")
+
+    await data.commit()
+    await aioshutil.move(str(source_dir), str(target_dir))
+
+    return await session.redirect(promote, success=success_message)
 
 
 async def _upload_files(

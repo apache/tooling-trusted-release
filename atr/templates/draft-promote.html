@@ -72,7 +72,7 @@
                 {{ promote_form.confirm_promote(class="form-check-input", id="confirm_promote_" + candidate_draft.name) }}
                 <label class="form-check-label"
                        for="confirm_promote_{{ candidate_draft.name }}">
-                  I understand this will freeze the candidate draft into a candidate
+                  I understand this will freeze the candidate draft
                 </label>
               </div>
               {% if promote_form.confirm_promote.errors %}
@@ -81,6 +81,29 @@
                 </div>
               {% endif %}
             </div>
+
+            <details class="mb-3">
+              <summary class="text-muted">Advanced options</summary>
+              <div class="pt-3 border-top mt-2">
+                <div class="mb-3 {% if promote_form.target_phase.errors %}has-danger{% endif %}">
+                  <label class="form-label fw-medium">{{ promote_form.target_phase.label }}</label>
+                  <div class="ms-2 mt-2">
+                    {% for subfield in promote_form.target_phase %}
+                      <div class="form-check">
+                        {{ subfield(class_='form-check-input') }}
+                        {{ subfield.label(class_='form-check-label') }}
+                      </div>
+                    {% endfor %}
+                  </div>
+                  {% if promote_form.target_phase.errors %}
+                    <div class="invalid-feedback d-block">
+                      {% for error in promote_form.target_phase.errors %}{{ error }}{% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </details>
+
             <button type="submit" class="btn btn-primary">{{ promote_form.submit.label.text }}</button>
           </form>
         </div>
