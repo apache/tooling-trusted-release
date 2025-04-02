@@ -32,95 +32,91 @@
 
   {% if candidate_drafts %}
     <h2>Candidate drafts</h2>
-    <ul>
+    <p>Jump to a specific candidate draft:</p>
+    <div class="mb-4 d-flex flex-wrap gap-2">
       {% for candidate_draft in candidate_drafts %}
-        <li>
-          <a href="#{{ candidate_draft.name }}">{{ candidate_draft.name }}</a>
-        </li>
+        <a href="#{{ candidate_draft.name }}"
+           class="btn btn-sm btn-outline-secondary">{{ candidate_draft.name }}</a>
       {% endfor %}
-    </ul>
+    </div>
 
     <h2>Actions</h2>
 
     {% for candidate_draft in candidate_drafts %}
-      <div id="{{ candidate_draft.name }}" class="card mb-4 shadow-sm">
+      <div id="{{ candidate_draft.name }}" class="card mb-2 shadow-sm">
         <div class="card-header bg-light">
           <h3 class="card-title mb-0">{{ candidate_draft.name }}</h3>
         </div>
         <div class="card-body">
-          <div class="d-flex flex-wrap gap-3 pb-3 mb-3 border-bottom text-secondary fs-6">
-            <!-- <span class="atr-candidate-meta-item">Version: {{ candidate_draft.version }}</span> -->
+          <div class="d-flex flex-wrap gap-3 text-secondary fs-6">
             <span class="atr-candidate-meta-item">Stage: {{ candidate_draft.stage.value.upper() }}</span>
             <span class="atr-candidate-meta-item">Phase: {{ candidate_draft.phase.value.upper() }}</span>
             <span class="atr-candidate-meta-item">Created: {{ candidate_draft.created.strftime("%Y-%m-%d %H:%M UTC") }}</span>
           </div>
+        </div>
+      </div>
 
-          <div class="row mt-3">
-            <div class="col-12">
-              <div class="card mb-3 border-primary">
-                <div class="card-header bg-primary bg-opacity-10 text-primary">
-                  <h5 class="mb-0">Promote candidate draft to candidate</h5>
-                </div>
-                <div class="card-body">
-                  <p class="text-muted mb-3">Promoting will freeze this candidate draft into a candidate that can be voted on.</p>
-                  <form method="post" action="{{ as_url(routes.draft.promote) }}">
-                    {{ promote_form.hidden_tag() }}
-                    <input type="hidden"
-                           name="candidate_draft_name"
-                           value="{{ candidate_draft.name }}" />
-                    <div class="mb-3">
-                      <div class="form-check">
-                        {{ promote_form.confirm_promote(class="form-check-input", id="confirm_promote_" + candidate_draft.name) }}
-                        <label class="form-check-label"
-                               for="confirm_promote_{{ candidate_draft.name }}">
-                          I understand this will freeze the candidate draft into a candidate
-                        </label>
-                      </div>
-                      {% if promote_form.confirm_promote.errors %}
-                        <div class="invalid-feedback d-block">
-                          {% for error in promote_form.confirm_promote.errors %}{{ error }}{% endfor %}
-                        </div>
-                      {% endif %}
-                    </div>
-                    <button type="submit" class="btn btn-primary">{{ promote_form.submit.label.text }}</button>
-                  </form>
-                </div>
+      <div class="card mt-3 mb-4 border-primary">
+        <div class="card-header bg-primary bg-opacity-10 text-primary">
+          <h5 class="mb-0">Promote candidate draft to candidate</h5>
+        </div>
+        <div class="card-body">
+          <p class="text-muted mb-3">Promoting will freeze this candidate draft into a candidate that can be voted on.</p>
+          <form method="post" action="{{ as_url(routes.draft.promote) }}">
+            {{ promote_form.hidden_tag() }}
+            <input type="hidden"
+                   name="candidate_draft_name"
+                   value="{{ candidate_draft.name }}" />
+            <div class="mb-3">
+              <div class="form-check">
+                {{ promote_form.confirm_promote(class="form-check-input", id="confirm_promote_" + candidate_draft.name) }}
+                <label class="form-check-label"
+                       for="confirm_promote_{{ candidate_draft.name }}">
+                  I understand this will freeze the candidate draft into a candidate
+                </label>
               </div>
+              {% if promote_form.confirm_promote.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for error in promote_form.confirm_promote.errors %}{{ error }}{% endfor %}
+                </div>
+              {% endif %}
             </div>
+            <button type="submit" class="btn btn-primary">{{ promote_form.submit.label.text }}</button>
+          </form>
+        </div>
+      </div>
 
-            <div class="col-12">
-              <div class="card border-danger">
-                <div class="card-header bg-danger bg-opacity-10 text-danger">
-                  <h5 class="mb-0">Delete candidate draft</h5>
-                </div>
-                <div class="card-body">
-                  <p class="text-muted mb-3">Warning: This action will permanently delete this candidate draft and cannot be undone.</p>
-                  <form method="post" action="{{ as_url(routes.draft.delete) }}">
-                    {{ delete_form.hidden_tag() }}
-                    <input type="hidden"
-                           name="candidate_draft_name"
-                           value="{{ candidate_draft.name }}" />
-                    <div class="mb-3">
-                      <label for="confirm_delete_{{ candidate_draft.name }}" class="form-label">
-                        Type <strong>DELETE</strong> to confirm:
-                      </label>
-                      {{ delete_form.confirm_delete(class="form-control mt-2",
-                                            id="confirm_delete_" + candidate_draft.name,
-                                            placeholder="DELETE") }}
-                      {% if delete_form.confirm_delete.errors %}
-                        <div class="invalid-feedback d-block">
-                          {% for error in delete_form.confirm_delete.errors %}{{ error }}{% endfor %}
-                        </div>
-                      {% endif %}
-                    </div>
-                    <button type="submit" class="btn btn-danger">{{ delete_form.submit.label.text }}</button>
-                  </form>
-                </div>
+      <!--
+      TODO: This clutters the UI somewhat, but perhaps we should use a modal dialogue?
+      <div class="col-12">
+        <div class="card border-danger">
+          <div class="card-header bg-danger bg-opacity-10 text-danger">
+            <h5 class="mb-0">Delete candidate draft</h5>
+          </div>
+          <div class="card-body">
+            <p class="text-muted mb-3">Warning: This action will permanently delete this candidate draft and cannot be undone.</p>
+            <form method="post" action="{{ as_url(routes.draft.delete) }}">
+              {{ delete_form.hidden_tag() }}
+              <input type="hidden" name="candidate_draft_name" value="{{ candidate_draft.name }}" />
+              <div class="mb-3">
+                <label for="confirm_delete_{{ candidate_draft.name }}" class="form-label">
+                  Type <strong>DELETE</strong> to confirm:
+                </label>
+                {{ delete_form.confirm_delete(class="form-control mt-2",
+                              id="confirm_delete_" + candidate_draft.name,
+                              placeholder="DELETE") }}
+                {% if delete_form.confirm_delete.errors %}
+                  <div class="invalid-feedback d-block">
+                    {% for error in delete_form.confirm_delete.errors %}{{ error }}{% endfor %}
+                  </div>
+                {% endif %}
               </div>
-            </div>
+              <button type="submit" class="btn btn-danger">{{ delete_form.submit.label.text }}</button>
+            </form>
           </div>
         </div>
       </div>
+      -->
     {% endfor %}
   {% else %}
     <div class="alert alert-info">
