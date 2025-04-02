@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import contextlib
 from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, Final
 
@@ -65,48 +66,35 @@ async def draft_checks(project_name: str, release_version: str, caller_data: db.
     base_path = util.get_release_candidate_draft_dir() / project_name / release_version
     paths_recursive = await util.paths_recursive(base_path)
 
-    if caller_data is None:
-        data = db.session()
-        await data.__aenter__()
-    else:
-        data = caller_data
+    session_context = db.session() if (caller_data is None) else contextlib.nullcontext(caller_data)
+    async with session_context as data:
+        release = await data.release(name=models.release_name(project_name, release_version), _committee=True).demand(
+            RuntimeError("Release not found")
+        )
+        for path in paths_recursive:
+            full_path = base_path / path
+            modified = int(await aiofiles.os.path.getmtime(full_path))
+            cached_tasks = await db.recent_tasks(data, release.name, str(path), modified)
 
-    release = await data.release(name=models.release_name(project_name, release_version), _committee=True).demand(
-        RuntimeError("Release not found")
-    )
-    for path in paths_recursive:
-        # This works because path is relative
-        full_path = base_path / path
+            for task_type, task_function in TASK_FUNCTIONS.items():
+                if path.name.endswith(task_type):
+                    for task in await task_function(release, str(path)):
+                        if task.task_type not in cached_tasks:
+                            data.add(task)
 
-        # We only want to analyse files that are new or have changed
-        # But rsync can set timestamps to the past, so we can't rely on them
-        # Instead, we can run any tasks when the file has a different modified time
-        # TODO: This may cause problems if the file is backdated
-        modified = int(await aiofiles.os.path.getmtime(full_path))
-        cached_tasks = await db.recent_tasks(data, release.name, str(path), modified)
+        path_check_task = models.Task(
+            status=models.TaskStatus.QUEUED,
+            task_type=models.TaskType.PATHS_CHECK,
+            task_args=paths.Check(
+                release_name=release.name,
+                base_release_dir=str(base_path),
+            ).model_dump(),
+        )
+        data.add(path_check_task)
 
-        # Add new tasks for each path
-        for task_type, task_function in TASK_FUNCTIONS.items():
-            if path.name.endswith(task_type):
-                for task in await task_function(release, str(path)):
-                    if task.task_type not in cached_tasks:
-                        data.add(task)
-
-    # TODO: Should we hash the set of paths to detect changes?
-    path_check_task = models.Task(
-        status=models.TaskStatus.QUEUED,
-        task_type=models.TaskType.PATHS_CHECK,
-        task_args=paths.Check(
-            release_name=release.name,
-            base_release_dir=str(base_path),
-        ).model_dump(),
-    )
-    data.add(path_check_task)
-
-    if caller_data is None:
-        await data.commit()
-        await data.__aexit__(None, None, None)
-    # Otherwise the caller is responsible for committing
+        if caller_data is None:
+            await data.commit()
+        # Otherwise the caller is responsible for committing
 
     return len(paths_recursive)
 
