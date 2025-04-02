@@ -1,98 +1,132 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Add signing key ~ ATR
+  Add your GPG key ~ ATR
 {% endblock title %}
 
 {% block description %}
-  Add a public signing key to your account.
+  Add your public signing key to your ATR account.
 {% endblock description %}
 
 {% block content %}
-  <h1>Add signing key</h1>
-  <p class="intro">Add your public key to use for signing release artifacts.</p>
+  <div class="my-4">
+    <h1 class="mb-4">Add your GPG key</h1>
 
-  <div class="user-info">
-    <p>
-      Welcome, <strong>{{ asf_id }}</strong>! You are authenticated as an ASF committer.
-    </p>
-  </div>
+    <p>Add your public key to use for signing release artifacts.</p>
+    {% if form.errors %}<div class="alert alert-danger">Please correct the errors below:</div>{% endif %}
 
-  {% if key_info %}
-    <h2>Key results</h2>
-    <div class="mt-3 p-3 bg-light rounded">
-      <h3 class="mt-0">Success: Added Key</h3>
-      <dl class="row mb-0">
-        <dt class="col-sm-3 fw-bold">Key ID</dt>
-        <dd class="col-sm-9 mb-2">
-          {{ key_info.key_id }}
-        </dd>
-        <dt class="col-sm-3 fw-bold">Fingerprint</dt>
-        <dd class="col-sm-9 mb-2">
-          {{ key_info.fingerprint }}
-        </dd>
-        <dt class="col-sm-3 fw-bold">User ID</dt>
-        <dd class="col-sm-9 mb-2">
-          {{ key_info.user_id }}
-        </dd>
-        <dt class="col-sm-3 fw-bold">Created</dt>
-        <dd class="col-sm-9 mb-2">
-          {{ key_info.creation_date }}
-        </dd>
-        <dt class="col-sm-3 fw-bold">Expires</dt>
-        <dd class="col-sm-9 mb-2">
-          {{ key_info.expiration_date or 'Never' }}
-        </dd>
-        <dt class="col-sm-3 fw-bold">Key Data</dt>
-        <dd class="col-sm-9 mb-2">
-          <pre class="mb-0">{{ key_info.data }}</pre>
-        </dd>
-      </dl>
-    </div>
-  {% endif %}
+    <form method="post"
+          class="striking py-4 px-5"
+          action="{{ as_url(routes.keys.add) }}"
+          novalidate>
+      {{ form.hidden_tag() if form.hidden_tag }}
 
-  <form method="post" class="striking">
-    <div class="mb-4">
-      <div class="mb-3">
-        <label for="public_key" class="form-label">Public key:</label>
-      </div>
-      <textarea id="public_key"
-                name="public_key"
-                class="form-control mb-2"
-                rows="8"
-                required
-                placeholder="Paste your public key here (in ASCII-armored format)"
-                aria-describedby="key-help"></textarea>
-      <small id="key-help" class="form-text text-muted">
-        Your public key should be in ASCII-armored format, starting with "-----BEGIN PGP PUBLIC KEY BLOCK-----"
-      </small>
-    </div>
-
-    {% if user_committees %}
       <div class="mb-4">
-        <div class="mb-3">
-          <label class="form-label">Associate with projects:</label>
+        <div class="row mb-3 pb-3 border-bottom{% if form.public_key.errors %} has-danger{% endif %}">
+          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.public_key.label }}</div>
+          <div class="col-md-9">
+            {{ form.public_key(class_='form-control font-monospace', rows=10, placeholder='Paste your ASCII-armored public GPG key here...') }}
+            <small class="form-text text-muted">
+              Your public key should be in ASCII-armored format, starting with "-----BEGIN PGP PUBLIC KEY BLOCK-----"
+            </small>
+            {% if form.public_key.errors %}
+              <div class="invalid-feedback d-block">
+                {% for error in form.public_key.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
         </div>
-        <div class="d-flex flex-wrap gap-3 mb-2">
-          {% for committee in user_committees|sort(attribute='name') %}
-            <div class="form-check d-flex align-items-center gap-2">
-              <input type="checkbox"
-                     class="form-check-input"
-                     id="committee_{{ committee.name }}"
-                     name="selected_committees"
-                     value="{{ committee.name }}" />
-              <label class="form-check-label mb-0" for="committee_{{ committee.name }}">{{ committee.display_name }}</label>
+
+        <div class="row mb-3 pb-3 border-bottom{% if form.selected_committees.errors %} has-danger{% endif %}">
+          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.selected_committees.label }}</div>
+          <div class="col-md-9">
+            <div class="row">
+              {% for subfield in form.selected_committees %}
+                <div class="col-sm-12 col-md-6 col-lg-4">
+                  <div class="form-check mb-2">
+                    {{ subfield(class_='form-check-input') }}
+                    {{ subfield.label(class_='form-check-label') }}
+                  </div>
+                </div>
+              {% endfor %}
             </div>
-          {% endfor %}
+            <div class="mt-2 mb-2">
+              <button type="button"
+                      id="toggleCommitteesBtn"
+                      class="btn btn-sm btn-outline-secondary">Select all</button>
+            </div>
+            <small class="form-text text-muted">Select the committees you are a member of.</small>
+            {% if form.selected_committees.errors %}
+              <div class="invalid-feedback d-block">
+                {% for error in form.selected_committees.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
         </div>
-        <small class="form-text text-muted">You must associate your key with at least one PMC of which you are a member.</small>
       </div>
-    {% else %}
-      <div class="text-danger mt-1">
-        <p>You must be a member of at least one PMC to add a signing key.</p>
+
+      <div class="mt-4">
+        {{ form.submit(class_='btn btn-primary') }}
+        <a href="{{ as_url(routes.keys.review) }}"
+           class="btn btn-link text-secondary">Cancel</a>
+      </div>
+    </form>
+
+    {% if key_info and key_info.status == 'success' %}
+      <div class="mt-5">
+        <h2 class="mb-3 fs-5">Key details added:</h2>
+        <div class="p-3 bg-light border rounded">
+          <p>
+            <strong>Key ID:</strong> {{ key_info.key_id }}
+            <br />
+            <strong>Fingerprint:</strong> <code>{{ key_info.fingerprint }}</code>
+            <br />
+            <strong>User ID:</strong> {{ key_info.user_id }}
+            <br />
+            <strong>Created:</strong> {{ key_info.creation_date.strftime("%Y-%m-%d") }}
+            <br />
+            <strong>Expires:</strong> {{ key_info.expiration_date.strftime("%Y-%m-%d") if key_info.expiration_date else 'Never' }}
+          </p>
+        </div>
       </div>
     {% endif %}
-
-    <button type="submit" class="btn btn-primary">Add key</button>
-  </form>
+  </div>
 {% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+  <script>
+      document.addEventListener("DOMContentLoaded", () => {
+          const btn = document.getElementById("toggleCommitteesBtn");
+          const checkboxes = document.querySelectorAll("input[name='selected_committees']");
+
+          if (!btn || checkboxes.length === 0) return;
+
+          function updateButtonText() {
+              let allChecked = true;
+              checkboxes.forEach(cb => {
+                  if (!cb.checked) allChecked = false;
+              });
+              btn.textContent = allChecked ? "Select none" : "Select all";
+          }
+
+          btn.addEventListener("click", () => {
+              let allChecked = true;
+              checkboxes.forEach(cb => {
+                  if (!cb.checked) allChecked = false;
+              });
+              const shouldCheck = !allChecked;
+              checkboxes.forEach(cb => {
+                  cb.checked = shouldCheck;
+              });
+              updateButtonText();
+          });
+
+          checkboxes.forEach(cb => {
+              cb.addEventListener("change", updateButtonText);
+          });
+
+          updateButtonText();
+      });
+  </script>
+{% endblock javascripts %}

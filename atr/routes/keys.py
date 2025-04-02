@@ -35,11 +35,16 @@ import quart
 import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
 import wtforms
+from wtforms import widgets
 
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.util as util
+
+
+class DeleteKeyForm(util.QuartFormTyped):
+    submit = wtforms.SubmitField("Delete key")
 
 
 class AddSSHKeyForm(util.QuartFormTyped):
@@ -247,20 +252,55 @@ async def add(session: routes.CommitterSession) -> str:
         project_list = session.committees + session.projects
         user_committees = await data.committee(name_in=project_list).all()
 
-    if quart.request.method == "POST":
+    committee_choices = [(c.name, c.display_name or c.name) for c in user_committees]
+
+    class AddGpgKeyForm(util.QuartFormTyped):
+        public_key = wtforms.TextAreaField(
+            "Public GPG key", validators=[wtforms.validators.InputRequired("Public key is required")]
+        )
+        selected_committees = wtforms.SelectMultipleField(
+            "Associate key with committees",
+            validators=[wtforms.validators.InputRequired("You must select at least one committee")],
+            coerce=str,
+            choices=committee_choices,
+            option_widget=widgets.CheckboxInput(),
+            widget=widgets.ListWidget(prefix_label=False),
+        )
+        submit = wtforms.SubmitField("Add GPG key")
+
+    form = await AddGpgKeyForm.create_form(data=await quart.request.form if quart.request.method == "POST" else None)
+
+    if await form.validate_on_submit():
         try:
-            key_info = await key_add_post(session, quart.request, user_committees)
+            public_key_data: str = util.unwrap(form.public_key.data)
+            selected_committees_data: list[str] = util.unwrap(form.selected_committees.data)
+
+            invalid_committees = [
+                committee
+                for committee in selected_committees_data
+                if (committee not in session.committees) and (committee not in session.projects)
+            ]
+            if invalid_committees:
+                raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
+
+            key_info = await key_user_add(session.uid, public_key_data, selected_committees_data)
+            if key_info:
+                await quart.flash(f"GPG key {key_info.get('fingerprint', '')} added successfully.", "success")
+            # Clear form data on success by creating a new empty form instance
+            form = await AddGpgKeyForm.create_form()
+
         except routes.FlashError as e:
-            logging.exception("FlashError:")
+            logging.warning("FlashError adding GPG key: %s", e)
             await quart.flash(str(e), "error")
         except Exception as e:
-            logging.exception("Exception:")
-            await quart.flash(f"Exception: {e}", "error")
+            logging.exception("Exception adding GPG key:")
+            await quart.flash(f"An unexpected error occurred: {e!s}", "error")
 
     return await quart.render_template(
         "keys-add.html",
         asf_id=session.uid,
         user_committees=user_committees,
+        form=form,
         key_info=key_info,
         algorithms=routes.algorithms,
     )
@@ -268,11 +308,15 @@ async def add(session: routes.CommitterSession) -> str:
 
 @routes.committer("/keys/delete", methods=["POST"])
 async def delete(session: routes.CommitterSession) -> response.Response:
-    """Delete a public signing key from the user's account."""
-    form = await routes.get_form(quart.request)
-    fingerprint = form.get("fingerprint")
+    """Delete a public signing key or SSH key from the user's account."""
+    form = await DeleteKeyForm.create_form(data=await quart.request.form)
+
+    if not await form.validate_on_submit():
+        return await session.redirect(review, error="Invalid request for key deletion.")
+
+    fingerprint = (await quart.request.form).get("fingerprint")
     if not fingerprint:
-        return await session.redirect(review, error="No key fingerprint provided")
+        return await session.redirect(review, error="Missing key fingerprint for deletion.")
 
     async with db.session() as data:
         async with data.begin():
@@ -305,6 +349,8 @@ async def review(session: routes.CommitterSession) -> str:
     status_message = quart.request.args.get("status_message")
     status_type = quart.request.args.get("status_type")
 
+    delete_form = await DeleteKeyForm.create_form()
+
     return await quart.render_template(
         "keys-review.html",
         asf_id=session.uid,
@@ -314,6 +360,7 @@ async def review(session: routes.CommitterSession) -> str:
         status_message=status_message,
         status_type=status_type,
         now=datetime.datetime.now(datetime.UTC),
+        delete_form=delete_form,
     )
 
 

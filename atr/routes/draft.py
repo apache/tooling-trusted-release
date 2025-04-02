@@ -167,7 +167,7 @@ async def add_file(session: routes.CommitterSession, project_name: str, version_
 
             await _upload_files(project_name, version_name, file_name, file_data)
             return await session.redirect(
-                review, success="File(s) added successfully", project_name=project_name, version_name=version_name
+                review, success="File or files added successfully", project_name=project_name, version_name=version_name
             )
         except Exception as e:
             logging.exception("Error adding file(s):")
