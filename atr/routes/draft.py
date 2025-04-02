@@ -59,6 +59,7 @@ class AddProtocol(Protocol):
 
     version_name: wtforms.StringField
     project_name: wtforms.SelectField
+    project_label_suffix: wtforms.StringField
 
 
 class DeleteForm(util.QuartFormTyped):
@@ -126,6 +127,17 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
         project_name = wtforms.SelectField("Project", choices=[(p.name, p.full_name or p.name) for p in user_projects])
         version_name = wtforms.StringField(
             "Version", validators=[wtforms.validators.InputRequired("Version is required")]
+        )
+        project_label_suffix = wtforms.StringField(
+            "Project label suffix",
+            validators=[
+                wtforms.validators.Optional(),
+                wtforms.validators.Regexp(
+                    r"^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$",
+                    message="Suffix must contain only alphanumeric characters and hyphens, "
+                    "and cannot start or end with a hyphen.",
+                ),
+            ],
         )
         submit = wtforms.SubmitField("Create candidate draft")
 
@@ -724,27 +736,60 @@ async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -
 async def _add(session: routes.CommitterSession, form: AddProtocol) -> None:
     """Handle POST request for creating a new release candidate draft."""
     version = str(form.version_name.data)
-    project_name = str(form.project_name.data)
+    base_project_name = str(form.project_name.data)
+    suffix = str(form.project_label_suffix.data or "")
 
     # Create the release record in the database
     async with db.session() as data:
         async with data.begin():
-            project = await data.project(name=project_name).get()
+            project = await data.project(name=base_project_name).get()
             if not project:
-                raise routes.FlashError("Project not found")
+                raise routes.FlashError("Base project not found")
 
-            # Verify user is a committee member or committer of the project
-            if project_name not in (p.name for p in await session.user_projects):
+            if base_project_name not in (p.name for p in await session.user_projects):
                 raise routes.FlashError(
-                    f"You must be a participant of {project_name} to submit a release candidate",
+                    f"You must be a participant of {base_project_name} to submit a release candidate",
                 )
 
-            release_name = f"{project_name}-{version}"
-            # Check that the release does not already exist
-            if await data.release(name=release_name).get():
-                raise routes.FlashError("Release candidate already exists")
+            # Construct the final label
+            final_project_label = base_project_name
+            if suffix:
+                final_project_label += f"-{suffix}"
 
-            # Create release record with project
+            # Check whether the subproject already exists
+            if final_project_label != base_project_name:
+                sub_project = await data.project(name=final_project_label).get()
+                if sub_project is not None:
+                    project = sub_project
+                else:
+                    # Create the new subproject
+                    # TODO: We're letting any participant do this
+                    # But we should probably limit this to committee members
+                    project = models.Project(
+                        name=final_project_label,
+                        full_name=f"{project.full_name} {suffix.title()}",
+                        is_podling=project.is_podling,
+                        is_retired=project.is_retired,
+                        description=project.description,
+                        category=project.category,
+                        programming_languages=project.programming_languages,
+                        committee_id=project.committee_id,
+                        vote_policy_id=project.vote_policy_id,
+                        # TODO: Add "created" and "created_by" to models.Project
+                        # created=datetime.datetime.now(datetime.UTC),
+                        # created_by=session.uid,
+                    )
+                    data.add(project)
+
+    async with db.session() as data:
+        async with data.begin():
+            # The release name uses the potentially suffixed label
+            release_name = f"{final_project_label}-{version}"
+
+            if await data.release(name=release_name).get():
+                raise routes.FlashError("Release candidate draft with this name already exists")
+
+            # Release is now linked to the appropriate project or subproject
             release = models.Release(
                 name=release_name,
                 stage=models.ReleaseStage.RELEASE_CANDIDATE,

@@ -108,6 +108,18 @@
       </div>
 
       <div class="mb-3 pb-3 row border-bottom">
+        <label for="{{ form.project_label_suffix.id }}"
+               class="col-sm-3 col-form-label text-sm-end">Project label:</label>
+        <div class="col-sm-8 d-flex align-items-center">
+          <span id="project-label-prefix" class="me-1 fw-bold"></span>
+          {{ form.project_label_suffix(class_="form-control w-auto flex-grow-1") }}
+          {% if form.project_label_suffix.errors %}
+            <div class="invalid-feedback d-block mt-1 ms-1">{{ form.project_label_suffix.errors[0] }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="mb-3 pb-3 row border-bottom">
         <label for="{{ form.version_name.id }}"
                class="col-sm-3 col-form-label text-sm-end">{{ form.version_name.label.text }}:</label>
         <div class="col-sm-8">
@@ -126,5 +138,28 @@
       {{ super() }}
       <script>
           init();
+          document.addEventListener("DOMContentLoaded", () => {
+              const projectSelect = document.getElementById("project_name");
+              const suffixInput = document.getElementById("project_label_suffix");
+              const prefixSpan = document.getElementById("project-label-prefix");
+
+              if (!projectSelect || !suffixInput || !prefixSpan) return;
+
+              function updatePrefix() {
+                  const selectedProjectLabel = projectSelect.value;
+                  const suffixValue = suffixInput.value.trim();
+
+                  if (suffixValue) {
+                      prefixSpan.textContent = selectedProjectLabel + "-";
+                  } else {
+                      prefixSpan.textContent = selectedProjectLabel;
+                  }
+              }
+
+              projectSelect.addEventListener("change", updatePrefix);
+              suffixInput.addEventListener("input", updatePrefix);
+
+              updatePrefix();
+          });
       </script>
     {% endblock javascripts %}
