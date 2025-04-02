@@ -106,8 +106,7 @@ def abs_path_to_release_and_rel_path(abs_path: str) -> tuple[str, str]:
     # The next two components are the project name and version name
     project_name = phase_sub_dir.parts[1]
     version_name = phase_sub_dir.parts[2]
-    release_name = f"{project_name}-{version_name}"
-    return release_name, str(pathlib.Path(*phase_sub_dir.parts[3:]))
+    return models.release_name(project_name, version_name), str(pathlib.Path(*phase_sub_dir.parts[3:]))
 
 
 def as_url(func: Callable, **kwargs: Any) -> str:

@@ -353,7 +353,7 @@ class Task(sqlmodel.SQLModel, table=True):
 class Release(sqlmodel.SQLModel, table=True):
     # We guarantee that "{project.name}-{version}" is unique
     # Therefore we can use that for the name
-    name: str = sqlmodel.Field(primary_key=True, unique=True)
+    name: str = sqlmodel.Field(default="", primary_key=True, unique=True)
     stage: ReleaseStage
     phase: ReleasePhase
     created: datetime.datetime
@@ -402,10 +402,15 @@ class Release(sqlmodel.SQLModel, table=True):
         return project.committee
 
 
+def release_name(project_name: str, version_name: str) -> str:
+    """Return the release name for a given project and version."""
+    return f"{project_name}-{version_name}"
+
+
 @event.listens_for(Release, "before_insert")
 def check_release_name(_mapper: sqlalchemy.orm.Mapper, _connection: sqlalchemy.Connection, release: Release) -> None:
-    if release.name != f"{release.project.name}-{release.version}":
-        raise ValueError(f"Release name must be set to {release.project.name}-{release.version}")
+    if release.name == "":
+        release.name = release_name(release.project.name, release.version)
 
 
 class SSHKey(sqlmodel.SQLModel, table=True):

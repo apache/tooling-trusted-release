@@ -420,7 +420,7 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
 
     # Check that the release exists
     async with db.session() as data:
-        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+        release = await data.release(name=models.release_name(project_name, version_name), _committee=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
@@ -467,13 +467,13 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
 
         # Get successes, warnings, and errors
         path_successes[path] = await data.check_result(
-            release_name=f"{project_name}-{version_name}", path=str(path), status=models.CheckResultStatus.SUCCESS
+            release_name=release.name, path=str(path), status=models.CheckResultStatus.SUCCESS
         ).all()
         path_warnings[path] = await data.check_result(
-            release_name=f"{project_name}-{version_name}", path=str(path), status=models.CheckResultStatus.WARNING
+            release_name=release.name, path=str(path), status=models.CheckResultStatus.WARNING
         ).all()
         path_errors[path] = await data.check_result(
-            release_name=f"{project_name}-{version_name}", path=str(path), status=models.CheckResultStatus.FAILURE
+            release_name=release.name, path=str(path), status=models.CheckResultStatus.FAILURE
         ).all()
 
     delete_file_form = await DeleteFileForm.create_form()
@@ -566,8 +566,7 @@ async def sbomgen(
 
     async with db.session() as data:
         # Check that the release exists
-        release_name = f"{project_name}-{version_name}"
-        await data.release(name=release_name, _project=True).demand(
+        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
@@ -599,7 +598,7 @@ async def sbomgen(
             ).model_dump(),
             added=datetime.datetime.now(datetime.UTC),
             status=models.TaskStatus.QUEUED,
-            release_name=release_name,
+            release_name=release.name,
         )
         data.add(sbom_task)
         await data.commit()
@@ -783,15 +782,11 @@ async def _add(session: routes.CommitterSession, form: AddProtocol) -> None:
 
     async with db.session() as data:
         async with data.begin():
-            # The release name uses the potentially suffixed label
-            release_name = f"{final_project_label}-{version}"
-
-            if await data.release(name=release_name).get():
-                raise routes.FlashError("Release candidate draft with this name already exists")
+            if release := await data.release(project_id=project.id, version=version).get():
+                raise routes.FlashError(f"{release.phase.value.upper()} with this name already exists")
 
             # Release is now linked to the appropriate project or subproject
             release = models.Release(
-                name=release_name,
                 stage=models.ReleaseStage.RELEASE_CANDIDATE,
                 phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
                 project_id=project.id,

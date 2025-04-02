@@ -64,10 +64,10 @@ async def _analyse_core(project_name: str, release_version: str) -> dict[str, An
     """Core logic to analyse an rsync upload and queue checks."""
     base_path = util.get_release_candidate_draft_dir() / project_name / release_version
     paths_recursive = await util.paths_recursive(base_path)
-    release_name = f"{project_name}-{release_version}"
-
     async with db.session() as data:
-        release = await data.release(name=release_name, _committee=True).demand(RuntimeError("Release not found"))
+        release = await data.release(name=models.release_name(project_name, release_version), _committee=True).demand(
+            RuntimeError("Release not found")
+        )
         for path in paths_recursive:
             # This works because path is relative
             full_path = base_path / path
@@ -77,7 +77,7 @@ async def _analyse_core(project_name: str, release_version: str) -> dict[str, An
             # Instead, we can run any tasks when the file has a different modified time
             # TODO: This may cause problems if the file is backdated
             modified = int(await aiofiles.os.path.getmtime(full_path))
-            cached_tasks = await db.recent_tasks(data, release_name, str(path), modified)
+            cached_tasks = await db.recent_tasks(data, release.name, str(path), modified)
 
             # Add new tasks for each path
             task_functions: dict[str, Callable[..., Coroutine[Any, Any, list[models.Task]]]] = {
@@ -96,7 +96,7 @@ async def _analyse_core(project_name: str, release_version: str) -> dict[str, An
             status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.PATHS_CHECK,
             task_args=paths.Check(
-                release_name=release_name,
+                release_name=release.name,
                 base_release_dir=str(base_path),
             ).model_dump(),
         )

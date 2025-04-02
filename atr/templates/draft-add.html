@@ -37,10 +37,7 @@
               {% endif %}
               <p class="card-text">
                 {% if candidate_drafts|length > 0 %}
-                  This project already has candidate drafts
-                  {% for release in candidate_drafts %}
-                    <code><a href="#{{ release.name }}" class="border rounded px-2">{{ release.version }}</a></code>,
-                  {% endfor %}
+                  This project already has {{ candidate_drafts|length }} candidate draft{{ "s" if candidate_drafts|length > 1 else "" }},
                   but to create another one, use the command below.
                 {% else %}
                   This project does not have a candidate draft.
@@ -71,10 +68,7 @@
               {% endif %}
               <p class="card-text">
                 {% if candidate_drafts|length > 0 %}
-                  This project already has candidate drafts
-                  {% for release in candidate_drafts %}
-                    <code><a href="#{{ release.name }}" class="border rounded px-2">{{ release.version }}</a></code>,
-                  {% endfor %}
+                  This project already has {{ candidate_drafts|length }} candidate draft{{ "s" if candidate_drafts|length > 1 else "" }},
                   but to create another one, use the command below.
                 {% else %}
                   This project does not have a candidate draft.

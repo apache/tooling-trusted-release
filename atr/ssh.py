@@ -286,16 +286,14 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
         exit_status = await proc.wait()
 
         # Start a task to process the new files
-        release_name = f"{project_name}-{release_version}"
         async with db.session() as data:
-            release = await data.release(name=release_name, _committee=True).get()
+            release = await data.release(name=models.release_name(project_name, release_version), _committee=True).get()
             # Create the release if it does not already exist
             if release is None:
                 project = await data.project(name=project_name, _committee=True).demand(
                     RuntimeError("Project not found")
                 )
                 release = models.Release(
-                    name=release_name,
                     project_id=project.id,
                     project=project,
                     version=release_version,

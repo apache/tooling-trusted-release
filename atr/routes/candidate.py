@@ -158,9 +158,9 @@ async def vote(session: routes.CommitterSession) -> str:
 @routes.committer("/candidate/vote/<project_name>/<version>", methods=["GET", "POST"])
 async def vote_project(session: routes.CommitterSession, project_name: str, version: str) -> response.Response | str:
     """Show the vote initiation form for a release."""
-    release_name = f"{project_name}-{version}"
     async with db.session() as data:
-        release = await data.release(name=release_name, _project=True, _committee=True).demand(
+        project = await data.project(name=project_name).demand(routes.FlashError("Project not found"))
+        release = await data.release(project_id=project.id, version=version, _committee=True).demand(
             routes.FlashError("Release candidate not found")
         )
         # Check that the user is on the release project committee
@@ -233,7 +233,7 @@ Thanks,
             data=await quart.request.form if quart.request.method == "POST" else None,
         )
         # Set hidden field data explicitly
-        form.release_name.data = release_name
+        form.release_name.data = release.name
 
         if quart.request.method == "GET":
             form.subject.data = default_subject
@@ -255,7 +255,7 @@ Thanks,
                 status=models.TaskStatus.QUEUED,
                 task_type=models.TaskType.VOTE_INITIATE,
                 task_args=tasks_vote.Initiate(
-                    release_name=release_name,
+                    release_name=release.name,
                     email_to=email_to,
                     vote_duration=vote_duration_choice,
                     initiator_id=session.uid,
@@ -263,7 +263,7 @@ Thanks,
                     subject=subject_data,
                     body=body_data,
                 ).model_dump(),
-                release_name=release_name,
+                release_name=release.name,
             )
 
             data.add(task)
