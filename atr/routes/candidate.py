@@ -191,11 +191,12 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
                 validators=[wtforms.validators.InputRequired("Vote duration is required")],
                 default="72",
             )
-            gpg_key_id = wtforms.StringField("Your GPG key ID", validators=[wtforms.validators.Optional()])
-            commit_hash = wtforms.StringField("Commit hash", validators=[wtforms.validators.Optional()])
             subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
             body = wtforms.TextAreaField("Body", validators=[wtforms.validators.Optional()])
             submit = wtforms.SubmitField("Prepare vote email")
+
+        user_key = await data.public_signing_key(apache_uid=session.uid).get()
+        user_key_fingerprint = user_key.fingerprint if user_key else None
 
         version = release.version
         committee_name = committee.name
@@ -212,9 +213,9 @@ The release candidate can be found at:
 
 https://apache.example.org/{committee_name}/{project_name}-{version}/
 
-The release artifacts are signed with GPG key: [KEY_ID].
+The release artifacts are signed with the GPG key with fingerprint:
 
-The artifacts were built from commit: [COMMIT_HASH].
+  [KEY_FINGERPRINT]
 
 Please review the release candidate and vote accordingly.
 
@@ -239,11 +240,8 @@ Thanks,
             form.body.data = default_body
 
         if await form.validate_on_submit():
-            # If POST and valid, process the form and create a vote_initiate task
             mailing_list_choice = util.unwrap(form.mailing_list.data)
             vote_duration_choice = util.unwrap(form.vote_duration.data)
-            gpg_key_id_data = form.gpg_key_id.data or ""
-            commit_hash_data = form.commit_hash.data or ""
             subject_data = util.unwrap(form.subject.data)
             body_data = util.unwrap(form.body.data)
 
@@ -260,9 +258,8 @@ Thanks,
                     release_name=release_name,
                     email_to=email_to,
                     vote_duration=vote_duration_choice,
-                    gpg_key_id=gpg_key_id_data,
-                    commit_hash=commit_hash_data,
                     initiator_id=session.uid,
+                    gpg_key_fingerprint=user_key_fingerprint,
                     subject=subject_data,
                     body=body_data,
                 ).model_dump(),
@@ -287,8 +284,7 @@ Thanks,
         preview_data = {
             "initiator_id": session.uid,
             "vote_duration": form.vote_duration.data or "72",
-            "gpg_key_id": form.gpg_key_id.data or "0xFFFFFFFFFFFFFFFF",
-            "commit_hash": form.commit_hash.data or "0000000000000000000000000000000000000000",
+            "gpg_key_fingerprint": user_key_fingerprint or "0000000000000000000000000000000000000000",
         }
 
         # For GET requests or failed POST validation

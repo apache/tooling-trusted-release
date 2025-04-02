@@ -75,30 +75,6 @@
           </div>
         </div>
 
-        <div class="row mb-3 pb-3 border-bottom{% if form.gpg_key_id.errors %} has-danger{% endif %}">
-          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.gpg_key_id.label }}</div>
-          <div class="col-md-9">
-            {{ form.gpg_key_id(class_='form-control w-75', placeholder='e.g., 0x1A2B3C4D') }}
-            {% if form.gpg_key_id.errors %}
-              <div class="invalid-feedback d-block">
-                {% for error in form.gpg_key_id.errors %}{{ error }}{% endfor %}
-              </div>
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="row mb-3 pb-3 border-bottom{% if form.commit_hash.errors %} has-danger{% endif %}">
-          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.commit_hash.label }}</div>
-          <div class="col-md-9">
-            {{ form.commit_hash(class_='form-control w-75', placeholder='Git commit hash used for this release') }}
-            {% if form.commit_hash.errors %}
-              <div class="invalid-feedback d-block">
-                {% for error in form.commit_hash.errors %}{{ error }}{% endfor %}
-              </div>
-            {% endif %}
-          </div>
-        </div>
-
         <div class="row mb-3 pb-3 border-bottom{% if form.subject.errors %} has-danger{% endif %}">
           <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.subject.label }}</div>
           <div class="col-md-9">
@@ -120,7 +96,7 @@
                 {% for error in form.body.errors %}{{ error }}{% endfor %}
               </div>
             {% endif %}
-            <small class="form-text text-muted">Edit the vote email content as needed. Placeholders like [KEY_ID], [COMMIT_HASH], [DURATION], and [YOUR_NAME] will be filled in automatically when the email is sent.</small>
+            <small class="form-text text-muted">Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT], [DURATION], and [YOUR_NAME] will be filled in automatically when the email is sent.</small>
           </div>
         </div>
 
@@ -130,8 +106,7 @@
               <summary class="text-muted">Show live preview</summary>
               <pre id="email-body-preview"
                    class="mt-2 p-3 bg-white border rounded font-monospace overflow-auto"
-                   data-key-id="{{ preview_data.gpg_key_id }}"
-                   data-commit-hash="{{ preview_data.commit_hash }}"
+                   data-key-fingerprint="{{ preview_data.gpg_key_fingerprint }}"
                    data-duration="{{ preview_data.vote_duration }}"
                    data-your-name="{{ preview_data.initiator_id }}"></pre>
             </details>
@@ -159,16 +134,14 @@
           if (!bodyTextarea || !previewPre) return;
 
           const previewData = {
-              keyId: previewPre.dataset.keyId,
-              commitHash: previewPre.dataset.commitHash,
+              keyFingerprint: previewPre.dataset.keyFingerprint,
               duration: previewPre.dataset.duration,
               yourName: previewPre.dataset.yourName
           };
 
           function updatePreview() {
               let bodyContent = bodyTextarea.value;
-              bodyContent = bodyContent.replace(/\[KEY_ID\]/g, previewData.keyId || "(Not provided)");
-              bodyContent = bodyContent.replace(/\[COMMIT_HASH\]/g, previewData.commitHash || "(Not provided)");
+              bodyContent = bodyContent.replace(/\[KEY_FINGERPRINT\]/g, previewData.keyFingerprint || "(No key found)");
               bodyContent = bodyContent.replace(/\[DURATION\]/g, previewData.duration);
               bodyContent = bodyContent.replace(/\[YOUR_NAME\]/g, previewData.yourName);
               previewPre.textContent = bodyContent;

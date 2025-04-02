@@ -50,7 +50,7 @@
     <label for="{{ form.release_checklist.id }}"
            class="col-sm-3 col-form-label text-sm-end">{{ form.release_checklist.label.text }}</label>
     <div class="col-sm-8">
-      {{ form.release_checklist(rows=10, style='resize: vertical', class_="form-control") }}
+      {{ form.release_checklist(rows=10, class_="form-control") }}
       <span id="release_checklist-help" class="form-text text-muted">Markdown text describing how to test release candidates.</span>
     </div>
   </div>

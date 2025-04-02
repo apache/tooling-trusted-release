@@ -41,9 +41,10 @@ class Initiate(pydantic.BaseModel):
     release_name: str = pydantic.Field(..., description="The name of the release to vote on")
     email_to: str = pydantic.Field(..., description="The mailing list address to send the vote email to")
     vote_duration: str = pydantic.Field(..., description="Duration of the vote in hours, as a string")
-    gpg_key_id: str = pydantic.Field(..., description="GPG Key ID of the initiator")
-    commit_hash: str = pydantic.Field(..., description="Commit hash the artifacts were built from")
     initiator_id: str = pydantic.Field(..., description="ASF ID of the vote initiator")
+    gpg_key_fingerprint: str | None = pydantic.Field(
+        ..., description="GPG key fingerprint of the initiator, if available"
+    )
     subject: str = pydantic.Field(..., description="Subject line for the vote email")
     body: str = pydantic.Field(..., description="Body content for the vote email")
 
@@ -75,9 +76,6 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
         release = await data.release(name=args.release_name, _project=True, _committee=True).demand(
             VoteInitiationError(f"Release {args.release_name} not found")
         )
-
-    # GPG key ID, just for testing the UI
-    gpg_key_id = args.gpg_key_id
 
     # Calculate vote end date
     vote_duration_hours = int(args.vote_duration)
@@ -116,8 +114,7 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     body = args.body
 
     # Perform substitutions in the body
-    body = body.replace("[KEY_ID]", gpg_key_id or "(Not provided)")
-    body = body.replace("[COMMIT_HASH]", args.commit_hash or "(Not provided)")
+    body = body.replace("[KEY_FINGERPRINT]", args.gpg_key_fingerprint or "(No key found)")
     body = body.replace("[DURATION]", args.vote_duration)
     body = body.replace("[YOUR_NAME]", args.initiator_id)
 
