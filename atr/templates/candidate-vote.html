@@ -41,6 +41,10 @@
             <span class="candidate-meta-item">Created: {{ candidate.created.strftime("%Y-%m-%d %H:%M UTC") }}</span>
           </div>
           <div class="d-flex gap-3 align-items-center pt-2">
+            <a class="btn btn-primary"
+               href="{{ as_url(routes.candidate.vote_project, project_name=candidate.project.name, version=candidate.version) }}">Start vote</a>
+            <a class="btn btn-outline-primary"
+               href="{{ as_url(routes.candidate.viewer, project_name=candidate.project.name, version_name=candidate.version) }}">View files</a>
             <form method="post"
                   action="{{ as_url(routes.candidate.delete) }}"
                   class="d-inline-block m-0">
@@ -51,10 +55,6 @@
                 Delete release candidate
               </button>
             </form>
-            <a class="btn btn-primary"
-               href="{{ as_url(routes.candidate.vote_project, project_name=candidate.project.name, version=candidate.version) }}">Start vote</a>
-            <a class="btn btn-outline-primary"
-               href="{{ as_url(routes.candidate.viewer, project_name=candidate.project.name, version_name=candidate.version) }}">View files</a>
           </div>
         </div>
       </div>
