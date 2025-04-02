@@ -150,7 +150,7 @@ async def add_file(session: routes.CommitterSession, project_name: str, version_
         file_data = wtforms.MultipleFileField(
             "File(s)", validators=[wtforms.validators.InputRequired("File(s) are required")]
         )
-        submit = wtforms.SubmitField("Add file(s)")
+        submit = wtforms.SubmitField("Add file or files")
 
         def validate_file_name(self, field: wtforms.Field) -> bool:
             if field.data and len(self.file_data.data) > 1:

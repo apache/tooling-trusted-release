@@ -244,9 +244,9 @@ Place comments on dedicated lines preceding the relevant code block. Comments at
 
 ## HTML
 
-### Use sentence case for headings
+### Use sentence case for headings, form labels, and submission buttons
 
-We write headings like "This is a heading", and not "This is a Heading" or "This Is A Heading". This follows the [Wikipedia style for headings](https://en.wikipedia.org/wiki/Wikipedia:Manual_of_Style#Section_headings). The same goes for button texts.
+We write headings, form labels, and submission buttons in the form "This is some text", and not "This is Some Text" or "This Is Some Text". This follows the [Wikipedia style for headings](https://en.wikipedia.org/wiki/Wikipedia:Manual_of_Style#Section_headings).
 
 ### Use Bootstrap classes for all style
 
