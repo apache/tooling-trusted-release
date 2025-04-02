@@ -46,7 +46,7 @@
     </form>
   </div>
 
-  {% if file_path.endswith(".tar.gz") %}
+  {% if file_path.endswith(".tar.gz") and user_is_admin %}
     <h3>Generate SBOM</h3>
     <p>Generate a CycloneDX Software Bill of Materials (SBOM) file for this artifact.</p>
     <form method="post"

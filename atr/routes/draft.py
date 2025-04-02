@@ -667,6 +667,7 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
         file_data=file_data,
         release=release,
         format_file_size=routes.format_file_size,
+        user_is_admin=session.user_is_admin,
     )
 
 

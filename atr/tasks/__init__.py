@@ -92,10 +92,6 @@ async def draft_checks(project_name: str, release_version: str, caller_data: db.
         )
         data.add(path_check_task)
 
-        if caller_data is None:
-            await data.commit()
-        # Otherwise the caller is responsible for committing
-
     return len(paths_recursive)
 
 
