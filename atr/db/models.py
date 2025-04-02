@@ -145,6 +145,7 @@ class Committee(sqlmodel.SQLModel, table=True):
 
 class Project(sqlmodel.SQLModel, table=True):
     id: int = sqlmodel.Field(default=None, primary_key=True)
+    # TODO: Make name the primary key, and remove id
     name: str = sqlmodel.Field(unique=True)
     # TODO: Ideally full_name would be unique for str only, but that's complex
     full_name: str | None = sqlmodel.Field(default=None)

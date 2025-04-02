@@ -210,7 +210,7 @@ async def viewer(session: routes.CommitterSession, project_name: str, version_na
 
     # Check that the release exists
     async with db.session() as data:
-        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
@@ -241,7 +241,7 @@ async def viewer_path(
         )
 
     async with db.session() as data:
-        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 

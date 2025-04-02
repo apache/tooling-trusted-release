@@ -20,6 +20,7 @@ import logging
 import tempfile
 from typing import Any, Final
 
+import aiofiles.os
 import gnupg
 import pydantic
 import sqlmodel
@@ -27,6 +28,7 @@ import sqlmodel
 import atr.db as db
 import atr.db.models as models
 import atr.tasks.checks as checks
+import atr.util as util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +38,6 @@ class Check(pydantic.BaseModel):
 
     release_name: str = pydantic.Field(..., description="Release name")
     committee_name: str = pydantic.Field(..., description="Name of the committee whose keys should be used")
-    abs_artifact_path: str = pydantic.Field(..., description="Absolute path to the artifact file")
     abs_signature_path: str = pydantic.Field(..., description="Absolute path to the signature file (.asc)")
 
 
@@ -45,15 +46,23 @@ async def check(args: Check) -> str | None:
     """Check a signature file."""
     rel_path = checks.rel_path(args.abs_signature_path)
     check_instance = await checks.Check.create(checker=check, release_name=args.release_name, path=rel_path)
+
+    # Get the artifact path
+    artifact_path = args.abs_signature_path.removesuffix(".asc")
+    abs_artifact_path = str(util.get_release_candidate_draft_dir() / artifact_path)
+    if not (await aiofiles.os.path.exists(abs_artifact_path)):
+        await check_instance.failure(f"Artifact {abs_artifact_path} does not exist", {})
+        return None
+
     _LOGGER.info(
-        f"Checking signature {args.abs_signature_path} for {args.abs_artifact_path}"
+        f"Checking signature {args.abs_signature_path} for {abs_artifact_path}"
         f" using {args.committee_name} keys (rel: {rel_path})"
     )
 
     try:
         result_data = await _check_core_logic(
             committee_name=args.committee_name,
-            artifact_path=args.abs_artifact_path,
+            artifact_path=abs_artifact_path,
             signature_path=args.abs_signature_path,
         )
         if result_data.get("error"):

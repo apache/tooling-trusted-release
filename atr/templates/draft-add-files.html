@@ -1,18 +1,18 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Add file(s) to {{ project_name }} {{ version_name }} ~ ATR
+  Add files to {{ project_name }} {{ version_name }} ~ ATR
 {% endblock title %}
 
 {% block description %}
-  Add file(s) to a release candidate.
+  Add files to a release candidate.
 {% endblock description %}
 
 {% block content %}
   <a href="{{ as_url(routes.draft.add) }}" class="back-link">← Back to add draft</a>
 
-  <h1>Add file(s) to {{ project_name }} {{ version_name }}</h1>
-  <p class="intro">Use this form to add a single file to this candidate draft.</p>
+  <h1>Add files to {{ project_name }} {{ version_name }}</h1>
+  <p class="intro">Use this form to add files to this candidate draft.</p>
 
   <form method="post"
         enctype="multipart/form-data"
@@ -24,7 +24,7 @@
              class="col-sm-3 col-form-label text-sm-end">{{ form.file_data.label.text }}:</label>
       <div class="col-sm-8">
         {{ form.file_data(class_="form-control" + (" is-invalid" if form.file_data.errors else "") ) }}
-        <span id="file_data-help" class="form-text text-muted">Select the file(s) to upload</span>
+        <span id="file_data-help" class="form-text text-muted">Select the files to upload</span>
         {% if form.file_data.errors %}
           {% for error in form.file_data.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
         {% endif %}

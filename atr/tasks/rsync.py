@@ -16,20 +16,12 @@
 # under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Final
+from typing import Final
 
-import aiofiles.os
 import pydantic
 
-import atr.db as db
-import atr.db.models as models
 import atr.tasks as tasks
 import atr.tasks.checks as checks
-import atr.tasks.checks.paths as paths
-import atr.util as util
-
-if TYPE_CHECKING:
-    from collections.abc import Callable, Coroutine
 
 # _CONFIG: Final = config.get()
 _LOGGER: Final = logging.getLogger(__name__)
@@ -47,60 +39,13 @@ async def analyse(args: Analyse) -> str | None:
     """Analyse an rsync upload by queuing specific checks for discovered files."""
     _LOGGER.info(f"Starting rsync analysis for {args.project_name} {args.release_version}")
     try:
-        result_data = await _analyse_core(
+        num_paths = await tasks.draft_checks(
             args.project_name,
             args.release_version,
         )
-        num_paths = len(result_data.get("paths", []))
         _LOGGER.info(f"Finished rsync analysis for {args.project_name} {args.release_version}, found {num_paths} paths")
     except Exception as e:
         _LOGGER.exception(f"Rsync analysis failed for {args.project_name} {args.release_version}: {e}")
         raise e
 
     return None
-
-
-async def _analyse_core(project_name: str, release_version: str) -> dict[str, Any]:
-    """Core logic to analyse an rsync upload and queue checks."""
-    base_path = util.get_release_candidate_draft_dir() / project_name / release_version
-    paths_recursive = await util.paths_recursive(base_path)
-    async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, release_version), _committee=True).demand(
-            RuntimeError("Release not found")
-        )
-        for path in paths_recursive:
-            # This works because path is relative
-            full_path = base_path / path
-
-            # We only want to analyse files that are new or have changed
-            # But rsync can set timestamps to the past, so we can't rely on them
-            # Instead, we can run any tasks when the file has a different modified time
-            # TODO: This may cause problems if the file is backdated
-            modified = int(await aiofiles.os.path.getmtime(full_path))
-            cached_tasks = await db.recent_tasks(data, release.name, str(path), modified)
-
-            # Add new tasks for each path
-            task_functions: dict[str, Callable[..., Coroutine[Any, Any, list[models.Task]]]] = {
-                ".asc": tasks.asc_checks,
-                ".sha256": tasks.sha_checks,
-                ".sha512": tasks.sha_checks,
-                ".tar.gz": tasks.tar_gz_checks,
-            }
-            for task_type, task_function in task_functions.items():
-                if path.name.endswith(task_type):
-                    for task in await task_function(release, str(path)):
-                        if task.task_type not in cached_tasks:
-                            data.add(task)
-
-        path_check_task = models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type=models.TaskType.PATHS_CHECK,
-            task_args=paths.Check(
-                release_name=release.name,
-                base_release_dir=str(base_path),
-            ).model_dump(),
-        )
-        data.add(path_check_task)
-
-        await data.commit()
-    return {"paths": [str(path) for path in paths_recursive]}

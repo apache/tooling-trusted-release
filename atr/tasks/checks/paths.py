@@ -81,12 +81,6 @@ async def _check_metadata_rules(
     if ext_metadata not in {".asc", ".sha256", ".sha512", ".md5", ".sha", ".sha1"}:
         warnings.append("The use of this metadata file is discouraged")
 
-    # Check whether the corresponding artifact exists
-    artifact_path_base = str(relative_path).removesuffix(ext_metadata)
-    full_artifact_path = base_path / artifact_path_base
-    if not await aiofiles.os.path.exists(full_artifact_path):
-        errors.append(f"Metadata file exists but corresponding artifact '{artifact_path_base}' is missing")
-
 
 async def _check_path_process_single(
     base_path: pathlib.Path,
@@ -94,6 +88,7 @@ async def _check_path_process_single(
     check_errors: checks.Check,
     check_warnings: checks.Check,
     check_success: checks.Check,
+    relative_paths: set[str],
 ) -> None:
     """Process and check a single path within the release directory."""
     full_path = base_path / relative_path
@@ -123,6 +118,11 @@ async def _check_path_process_single(
     elif ext_metadata:
         _LOGGER.info("Checking metadata rules for %s", full_path)
         await _check_metadata_rules(base_path, relative_path, ext_metadata, errors, warnings)
+
+        # Check whether the corresponding artifact exists
+        artifact_path_base = str(relative_path).removesuffix(ext_metadata)
+        if artifact_path_base not in relative_paths:
+            errors.append(f"Metadata file exists but corresponding artifact '{artifact_path_base}' is missing")
     else:
         _LOGGER.info("Checking general rules for %s", full_path)
         allowed_top_level = {"LICENSE", "NOTICE", "README", "CHANGES"}
@@ -163,7 +163,6 @@ async def check(args: Check) -> None:
         checker=checks.function_key(check) + "_success", release_name=args.release_name, path=None, afresh=True
     )
     relative_paths = await util.paths_recursive(base_path)
-
     for relative_path in relative_paths:
         # Delegate processing of each path to the helper function
         await _check_path_process_single(
@@ -172,6 +171,7 @@ async def check(args: Check) -> None:
             check_errors,
             check_warnings,
             check_success,
+            set(str(p) for p in relative_paths),
         )
 
     return None

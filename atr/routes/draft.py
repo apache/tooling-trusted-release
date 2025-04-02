@@ -163,16 +163,16 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
 
 @routes.committer("/draft/add/<project_name>/<version_name>", methods=["GET", "POST"])
 async def add_file(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
-    """Show a page to allow the user to add a single file to a candidate draft."""
+    """Show a page to allow the user to add files to a candidate draft."""
 
     class AddFilesForm(util.QuartFormTyped):
-        """Form for adding file(s) to a release candidate."""
+        """Form for adding files to a release candidate."""
 
         file_name = wtforms.StringField("File name (optional)")
         file_data = wtforms.MultipleFileField(
-            "File(s)", validators=[wtforms.validators.InputRequired("File(s) are required")]
+            "Files", validators=[wtforms.validators.InputRequired("At least one file is required")]
         )
-        submit = wtforms.SubmitField("Add file or files")
+        submit = wtforms.SubmitField("Add files")
 
         def validate_file_name(self, field: wtforms.Field) -> bool:
             if field.data and len(self.file_data.data) > 1:
@@ -187,13 +187,16 @@ async def add_file(session: routes.CommitterSession, project_name: str, version_
                 file_name = pathlib.Path(form.file_name.data)
             file_data = form.file_data.data
 
-            await _upload_files(project_name, version_name, file_name, file_data)
+            number_of_files = await _upload_files(project_name, version_name, file_name, file_data)
             return await session.redirect(
-                review, success="File or files added successfully", project_name=project_name, version_name=version_name
+                review,
+                success=f"{number_of_files} file{'' if number_of_files == 1 else 's'} added successfully",
+                project_name=project_name,
+                version_name=version_name,
             )
         except Exception as e:
-            logging.exception("Error adding file(s):")
-            await quart.flash(f"Error adding file(s): {e!s}", "error")
+            logging.exception("Error adding file:")
+            await quart.flash(f"Error adding file: {e!s}", "error")
 
     return await quart.render_template(
         "draft-add-files.html",
@@ -263,7 +266,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
 
     async with db.session() as data:
         # Check that the release exists
-        await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+        await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
@@ -276,6 +279,9 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
 
         # Delete the file
         await aiofiles.os.remove(full_path)
+
+        # Ensure that checks are queued again
+        await tasks.draft_checks(project_name, version_name, caller_data=data)
 
     return await session.redirect(
         review, success="File deleted successfully", project_name=project_name, version_name=version_name
@@ -293,7 +299,7 @@ async def hashgen(
 
     async with db.session() as data:
         # Check that the release exists
-        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+        await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
@@ -329,9 +335,8 @@ async def hashgen(
         async with aiofiles.open(full_hash_path, "w") as f:
             await f.write(f"{hash_value}  {file_path}\n")
 
-        # Add any relevant tasks to the database
-        for task in await tasks.sha_checks(release, str(hash_path)):
-            data.add(task)
+        # Ensure that checks are queued again
+        await tasks.draft_checks(project_name, version_name, caller_data=data)
         await data.commit()
 
     return await session.redirect(
@@ -508,7 +513,7 @@ async def review_path(session: routes.CommitterSession, project_name: str, versi
 
     async with db.session() as data:
         # Check that the release exists
-        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
@@ -620,7 +625,7 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
 
     async with db.session() as data:
         # Check that the release exists
-        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
@@ -660,7 +665,7 @@ async def viewer(session: routes.CommitterSession, project_name: str, version_na
 
     # Check that the release exists
     async with db.session() as data:
-        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
@@ -693,7 +698,7 @@ async def viewer_path(
         )
 
     async with db.session() as data:
-        release = await data.release(name=f"{project_name}-{version_name}", _project=True).demand(
+        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
@@ -853,7 +858,7 @@ async def _upload_files(
     version_name: str,
     file_name: pathlib.Path | None,
     files: Sequence[datastructures.FileStorage],
-) -> None:
+) -> int:
     """Process and save the uploaded files."""
     # Create target directory
     target_dir = util.get_release_candidate_draft_dir() / project_name / version_name
@@ -875,6 +880,11 @@ async def _upload_files(
         target_path.parent.mkdir(parents=True, exist_ok=True)
 
         await _save_file(file, target_path)
+
+    # Ensure that checks are queued again
+    await tasks.draft_checks(project_name, version_name)
+
+    return len(files)
 
 
 async def _save_file(file: datastructures.FileStorage, target_path: pathlib.Path) -> None:
