@@ -111,14 +111,14 @@
 
             {% if check_result.message %}<div class="mt-2">{{ check_result.message }}</div>{% endif %}
 
-            {% if check_result.data is mapping %}
+            {% if (check_result.data is mapping) and (check_result.data.keys()|length > 0) %}
               <details class="mt-2 p-2 bg-light rounded">
                 {% if check_result.status.value in ["failure", "exception"] %}
-                  <summary class="atr-cursor-pointer user-select-none p-2">View details ({{ check_result.status.value|title }})</summary>
+                  <summary class="atr-cursor-pointer user-select-none p-2">View details</summary>
                 {% elif check_result.status.value == "warning" %}
-                  <summary class="atr-cursor-pointer user-select-none p-2">View details (Warning)</summary>
+                  <summary class="atr-cursor-pointer user-select-none p-2">View details</summary>
                 {% else %}
-                  <summary class="atr-cursor-pointer user-select-none p-2">View detailed results</summary>
+                  <summary class="atr-cursor-pointer user-select-none p-2">View details</summary>
                 {% endif %}
 
                 {% if check_result.checker.endswith("rat.check_licenses") %}
