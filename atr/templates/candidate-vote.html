@@ -26,6 +26,12 @@
 {% block content %}
   <h1>Start release candidate vote</h1>
 
+  <div class="alert alert-info">
+    <p class="mb-0">
+      The status of vote announcement emails is available on the <a href="{{ as_url(routes.candidate.resolve) }}">vote resolution page</a>.
+    </p>
+  </div>
+
   <p>Here are all the release candidates to which you have access.</p>
 
   {% if candidates %}

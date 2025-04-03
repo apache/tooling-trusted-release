@@ -52,9 +52,8 @@
                 <p class="mb-1 text-danger fw-semibold">
                   <i class="bi bi-x-octagon-fill me-1"></i> Vote email failed: {{ vote_task.completed.strftime("%Y-%m-%d %H:%M UTC") }}
                 </p>
-                <div class="alert alert-danger mt-1 mb-0 p-2" role="alert">
-                  <strong>Error:</strong>
-                  <pre class="mb-0 fs-6"><code class="text-danger">{{ vote_task.error }}</code></pre>
+                <div class="alert alert-danger mt-2 mb-0 p-2" role="alert">
+                  <p class="mb-0 p-2 text-danger">{{ vote_task.error }}</p>
                 </div>
               {% else %}
                 <p class="mb-0 text-warning fw-semibold">

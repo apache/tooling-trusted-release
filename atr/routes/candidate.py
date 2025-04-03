@@ -276,9 +276,10 @@ Thanks,
             # We should also log all outgoing email and the session so that users can confirm
             # And can be warned if there was a failure
             # (The message should be shown on the vote resolution page)
+            # TODO: Link to the vote resolution page in the flash message
             return await session.redirect(
                 vote,
-                success=f"The vote announcement email will soon be sent to {email_to} by background task #{task.id}.",
+                success=f"The vote announcement email will soon be sent to {email_to}.",
             )
 
         preview_data = {
