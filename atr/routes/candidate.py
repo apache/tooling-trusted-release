@@ -317,21 +317,33 @@ async def _resolve_get(session: routes.CommitterSession) -> str:
             phase=models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE,
             _committee=True,
             _project=True,
+            _tasks=True,
         ).all()
-        user_candidates = session.only_user_releases(releases)
+    user_candidates = session.only_user_releases(releases)
 
-        # Create a unique form for each candidate
-        candidate_forms = {}
-        for candidate in user_candidates:
-            form = await ResolveForm.create_form()
-            candidate_forms[candidate.name] = form
+    # Create a unique form for each candidate and find the latest vote initiation task
+    candidate_forms = {}
+    candidate_vote_tasks = {}
+    for candidate in user_candidates:
+        form = await ResolveForm.create_form()
+        candidate_forms[candidate.name] = form
 
-        return await quart.render_template(
-            "candidate-resolve.html",
-            candidates=user_candidates,
-            candidate_forms=candidate_forms,
-            format_artifact_name=_format_artifact_name,
-        )
+        # Find the most recent VOTE_INITIATE task for this release
+        # TODO: Make this a proper query
+        latest_vote_task = None
+        for task in sorted(candidate.tasks, key=lambda t: t.added, reverse=True):
+            if task.task_type == models.TaskType.VOTE_INITIATE:
+                latest_vote_task = task
+                break
+        candidate_vote_tasks[candidate.name] = latest_vote_task
+
+    return await quart.render_template(
+        "candidate-resolve.html",
+        candidates=user_candidates,
+        candidate_forms=candidate_forms,
+        candidate_vote_tasks=candidate_vote_tasks,
+        format_artifact_name=_format_artifact_name,
+    )
 
 
 async def _resolve_post(session: routes.CommitterSession) -> response.Response:

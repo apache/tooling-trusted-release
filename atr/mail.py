@@ -15,19 +15,16 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import asyncio
 import datetime
 import email.utils as utils
-import io
 import logging
-import smtplib
+import ssl
 import time
 import uuid
+from typing import Final
 
 import aiosmtplib
 import dkim
-import dns.rdtypes.ANY.MX as MX
-import dns.resolver as resolver
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,6 +38,10 @@ global_dkim_selector: str = "202501"
 global_domain: str = "tooling-vm-ec2-de.apache.org"
 global_email_contact: str = f"contact@{global_domain}"
 global_secret_key: str | None = None
+
+_MAIL_RELAY: Final[str] = "mail-relay.apache.org"
+_SMTP_PORT: Final[int] = 587
+_SMTP_TIMEOUT: Final[int] = 30
 
 
 class VoteEvent:
@@ -56,24 +57,24 @@ class VoteEvent:
         self.vote_end = vote_end
 
 
-async def send(event: VoteEvent) -> None:
+async def send(event: VoteEvent) -> str:
     """Send an email notification about an artifact or a vote."""
     _LOGGER.info(f"Sending email for event: {event}")
     from_addr = global_email_contact
+    if not from_addr.endswith(f"@{global_domain}"):
+        raise ValueError(f"from_addr must end with @{global_domain}, got {from_addr}")
     to_addr = event.email_recipient
     _validate_recipient(to_addr)
 
     # UUID4 is entirely random, with no timestamp nor namespace
     # It does have 6 version and variant bits, so only 122 bits are random
-    mid = f"<{uuid.uuid4()}@{global_domain}>"
-
-    # Different message format depending on event type
+    mid = f"{uuid.uuid4()}@{global_domain}"
     msg_text = f"""
 From: {from_addr}
 To: {to_addr}
 Subject: {event.subject}
 Date: {utils.formatdate(localtime=True)}
-Message-ID: {mid}
+Message-ID: <{mid}>
 
 {event.body}
 """
@@ -95,32 +96,13 @@ Message-ID: {mid}
     elapsed = time.perf_counter() - start
     _LOGGER.info(f" send_many took {elapsed:.3f}s")
 
+    return mid
+
 
 def set_secret_key(key: str) -> None:
     """Set the secret key for DKIM signing."""
     global global_secret_key
     global_secret_key = key
-
-
-async def _resolve_mx_records(domain: str) -> list[tuple[str, int]]:
-    """Resolve MX records."""
-    try:
-        mx_records = await asyncio.to_thread(resolver.resolve, domain, "MX")
-        mxs = []
-
-        for rdata in mx_records:
-            if not isinstance(rdata, MX.MX):
-                raise ValueError(f"Unexpected MX record type: {type(rdata)}")
-            mx = rdata
-            mxs.append((mx.exchange.to_text(True), mx.preference))
-        # Sort by preference
-        mxs.sort(key=lambda x: x[1])
-
-        if not mxs:
-            mxs = [(domain, 0)]
-    except Exception as e:
-        raise ValueError(f"Failed to lookup MX records for {domain}: {e}")
-    return mxs
 
 
 async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None:
@@ -144,67 +126,44 @@ async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None
 
     # Prepend the DKIM signature to the message
     dkim_msg = sig + message_bytes
-    dkim_reader = io.StringIO(str(dkim_msg, "utf-8"))
 
     _LOGGER.info("email_send_many")
 
+    errors = []
     for addr in to_addrs:
-        _, domain = _split_address(addr)
+        try:
+            await _send_via_relay(from_addr, addr, dkim_msg)
+        except Exception as e:
+            _LOGGER.exception(f"Failed to send to {addr}:")
+            errors.append(f"failed to send to {addr}: {e}")
 
-        if domain == "localhost":
-            mxs = [("127.0.0.1", 0)]
-        else:
-            mxs = await _resolve_mx_records(domain)
-
-        # Try each MX server
-        errors = []
-        for mx_host, _ in mxs:
-            try:
-                await _send_one(mx_host, from_addr, addr, dkim_reader)
-                # Success, no need to try other MX servers
-                break
-            except Exception as e:
-                errors.append(f"Failed to send to {mx_host}: {e}")
-                # Reset reader for next attempt
-                dkim_reader.seek(0)
-        else:
-            # If we get here, all MX servers failed
-            raise Exception("; ".join(errors))
+    if errors:
+        # Raising an exception will ensure that any calling task is marked as failed
+        raise Exception("Failed to send to one or more recipients: " + "; ".join(errors))
 
 
-async def _send_one(mx_host: str, from_addr: str, to_addr: str, msg_reader: io.StringIO) -> None:
-    """Send an email to a single recipient via the ASF mail relay."""
-    default_timeout_seconds = 30
+async def _send_via_relay(from_addr: str, to_addr: str, dkim_msg_bytes: bytes) -> None:
+    """Send a DKIM signed email to a single recipient via the ASF mail relay."""
     _validate_recipient(to_addr)
 
-    try:
-        # Connect to the ASF mail relay
-        # TODO: Use asfpy for sending mail
-        mail_relay = "mail-relay.apache.org"
-        _LOGGER.info(f"Connecting async to {mail_relay}:587")
-        smtp = aiosmtplib.SMTP(hostname=mail_relay, port=587, timeout=default_timeout_seconds)
-        await smtp.connect()
-        _LOGGER.info(f"Connected to {smtp.hostname}:{smtp.port}")
+    # Connect to the ASF mail relay
+    # NOTE: Our code is very different from the asfpy code:
+    # - Uses types
+    # - Uses asyncio
+    # - Performs DKIM signing
+    # Due to the divergence, we should probably not contribute upstream
+    # In effect, these are two different "packages" of functionality
+    # We can't even sign it first and pass it to asfpy, due to its different design
+    _LOGGER.info(f"Connecting async to {_MAIL_RELAY}:{_SMTP_PORT}")
+    context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
 
-        # Identify ourselves to the server
-        await smtp.ehlo()
-
-        # # Use STARTTLS for port 587
-        # context = ssl.create_default_context()
-        # context.minimum_version = ssl.TLSVersion.TLSv1_2
-        # await smtp.starttls(tls_context=context)
-        await smtp.ehlo()
-
-        # Send the message
-        await smtp.sendmail(from_addr, [to_addr], msg_reader.read())
-
-        # Close the connection
-        await smtp.quit()
-
-    except (OSError, smtplib.SMTPException) as e:
-        # TODO: Check whether aiosmtplib raises different exceptions
-        _LOGGER.error(f"Async SMTP error: {e}")
-        raise Exception(f"SMTP error: {e}")
+    smtp = aiosmtplib.SMTP(hostname=_MAIL_RELAY, port=_SMTP_PORT, timeout=_SMTP_TIMEOUT, tls_context=context)
+    await smtp.connect()
+    _LOGGER.info(f"Connected to {smtp.hostname}:{smtp.port}")
+    await smtp.ehlo()
+    await smtp.sendmail(from_addr, [to_addr], dkim_msg_bytes)
+    await smtp.quit()
 
 
 def _split_address(addr: str) -> tuple[str, str]:
