@@ -16,6 +16,7 @@
 # under the License.
 
 import datetime
+import json
 import logging
 import os
 from typing import Any, Final
@@ -54,10 +55,7 @@ async def initiate(args: Initiate) -> str | None:
     """Initiate a vote for a release."""
     try:
         result_data = await _initiate_core_logic(args)
-        success_message = result_data.get("message", "Vote initiated successfully, but message missing")
-        if not isinstance(success_message, str):
-            raise VoteInitiationError("Success message is not a string")
-        return success_message
+        return json.dumps(result_data)
 
     except VoteInitiationError as e:
         _LOGGER.error(f"Vote initiation failed: {e}")
@@ -69,7 +67,7 @@ async def initiate(args: Initiate) -> str | None:
 
 async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     """Get arguments, create an email, and then send it to the recipient."""
-    test_recipients = ["sbp"]
+    tooling_test_recipients = ["user-tests"]
     _LOGGER.info("Starting initiate_core")
 
     async with db.session() as data:
@@ -121,29 +119,30 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     # Store the original recipient for logging
     original_recipient = args.email_to
     # Only one test recipient is required for now
-    test_recipient = test_recipients[0] + "@apache.org"
-    _LOGGER.info(f"TEMPORARY: Overriding recipient from {original_recipient} to {test_recipient}")
+    tooling_test_recipient = tooling_test_recipients[0] + "@tooling.apache.org"
+    _LOGGER.info(f"TEMPORARY: Overriding recipient from {original_recipient} to {tooling_test_recipient}")
 
     # Create mail event with test recipient
     # Use test account instead of actual PMC list
     event = mail.VoteEvent(
         release_name=args.release_name,
-        email_recipient=test_recipient,
+        email_recipient=tooling_test_recipient,
         subject=subject,
         body=body,
         vote_end=vote_end,
     )
 
     # Send the email
-    await mail.send(event)
+    mid = await mail.send(event)
     _LOGGER.info(
-        f"Vote email sent successfully to test account {test_recipient} (would have been {original_recipient})"
+        f"Vote email sent successfully to test account {tooling_test_recipient} (would have been {original_recipient})"
     )
 
     return {
-        "message": "Vote initiated successfully (sent to test account)",
+        "message": "Vote initiated successfully, and sent to test account",
         "original_email_to": original_recipient,
-        "actual_email_to": test_recipient,
+        "actual_email_to": tooling_test_recipient,
         "vote_end": vote_end_str,
         "subject": subject,
+        "mid": mid,
     }

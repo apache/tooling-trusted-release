@@ -22,7 +22,7 @@
     </div>
 
     <div class="p-3 mb-4 bg-warning-subtle border border-warning rounded">
-      <strong>Note:</strong> This feature is currently in development. The form below only sends email to a test account.
+      <strong>Note:</strong> This feature is currently in development. The form below only sends email to a test account, not the email addresses listed in the form.
     </div>
 
     {% if form.errors %}
@@ -45,7 +45,7 @@
 
       <div class="mb-4">
         <div class="row mb-3 pb-3 border-bottom{% if form.mailing_list.errors %} has-danger{% endif %}">
-          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.mailing_list.label }}</div>
+          <div class="col-md-3 text-md-end fw-medium">{{ form.mailing_list.label }}</div>
           <div class="col-md-9">
             <div class="d-flex gap-4">
               {% for subfield in form.mailing_list %}

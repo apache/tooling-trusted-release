@@ -17,6 +17,8 @@
 
 """candidate.py"""
 
+import json
+
 import aiofiles.os
 import aioshutil
 import asfquart
@@ -332,11 +334,32 @@ async def _resolve_get(session: routes.CommitterSession) -> str:
         # Find the most recent VOTE_INITIATE task for this release
         # TODO: Make this a proper query
         latest_vote_task = None
+        task_mid = None
         for task in sorted(candidate.tasks, key=lambda t: t.added, reverse=True):
             if task.task_type == models.TaskType.VOTE_INITIATE:
                 latest_vote_task = task
                 break
-        candidate_vote_tasks[candidate.name] = latest_vote_task
+
+        if latest_vote_task and (latest_vote_task.status == models.TaskStatus.COMPLETED) and latest_vote_task.result:
+            try:
+                # Result is stored as a JSON string
+                # Handle that defensively
+                if isinstance(latest_vote_task.result, str):
+                    parsed_result = json.loads(latest_vote_task.result)
+                elif isinstance(latest_vote_task.result, dict):
+                    parsed_result = latest_vote_task.result
+                else:
+                    parsed_result = {}
+
+                if isinstance(parsed_result, dict):
+                    task_mid = parsed_result.get("mid", "(mid not found in result)")
+                else:
+                    task_mid = "(no result)"
+
+            except (json.JSONDecodeError, TypeError):
+                task_mid = "(malformed result)"
+
+        candidate_vote_tasks[candidate.name] = (latest_vote_task, task_mid)
 
     return await quart.render_template(
         "candidate-resolve.html",

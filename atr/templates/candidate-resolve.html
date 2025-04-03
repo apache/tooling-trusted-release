@@ -41,13 +41,18 @@
             <span class="atr-candidate-meta-item">Created: {{ candidate.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
           </div>
 
-          {% set vote_task = candidate_vote_tasks[candidate.name] %}
+          {% set vote_task, task_mid = candidate_vote_tasks[candidate.name] %}
           <div class="mt-2 p-3 border rounded bg-white mb-3">
             {% if vote_task %}
               {% if vote_task.status.value == "completed" %}
                 <p class="mb-0 text-success fw-semibold">
                   <i class="bi bi-check-circle-fill me-1"></i> Vote email sent: {{ vote_task.completed.strftime("%Y-%m-%d %H:%M:%S UTC") }}
                 </p>
+                {% if task_mid %}
+                  <p class="mb-0 small text-muted ps-4">
+                    Message-ID: <code class="user-select-all">{{ task_mid }}</code>
+                  </p>
+                {% endif %}
               {% elif vote_task.status.value == "failed" %}
                 <p class="mb-1 text-danger fw-semibold">
                   <i class="bi bi-x-octagon-fill me-1"></i> Vote email failed: {{ vote_task.completed.strftime("%Y-%m-%d %H:%M:%S UTC") }}
