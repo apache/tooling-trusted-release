@@ -39,8 +39,6 @@ RUN make sync PYTHON="$(find /usr/bin -name python3.13 | head -n 1)"
 # final image
 FROM ubuntu:24.04
 
-ARG BIND=127.0.0.1:4443
-ENV BIND=${BIND}
 ARG SCRIPTS=scripts/poetry
 ENV SCRIPTS=${SCRIPTS}
 

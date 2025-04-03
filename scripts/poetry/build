@@ -1,4 +1,7 @@
 #!/bin/sh
 set -eu
+
 DOCKERFILE="${1:-Dockerfile.alpine}"
-docker build -t tooling-trusted-release --build-arg BIND=0.0.0.0:4443 -f "${DOCKERFILE}" .
+IMAGE="${2:-tooling-trusted-release}"
+
+docker build -t "${IMAGE}" -f "${DOCKERFILE}" .

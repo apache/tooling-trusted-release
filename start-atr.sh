@@ -11,5 +11,6 @@ then
   python3 scripts/generate-certificates
 fi
 
+echo "Starting hypercorn on ${BIND}" >> /var/log/hypercorn.log
 exec hypercorn --bind "${BIND}" \
   --keyfile key.pem --certfile cert.pem atr.server:app >> /var/log/hypercorn.log 2>&1

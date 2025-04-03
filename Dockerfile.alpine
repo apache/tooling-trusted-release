@@ -31,8 +31,6 @@ RUN make sync
 # final image
 FROM python:3.13.2-alpine3.21
 
-ARG BIND=127.0.0.1:4443
-ENV BIND=${BIND}
 ARG SCRIPTS=scripts/poetry
 ENV SCRIPTS=${SCRIPTS}
 

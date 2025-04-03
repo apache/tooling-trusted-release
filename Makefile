@@ -1,6 +1,7 @@
 .PHONY: build build-alpine build-ubuntu certs check docs generate-version obvfix report run stop serve sync sync-dev
 
 BIND ?= 127.0.0.1:8080
+IMAGE ?= tooling-trusted-release
 PYTHON ?= $(which python3)
 SCRIPTS ?= scripts/poetry
 
@@ -9,10 +10,10 @@ GET_VERSION = $($(SCRIPTS)/run python atr/metadata.py)
 build: build-alpine
 
 build-alpine:
-	$(SCRIPTS)/build Dockerfile.alpine
+	$(SCRIPTS)/build Dockerfile.alpine $(IMAGE)
 
 build-ubuntu:
-	$(SCRIPTS)/build Dockerfile.ubuntu
+	$(SCRIPTS)/build Dockerfile.ubuntu $(IMAGE)
 
 certs:
 	if test ! -f state/cert.pem || test ! -f state/key.pem; \
