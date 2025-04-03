@@ -71,14 +71,12 @@ class ProductionConfig(AppConfig): ...
 
 
 class DebugConfig(AppConfig):
-    SSH_HOST = "127.0.0.1"
     DEBUG = True
     TEMPLATES_AUTO_RELOAD = True
     USE_BLOCKBUSTER = False
 
 
 class ProfilingConfig(AppConfig):
-    SSH_HOST = "127.0.0.1"
     DEBUG = False
     TEMPLATES_AUTO_RELOAD = False
     USE_BLOCKBUSTER = True

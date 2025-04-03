@@ -46,11 +46,12 @@ report:
 run:
 	scripts/run
 
+serve:
+	SSH_HOST=127.0.0.1 $(SCRIPTS)/run hypercorn --bind $(BIND) \
+		--keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
+
 stop:
 	scripts/stop
-
-serve:
-	$(SCRIPTS)/run hypercorn --bind $(BIND) --keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
 
 sync:
 	$(SCRIPTS)/sync $(PYTHON)
