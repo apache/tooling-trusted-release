@@ -33,13 +33,6 @@ import sqlmodel
 import atr.db as db
 import atr.db.models as models
 
-# Configure logging
-logging.basicConfig(
-    format="[%(asctime)s.%(msecs)03d] [%(levelname)s] %(message)s",
-    level=logging.INFO,
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-
 _LOGGER: Final = logging.getLogger(__name__)
 
 # Global debug flag to control worker process output capturing

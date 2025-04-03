@@ -180,10 +180,6 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
 def app_setup_logging(app: base.QuartApp, config_mode: config.Mode, app_config: type[config.AppConfig]) -> None:
     """Setup application logging."""
 
-    # remove any existing handlers, hypercorn might have set them up already
-    for handler in logging.root.handlers:
-        logging.root.removeHandler(handler)
-
     logging.basicConfig(
         format="[%(asctime)s.%(msecs)03d  ] [%(process)d] %(message)s",
         level=logging.INFO,
