@@ -495,8 +495,17 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
             release_name=release.name, path=str(path), status=models.CheckResultStatus.FAILURE
         ).all()
 
-    delete_file_form = await DeleteFileForm.create_form()
+    # # TODO: This is only accurate to a second
+    # oldest_check_result = None
+    # latest_check_result = None
+    # for path_success in path_successes:
+    #     for check_result in path_successes[path_success]:
+    #         if (oldest_check_result is None) or (check_result.created < oldest_check_result):
+    #             oldest_check_result = check_result.created
+    #         if (latest_check_result is None) or (check_result.created > latest_check_result):
+    #             latest_check_result = check_result.created
 
+    delete_file_form = await DeleteFileForm.create_form()
     return await quart.render_template(
         "draft-review.html",
         asf_id=session.uid,
@@ -505,6 +514,8 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
         release=release,
         paths=paths,
         server_domain=session.host,
+        # oldest_check_result=oldest_check_result,
+        # latest_check_result=latest_check_result,
         templates=path_templates,
         substitutions=path_substitutions,
         artifacts=path_artifacts,

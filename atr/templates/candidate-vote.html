@@ -44,7 +44,7 @@
             <span class="candidate-meta-item">Stage: {{ candidate.stage.value.upper() }}</span>
             <span class="candidate-meta-item">Phase: {{ candidate.phase.value.upper() }}</span>
             <!-- <span class="candidate-meta-item">Project: {{ candidate.project.name if candidate.project else "unknown" }}</span> -->
-            <span class="candidate-meta-item">Created: {{ candidate.created.strftime("%Y-%m-%d %H:%M UTC") }}</span>
+            <span class="candidate-meta-item">Created: {{ candidate.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
           </div>
           <div class="d-flex gap-3 align-items-center pt-2">
             <a class="btn btn-primary"

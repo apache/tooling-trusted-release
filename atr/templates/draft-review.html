@@ -41,7 +41,7 @@
             <strong>Phase:</strong> <span class="badge bg-info">{{ release.phase.value.upper() }}</span>
           </p>
           <p>
-            <strong>Created:</strong> {{ release.created.strftime("%Y-%m-%d %H:%M") }}
+            <strong>Created:</strong> {{ release.created.strftime("%Y-%m-%d %H:%M:%S") }}
           </p>
         </div>
       </div>
@@ -109,6 +109,20 @@
             </tbody>
           </table>
         </div>
+
+        <!--
+        {% if oldest_check_result or latest_check_result %}
+          <p class="text-muted mt-3 small fst-italic">
+            {% if oldest_check_result %}
+              Checks first ran: {{ oldest_check_result.strftime("%Y-%m-%d %H:%M:%S UTC") }}
+            {% endif %}
+            {% if oldest_check_result and latest_check_result %}|{% endif %}
+            {% if latest_check_result %}
+              Checks last ran: {{ latest_check_result.strftime("%Y-%m-%d %H:%M:%S UTC") }}
+            {% endif %}
+          </p>
+        {% endif %}
+        -->
 
         <details>
           <summary>Debugging information</summary>

@@ -21,7 +21,7 @@
       <strong>Size:</strong> {{ format_file_size(package.bytes_size) }}
     </p>
     <p class="mb-0">
-      <strong>Uploaded:</strong> {{ package.uploaded.strftime("%Y-%m-%d %H:%M UTC") }}
+      <strong>Uploaded:</strong> {{ package.uploaded.strftime("%Y-%m-%d %H:%M:%S UTC") }}
     </p>
   </div>
 
@@ -106,7 +106,7 @@
           </div>
           <div class="small">
             <div>
-              Checked: {{ check_result.created.strftime("%Y-%m-%d %H:%M UTC") if check_result.created else "Not checked" }}
+              Checked: {{ check_result.created.strftime("%Y-%m-%d %H:%M:%S UTC") if check_result.created else "Not checked" }}
             </div>
 
             {% if check_result.message %}<div class="mt-2">{{ check_result.message }}</div>{% endif %}

@@ -37,7 +37,9 @@ class Check(pydantic.BaseModel):
     base_release_dir: str = pydantic.Field(..., description="Absolute path to the base directory of the release draft")
 
 
-async def _check_artifact_rules(base_path: pathlib.Path, relative_path: pathlib.Path, errors: list[str]) -> None:
+async def _check_artifact_rules(
+    base_path: pathlib.Path, relative_path: pathlib.Path, relative_paths: set[str], errors: list[str]
+) -> None:
     """Check rules specific to artifact files."""
     full_path = base_path / relative_path
 
@@ -47,16 +49,21 @@ async def _check_artifact_rules(base_path: pathlib.Path, relative_path: pathlib.
         errors.append(f"Missing corresponding signature file ({relative_path}.asc)")
 
     # RDP requires one of .sha256 or .sha512
-    sha256_path = full_path.with_suffix(full_path.suffix + ".sha256")
-    sha512_path = full_path.with_suffix(full_path.suffix + ".sha512")
-    has_sha256 = await aiofiles.os.path.exists(sha256_path)
-    has_sha512 = await aiofiles.os.path.exists(sha512_path)
+    relative_sha256_path = relative_path.with_suffix(relative_path.suffix + ".sha256")
+    relative_sha512_path = relative_path.with_suffix(relative_path.suffix + ".sha512")
+    has_sha256 = str(relative_sha256_path) in relative_paths
+    has_sha512 = str(relative_sha512_path) in relative_paths
     if not (has_sha256 or has_sha512):
-        errors.append(f"Missing corresponding checksum file ({relative_path}.sha256 or .sha512)")
+        errors.append(f"Missing corresponding checksum file ({relative_path}.sha256 or {relative_path}.sha512)")
 
 
 async def _check_metadata_rules(
-    base_path: pathlib.Path, relative_path: pathlib.Path, ext_metadata: str, errors: list[str], warnings: list[str]
+    _base_path: pathlib.Path,
+    relative_path: pathlib.Path,
+    relative_paths: set[str],
+    ext_metadata: str,
+    errors: list[str],
+    warnings: list[str],
 ) -> None:
     """Check rules specific to metadata files (.asc, .sha*, etc.)."""
     suffixes = set(relative_path.suffixes)
@@ -80,6 +87,11 @@ async def _check_metadata_rules(
     # TODO: Is .mds supported in analysis.METADATA_SUFFIXES?
     if ext_metadata not in {".asc", ".sha256", ".sha512", ".md5", ".sha", ".sha1"}:
         warnings.append("The use of this metadata file is discouraged")
+
+    # Check whether the corresponding artifact exists
+    artifact_path_base = str(relative_path).removesuffix(ext_metadata)
+    if artifact_path_base not in relative_paths:
+        errors.append(f"Metadata file exists but corresponding artifact '{artifact_path_base}' is missing")
 
 
 async def _check_path_process_single(
@@ -114,15 +126,10 @@ async def _check_path_process_single(
 
     if ext_artifact:
         _LOGGER.info("Checking artifact rules for %s", full_path)
-        await _check_artifact_rules(base_path, relative_path, errors)
+        await _check_artifact_rules(base_path, relative_path, relative_paths, errors)
     elif ext_metadata:
         _LOGGER.info("Checking metadata rules for %s", full_path)
-        await _check_metadata_rules(base_path, relative_path, ext_metadata, errors, warnings)
-
-        # Check whether the corresponding artifact exists
-        artifact_path_base = str(relative_path).removesuffix(ext_metadata)
-        if artifact_path_base not in relative_paths:
-            errors.append(f"Metadata file exists but corresponding artifact '{artifact_path_base}' is missing")
+        await _check_metadata_rules(base_path, relative_path, relative_paths, ext_metadata, errors, warnings)
     else:
         _LOGGER.info("Checking general rules for %s", full_path)
         allowed_top_level = {"LICENSE", "NOTICE", "README", "CHANGES"}

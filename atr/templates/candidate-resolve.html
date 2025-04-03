@@ -38,7 +38,7 @@
           <div class="d-flex flex-wrap gap-3 pb-3 mb-2 border-bottom text-secondary fs-6">
             <span class="atr-candidate-meta-item">Stage: {{ candidate.stage.value.upper() }}</span>
             <span class="atr-candidate-meta-item">Phase: {{ candidate.phase.value.upper() }}</span>
-            <span class="atr-candidate-meta-item">Created: {{ candidate.created.strftime("%Y-%m-%d %H:%M UTC") }}</span>
+            <span class="atr-candidate-meta-item">Created: {{ candidate.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
           </div>
 
           {% set vote_task = candidate_vote_tasks[candidate.name] %}
@@ -46,11 +46,11 @@
             {% if vote_task %}
               {% if vote_task.status.value == "completed" %}
                 <p class="mb-0 text-success fw-semibold">
-                  <i class="bi bi-check-circle-fill me-1"></i> Vote email sent: {{ vote_task.completed.strftime("%Y-%m-%d %H:%M UTC") }}
+                  <i class="bi bi-check-circle-fill me-1"></i> Vote email sent: {{ vote_task.completed.strftime("%Y-%m-%d %H:%M:%S UTC") }}
                 </p>
               {% elif vote_task.status.value == "failed" %}
                 <p class="mb-1 text-danger fw-semibold">
-                  <i class="bi bi-x-octagon-fill me-1"></i> Vote email failed: {{ vote_task.completed.strftime("%Y-%m-%d %H:%M UTC") }}
+                  <i class="bi bi-x-octagon-fill me-1"></i> Vote email failed: {{ vote_task.completed.strftime("%Y-%m-%d %H:%M:%S UTC") }}
                 </p>
                 <div class="alert alert-danger mt-2 mb-0 p-2" role="alert">
                   <p class="mb-0 p-2 text-danger">{{ vote_task.error }}</p>
@@ -59,9 +59,9 @@
                 <p class="mb-0 text-warning fw-semibold">
                   <i class="bi bi-hourglass-split me-1"></i> Vote email status: {{ vote_task.status.value.upper() }}
                   {% if vote_task.started %}
-                    (Started: {{ vote_task.started.strftime("%Y-%m-%d %H:%M UTC") }})
+                    (Started: {{ vote_task.started.strftime("%Y-%m-%d %H:%M:%S UTC") }})
                   {% else %}
-                    (Added: {{ vote_task.added.strftime("%Y-%m-%d %H:%M UTC") }})
+                    (Added: {{ vote_task.added.strftime("%Y-%m-%d %H:%M:%S UTC") }})
                   {% endif %}
                 </p>
               {% endif %}

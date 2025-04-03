@@ -219,15 +219,20 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
 
 async def _worker_loop_run() -> None:
     """Main worker loop."""
+    processed = 0
+    max_to_process = 10
     while True:
         try:
             task = await _task_next_claim()
             if task:
                 task_id, task_type, task_args = task
                 await _task_process(task_id, task_type, task_args)
-                # Only process one task and then exit
+                processed += 1
+                # Only process max_to_process tasks and then exit
                 # This prevents memory leaks from accumulating
-                break
+                # Another worker will be started automatically when one exits
+                if processed >= max_to_process:
+                    break
             else:
                 # No tasks available, wait 100ms before checking again
                 await asyncio.sleep(0.1)
