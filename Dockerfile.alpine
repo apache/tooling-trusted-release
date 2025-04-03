@@ -53,7 +53,8 @@ RUN apk update && \
       gpg \
       make \
       nix \
-      openjdk8
+      openjdk8 \
+      rsync
 
 WORKDIR /opt/atr
 

@@ -1,6 +1,7 @@
 #!/bin/sh
 
-if [ -d "${HOME}/tooling-trusted-release" ]; then
+if [ -d "${HOME}/tooling-trusted-release" ]
+then
   MOUNT="${HOME}/tooling-trusted-release/state"
 else
   MOUNT="./state"

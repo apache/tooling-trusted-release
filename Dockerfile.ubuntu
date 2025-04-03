@@ -58,6 +58,7 @@ RUN apt-get update && \
       gpg \
       make \
       openjdk-8-jdk \
+      rsync \
       software-properties-common && \
     rm -rf /var/lib/apt/lists/*
 
