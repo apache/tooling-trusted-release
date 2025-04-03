@@ -47,10 +47,10 @@ report:
 run: run-dev
 
 run-dev:
-	BIND=127.0.0.1:8080 scripts/run
+	BIND=127.0.0.1:4443 scripts/run
 
 run-staging:
-	BIND=127.0.0.1:8081 scripts/run
+	BIND=127.0.0.1:8443 scripts/run
 
 serve:
 	SSH_HOST=127.0.0.1 $(SCRIPTS)/run hypercorn --bind $(BIND) \
