@@ -1,4 +1,4 @@
-.PHONY: build build-alpine build-ubuntu certs check docs generate-version obvfix report run stop serve sync sync-dev
+.PHONY: build build-alpine build-ubuntu certs check docs generate-version obvfix report run run-dev run-staging stop serve sync sync-dev
 
 BIND ?= 127.0.0.1:8080
 IMAGE ?= tooling-trusted-release
@@ -44,8 +44,13 @@ obvfix:
 report:
 	@echo SCRIPTS = $(SCRIPTS)
 
-run:
-	scripts/run
+run: run-dev
+
+run-dev:
+	BIND=127.0.0.1:8080 scripts/run
+
+run-staging:
+	BIND=127.0.0.1:8081 scripts/run
 
 serve:
 	SSH_HOST=127.0.0.1 $(SCRIPTS)/run hypercorn --bind $(BIND) \

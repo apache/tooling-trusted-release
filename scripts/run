@@ -7,4 +7,6 @@ else
   MOUNT="./state"
 fi
 
-docker run --rm -d -v "${MOUNT}:/opt/atr/state" --network host --name tooling-trusted-release tooling-trusted-release
+BIND="${BIND:=127.0.0.1:8080}"
+
+docker run --rm -d -v "${MOUNT}:/opt/atr/state" -e BIND="${BIND}" --network host --name tooling-trusted-release tooling-trusted-release
