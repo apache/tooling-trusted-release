@@ -217,4 +217,5 @@ TASK_FUNCTIONS: Final[dict[str, Callable[..., Coroutine[Any, Any, list[models.Ta
     ".sha256": sha_checks,
     ".sha512": sha_checks,
     ".tar.gz": tar_gz_checks,
+    ".tgz": tar_gz_checks,
 }
