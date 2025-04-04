@@ -429,23 +429,20 @@ async def _resolve_post_files(project_name: str, release: models.Release, vote_r
 
 
 def _task_mid(latest_vote_task: models.Task) -> str:
-    try:
-        # Result is stored as a JSON string
-        # Handle that defensively
-        if isinstance(latest_vote_task.result, str):
-            parsed_result = json.loads(latest_vote_task.result)
-            if not isinstance(parsed_result, list):
-                raise TypeError("Unexpected result type")
-        elif isinstance(latest_vote_task.result, list):
-            parsed_result = latest_vote_task.result
-        else:
-            raise TypeError("Unexpected result type")
+    task_mid = "(no result)"
 
-        task_mid = "(no result)"
-        for result in parsed_result:
-            if isinstance(result, dict):
-                task_mid = result.get("mid", "(mid not found in result)")
-            break
+    try:
+        for result in latest_vote_task.result or []:
+            if isinstance(result, str):
+                parsed_result = json.loads(result)
+            else:
+                # Shouldn't happen
+                parsed_result = result
+            if isinstance(parsed_result, dict):
+                task_mid = parsed_result.get("mid", "(mid not found in result)")
+                break
+            else:
+                task_mid = "(malformed result)"
 
     except (json.JSONDecodeError, TypeError):
         task_mid = "(malformed result)"
