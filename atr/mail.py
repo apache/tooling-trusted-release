@@ -76,8 +76,11 @@ Message-ID: <{mid}>
 {event.body}
 """
 
-    # Convert Unix line endings to CRLF
-    msg_text = msg_text.strip().replace("\n", "\r\n") + "\r\n"
+    # Normalise padding, and line endings to CRLF
+    msg_text = msg_text.strip()
+    msg_text = msg_text.replace("\r\n", "\n")
+    msg_text = msg_text.replace("\n", "\r\n")
+    msg_text = msg_text + "\r\n"
 
     start = time.perf_counter()
     _LOGGER.info(f"sending message: {msg_text}")
