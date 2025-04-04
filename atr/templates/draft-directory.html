@@ -34,13 +34,17 @@
             {% if release.project.committee %}
               <h6 class="card-subtitle mb-2 text-muted">{{ release.project.committee.display_name }}</h6>
             {% endif %}
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 mb-2">
               <a href="{{ as_url(routes.draft.review, project_name=release.project.name, version_name=release.version) }}"
                  class="btn btn-sm btn-outline-primary">Review</a>
               <a href="{{ as_url(routes.draft.viewer, project_name=release.project.name, version_name=release.version) }}"
                  class="btn btn-sm btn-outline-primary">View files</a>
               <a href="{{ as_url(routes.draft.add_file, project_name=release.project.name, version_name=release.version) }}"
                  class="btn btn-sm btn-outline-primary">Upload file</a>
+            </div>
+            <div class="d-flex gap-2">
+              <a href="{{ as_url(routes.draft.promote) }}#{{ release.name }}"
+                 class="btn btn-sm btn-outline-success">Promote draft</a>
               <button class="btn btn-sm btn-outline-danger"
                       data-bs-toggle="modal"
                       data-bs-target="#delete-{{ release_id }}">Delete draft</button>
