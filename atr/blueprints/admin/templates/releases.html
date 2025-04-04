@@ -25,7 +25,26 @@
     <tbody>
       {% for release in releases %}
         <tr>
-          <td>{{ release.name }}</td>
+          <td>
+            {% set phase_value = release.phase.value %}
+            {% if release.project %}
+              {% if phase_value == "release_candidate_draft" %}
+                <a href="{{ as_url(routes.draft.review, project_name=release.project.name, version_name=release.version) }}">{{ release.name }}</a>
+              {% elif phase_value == "release_candidate_before_vote" %}
+                <a href="{{ as_url(routes.candidate.vote_project, project_name=release.project.name, version=release.version) }}">{{ release.name }}</a>
+              {% elif phase_value == "release_candidate_during_vote" %}
+                <a href="{{ as_url(routes.candidate.resolve) }}">{{ release.name }}</a>
+              {% elif phase_value == "release_preview" %}
+                <a href="{{ as_url(routes.preview.review) }}">{{ release.name }}</a>
+              {% elif phase_value == "release_before_announcement" or phase_value == "release_after_announcement" %}
+                <a href="{{ as_url(routes.release.review) }}">{{ release.name }}</a>
+              {% else %}
+                {{ release.name }}
+              {% endif %}
+            {% else %}
+              {{ release.name }}
+            {% endif %}
+          </td>
           <td>{{ release.project.name if release.project else "N/A" }}</td>
           <td>{{ release.project.committee.name if release.project and release.project.committee else "N/A" }}</td>
           <td>{{ release.stage.value }}</td>
