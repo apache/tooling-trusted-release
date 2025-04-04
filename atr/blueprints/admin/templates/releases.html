@@ -29,7 +29,25 @@
           <td>{{ release.project.name if release.project else "N/A" }}</td>
           <td>{{ release.project.committee.name if release.project and release.project.committee else "N/A" }}</td>
           <td>{{ release.stage.value }}</td>
-          <td>{{ release.phase.value }}</td>
+          <td>
+            {% set phase_value = release.phase.value %}
+            {{ phase_value }} <br />
+            {% if phase_value == "release_candidate_draft" %}
+              <span class="badge bg-secondary">1. Draft</span>
+            {% elif phase_value == "release_candidate_before_vote" %}
+              <span class="badge bg-info">2. Candidate</span>
+            {% elif phase_value == "release_candidate_during_vote" %}
+              <span class="badge bg-info">2. Candidate</span>
+            {% elif phase_value == "release_preview" %}
+              <span class="badge bg-warning text-dark">3. Preview</span>
+            {% elif phase_value == "release_before_announcement" %}
+              <span class="badge bg-success">4. Release</span>
+            {% elif phase_value == "release_after_announcement" %}
+              <span class="badge bg-success">4. Release</span>
+            {% else %}
+              <span class="badge bg-dark">Unknown</span>
+            {% endif %}
+          </td>
           <td>{{ release.created.strftime('%Y-%m-%d %H:%M:%S UTC') }}</td>
         </tr>
       {% else %}
