@@ -18,11 +18,13 @@
 """candidate.py"""
 
 import json
+import logging
 
 import aiofiles.os
 import aioshutil
 import asfquart
 import asfquart.base as base
+import httpx
 import quart
 import werkzeug.wrappers.response as response
 import wtforms
@@ -58,7 +60,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     return await session.redirect(vote, error="Not yet implemented")
 
 
-@routes.committer("/candidate/resolve", methods=["GET", "POST"])
+@routes.committer("/candidate/resolve", methods=["GET", "POST"], measure_performance=False)
 async def resolve(session: routes.CommitterSession) -> response.Response | str:
     """Resolve the vote on a release candidate."""
     # For GET requests, show the list of candidates with ongoing votes
@@ -335,6 +337,7 @@ async def _resolve_get(session: routes.CommitterSession) -> str:
         # TODO: Make this a proper query
         latest_vote_task = None
         task_mid = None
+        archive_url = None
         for task in sorted(candidate.tasks, key=lambda t: t.added, reverse=True):
             if task.task_type == models.TaskType.VOTE_INITIATE:
                 latest_vote_task = task
@@ -342,8 +345,8 @@ async def _resolve_get(session: routes.CommitterSession) -> str:
 
         if latest_vote_task and (latest_vote_task.status == models.TaskStatus.COMPLETED) and latest_vote_task.result:
             task_mid = _task_mid(latest_vote_task)
-
-        candidate_vote_tasks[candidate.name] = (latest_vote_task, task_mid)
+            archive_url = await _task_archive_url(task_mid)
+        candidate_vote_tasks[candidate.name] = (latest_vote_task, task_mid, archive_url)
 
     return await quart.render_template(
         "candidate-resolve.html",
@@ -426,6 +429,25 @@ async def _resolve_post_files(project_name: str, release: models.Release, vote_r
     if await aiofiles.os.path.exists(target):
         raise base.ASFQuartException("Release already exists", errorcode=400)
     await aioshutil.move(source, target)
+
+
+async def _task_archive_url(task_mid: str) -> str | None:
+    # TODO: Should cache the result of this function in sqlite
+    if "@" not in task_mid:
+        return None
+
+    # TODO: This List ID will be dynamic when we allow posting to arbitrary lists
+    lid = "user-tests.tooling.apache.org"
+    url = f"https://lists.apache.org/api/email.lua?id=%3C{task_mid}%3E&listid=%3C{lid}%3E"
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+        response.raise_for_status()
+        email_data = response.json()
+        return "https://lists.apache.org/thread/" + email_data["mid"]
+    except Exception:
+        logging.exception("Failed to get archive URL for task %s", task_mid)
+        return None
 
 
 def _task_mid(latest_vote_task: models.Task) -> str:

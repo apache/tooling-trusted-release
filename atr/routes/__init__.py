@@ -49,7 +49,7 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 # TODO: Should get this from config, checking debug there
-measure_performance: bool = True
+_MEASURE_PERFORMANCE: Final[bool] = True
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -170,12 +170,14 @@ route_logger.setLevel(logging.INFO)
 route_logger.propagate = False
 
 
-def app_route(path: str, methods: list[str] | None = None, endpoint: str | None = None) -> Callable:
+def app_route(
+    path: str, methods: list[str] | None = None, endpoint: str | None = None, measure_performance: bool = True
+) -> Callable:
     """Register a route with the Flask app with built-in performance logging."""
 
     def decorator(f: Callable[P, Coroutine[Any, Any, T]]) -> Callable[P, Awaitable[T]]:
         # First apply our performance measuring decorator
-        if measure_performance:
+        if _MEASURE_PERFORMANCE and measure_performance:
             measured_func = app_route_performance_measure(path, methods)(f)
         else:
             measured_func = f
@@ -226,8 +228,9 @@ def app_route_performance_measure(route_path: str, http_methods: list[str] | Non
                     loop = asyncio.get_running_loop()
                     wait_start = time.perf_counter()
                     loop_start = loop.time()
-                    while not future.done():
-                        await asyncio.sleep(0)
+                    if future is not None:
+                        while not future.done():
+                            await asyncio.sleep(0)
                     wait_end = time.perf_counter()
                     loop_end = loop.time()
                     async_time += wait_end - wait_start
@@ -441,7 +444,9 @@ class RouteHandler(Protocol[R]):
 
 
 # This decorator is an adaptor between @committer_get and @app_route functions
-def committer(path: str, methods: list[str] | None = None) -> Callable[[CommitterRouteHandler[R]], RouteHandler[R]]:
+def committer(
+    path: str, methods: list[str] | None = None, measure_performance: bool = True
+) -> Callable[[CommitterRouteHandler[R]], RouteHandler[R]]:
     """Decorator for committer GET routes that provides an enhanced session object."""
 
     def decorator(func: CommitterRouteHandler[R]) -> RouteHandler[R]:
@@ -463,14 +468,18 @@ def committer(path: str, methods: list[str] | None = None) -> Callable[[Committe
 
         # Apply decorators in reverse order
         decorated = auth.require(auth.Requirements.committer)(wrapper)
-        decorated = app_route(path, methods=methods or ["GET"], endpoint=endpoint)(decorated)
+        decorated = app_route(
+            path, methods=methods or ["GET"], endpoint=endpoint, measure_performance=measure_performance
+        )(decorated)
 
         return decorated
 
     return decorator
 
 
-def public(path: str, methods: list[str] | None = None) -> Callable[[RouteHandler[R]], RouteHandler[R]]:
+def public(
+    path: str, methods: list[str] | None = None, measure_performance: bool = True
+) -> Callable[[RouteHandler[R]], RouteHandler[R]]:
     """Decorator for public GET routes that provides an enhanced session object."""
 
     def decorator(func: RouteHandler[R]) -> RouteHandler[R]:
@@ -486,7 +495,9 @@ def public(path: str, methods: list[str] | None = None) -> Callable[[RouteHandle
         wrapper.__annotations__["endpoint"] = endpoint
 
         # Apply decorators in reverse order
-        decorated = app_route(path, methods=methods or ["GET"], endpoint=endpoint)(wrapper)
+        decorated = app_route(
+            path, methods=methods or ["GET"], endpoint=endpoint, measure_performance=measure_performance
+        )(wrapper)
 
         return decorated
 
