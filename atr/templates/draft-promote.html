@@ -53,6 +53,14 @@
             <span class="atr-candidate-meta-item">Phase: {{ candidate_draft.phase.value.upper() }}</span>
             <span class="atr-candidate-meta-item">Created: {{ candidate_draft.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
           </div>
+          <div class="mt-3 d-flex flex-wrap gap-3 text-secondary fs-6">
+            <span class="atr-candidate-meta-item">
+              <a href="{{ as_url(routes.draft.viewer, project_name=candidate_draft.project.name, version_name=candidate_draft.version) }}"
+                 class="btn btn-outline-primary btn-sm">
+                View {{ candidate_draft_files[candidate_draft.name] }} files
+              </a>
+            </span>
+          </div>
         </div>
       </div>
 

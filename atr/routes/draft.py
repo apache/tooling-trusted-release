@@ -422,9 +422,14 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
                 logging.exception("Error promoting candidate draft:")
                 return await session.redirect(promote, error=f"Error promoting candidate draft: {e!s}")
 
+    candidate_draft_files = {}
+    for candidate_draft in user_candidate_drafts:
+        candidate_draft_files[candidate_draft.name] = await _number_of_release_files(candidate_draft)
+
     return await quart.render_template(
         "draft-promote.html",
         candidate_drafts=user_candidate_drafts,
+        candidate_draft_files=candidate_draft_files,
         promote_form=promote_form,
         delete_form=delete_form,
     )
