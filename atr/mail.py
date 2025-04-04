@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import dataclasses
 import datetime
 import email.utils as utils
 import logging
@@ -32,11 +33,10 @@ _LOGGER = logging.getLogger(__name__)
 # We could e.g. use uppercase instead of global_
 # It's not always worth identifying globals as globals
 # But in many cases we should do so
-# TODO: Get at least global_domain from configuration
+# TODO: Get at least global_dkim_domain from configuration
 # And probably global_dkim_selector too
-global_dkim_selector: str = "202501"
-global_domain: str = "tooling-vm-ec2-de.apache.org"
-global_email_contact: str = f"contact@{global_domain}"
+global_dkim_selector: str = "mail"
+global_dkim_domain: str = "apache.org"
 global_secret_key: str | None = None
 
 _MAIL_RELAY: Final[str] = "mail-relay.apache.org"
@@ -44,31 +44,28 @@ _SMTP_PORT: Final[int] = 587
 _SMTP_TIMEOUT: Final[int] = 30
 
 
+@dataclasses.dataclass
 class VoteEvent:
-    """Data class to represent a release vote event."""
-
-    def __init__(
-        self, release_name: str, email_recipient: str, subject: str, body: str, vote_end: datetime.datetime
-    ) -> None:
-        self.release_name = release_name
-        self.email_recipient = email_recipient
-        self.subject = subject
-        self.body = body
-        self.vote_end = vote_end
+    release_name: str
+    email_sender: str
+    email_recipient: str
+    subject: str
+    body: str
+    vote_end: datetime.datetime
 
 
 async def send(event: VoteEvent) -> str:
     """Send an email notification about an artifact or a vote."""
     _LOGGER.info(f"Sending email for event: {event}")
-    from_addr = global_email_contact
-    if not from_addr.endswith(f"@{global_domain}"):
-        raise ValueError(f"from_addr must end with @{global_domain}, got {from_addr}")
+    from_addr = event.email_sender
+    if not from_addr.endswith(f"@{global_dkim_domain}"):
+        raise ValueError(f"from_addr must end with @{global_dkim_domain}, got {from_addr}")
     to_addr = event.email_recipient
     _validate_recipient(to_addr)
 
     # UUID4 is entirely random, with no timestamp nor namespace
     # It does have 6 version and variant bits, so only 122 bits are random
-    mid = f"{uuid.uuid4()}@{global_domain}"
+    mid = f"{uuid.uuid4()}@{global_dkim_domain}"
     msg_text = f"""
 From: {from_addr}
 To: {to_addr}
@@ -119,7 +116,7 @@ async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None
     sig = dkim.sign(
         message=message_bytes,
         selector=bytes(global_dkim_selector, "utf-8"),
-        domain=bytes(global_domain, "utf-8"),
+        domain=bytes(global_dkim_domain, "utf-8"),
         privkey=private_key,
         include_headers=[b"From", b"To", b"Subject", b"Date", b"Message-ID"],
     )

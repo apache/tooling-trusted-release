@@ -18,7 +18,6 @@
 """candidate.py"""
 
 import json
-import logging
 
 import aiofiles.os
 import aioshutil
@@ -342,24 +341,7 @@ async def _resolve_get(session: routes.CommitterSession) -> str:
                 break
 
         if latest_vote_task and (latest_vote_task.status == models.TaskStatus.COMPLETED) and latest_vote_task.result:
-            try:
-                # Result is stored as a JSON string
-                # Handle that defensively
-                if isinstance(latest_vote_task.result, str):
-                    parsed_result = json.loads(latest_vote_task.result)
-                elif isinstance(latest_vote_task.result, dict):
-                    parsed_result = latest_vote_task.result
-                else:
-                    parsed_result = {}
-
-                if isinstance(parsed_result, dict):
-                    logging.info(f"Vote task result: {parsed_result}")
-                    task_mid = parsed_result.get("mid", "(mid not found in result)")
-                else:
-                    task_mid = "(no result)"
-
-            except (json.JSONDecodeError, TypeError):
-                task_mid = "(malformed result)"
+            task_mid = _task_mid(latest_vote_task)
 
         candidate_vote_tasks[candidate.name] = (latest_vote_task, task_mid)
 
@@ -444,3 +426,28 @@ async def _resolve_post_files(project_name: str, release: models.Release, vote_r
     if await aiofiles.os.path.exists(target):
         raise base.ASFQuartException("Release already exists", errorcode=400)
     await aioshutil.move(source, target)
+
+
+def _task_mid(latest_vote_task: models.Task) -> str:
+    try:
+        # Result is stored as a JSON string
+        # Handle that defensively
+        if isinstance(latest_vote_task.result, str):
+            parsed_result = json.loads(latest_vote_task.result)
+            if not isinstance(parsed_result, list):
+                raise TypeError("Unexpected result type")
+        elif isinstance(latest_vote_task.result, list):
+            parsed_result = latest_vote_task.result
+        else:
+            raise TypeError("Unexpected result type")
+
+        task_mid = "(no result)"
+        for result in parsed_result:
+            if isinstance(result, dict):
+                task_mid = result.get("mid", "(mid not found in result)")
+            break
+
+    except (json.JSONDecodeError, TypeError):
+        task_mid = "(malformed result)"
+
+    return task_mid

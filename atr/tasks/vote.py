@@ -126,6 +126,7 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     # Use test account instead of actual PMC list
     event = mail.VoteEvent(
         release_name=args.release_name,
+        email_sender=f"{args.initiator_id}@apache.org",
         email_recipient=tooling_test_recipient,
         subject=subject,
         body=body,
