@@ -116,6 +116,11 @@
                {% if request.endpoint == 'admin.admin_data' %}class="active"{% endif %}>Browse database</a>
           </li>
           <li>
+            <i class="fa-solid fa-list-ul"></i>
+            <a href="{{ url_for('admin.admin_releases') }}"
+               {% if request.endpoint == 'admin.admin_releases' %}class="active"{% endif %}>All releases</a>
+          </li>
+          <li>
             <i class="fa-solid fa-rotate"></i>
             <a href="{{ url_for('admin.admin_projects_update') }}"
                {% if request.endpoint == 'admin.admin_projects_update' %}class="active"{% endif %}>Update projects</a>

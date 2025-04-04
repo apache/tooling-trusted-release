@@ -389,6 +389,14 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
     return added_count, updated_count
 
 
+@admin.BLUEPRINT.route("/releases")
+async def admin_releases() -> str:
+    """Display a list of all releases across all stages and phases."""
+    async with db.session() as data:
+        releases = await data.release(_project=True, _committee=True).order_by(models.Release.name).all()
+    return await quart.render_template("releases.html", releases=releases)
+
+
 @admin.BLUEPRINT.route("/tasks")
 async def admin_tasks() -> str:
     return await quart.render_template("tasks.html")
