@@ -18,6 +18,7 @@
 """candidate.py"""
 
 import json
+import logging
 
 import aiofiles.os
 import aioshutil
@@ -352,6 +353,7 @@ async def _resolve_get(session: routes.CommitterSession) -> str:
                     parsed_result = {}
 
                 if isinstance(parsed_result, dict):
+                    logging.info(f"Vote task result: {parsed_result}")
                     task_mid = parsed_result.get("mid", "(mid not found in result)")
                 else:
                     task_mid = "(no result)"

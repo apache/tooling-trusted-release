@@ -284,6 +284,10 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
 
         # Wait for the process to complete
         exit_status = await proc.wait()
+        if exit_status != 0:
+            _LOGGER.error(f"Command {process.command} failed with exit status {exit_status}")
+            process.exit(exit_status)
+            return
 
         # Start a task to process the new files
         async with db.session() as data:
@@ -322,6 +326,7 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
             await data.commit()
 
         # Exit the SSH process with the same status as the rsync process
+        # Should be 0 here
         process.exit(exit_status)
 
     except Exception as e:
