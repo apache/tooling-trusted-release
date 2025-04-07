@@ -439,3 +439,10 @@ class CheckResult(sqlmodel.SQLModel, table=True):
     status: CheckResultStatus
     message: str
     data: Any = sqlmodel.Field(sa_column=sqlalchemy.Column(sqlalchemy.JSON))
+
+
+class TextValue(sqlmodel.SQLModel, table=True):
+    # Composite primary key, automatically handled by SQLModel
+    ns: str = sqlmodel.Field(primary_key=True, index=True)
+    key: str = sqlmodel.Field(primary_key=True, index=True)
+    value: str = sqlmodel.Field()

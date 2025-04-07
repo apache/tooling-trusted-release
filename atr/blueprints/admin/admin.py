@@ -16,9 +16,11 @@
 # under the License.
 
 import collections
+import datetime
 import logging
 import pathlib
 import statistics
+import uuid
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -202,6 +204,7 @@ async def admin_data(model: str = "Committee") -> str:
             "Release": data.release,
             "SSHKey": data.ssh_key,
             "Task": data.task,
+            "TextValue": data.text_value,
             "VotePolicy": data.vote_policy,
         }
 
@@ -387,6 +390,63 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
             tooling_committee.is_podling = False
 
     return added_count, updated_count
+
+
+@admin.BLUEPRINT.route("/test-kv")
+async def admin_test_kv() -> str:
+    """Test route for writing and reading from the TextValue KV store."""
+    test_ns = "kv_test"
+    test_key = str(uuid.uuid4())
+    test_value = f"Test value set at {datetime.datetime.now(datetime.UTC)}"
+    message: str
+
+    try:
+        async with db.session() as data:
+            existing = await data.text_value(ns=test_ns, key=test_key).get()
+            if existing:
+                existing.value = test_value
+                data.add(existing)
+            else:
+                new_entry = models.TextValue(ns=test_ns, key=test_key, value=test_value)
+                data.add(new_entry)
+            await data.commit()
+            _LOGGER.info(f"Text value test: Wrote {test_ns}/{test_key} = {test_value}")
+
+        async with db.session() as data:
+            read_back = await data.text_value(ns=test_ns, key=test_key).get()
+            if read_back and (read_back.value == test_value):
+                message = f"<p class='success'>Test SUCCESS: Wrote/read ok (ns='{test_ns}', key='{test_key}')</p>"
+                _LOGGER.info("Text value test SUCCESS")
+            elif read_back:
+                message = (
+                    f"<p class='error'>Test FAILED: Read back wrong value!</p>"
+                    f"<p>Expected: '{test_value}'</p>"
+                    f"<p>Got: '{read_back.value}'</p>"
+                )
+                _LOGGER.error(
+                    f"Text value test FAILED: Read back wrong value! Expected='{test_value}', got='{read_back.value}'"
+                )
+            else:
+                message = f"<p class='error'>Test FAILED: Failed read (ns='{test_ns}', key='{test_key}')</p>"
+                _LOGGER.error(f"Text value test FAILED: Failed to read back key='{test_key}' in ns='{test_ns}'")
+
+    except Exception as e:
+        message = f"<p class='error'>Test FAILED: Exception occurred - {e!s}</p>"
+        _LOGGER.exception("Text value test exception")
+
+    return f"""<!DOCTYPE html>
+<html>
+<head><title>Text value test result</title></head>
+<style>
+.error {{ color: red; }}
+.success {{ color: green; }}
+</style>
+<body>
+<h1>Text value test result</h1>
+{message}
+</body>
+</html>
+"""
 
 
 @admin.BLUEPRINT.route("/releases")

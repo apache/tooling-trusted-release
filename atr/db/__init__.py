@@ -464,6 +464,23 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
         return Query(self, query)
 
+    def text_value(
+        self,
+        ns: Opt[str] = NotSet,
+        key: Opt[str] = NotSet,
+        value: Opt[str] = NotSet,
+    ) -> Query[models.TextValue]:
+        query = sqlmodel.select(models.TextValue)
+
+        if is_defined(ns):
+            query = query.where(models.TextValue.ns == ns)
+        if is_defined(key):
+            query = query.where(models.TextValue.key == key)
+        if is_defined(value):
+            query = query.where(models.TextValue.value == value)
+
+        return Query(self, query)
+
 
 def init_database(app: base.QuartApp) -> None:
     """
