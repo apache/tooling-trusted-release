@@ -428,10 +428,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Task.error == error)
         if is_defined(release_name):
             query = query.where(models.Task.release_name == release_name)
-        if is_defined(path):
-            query = query.where(models.Task.path == path)
-        if is_defined(modified):
-            query = query.where(models.Task.modified == modified)
 
         if _release:
             query = query.options(select_in_load(models.Task.release))
@@ -550,23 +546,23 @@ async def create_async_engine(app_config: type[config.AppConfig]) -> sqlalchemy.
     return engine
 
 
-async def recent_tasks(data: Session, release_name: str, file_path: str, modified: int) -> dict[str, models.Task]:
-    """Get the most recent task for each task type for a specific file."""
-    tasks = await data.task(
-        release_name=release_name,
-        path=str(file_path),
-        modified=modified,
-    ).all()
-
-    # Group by task_type and keep the most recent one
-    # We use the highest id to determine the most recent task
-    recent_tasks: dict[str, models.Task] = {}
-    for task in tasks:
-        # If we haven't seen this task type before or if this task is newer
-        if (task.task_type.value not in recent_tasks) or (task.id > recent_tasks[task.task_type.value].id):
-            recent_tasks[task.task_type.value] = task
-
-    return recent_tasks
+# async def recent_tasks(data: Session, release_name: str, file_path: str, modified: int) -> dict[str, models.Task]:
+#     """Get the most recent task for each task type for a specific file."""
+#     tasks = await data.task(
+#         release_name=release_name,
+#         path=str(file_path),
+#         modified=modified,
+#     ).all()
+#
+#     # Group by task_type and keep the most recent one
+#     # We use the highest id to determine the most recent task
+#     recent_tasks: dict[str, models.Task] = {}
+#     for task in tasks:
+#         # If we haven't seen this task type before or if this task is newer
+#         if (task.task_type.value not in recent_tasks) or (task.id > recent_tasks[task.task_type.value].id):
+#             recent_tasks[task.task_type.value] = task
+#
+#     return recent_tasks
 
 
 def select_in_load(*entities: Any) -> orm.strategy_options._AbstractLoad:

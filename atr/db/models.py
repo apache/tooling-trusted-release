@@ -327,8 +327,6 @@ class Task(sqlmodel.SQLModel, table=True):
     error: str | None = None
     release_name: str | None = sqlmodel.Field(default=None, foreign_key="release.name")
     release: Optional["Release"] = sqlmodel.Relationship(back_populates="tasks")
-    path: str | None = sqlmodel.Field(default=None)
-    modified: int | None = sqlmodel.Field(default=None)
 
     # Create an index on status and added for efficient task claiming
     __table_args__ = (
