@@ -26,7 +26,7 @@ from typing import Any, Final
 import pydantic
 
 import atr.tasks.checks as checks
-import atr.tasks.checks.archive as archive
+import atr.tasks.checks.targz as targz
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -298,7 +298,7 @@ def _files_check_core_logic(artifact_path: str) -> dict[str, Any]:
 
     # First find and validate the root directory
     try:
-        root_dir = archive.root_directory(artifact_path)
+        root_dir = targz.root_directory(artifact_path)
     except ValueError as e:
         return {
             "files_checked": ["LICENSE", "NOTICE"],
@@ -404,7 +404,7 @@ def _headers_check_core_logic(artifact_path: str) -> dict[str, Any]:
 
     # First find and validate the root directory
     try:
-        root_dir = archive.root_directory(artifact_path)
+        root_dir = targz.root_directory(artifact_path)
     except ValueError as e:
         return {
             "files_checked": 0,

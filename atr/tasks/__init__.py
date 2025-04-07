@@ -24,12 +24,12 @@ import aiofiles.os
 import atr.db as db
 import atr.db.models as models
 import atr.tasks.checks as checks
-import atr.tasks.checks.archive as archive
 import atr.tasks.checks.hashing as hashing
 import atr.tasks.checks.license as license
 import atr.tasks.checks.paths as paths
 import atr.tasks.checks.rat as rat
 import atr.tasks.checks.signature as signature
+import atr.tasks.checks.targz as targz
 import atr.tasks.checks.zipformat as zipformat
 import atr.tasks.rsync as rsync
 import atr.tasks.sbom as sbom
@@ -101,10 +101,6 @@ async def draft_checks(project_name: str, release_version: str, caller_data: db.
 
 def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:  # noqa: C901
     match task_type:
-        case models.TaskType.ARCHIVE_INTEGRITY:
-            return archive.integrity
-        case models.TaskType.ARCHIVE_STRUCTURE:
-            return archive.structure
         case models.TaskType.HASHING_CHECK:
             return hashing.check
         case models.TaskType.LICENSE_FILES:
@@ -121,6 +117,10 @@ def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:
             return sbom.generate_cyclonedx
         case models.TaskType.SIGNATURE_CHECK:
             return signature.check
+        case models.TaskType.TARGZ_INTEGRITY:
+            return targz.integrity
+        case models.TaskType.TARGZ_STRUCTURE:
+            return targz.structure
         case models.TaskType.VOTE_INITIATE:
             return vote.initiate
         case models.TaskType.ZIPFORMAT_INTEGRITY:
@@ -179,22 +179,6 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
     tasks = [
         models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type=models.TaskType.ARCHIVE_INTEGRITY,
-            task_args=archive.Integrity(release_name=release.name, abs_path=full_path).model_dump(),
-            release_name=release.name,
-            path=path,
-            modified=modified,
-        ),
-        models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type=models.TaskType.ARCHIVE_STRUCTURE,
-            task_args=archive.Structure(release_name=release.name, abs_path=full_path).model_dump(),
-            release_name=release.name,
-            path=path,
-            modified=modified,
-        ),
-        models.Task(
-            status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.LICENSE_FILES,
             task_args=license.Files(release_name=release.name, abs_path=full_path).model_dump(),
             release_name=release.name,
@@ -213,6 +197,22 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
             status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.RAT_CHECK,
             task_args=rat.Check(release_name=release.name, abs_path=full_path).model_dump(),
+            release_name=release.name,
+            path=path,
+            modified=modified,
+        ),
+        models.Task(
+            status=models.TaskStatus.QUEUED,
+            task_type=models.TaskType.TARGZ_INTEGRITY,
+            task_args=targz.Integrity(release_name=release.name, abs_path=full_path).model_dump(),
+            release_name=release.name,
+            path=path,
+            modified=modified,
+        ),
+        models.Task(
+            status=models.TaskStatus.QUEUED,
+            task_type=models.TaskType.TARGZ_STRUCTURE,
+            task_args=checks.ReleaseAndAbsPath(release_name=release.name, abs_path=full_path).model_dump(),
             release_name=release.name,
             path=path,
             modified=modified,

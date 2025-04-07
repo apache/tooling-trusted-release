@@ -286,8 +286,6 @@ class TaskStatus(str, enum.Enum):
 
 
 class TaskType(str, enum.Enum):
-    ARCHIVE_INTEGRITY = "archive_integrity"
-    ARCHIVE_STRUCTURE = "archive_structure"
     HASHING_CHECK = "hashing_check"
     LICENSE_FILES = "license_files"
     LICENSE_HEADERS = "license_headers"
@@ -296,6 +294,8 @@ class TaskType(str, enum.Enum):
     RSYNC_ANALYSE = "rsync_analyse"
     SBOM_GENERATE_CYCLONEDX = "sbom_generate_cyclonedx"
     SIGNATURE_CHECK = "signature_check"
+    TARGZ_INTEGRITY = "targz_integrity"
+    TARGZ_STRUCTURE = "targz_structure"
     VOTE_INITIATE = "vote_initiate"
     ZIPFORMAT_INTEGRITY = "zipformat_integrity"
     ZIPFORMAT_LICENSE_FILES = "zipformat_license_files"

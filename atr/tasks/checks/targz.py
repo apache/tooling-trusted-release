@@ -50,15 +50,8 @@ async def integrity(args: Integrity) -> str | None:
     return None
 
 
-class Structure(pydantic.BaseModel):
-    """Parameters for archive structure checking."""
-
-    release_name: str = pydantic.Field(..., description="Release name")
-    abs_path: str = pydantic.Field(..., description="Absolute path to the .tar.gz file to check")
-
-
-@checks.with_model(Structure)
-async def structure(args: Structure) -> str | None:
+@checks.with_model(checks.ReleaseAndAbsPath)
+async def structure(args: checks.ReleaseAndAbsPath) -> str | None:
     """Check the structure of a .tar.gz file."""
     rel_path = checks.rel_path(args.abs_path)
     check = await checks.Check.create(checker=structure, release_name=args.release_name, path=rel_path)

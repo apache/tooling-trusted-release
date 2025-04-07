@@ -27,7 +27,7 @@ import pydantic
 
 import atr.config as config
 import atr.tasks.checks as checks
-import atr.tasks.checks.archive as archive
+import atr.tasks.checks.targz as targz
 import atr.tasks.sbom as sbom
 
 _CONFIG: Final = config.get()
@@ -157,7 +157,7 @@ def _check_core_logic(
 
             # Find and validate the root directory
             try:
-                root_dir = archive.root_directory(artifact_path)
+                root_dir = targz.root_directory(artifact_path)
             except ValueError as e:
                 error_msg = str(e)
                 _LOGGER.error(f"Archive root directory issue: {error_msg}")

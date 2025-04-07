@@ -27,7 +27,7 @@ import pydantic
 
 import atr.config as config
 import atr.tasks.checks as checks
-import atr.tasks.checks.archive as archive
+import atr.tasks.checks.targz as targz
 import atr.util as util
 
 _CONFIG: Final = config.get()
@@ -164,7 +164,7 @@ async def _generate_cyclonedx_core(artifact_path: str, output_path: str) -> dict
 
         # Find and validate the root directory
         try:
-            root_dir = await asyncio.to_thread(archive.root_directory, artifact_path)
+            root_dir = await asyncio.to_thread(targz.root_directory, artifact_path)
         except ValueError as e:
             raise SBOMGenerationError(f"Archive root directory issue: {e}", {"artifact_path": artifact_path}) from e
         except Exception as e:
