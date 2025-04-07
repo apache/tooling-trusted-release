@@ -20,9 +20,11 @@ import binascii
 import contextlib
 import dataclasses
 import hashlib
+import logging
 import pathlib
 import shutil
 import tempfile
+import uuid
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from typing import Annotated, Any, TypeVar
 
@@ -40,6 +42,8 @@ import atr.db.models as models
 
 F = TypeVar("F", bound="QuartFormTyped")
 T = TypeVar("T")
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def get_asf_id_or_die() -> str:
@@ -143,6 +147,34 @@ async def content_list(phase_subdir: pathlib.Path, project_name: str, version_na
         )
 
 
+async def create_hard_link_clone(source_dir: pathlib.Path, dest_dir: pathlib.Path) -> None:
+    """Recursively create a clone of source_dir in dest_dir using hard links for files."""
+    # Ensure source exists and is a directory
+    if not await aiofiles.os.path.isdir(source_dir):
+        raise ValueError(f"Source path is not a directory or does not exist: {source_dir}")
+
+    # Create destination directory
+    await aiofiles.os.makedirs(dest_dir, exist_ok=False)
+
+    async def _clone_recursive(current_source: pathlib.Path, current_dest: pathlib.Path) -> None:
+        for entry in await aiofiles.os.scandir(current_source):
+            source_entry_path = current_source / entry.name
+            dest_entry_path = current_dest / entry.name
+
+            try:
+                if entry.is_dir():
+                    await aiofiles.os.makedirs(dest_entry_path, exist_ok=True)
+                    await _clone_recursive(source_entry_path, dest_entry_path)
+                elif entry.is_file():
+                    await aiofiles.os.link(source_entry_path, dest_entry_path)
+                # Ignore other types like symlinks for now
+            except OSError as e:
+                _LOGGER.error(f"Error cloning {source_entry_path} to {dest_entry_path}: {e}")
+                raise
+
+    await _clone_recursive(source_dir, dest_dir)
+
+
 async def file_sha3(path: str) -> str:
     """Compute SHA3-256 hash of a file."""
     sha3 = hashlib.sha3_256()
@@ -236,6 +268,32 @@ def unwrap(value: T | None, error_message: str = "unexpected None when unwrappin
         raise ValueError(error_message)
     else:
         return value
+
+
+async def update_atomic_symlink(link_path: pathlib.Path, target_path: pathlib.Path | str) -> None:
+    """Atomically update or create a symbolic link at link_path pointing to target_path."""
+    target_str = str(target_path)
+
+    # Generate a temporary path name for the new link
+    link_dir = link_path.parent
+    temp_link_path = link_dir / f".{link_path.name}.{uuid.uuid4()}.tmp"
+
+    try:
+        await aiofiles.os.symlink(target_str, temp_link_path)
+        # Atomically rename the temporary link to the final link path
+        # This overwrites link_path if it exists
+        await aiofiles.os.rename(temp_link_path, link_path)
+        _LOGGER.info(f"Atomically updated symlink {link_path} -> {target_str}")
+    except Exception as e:
+        # Don't bother with _LOGGER.exception here
+        _LOGGER.error(f"Failed to update atomic symlink {link_path} -> {target_str}: {e}")
+        # Clean up temporary link if rename failed
+        try:
+            await aiofiles.os.remove(temp_link_path)
+        except FileNotFoundError:
+            # TODO: Use with contextlib.suppress(FileNotFoundError) for these sorts of blocks?
+            pass
+        raise
 
 
 def user_releases(asf_uid: str, releases: Sequence[models.Release]) -> list[models.Release]:
