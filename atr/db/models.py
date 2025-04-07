@@ -294,9 +294,13 @@ class TaskType(str, enum.Enum):
     PATHS_CHECK = "paths_check"
     RAT_CHECK = "rat_check"
     RSYNC_ANALYSE = "rsync_analyse"
+    SBOM_GENERATE_CYCLONEDX = "sbom_generate_cyclonedx"
     SIGNATURE_CHECK = "signature_check"
     VOTE_INITIATE = "vote_initiate"
-    SBOM_GENERATE_CYCLONEDX = "sbom_generate_cyclonedx"
+    ZIPFORMAT_INTEGRITY = "zipformat_integrity"
+    ZIPFORMAT_LICENSE_FILES = "zipformat_license_files"
+    ZIPFORMAT_LICENSE_HEADERS = "zipformat_license_headers"
+    ZIPFORMAT_STRUCTURE = "zipformat_structure"
 
 
 class Task(sqlmodel.SQLModel, table=True):

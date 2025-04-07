@@ -153,3 +153,8 @@ def with_model(model_class: type[T]) -> Callable[[Callable[..., Awaitable[R]]], 
         return wrapper
 
     return decorator
+
+
+class ReleaseAndAbsPath(pydantic.BaseModel):
+    release_name: str = pydantic.Field(..., description="Release name")
+    abs_path: str = pydantic.Field(..., description="Absolute path to the file to check")

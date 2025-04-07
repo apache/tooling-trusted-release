@@ -23,12 +23,14 @@ import aiofiles.os
 
 import atr.db as db
 import atr.db.models as models
+import atr.tasks.checks as checks
 import atr.tasks.checks.archive as archive
 import atr.tasks.checks.hashing as hashing
 import atr.tasks.checks.license as license
 import atr.tasks.checks.paths as paths
 import atr.tasks.checks.rat as rat
 import atr.tasks.checks.signature as signature
+import atr.tasks.checks.zipformat as zipformat
 import atr.tasks.rsync as rsync
 import atr.tasks.sbom as sbom
 import atr.tasks.vote as vote
@@ -115,12 +117,20 @@ def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:
             return rat.check
         case models.TaskType.RSYNC_ANALYSE:
             return rsync.analyse
+        case models.TaskType.SBOM_GENERATE_CYCLONEDX:
+            return sbom.generate_cyclonedx
         case models.TaskType.SIGNATURE_CHECK:
             return signature.check
         case models.TaskType.VOTE_INITIATE:
             return vote.initiate
-        case models.TaskType.SBOM_GENERATE_CYCLONEDX:
-            return sbom.generate_cyclonedx
+        case models.TaskType.ZIPFORMAT_INTEGRITY:
+            return zipformat.integrity
+        case models.TaskType.ZIPFORMAT_STRUCTURE:
+            return zipformat.structure
+        case models.TaskType.ZIPFORMAT_LICENSE_FILES:
+            return zipformat.license_files
+        case models.TaskType.ZIPFORMAT_LICENSE_HEADERS:
+            return zipformat.license_headers
         # NOTE: Do NOT add "case _" here
         # Otherwise we lose exhaustiveness checking
 
@@ -212,10 +222,53 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
     return tasks
 
 
+async def zip_checks(release: models.Release, path: str) -> list[models.Task]:
+    """Create check tasks for a .zip file."""
+    full_path = str(util.get_release_candidate_draft_dir() / release.project.name / release.version / path)
+    modified = int(await aiofiles.os.path.getmtime(full_path))
+
+    tasks = [
+        models.Task(
+            status=models.TaskStatus.QUEUED,
+            task_type=models.TaskType.ZIPFORMAT_INTEGRITY,
+            task_args=checks.ReleaseAndAbsPath(release_name=release.name, abs_path=full_path).model_dump(),
+            release_name=release.name,
+            path=path,
+            modified=modified,
+        ),
+        models.Task(
+            status=models.TaskStatus.QUEUED,
+            task_type=models.TaskType.ZIPFORMAT_LICENSE_FILES,
+            task_args=checks.ReleaseAndAbsPath(release_name=release.name, abs_path=full_path).model_dump(),
+            release_name=release.name,
+            path=path,
+            modified=modified,
+        ),
+        models.Task(
+            status=models.TaskStatus.QUEUED,
+            task_type=models.TaskType.ZIPFORMAT_LICENSE_HEADERS,
+            task_args=checks.ReleaseAndAbsPath(release_name=release.name, abs_path=full_path).model_dump(),
+            release_name=release.name,
+            path=path,
+            modified=modified,
+        ),
+        models.Task(
+            status=models.TaskStatus.QUEUED,
+            task_type=models.TaskType.ZIPFORMAT_STRUCTURE,
+            task_args=checks.ReleaseAndAbsPath(release_name=release.name, abs_path=full_path).model_dump(),
+            release_name=release.name,
+            path=path,
+            modified=modified,
+        ),
+    ]
+    return tasks
+
+
 TASK_FUNCTIONS: Final[dict[str, Callable[..., Coroutine[Any, Any, list[models.Task]]]]] = {
     ".asc": asc_checks,
     ".sha256": sha_checks,
     ".sha512": sha_checks,
     ".tar.gz": tar_gz_checks,
     ".tgz": tar_gz_checks,
+    ".zip": zip_checks,
 }

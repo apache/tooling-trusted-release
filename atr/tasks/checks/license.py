@@ -30,9 +30,30 @@ import atr.tasks.checks.archive as archive
 
 _LOGGER = logging.getLogger(__name__)
 
+
+# Constant that must be present in the Apache License header
+APACHE_LICENSE_HEADER: Final[bytes] = b"""\
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License."""
+
+
 # File type comment style definitions
 # Ordered by their popularity in the Stack Overflow Developer Survey 2024
-_COMMENT_STYLES: Final[dict[str, dict[str, str]]] = {
+COMMENT_STYLES: Final[dict[str, dict[str, str]]] = {
     # JavaScript and variants
     "js": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
     "mjs": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
@@ -121,7 +142,7 @@ _COMMENT_STYLES: Final[dict[str, dict[str, str]]] = {
 
 # Patterns for files to include in license header checks
 # Ordered by their popularity in the Stack Overflow Developer Survey 2024
-_INCLUDED_PATTERNS: Final[list[str]] = [
+INCLUDED_PATTERNS: Final[list[str]] = [
     r"\.(js|mjs|cjs|jsx)$",  # JavaScript
     r"\.py$",  # Python
     r"\.(sql|ddl|dml)$",  # SQL
@@ -149,25 +170,6 @@ _INCLUDED_PATTERNS: Final[list[str]] = [
     r"\.(scala|sc)$",  # Scala
     r"\.(pl|pm|t)$",  # Perl
 ]
-
-# Constant that must be present in the Apache License header
-_APACHE_LICENSE_HEADER: Final[bytes] = b"""\
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License."""
 
 # Tasks
 
@@ -234,6 +236,54 @@ async def headers(args: Headers) -> str | None:
         await check_instance.exception("Error checking license headers", {"error": str(e)})
 
     return None
+
+
+def strip_comments(content: bytes, file_ext: str) -> bytes:
+    """Strip comment prefixes from the content based on the file extension."""
+    if file_ext not in COMMENT_STYLES:
+        return content
+
+    comment_style = COMMENT_STYLES[file_ext]
+    lines = content.split(b"\n")
+    cleaned_lines = []
+
+    # Get comment markers as bytes
+    multi_start = comment_style.get("multi_start", "").encode()
+    multi_end = comment_style.get("multi_end", "").encode()
+    single = comment_style.get("single", "").encode()
+
+    # State tracking
+    in_multiline = False
+    is_c_style = (multi_start == b"/*") and (multi_end == b"*/")
+
+    for line in lines:
+        line = line.strip()
+
+        # Handle start of multi-line comment
+        if not in_multiline and multi_start and multi_start in line:
+            # Get content after multi-start
+            line = line[line.find(multi_start) + len(multi_start) :].strip()
+            in_multiline = True
+
+        # Handle end of multi-line comment
+        elif in_multiline and multi_end and multi_end in line:
+            # Get content before multi-end
+            line = line[: line.find(multi_end)].strip()
+            in_multiline = False
+
+        # Handle single-line comments
+        elif not in_multiline and single and line.startswith(single):
+            line = line[len(single) :].strip()
+
+        # For C style comments, strip leading asterisk if present
+        elif is_c_style and in_multiline and line.startswith(b"*"):
+            line = line[1:].strip()
+
+        # Only add non-empty lines
+        if line:
+            cleaned_lines.append(line)
+
+    return b"\n".join(cleaned_lines)
 
 
 # File helpers
@@ -425,7 +475,7 @@ def _headers_check_core_logic_process_file(
 
         # Allow for some extra content at the start of the file
         # That may be shebangs, encoding declarations, etc.
-        content = f.read(len(_APACHE_LICENSE_HEADER) + 512)
+        content = f.read(len(APACHE_LICENSE_HEADER) + 512)
         is_valid, error = _headers_validate(content, member.name)
         if is_valid:
             return True, {"valid": True}
@@ -442,11 +492,11 @@ def _headers_check_core_logic_should_check(filepath: str) -> bool:
         return False
 
     # First check if we have comment style definitions for this extension
-    if ext not in _COMMENT_STYLES:
+    if ext not in COMMENT_STYLES:
         return False
 
     # Then check if the file matches any of our included patterns
-    for pattern in _INCLUDED_PATTERNS:
+    for pattern in INCLUDED_PATTERNS:
         if re.search(pattern, filepath, re.IGNORECASE):
             return True
 
@@ -461,66 +511,18 @@ def _get_file_extension(filename: str) -> str | None:
     return ext[1:].lower()
 
 
-def _strip_comments(content: bytes, file_ext: str) -> bytes:
-    """Strip comment prefixes from the content based on the file extension."""
-    if file_ext not in _COMMENT_STYLES:
-        return content
-
-    comment_style = _COMMENT_STYLES[file_ext]
-    lines = content.split(b"\n")
-    cleaned_lines = []
-
-    # Get comment markers as bytes
-    multi_start = comment_style.get("multi_start", "").encode()
-    multi_end = comment_style.get("multi_end", "").encode()
-    single = comment_style.get("single", "").encode()
-
-    # State tracking
-    in_multiline = False
-    is_c_style = (multi_start == b"/*") and (multi_end == b"*/")
-
-    for line in lines:
-        line = line.strip()
-
-        # Handle start of multi-line comment
-        if not in_multiline and multi_start and multi_start in line:
-            # Get content after multi-start
-            line = line[line.find(multi_start) + len(multi_start) :].strip()
-            in_multiline = True
-
-        # Handle end of multi-line comment
-        elif in_multiline and multi_end and multi_end in line:
-            # Get content before multi-end
-            line = line[: line.find(multi_end)].strip()
-            in_multiline = False
-
-        # Handle single-line comments
-        elif not in_multiline and single and line.startswith(single):
-            line = line[len(single) :].strip()
-
-        # For C style comments, strip leading asterisk if present
-        elif is_c_style and in_multiline and line.startswith(b"*"):
-            line = line[1:].strip()
-
-        # Only add non-empty lines
-        if line:
-            cleaned_lines.append(line)
-
-    return b"\n".join(cleaned_lines)
-
-
 def _headers_validate(content: bytes, filename: str) -> tuple[bool, str | None]:
     """Validate that the content contains the Apache License header after removing comments."""
     # Get the file extension from the filename
     file_ext = _get_file_extension(filename)
-    if not file_ext or file_ext not in _COMMENT_STYLES:
+    if not file_ext or file_ext not in COMMENT_STYLES:
         return False, "Could not determine file type from extension"
 
     # Strip comments, removing empty lines in the process
-    cleaned_header = _strip_comments(content, file_ext)
+    cleaned_header = strip_comments(content, file_ext)
 
     # Normalise the expected header in the same way as directly above
-    expected_lines = [line.strip() for line in _APACHE_LICENSE_HEADER.split(b"\n")]
+    expected_lines = [line.strip() for line in APACHE_LICENSE_HEADER.split(b"\n")]
     expected_lines = [line for line in expected_lines if line]
     expected_header = b"\n".join(expected_lines)
 
