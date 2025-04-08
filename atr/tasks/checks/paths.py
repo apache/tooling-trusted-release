@@ -34,7 +34,6 @@ class Check(pydantic.BaseModel):
     """Arguments for the path structure and naming convention check."""
 
     release_name: str = pydantic.Field(..., description="Name of the release being checked")
-    base_release_dir: str = pydantic.Field(..., description="Absolute path to the base directory of the release draft")
 
 
 async def _check_artifact_rules(
@@ -139,12 +138,12 @@ async def _check_path_process_single(
     # Must aggregate errors and aggregate warnings otherwise they will be removed by afresh=True
     # Alternatively we could call Check.clear() manually
     if errors:
-        await check_errors.failure("; ".join(errors), {"errors": errors}, path=relative_path_str)
+        await check_errors.failure("; ".join(errors), {"errors": errors}, primary_rel_path=relative_path_str)
     if warnings:
-        await check_warnings.warning("; ".join(warnings), {"warnings": warnings}, path=relative_path_str)
+        await check_warnings.warning("; ".join(warnings), {"warnings": warnings}, primary_rel_path=relative_path_str)
     if not (errors or warnings):
         await check_success.success(
-            "Path structure and naming conventions conform to policy", {}, path=relative_path_str
+            "Path structure and naming conventions conform to policy", {}, primary_rel_path=relative_path_str
         )
 
 
@@ -154,22 +153,36 @@ async def check(args: Check) -> None:
     # We refer to the following authoritative policies:
     # - Release Creation Process (RCP)
     # - Release Distribution Policy (RDP)
-    base_path = pathlib.Path(args.base_release_dir)
+
+    check_errors = await checks.Check.create(
+        checker=checks.function_key(check) + "_errors",
+        release_name=args.release_name,
+        primary_rel_path=None,
+        afresh=True,
+    )
+    check_warnings = await checks.Check.create(
+        checker=checks.function_key(check) + "_warnings",
+        release_name=args.release_name,
+        primary_rel_path=None,
+        afresh=True,
+    )
+    check_success = await checks.Check.create(
+        checker=checks.function_key(check) + "_success",
+        release_name=args.release_name,
+        primary_rel_path=None,
+        afresh=True,
+    )
+
+    # As primary_rel_path is None, the base path is the release candidate draft directory
+    if not (base_path := await check_success.abs_path()):
+        return
 
     if not await aiofiles.os.path.isdir(base_path):
         _LOGGER.error("Base release directory does not exist or is not a directory: %s", base_path)
         return
 
-    check_errors = await checks.Check.create(
-        checker=checks.function_key(check) + "_errors", release_name=args.release_name, path=None, afresh=True
-    )
-    check_warnings = await checks.Check.create(
-        checker=checks.function_key(check) + "_warnings", release_name=args.release_name, path=None, afresh=True
-    )
-    check_success = await checks.Check.create(
-        checker=checks.function_key(check) + "_success", release_name=args.release_name, path=None, afresh=True
-    )
     relative_paths = await util.paths_recursive(base_path)
+    relative_paths_set = set(str(p) for p in relative_paths)
     for relative_path in relative_paths:
         # Delegate processing of each path to the helper function
         await _check_path_process_single(
@@ -178,7 +191,7 @@ async def check(args: Check) -> None:
             check_errors,
             check_warnings,
             check_success,
-            set(str(p) for p in relative_paths),
+            relative_paths_set,
         )
 
     return None

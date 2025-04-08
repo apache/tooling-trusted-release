@@ -36,10 +36,8 @@ import atr.util as util
 
 
 async def asc_checks(release: models.Release, signature_path: str) -> list[models.Task]:
+    """Create signature check task for a .asc file."""
     tasks = []
-
-    draft_dir = util.get_release_candidate_draft_dir() / release.project.name / release.version
-    full_signature_path = str(draft_dir / signature_path)
 
     if release.committee:
         tasks.append(
@@ -49,7 +47,7 @@ async def asc_checks(release: models.Release, signature_path: str) -> list[model
                 task_args=signature.Check(
                     release_name=release.name,
                     committee_name=release.committee.name,
-                    abs_signature_path=full_signature_path,
+                    signature_rel_path=signature_path,
                 ).model_dump(),
                 release_name=release.name,
             ),
@@ -61,32 +59,31 @@ async def asc_checks(release: models.Release, signature_path: str) -> list[model
 async def draft_checks(project_name: str, release_version: str, caller_data: db.Session | None = None) -> int:
     """Core logic to analyse an rsync upload and queue checks."""
     base_path = util.get_release_candidate_draft_dir() / project_name / release_version
-    paths_recursive = await util.paths_recursive(base_path)
+    relative_paths = await util.paths_recursive(base_path)
 
     session_context = db.session() if (caller_data is None) else contextlib.nullcontext(caller_data)
     async with session_context as data:
         release = await data.release(name=models.release_name(project_name, release_version), _committee=True).demand(
             RuntimeError("Release not found")
         )
-        for path in paths_recursive:
-            for task_type, task_function in TASK_FUNCTIONS.items():
-                if path.name.endswith(task_type):
-                    for task in await task_function(release, str(path)):
+        for path in relative_paths:
+            path_str = str(path)
+            for suffix, task_function in TASK_FUNCTIONS.items():
+                if path.name.endswith(suffix):
+                    for task in await task_function(release, path_str):
                         data.add(task)
 
         path_check_task = models.Task(
             status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.PATHS_CHECK,
-            task_args=paths.Check(
-                release_name=release.name,
-                base_release_dir=str(base_path),
-            ).model_dump(),
+            task_args=paths.Check(release_name=release.name).model_dump(),
+            release_name=release.name,
         )
         data.add(path_check_task)
         if caller_data is None:
             await data.commit()
 
-    return len(paths_recursive)
+    return len(relative_paths)
 
 
 def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:  # noqa: C901
@@ -126,29 +123,16 @@ def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:
 
 
 async def sha_checks(release: models.Release, hash_file: str) -> list[models.Task]:
+    """Create hash check task for a .sha256 or .sha512 file."""
     tasks = []
-
-    full_hash_file_path = str(
-        util.get_release_candidate_draft_dir() / release.project.name / release.version / hash_file
-    )
-    algorithm = "sha512"
-    if hash_file.endswith(".sha512"):
-        original_file = full_hash_file_path.removesuffix(".sha512")
-    elif hash_file.endswith(".sha256"):
-        original_file = full_hash_file_path.removesuffix(".sha256")
-        algorithm = "sha256"
-    else:
-        raise RuntimeError(f"Unsupported hash file: {hash_file}")
 
     tasks.append(
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.HASHING_CHECK,
-            task_args=hashing.Check(
+            task_args=checks.ReleaseAndRelPath(
                 release_name=release.name,
-                abs_path=original_file,
-                abs_hash_file=full_hash_file_path,
-                algorithm=algorithm,
+                primary_rel_path=hash_file,
             ).model_dump(),
             release_name=release.name,
         ),
@@ -158,39 +142,36 @@ async def sha_checks(release: models.Release, hash_file: str) -> list[models.Tas
 
 
 async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]:
-    # TODO: We should probably use an enum for task_type
-    full_path = str(util.get_release_candidate_draft_dir() / release.project.name / release.version / path)
-    # filename = os.path.basename(path)
-
+    """Create check tasks for a .tar.gz or .tgz file."""
     tasks = [
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.LICENSE_FILES,
-            task_args=license.Files(release_name=release.name, abs_path=full_path).model_dump(),
+            task_args=checks.ReleaseAndRelPath(release_name=release.name, primary_rel_path=path).model_dump(),
             release_name=release.name,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.LICENSE_HEADERS,
-            task_args=license.Headers(release_name=release.name, abs_path=full_path).model_dump(),
+            task_args=checks.ReleaseAndRelPath(release_name=release.name, primary_rel_path=path).model_dump(),
             release_name=release.name,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.RAT_CHECK,
-            task_args=rat.Check(release_name=release.name, abs_path=full_path).model_dump(),
+            task_args=rat.Check(release_name=release.name, primary_rel_path=path).model_dump(),
             release_name=release.name,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.TARGZ_INTEGRITY,
-            task_args=targz.Integrity(release_name=release.name, abs_path=full_path).model_dump(),
+            task_args=targz.Integrity(release_name=release.name, primary_rel_path=path).model_dump(),
             release_name=release.name,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.TARGZ_STRUCTURE,
-            task_args=checks.ReleaseAndAbsPath(release_name=release.name, abs_path=full_path).model_dump(),
+            task_args=checks.ReleaseAndRelPath(release_name=release.name, primary_rel_path=path).model_dump(),
             release_name=release.name,
         ),
     ]
@@ -200,31 +181,29 @@ async def tar_gz_checks(release: models.Release, path: str) -> list[models.Task]
 
 async def zip_checks(release: models.Release, path: str) -> list[models.Task]:
     """Create check tasks for a .zip file."""
-    full_path = str(util.get_release_candidate_draft_dir() / release.project.name / release.version / path)
-
     tasks = [
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.ZIPFORMAT_INTEGRITY,
-            task_args=checks.ReleaseAndAbsPath(release_name=release.name, abs_path=full_path).model_dump(),
+            task_args=checks.ReleaseAndRelPath(release_name=release.name, primary_rel_path=path).model_dump(),
             release_name=release.name,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.ZIPFORMAT_LICENSE_FILES,
-            task_args=checks.ReleaseAndAbsPath(release_name=release.name, abs_path=full_path).model_dump(),
+            task_args=checks.ReleaseAndRelPath(release_name=release.name, primary_rel_path=path).model_dump(),
             release_name=release.name,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.ZIPFORMAT_LICENSE_HEADERS,
-            task_args=checks.ReleaseAndAbsPath(release_name=release.name, abs_path=full_path).model_dump(),
+            task_args=checks.ReleaseAndRelPath(release_name=release.name, primary_rel_path=path).model_dump(),
             release_name=release.name,
         ),
         models.Task(
             status=models.TaskStatus.QUEUED,
             task_type=models.TaskType.ZIPFORMAT_STRUCTURE,
-            task_args=checks.ReleaseAndAbsPath(release_name=release.name, abs_path=full_path).model_dump(),
+            task_args=checks.ReleaseAndRelPath(release_name=release.name, primary_rel_path=path).model_dump(),
             release_name=release.name,
         ),
     ]

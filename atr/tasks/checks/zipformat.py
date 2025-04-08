@@ -27,41 +27,47 @@ import atr.tasks.checks.license as license
 _LOGGER = logging.getLogger(__name__)
 
 
-@checks.with_model(checks.ReleaseAndAbsPath)
-async def integrity(args: checks.ReleaseAndAbsPath) -> str | None:
+@checks.with_model(checks.ReleaseAndRelPath)
+async def integrity(args: checks.ReleaseAndRelPath) -> str | None:
     """Check that the zip archive is not corrupted and can be opened."""
-    rel_path = checks.rel_path(args.abs_path)
-    check_instance = await checks.Check.create(checker=integrity, release_name=args.release_name, path=rel_path)
-    _LOGGER.info(f"Checking zip integrity for {args.abs_path} (rel: {rel_path})")
+    check = await checks.Check.create(
+        checker=integrity, release_name=args.release_name, primary_rel_path=args.primary_rel_path
+    )
+    if not (artifact_abs_path := await check.abs_path()):
+        return None
+
+    _LOGGER.info(f"Checking zip integrity for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
-        result_data = await asyncio.to_thread(_integrity_check_core_logic, args.abs_path)
+        result_data = await asyncio.to_thread(_integrity_check_core_logic, str(artifact_abs_path))
         if result_data.get("error"):
-            await check_instance.failure(result_data["error"], result_data)
+            await check.failure(result_data["error"], result_data)
         else:
-            await check_instance.success(
-                f"Zip archive integrity OK ({result_data['member_count']} members)", result_data
-            )
+            await check.success(f"Zip archive integrity OK ({result_data['member_count']} members)", result_data)
     except Exception as e:
-        await check_instance.exception("Error checking zip integrity", {"error": str(e)})
+        await check.failure("Error checking zip integrity", {"error": str(e)})
 
     return None
 
 
-@checks.with_model(checks.ReleaseAndAbsPath)
-async def license_files(args: checks.ReleaseAndAbsPath) -> str | None:
+@checks.with_model(checks.ReleaseAndRelPath)
+async def license_files(args: checks.ReleaseAndRelPath) -> str | None:
     """Check that the LICENSE and NOTICE files exist and are valid within the zip."""
-    rel_path = checks.rel_path(args.abs_path)
-    check_instance = await checks.Check.create(checker=license_files, release_name=args.release_name, path=rel_path)
-    _LOGGER.info(f"Checking zip license files for {args.abs_path} (rel: {rel_path})")
+    check = await checks.Check.create(
+        checker=license_files, release_name=args.release_name, primary_rel_path=args.primary_rel_path
+    )
+    if not (artifact_abs_path := await check.abs_path()):
+        return None
+
+    _LOGGER.info(f"Checking zip license files for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
-        result_data = await asyncio.to_thread(_license_files_check_core_logic_zip, args.abs_path)
+        result_data = await asyncio.to_thread(_license_files_check_core_logic_zip, str(artifact_abs_path))
 
         if result_data.get("error"):
-            await check_instance.failure(result_data["error"], result_data)
+            await check.failure(result_data["error"], result_data)
         elif result_data.get("license_valid") and result_data.get("notice_valid"):
-            await check_instance.success("LICENSE and NOTICE files present and valid in zip", result_data)
+            await check.success("LICENSE and NOTICE files present and valid in zip", result_data)
         else:
             issues = []
             if not result_data.get("license_found"):
@@ -73,56 +79,64 @@ async def license_files(args: checks.ReleaseAndAbsPath) -> str | None:
             elif not result_data.get("notice_valid"):
                 issues.append("NOTICE invalid or empty")
             issue_str = ", ".join(issues) if issues else "Issues found with LICENSE or NOTICE files"
-            await check_instance.failure(issue_str, result_data)
+            await check.failure(issue_str, result_data)
 
     except Exception as e:
-        await check_instance.exception("Error checking zip license files", {"error": str(e)})
+        await check.failure("Error checking zip license files", {"error": str(e)})
 
     return None
 
 
-@checks.with_model(checks.ReleaseAndAbsPath)
-async def license_headers(args: checks.ReleaseAndAbsPath) -> str | None:
+@checks.with_model(checks.ReleaseAndRelPath)
+async def license_headers(args: checks.ReleaseAndRelPath) -> str | None:
     """Check that all source files within the zip have valid license headers."""
-    rel_path = checks.rel_path(args.abs_path)
-    check_instance = await checks.Check.create(checker=license_headers, release_name=args.release_name, path=rel_path)
-    _LOGGER.info(f"Checking zip license headers for {args.abs_path} (rel: {rel_path})")
+    check = await checks.Check.create(
+        checker=license_headers, release_name=args.release_name, primary_rel_path=args.primary_rel_path
+    )
+    if not (artifact_abs_path := await check.abs_path()):
+        return None
+
+    _LOGGER.info(f"Checking zip license headers for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
-        result_data = await asyncio.to_thread(_license_headers_check_core_logic_zip, args.abs_path)
+        result_data = await asyncio.to_thread(_license_headers_check_core_logic_zip, str(artifact_abs_path))
 
         if result_data.get("error_message"):
-            await check_instance.failure(result_data["error_message"], result_data)
+            await check.failure(result_data["error_message"], result_data)
         elif not result_data.get("valid"):
             num_issues = len(result_data.get("files_without_headers", []))
             failure_msg = f"{num_issues} file(s) missing or having invalid license headers"
-            await check_instance.failure(failure_msg, result_data)
+            await check.failure(failure_msg, result_data)
         else:
-            await check_instance.success(
+            await check.success(
                 f"License headers OK ({result_data.get('files_checked', 0)} files checked)", result_data
             )
 
     except Exception as e:
-        await check_instance.exception("Error checking zip license headers", {"error": str(e)})
+        await check.failure("Error checking zip license headers", {"error": str(e)})
 
     return None
 
 
-@checks.with_model(checks.ReleaseAndAbsPath)
-async def structure(args: checks.ReleaseAndAbsPath) -> str | None:
+@checks.with_model(checks.ReleaseAndRelPath)
+async def structure(args: checks.ReleaseAndRelPath) -> str | None:
     """Check that the zip archive has a single root directory matching the artifact name."""
-    rel_path = checks.rel_path(args.abs_path)
-    check_instance = await checks.Check.create(checker=structure, release_name=args.release_name, path=rel_path)
-    _LOGGER.info(f"Checking zip structure for {args.abs_path} (rel: {rel_path})")
+    check = await checks.Check.create(
+        checker=structure, release_name=args.release_name, primary_rel_path=args.primary_rel_path
+    )
+    if not (artifact_abs_path := await check.abs_path()):
+        return None
+
+    _LOGGER.info(f"Checking zip structure for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
-        result_data = await asyncio.to_thread(_structure_check_core_logic, args.abs_path)
+        result_data = await asyncio.to_thread(_structure_check_core_logic, str(artifact_abs_path))
         if result_data.get("error"):
-            await check_instance.failure(result_data["error"], result_data)
+            await check.failure(result_data["error"], result_data)
         else:
-            await check_instance.success(f"Zip structure OK (root: {result_data['root_dir']})", result_data)
+            await check.success(f"Zip structure OK (root: {result_data['root_dir']})", result_data)
     except Exception as e:
-        await check_instance.exception("Error checking zip structure", {"error": str(e)})
+        await check.failure("Error checking zip structure", {"error": str(e)})
 
     return None
 

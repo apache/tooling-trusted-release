@@ -17,7 +17,6 @@
 
 import asyncio
 import logging
-import os.path
 import tarfile
 from typing import Final
 
@@ -32,35 +31,48 @@ class Integrity(pydantic.BaseModel):
     """Parameters for archive integrity checking."""
 
     release_name: str = pydantic.Field(..., description="Release name")
-    abs_path: str = pydantic.Field(..., description="Absolute path to the .tar.gz file to check")
+    primary_rel_path: str = pydantic.Field(..., description="Relative path to the .tar.gz file to check")
     chunk_size: int = pydantic.Field(default=4096, description="Size of chunks to read when checking the file")
 
 
 @checks.with_model(Integrity)
 async def integrity(args: Integrity) -> str | None:
     """Check the integrity of a .tar.gz file."""
-    rel_path = checks.rel_path(args.abs_path)
-    _LOGGER.info(f"ABS, REL: {args.abs_path} {rel_path}")
-    check = await checks.Check.create(checker=integrity, release_name=args.release_name, path=rel_path)
+    check = await checks.Check.create(
+        checker=integrity, release_name=args.release_name, primary_rel_path=args.primary_rel_path
+    )
+    if not (artifact_abs_path := await check.abs_path()):
+        return None
+
+    _LOGGER.info(f"Checking integrity for {artifact_abs_path} (rel: {args.primary_rel_path})")
+
     try:
-        size = await asyncio.to_thread(_integrity_core, args.abs_path, args.chunk_size)
+        size = await asyncio.to_thread(_integrity_core, str(artifact_abs_path), args.chunk_size)
         await check.success("Able to read all entries of the archive using tarfile", {"size": size})
     except Exception as e:
         await check.failure("Unable to read all entries of the archive using tarfile", {"error": str(e)})
     return None
 
 
-@checks.with_model(checks.ReleaseAndAbsPath)
-async def structure(args: checks.ReleaseAndAbsPath) -> str | None:
+@checks.with_model(checks.ReleaseAndRelPath)
+async def structure(args: checks.ReleaseAndRelPath) -> str | None:
     """Check the structure of a .tar.gz file."""
-    rel_path = checks.rel_path(args.abs_path)
-    check = await checks.Check.create(checker=structure, release_name=args.release_name, path=rel_path)
-    filename = os.path.basename(args.abs_path)
-    expected_root: Final[str] = os.path.splitext(os.path.splitext(filename)[0])[0]
-    _LOGGER.info(f"Checking structure for {args.abs_path} (expected root: {expected_root})")
+    check = await checks.Check.create(
+        checker=structure, release_name=args.release_name, primary_rel_path=args.primary_rel_path
+    )
+    if not (artifact_abs_path := await check.abs_path()):
+        return None
+
+    filename = artifact_abs_path.name
+    expected_root: Final[str] = (
+        filename.removesuffix(".tar.gz") if filename.endswith(".tar.gz") else filename.removesuffix(".tgz")
+    )
+    _LOGGER.info(
+        f"Checking structure for {artifact_abs_path} (expected root: {expected_root}) (rel: {args.primary_rel_path})"
+    )
 
     try:
-        root = await asyncio.to_thread(root_directory, args.abs_path)
+        root = await asyncio.to_thread(root_directory, str(artifact_abs_path))
         if root == expected_root:
             await check.success(
                 "Archive contains exactly one root directory matching the expected name",

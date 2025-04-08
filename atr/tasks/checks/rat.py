@@ -48,7 +48,7 @@ class Check(pydantic.BaseModel):
     """Parameters for Apache RAT license checking."""
 
     release_name: str = pydantic.Field(..., description="Release name")
-    abs_path: str = pydantic.Field(..., description="Absolute path to the .tar.gz file to check")
+    primary_rel_path: str = pydantic.Field(..., description="Relative path to the archive file to check")
     rat_jar_path: str = pydantic.Field(
         default=_CONFIG.APACHE_RAT_JAR_PATH, description="Path to the Apache RAT JAR file"
     )
@@ -61,14 +61,18 @@ class Check(pydantic.BaseModel):
 @checks.with_model(Check)
 async def check(args: Check) -> str | None:
     """Use Apache RAT to check the licenses of the files in the artifact."""
-    rel_path = checks.rel_path(args.abs_path)
-    check_instance = await checks.Check.create(checker=check, release_name=args.release_name, path=rel_path)
-    _LOGGER.info(f"Checking RAT licenses for {args.abs_path} (rel: {rel_path})")
+    check_obj = await checks.Check.create(
+        checker=check, release_name=args.release_name, primary_rel_path=args.primary_rel_path
+    )
+    if not (artifact_abs_path := await check_obj.abs_path()):
+        return None
+
+    _LOGGER.info(f"Checking RAT licenses for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
         result_data = await asyncio.to_thread(
             _check_core_logic,
-            artifact_path=args.abs_path,
+            artifact_path=str(artifact_abs_path),
             rat_jar_path=args.rat_jar_path,
             max_extract_size=args.max_extract_size,
             chunk_size=args.chunk_size,
@@ -76,17 +80,17 @@ async def check(args: Check) -> str | None:
 
         if result_data.get("error"):
             # Handle errors from within the core logic
-            await check_instance.failure(result_data["message"], result_data)
+            await check_obj.failure(result_data["message"], result_data)
         elif not result_data["valid"]:
             # Handle RAT validation failures
-            await check_instance.failure(result_data["message"], result_data)
+            await check_obj.failure(result_data["message"], result_data)
         else:
             # Handle success
-            await check_instance.success(result_data["message"], result_data)
+            await check_obj.success(result_data["message"], result_data)
 
     except Exception as e:
         # TODO: Or bubble for task failure?
-        await check_instance.exception("Error running Apache RAT check", {"error": str(e)})
+        await check_obj.failure("Error running Apache RAT check", {"error": str(e)})
 
     return None
 

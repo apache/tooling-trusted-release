@@ -21,63 +21,63 @@ import secrets
 from typing import Final
 
 import aiofiles
-import pydantic
 
 import atr.tasks.checks as checks
 
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-class Check(pydantic.BaseModel):
-    """Parameters for file hash checking."""
-
-    release_name: str = pydantic.Field(..., description="Release name")
-    abs_path: str = pydantic.Field(..., description="Absolute path to the file to check")
-    abs_hash_file: str = pydantic.Field(..., description="Absolute path to the hash file")
-    algorithm: str = pydantic.Field(..., description="Hash algorithm to use")
-
-
-@checks.with_model(Check)
-async def check(args: Check) -> str | None:
+@checks.with_model(checks.ReleaseAndRelPath)
+async def check(args: checks.ReleaseAndRelPath) -> str | None:
     """Check the hash of a file."""
-    # This is probably the best idea for the rel_path
-    # But we might want to use the artifact instead
-    rel_path = checks.rel_path(args.abs_hash_file)
-    check_instance = await checks.Check.create(checker=check, release_name=args.release_name, path=rel_path)
+    check_obj = await checks.Check.create(
+        checker=check, release_name=args.release_name, primary_rel_path=args.primary_rel_path
+    )
 
-    _LOGGER.info(f"Checking hash ({args.algorithm}) for {args.abs_path} against {args.abs_hash_file} (rel: {rel_path})")
-
-    if args.algorithm == "sha256":
-        hash_func = hashlib.sha256
-    elif args.algorithm == "sha512":
-        hash_func = hashlib.sha512
-    else:
-        await check_instance.failure(f"Unsupported hash algorithm: {args.algorithm}", {"algorithm": args.algorithm})
+    if not (hash_abs_path := await check_obj.abs_path()):
         return None
 
+    algorithm = hash_abs_path.suffix.lstrip(".")
+    if algorithm not in {"sha256", "sha512"}:
+        await check_obj.failure("Unsupported hash algorithm", {"algorithm": algorithm})
+        return None
+
+    # Remove the hash file suffix to get the artifact path
+    # This replaces the last suffix, which is what we want
+    # >>> pathlib.Path("a/b/c.d.e.f.g").with_suffix(".x")
+    # PosixPath('a/b/c.d.e.f.x')
+    # >>> pathlib.Path("a/b/c.d.e.f.g").with_suffix("")
+    # PosixPath('a/b/c.d.e.f')
+    artifact_abs_path = hash_abs_path.with_suffix("")
+
+    _LOGGER.info(
+        f"Checking hash ({algorithm}) for {artifact_abs_path} against {hash_abs_path} (rel: {args.primary_rel_path})"
+    )
+
+    hash_func = hashlib.sha256 if algorithm == "sha256" else hashlib.sha512
     hash_obj = hash_func()
     try:
-        async with aiofiles.open(args.abs_path, mode="rb") as f:
+        async with aiofiles.open(artifact_abs_path, mode="rb") as f:
             while chunk := await f.read(4096):
                 hash_obj.update(chunk)
         computed_hash = hash_obj.hexdigest()
 
-        async with aiofiles.open(args.abs_hash_file) as f:
+        async with aiofiles.open(hash_abs_path) as f:
             expected_hash = await f.read()
         # May be in the format "HASH FILENAME\n"
         # TODO: Check the FILENAME part
         expected_hash = expected_hash.strip().split()[0]
 
         if secrets.compare_digest(computed_hash, expected_hash):
-            await check_instance.success(
-                f"Hash ({args.algorithm}) matches expected value",
+            await check_obj.success(
+                f"Hash ({algorithm}) matches expected value",
                 {"computed_hash": computed_hash, "expected_hash": expected_hash},
             )
         else:
-            await check_instance.failure(
-                f"Hash ({args.algorithm}) mismatch",
+            await check_obj.failure(
+                f"Hash ({algorithm}) mismatch",
                 {"computed_hash": computed_hash, "expected_hash": expected_hash},
             )
     except Exception as e:
-        await check_instance.exception("Unable to verify hash", {"error": str(e)})
+        await check_obj.failure("Unable to verify hash", {"error": str(e)})
     return None

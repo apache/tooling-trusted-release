@@ -20,7 +20,6 @@ import logging
 import tempfile
 from typing import Any, Final
 
-import aiofiles.os
 import gnupg
 import pydantic
 import sqlmodel
@@ -28,7 +27,6 @@ import sqlmodel
 import atr.db as db
 import atr.db.models as models
 import atr.tasks.checks as checks
-import atr.util as util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,43 +36,44 @@ class Check(pydantic.BaseModel):
 
     release_name: str = pydantic.Field(..., description="Release name")
     committee_name: str = pydantic.Field(..., description="Name of the committee whose keys should be used")
-    abs_signature_path: str = pydantic.Field(..., description="Absolute path to the signature file (.asc)")
+    signature_rel_path: str = pydantic.Field(..., description="Relative path to the signature file (.asc)")
 
 
 @checks.with_model(Check)
 async def check(args: Check) -> str | None:
     """Check a signature file."""
-    rel_path = checks.rel_path(args.abs_signature_path)
-    check_instance = await checks.Check.create(checker=check, release_name=args.release_name, path=rel_path)
+    check_obj = await checks.Check.create(
+        checker=check, release_name=args.release_name, primary_rel_path=args.signature_rel_path
+    )
 
-    # Get the artifact path
-    artifact_path = args.abs_signature_path.removesuffix(".asc")
-    abs_artifact_path = str(util.get_release_candidate_draft_dir() / artifact_path)
-    if not (await aiofiles.os.path.exists(abs_artifact_path)):
-        await check_instance.failure(f"Artifact {abs_artifact_path} does not exist", {})
+    if not (signature_abs_path := await check_obj.abs_path()):
+        return None
+
+    artifact_rel_path = args.signature_rel_path.removesuffix(".asc")
+    if not (artifact_abs_path := await check_obj.abs_path(artifact_rel_path)):
         return None
 
     _LOGGER.info(
-        f"Checking signature {args.abs_signature_path} for {abs_artifact_path}"
-        f" using {args.committee_name} keys (rel: {rel_path})"
+        f"Checking signature {signature_abs_path} for {artifact_abs_path}"
+        f" using {args.committee_name} keys (rel: {args.signature_rel_path})"
     )
 
     try:
         result_data = await _check_core_logic(
             committee_name=args.committee_name,
-            artifact_path=abs_artifact_path,
-            signature_path=args.abs_signature_path,
+            artifact_path=str(artifact_abs_path),
+            signature_path=str(signature_abs_path),
         )
         if result_data.get("error"):
-            await check_instance.failure(result_data["error"], result_data)
+            await check_obj.failure(result_data["error"], result_data)
         elif result_data.get("verified"):
-            await check_instance.success("Signature verified successfully", result_data)
+            await check_obj.success("Signature verified successfully", result_data)
         else:
             # Shouldn't happen
-            await check_instance.exception("Signature verification failed for unknown reasons", result_data)
+            await check_obj.failure("Signature verification failed for unknown reasons", result_data)
 
     except Exception as e:
-        await check_instance.exception("Error during signature check execution", {"error": str(e)})
+        await check_obj.failure("Error during signature check execution", {"error": str(e)})
 
     return None
 

@@ -23,8 +23,6 @@ import re
 import tarfile
 from typing import Any, Final
 
-import pydantic
-
 import atr.tasks.checks as checks
 import atr.tasks.checks.targz as targz
 
@@ -174,66 +172,62 @@ INCLUDED_PATTERNS: Final[list[str]] = [
 # Tasks
 
 
-class Files(pydantic.BaseModel):
-    """Parameters for LICENSE and NOTICE file checks."""
-
-    release_name: str = pydantic.Field(..., description="Release name")
-    abs_path: str = pydantic.Field(..., description="Absolute path to the .tar.gz file to check")
-
-
-@checks.with_model(Files)
-async def files(args: Files) -> str | None:
+@checks.with_model(checks.ReleaseAndRelPath)
+async def files(args: checks.ReleaseAndRelPath) -> str | None:
     """Check that the LICENSE and NOTICE files exist and are valid."""
-    rel_path = checks.rel_path(args.abs_path)
-    check_instance = await checks.Check.create(checker=files, release_name=args.release_name, path=rel_path)
-    _LOGGER.info(f"Checking license files for {args.abs_path} (rel: {rel_path})")
+    check = await checks.Check.create(
+        checker=files, release_name=args.release_name, primary_rel_path=args.primary_rel_path
+    )
+
+    if not (artifact_abs_path := await check.abs_path()):
+        return None
+
+    _LOGGER.info(f"Checking license files for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
-        result_data = await asyncio.to_thread(_files_check_core_logic, args.abs_path)
+        result_data = await asyncio.to_thread(_files_check_core_logic, str(artifact_abs_path))
 
         if result_data.get("error"):
-            await check_instance.failure(result_data["error"], result_data)
+            await check.failure(result_data["error"], result_data)
         elif result_data["license_valid"] and result_data["notice_valid"]:
-            await check_instance.success("LICENSE and NOTICE files present and valid", result_data)
+            await check.success("LICENSE and NOTICE files present and valid", result_data)
         else:
             # TODO: Be more specific about the issues
-            await check_instance.failure("Issues found with LICENSE or NOTICE files", result_data)
+            await check.failure("Issues found with LICENSE or NOTICE files", result_data)
 
     except Exception as e:
-        await check_instance.failure("Error checking license files", {"error": str(e)})
+        await check.failure("Error checking license files", {"error": str(e)})
 
     return None
 
 
-class Headers(pydantic.BaseModel):
-    """Parameters for license header checks."""
-
-    release_name: str = pydantic.Field(..., description="Release name")
-    abs_path: str = pydantic.Field(..., description="Absolute path to the .tar.gz file to check")
-
-
-@checks.with_model(Headers)
-async def headers(args: Headers) -> str | None:
+@checks.with_model(checks.ReleaseAndRelPath)
+async def headers(args: checks.ReleaseAndRelPath) -> str | None:
     """Check that all source files have valid license headers."""
-    rel_path = checks.rel_path(args.abs_path)
-    check_instance = await checks.Check.create(checker=headers, release_name=args.release_name, path=rel_path)
-    _LOGGER.info(f"Checking license headers for {args.abs_path} (rel: {rel_path})")
+    check = await checks.Check.create(
+        checker=headers, release_name=args.release_name, primary_rel_path=args.primary_rel_path
+    )
+
+    if not (artifact_abs_path := await check.abs_path()):
+        return None
+
+    _LOGGER.info(f"Checking license headers for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
-        result_data = await asyncio.to_thread(_headers_check_core_logic, args.abs_path)
+        result_data = await asyncio.to_thread(_headers_check_core_logic, str(artifact_abs_path))
 
         if result_data.get("error_message"):
             # Handle errors during the check process itself
-            await check_instance.failure(result_data["error_message"], result_data)
+            await check.failure(result_data["error_message"], result_data)
         elif not result_data["valid"]:
             # Handle validation failures
-            await check_instance.failure(result_data["message"], result_data)
+            await check.failure(result_data["message"], result_data)
         else:
             # Handle success
-            await check_instance.success(result_data["message"], result_data)
+            await check.success(result_data["message"], result_data)
 
     except Exception as e:
-        await check_instance.exception("Error checking license headers", {"error": str(e)})
+        await check.failure("Error checking license headers", {"error": str(e)})
 
     return None
 

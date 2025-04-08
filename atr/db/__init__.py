@@ -118,7 +118,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         id: Opt[int] = NotSet,
         release_name: Opt[str] = NotSet,
         checker: Opt[str] = NotSet,
-        path: Opt[str | None] = NotSet,
+        primary_rel_path: Opt[str | None] = NotSet,
         created: Opt[datetime.datetime] = NotSet,
         status: Opt[models.CheckResultStatus] = NotSet,
         message: Opt[str] = NotSet,
@@ -133,8 +133,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.CheckResult.release_name == release_name)
         if is_defined(checker):
             query = query.where(models.CheckResult.checker == checker)
-        if is_defined(path):
-            query = query.where(models.CheckResult.path == path)
+        if is_defined(primary_rel_path):
+            query = query.where(models.CheckResult.primary_rel_path == primary_rel_path)
         if is_defined(created):
             query = query.where(models.CheckResult.created == created)
         if is_defined(status):

@@ -327,6 +327,8 @@ class Task(sqlmodel.SQLModel, table=True):
     error: str | None = None
     release_name: str | None = sqlmodel.Field(default=None, foreign_key="release.name")
     release: Optional["Release"] = sqlmodel.Relationship(back_populates="tasks")
+    # Identifier for the draft revision that this task targets, if any
+    draft_revision: str | None = sqlmodel.Field(default=None, index=True)
 
     # Create an index on status and added for efficient task claiming
     __table_args__ = (
@@ -410,6 +412,15 @@ def release_name(project_name: str, version_name: str) -> str:
     return f"{project_name}-{version_name}"
 
 
+def project_version(release_name: str) -> tuple[str, str]:
+    """Return the project and version for a given release name."""
+    try:
+        project_name, version_name = release_name.rsplit("-", 1)
+        return (project_name, version_name)
+    except ValueError:
+        raise ValueError(f"Invalid release name: {release_name}")
+
+
 @event.listens_for(Release, "before_insert")
 def check_release_name(_mapper: sqlalchemy.orm.Mapper, _connection: sqlalchemy.Connection, release: Release) -> None:
     if release.name == "":
@@ -434,11 +445,22 @@ class CheckResult(sqlmodel.SQLModel, table=True):
     release_name: str = sqlmodel.Field(foreign_key="release.name")
     release: Release = sqlmodel.Relationship(back_populates="check_results")
     checker: str
-    path: str | None = None
+    primary_rel_path: str | None = sqlmodel.Field(default=None, index=True)
     created: datetime.datetime
     status: CheckResultStatus
     message: str
     data: Any = sqlmodel.Field(sa_column=sqlalchemy.Column(sqlalchemy.JSON))
+
+    # Link to the draft revisions that these results are for
+    histories: list["CheckResultHistoryLink"] = sqlmodel.Relationship(back_populates="check_result")
+
+
+class CheckResultHistoryLink(sqlmodel.SQLModel, table=True):
+    # Composite primary key, automatically handled by SQLModel
+    check_result_id: int = sqlmodel.Field(foreign_key="checkresult.id", primary_key=True)
+    draft_revision: str = sqlmodel.Field(index=True, primary_key=True)
+
+    check_result: CheckResult = sqlmodel.Relationship(back_populates="histories")
 
 
 class TextValue(sqlmodel.SQLModel, table=True):

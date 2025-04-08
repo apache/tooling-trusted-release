@@ -491,13 +491,13 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
 
         # Get successes, warnings, and errors
         path_successes[path] = await data.check_result(
-            release_name=release.name, path=str(path), status=models.CheckResultStatus.SUCCESS
+            release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.SUCCESS
         ).all()
         path_warnings[path] = await data.check_result(
-            release_name=release.name, path=str(path), status=models.CheckResultStatus.WARNING
+            release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.WARNING
         ).all()
         path_errors[path] = await data.check_result(
-            release_name=release.name, path=str(path), status=models.CheckResultStatus.FAILURE
+            release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.FAILURE
         ).all()
 
     # # TODO: This is only accurate to a second
@@ -534,8 +534,8 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
     )
 
 
-@routes.committer("/draft/review/<project_name>/<version_name>/<path:file_path>")
-async def review_path(session: routes.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
+@routes.committer("/draft/review/<project_name>/<version_name>/<path:rel_path>")
+async def review_path(session: routes.CommitterSession, project_name: str, version_name: str, rel_path: str) -> str:
     """Show the status of all checks for a specific file."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
@@ -547,17 +547,17 @@ async def review_path(session: routes.CommitterSession, project_name: str, versi
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
-        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / file_path)
+        abs_path = util.get_release_candidate_draft_dir() / project_name / version_name / rel_path
 
         # Check that the file exists
-        if not await aiofiles.os.path.exists(full_path):
+        if not await aiofiles.os.path.exists(abs_path):
             raise base.ASFQuartException("File does not exist", errorcode=404)
 
-        modified = int(await aiofiles.os.path.getmtime(full_path))
-        file_size = await aiofiles.os.path.getsize(full_path)
+        modified = int(await aiofiles.os.path.getmtime(abs_path))
+        file_size = await aiofiles.os.path.getsize(abs_path)
 
         # Get all check results for this file
-        query = data.check_result(release_name=release.name, path=file_path).order_by(
+        query = data.check_result(release_name=release.name, primary_rel_path=str(rel_path)).order_by(
             db.validate_instrumented_attribute(models.CheckResult.checker).asc(),
             db.validate_instrumented_attribute(models.CheckResult.created).desc(),
         )
@@ -573,7 +573,7 @@ async def review_path(session: routes.CommitterSession, project_name: str, versi
         check_results_list = list(latest_check_results.values())
 
     file_data = {
-        "filename": pathlib.Path(file_path).name,
+        "filename": pathlib.Path(rel_path).name,
         "bytes_size": file_size,
         "uploaded": datetime.datetime.fromtimestamp(modified, tz=datetime.UTC),
     }
@@ -582,7 +582,7 @@ async def review_path(session: routes.CommitterSession, project_name: str, versi
         "draft-review-path.html",
         project_name=project_name,
         version_name=version_name,
-        file_path=file_path,
+        rel_path=rel_path,
         package=file_data,
         release=release,
         check_results=check_results_list,

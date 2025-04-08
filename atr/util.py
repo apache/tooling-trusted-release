@@ -101,16 +101,16 @@ class QuartFormTyped(quart_wtf.QuartForm):
         return form
 
 
-def abs_path_to_release_and_rel_path(abs_path: str) -> tuple[str, str]:
-    """Return the release name and relative path for a given path."""
-    conf = config.get()
-    phase_dir = pathlib.Path(conf.PHASE_STORAGE_DIR)
-    phase_sub_dir = pathlib.Path(abs_path).relative_to(phase_dir)
-    # Skip the first component, which is the phase name
-    # The next two components are the project name and version name
-    project_name = phase_sub_dir.parts[1]
-    version_name = phase_sub_dir.parts[2]
-    return models.release_name(project_name, version_name), str(pathlib.Path(*phase_sub_dir.parts[3:]))
+# def abs_path_to_release_and_rel_path(abs_path: str) -> tuple[str, str]:
+#     """Return the release name and relative path for a given path."""
+#     conf = config.get()
+#     phase_dir = pathlib.Path(conf.PHASE_STORAGE_DIR)
+#     phase_sub_dir = pathlib.Path(abs_path).relative_to(phase_dir)
+#     # Skip the first component, which is the phase name
+#     # The next two components are the project name and version name
+#     project_name = phase_sub_dir.parts[1]
+#     version_name = phase_sub_dir.parts[2]
+#     return models.release_name(project_name, version_name), str(pathlib.Path(*phase_sub_dir.parts[3:]))
 
 
 def as_url(func: Callable, **kwargs: Any) -> str:
