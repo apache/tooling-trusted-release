@@ -32,6 +32,11 @@
           <p>
             <strong>Label:</strong> {{ release.name }}
           </p>
+          {% if revision_editor %}
+            <p>
+              <strong>Revision editor:</strong> {{ revision_editor }}
+            </p>
+          {% endif %}
         </div>
         <div class="col-md-6">
           <p>
@@ -43,6 +48,11 @@
           <p>
             <strong>Created:</strong> {{ release.created.strftime("%Y-%m-%d %H:%M:%S") }}
           </p>
+          {% if revision_time %}
+            <p>
+              <strong>Revision:</strong> {{ revision_time.strftime("%Y-%m-%d %H:%M:%S") }}
+            </p>
+          {% endif %}
         </div>
       </div>
     </div>

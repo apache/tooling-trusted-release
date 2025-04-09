@@ -411,6 +411,8 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
     #         if (latest_check_result is None) or (check_result.created > latest_check_result):
     #             latest_check_result = check_result.created
 
+    revision_editor, revision_time = await revision.latest_info(project_name, version_name)
+
     delete_file_form = await DeleteFileForm.create_form()
     return await quart.render_template(
         "draft-evaluate.html",
@@ -432,6 +434,8 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
         modified=path_modified,
         models=models,
         delete_file_form=delete_file_form,
+        revision_editor=revision_editor,
+        revision_time=revision_time,
     )
 
 

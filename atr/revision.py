@@ -109,6 +109,27 @@ async def create_and_manage(
                     await aioshutil.rmtree(new_revision_dir)  # type: ignore[call-arg]
 
 
+async def latest_info(project_name: str, version_name: str) -> tuple[str | None, datetime.datetime | None]:
+    """Get the editor and timestamp of the latest revision from the filesystem."""
+    editor: str | None = None
+    timestamp: datetime.datetime | None = None
+
+    with contextlib.suppress(OSError, FileNotFoundError, ValueError):
+        draft_base_dir = util.get_release_candidate_draft_dir()
+        release_dir = draft_base_dir / project_name / version_name
+        latest_symlink_path = release_dir / "latest"
+
+        if await aiofiles.os.path.islink(latest_symlink_path):
+            revision_name = await aiofiles.os.readlink(str(latest_symlink_path))
+            parts = revision_name.split("@", 1)
+            if len(parts) == 2:
+                editor = parts[0]
+                dt_obj = datetime.datetime.strptime(parts[1][:-1], "%Y-%m-%dT%H.%M.%S.%f")
+                timestamp = dt_obj.replace(tzinfo=datetime.UTC)
+
+    return editor, timestamp
+
+
 async def _manage_draft_revision_find_parent(
     release_dir: pathlib.Path, latest_symlink_path: pathlib.Path
 ) -> tuple[pathlib.Path | None, str | None]:
