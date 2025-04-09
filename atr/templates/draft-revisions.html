@@ -9,17 +9,19 @@
 {% endblock description %}
 
 {% block content %}
-  <a href="{{ as_url(routes.draft.evaluate, project_name=project_name, version_name=version_name) }}"
-     class="back-link">← Back to draft evaluation</a>
+  <a href="{{ as_url(routes.draft.drafts) }}" class="back-link">← Back to view drafts</a>
 
   <h1>Revision history for {{ release.project.display_name }} {{ release.version }}</h1>
 
   {% if revision_history %}
     {% for revision in revision_history %}
-      <div class="card mb-3">
+      <div id="{{ revision.name }}" class="card mb-3">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <h5 class="mb-0">{{ revision.name }}</h5>
-          <span class="text-muted small">
+          <h2 class="fs-6 my-2 mx-0 p-0 border-0">
+            <a href="#{{ revision.name }}"
+               class="fw-bold atr-sans text-decoration-none text-body">{{ revision.name }}</a>
+          </h2>
+          <span class="fs-6 text-muted">
             {% if revision.timestamp %}
               {{ revision.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC") }}
             {% else %}
@@ -30,7 +32,9 @@
         </div>
         <div class="card-body">
           {% if revision.parent %}
-            <p class="small text-muted mb-2">Changes from parent revision: {{ revision.parent }}</p>
+            <p class="small text-muted mb-2">
+              Changes from parent revision: <a href="#{{ revision.parent }}">{{ revision.parent }}</a>
+            </p>
           {% else %}
             <p class="small text-muted mb-2">Initial revision</p>
           {% endif %}

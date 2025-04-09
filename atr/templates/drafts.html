@@ -41,6 +41,8 @@
                  class="btn btn-sm btn-outline-secondary">View files</a>
               <a href="{{ as_url(routes.draft.add_file, project_name=release.project.name, version_name=release.version) }}"
                  class="btn btn-sm btn-outline-secondary">Upload file</a>
+              <a href="{{ as_url(routes.draft.revisions, project_name=release.project.name, version_name=release.version) }}"
+                 class="btn btn-sm btn-outline-secondary">Revisions</a>
             </div>
             <div class="d-flex gap-2">
               <a href="{{ as_url(routes.draft.promote) }}#{{ release.name }}"
