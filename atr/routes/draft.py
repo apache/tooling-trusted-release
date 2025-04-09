@@ -636,6 +636,7 @@ async def revision_set(session: routes.CommitterSession, project_name: str, vers
 
     try:
         # Target must be relative for the symlink
+        # TODO: We should probably log who is doing this, to create an audit trail
         await util.update_atomic_symlink(latest_symlink_path, revision_name)
     except Exception as e:
         logging.exception("Error updating latest symlink:")

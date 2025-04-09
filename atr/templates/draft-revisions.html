@@ -44,7 +44,9 @@
             <p class="fst-italic text-muted">No file changes detected in this revision.</p>
           {% else %}
             {% if revision.added %}
-              <h3 class="fs-6 fw-semibold mt-3 atr-sans">Added files</h3>
+              <h3 class="fs-6 fw-semibold mt-3 atr-sans">
+                Added files <span class="font-monospace fw-normal">({{ revision.added|length }})</span>
+              </h3>
               <ul class="list-group list-group-flush mb-2">
                 {% for file in revision.added %}
                   <li class="list-group-item list-group-item-success py-1 px-3 small rounded-2">{{ file }}</li>
@@ -53,7 +55,9 @@
             {% endif %}
 
             {% if revision.removed %}
-              <h3 class="fs-6 fw-semibold mt-3 atr-sans">Removed files</h3>
+              <h3 class="fs-6 fw-semibold mt-3 atr-sans">
+                Removed files <span class="font-monospace fw-normal">({{ revision.removed|length }})</span>
+              </h3>
               <ul class="list-group list-group-flush mb-2">
                 {% for file in revision.removed %}
                   <li class="list-group-item list-group-item-danger py-1 px-3 small rounded-2">{{ file }}</li>
@@ -62,7 +66,9 @@
             {% endif %}
 
             {% if revision.modified %}
-              <h3 class="fs-6 fw-semibold mt-3 atr-sans">Modified files</h3>
+              <h3 class="fs-6 fw-semibold mt-3 atr-sans">
+                Modified files <span class="font-monospace fw-normal">({{ revision.modified|length }})</span>
+              </h3>
               <ul class="list-group list-group-flush mb-2">
                 {% for file in revision.modified %}
                   <li class="list-group-item list-group-item-warning py-1 px-3 small rounded-2">{{ file }}</li>
