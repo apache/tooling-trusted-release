@@ -1,7 +1,7 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Your keys ~ ATR
+  Your public keys ~ ATR
 {% endblock title %}
 
 {% block description %}
@@ -9,13 +9,21 @@
 {% endblock description %}
 
 {% block content %}
-  <h1>Your keys</h1>
+  <h1>Your public keys</h1>
   <p class="intro">Review your public keys used for signing release artifacts.</p>
 
   <div class="user-info">
     <p>
       Welcome, <strong>{{ asf_id }}</strong>! You are authenticated as an ASF committer.
     </p>
+  </div>
+
+  <div class="d-flex gap-4">
+    <a href="{{ as_url(routes.keys.add) }}" class="btn btn-outline-primary">Add a GPG key</a>
+    <a href="{{ as_url(routes.keys.upload) }}"
+       class="btn btn-outline-primary">Upload a KEYS file</a>
+    <a href="{{ as_url(routes.keys.ssh_add) }}"
+       class="btn btn-outline-primary">Add an SSH key</a>
   </div>
 
   {% if user_keys %}
