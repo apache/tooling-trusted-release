@@ -123,18 +123,21 @@ table tr:last-child {
 }
 
 aside h1 {
-    font-size: 3rem;
-    line-height: 1.1;
+    font-size: 2rem;
+    line-height: 1;
     text-align: center;
+    letter-spacing: 2px;
 }
 
 aside h1 span.rest {
-    color: #777777;
+    color: #666666;
 }
 
 aside h3 {
     margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
 }
+
 
 pre {
     white-space: pre-wrap;
@@ -241,7 +244,7 @@ span.warning {
     text-align: center;
     border-top: 1px solid #d1d2d3;
     border-bottom: 1px solid #d1d2d3;
-    padding: 1.5rem 0;
+    padding: .5rem 0;
 }
 
 .sidebar hr {
@@ -261,7 +264,7 @@ span.warning {
 }
 
 .sidebar nav li {
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
 }
 
 .hamburger {

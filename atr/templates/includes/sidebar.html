@@ -27,15 +27,6 @@
     {% endif %}
   </div>
   <nav>
-    <h3>Home</h3>
-    <ul>
-      <li>
-        <i class="fa-solid fa-house"></i>
-        <a href="{{ as_url(routes.root.index) }}"
-           {% if request.endpoint == 'root' %}class="active"{% endif %}>About</a>
-      </li>
-    </ul>
-
     {% if current_user %}
       <h3>Release candidate drafts</h3>
       <ul>
@@ -83,6 +74,15 @@
         <li>
           <i class="fa-solid fa-key"></i>
           <a href="{{ as_url(routes.keys.review) }}">Your public keys</a>
+        </li>
+      </ul>
+
+      <h3>Documentation</h3>
+      <ul>
+        <li>
+          <i class="fa-solid fa-house"></i>
+          <a href="{{ as_url(routes.root.index) }}"
+             {% if request.endpoint == 'root' %}class="active"{% endif %}>About</a>
         </li>
       </ul>
 
