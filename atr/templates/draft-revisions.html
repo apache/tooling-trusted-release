@@ -1,0 +1,74 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Revisions for {{ project_name }} {{ version_name }} ~ ATR
+{% endblock title %}
+
+{% block description %}
+  View the revision history for the {{ project_name }} {{ version_name }} candidate draft.
+{% endblock description %}
+
+{% block content %}
+  <a href="{{ as_url(routes.draft.evaluate, project_name=project_name, version_name=version_name) }}"
+     class="back-link">← Back to draft evaluation</a>
+
+  <h1>Revision history for {{ release.project.display_name }} {{ release.version }}</h1>
+
+  {% if revision_history %}
+    {% for revision in revision_history %}
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">{{ revision.name }}</h5>
+          <span class="text-muted small">
+            {% if revision.timestamp %}
+              {{ revision.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC") }}
+            {% else %}
+              Invalid timestamp
+            {% endif %}
+            by {{ revision.editor }}
+          </span>
+        </div>
+        <div class="card-body">
+          {% if revision.parent %}
+            <p class="small text-muted mb-2">Changes from parent revision: {{ revision.parent }}</p>
+          {% else %}
+            <p class="small text-muted mb-2">Initial revision</p>
+          {% endif %}
+
+          {% if not revision.added and not revision.removed and not revision.modified %}
+            <p class="fst-italic text-muted">No file changes detected in this revision.</p>
+          {% else %}
+            {% if revision.added %}
+              <p class="fs-6 fw-bold mt-3">Added files</p>
+              <ul class="list-group list-group-flush mb-2">
+                {% for file in revision.added %}
+                  <li class="list-group-item list-group-item-success py-1 px-3 small rounded-2">{{ file }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+
+            {% if revision.removed %}
+              <p class="fs-6 fw-bold mt-3">Removed files</p>
+              <ul class="list-group list-group-flush mb-2">
+                {% for file in revision.removed %}
+                  <li class="list-group-item list-group-item-danger py-1 px-3 small rounded-2">{{ file }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+
+            {% if revision.modified %}
+              <p class="fs-6 fw-bold mt-3">Modified files</p>
+              <ul class="list-group list-group-flush mb-2">
+                {% for file in revision.modified %}
+                  <li class="list-group-item list-group-item-warning py-1 px-3 small rounded-2">{{ file }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="alert alert-info">No revision history found for this candidate draft.</div>
+  {% endif %}
+{% endblock content %}

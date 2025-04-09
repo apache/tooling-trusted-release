@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import datetime
 import hashlib
 import logging
@@ -31,6 +32,7 @@ import aiofiles.os
 import aioshutil
 import asfquart.base as base
 import quart
+import sqlmodel
 import wtforms
 
 import atr.analysis as analysis
@@ -42,7 +44,7 @@ import atr.tasks.sbom as sbom
 import atr.util as util
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     import werkzeug.datastructures as datastructures
     import werkzeug.wrappers.response as response
@@ -612,6 +614,76 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
     )
 
 
+@routes.committer("/draft/revisions/<project_name>/<version_name>")
+async def revisions(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
+    """Show the revision history for a release candidate draft."""
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
+    async with db.session() as data:
+        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+        if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+            raise base.ASFQuartException("Revisions are only available for candidate drafts", errorcode=400)
+
+        release_dir = util.get_release_candidate_draft_dir() / project_name / version_name
+        revision_dirs: list[str] = []
+        with contextlib.suppress(FileNotFoundError):
+            for entry in await aiofiles.os.listdir(str(release_dir)):
+                # Match pattern like "user@YYYY-MM-DDTHH.MM.SS.fffZ"
+                if "@" in entry and entry.endswith("Z"):
+                    if await aiofiles.os.path.isdir(release_dir / entry):
+                        revision_dirs.append(entry)
+
+        # Sort revisions by timestamp
+        def sort_key(rev_name: str) -> datetime.datetime:
+            try:
+                # Remove trailing Z, though we could just put it in the template pattern
+                timestamp_str = rev_name.split("@", 1)[1][:-1]
+                return datetime.datetime.strptime(timestamp_str, "%Y-%m-%dT%H.%M.%S.%f")
+            except (IndexError, ValueError):
+                # Should not happen for valid names, put invalid ones last
+                return datetime.datetime.min
+
+        # Sort revisions by timestamp, newest first
+        revision_dirs.sort(key=sort_key, reverse=True)
+
+        # Get parent links using a direct query due to the use of in_(...)
+        query = sqlmodel.select(models.TextValue).where(
+            models.TextValue.ns == "draft_parent",
+            db.validate_instrumented_attribute(models.TextValue.key).in_(revision_dirs),
+        )
+        parent_links_result = await data.execute(query)
+        parent_map = {link.key: link.value for link in parent_links_result.scalars().all()}
+
+        revision_history = []
+        prev_revision_files: set[pathlib.Path] | None = None
+        prev_revision_name: str | None = None
+
+        # Oldest to newest, to build diffs relative to previous revision
+        for rev_name in reversed(revision_dirs):
+            revision_data, current_revision_files = await _revisions_process(
+                rev_name,
+                release_dir,
+                parent_map,
+                prev_revision_files,
+                prev_revision_name,
+                sort_key,
+            )
+            revision_history.append(revision_data)
+            prev_revision_files = current_revision_files
+            prev_revision_name = rev_name
+
+    return await quart.render_template(
+        "draft-revisions.html",
+        project_name=project_name,
+        version_name=version_name,
+        release=release,
+        revision_history=list(reversed(revision_history)),
+    )
+
+
 @routes.committer("/draft/sbomgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
 async def sbomgen(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
@@ -930,6 +1002,69 @@ async def _promote(
     await aioshutil.rmtree(str(base_dir))  # type: ignore[call-arg]
 
     return await session.redirect(promote, success=success_message)
+
+
+async def _revisions_process(
+    rev_name: str,
+    release_dir: pathlib.Path,
+    parent_map: dict[str, str],
+    prev_revision_files: set[pathlib.Path] | None,
+    prev_revision_name: str | None,
+    sort_key: Callable[[str], datetime.datetime],
+) -> tuple[dict, set[pathlib.Path]]:
+    """Process a single revision and calculate its diff from the previous."""
+    current_revision_dir = release_dir / rev_name
+    current_revision_files = set(await util.paths_recursive(current_revision_dir))
+    parent_name = parent_map.get(rev_name)
+
+    added_files: set[pathlib.Path] = set()
+    removed_files: set[pathlib.Path] = set()
+    modified_files: set[pathlib.Path] = set()
+
+    if (prev_revision_files is not None) and (prev_revision_name is not None):
+        added_files = current_revision_files - prev_revision_files
+        removed_files = prev_revision_files - current_revision_files
+        common_files = current_revision_files & prev_revision_files
+
+        # Check modification times for common files
+        parent_revision_dir = release_dir / prev_revision_name
+        mtime_tasks = []
+        for common_file in common_files:
+
+            async def check_mtime(file_path: pathlib.Path) -> tuple[pathlib.Path, bool]:
+                try:
+                    parent_mtime = await aiofiles.os.path.getmtime(parent_revision_dir / file_path)
+                    current_mtime = await aiofiles.os.path.getmtime(current_revision_dir / file_path)
+                    return file_path, parent_mtime != current_mtime
+                except OSError:
+                    # Treat errors as modified
+                    return file_path, True
+
+            mtime_tasks.append(check_mtime(common_file))
+
+        results = await asyncio.gather(*mtime_tasks)
+        modified_files = {f for f, modified in results if modified}
+    else:
+        # First revision, all files are considered added
+        added_files = current_revision_files
+
+    try:
+        editor = rev_name.split("@", 1)[0]
+        timestamp = sort_key(rev_name)
+    except (ValueError, IndexError):
+        editor = "Unknown"
+        timestamp = None
+
+    revision_data = {
+        "name": rev_name,
+        "editor": editor,
+        "timestamp": timestamp,
+        "parent": parent_name,
+        "added": sorted(list(added_files)),
+        "removed": sorted(list(removed_files)),
+        "modified": sorted(list(modified_files)),
+    }
+    return revision_data, current_revision_files
 
 
 async def _upload_files(
