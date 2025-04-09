@@ -176,11 +176,12 @@ def _license_files_check_core_logic_zip(artifact_path: str) -> dict[str, Any]:
                 return {"error": "Archive is empty"}
 
             root_dir = _license_files_find_root_dir_zip(members)
+            # _LOGGER.info(f"Root dir of {artifact_path}: {root_dir}")
             if not root_dir:
                 return {"error": "Could not determine root directory"}
 
-            expected_license_path = root_dir + "LICENSE"
-            expected_notice_path = root_dir + "NOTICE"
+            expected_license_path = root_dir + "/LICENSE"
+            expected_notice_path = root_dir + "/NOTICE"
 
             member_set = set(members)
 
