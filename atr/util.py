@@ -23,8 +23,10 @@ import hashlib
 import logging
 import pathlib
 import shutil
+import tarfile
 import tempfile
 import uuid
+import zipfile
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from typing import Annotated, Any, TypeVar
 
@@ -94,6 +96,35 @@ class QuartFormTyped(quart_wtf.QuartForm):
         if not isinstance(form, cls):
             raise TypeError(f"Form is not of type {cls.__name__}")
         return form
+
+
+async def archive_listing(file_path: pathlib.Path) -> list[str] | None:
+    """Attempt to list contents of supported archive files."""
+    if not await aiofiles.os.path.isfile(file_path):
+        return None
+
+    with contextlib.suppress(Exception):
+        if file_path.name.endswith((".tar.gz", ".tgz")):
+
+            def _read_tar() -> list[str] | None:
+                with contextlib.suppress(tarfile.ReadError, EOFError, ValueError, OSError):
+                    with tarfile.open(file_path, mode="r:*") as tf:
+                        return sorted(tf.getnames())
+                return None
+
+            return await asyncio.to_thread(_read_tar)
+
+        elif file_path.name.endswith(".zip"):
+
+            def _read_zip() -> list[str] | None:
+                with contextlib.suppress(zipfile.BadZipFile, EOFError, ValueError, OSError):
+                    with zipfile.ZipFile(file_path, "r") as zf:
+                        return sorted(zf.namelist())
+                return None
+
+            return await asyncio.to_thread(_read_zip)
+
+    return None
 
 
 def as_url(func: Callable, **kwargs: Any) -> str:

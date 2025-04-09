@@ -896,8 +896,14 @@ async def view_path(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
-    _max_view_size = 1 * 1024 * 1024
+    # Limit to 256 KiB
+    _max_view_size = 256 * 1024
     full_path = util.get_release_candidate_draft_dir() / project_name / version_name / "latest" / file_path
+
+    # Attempt to get an archive listing
+    # This will be None if the file is not an archive
+    content_listing = await util.archive_listing(full_path)
+
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
     return await quart.render_template(
         "phase-view-path.html",
@@ -909,8 +915,10 @@ async def view_path(
         is_text=is_text,
         is_truncated=is_truncated,
         error_message=error_message,
+        content_listing=content_listing,
         format_file_size=routes.format_file_size,
         phase_key="draft",
+        max_view_size=routes.format_file_size(_max_view_size),
     )
 
 
