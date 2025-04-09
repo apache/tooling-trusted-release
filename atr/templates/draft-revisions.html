@@ -71,14 +71,16 @@
             {% endif %}
           {% endif %}
 
-          <h3 class="fs-6 fw-semibold mt-3 atr-sans">Actions</h3>
-          <div class="mt-3">
-            <form method="post"
-                  action="{{ as_url(routes.draft.revision_set, project_name=project_name, version_name=version_name) }}">
-              <input type="hidden" name="revision_name" value="{{ revision.name }}" />
-              <button type="submit" class="btn btn-sm btn-outline-danger">Set this revision as latest</button>
-            </form>
-          </div>
+          {% if revision.name != latest_revision_name %}
+            <h3 class="fs-6 fw-semibold mt-3 atr-sans">Actions</h3>
+            <div class="mt-3">
+              <form method="post"
+                    action="{{ as_url(routes.draft.revision_set, project_name=project_name, version_name=version_name) }}">
+                <input type="hidden" name="revision_name" value="{{ revision.name }}" />
+                <button type="submit" class="btn btn-sm btn-outline-danger">Set this revision as latest</button>
+              </form>
+            </div>
+          {% endif %}
         </div>
       </div>
     {% endfor %}
