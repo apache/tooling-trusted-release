@@ -37,6 +37,8 @@ import quart
 import quart_wtf
 import quart_wtf.typing
 
+# NOTE: The atr.db module imports this module
+# Therefore, this module must not import atr.db
 import atr.config as config
 import atr.db.models as models
 
@@ -44,13 +46,6 @@ F = TypeVar("F", bound="QuartFormTyped")
 T = TypeVar("T")
 
 _LOGGER = logging.getLogger(__name__)
-
-
-async def get_asf_id_or_die() -> str:
-    web_session = await session.read()
-    if web_session is None or web_session.uid is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-    return web_session.uid
 
 
 # from https://github.com/pydantic/pydantic/discussions/8755#discussioncomment-8417979
@@ -101,21 +96,21 @@ class QuartFormTyped(quart_wtf.QuartForm):
         return form
 
 
-# def abs_path_to_release_and_rel_path(abs_path: str) -> tuple[str, str]:
-#     """Return the release name and relative path for a given path."""
-#     conf = config.get()
-#     phase_dir = pathlib.Path(conf.PHASE_STORAGE_DIR)
-#     phase_sub_dir = pathlib.Path(abs_path).relative_to(phase_dir)
-#     # Skip the first component, which is the phase name
-#     # The next two components are the project name and version name
-#     project_name = phase_sub_dir.parts[1]
-#     version_name = phase_sub_dir.parts[2]
-#     return models.release_name(project_name, version_name), str(pathlib.Path(*phase_sub_dir.parts[3:]))
-
-
 def as_url(func: Callable, **kwargs: Any) -> str:
     """Return the URL for a function."""
     return quart.url_for(func.__annotations__["endpoint"], **kwargs)
+
+
+@contextlib.asynccontextmanager
+async def async_temporary_directory(
+    suffix: str | None = None, prefix: str | None = None, dir: str | pathlib.Path | None = None
+) -> AsyncGenerator[pathlib.Path]:
+    """Create an async temporary directory similar to tempfile.TemporaryDirectory."""
+    temp_dir_path: str = await asyncio.to_thread(tempfile.mkdtemp, suffix=suffix, prefix=prefix, dir=dir)
+    try:
+        yield pathlib.Path(temp_dir_path)
+    finally:
+        await asyncio.to_thread(shutil.rmtree, temp_dir_path, ignore_errors=True)
 
 
 def compute_sha3_256(file_data: bytes) -> str:
@@ -135,6 +130,8 @@ async def compute_sha512(file_path: pathlib.Path) -> str:
 async def content_list(phase_subdir: pathlib.Path, project_name: str, version_name: str) -> AsyncGenerator[FileStat]:
     """List all the files in the given path."""
     base_path = phase_subdir / project_name / version_name
+    if phase_subdir.name == "release-candidate-draft":
+        base_path = base_path / "latest"
     for path in await paths_recursive(base_path):
         stat = await aiofiles.os.stat(base_path / path)
         yield FileStat(
@@ -149,6 +146,7 @@ async def content_list(phase_subdir: pathlib.Path, project_name: str, version_na
 
 async def create_hard_link_clone(source_dir: pathlib.Path, dest_dir: pathlib.Path) -> None:
     """Recursively create a clone of source_dir in dest_dir using hard links for files."""
+    # TODO: We're currently using cp -al instead
     # Ensure source exists and is a directory
     if not await aiofiles.os.path.isdir(source_dir):
         raise ValueError(f"Source path is not a directory or does not exist: {source_dir}")
@@ -182,6 +180,13 @@ async def file_sha3(path: str) -> str:
         while chunk := await f.read(4096):
             sha3.update(chunk)
     return sha3.hexdigest()
+
+
+async def get_asf_id_or_die() -> str:
+    web_session = await session.read()
+    if web_session is None or web_session.uid is None:
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
+    return web_session.uid
 
 
 def get_phase_dir() -> pathlib.Path:
@@ -231,6 +236,49 @@ async def paths_recursive(base_path: pathlib.Path, sort: bool = True) -> list[pa
     if sort is True:
         paths.sort()
     return paths
+
+
+async def read_file_for_viewer(full_path: pathlib.Path, max_size: int) -> tuple[str | None, bool, bool, str | None]:
+    """Read file content for viewer."""
+    content: str | None = None
+    is_text = False
+    is_truncated = False
+    error_message: str | None = None
+
+    try:
+        if not await aiofiles.os.path.exists(full_path):
+            return None, False, False, "File does not exist"
+        if not await aiofiles.os.path.isfile(full_path):
+            return None, False, False, "Path is not a file"
+
+        file_size = await aiofiles.os.path.getsize(full_path)
+        read_size = min(file_size, max_size)
+
+        if file_size > max_size:
+            is_truncated = True
+
+        if file_size == 0:
+            is_text = True
+            content = "(Empty file)"
+            raw_content = b""
+        else:
+            async with aiofiles.open(full_path, "rb") as f:
+                raw_content = await f.read(read_size)
+
+        if file_size > 0:
+            try:
+                if b"\x00" in raw_content:
+                    raise UnicodeDecodeError("utf-8", b"", 0, 1, "Null byte found")
+                content = raw_content.decode("utf-8")
+                is_text = True
+            except UnicodeDecodeError:
+                is_text = False
+                content = _generate_hexdump(raw_content)
+
+    except Exception as e:
+        error_message = f"An error occurred reading the file: {e!s}"
+
+    return content, is_text, is_truncated, error_message
 
 
 def release_directory(release: models.Release) -> pathlib.Path:
@@ -315,6 +363,20 @@ def validate_as_type(value: Any, t: type[T]) -> T:
     return value
 
 
+def _generate_hexdump(data: bytes) -> str:
+    """Generate a formatted hexdump string from bytes."""
+    hex_lines = []
+    for i in range(0, len(data), 16):
+        chunk = data[i : i + 16]
+        hex_part = binascii.hexlify(chunk).decode("ascii")
+        hex_part = hex_part.ljust(32)
+        hex_part_spaced = " ".join(hex_part[j : j + 2] for j in range(0, len(hex_part), 2))
+        ascii_part = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
+        line_num = f"{i:08x}"
+        hex_lines.append(f"{line_num}  {hex_part_spaced}  |{ascii_part}|")
+    return "\n".join(hex_lines)
+
+
 def _get_dict_to_list_inner_type_adapter(source_type: Any, key: str) -> pydantic.TypeAdapter[dict[Any, Any]]:
     root_adapter = pydantic.TypeAdapter(source_type)
     schema = root_adapter.core_schema
@@ -361,72 +423,3 @@ def _get_dict_to_list_validator(inner_adapter: pydantic.TypeAdapter[dict[Any, An
         return val
 
     return validator
-
-
-@contextlib.asynccontextmanager
-async def async_temporary_directory(
-    suffix: str | None = None, prefix: str | None = None, dir: str | pathlib.Path | None = None
-) -> AsyncGenerator[pathlib.Path]:
-    """Create an async temporary directory similar to tempfile.TemporaryDirectory."""
-    temp_dir_path: str = await asyncio.to_thread(tempfile.mkdtemp, suffix=suffix, prefix=prefix, dir=dir)
-    try:
-        yield pathlib.Path(temp_dir_path)
-    finally:
-        await asyncio.to_thread(shutil.rmtree, temp_dir_path, ignore_errors=True)
-
-
-async def read_file_for_viewer(full_path: pathlib.Path, max_size: int) -> tuple[str | None, bool, bool, str | None]:
-    """Read file content for viewer."""
-    content: str | None = None
-    is_text = False
-    is_truncated = False
-    error_message: str | None = None
-
-    try:
-        if not await aiofiles.os.path.exists(full_path):
-            return None, False, False, "File does not exist"
-        if not await aiofiles.os.path.isfile(full_path):
-            return None, False, False, "Path is not a file"
-
-        file_size = await aiofiles.os.path.getsize(full_path)
-        read_size = min(file_size, max_size)
-
-        if file_size > max_size:
-            is_truncated = True
-
-        if file_size == 0:
-            is_text = True
-            content = "(Empty file)"
-            raw_content = b""
-        else:
-            async with aiofiles.open(full_path, "rb") as f:
-                raw_content = await f.read(read_size)
-
-        if file_size > 0:
-            try:
-                if b"\x00" in raw_content:
-                    raise UnicodeDecodeError("utf-8", b"", 0, 1, "Null byte found")
-                content = raw_content.decode("utf-8")
-                is_text = True
-            except UnicodeDecodeError:
-                is_text = False
-                content = _generate_hexdump(raw_content)
-
-    except Exception as e:
-        error_message = f"An error occurred reading the file: {e!s}"
-
-    return content, is_text, is_truncated, error_message
-
-
-def _generate_hexdump(data: bytes) -> str:
-    """Generate a formatted hexdump string from bytes."""
-    hex_lines = []
-    for i in range(0, len(data), 16):
-        chunk = data[i : i + 16]
-        hex_part = binascii.hexlify(chunk).decode("ascii")
-        hex_part = hex_part.ljust(32)
-        hex_part_spaced = " ".join(hex_part[j : j + 2] for j in range(0, len(hex_part), 2))
-        ascii_part = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
-        line_num = f"{i:08x}"
-        hex_lines.append(f"{line_num}  {hex_part_spaced}  |{ascii_part}|")
-    return "\n".join(hex_lines)

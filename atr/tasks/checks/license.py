@@ -172,14 +172,10 @@ INCLUDED_PATTERNS: Final[list[str]] = [
 # Tasks
 
 
-@checks.with_model(checks.ReleaseAndRelPath)
-async def files(args: checks.ReleaseAndRelPath) -> str | None:
+async def files(args: checks.FunctionArguments) -> str | None:
     """Check that the LICENSE and NOTICE files exist and are valid."""
-    check = await checks.Check.create(
-        checker=files, release_name=args.release_name, primary_rel_path=args.primary_rel_path
-    )
-
-    if not (artifact_abs_path := await check.abs_path()):
+    recorder = await args.recorder()
+    if not (artifact_abs_path := await recorder.abs_path()):
         return None
 
     _LOGGER.info(f"Checking license files for {artifact_abs_path} (rel: {args.primary_rel_path})")
@@ -188,27 +184,23 @@ async def files(args: checks.ReleaseAndRelPath) -> str | None:
         result_data = await asyncio.to_thread(_files_check_core_logic, str(artifact_abs_path))
 
         if result_data.get("error"):
-            await check.failure(result_data["error"], result_data)
+            await recorder.failure(result_data["error"], result_data)
         elif result_data["license_valid"] and result_data["notice_valid"]:
-            await check.success("LICENSE and NOTICE files present and valid", result_data)
+            await recorder.success("LICENSE and NOTICE files present and valid", result_data)
         else:
             # TODO: Be more specific about the issues
-            await check.failure("Issues found with LICENSE or NOTICE files", result_data)
+            await recorder.failure("Issues found with LICENSE or NOTICE files", result_data)
 
     except Exception as e:
-        await check.failure("Error checking license files", {"error": str(e)})
+        await recorder.failure("Error checking license files", {"error": str(e)})
 
     return None
 
 
-@checks.with_model(checks.ReleaseAndRelPath)
-async def headers(args: checks.ReleaseAndRelPath) -> str | None:
+async def headers(args: checks.FunctionArguments) -> str | None:
     """Check that all source files have valid license headers."""
-    check = await checks.Check.create(
-        checker=headers, release_name=args.release_name, primary_rel_path=args.primary_rel_path
-    )
-
-    if not (artifact_abs_path := await check.abs_path()):
+    recorder = await args.recorder()
+    if not (artifact_abs_path := await recorder.abs_path()):
         return None
 
     _LOGGER.info(f"Checking license headers for {artifact_abs_path} (rel: {args.primary_rel_path})")
@@ -218,16 +210,16 @@ async def headers(args: checks.ReleaseAndRelPath) -> str | None:
 
         if result_data.get("error_message"):
             # Handle errors during the check process itself
-            await check.failure(result_data["error_message"], result_data)
+            await recorder.failure(result_data["error_message"], result_data)
         elif not result_data["valid"]:
             # Handle validation failures
-            await check.failure(result_data["message"], result_data)
+            await recorder.failure(result_data["message"], result_data)
         else:
             # Handle success
-            await check.success(result_data["message"], result_data)
+            await recorder.success(result_data["message"], result_data)
 
     except Exception as e:
-        await check.failure("Error checking license headers", {"error": str(e)})
+        await recorder.failure("Error checking license headers", {"error": str(e)})
 
     return None
 

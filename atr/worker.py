@@ -24,6 +24,7 @@
 
 import asyncio
 import datetime
+import inspect
 import json
 import logging
 import os
@@ -37,6 +38,7 @@ import sqlmodel
 import atr.db as db
 import atr.db.models as models
 import atr.tasks as tasks
+import atr.tasks.checks as checks
 import atr.tasks.task as task
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -192,7 +194,7 @@ async def _task_result_process(
 
 async def _task_process(task_id: int, task_type: str, task_args: list[str] | dict[str, Any]) -> None:
     """Process a claimed task."""
-    _LOGGER.info(f"Processing task {task_id} ({task_type}) with args {task_args}")
+    _LOGGER.info(f"Processing task {task_id} ({task_type}) with raw args {task_args}")
     try:
         task_type_member = models.TaskType(task_type)
     except ValueError as e:
@@ -203,13 +205,58 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
     task_results: tuple[Any, ...]
     try:
         handler = tasks.resolve(task_type_member)
-        handler_result = await handler(task_args)
+        sig = inspect.signature(handler)
+        params = list(sig.parameters.values())
+
+        # Check whether the handler is a check handler
+        if (len(params) == 1) and (params[0].annotation == checks.FunctionArguments):
+            _LOGGER.debug(f"Handler {handler.__name__} expects checks.FunctionArguments, fetching full task details")
+            async with db.session() as data:
+                task_obj = await data.task(id=task_id).demand(
+                    ValueError(f"Task {task_id} disappeared during processing")
+                )
+
+            # Validate required fields from the Task object itself
+            if task_obj.release_name is None:
+                raise ValueError(f"Task {task_id} is missing required release_name")
+            if task_obj.draft_revision is None:
+                raise ValueError(f"Task {task_id} is missing required draft_revision")
+
+            if not isinstance(task_args, dict):
+                raise TypeError(
+                    f"Task {task_id} ({task_type}) has non-dict raw args"
+                    f" {task_args} which should represent keyword_args"
+                )
+
+            async def recorder_factory() -> checks.Recorder:
+                return await checks.Recorder.create(
+                    checker=handler,
+                    release_name=task_obj.release_name or "",
+                    draft_revision=task_obj.draft_revision or "",
+                    primary_rel_path=task_obj.primary_rel_path,
+                )
+
+            function_arguments = checks.FunctionArguments(
+                recorder=recorder_factory,
+                release_name=task_obj.release_name,
+                draft_revision=task_obj.draft_revision,
+                primary_rel_path=task_obj.primary_rel_path,
+                extra_args=task_args,
+            )
+            _LOGGER.debug(f"Calling {handler.__name__} with structured arguments: {function_arguments}")
+            handler_result = await handler(function_arguments)
+        else:
+            # Otherwise, it's not a check handler
+            handler_result = await handler(task_args)
+
         task_results = (handler_result,)
         status = task.COMPLETED
         error = None
     except Exception as e:
         task_results = tuple()
         status = task.FAILED
+        error_details = traceback.format_exc()
+        _LOGGER.error(f"Task {task_id} failed processing: {error_details}")
         error = str(e)
     await _task_result_process(task_id, task_results, status, error)
 

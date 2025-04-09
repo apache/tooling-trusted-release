@@ -21,19 +21,12 @@ import re
 from typing import Final
 
 import aiofiles.os
-import pydantic
 
 import atr.analysis as analysis
 import atr.tasks.checks as checks
 import atr.util as util
 
 _LOGGER: Final = logging.getLogger(__name__)
-
-
-class Check(pydantic.BaseModel):
-    """Arguments for the path structure and naming convention check."""
-
-    release_name: str = pydantic.Field(..., description="Name of the release being checked")
 
 
 async def _check_artifact_rules(
@@ -96,9 +89,9 @@ async def _check_metadata_rules(
 async def _check_path_process_single(
     base_path: pathlib.Path,
     relative_path: pathlib.Path,
-    check_errors: checks.Check,
-    check_warnings: checks.Check,
-    check_success: checks.Check,
+    recorder_errors: checks.Recorder,
+    recorder_warnings: checks.Recorder,
+    recorder_success: checks.Recorder,
     relative_paths: set[str],
 ) -> None:
     """Process and check a single path within the release directory."""
@@ -138,43 +131,45 @@ async def _check_path_process_single(
     # Must aggregate errors and aggregate warnings otherwise they will be removed by afresh=True
     # Alternatively we could call Check.clear() manually
     if errors:
-        await check_errors.failure("; ".join(errors), {"errors": errors}, primary_rel_path=relative_path_str)
+        await recorder_errors.failure("; ".join(errors), {"errors": errors}, primary_rel_path=relative_path_str)
     if warnings:
-        await check_warnings.warning("; ".join(warnings), {"warnings": warnings}, primary_rel_path=relative_path_str)
+        await recorder_warnings.warning("; ".join(warnings), {"warnings": warnings}, primary_rel_path=relative_path_str)
     if not (errors or warnings):
-        await check_success.success(
+        await recorder_success.success(
             "Path structure and naming conventions conform to policy", {}, primary_rel_path=relative_path_str
         )
 
 
-@checks.with_model(Check)
-async def check(args: Check) -> None:
+async def check(args: checks.FunctionArguments) -> None:
     """Check file path structure and naming conventions against ASF release policy for all files in a release."""
     # We refer to the following authoritative policies:
     # - Release Creation Process (RCP)
     # - Release Distribution Policy (RDP)
 
-    check_errors = await checks.Check.create(
+    recorder_errors = await checks.Recorder.create(
         checker=checks.function_key(check) + "_errors",
         release_name=args.release_name,
+        draft_revision=args.draft_revision,
         primary_rel_path=None,
         afresh=True,
     )
-    check_warnings = await checks.Check.create(
+    recorder_warnings = await checks.Recorder.create(
         checker=checks.function_key(check) + "_warnings",
         release_name=args.release_name,
+        draft_revision=args.draft_revision,
         primary_rel_path=None,
         afresh=True,
     )
-    check_success = await checks.Check.create(
+    recorder_success = await checks.Recorder.create(
         checker=checks.function_key(check) + "_success",
         release_name=args.release_name,
+        draft_revision=args.draft_revision,
         primary_rel_path=None,
         afresh=True,
     )
 
     # As primary_rel_path is None, the base path is the release candidate draft directory
-    if not (base_path := await check_success.abs_path()):
+    if not (base_path := await recorder_success.abs_path()):
         return
 
     if not await aiofiles.os.path.isdir(base_path):
@@ -188,9 +183,9 @@ async def check(args: Check) -> None:
         await _check_path_process_single(
             base_path,
             relative_path,
-            check_errors,
-            check_warnings,
-            check_success,
+            recorder_errors,
+            recorder_warnings,
+            recorder_success,
             relative_paths_set,
         )
 

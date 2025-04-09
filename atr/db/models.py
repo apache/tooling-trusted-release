@@ -291,7 +291,7 @@ class TaskType(str, enum.Enum):
     LICENSE_HEADERS = "license_headers"
     PATHS_CHECK = "paths_check"
     RAT_CHECK = "rat_check"
-    RSYNC_ANALYSE = "rsync_analyse"
+    # RSYNC_ANALYSE = "rsync_analyse"
     SBOM_GENERATE_CYCLONEDX = "sbom_generate_cyclonedx"
     SIGNATURE_CHECK = "signature_check"
     TARGZ_INTEGRITY = "targz_integrity"
@@ -325,10 +325,13 @@ class Task(sqlmodel.SQLModel, table=True):
     )
     result: Any | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
     error: str | None = None
+
+    # Used for check tasks
+    # We don't put these in task_args because we want to query them efficiently
     release_name: str | None = sqlmodel.Field(default=None, foreign_key="release.name")
     release: Optional["Release"] = sqlmodel.Relationship(back_populates="tasks")
-    # Identifier for the draft revision that this task targets, if any
     draft_revision: str | None = sqlmodel.Field(default=None, index=True)
+    primary_rel_path: str | None = sqlmodel.Field(default=None, index=True)
 
     # Create an index on status and added for efficient task claiming
     __table_args__ = (

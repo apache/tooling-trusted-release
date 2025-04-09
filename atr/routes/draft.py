@@ -36,8 +36,8 @@ import wtforms
 import atr.analysis as analysis
 import atr.db as db
 import atr.db.models as models
+import atr.revision as revision
 import atr.routes as routes
-import atr.tasks as tasks
 import atr.tasks.sbom as sbom
 import atr.util as util
 
@@ -111,7 +111,7 @@ async def _number_of_release_files(release: models.Release) -> int:
     """Return the number of files in the release."""
     path_project = release.project.name
     path_version = release.version
-    path = util.get_release_candidate_draft_dir() / path_project / path_version
+    path = util.get_release_candidate_draft_dir() / path_project / path_version / "latest"
     return len(await util.paths_recursive(path))
 
 
@@ -187,7 +187,7 @@ async def add_file(session: routes.CommitterSession, project_name: str, version_
                 file_name = pathlib.Path(form.file_name.data)
             file_data = form.file_data.data
 
-            number_of_files = await _upload_files(project_name, version_name, file_name, file_data)
+            number_of_files = await _upload_files(project_name, version_name, session.uid, file_name, file_data)
             return await session.redirect(
                 review,
                 success=f"{number_of_files} file{'' if number_of_files == 1 else 's'} added successfully",
@@ -255,7 +255,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
 @routes.committer("/draft/delete-file/<project_name>/<version_name>", methods=["POST"])
 async def delete_file(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
-    """Delete a specific file from the release candidate."""
+    """Delete a specific file from the release candidate, creating a new revision."""
     form = await DeleteFileForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
         return await session.redirect(review, project_name=project_name, version_name=version_name)
@@ -264,40 +264,49 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
     if not any((p.name == project_name) for p in (await session.user_projects)):
         raise base.ASFQuartException("You do not have access to this project", errorcode=403)
 
-    async with db.session() as data:
-        # Check that the release exists
-        await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
+    rel_path_to_delete = pathlib.Path(str(form.file_path.data))
+    metadata_files_deleted = 0
 
-        file_path = str(form.file_path.data)
-        full_path_obj = util.get_release_candidate_draft_dir() / project_name / version_name / file_path
-        full_path = str(full_path_obj)
+    try:
+        async with revision.create_and_manage(project_name, version_name, session.uid) as (
+            new_revision_dir,
+            new_revision_name,
+        ):
+            # Path to delete within the new revision directory
+            path_in_new_revision = new_revision_dir / rel_path_to_delete
 
-        # Check that the file exists
-        if not await aiofiles.os.path.exists(full_path):
-            raise base.ASFQuartException("File does not exist", errorcode=404)
+            # Check that the file exists in the new revision
+            if not await aiofiles.os.path.exists(path_in_new_revision):
+                # This indicates a potential severe issue with hard linking or logic
+                logging.error(
+                    f"SEVERE ERROR! File {rel_path_to_delete} not found in new revision"
+                    f" {new_revision_name} before deletion"
+                )
+                raise routes.FlashError("File to delete was not found in the new revision")
 
-        # Check whether the file is an artifact
-        metadata_files = 0
-        if analysis.is_artifact(full_path_obj):
-            # If so, delete all associated metadata files
-            for p in await util.paths_recursive(full_path_obj.parent):
-                if p.name.startswith(full_path_obj.name + "."):
-                    await aiofiles.os.remove(full_path_obj.parent / p.name)
-                    metadata_files += 1
+            # Check whether the file is an artifact
+            if analysis.is_artifact(path_in_new_revision):
+                # If so, delete all associated metadata files in the new revision
+                for p in await util.paths_recursive(path_in_new_revision.parent):
+                    # Construct full path within the new revision
+                    metadata_path_obj = new_revision_dir / p
+                    if p.name.startswith(rel_path_to_delete.name + "."):
+                        await aiofiles.os.remove(metadata_path_obj)
+                        metadata_files_deleted += 1
 
-        # Delete the file
-        await aiofiles.os.remove(full_path)
+            # Delete the file
+            await aiofiles.os.remove(path_in_new_revision)
 
-        # Ensure that checks are queued again
-        await tasks.draft_checks(project_name, version_name, caller_data=data)
-        await data.commit()
+    except Exception as e:
+        logging.exception("Error deleting file:")
+        await quart.flash(f"Error deleting file: {e!s}", "error")
+        return await session.redirect(review, project_name=project_name, version_name=version_name)
 
-    success_message = "File deleted successfully"
-    if metadata_files:
+    success_message = f"File '{rel_path_to_delete.name}' deleted successfully"
+    if metadata_files_deleted:
         success_message += (
-            f", and {metadata_files} associated metadata file{'' if metadata_files == 1 else 's'} deleted"
+            f", and {metadata_files_deleted} associated metadata "
+            f"file{'' if metadata_files_deleted == 1 else 's'} deleted"
         )
     return await session.redirect(review, success=success_message, project_name=project_name, version_name=version_name)
 
@@ -306,52 +315,55 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
 async def hashgen(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
-    """Generate an sha256 or sha512 hash file for a candidate draft file."""
+    """Generate an sha256 or sha512 hash file for a candidate draft file, creating a new revision."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
         raise base.ASFQuartException("You do not have access to this project", errorcode=403)
 
-    async with db.session() as data:
-        # Check that the release exists
-        await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
+    # Get the hash type from the form data
+    # This is just a button, so we don't make a whole form validation schema for it
+    form = await quart.request.form
+    hash_type = form.get("hash_type")
+    if hash_type not in {"sha256", "sha512"}:
+        raise base.ASFQuartException("Invalid hash type", errorcode=400)
 
-        # Get the hash type from the form data
-        # This is just a button, so we don't make a whole form validation schema for it
-        form = await quart.request.form
-        hash_type = form.get("hash_type")
-        if hash_type not in {"sha256", "sha512"}:
-            raise base.ASFQuartException("Invalid hash type", errorcode=400)
+    rel_path = pathlib.Path(file_path)
 
-        # Construct paths
-        base_path = util.get_release_candidate_draft_dir() / project_name / version_name
-        full_path = base_path / file_path
-        hash_path = file_path + f".{hash_type}"
-        full_hash_path = base_path / hash_path
+    try:
+        async with revision.create_and_manage(project_name, version_name, session.uid) as (
+            new_revision_dir,
+            new_revision_name,
+        ):
+            path_in_new_revision = new_revision_dir / rel_path
+            hash_path_rel = rel_path.name + f".{hash_type}"
+            hash_path_in_new_revision = new_revision_dir / rel_path.parent / hash_path_rel
 
-        # Check that the source file exists
-        if not await aiofiles.os.path.exists(full_path):
-            raise base.ASFQuartException("Source file does not exist", errorcode=404)
+            # Check that the source file exists in the new revision
+            if not await aiofiles.os.path.exists(path_in_new_revision):
+                logging.error(
+                    f"Source file {rel_path} not found in new revision {new_revision_name} for hash generation."
+                )
+                raise routes.FlashError("Source file not found in the new revision.")
 
-        # Check that the hash file does not already exist
-        if await aiofiles.os.path.exists(full_hash_path):
-            raise base.ASFQuartException(f"{hash_type} file already exists", errorcode=400)
+            # Check that the hash file does not already exist in the new revision
+            if await aiofiles.os.path.exists(hash_path_in_new_revision):
+                raise base.ASFQuartException(f"{hash_type} file already exists", errorcode=400)
 
-        # Read the file and compute the hash
-        hash_obj = hashlib.sha256() if hash_type == "sha256" else hashlib.sha512()
-        async with aiofiles.open(full_path, "rb") as f:
-            while chunk := await f.read(8192):
-                hash_obj.update(chunk)
+            # Read the source file from the new revision and compute the hash
+            hash_obj = hashlib.sha256() if hash_type == "sha256" else hashlib.sha512()
+            async with aiofiles.open(path_in_new_revision, "rb") as f:
+                while chunk := await f.read(8192):
+                    hash_obj.update(chunk)
 
-        # Write the hash file
-        hash_value = hash_obj.hexdigest()
-        async with aiofiles.open(full_hash_path, "w") as f:
-            await f.write(f"{hash_value}  {file_path}\n")
+            # Write the hash file into the new revision
+            hash_value = hash_obj.hexdigest()
+            async with aiofiles.open(hash_path_in_new_revision, "w") as f:
+                await f.write(f"{hash_value}  {rel_path.name}\n")
 
-        # Ensure that checks are queued again
-        await tasks.draft_checks(project_name, version_name, caller_data=data)
-        await data.commit()
+    except Exception as e:
+        logging.exception("Error generating hash file:")
+        await quart.flash(f"Error generating hash file: {e!s}", "error")
+        return await session.redirect(review, project_name=project_name, version_name=version_name)
 
     return await session.redirect(
         review, success=f"{hash_type} file generated successfully", project_name=project_name, version_name=version_name
@@ -448,7 +460,7 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
-    base_path = util.get_release_candidate_draft_dir() / project_name / version_name
+    base_path = util.get_release_candidate_draft_dir() / project_name / version_name / "latest"
     paths = await util.paths_recursive(base_path)
     # paths_set = set(paths)
     path_templates = {}
@@ -486,7 +498,7 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
                 path_metadata.add(path)
 
         # Get modified time
-        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / path)
+        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / "latest" / path)
         path_modified[path] = int(await aiofiles.os.path.getmtime(full_path))
 
         # Get successes, warnings, and errors
@@ -547,7 +559,8 @@ async def review_path(session: routes.CommitterSession, project_name: str, versi
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
-        abs_path = util.get_release_candidate_draft_dir() / project_name / version_name / rel_path
+        # TODO: When we do more than one thing in a dir, we should use the revision directory directly
+        abs_path = util.get_release_candidate_draft_dir() / project_name / version_name / "latest" / rel_path
 
         # Check that the file exists
         if not await aiofiles.os.path.exists(abs_path):
@@ -594,53 +607,75 @@ async def review_path(session: routes.CommitterSession, project_name: str, versi
 async def sbomgen(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
-    """Generate a CycloneDX SBOM file for a candidate draft file."""
+    """Generate a CycloneDX SBOM file for a candidate draft file, creating a new revision."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
         raise base.ASFQuartException("You do not have access to this project", errorcode=403)
 
-    async with db.session() as data:
-        # Check that the release exists
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
+    rel_path = pathlib.Path(file_path)
 
-        # Construct paths
-        base_path = util.get_release_candidate_draft_dir() / project_name / version_name
-        full_path = base_path / file_path
-        # Standard CycloneDX extension
-        sbom_path_rel = file_path + ".cdx.json"
-        full_sbom_path = base_path / sbom_path_rel
+    # Check that the file is a .tar.gz archive before creating a revision
+    if not (file_path.endswith(".tar.gz") or file_path.endswith(".tgz")):
+        raise base.ASFQuartException("SBOM generation is only supported for .tar.gz files", errorcode=400)
 
-        # Check that the source file exists
-        if not await aiofiles.os.path.exists(full_path):
-            raise base.ASFQuartException("Source artifact file does not exist", errorcode=404)
+    try:
+        async with revision.create_and_manage(project_name, version_name, session.uid) as (
+            new_revision_dir,
+            new_revision_name,
+        ):
+            path_in_new_revision = new_revision_dir / rel_path
+            sbom_path_rel = rel_path.with_suffix(rel_path.suffix + ".cdx.json").name
+            sbom_path_in_new_revision = new_revision_dir / rel_path.parent / sbom_path_rel
 
-        # Check that the file is a .tar.gz archive
-        if not file_path.endswith(".tar.gz"):
-            raise base.ASFQuartException("SBOM generation is only supported for .tar.gz files", errorcode=400)
+            # Check that the source file exists in the new revision
+            if not await aiofiles.os.path.exists(path_in_new_revision):
+                logging.error(
+                    f"Source file {rel_path} not found in new revision {new_revision_name} for SBOM generation."
+                )
+                raise routes.FlashError("Source artifact file not found in the new revision.")
 
-        # Check that the SBOM file does not already exist
-        if await aiofiles.os.path.exists(full_sbom_path):
-            raise base.ASFQuartException("SBOM file already exists", errorcode=400)
+            # Check that the SBOM file does not already exist in the new revision
+            if await aiofiles.os.path.exists(sbom_path_in_new_revision):
+                raise base.ASFQuartException("SBOM file already exists", errorcode=400)
 
-        # Create and queue the task
-        sbom_task = models.Task(
-            task_type=models.TaskType.SBOM_GENERATE_CYCLONEDX,
-            task_args=sbom.GenerateCycloneDX(
-                artifact_path=str(full_path),
-                output_path=str(full_sbom_path),
-            ).model_dump(),
-            added=datetime.datetime.now(datetime.UTC),
-            status=models.TaskStatus.QUEUED,
-            release_name=release.name,
-        )
-        data.add(sbom_task)
-        await data.commit()
+            # Create and queue the task, using paths within the new revision
+            async with db.session() as data:
+                # We still need release.name for the task metadata
+                release = await data.release(
+                    name=models.release_name(project_name, version_name), _project=True
+                ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
+
+                sbom_task = models.Task(
+                    task_type=models.TaskType.SBOM_GENERATE_CYCLONEDX,
+                    task_args=sbom.GenerateCycloneDX(
+                        artifact_path=str(path_in_new_revision.resolve()),
+                        output_path=str(sbom_path_in_new_revision.resolve()),
+                    ).model_dump(),
+                    added=datetime.datetime.now(datetime.UTC),
+                    status=models.TaskStatus.QUEUED,
+                    release_name=release.name,
+                    draft_revision=new_revision_name,
+                )
+                data.add(sbom_task)
+                await data.commit()
+
+                # We must wait until the sbom_task is complete before we can queue checks
+                # Maximum wait time is 60 * 100ms = 6000ms
+                for _attempt in range(60):
+                    await data.refresh(sbom_task)
+                    if sbom_task.status != models.TaskStatus.QUEUED:
+                        break
+                    # Wait 100ms before checking again
+                    await asyncio.sleep(0.1)
+
+    except Exception as e:
+        logging.exception("Error generating SBOM:")
+        await quart.flash(f"Error generating SBOM: {e!s}", "error")
+        return await session.redirect(review, project_name=project_name, version_name=version_name)
 
     return await session.redirect(
         review,
-        success=f"SBOM generation task queued for {pathlib.Path(file_path).name}",
+        success=f"SBOM generation task queued for {rel_path.name}",
         project_name=project_name,
         version_name=version_name,
     )
@@ -659,7 +694,7 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
-        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / file_path)
+        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / "latest" / file_path)
 
         # Check that the file exists
         if not await aiofiles.os.path.exists(full_path):
@@ -734,7 +769,7 @@ async def viewer_path(
         )
 
     _max_view_size = 1 * 1024 * 1024
-    full_path = util.get_release_candidate_draft_dir() / project_name / version_name / file_path
+    full_path = util.get_release_candidate_draft_dir() / project_name / version_name / "latest" / file_path
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
     return await quart.render_template(
         "phase-viewer-path.html",
@@ -850,7 +885,9 @@ async def _promote(
     if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
         return await session.redirect(promote, error="This release is not in the candidate draft phase")
 
-    source_dir = util.get_release_candidate_draft_dir() / project_name / version_name
+    base_dir = util.get_release_candidate_draft_dir() / project_name / version_name
+    # Read the "latest" symlink and make an absolute path from it relative to base_dir
+    source_dir = base_dir / await aiofiles.os.readlink(str(base_dir / "latest"))
     target_dir: pathlib.Path
     success_message: str
 
@@ -872,14 +909,16 @@ async def _promote(
         target_dir = util.get_release_dir() / project_name / version_name
         success_message = "Candidate draft successfully promoted to release (after announcement)"
     else:
-        # Should not happen due to form validation
+        # Should not happen, due to form validation
         return await session.redirect(promote, error="Unsupported target phase")
 
     if await aiofiles.os.path.exists(target_dir):
         return await session.redirect(promote, error=f"Target directory {target_dir.name} already exists")
 
     await data.commit()
+    logging.warning(f"Moving {source_dir} to {target_dir} (base: {base_dir})")
     await aioshutil.move(str(source_dir), str(target_dir))
+    await aioshutil.rmtree(str(base_dir))  # type: ignore[call-arg]
 
     return await session.redirect(promote, success=success_message)
 
@@ -887,33 +926,39 @@ async def _promote(
 async def _upload_files(
     project_name: str,
     version_name: str,
+    asf_uid: str,
     file_name: pathlib.Path | None,
     files: Sequence[datastructures.FileStorage],
 ) -> int:
-    """Process and save the uploaded files."""
-    # Create target directory
-    target_dir = util.get_release_candidate_draft_dir() / project_name / version_name
-    target_dir.mkdir(parents=True, exist_ok=True)
+    """Process and save the uploaded files into a new draft revision."""
+    async with revision.create_and_manage(project_name, version_name, asf_uid) as (
+        new_revision_dir,
+        _new_revision_name,
+    ):
 
-    def get_filepath(file: datastructures.FileStorage) -> pathlib.Path:
-        # Use the original filename if no path is specified
-        if not file_name:
-            if not file.filename:
-                raise routes.FlashError("No filename provided")
-            return pathlib.Path(file.filename)
-        else:
-            return file_name
+        def get_target_path(file: datastructures.FileStorage) -> pathlib.Path:
+            # Determine the target path within the new revision directory
+            relative_file_path: pathlib.Path
+            if not file_name:
+                if not file.filename:
+                    raise routes.FlashError("No filename provided")
+                # Use the original name
+                relative_file_path = pathlib.Path(file.filename)
+            else:
+                # Use the provided name, relative to its anchor
+                # In other words, ignore the leading "/"
+                relative_file_path = file_name.relative_to(file_name.anchor)
 
-    for file in files:
-        # Save file to specified path
-        file_path = get_filepath(file)
-        target_path = target_dir / file_path.relative_to(file_path.anchor)
-        target_path.parent.mkdir(parents=True, exist_ok=True)
+            # Construct path inside the new revision directory
+            target_path = new_revision_dir / relative_file_path
+            return target_path
 
-        await _save_file(file, target_path)
-
-    # Ensure that checks are queued again
-    await tasks.draft_checks(project_name, version_name)
+        # Save each uploaded file to the new revision directory
+        for file in files:
+            target_path = get_target_path(file)
+            # Ensure parent directories exist within the new revision
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            await _save_file(file, target_path)
 
     return len(files)
 

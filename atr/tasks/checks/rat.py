@@ -23,8 +23,6 @@ import tempfile
 import xml.etree.ElementTree as ElementTree
 from typing import Any, Final
 
-import pydantic
-
 import atr.config as config
 import atr.tasks.checks as checks
 import atr.tasks.checks.targz as targz
@@ -44,27 +42,10 @@ _JAVA_MEMORY_ARGS: Final[list[str]] = []
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-class Check(pydantic.BaseModel):
-    """Parameters for Apache RAT license checking."""
-
-    release_name: str = pydantic.Field(..., description="Release name")
-    primary_rel_path: str = pydantic.Field(..., description="Relative path to the archive file to check")
-    rat_jar_path: str = pydantic.Field(
-        default=_CONFIG.APACHE_RAT_JAR_PATH, description="Path to the Apache RAT JAR file"
-    )
-    max_extract_size: int = pydantic.Field(
-        default=_CONFIG.MAX_EXTRACT_SIZE, description="Maximum extraction size in bytes"
-    )
-    chunk_size: int = pydantic.Field(default=_CONFIG.EXTRACT_CHUNK_SIZE, description="Chunk size for extraction")
-
-
-@checks.with_model(Check)
-async def check(args: Check) -> str | None:
+async def check(args: checks.FunctionArguments) -> str | None:
     """Use Apache RAT to check the licenses of the files in the artifact."""
-    check_obj = await checks.Check.create(
-        checker=check, release_name=args.release_name, primary_rel_path=args.primary_rel_path
-    )
-    if not (artifact_abs_path := await check_obj.abs_path()):
+    recorder = await args.recorder()
+    if not (artifact_abs_path := await recorder.abs_path()):
         return None
 
     _LOGGER.info(f"Checking RAT licenses for {artifact_abs_path} (rel: {args.primary_rel_path})")
@@ -73,24 +54,24 @@ async def check(args: Check) -> str | None:
         result_data = await asyncio.to_thread(
             _check_core_logic,
             artifact_path=str(artifact_abs_path),
-            rat_jar_path=args.rat_jar_path,
-            max_extract_size=args.max_extract_size,
-            chunk_size=args.chunk_size,
+            rat_jar_path=args.extra_args.get("rat_jar_path", _CONFIG.APACHE_RAT_JAR_PATH),
+            max_extract_size=args.extra_args.get("max_extract_size", _CONFIG.MAX_EXTRACT_SIZE),
+            chunk_size=args.extra_args.get("chunk_size", _CONFIG.EXTRACT_CHUNK_SIZE),
         )
 
         if result_data.get("error"):
             # Handle errors from within the core logic
-            await check_obj.failure(result_data["message"], result_data)
+            await recorder.failure(result_data["message"], result_data)
         elif not result_data["valid"]:
             # Handle RAT validation failures
-            await check_obj.failure(result_data["message"], result_data)
+            await recorder.failure(result_data["message"], result_data)
         else:
             # Handle success
-            await check_obj.success(result_data["message"], result_data)
+            await recorder.success(result_data["message"], result_data)
 
     except Exception as e:
         # TODO: Or bubble for task failure?
-        await check_obj.failure("Error running Apache RAT check", {"error": str(e)})
+        await recorder.failure("Error running Apache RAT check", {"error": str(e)})
 
     return None
 

@@ -23,7 +23,7 @@ import datetime
 import logging
 import os
 import string
-from typing import Final
+from typing import Final, TypeVar
 
 import aiofiles
 import aiofiles.os
@@ -32,12 +32,13 @@ import asyncssh
 import atr.config as config
 import atr.db as db
 import atr.db.models as models
-import atr.tasks.rsync as rsync
+import atr.revision as revision
 import atr.user as user
-import atr.util as util
 
 _LOGGER: Final = logging.getLogger(__name__)
 _CONFIG: Final = config.get()
+
+T = TypeVar("T")
 
 
 class _SSHServer(asyncssh.SSHServer):
@@ -165,66 +166,48 @@ def _command_path_validate(path: str) -> tuple[str, str] | str:
     return path_project, path_version
 
 
-def _command_simple_validate(argv: list[str]) -> str | None:
+def _command_simple_validate(argv: list[str]) -> tuple[str | None, int]:
     if argv[0] != "rsync":
-        return "The first argument should be rsync"
+        return "The first argument should be rsync", -1
 
     if argv[1] != "--server":
-        return "The second argument should be --server"
+        return "The second argument should be --server", -1
 
     # TODO: Might need to accept permutations of this
     # Also certain versions of rsync might change the options
     acceptable_options: Final[str] = "vlogDtpre"
     if not argv[2].startswith(f"-{acceptable_options}."):
-        return f"The third argument should start with -{acceptable_options}."
+        return f"The third argument should start with -{acceptable_options}.", -1
 
     if not argv[2][len(f"-{acceptable_options}.") :].isalpha():
-        return "The third argument should be a valid command"
+        return "The third argument should be a valid command", -1
 
     # Support --delete as an optional argument before the path
     if argv[3] != "--delete":
         # No --delete, short command
         if argv[3] != ".":
-            return "The fourth argument should be ."
+            return "The fourth argument should be .", -1
         if len(argv) != 5:
-            return "There should be 5 arguments"
+            return "There should be 5 arguments", -1
+        path_index = 4
     else:
         # Has --delete, long command
         if argv[4] != ".":
-            return "The fifth argument should be ."
+            return "The fifth argument should be .", -1
         if len(argv) != 6:
-            return "There should be 6 arguments"
-
-    return None
-
-
-async def _command_validate(process: asyncssh.SSHServerProcess) -> tuple[str, str, list[str]] | None:
-    def fail(message: str) -> tuple[str, str, list[str]] | None:
-        # NOTE: Changing the return type to just None really confuses mypy
-        _LOGGER.error(message)
-        process.stderr.write(f"ATR SSH error: {message}\nCommand: {process.command}\n".encode())
-        process.exit(1)
-        return None
-
-    command = process.command
-    if not command:
-        return fail("No command specified")
-
-    _LOGGER.info(f"Command received: {command}")
-    argv = command.split()
-
-    error = _command_simple_validate(argv)
-    if error:
-        return fail(error)
-
-    if argv[3] == "--delete":
+            return "There should be 6 arguments", -1
         path_index = 5
-    else:
-        path_index = 4
 
+    return None, path_index
+
+
+async def _command_validate(
+    process: asyncssh.SSHServerProcess, argv: list[str], path_index: int
+) -> tuple[str, str] | None:
     result = _command_path_validate(argv[path_index])
     if isinstance(result, str):
-        return fail(result)
+        _fail(process, result, None)
+        return None
     path_project, path_version = result
 
     # Ensure that the user has permission to upload to this project
@@ -232,30 +215,141 @@ async def _command_validate(process: asyncssh.SSHServerProcess) -> tuple[str, st
         project = await data.project(name=path_project, _committee=True).get()
         if not project:
             # Projects are public, so existence information is public
-            return fail("This project does not exist")
+            _fail(process, "This project does not exist", None)
+            return None
         release = await data.release(project_id=project.id, version=path_version).get()
         # The SSH UID has also been validated by SSH as being the ASF UID
         # Since users can only set an SSH key when authenticated using ASF OAuth
         ssh_uid = process.get_extra_info("username")
         if not release:
             # The user is requesting to create a new release
-            # Check if the user has permission to create a release for this project
+            # Check whether the user has permission to create a release for this project
             if not user.is_committee_member(project.committee, ssh_uid):
-                return fail("You must be a member of this project's committee to create a release")
+                _fail(process, "You must be a member of this project's committee to create a release", None)
+                return None
         else:
             # The user is requesting to upload to an existing release
-            # Check if the user has permission to upload to this release
+            # Check whether the user has permission to upload to this release
             if not user.is_committer(release.committee, ssh_uid):
-                return fail("You must be a member of this project's committee or a committer to upload to this release")
+                _fail(
+                    process,
+                    "You must be a member of this project's committee or a committer to upload to this release",
+                    None,
+                )
+                return None
+    return path_project, path_version
 
-    # Set the target directory to the release storage directory
-    argv[path_index] = str(util.get_release_candidate_draft_dir() / path_project / path_version)
-    _LOGGER.info(f"Modified command: {argv}")
 
-    # Create the release's storage directory if it doesn't exist
-    await aiofiles.os.makedirs(argv[path_index], exist_ok=True)
+async def _ensure_release_object(
+    process: asyncssh.SSHServerProcess, project_name: str, version_name: str, new_draft_revision: str
+) -> bool:
+    try:
+        async with db.session() as data:
+            async with data.begin():
+                release = await data.release(
+                    name=models.release_name(project_name, version_name), _committee=True
+                ).get()
+                if release is None:
+                    project = await data.project(name=project_name, _committee=True).demand(
+                        RuntimeError("Project not found")
+                    )
+                    # Create a new release object
+                    release = models.Release(
+                        project_id=project.id,
+                        project=project,
+                        version=version_name,
+                        stage=models.ReleaseStage.RELEASE_CANDIDATE,
+                        phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+                        created=datetime.datetime.now(datetime.UTC),
+                    )
+                    data.add(release)
+                elif release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+                    return _fail(
+                        process, f"Release {release.name} is no longer in draft phase ({release.phase.value})", False
+                    )
 
-    return path_project, path_version, argv
+                # # TODO: We now do this in the context manager, so we can delete the rsync task
+                # data.add(
+                #     models.Task(
+                #         status=models.TaskStatus.QUEUED,
+                #         task_type=models.TaskType.RSYNC_ANALYSE,
+                #         task_args=rsync.Analyse(
+                #             project_name=project_name,
+                #             release_version=version_name,
+                #             draft_revision=new_draft_revision,
+                #         ).model_dump(),
+                #         release_name=models.release_name(project_name, version_name),
+                #         draft_revision=new_draft_revision,
+                #     )
+                # )
+        return True
+    except Exception as e:
+        _LOGGER.exception("Error finalising upload in database")
+        return _fail(process, f"Internal error finalising upload: {e}", False)
+
+
+async def _execute_rsync(process: asyncssh.SSHServerProcess, argv: list[str]) -> int:
+    # This is Step 2 of the upload process
+    _LOGGER.info(f"Executing modified command: {' '.join(argv)}")
+    proc = await asyncio.create_subprocess_shell(
+        " ".join(argv),
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    await process.redirect(stdin=proc.stdin, stdout=proc.stdout, stderr=proc.stderr)
+    exit_status = await proc.wait()
+    return exit_status
+
+
+def _fail(proc: asyncssh.SSHServerProcess, message: str, return_value: T) -> T:
+    _LOGGER.error(message)
+    proc.stderr.write(f"ATR SSH error: {message}\n".encode())
+    proc.exit(1)
+    return return_value
+
+
+async def _process_validated_rsync(
+    process: asyncssh.SSHServerProcess,
+    argv: list[str],
+    path_index: int,
+    project_name: str,
+    version_name: str,
+) -> None:
+    asf_uid = process.get_extra_info("username")
+    exit_status = 1
+
+    try:
+        async with revision.create_and_manage(project_name, version_name, asf_uid) as (
+            new_revision_dir,
+            new_draft_revision,
+        ):
+            # Update the rsync command path to the new temporary revision directory
+            argv[path_index] = str(new_revision_dir)
+
+            # Execute the rsync command
+            exit_status = await _execute_rsync(process, argv)
+            if exit_status != 0:
+                _LOGGER.error(
+                    f"rsync failed with exit status {exit_status} for revision {new_draft_revision}. \
+                    Command: {process.command} (run as {' '.join(argv)})"
+                )
+                process.exit(exit_status)
+                return
+
+            # Ensure that the release object exists and is in the correct phase
+            if not await _ensure_release_object(process, project_name, version_name, new_draft_revision):
+                process.exit(1)
+                return
+
+            # Exit with the rsync exit status
+            process.exit(exit_status)
+
+    except Exception as e:
+        _LOGGER.exception(f"Error during draft revision processing for {project_name}-{version_name}")
+        _fail(process, f"Internal error processing revision: {e}", None)
+        if not process.is_closing():
+            process.exit(1)
 
 
 async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
@@ -263,73 +357,23 @@ async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
     asf_uid = process.get_extra_info("username")
     _LOGGER.info(f"Handling command for authenticated user: {asf_uid}")
 
-    validation_results = await _command_validate(process)
+    if not process.command:
+        process.stderr.write(b"ATR SSH error: No command specified\n")
+        process.exit(1)
+        return
+
+    _LOGGER.info(f"Command received: {process.command}")
+    argv = process.command.split()
+
+    simple_validation_error, path_index = _command_simple_validate(argv)
+    if simple_validation_error:
+        process.stderr.write(f"ATR SSH error: {simple_validation_error}\nCommand: {process.command}\n".encode())
+        process.exit(1)
+        return
+
+    validation_results = await _command_validate(process, argv, path_index)
     if not validation_results:
         return
-    project_name, release_version, argv = validation_results
+    project_name, version_name = validation_results
 
-    try:
-        # Create subprocess to actually run the command
-        # NOTE: asyncio base_events subprocess_shell requires cmd be str | bytes
-        # Ought to be list[str] | list[bytes] really
-        proc = await asyncio.create_subprocess_shell(
-            " ".join(argv),
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-
-        # Redirect I/O between SSH process and the subprocess
-        await process.redirect(stdin=proc.stdin, stdout=proc.stdout, stderr=proc.stderr)
-
-        # Wait for the process to complete
-        exit_status = await proc.wait()
-        if exit_status != 0:
-            _LOGGER.error(f"Command {process.command} failed with exit status {exit_status}")
-            process.exit(exit_status)
-            return
-
-        # Start a task to process the new files
-        async with db.session() as data:
-            release = await data.release(name=models.release_name(project_name, release_version), _committee=True).get()
-            # Create the release if it does not already exist
-            if release is None:
-                project = await data.project(name=project_name, _committee=True).demand(
-                    RuntimeError("Project not found")
-                )
-                release = models.Release(
-                    project_id=project.id,
-                    project=project,
-                    version=release_version,
-                    stage=models.ReleaseStage.RELEASE_CANDIDATE,
-                    phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
-                    created=datetime.datetime.now(),
-                )
-                data.add(release)
-                await data.commit()
-            if release.stage != models.ReleaseStage.RELEASE_CANDIDATE:
-                raise RuntimeError("Release is not in the candidate stage")
-            if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-                raise RuntimeError("Release is not in the candidate draft phase")
-
-            # Add a task to analyse the new files
-            data.add(
-                models.Task(
-                    status=models.TaskStatus.QUEUED,
-                    task_type=models.TaskType.RSYNC_ANALYSE,
-                    task_args=rsync.Analyse(
-                        project_name=project_name,
-                        release_version=release_version,
-                    ).model_dump(),
-                )
-            )
-            await data.commit()
-
-        # Exit the SSH process with the same status as the rsync process
-        # Should be 0 here
-        process.exit(exit_status)
-
-    except Exception as e:
-        _LOGGER.exception(f"Error executing command {process.command}")
-        process.stderr.write(f"Error: {e!s}\n")
-        process.exit(1)
+    await _process_validated_rsync(process, argv, path_index, project_name, version_name)

@@ -64,7 +64,7 @@ def register_routes(app: base.QuartApp) -> ModuleType:
     # NOTE: These imports are for their side effects only
     import atr.routes.modules as modules
 
-    # Add a global error handler to show helpful error messages with tracebacks.
+    # Add a global error handler to show helpful error messages with tracebacks
     @app.errorhandler(Exception)
     async def handle_any_exception(error: Exception) -> Any:
         import traceback

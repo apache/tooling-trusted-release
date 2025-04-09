@@ -27,19 +27,15 @@ import atr.tasks.checks as checks
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-@checks.with_model(checks.ReleaseAndRelPath)
-async def check(args: checks.ReleaseAndRelPath) -> str | None:
+async def check(args: checks.FunctionArguments) -> str | None:
     """Check the hash of a file."""
-    check_obj = await checks.Check.create(
-        checker=check, release_name=args.release_name, primary_rel_path=args.primary_rel_path
-    )
-
-    if not (hash_abs_path := await check_obj.abs_path()):
+    recorder = await args.recorder()
+    if not (hash_abs_path := await recorder.abs_path()):
         return None
 
     algorithm = hash_abs_path.suffix.lstrip(".")
     if algorithm not in {"sha256", "sha512"}:
-        await check_obj.failure("Unsupported hash algorithm", {"algorithm": algorithm})
+        await recorder.failure("Unsupported hash algorithm", {"algorithm": algorithm})
         return None
 
     # Remove the hash file suffix to get the artifact path
@@ -69,15 +65,15 @@ async def check(args: checks.ReleaseAndRelPath) -> str | None:
         expected_hash = expected_hash.strip().split()[0]
 
         if secrets.compare_digest(computed_hash, expected_hash):
-            await check_obj.success(
+            await recorder.success(
                 f"Hash ({algorithm}) matches expected value",
                 {"computed_hash": computed_hash, "expected_hash": expected_hash},
             )
         else:
-            await check_obj.failure(
+            await recorder.failure(
                 f"Hash ({algorithm}) mismatch",
                 {"computed_hash": computed_hash, "expected_hash": expected_hash},
             )
     except Exception as e:
-        await check_obj.failure("Unable to verify hash", {"error": str(e)})
+        await recorder.failure("Unable to verify hash", {"error": str(e)})
     return None

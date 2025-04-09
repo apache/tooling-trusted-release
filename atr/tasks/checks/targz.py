@@ -20,47 +20,32 @@ import logging
 import tarfile
 from typing import Final
 
-import pydantic
-
 import atr.tasks.checks as checks
 
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-class Integrity(pydantic.BaseModel):
-    """Parameters for archive integrity checking."""
-
-    release_name: str = pydantic.Field(..., description="Release name")
-    primary_rel_path: str = pydantic.Field(..., description="Relative path to the .tar.gz file to check")
-    chunk_size: int = pydantic.Field(default=4096, description="Size of chunks to read when checking the file")
-
-
-@checks.with_model(Integrity)
-async def integrity(args: Integrity) -> str | None:
+async def integrity(args: checks.FunctionArguments) -> str | None:
     """Check the integrity of a .tar.gz file."""
-    check = await checks.Check.create(
-        checker=integrity, release_name=args.release_name, primary_rel_path=args.primary_rel_path
-    )
-    if not (artifact_abs_path := await check.abs_path()):
+    recorder = await args.recorder()
+    if not (artifact_abs_path := await recorder.abs_path()):
         return None
 
     _LOGGER.info(f"Checking integrity for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
+    chunk_size = 4096
     try:
-        size = await asyncio.to_thread(_integrity_core, str(artifact_abs_path), args.chunk_size)
-        await check.success("Able to read all entries of the archive using tarfile", {"size": size})
+        size = await asyncio.to_thread(_integrity_core, str(artifact_abs_path), chunk_size)
+        await recorder.success("Able to read all entries of the archive using tarfile", {"size": size})
     except Exception as e:
-        await check.failure("Unable to read all entries of the archive using tarfile", {"error": str(e)})
+        await recorder.failure("Unable to read all entries of the archive using tarfile", {"error": str(e)})
     return None
 
 
-@checks.with_model(checks.ReleaseAndRelPath)
-async def structure(args: checks.ReleaseAndRelPath) -> str | None:
+async def structure(args: checks.FunctionArguments) -> str | None:
     """Check the structure of a .tar.gz file."""
-    check = await checks.Check.create(
-        checker=structure, release_name=args.release_name, primary_rel_path=args.primary_rel_path
-    )
-    if not (artifact_abs_path := await check.abs_path()):
+    recorder = await args.recorder()
+    if not (artifact_abs_path := await recorder.abs_path()):
         return None
 
     filename = artifact_abs_path.name
@@ -74,17 +59,17 @@ async def structure(args: checks.ReleaseAndRelPath) -> str | None:
     try:
         root = await asyncio.to_thread(root_directory, str(artifact_abs_path))
         if root == expected_root:
-            await check.success(
+            await recorder.success(
                 "Archive contains exactly one root directory matching the expected name",
                 {"root": root, "expected": expected_root},
             )
         else:
-            await check.failure(
+            await recorder.failure(
                 f"Root directory '{root}' does not match expected name '{expected_root}'",
                 {"root": root, "expected": expected_root},
             )
     except Exception as e:
-        await check.failure("Unable to verify archive structure", {"error": str(e)})
+        await recorder.failure("Unable to verify archive structure", {"error": str(e)})
     return None
 
 

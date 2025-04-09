@@ -31,6 +31,7 @@ import wtforms
 
 import atr.db as db
 import atr.db.models as models
+import atr.revision as revision
 import atr.routes as routes
 import atr.tasks.vote as tasks_vote
 import atr.user as user
@@ -87,6 +88,7 @@ async def viewer(session: routes.CommitterSession, project_name: str, version_na
     file_stats = [
         stat async for stat in util.content_list(util.get_release_candidate_dir(), project_name, version_name)
     ]
+    logging.warning(f"File stats: {file_stats}")
 
     return await quart.render_template(
         "phase-viewer.html",
@@ -415,20 +417,27 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
 
             await data.commit()
 
-    await _resolve_post_files(project_name, release, vote_result)
+    await _resolve_post_files(project_name, release, vote_result, session.uid)
     return await session.redirect(resolve, success=success_message)
 
 
-async def _resolve_post_files(project_name: str, release: models.Release, vote_result: str) -> None:
+async def _resolve_post_files(project_name: str, release: models.Release, vote_result: str, asf_uid: str) -> None:
     # TODO: Obtain a lock for this
     source = str(util.get_release_candidate_dir() / project_name / release.version)
     if vote_result == "passed":
+        # The vote passed, so promote the release candidate to the release preview directory
         target = str(util.get_release_preview_dir() / project_name / release.version)
-    else:
-        target = str(util.get_release_candidate_draft_dir() / project_name / release.version)
-    if await aiofiles.os.path.exists(target):
-        raise base.ASFQuartException("Release already exists", errorcode=400)
-    await aioshutil.move(source, target)
+        if await aiofiles.os.path.exists(target):
+            raise base.ASFQuartException("Release already exists", errorcode=400)
+        await aioshutil.move(source, target)
+        return
+
+    # The vote failed, so move the release candidate to the release draft directory
+    async with revision.create_and_manage(project_name, release.version, asf_uid) as (
+        new_revision_dir,
+        _new_revision_name,
+    ):
+        await aioshutil.move(source, new_revision_dir)
 
 
 async def _task_archive_url(task_mid: str) -> str | None:
