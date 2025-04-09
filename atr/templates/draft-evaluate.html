@@ -50,7 +50,10 @@
           </p>
           {% if revision_time %}
             <p>
-              <strong>Revision:</strong> {{ revision_time.strftime("%Y-%m-%d %H:%M:%S") }}
+              <strong>Revision:</strong>
+              <a href="{{ as_url(routes.draft.revisions, project_name=project_name, version_name=version_name) }}#{{ revision_name_from_link }}">
+                {{ revision_time.strftime("%Y-%m-%d %H:%M:%S") }}
+              </a>
             </p>
           {% endif %}
         </div>

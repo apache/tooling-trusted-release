@@ -17,9 +17,10 @@
     {% for revision in revision_history %}
       <div id="{{ revision.name }}" class="card mb-3">
         <div class="card-header d-flex justify-content-between align-items-center">
-          <h2 class="fs-6 my-2 mx-0 p-0 border-0">
+          <h2 class="fs-6 my-2 mx-0 p-0 border-0 atr-sans">
             <a href="#{{ revision.name }}"
-               class="fw-bold atr-sans text-decoration-none text-body">{{ revision.name }}</a>
+               class="fw-bold text-decoration-none text-body">{{ revision.name }}</a>
+            {% if revision.name == latest_revision_name %}<span class="badge bg-primary ms-2">Latest</span>{% endif %}
           </h2>
           <span class="fs-6 text-muted">
             {% if revision.timestamp %}
@@ -43,7 +44,7 @@
             <p class="fst-italic text-muted">No file changes detected in this revision.</p>
           {% else %}
             {% if revision.added %}
-              <p class="fs-6 fw-bold mt-3">Added files</p>
+              <h3 class="fs-6 fw-semibold mt-3 atr-sans">Added files</h3>
               <ul class="list-group list-group-flush mb-2">
                 {% for file in revision.added %}
                   <li class="list-group-item list-group-item-success py-1 px-3 small rounded-2">{{ file }}</li>
@@ -52,7 +53,7 @@
             {% endif %}
 
             {% if revision.removed %}
-              <p class="fs-6 fw-bold mt-3">Removed files</p>
+              <h3 class="fs-6 fw-semibold mt-3 atr-sans">Removed files</h3>
               <ul class="list-group list-group-flush mb-2">
                 {% for file in revision.removed %}
                   <li class="list-group-item list-group-item-danger py-1 px-3 small rounded-2">{{ file }}</li>
@@ -61,7 +62,7 @@
             {% endif %}
 
             {% if revision.modified %}
-              <p class="fs-6 fw-bold mt-3">Modified files</p>
+              <h3 class="fs-6 fw-semibold mt-3 atr-sans">Modified files</h3>
               <ul class="list-group list-group-flush mb-2">
                 {% for file in revision.modified %}
                   <li class="list-group-item list-group-item-warning py-1 px-3 small rounded-2">{{ file }}</li>
@@ -69,6 +70,15 @@
               </ul>
             {% endif %}
           {% endif %}
+
+          <h3 class="fs-6 fw-semibold mt-3 atr-sans">Actions</h3>
+          <div class="mt-3">
+            <form method="post"
+                  action="{{ as_url(routes.draft.revision_set, project_name=project_name, version_name=version_name) }}">
+              <input type="hidden" name="revision_name" value="{{ revision.name }}" />
+              <button type="submit" class="btn btn-sm btn-outline-danger">Set this revision as latest</button>
+            </form>
+          </div>
         </div>
       </div>
     {% endfor %}

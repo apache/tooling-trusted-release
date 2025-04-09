@@ -413,7 +413,7 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
     #         if (latest_check_result is None) or (check_result.created > latest_check_result):
     #             latest_check_result = check_result.created
 
-    revision_editor, revision_time = await revision.latest_info(project_name, version_name)
+    revision_name_from_link, revision_editor, revision_time = await revision.latest_info(project_name, version_name)
 
     delete_file_form = await DeleteFileForm.create_form()
     return await quart.render_template(
@@ -438,6 +438,7 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
         delete_file_form=delete_file_form,
         revision_editor=revision_editor,
         revision_time=revision_time,
+        revision_name_from_link=revision_name_from_link,
     )
 
 
@@ -614,6 +615,45 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
     )
 
 
+@routes.committer("/draft/revision/set/<project_name>/<version_name>", methods=["POST"])
+async def revision_set(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
+    """Set a specific revision as the latest for a candidate draft."""
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
+    form_data = await quart.request.form
+    revision_name = form_data.get("revision_name")
+    if not revision_name:
+        raise base.ASFQuartException("Missing revision name", errorcode=400)
+
+    release_dir = util.get_release_candidate_draft_dir() / project_name / version_name
+    target_revision_dir = release_dir / revision_name
+    latest_symlink_path = release_dir / "latest"
+
+    # Check that the target revision directory exists
+    if not await aiofiles.os.path.isdir(target_revision_dir):
+        raise base.ASFQuartException("Target revision directory not found", errorcode=404)
+
+    try:
+        # Target must be relative for the symlink
+        await util.update_atomic_symlink(latest_symlink_path, revision_name)
+    except Exception as e:
+        logging.exception("Error updating latest symlink:")
+        return await session.redirect(
+            revisions,
+            error=f"Failed to set revision {revision_name} as latest: {e!s}",
+            project_name=project_name,
+            version_name=version_name,
+        )
+
+    return await session.redirect(
+        revisions,
+        success=f"Revision {revision_name} set as latest",
+        project_name=project_name,
+        version_name=version_name,
+    )
+
+
 @routes.committer("/draft/revisions/<project_name>/<version_name>")
 async def revisions(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
     """Show the revision history for a release candidate draft."""
@@ -657,6 +697,11 @@ async def revisions(session: routes.CommitterSession, project_name: str, version
         parent_links_result = await data.execute(query)
         parent_map = {link.key: link.value for link in parent_links_result.scalars().all()}
 
+        # Determine the current latest revision
+        latest_revision_name: str | None = None
+        with contextlib.suppress(FileNotFoundError, OSError):
+            latest_revision_name = await aiofiles.os.readlink(str(release_dir / "latest"))
+
         revision_history = []
         prev_revision_files: set[pathlib.Path] | None = None
         prev_revision_name: str | None = None
@@ -681,6 +726,7 @@ async def revisions(session: routes.CommitterSession, project_name: str, version
         version_name=version_name,
         release=release,
         revision_history=list(reversed(revision_history)),
+        latest_revision_name=latest_revision_name,
     )
 
 
