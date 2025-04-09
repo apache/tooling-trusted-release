@@ -19,7 +19,7 @@
   {% elif phase_key == "release" %}
     {% set back_url = as_url(routes.release.view, project_name=project_name, version_name=version_name) %}
   {% endif %}
-  <a href="{{ back_url }}" class="back-link">← Back to Viewer</a>
+  <a href="{{ back_url }}" class="back-link">← Back to View files</a>
 
   <div class="p-3 mb-4 bg-light border rounded">
     <h2 class="mt-0">Viewing file: {{ file_path }}</h2>
