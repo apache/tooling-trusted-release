@@ -71,9 +71,9 @@ async def resolve(session: routes.CommitterSession) -> response.Response | str:
     return await _resolve_post(session)
 
 
-@routes.committer("/candidate/viewer/<project_name>/<version_name>")
-async def viewer(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
-    """Show all the files in the rsync upload directory for a release."""
+@routes.committer("/candidate/view/<project_name>/<version_name>")
+async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+    """View all the files in the rsync upload directory for a release."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
         return await session.redirect(vote, error="You do not have access to this project")
@@ -91,7 +91,7 @@ async def viewer(session: routes.CommitterSession, project_name: str, version_na
     logging.warning(f"File stats: {file_stats}")
 
     return await quart.render_template(
-        "phase-viewer.html",
+        "phase-view.html",
         file_stats=file_stats,
         release=release,
         format_datetime=routes.format_datetime,
@@ -102,15 +102,15 @@ async def viewer(session: routes.CommitterSession, project_name: str, version_na
     )
 
 
-@routes.committer("/candidate/viewer/<project_name>/<version_name>/<path:file_path>")
-async def viewer_path(
+@routes.committer("/candidate/view/<project_name>/<version_name>/<path:file_path>")
+async def view_path(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:
-    """Show the content of a specific file in the release candidate."""
+    """View the content of a specific file in the release candidate."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
         return await session.redirect(
-            viewer, error="You do not have access to this project", project_name=project_name, version_name=version_name
+            view, error="You do not have access to this project", project_name=project_name, version_name=version_name
         )
 
     async with db.session() as data:
@@ -122,7 +122,7 @@ async def viewer_path(
     full_path = util.get_release_candidate_dir() / project_name / version_name / file_path
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
     return await quart.render_template(
-        "phase-viewer-path.html",
+        "phase-view-path.html",
         release=release,
         project_name=project_name,
         version_name=version_name,

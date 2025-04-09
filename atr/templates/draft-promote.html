@@ -55,7 +55,7 @@
           </div>
           <div class="mt-3 d-flex flex-wrap gap-3 text-secondary fs-6">
             <span class="atr-candidate-meta-item">
-              <a href="{{ as_url(routes.draft.viewer, project_name=candidate_draft.project.name, version_name=candidate_draft.version) }}"
+              <a href="{{ as_url(routes.draft.view, project_name=candidate_draft.project.name, version_name=candidate_draft.version) }}"
                  class="btn btn-outline-primary btn-sm">
                 View {{ candidate_draft_files[candidate_draft.name] }} files
               </a>

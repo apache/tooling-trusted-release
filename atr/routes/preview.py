@@ -98,6 +98,25 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     return await session.redirect(promote, success="Preview deleted successfully")
 
 
+@routes.committer("/previews")
+async def previews(session: routes.CommitterSession) -> str:
+    """View all release previews to which the user has access."""
+    async with db.session() as data:
+        # Get all releases where the user is a PMC member or committer
+        releases = await data.release(
+            stage=models.ReleaseStage.RELEASE,
+            phase=models.ReleasePhase.RELEASE_PREVIEW,
+            _committee=True,
+            _packages=True,
+        ).all()
+    user_previews = session.only_user_releases(releases)
+
+    return await quart.render_template(
+        "previews.html",
+        previews=user_previews,
+    )
+
+
 @routes.committer("/preview/promote", methods=["GET", "POST"])
 async def promote(session: routes.CommitterSession) -> str | response.Response:
     """Allow the user to promote a release preview."""
@@ -182,31 +201,12 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
     )
 
 
-@routes.committer("/preview/review")
-async def review(session: routes.CommitterSession) -> str:
-    """Show all release previews to which the user has access."""
-    async with db.session() as data:
-        # Get all releases where the user is a PMC member or committer
-        releases = await data.release(
-            stage=models.ReleaseStage.RELEASE,
-            phase=models.ReleasePhase.RELEASE_PREVIEW,
-            _committee=True,
-            _packages=True,
-        ).all()
-    user_previews = session.only_user_releases(releases)
-
-    return await quart.render_template(
-        "preview-review.html",
-        previews=user_previews,
-    )
-
-
-@routes.committer("/preview/viewer/<project_name>/<version_name>")
-async def viewer(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
-    """Show all the files in the rsync upload directory for a release."""
+@routes.committer("/preview/view/<project_name>/<version_name>")
+async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+    """View all the files in the rsync upload directory for a release."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(review, error="You do not have access to this project")
+        return await session.redirect(previews, error="You do not have access to this project")
 
     # Check that the release exists
     async with db.session() as data:
@@ -218,7 +218,7 @@ async def viewer(session: routes.CommitterSession, project_name: str, version_na
     file_stats = [stat async for stat in util.content_list(util.get_release_preview_dir(), project_name, version_name)]
 
     return await quart.render_template(
-        "phase-viewer.html",
+        "phase-view.html",
         file_stats=file_stats,
         release=release,
         format_datetime=routes.format_datetime,
@@ -229,15 +229,15 @@ async def viewer(session: routes.CommitterSession, project_name: str, version_na
     )
 
 
-@routes.committer("/preview/viewer/<project_name>/<version_name>/<path:file_path>")
-async def viewer_path(
+@routes.committer("/preview/view/<project_name>/<version_name>/<path:file_path>")
+async def view_path(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:
-    """Show the content of a specific file in the release preview."""
+    """View the content of a specific file in the release preview."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
         return await session.redirect(
-            viewer, error="You do not have access to this project", project_name=project_name, version_name=version_name
+            view, error="You do not have access to this project", project_name=project_name, version_name=version_name
         )
 
     async with db.session() as data:
@@ -249,7 +249,7 @@ async def viewer_path(
     full_path = util.get_release_preview_dir() / project_name / version_name / file_path
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
     return await quart.render_template(
-        "phase-viewer-path.html",
+        "phase-view-path.html",
         release=release,
         project_name=project_name,
         version_name=version_name,

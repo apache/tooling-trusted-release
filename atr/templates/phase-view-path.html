@@ -11,13 +11,13 @@
 {% block content %}
   {# Generate back link based on phase_key #}
   {% if phase_key == "draft" %}
-    {% set back_url = as_url(routes.draft.viewer, project_name=project_name, version_name=version_name) %}
+    {% set back_url = as_url(routes.draft.view, project_name=project_name, version_name=version_name) %}
   {% elif phase_key == "candidate" %}
-    {% set back_url = as_url(routes.candidate.viewer, project_name=project_name, version_name=version_name) %}
+    {% set back_url = as_url(routes.candidate.view, project_name=project_name, version_name=version_name) %}
   {% elif phase_key == "preview" %}
-    {% set back_url = as_url(routes.preview.viewer, project_name=project_name, version_name=version_name) %}
+    {% set back_url = as_url(routes.preview.view, project_name=project_name, version_name=version_name) %}
   {% elif phase_key == "release" %}
-    {% set back_url = as_url(routes.release.viewer, project_name=project_name, version_name=version_name) %}
+    {% set back_url = as_url(routes.release.view, project_name=project_name, version_name=version_name) %}
   {% endif %}
   <a href="{{ back_url }}" class="back-link">← Back to Viewer</a>
 

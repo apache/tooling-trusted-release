@@ -312,11 +312,11 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     form = await DeleteKeyForm.create_form(data=await quart.request.form)
 
     if not await form.validate_on_submit():
-        return await session.redirect(review, error="Invalid request for key deletion.")
+        return await session.redirect(keys, error="Invalid request for key deletion.")
 
     fingerprint = (await quart.request.form).get("fingerprint")
     if not fingerprint:
-        return await session.redirect(review, error="Missing key fingerprint for deletion.")
+        return await session.redirect(keys, error="Missing key fingerprint for deletion.")
 
     async with db.session() as data:
         async with data.begin():
@@ -325,22 +325,22 @@ async def delete(session: routes.CommitterSession) -> response.Response:
             if key:
                 # Delete the GPG key
                 await data.delete(key)
-                return await session.redirect(review, success="GPG key deleted successfully")
+                return await session.redirect(keys, success="GPG key deleted successfully")
 
             # If not a GPG key, try to get an SSH key
             ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=session.uid).get()
             if ssh_key:
                 # Delete the SSH key
                 await data.delete(ssh_key)
-                return await session.redirect(review, success="SSH key deleted successfully")
+                return await session.redirect(keys, success="SSH key deleted successfully")
 
             # No key was found
-            return await session.redirect(review, error="Key not found or not owned by you")
+            return await session.redirect(keys, error="Key not found or not owned by you")
 
 
-@routes.committer("/keys/review")
-async def review(session: routes.CommitterSession) -> str:
-    """Show all keys associated with the user's account."""
+@routes.committer("/keys")
+async def keys(session: routes.CommitterSession) -> str:
+    """View all keys associated with the user's account."""
     # Get all existing keys for the user
     async with db.session() as data:
         user_keys = await data.public_signing_key(apache_uid=session.uid, _committees=True).all()
@@ -380,7 +380,7 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
         async with db.session() as data:
             async with data.begin():
                 data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=session.uid))
-        return await session.redirect(review, success=f"SSH key added successfully: {fingerprint}")
+        return await session.redirect(keys, success=f"SSH key added successfully: {fingerprint}")
 
     return await quart.render_template(
         "keys-ssh-add.html",

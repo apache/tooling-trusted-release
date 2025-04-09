@@ -29,7 +29,7 @@
             {% set phase_value = release.phase.value %}
             {% if release.project %}
               {% if phase_value == "release_candidate_draft" %}
-                <a href="{{ as_url(routes.draft.review, project_name=release.project.name, version_name=release.version) }}">{{ release.name }}</a>
+                <a href="{{ as_url(routes.draft.evaluate, project_name=release.project.name, version_name=release.version) }}">{{ release.name }}</a>
               {% elif phase_value == "release_candidate_before_vote" %}
                 <a href="{{ as_url(routes.candidate.vote_project, project_name=release.project.name, version=release.version) }}">{{ release.name }}</a>
               {% elif phase_value == "release_candidate_during_vote" %}

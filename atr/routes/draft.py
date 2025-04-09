@@ -147,7 +147,7 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
             # TODO: Show the form with errors
             return await session.redirect(add, error="Invalid form data")
         await _add(session, form)
-        return await session.redirect(directory, success="Release candidate created successfully")
+        return await session.redirect(drafts, success="Release candidate created successfully")
 
     return await quart.render_template(
         "draft-add.html",
@@ -189,7 +189,7 @@ async def add_file(session: routes.CommitterSession, project_name: str, version_
 
             number_of_files = await _upload_files(project_name, version_name, session.uid, file_name, file_data)
             return await session.redirect(
-                review,
+                evaluate,
                 success=f"{number_of_files} file{'' if number_of_files == 1 else 's'} added successfully",
                 project_name=project_name,
                 version_name=version_name,
@@ -216,7 +216,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         for _field, errors in form.errors.items():
             for error in errors:
                 await quart.flash(f"{error}", "error")
-        return await session.redirect(directory)
+        return await session.redirect(drafts)
 
     candidate_draft_name = form.candidate_draft_name.data
     if not candidate_draft_name:
@@ -250,7 +250,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         # Yet it works in preview.py
         await aioshutil.rmtree(draft_dir)  # type: ignore[call-arg]
 
-    return await session.redirect(directory, success="Candidate draft deleted successfully")
+    return await session.redirect(drafts, success="Candidate draft deleted successfully")
 
 
 @routes.committer("/draft/delete-file/<project_name>/<version_name>", methods=["POST"])
@@ -258,7 +258,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
     """Delete a specific file from the release candidate, creating a new revision."""
     form = await DeleteFileForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
-        return await session.redirect(review, project_name=project_name, version_name=version_name)
+        return await session.redirect(evaluate, project_name=project_name, version_name=version_name)
 
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
@@ -300,7 +300,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
     except Exception as e:
         logging.exception("Error deleting file:")
         await quart.flash(f"Error deleting file: {e!s}", "error")
-        return await session.redirect(review, project_name=project_name, version_name=version_name)
+        return await session.redirect(evaluate, project_name=project_name, version_name=version_name)
 
     success_message = f"File '{rel_path_to_delete.name}' deleted successfully"
     if metadata_files_deleted:
@@ -308,70 +308,13 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
             f", and {metadata_files_deleted} associated metadata "
             f"file{'' if metadata_files_deleted == 1 else 's'} deleted"
         )
-    return await session.redirect(review, success=success_message, project_name=project_name, version_name=version_name)
-
-
-@routes.committer("/draft/hashgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
-async def hashgen(
-    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
-) -> response.Response:
-    """Generate an sha256 or sha512 hash file for a candidate draft file, creating a new revision."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
-
-    # Get the hash type from the form data
-    # This is just a button, so we don't make a whole form validation schema for it
-    form = await quart.request.form
-    hash_type = form.get("hash_type")
-    if hash_type not in {"sha256", "sha512"}:
-        raise base.ASFQuartException("Invalid hash type", errorcode=400)
-
-    rel_path = pathlib.Path(file_path)
-
-    try:
-        async with revision.create_and_manage(project_name, version_name, session.uid) as (
-            new_revision_dir,
-            new_revision_name,
-        ):
-            path_in_new_revision = new_revision_dir / rel_path
-            hash_path_rel = rel_path.name + f".{hash_type}"
-            hash_path_in_new_revision = new_revision_dir / rel_path.parent / hash_path_rel
-
-            # Check that the source file exists in the new revision
-            if not await aiofiles.os.path.exists(path_in_new_revision):
-                logging.error(
-                    f"Source file {rel_path} not found in new revision {new_revision_name} for hash generation."
-                )
-                raise routes.FlashError("Source file not found in the new revision.")
-
-            # Check that the hash file does not already exist in the new revision
-            if await aiofiles.os.path.exists(hash_path_in_new_revision):
-                raise base.ASFQuartException(f"{hash_type} file already exists", errorcode=400)
-
-            # Read the source file from the new revision and compute the hash
-            hash_obj = hashlib.sha256() if hash_type == "sha256" else hashlib.sha512()
-            async with aiofiles.open(path_in_new_revision, "rb") as f:
-                while chunk := await f.read(8192):
-                    hash_obj.update(chunk)
-
-            # Write the hash file into the new revision
-            hash_value = hash_obj.hexdigest()
-            async with aiofiles.open(hash_path_in_new_revision, "w") as f:
-                await f.write(f"{hash_value}  {rel_path.name}\n")
-
-    except Exception as e:
-        logging.exception("Error generating hash file:")
-        await quart.flash(f"Error generating hash file: {e!s}", "error")
-        return await session.redirect(review, project_name=project_name, version_name=version_name)
-
     return await session.redirect(
-        review, success=f"{hash_type} file generated successfully", project_name=project_name, version_name=version_name
+        evaluate, success=success_message, project_name=project_name, version_name=version_name
     )
 
 
 @routes.committer("/drafts")
-async def directory(session: routes.CommitterSession) -> str:
+async def drafts(session: routes.CommitterSession) -> str:
     """Allow the user to view current candidate drafts."""
     # Do them outside of the template rendering call to ensure order
     # The user_candidate_drafts call can use cached results from user_projects
@@ -383,7 +326,7 @@ async def directory(session: routes.CommitterSession) -> str:
     delete_form = await DeleteForm.create_form()
 
     return await quart.render_template(
-        "draft-directory.html",
+        "drafts.html",
         asf_id=session.uid,
         projects=user_projects,
         server_domain=session.host,
@@ -393,63 +336,9 @@ async def directory(session: routes.CommitterSession) -> str:
     )
 
 
-@routes.committer("/draft/promote", methods=["GET", "POST"])
-async def promote(session: routes.CommitterSession) -> str | response.Response:
-    """Allow the user to promote a candidate draft."""
-    user_candidate_drafts = await session.user_candidate_drafts
-
-    # Create the forms
-    promote_form = await PromoteForm.create_form(
-        data=await quart.request.form if (quart.request.method == "POST") else None
-    )
-    delete_form = await DeleteForm.create_form()
-
-    if (quart.request.method == "POST") and (await promote_form.validate_on_submit()):
-        candidate_draft_name = promote_form.candidate_draft_name.data
-        if not candidate_draft_name:
-            return await session.redirect(promote, error="Missing required parameters")
-
-        # Extract project name and version
-        try:
-            project_name, version_name = candidate_draft_name.rsplit("-", 1)
-        except ValueError:
-            return await session.redirect(promote, error="Invalid candidate draft name format")
-
-        # Check that the user has access to the project
-        if not any((p.name == project_name) for p in (await session.user_projects)):
-            return await session.redirect(promote, error="You do not have access to this project")
-
-        selected_target_phase_value = promote_form.target_phase.data
-        try:
-            target_phase_enum = models.ReleasePhase(selected_target_phase_value)
-        except ValueError:
-            return await session.redirect(promote, error="Invalid target phase selected")
-
-        async with db.session() as data:
-            try:
-                return await _promote(
-                    data, candidate_draft_name, session, target_phase_enum, project_name, version_name
-                )
-            except Exception as e:
-                logging.exception("Error promoting candidate draft:")
-                return await session.redirect(promote, error=f"Error promoting candidate draft: {e!s}")
-
-    candidate_draft_files = {}
-    for candidate_draft in user_candidate_drafts:
-        candidate_draft_files[candidate_draft.name] = await _number_of_release_files(candidate_draft)
-
-    return await quart.render_template(
-        "draft-promote.html",
-        candidate_drafts=user_candidate_drafts,
-        candidate_draft_files=candidate_draft_files,
-        promote_form=promote_form,
-        delete_form=delete_form,
-    )
-
-
-@routes.committer("/draft/review/<project_name>/<version_name>")
-async def review(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
-    """Show all the files in the rsync upload directory for a release."""
+@routes.committer("/draft/evaluate/<project_name>/<version_name>")
+async def evaluate(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+    """Evaluate all the files in the rsync upload directory for a release."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
         return await session.redirect(add, error="You do not have access to this project")
@@ -524,7 +413,7 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
 
     delete_file_form = await DeleteFileForm.create_form()
     return await quart.render_template(
-        "draft-review.html",
+        "draft-evaluate.html",
         asf_id=session.uid,
         project_name=project_name,
         version_name=version_name,
@@ -546,9 +435,9 @@ async def review(session: routes.CommitterSession, project_name: str, version_na
     )
 
 
-@routes.committer("/draft/review/<project_name>/<version_name>/<path:rel_path>")
-async def review_path(session: routes.CommitterSession, project_name: str, version_name: str, rel_path: str) -> str:
-    """Show the status of all checks for a specific file."""
+@routes.committer("/draft/evaluate/<project_name>/<version_name>/<path:rel_path>")
+async def evaluate_path(session: routes.CommitterSession, project_name: str, version_name: str, rel_path: str) -> str:
+    """Evaluate the status of all checks for a specific file."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
         raise base.ASFQuartException("You do not have access to this project", errorcode=403)
@@ -592,7 +481,7 @@ async def review_path(session: routes.CommitterSession, project_name: str, versi
     }
 
     return await quart.render_template(
-        "draft-review-path.html",
+        "draft-evaluate-path.html",
         project_name=project_name,
         version_name=version_name,
         rel_path=rel_path,
@@ -600,6 +489,122 @@ async def review_path(session: routes.CommitterSession, project_name: str, versi
         release=release,
         check_results=check_results_list,
         format_file_size=routes.format_file_size,
+    )
+
+
+@routes.committer("/draft/hashgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+async def hashgen(
+    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
+) -> response.Response:
+    """Generate an sha256 or sha512 hash file for a candidate draft file, creating a new revision."""
+    # Check that the user has access to the project
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
+    # Get the hash type from the form data
+    # This is just a button, so we don't make a whole form validation schema for it
+    form = await quart.request.form
+    hash_type = form.get("hash_type")
+    if hash_type not in {"sha256", "sha512"}:
+        raise base.ASFQuartException("Invalid hash type", errorcode=400)
+
+    rel_path = pathlib.Path(file_path)
+
+    try:
+        async with revision.create_and_manage(project_name, version_name, session.uid) as (
+            new_revision_dir,
+            new_revision_name,
+        ):
+            path_in_new_revision = new_revision_dir / rel_path
+            hash_path_rel = rel_path.name + f".{hash_type}"
+            hash_path_in_new_revision = new_revision_dir / rel_path.parent / hash_path_rel
+
+            # Check that the source file exists in the new revision
+            if not await aiofiles.os.path.exists(path_in_new_revision):
+                logging.error(
+                    f"Source file {rel_path} not found in new revision {new_revision_name} for hash generation."
+                )
+                raise routes.FlashError("Source file not found in the new revision.")
+
+            # Check that the hash file does not already exist in the new revision
+            if await aiofiles.os.path.exists(hash_path_in_new_revision):
+                raise base.ASFQuartException(f"{hash_type} file already exists", errorcode=400)
+
+            # Read the source file from the new revision and compute the hash
+            hash_obj = hashlib.sha256() if hash_type == "sha256" else hashlib.sha512()
+            async with aiofiles.open(path_in_new_revision, "rb") as f:
+                while chunk := await f.read(8192):
+                    hash_obj.update(chunk)
+
+            # Write the hash file into the new revision
+            hash_value = hash_obj.hexdigest()
+            async with aiofiles.open(hash_path_in_new_revision, "w") as f:
+                await f.write(f"{hash_value}  {rel_path.name}\n")
+
+    except Exception as e:
+        logging.exception("Error generating hash file:")
+        await quart.flash(f"Error generating hash file: {e!s}", "error")
+        return await session.redirect(evaluate, project_name=project_name, version_name=version_name)
+
+    return await session.redirect(
+        evaluate,
+        success=f"{hash_type} file generated successfully",
+        project_name=project_name,
+        version_name=version_name,
+    )
+
+
+@routes.committer("/draft/promote", methods=["GET", "POST"])
+async def promote(session: routes.CommitterSession) -> str | response.Response:
+    """Allow the user to promote a candidate draft."""
+    user_candidate_drafts = await session.user_candidate_drafts
+
+    # Create the forms
+    promote_form = await PromoteForm.create_form(
+        data=await quart.request.form if (quart.request.method == "POST") else None
+    )
+    delete_form = await DeleteForm.create_form()
+
+    if (quart.request.method == "POST") and (await promote_form.validate_on_submit()):
+        candidate_draft_name = promote_form.candidate_draft_name.data
+        if not candidate_draft_name:
+            return await session.redirect(promote, error="Missing required parameters")
+
+        # Extract project name and version
+        try:
+            project_name, version_name = candidate_draft_name.rsplit("-", 1)
+        except ValueError:
+            return await session.redirect(promote, error="Invalid candidate draft name format")
+
+        # Check that the user has access to the project
+        if not any((p.name == project_name) for p in (await session.user_projects)):
+            return await session.redirect(promote, error="You do not have access to this project")
+
+        selected_target_phase_value = promote_form.target_phase.data
+        try:
+            target_phase_enum = models.ReleasePhase(selected_target_phase_value)
+        except ValueError:
+            return await session.redirect(promote, error="Invalid target phase selected")
+
+        async with db.session() as data:
+            try:
+                return await _promote(
+                    data, candidate_draft_name, session, target_phase_enum, project_name, version_name
+                )
+            except Exception as e:
+                logging.exception("Error promoting candidate draft:")
+                return await session.redirect(promote, error=f"Error promoting candidate draft: {e!s}")
+
+    candidate_draft_files = {}
+    for candidate_draft in user_candidate_drafts:
+        candidate_draft_files[candidate_draft.name] = await _number_of_release_files(candidate_draft)
+
+    return await quart.render_template(
+        "draft-promote.html",
+        candidate_drafts=user_candidate_drafts,
+        candidate_draft_files=candidate_draft_files,
+        promote_form=promote_form,
+        delete_form=delete_form,
     )
 
 
@@ -671,10 +676,10 @@ async def sbomgen(
     except Exception as e:
         logging.exception("Error generating SBOM:")
         await quart.flash(f"Error generating SBOM: {e!s}", "error")
-        return await session.redirect(review, project_name=project_name, version_name=version_name)
+        return await session.redirect(evaluate, project_name=project_name, version_name=version_name)
 
     return await session.redirect(
-        review,
+        evaluate,
         success=f"SBOM generation task queued for {rel_path.name}",
         project_name=project_name,
         version_name=version_name,
@@ -722,9 +727,9 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
     )
 
 
-@routes.committer("/draft/viewer/<project_name>/<version_name>")
-async def viewer(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
-    """Show all the files in the rsync upload directory for a release."""
+@routes.committer("/draft/view/<project_name>/<version_name>")
+async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+    """View all the files in the rsync upload directory for a release."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
         return await session.redirect(add, error="You do not have access to this project")
@@ -741,7 +746,7 @@ async def viewer(session: routes.CommitterSession, project_name: str, version_na
     ]
 
     return await quart.render_template(
-        "phase-viewer.html",
+        "phase-view.html",
         file_stats=file_stats,
         release=release,
         format_datetime=routes.format_datetime,
@@ -752,15 +757,15 @@ async def viewer(session: routes.CommitterSession, project_name: str, version_na
     )
 
 
-@routes.committer("/draft/viewer/<project_name>/<version_name>/<path:file_path>")
-async def viewer_path(
+@routes.committer("/draft/view/<project_name>/<version_name>/<path:file_path>")
+async def view_path(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:
-    """Show the content of a specific file in the release candidate draft."""
+    """View the content of a specific file in the release candidate draft."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
         return await session.redirect(
-            viewer, error="You do not have access to this project", project_name=project_name, version_name=version_name
+            view, error="You do not have access to this project", project_name=project_name, version_name=version_name
         )
 
     async with db.session() as data:
@@ -772,7 +777,7 @@ async def viewer_path(
     full_path = util.get_release_candidate_draft_dir() / project_name / version_name / "latest" / file_path
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
     return await quart.render_template(
-        "phase-viewer-path.html",
+        "phase-view-path.html",
         release=release,
         project_name=project_name,
         version_name=version_name,

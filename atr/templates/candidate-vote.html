@@ -50,7 +50,7 @@
             <a class="btn btn-primary"
                href="{{ as_url(routes.candidate.vote_project, project_name=candidate.project.name, version=candidate.version) }}">Start vote</a>
             <a class="btn btn-outline-primary"
-               href="{{ as_url(routes.candidate.viewer, project_name=candidate.project.name, version_name=candidate.version) }}">View files</a>
+               href="{{ as_url(routes.candidate.view, project_name=candidate.project.name, version_name=candidate.version) }}">View files</a>
             <form method="post"
                   action="{{ as_url(routes.candidate.delete) }}"
                   class="d-inline-block m-0">

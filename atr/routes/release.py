@@ -70,9 +70,9 @@ async def release_bulk_status(session: routes.CommitterSession, task_id: int) ->
     return await quart.render_template("release-bulk.html", task=task, release=release, TaskStatus=models.TaskStatus)
 
 
-@routes.committer("/release/review")
-async def review(session: routes.CommitterSession) -> str:
-    """Show all releases."""
+@routes.committer("/releases")
+async def releases(session: routes.CommitterSession) -> str:
+    """View all releases."""
     # Releases are public, so we don't need to filter by user
     async with db.session() as data:
         # TODO: Improve this query
@@ -90,14 +90,14 @@ async def review(session: routes.CommitterSession) -> str:
         ).all()
 
     return await quart.render_template(
-        "release-review.html",
+        "releases.html",
         releases=list(releases_before_announcement) + list(releases_after_announcement),
     )
 
 
-@routes.committer("/release/viewer/<project_name>/<version_name>")
-async def viewer(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
-    """Show all the files in the rsync upload directory for a release."""
+@routes.committer("/release/view/<project_name>/<version_name>")
+async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+    """View all the files in the rsync upload directory for a release."""
     # Releases are public, so we don't need to filter by user
 
     # Check that the release exists
@@ -110,7 +110,7 @@ async def viewer(session: routes.CommitterSession, project_name: str, version_na
     file_stats = [stat async for stat in util.content_list(util.get_release_dir(), project_name, version_name)]
 
     return await quart.render_template(
-        "phase-viewer.html",
+        "phase-view.html",
         file_stats=file_stats,
         release=release,
         format_datetime=routes.format_datetime,
@@ -121,11 +121,11 @@ async def viewer(session: routes.CommitterSession, project_name: str, version_na
     )
 
 
-@routes.committer("/release/viewer/<project_name>/<version_name>/<path:file_path>")
-async def viewer_path(
+@routes.committer("/release/view/<project_name>/<version_name>/<path:file_path>")
+async def view_path(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:
-    """Show the content of a specific file in the final release."""
+    """View the content of a specific file in the final release."""
     # Releases are public, no specific access check needed here beyond being a committer
 
     async with db.session() as data:
@@ -137,7 +137,7 @@ async def viewer_path(
     full_path = util.get_release_dir() / project_name / version_name / file_path
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
     return await quart.render_template(
-        "phase-viewer-path.html",
+        "phase-view-path.html",
         release=release,
         project_name=project_name,
         version_name=version_name,
