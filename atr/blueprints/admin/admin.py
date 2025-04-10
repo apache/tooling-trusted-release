@@ -56,6 +56,53 @@ class DeleteReleaseForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Delete selected releases permanently")
 
 
+@admin.BLUEPRINT.route("/data")
+@admin.BLUEPRINT.route("/data/<model>")
+async def admin_data(model: str = "Committee") -> str:
+    """Browse all records in the database."""
+    async with db.session() as data:
+        # Map of model names to their classes
+        # TODO: Add distribution channel, key link, and any others
+        model_methods: dict[str, Callable[[], db.Query[Any]]] = {
+            "CheckResult": data.check_result,
+            "Committee": data.committee,
+            "Package": data.package,
+            "Project": data.project,
+            "PublicSigningKey": data.public_signing_key,
+            "Release": data.release,
+            "SSHKey": data.ssh_key,
+            "Task": data.task,
+            "TextValue": data.text_value,
+            "VotePolicy": data.vote_policy,
+        }
+
+        if model not in model_methods:
+            raise base.ASFQuartException(f"Model type '{model}' not found", 404)
+
+        # Get all records for the selected model
+        records = await model_methods[model]().all()
+
+        # Convert records to dictionaries for JSON serialization
+        records_dict = []
+        for record in records:
+            if hasattr(record, "dict"):
+                record_dict = record.dict()
+            else:
+                # Fallback for models without dict() method
+                record_dict = {
+                    "id": getattr(record, "id", None),
+                    "name": getattr(record, "name", None),
+                }
+                for key in record.__dict__:
+                    if not key.startswith("_"):
+                        record_dict[key] = getattr(record, key)
+            records_dict.append(record_dict)
+
+        return await quart.render_template(
+            "data-browser.html", models=list(model_methods.keys()), model=model, records=records_dict
+        )
+
+
 @admin.BLUEPRINT.route("/delete-release", methods=["GET", "POST"])
 async def admin_delete_release() -> str | response.Response:
     """Page to delete selected releases and their associated data and files."""
@@ -105,6 +152,28 @@ async def admin_delete_release() -> str | response.Response:
     async with db.session() as data:
         releases = await data.release(_project=True).order_by(models.Release.name).all()
     return await quart.render_template("delete-release.html", form=form, releases=releases, stats=None)
+
+
+@admin.BLUEPRINT.route("/keys/delete-all")
+async def admin_keys_delete_all() -> str:
+    """Debug endpoint to delete all of a user's keys."""
+    web_session = await session.read()
+    if web_session is None:
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
+    uid = util.unwrap(web_session.uid)
+
+    async with db.session() as data:
+        async with data.begin():
+            # Get all keys for the user
+            # TODO: Use session.apache_uid instead of session.uid?
+            keys = await data.public_signing_key(apache_uid=uid).all()
+            count = len(keys)
+
+            # Delete all keys
+            for key in keys:
+                await data.delete(key)
+
+        return f"Deleted {count} keys"
 
 
 @admin.BLUEPRINT.route("/performance")
@@ -188,53 +257,6 @@ async def admin_performance() -> str:
     return await quart.render_template("performance.html", stats=sorted_summary)
 
 
-@admin.BLUEPRINT.route("/data")
-@admin.BLUEPRINT.route("/data/<model>")
-async def admin_data(model: str = "Committee") -> str:
-    """Browse all records in the database."""
-    async with db.session() as data:
-        # Map of model names to their classes
-        # TODO: Add distribution channel, key link, and any others
-        model_methods: dict[str, Callable[[], db.Query[Any]]] = {
-            "CheckResult": data.check_result,
-            "Committee": data.committee,
-            "Package": data.package,
-            "Project": data.project,
-            "PublicSigningKey": data.public_signing_key,
-            "Release": data.release,
-            "SSHKey": data.ssh_key,
-            "Task": data.task,
-            "TextValue": data.text_value,
-            "VotePolicy": data.vote_policy,
-        }
-
-        if model not in model_methods:
-            raise base.ASFQuartException(f"Model type '{model}' not found", 404)
-
-        # Get all records for the selected model
-        records = await model_methods[model]().all()
-
-        # Convert records to dictionaries for JSON serialization
-        records_dict = []
-        for record in records:
-            if hasattr(record, "dict"):
-                record_dict = record.dict()
-            else:
-                # Fallback for models without dict() method
-                record_dict = {
-                    "id": getattr(record, "id", None),
-                    "name": getattr(record, "name", None),
-                }
-                for key in record.__dict__:
-                    if not key.startswith("_"):
-                        record_dict[key] = getattr(record, key)
-            records_dict.append(record_dict)
-
-        return await quart.render_template(
-            "data-browser.html", models=list(model_methods.keys()), model=model, records=records_dict
-        )
-
-
 @admin.BLUEPRINT.route("/projects/update", methods=["GET", "POST"])
 async def admin_projects_update() -> str | response.Response | tuple[Mapping[str, Any], int]:
     """Update projects from remote data."""
@@ -259,6 +281,145 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
 
     # For GET requests, show the update form
     return await quart.render_template("update-committees.html")
+
+
+@admin.BLUEPRINT.route("/releases")
+async def admin_releases() -> str:
+    """Display a list of all releases across all stages and phases."""
+    async with db.session() as data:
+        releases = await data.release(_project=True, _committee=True).order_by(models.Release.name).all()
+    return await quart.render_template("releases.html", releases=releases)
+
+
+@admin.BLUEPRINT.route("/tasks")
+async def admin_tasks() -> str:
+    return await quart.render_template("tasks.html")
+
+
+@admin.BLUEPRINT.route("/test-kv")
+async def admin_test_kv() -> str:
+    """Test route for writing and reading from the TextValue KV store."""
+    test_ns = "kv_test"
+    test_key = str(uuid.uuid4())
+    test_value = f"Test value set at {datetime.datetime.now(datetime.UTC)}"
+    message: str
+
+    try:
+        async with db.session() as data:
+            existing = await data.text_value(ns=test_ns, key=test_key).get()
+            if existing:
+                existing.value = test_value
+                data.add(existing)
+            else:
+                new_entry = models.TextValue(ns=test_ns, key=test_key, value=test_value)
+                data.add(new_entry)
+            await data.commit()
+            _LOGGER.info(f"Text value test: Wrote {test_ns}/{test_key} = {test_value}")
+
+        async with db.session() as data:
+            read_back = await data.text_value(ns=test_ns, key=test_key).get()
+            if read_back and (read_back.value == test_value):
+                message = f"<p class='success'>Test SUCCESS: Wrote/read ok (ns='{test_ns}', key='{test_key}')</p>"
+                _LOGGER.info("Text value test SUCCESS")
+            elif read_back:
+                message = (
+                    f"<p class='error'>Test FAILED: Read back wrong value!</p>"
+                    f"<p>Expected: '{test_value}'</p>"
+                    f"<p>Got: '{read_back.value}'</p>"
+                )
+                _LOGGER.error(
+                    f"Text value test FAILED: Read back wrong value! Expected='{test_value}', got='{read_back.value}'"
+                )
+            else:
+                message = f"<p class='error'>Test FAILED: Failed read (ns='{test_ns}', key='{test_key}')</p>"
+                _LOGGER.error(f"Text value test FAILED: Failed to read back key='{test_key}' in ns='{test_ns}'")
+
+    except Exception as e:
+        message = f"<p class='error'>Test FAILED: Exception occurred - {e!s}</p>"
+        _LOGGER.exception("Text value test exception")
+
+    return f"""<!DOCTYPE html>
+<html>
+<head><title>Text value test result</title></head>
+<style>
+.error {{ color: red; }}
+.success {{ color: green; }}
+</style>
+<body>
+<h1>Text value test result</h1>
+{message}
+</body>
+</html>
+"""
+
+
+@admin.BLUEPRINT.route("/toggle-admin-view", methods=["POST"])
+async def admin_toggle_view() -> response.Response:
+    web_session = await session.read()
+    if web_session is None:
+        # For the type checker
+        # We should pass this as an argument, then it's guaranteed
+        raise base.ASFQuartException("Not authenticated", 401)
+    user_uid = web_session.uid
+    if user_uid is None:
+        raise base.ASFQuartException("Invalid session, uid is None", 500)
+
+    app = asfquart.APP
+    if not hasattr(app, "app_id") or not isinstance(app.app_id, str):
+        raise TypeError("Internal error: APP has no valid app_id")
+
+    cookie_id = app.app_id
+    session_dict = quart.session.get(cookie_id, {})
+    downgrade = not session_dict.get("downgrade_admin_to_user", False)
+    session_dict["downgrade_admin_to_user"] = downgrade
+
+    message = "Viewing as regular user" if downgrade else "Viewing as admin"
+    await quart.flash(message, "success")
+    referrer = quart.request.referrer
+    return quart.redirect(referrer or quart.url_for("admin.admin_data"))
+
+
+async def _delete_release_data(release_name: str) -> None:
+    """Handle the deletion of database records and filesystem data for a release."""
+    async with db.session() as data:
+        release = await data.release(name=release_name).demand(
+            base.ASFQuartException(f"Release '{release_name}' not found.", 404)
+        )
+        release_dir = util.release_directory(release)
+
+        # Delete from the database
+        _LOGGER.info("Deleting database records for release: %s", release_name)
+        # Cascade should handle this, but we delete manually anyway
+        tasks_to_delete = await data.task(release_name=release_name).all()
+        for task in tasks_to_delete:
+            await data.delete(task)
+        _LOGGER.debug("Deleted %d tasks for %s", len(tasks_to_delete), release_name)
+
+        checks_to_delete = await data.check_result(release_name=release_name).all()
+        for check in checks_to_delete:
+            await data.delete(check)
+        _LOGGER.debug("Deleted %d check results for %s", len(checks_to_delete), release_name)
+
+        await data.delete(release)
+        _LOGGER.info("Deleted release record: %s", release_name)
+        await data.commit()
+
+    # Delete from the filesystem
+    try:
+        if await aiofiles.os.path.isdir(release_dir):
+            _LOGGER.info("Deleting filesystem directory: %s", release_dir)
+            # Believe this to be another bug in mypy Protocol handling
+            # TODO: Confirm that this is a bug, and report upstream
+            await aioshutil.rmtree(release_dir)  # type: ignore[call-arg]
+            _LOGGER.info("Successfully deleted directory: %s", release_dir)
+        else:
+            _LOGGER.warning("Filesystem directory not found, skipping deletion: %s", release_dir)
+    except Exception as e:
+        _LOGGER.exception("Error deleting filesystem directory %s:", release_dir)
+        await quart.flash(
+            f"Database records for '{release_name}' deleted, but failed to delete filesystem directory: {e!s}",
+            "warning",
+        )
 
 
 async def _update_committees() -> tuple[int, int]:  # noqa: C901
@@ -390,164 +551,3 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
             tooling_committee.is_podling = False
 
     return added_count, updated_count
-
-
-@admin.BLUEPRINT.route("/test-kv")
-async def admin_test_kv() -> str:
-    """Test route for writing and reading from the TextValue KV store."""
-    test_ns = "kv_test"
-    test_key = str(uuid.uuid4())
-    test_value = f"Test value set at {datetime.datetime.now(datetime.UTC)}"
-    message: str
-
-    try:
-        async with db.session() as data:
-            existing = await data.text_value(ns=test_ns, key=test_key).get()
-            if existing:
-                existing.value = test_value
-                data.add(existing)
-            else:
-                new_entry = models.TextValue(ns=test_ns, key=test_key, value=test_value)
-                data.add(new_entry)
-            await data.commit()
-            _LOGGER.info(f"Text value test: Wrote {test_ns}/{test_key} = {test_value}")
-
-        async with db.session() as data:
-            read_back = await data.text_value(ns=test_ns, key=test_key).get()
-            if read_back and (read_back.value == test_value):
-                message = f"<p class='success'>Test SUCCESS: Wrote/read ok (ns='{test_ns}', key='{test_key}')</p>"
-                _LOGGER.info("Text value test SUCCESS")
-            elif read_back:
-                message = (
-                    f"<p class='error'>Test FAILED: Read back wrong value!</p>"
-                    f"<p>Expected: '{test_value}'</p>"
-                    f"<p>Got: '{read_back.value}'</p>"
-                )
-                _LOGGER.error(
-                    f"Text value test FAILED: Read back wrong value! Expected='{test_value}', got='{read_back.value}'"
-                )
-            else:
-                message = f"<p class='error'>Test FAILED: Failed read (ns='{test_ns}', key='{test_key}')</p>"
-                _LOGGER.error(f"Text value test FAILED: Failed to read back key='{test_key}' in ns='{test_ns}'")
-
-    except Exception as e:
-        message = f"<p class='error'>Test FAILED: Exception occurred - {e!s}</p>"
-        _LOGGER.exception("Text value test exception")
-
-    return f"""<!DOCTYPE html>
-<html>
-<head><title>Text value test result</title></head>
-<style>
-.error {{ color: red; }}
-.success {{ color: green; }}
-</style>
-<body>
-<h1>Text value test result</h1>
-{message}
-</body>
-</html>
-"""
-
-
-@admin.BLUEPRINT.route("/toggle-admin-view", methods=["POST"])
-async def admin_toggle_view() -> response.Response:
-    web_session = await session.read()
-    if web_session is None:
-        # For the type checker
-        # We should pass this as an argument, then it's guaranteed
-        raise base.ASFQuartException("Not authenticated", 401)
-    user_uid = web_session.uid
-    if user_uid is None:
-        raise base.ASFQuartException("Invalid session, uid is None", 500)
-
-    app = asfquart.APP
-    if not hasattr(app, "app_id") or not isinstance(app.app_id, str):
-        raise TypeError("Internal error: APP has no valid app_id")
-
-    cookie_id = app.app_id
-    session_dict = quart.session.get(cookie_id, {})
-    downgrade = not session_dict.get("downgrade_admin_to_user", False)
-    session_dict["downgrade_admin_to_user"] = downgrade
-
-    message = "Viewing as regular user" if downgrade else "Viewing as admin"
-    await quart.flash(message, "success")
-    referrer = quart.request.referrer
-    return quart.redirect(referrer or quart.url_for("admin.admin_data"))
-
-
-@admin.BLUEPRINT.route("/releases")
-async def admin_releases() -> str:
-    """Display a list of all releases across all stages and phases."""
-    async with db.session() as data:
-        releases = await data.release(_project=True, _committee=True).order_by(models.Release.name).all()
-    return await quart.render_template("releases.html", releases=releases)
-
-
-@admin.BLUEPRINT.route("/tasks")
-async def admin_tasks() -> str:
-    return await quart.render_template("tasks.html")
-
-
-@admin.BLUEPRINT.route("/keys/delete-all")
-async def admin_keys_delete_all() -> str:
-    """Debug endpoint to delete all of a user's keys."""
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-    uid = util.unwrap(web_session.uid)
-
-    async with db.session() as data:
-        async with data.begin():
-            # Get all keys for the user
-            # TODO: Use session.apache_uid instead of session.uid?
-            keys = await data.public_signing_key(apache_uid=uid).all()
-            count = len(keys)
-
-            # Delete all keys
-            for key in keys:
-                await data.delete(key)
-
-        return f"Deleted {count} keys"
-
-
-async def _delete_release_data(release_name: str) -> None:
-    """Handle the deletion of database records and filesystem data for a release."""
-    async with db.session() as data:
-        release = await data.release(name=release_name).demand(
-            base.ASFQuartException(f"Release '{release_name}' not found.", 404)
-        )
-        release_dir = util.release_directory(release)
-
-        # Delete from the database
-        _LOGGER.info("Deleting database records for release: %s", release_name)
-        # Cascade should handle this, but we delete manually anyway
-        tasks_to_delete = await data.task(release_name=release_name).all()
-        for task in tasks_to_delete:
-            await data.delete(task)
-        _LOGGER.debug("Deleted %d tasks for %s", len(tasks_to_delete), release_name)
-
-        checks_to_delete = await data.check_result(release_name=release_name).all()
-        for check in checks_to_delete:
-            await data.delete(check)
-        _LOGGER.debug("Deleted %d check results for %s", len(checks_to_delete), release_name)
-
-        await data.delete(release)
-        _LOGGER.info("Deleted release record: %s", release_name)
-        await data.commit()
-
-    # Delete from the filesystem
-    try:
-        if await aiofiles.os.path.isdir(release_dir):
-            _LOGGER.info("Deleting filesystem directory: %s", release_dir)
-            # Believe this to be another bug in mypy Protocol handling
-            # TODO: Confirm that this is a bug, and report upstream
-            await aioshutil.rmtree(release_dir)  # type: ignore[call-arg]
-            _LOGGER.info("Successfully deleted directory: %s", release_dir)
-        else:
-            _LOGGER.warning("Filesystem directory not found, skipping deletion: %s", release_dir)
-    except Exception as e:
-        _LOGGER.exception("Error deleting filesystem directory %s:", release_dir)
-        await quart.flash(
-            f"Database records for '{release_name}' deleted, but failed to delete filesystem directory: {e!s}",
-            "warning",
-        )
