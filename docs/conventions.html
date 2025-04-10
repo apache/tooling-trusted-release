@@ -152,6 +152,8 @@ def _verify_archive_integrity_do_something():
 </code></pre>
 <h3>Use terse comments on their own lines</h3>
 <p>Place comments on dedicated lines preceding the relevant code block. Comments at the ends of lines are strictly reserved for linter or type checker directives. This convention enhances code scannability for such directives. General comments must not appear at the end of code lines. Keep comments concise, using sentence case without terminal punctuation. Each sentence forming a comment must occupy its own line.</p>
+<h3>Prefer explicit checks over <code>assert</code></h3>
+<p>We do not use <code>assert</code>. If you need to guard against invalid states or inputs, use standard <code>if</code> checks and raise appropriate exceptions. If you need to help type checkers understand the type of a variable within a specific code block, in other words if you need to narrow a type, then use <code>if isinstance(...)</code> or <code>if not isinstance(...)</code> as appropriate.</p>
 <h2>HTML</h2>
 <h3>Use sentence case for headings, form labels, and submission buttons</h3>
 <p>We write headings, form labels, and submission buttons in the form &quot;This is some text&quot;, and not &quot;This is Some Text&quot; or &quot;This Is Some Text&quot;. This follows the <a href="https://en.wikipedia.org/wiki/Wikipedia:Manual_of_Style#Section_headings">Wikipedia style for headings</a>.</p>
