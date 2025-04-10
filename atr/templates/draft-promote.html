@@ -27,7 +27,7 @@
   <h1>Promote candidate draft</h1>
 
   <p>
-    On this page you can promote any release candidate draft to a release candidate. This will freeze the candidate draft into a candidate that can be voted on.
+    On this page you can promote any release candidate draft to a release candidate. This will freeze the candidate draft into a candidate that can be voted on, and delete its revision history.
   </p>
 
   {% if candidate_drafts %}
@@ -80,7 +80,7 @@
                 {{ promote_form.confirm_promote(class="form-check-input", id="confirm_promote_" + candidate_draft.name) }}
                 <label class="form-check-label"
                        for="confirm_promote_{{ candidate_draft.name }}">
-                  I understand this will freeze the candidate draft
+                  I understand this will freeze the candidate draft and delete its revision history
                 </label>
               </div>
               {% if promote_form.confirm_promote.errors %}
