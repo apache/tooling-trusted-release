@@ -77,8 +77,17 @@
                   {% endif %}
                   <p class="card-text">
                     {% if candidate_drafts|length > 0 %}
-                      This project already has {{ candidate_drafts|length }} candidate draft{{ "s" if candidate_drafts|length > 1 else "" }},
-                      but to create another one, use the command below.
+                      This project already has {{ candidate_drafts|length }} candidate draft{{ "s" if candidate_drafts|length > 1 else "" }}:
+                    </p>
+                    <ul>
+                      {% for draft in candidate_drafts %}
+                        <li>
+                          <a href="{{ as_url(routes.draft.drafts) }}#{{ project.name }}-{{ draft.version }}">{{ draft.version }}</a>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                    <p>
+                      But to create another one, use the command below.
                     {% else %}
                       This project does not have a candidate draft.
                       To create one and add files, use the command below.
@@ -107,13 +116,29 @@
                   {% endif %}
                   <p class="card-text">
                     {% if candidate_drafts|length > 0 %}
-                      This project already has {{ candidate_drafts|length }} candidate draft{{ "s" if candidate_drafts|length > 1 else "" }},
-                      but to create another one, use the command below.
+                      This project already has {{ candidate_drafts|length }} candidate draft{{ "s" if candidate_drafts|length > 1 else "" }}:
+                    </p>
+                    <ul>
+                      {% for draft in candidate_drafts %}
+                        <li>
+                          <a href="{{ as_url(routes.draft.drafts) }}#{{ project.name }}-{{ draft.version }}">{{ draft.version }}</a>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                    <p>
+                      But to create another one, use the command below.
                     {% else %}
                       This project does not have a candidate draft.
                       To create one, you must be a member of the PMC.
                     {% endif %}
                   </p>
+                </div>
+                <div class="card-footer bg-light border-1 pt-4 pb-4 position-relative">
+                  <button class="btn btn-sm btn-outline-secondary atr-copy-btn fs-6 position-absolute top-0 end-0 m-2"
+                          data-clipboard-target="#cmd-newdraft-{{ project.name|slugify }}">
+                    <i class="bi bi-clipboard"></i> Copy
+                  </button>
+                  <pre class="small mb-0" id="cmd-newdraft-{{ project.name|slugify }}">rsync -av -e 'ssh -p 2222' ${YOUR_FILES}/ {{ asf_id }}@{{ server_domain }}:/{{ project.name }}/${VERSION}/</pre>
                 </div>
               </div>
             </div>
