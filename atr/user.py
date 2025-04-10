@@ -59,7 +59,7 @@ def is_committee_member(committee: models.Committee | None, uid: str) -> bool:
     return any((member_uid == uid) for member_uid in committee.committee_members)
 
 
-async def projects(uid: str) -> list[models.Project]:
+async def projects(uid: str, committee_only: bool = False) -> list[models.Project]:
     user_projects: list[models.Project] = []
     async with db.session() as data:
         # Must have releases, because this is used in candidate_drafts
@@ -67,8 +67,12 @@ async def projects(uid: str) -> list[models.Project]:
         for p in projects:
             if p.committee is None:
                 continue
-            if (uid in p.committee.committee_members) or (uid in p.committee.committers):
-                user_projects.append(p)
+            if committee_only:
+                if uid in p.committee.committee_members:
+                    user_projects.append(p)
+            else:
+                if (uid in p.committee.committee_members) or (uid in p.committee.committers):
+                    user_projects.append(p)
     return user_projects
 
 

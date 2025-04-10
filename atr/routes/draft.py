@@ -41,6 +41,7 @@ import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
 import atr.tasks.sbom as sbom
+import atr.user as user
 import atr.util as util
 
 if TYPE_CHECKING:
@@ -122,7 +123,7 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
     """Show a page to allow the user to rsync files to candidate drafts."""
     # Do them outside of the template rendering call to ensure order
     # The user_candidate_drafts call can use cached results from user_projects
-    user_projects = await session.user_projects
+    user_projects = await user.projects(session.uid, committee_only=True)
     user_candidate_drafts = await session.user_candidate_drafts
     # Sort the project choices reverse chronologically by their creation date
     # This means that if the user added a project recently, it will be at the top of the list
