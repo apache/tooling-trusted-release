@@ -15,10 +15,11 @@
       <div class="user-info">
         <span>{{ current_user.fullname }}</span>
         (<code>{{ current_user.uid }}</code>)
+        <br />
+        <a href="#"
+           onclick="location.href='/auth?logout=/';"
+           class="logout-link"><i class="fa-solid fa-right-from-bracket"></i></a>
       </div>
-      <a href="#"
-         onclick="location.href='/auth?logout=/';"
-         class="logout-link"><i class="fa-solid fa-right-from-bracket"></i></a>
     {% else %}
 
       <a href="#"
@@ -102,7 +103,7 @@
         </li>
       </ul>
 
-      {% if is_admin_fn(current_user.uid) %}
+      {% if is_viewing_as_admin_fn(current_user.uid) %}
         <h3>Administration</h3>
         <ul>
           <li>
@@ -138,5 +139,21 @@
         </ul>
       {% endif %}
     {% endif %}
+
+    {% if current_user and is_admin_fn(current_user.uid) %}
+      <h3>Admin actions</h3>
+      <form action="{{ url_for('admin.admin_toggle_view') }}"
+            method="post"
+            class="ms-2 mb-4">
+        <button type="submit" class="btn btn-sm btn-outline-secondary">
+          {% if not is_viewing_as_admin_fn(current_user.uid) %}
+            <i class="fa-solid fa-user-shield"></i> View as admin
+          {% else %}
+            <i class="fa-solid fa-user-ninja"></i> View as user
+          {% endif %}
+        </button>
+      </form>
+    {% endif %}
+
   </nav>
 </aside>

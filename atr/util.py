@@ -32,6 +32,7 @@ from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from typing import Annotated, Any, TypeVar
 
 import aiofiles.os
+import asfquart
 import asfquart.base as base
 import asfquart.session as session
 import pydantic
@@ -44,6 +45,7 @@ import quart_wtf.typing
 # Therefore, this module must not import atr.db
 import atr.config as config
 import atr.db.models as models
+import atr.user as user
 
 F = TypeVar("F", bound="QuartFormTyped")
 T = TypeVar("T")
@@ -239,6 +241,26 @@ def get_release_preview_dir() -> pathlib.Path:
 
 def get_release_dir() -> pathlib.Path:
     return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "release"
+
+
+def is_user_viewing_as_admin(uid: str | None) -> bool:
+    """Check whether a user is currently viewing the site with active admin privileges."""
+    if not user.is_admin(uid):
+        return False
+
+    try:
+        app = asfquart.APP
+        if not hasattr(app, "app_id") or not isinstance(app.app_id, str):
+            _LOGGER.error("Cannot get valid app_id to read session for admin view check")
+            return True
+
+        cookie_id = app.app_id
+        session_dict = quart.session.get(cookie_id, {})
+        is_downgraded = session_dict.get("downgrade_admin_to_user", False)
+        return not is_downgraded
+    except Exception:
+        _LOGGER.exception(f"Error checking admin downgrade session status for {uid}")
+        return True
 
 
 async def paths_recursive(base_path: pathlib.Path, sort: bool = True) -> list[pathlib.Path]:

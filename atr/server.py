@@ -144,6 +144,7 @@ def app_setup_context(app: base.QuartApp) -> None:
             "commit": metadata.commit,
             "current_user": await asfquart.session.read(),
             "is_admin_fn": user.is_admin,
+            "is_viewing_as_admin_fn": util.is_user_viewing_as_admin,
             "is_committee_member_fn": user.is_committee_member,
             "routes": modules,
             "version": metadata.version,

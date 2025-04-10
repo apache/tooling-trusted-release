@@ -418,10 +418,6 @@ class CommitterSession:
     #     return ...
 
     @property
-    def user_is_admin(self) -> bool:
-        return user.is_admin(self.uid)
-
-    @property
     async def user_projects(self) -> list[models.Project]:
         if self._projects is None:
             self._projects = await user.projects(self.uid)

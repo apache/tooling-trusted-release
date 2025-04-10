@@ -449,6 +449,32 @@ async def admin_test_kv() -> str:
 """
 
 
+@admin.BLUEPRINT.route("/toggle-admin-view", methods=["POST"])
+async def admin_toggle_view() -> response.Response:
+    web_session = await session.read()
+    if web_session is None:
+        # For the type checker
+        # We should pass this as an argument, then it's guaranteed
+        raise base.ASFQuartException("Not authenticated", 401)
+    user_uid = web_session.uid
+    if user_uid is None:
+        raise base.ASFQuartException("Invalid session, uid is None", 500)
+
+    app = asfquart.APP
+    if not hasattr(app, "app_id") or not isinstance(app.app_id, str):
+        raise TypeError("Internal error: APP has no valid app_id")
+
+    cookie_id = app.app_id
+    session_dict = quart.session.get(cookie_id, {})
+    downgrade = not session_dict.get("downgrade_admin_to_user", False)
+    session_dict["downgrade_admin_to_user"] = downgrade
+
+    message = "Viewing as regular user" if downgrade else "Viewing as admin"
+    await quart.flash(message, "success")
+    referrer = quart.request.referrer
+    return quart.redirect(referrer or quart.url_for("admin.admin_data"))
+
+
 @admin.BLUEPRINT.route("/releases")
 async def admin_releases() -> str:
     """Display a list of all releases across all stages and phases."""
