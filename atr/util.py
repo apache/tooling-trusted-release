@@ -35,6 +35,7 @@ import aiofiles.os
 import asfquart
 import asfquart.base as base
 import asfquart.session as session
+import jinja2
 import pydantic
 import pydantic_core
 import quart
@@ -132,7 +133,15 @@ async def archive_listing(file_path: pathlib.Path) -> list[str] | None:
 
 def as_url(func: Callable, **kwargs: Any) -> str:
     """Return the URL for a function."""
-    return quart.url_for(func.__annotations__["endpoint"], **kwargs)
+    if isinstance(func, jinja2.runtime.Undefined):
+        _LOGGER.exception("Undefined route in the calling template")
+        raise base.ASFQuartException("Undefined route", 500)
+    try:
+        annotations = func.__annotations__
+    except AttributeError as e:
+        _LOGGER.error(f"Cannot get annotations for {func} (type: {type(func)})")
+        raise base.ASFQuartException(f"Cannot get annotations for {func} (type: {type(func)})", 500) from e
+    return quart.url_for(annotations["endpoint"], **kwargs)
 
 
 @contextlib.asynccontextmanager
