@@ -96,6 +96,10 @@
           <i class="fa-solid fa-diagram-project"></i>
           <a href="{{ as_url(routes.projects.directory) }}">Projects</a>
         </li>
+        <li>
+          <i class="fa-solid fa-diagram-project"></i>
+          <a href="{{ as_url(routes.projects.add) }}">Add project</a>
+        </li>
       </ul>
 
       {% if is_admin_fn(current_user.uid) %}

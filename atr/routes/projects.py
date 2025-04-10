@@ -57,7 +57,7 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
                 wtforms.validators.Length(min=1, max=100),
             ],
         )
-        submit = wtforms.SubmitField("Create derived project")
+        submit = wtforms.SubmitField("Add derived project")
 
     form = await AddForm.create_form()
 

@@ -31,7 +31,11 @@
           {{ form.derived_project_name(class_="form-control") }}
           {% if form.derived_project_name.errors -%}
             <span class="text-danger small">{{ form.derived_project_name.errors[0] }}</span>{%- endif %}
-            <p class="text-muted small mt-1">The desired suffix for the full project name.</p>
+            <p class="text-muted mt-1">The desired suffix for the full project name.</p>
+            <p id="capitalisation-warning" class="text-danger small mt-1 d-none">
+              <span class="fa-solid fa-triangle-exclamation"></span>
+              Warning: Ensure all words in the derived name start with a capital for proper display.
+            </p>
           </div>
         </div>
 
@@ -71,8 +75,9 @@
               const derivedNameInput = document.getElementById("{{ form.derived_project_name.id }}");
               const newNameDisplay = document.getElementById("new-project-name-display");
               const newLabelDisplay = document.getElementById("new-project-label-display");
+              const capitalisationWarning = document.getElementById("capitalisation-warning");
 
-              if (!projectSelect || !derivedNameInput || !newNameDisplay || !newLabelDisplay) return;
+              if (!projectSelect || !derivedNameInput || !newNameDisplay || !newLabelDisplay || !capitalisationWarning) return;
 
               function generateSlug(text) {
                   return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
@@ -83,6 +88,23 @@
                   const baseLabel = selectedOption ? selectedOption.value : "";
                   const baseFullName = selectedOption ? selectedOption.text : "";
                   const derivedNameValue = derivedNameInput.value.trim();
+
+                  let hasCapitalisationIssue = false;
+                  if (derivedNameValue) {
+                      const words = derivedNameValue.split(/\s+/);
+                      for (const word of words) {
+                          if (word.length > 0 && !/^[A-Z]/.test(word)) {
+                              hasCapitalisationIssue = true;
+                              break;
+                          }
+                      }
+                  }
+
+                  if (hasCapitalisationIssue) {
+                      capitalisationWarning.classList.remove("d-none");
+                  } else {
+                      capitalisationWarning.classList.add("d-none");
+                  }
 
                   let newFullName = baseFullName;
                   if (derivedNameValue) {
