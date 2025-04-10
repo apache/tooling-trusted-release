@@ -19,70 +19,7 @@
     <li>A candidate draft is only editable until submitted for voting</li>
   </ul>
 
-  <div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
-    {% for project in projects %}
-      {% set candidate_drafts = project.candidate_drafts %}
-
-      {# Show card for creating a new release if allowed #}
-      {% if asf_id in project.committee.committee_members %}
-        <div class="col">
-          <div class="card h-100">
-            <div class="card-body position-relative">
-              <div class="position-absolute top-0 end-0 m-2">
-                <span class="badge bg-primary">Potential</span>
-              </div>
-              <h5 class="card-title">{{ project.display_name }}</h5>
-              {% if project.committee %}
-                <h6 class="card-subtitle mb-2 text-muted">{{ project.committee.display_name }}</h6>
-              {% endif %}
-              <p class="card-text">
-                {% if candidate_drafts|length > 0 %}
-                  This project already has {{ candidate_drafts|length }} candidate draft{{ "s" if candidate_drafts|length > 1 else "" }},
-                  but to create another one, use the command below.
-                {% else %}
-                  This project does not have a candidate draft.
-                  To create one and add files, use the command below.
-                {% endif %}
-              </p>
-            </div>
-            <div class="card-footer bg-light border-1 pt-4 pb-4 position-relative">
-              <button class="btn btn-sm btn-outline-secondary atr-copy-btn fs-6 position-absolute top-0 end-0 m-2"
-                      data-clipboard-target="#cmd-newdraft-{{ project.name|slugify }}">
-                <i class="bi bi-clipboard"></i> Copy
-              </button>
-              <pre class="small mb-0" id="cmd-newdraft-{{ project.name|slugify }}">rsync -av -e 'ssh -p 2222' your/files/ \
-    {{ asf_id }}@{{ server_domain }}:/{{ project.name }}/VERSION/</pre>
-            </div>
-          </div>
-        </div>
-      {% else %}
-        <div class="col">
-          <div class="card h-100">
-            <div class="card-body position-relative">
-              <div class="position-absolute top-0 end-0 m-2">
-                <span class="badge bg-secondary">Ask</span>
-              </div>
-              <h5 class="card-title">{{ project.display_name }}</h5>
-              {% if project.committee %}
-                <h6 class="card-subtitle mb-2 text-muted">{{ project.committee.display_name }}</h6>
-              {% endif %}
-              <p class="card-text">
-                {% if candidate_drafts|length > 0 %}
-                  This project already has {{ candidate_drafts|length }} candidate draft{{ "s" if candidate_drafts|length > 1 else "" }},
-                  but to create another one, use the command below.
-                {% else %}
-                  This project does not have a candidate draft.
-                  To create one, you must be a member of the PMC.
-                {% endif %}
-              </p>
-            </div>
-          </div>
-        </div>
-      {% endif %}
-    {% endfor %}
-  </div>
-
-  <p>Or use the following form to create an empty release candidate draft.</p>
+  <h2>Create an empty candidate draft for an existing project</h2>
 
   <form method="post"
         enctype="multipart/form-data"
@@ -98,18 +35,9 @@
           {% if not user_projects %}
             <p class="text-danger">You must be a participant of a project to submit a release candidate.</p>
           {% endif %}
-        </div>
-      </div>
-
-      <div class="mb-3 pb-3 row border-bottom">
-        <label for="{{ form.project_label_suffix.id }}"
-               class="col-sm-3 col-form-label text-sm-end">Project label:</label>
-        <div class="col-sm-8 d-flex align-items-center">
-          <span id="project-label-prefix" class="me-1 fw-bold"></span>
-          {{ form.project_label_suffix(class_="form-control w-auto flex-grow-1") }}
-          {% if form.project_label_suffix.errors %}
-            <div class="invalid-feedback d-block mt-1 ms-1">{{ form.project_label_suffix.errors[0] }}</div>
-          {% endif %}
+          <p class="text-muted">
+            If your project is not listed above, you may need to <a href="{{ as_url(routes.projects.add) }}">add it first</a>.
+          </p>
         </div>
       </div>
 
@@ -126,6 +54,73 @@
           <div class="col-sm-9 offset-sm-3">{{ form.submit(class_="btn btn-primary mt-3") }}</div>
         </div>
       </form>
+
+      <h2>Create or update a candidate draft using rsync</h2>
+
+      <p>Or use one of the commands below to create or update a candidate draft.</p>
+
+      <div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
+        {% for project in projects %}
+          {% set candidate_drafts = project.candidate_drafts %}
+
+          {# Show card for creating a new release if allowed #}
+          {% if asf_id in project.committee.committee_members %}
+            <div class="col">
+              <div class="card h-100">
+                <div class="card-body position-relative">
+                  <div class="position-absolute top-0 end-0 m-2">
+                    <span class="badge bg-primary">Potential</span>
+                  </div>
+                  <h5 class="card-title">{{ project.display_name }}</h5>
+                  {% if project.committee %}
+                    <h6 class="card-subtitle mb-2 text-muted">{{ project.committee.display_name }}</h6>
+                  {% endif %}
+                  <p class="card-text">
+                    {% if candidate_drafts|length > 0 %}
+                      This project already has {{ candidate_drafts|length }} candidate draft{{ "s" if candidate_drafts|length > 1 else "" }},
+                      but to create another one, use the command below.
+                    {% else %}
+                      This project does not have a candidate draft.
+                      To create one and add files, use the command below.
+                    {% endif %}
+                  </p>
+                </div>
+                <div class="card-footer bg-light border-1 pt-4 pb-4 position-relative">
+                  <button class="btn btn-sm btn-outline-secondary atr-copy-btn fs-6 position-absolute top-0 end-0 m-2"
+                          data-clipboard-target="#cmd-newdraft-{{ project.name|slugify }}">
+                    <i class="bi bi-clipboard"></i> Copy
+                  </button>
+                  <pre class="small mb-0" id="cmd-newdraft-{{ project.name|slugify }}">rsync -av -e 'ssh -p 2222' your/files/ \
+    {{ asf_id }}@{{ server_domain }}:/{{ project.name }}/VERSION/</pre>
+                </div>
+              </div>
+            </div>
+          {% else %}
+            <div class="col">
+              <div class="card h-100">
+                <div class="card-body position-relative">
+                  <div class="position-absolute top-0 end-0 m-2">
+                    <span class="badge bg-secondary">Ask</span>
+                  </div>
+                  <h5 class="card-title">{{ project.display_name }}</h5>
+                  {% if project.committee %}
+                    <h6 class="card-subtitle mb-2 text-muted">{{ project.committee.display_name }}</h6>
+                  {% endif %}
+                  <p class="card-text">
+                    {% if candidate_drafts|length > 0 %}
+                      This project already has {{ candidate_drafts|length }} candidate draft{{ "s" if candidate_drafts|length > 1 else "" }},
+                      but to create another one, use the command below.
+                    {% else %}
+                      This project does not have a candidate draft.
+                      To create one, you must be a member of the PMC.
+                    {% endif %}
+                  </p>
+                </div>
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
     {% endblock content %}
 
     {% block javascripts %}

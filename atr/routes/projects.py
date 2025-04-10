@@ -31,6 +31,11 @@ import atr.user as user
 import atr.util as util
 
 
+@routes.committer("/project/add", methods=["GET", "POST"])
+async def add(session: routes.CommitterSession) -> response.Response | str:
+    raise NotImplementedError("Not implemented")
+
+
 @routes.public("/projects")
 async def directory() -> str:
     """Main project directory page."""
