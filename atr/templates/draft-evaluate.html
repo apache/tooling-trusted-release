@@ -191,8 +191,7 @@
         <i class="bi bi-clipboard"></i> Copy
       </button>
       <pre class="small mb-0" id="cmd-newdraft-{{ release.project.name|slugify }}">
-rsync -av -e 'ssh -p 2222' your/files/ \
-    {{ asf_id }}@{{ server_domain }}:/{{ project_name }}/{{ version_name }}/
+rsync -av -e 'ssh -p 2222' ${YOUR_FILES}/ {{ asf_id }}@{{ server_domain }}:/{{ project_name }}/{{ version_name }}/
       </pre>
     </div>
   </div>

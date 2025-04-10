@@ -21,7 +21,7 @@
     <li>A candidate draft is only editable until submitted for voting</li>
   </ul>
 
-  <div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
+  <div class="row row-cols-1 g-4 mb-5">
     {% for release in candidate_drafts %}
       {% set release_id = release.name %}
       <div class="col" id="{{ release.name }}">
@@ -37,19 +37,17 @@
             <div class="d-flex gap-2 mb-2">
               <a href="{{ as_url(routes.draft.evaluate, project_name=release.project.name, version_name=release.version) }}"
                  class="btn btn-sm btn-outline-primary">Evaluate files</a>
+              <a href="{{ as_url(routes.draft.promote) }}#{{ release.name }}"
+                 class="btn btn-sm btn-outline-success">Promote draft</a>
+              <button class="btn btn-sm btn-outline-danger me-2"
+                      data-bs-toggle="modal"
+                      data-bs-target="#delete-{{ release_id }}">Delete draft</button>
               <a href="{{ as_url(routes.draft.view, project_name=release.project.name, version_name=release.version) }}"
                  class="btn btn-sm btn-outline-secondary">View files</a>
               <a href="{{ as_url(routes.draft.add_file, project_name=release.project.name, version_name=release.version) }}"
                  class="btn btn-sm btn-outline-secondary">Upload file</a>
               <a href="{{ as_url(routes.draft.revisions, project_name=release.project.name, version_name=release.version) }}"
                  class="btn btn-sm btn-outline-secondary">Revisions</a>
-            </div>
-            <div class="d-flex gap-2">
-              <a href="{{ as_url(routes.draft.promote) }}#{{ release.name }}"
-                 class="btn btn-sm btn-outline-success">Promote draft</a>
-              <button class="btn btn-sm btn-outline-danger"
-                      data-bs-toggle="modal"
-                      data-bs-target="#delete-{{ release_id }}">Delete draft</button>
             </div>
             <p class="card-text mt-3">
               {% if number_of_release_files(release) > 0 %}
@@ -65,8 +63,7 @@
                     data-clipboard-target="#cmd-{{ release.name|slugify }}">
               <i class="bi bi-clipboard"></i> Copy
             </button>
-            <pre class="small mb-0" id="cmd-{{ release.name|slugify }}">rsync -av -e 'ssh -p 2222' your/files/ \
-    {{ asf_id }}@{{ server_domain }}:/{{ release.project.name }}/{{ release.version }}/</pre>
+            <pre class="small mb-0" id="cmd-{{ release.name|slugify }}">rsync -av -e 'ssh -p 2222' ${YOUR_FILES}/ {{ asf_id }}@{{ server_domain }}:/{{ release.project.name }}/{{ release.version }}/</pre>
           </div>
         </div>
       </div>

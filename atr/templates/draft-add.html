@@ -59,7 +59,7 @@
 
       <p>Or use one of the commands below to create or update a candidate draft.</p>
 
-      <div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
+      <div class="row row-cols-1 g-4 mb-5">
         {% for project in projects %}
           {% set candidate_drafts = project.candidate_drafts %}
 
@@ -90,8 +90,7 @@
                           data-clipboard-target="#cmd-newdraft-{{ project.name|slugify }}">
                     <i class="bi bi-clipboard"></i> Copy
                   </button>
-                  <pre class="small mb-0" id="cmd-newdraft-{{ project.name|slugify }}">rsync -av -e 'ssh -p 2222' your/files/ \
-    {{ asf_id }}@{{ server_domain }}:/{{ project.name }}/VERSION/</pre>
+                  <pre class="small mb-0" id="cmd-newdraft-{{ project.name|slugify }}">rsync -av -e 'ssh -p 2222' ${YOUR_FILES}/ {{ asf_id }}@{{ server_domain }}:/{{ project.name }}/${VERSION}/</pre>
                 </div>
               </div>
             </div>
