@@ -993,6 +993,8 @@ async def _add(session: routes.CommitterSession, form: AddProtocol) -> None:
                 raise routes.FlashError(f"{release.phase.value.upper()} with this name already exists")
 
             # Release is now linked to the appropriate project or subproject
+            if version_name_error := util.version_name_error(version):
+                raise routes.FlashError(f'Invalid version name "{version}": {version_name_error}')
             release = models.Release(
                 stage=models.ReleaseStage.RELEASE_CANDIDATE,
                 phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,

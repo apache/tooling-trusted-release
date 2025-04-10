@@ -34,6 +34,7 @@ import atr.db as db
 import atr.db.models as models
 import atr.revision as revision
 import atr.user as user
+import atr.util as util
 
 _LOGGER: Final = logging.getLogger(__name__)
 _CONFIG: Final = config.get()
@@ -240,9 +241,7 @@ async def _command_validate(
     return path_project, path_version
 
 
-async def _ensure_release_object(
-    process: asyncssh.SSHServerProcess, project_name: str, version_name: str, new_draft_revision: str
-) -> bool:
+async def _ensure_release_object(process: asyncssh.SSHServerProcess, project_name: str, version_name: str) -> bool:
     try:
         async with db.session() as data:
             async with data.begin():
@@ -253,6 +252,8 @@ async def _ensure_release_object(
                     project = await data.project(name=project_name, _committee=True).demand(
                         RuntimeError("Project not found")
                     )
+                    if version_name_error := util.version_name_error(version_name):
+                        raise RuntimeError(f'Invalid version name "{version_name}": {version_name_error}')
                     # Create a new release object
                     release = models.Release(
                         project_id=project.id,
@@ -267,29 +268,13 @@ async def _ensure_release_object(
                     return _fail(
                         process, f"Release {release.name} is no longer in draft phase ({release.phase.value})", False
                     )
-
-                # # TODO: We now do this in the context manager, so we can delete the rsync task
-                # data.add(
-                #     models.Task(
-                #         status=models.TaskStatus.QUEUED,
-                #         task_type=models.TaskType.RSYNC_ANALYSE,
-                #         task_args=rsync.Analyse(
-                #             project_name=project_name,
-                #             release_version=version_name,
-                #             draft_revision=new_draft_revision,
-                #         ).model_dump(),
-                #         release_name=models.release_name(project_name, version_name),
-                #         draft_revision=new_draft_revision,
-                #     )
-                # )
         return True
     except Exception as e:
-        _LOGGER.exception("Error finalising upload in database")
-        return _fail(process, f"Internal error finalising upload: {e}", False)
+        _LOGGER.exception("Error creating release object")
+        return _fail(process, f"Internal error creating release object: {e}", False)
 
 
 async def _execute_rsync(process: asyncssh.SSHServerProcess, argv: list[str]) -> int:
-    # This is Step 2 of the upload process
     _LOGGER.info(f"Executing modified command: {' '.join(argv)}")
     proc = await asyncio.create_subprocess_shell(
         " ".join(argv),
@@ -324,8 +309,15 @@ async def _process_validated_rsync(
             new_revision_dir,
             new_draft_revision,
         ):
-            # Update the rsync command path to the new temporary revision directory
+            # Update the rsync command path to the new revision directory
+            # The revision directory has already been created by the context manager
             argv[path_index] = str(new_revision_dir)
+
+            # Ensure that the release object exists
+            # This performs validation, so must be done before the rsync command
+            if not await _ensure_release_object(process, project_name, version_name):
+                process.exit(1)
+                return
 
             # Execute the rsync command
             exit_status = await _execute_rsync(process, argv)
@@ -335,11 +327,6 @@ async def _process_validated_rsync(
                     Command: {process.command} (run as {' '.join(argv)})"
                 )
                 process.exit(exit_status)
-                return
-
-            # Ensure that the release object exists and is in the correct phase
-            if not await _ensure_release_object(process, project_name, version_name, new_draft_revision):
-                process.exit(1)
                 return
 
             # Exit with the rsync exit status

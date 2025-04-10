@@ -22,6 +22,7 @@ import dataclasses
 import hashlib
 import logging
 import pathlib
+import re
 import shutil
 import tarfile
 import tempfile
@@ -392,6 +393,23 @@ def validate_as_type(value: Any, t: type[T]) -> T:
     if not isinstance(value, t):
         raise ValueError(f"Expected {t}, got {type(value)}")
     return value
+
+
+def version_name_error(version_name: str) -> str | None:
+    """Check if the given version name is valid."""
+    if version_name == "":
+        return "Must not be empty"
+    if version_name.lower() == "version":
+        return "Must not be 'version'"
+    if not re.match(r"^[a-zA-Z0-9]", version_name):
+        return "Must start with a letter or number"
+    if not re.search(r"[a-zA-Z0-9]$", version_name):
+        return "Must end with a letter or number"
+    if re.search(r"[+.-]{2,}", version_name):
+        return "Must not contain multiple consecutive plus, full stop, or hyphen"
+    if not re.match(r"^[a-zA-Z0-9+.-]+$", version_name):
+        return "Must contain only letters, numbers, plus, full stop, or hyphen"
+    return None
 
 
 def _generate_hexdump(data: bytes) -> str:
