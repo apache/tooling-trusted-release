@@ -17,6 +17,7 @@
 
 """project.py"""
 
+import datetime
 import http.client
 import re
 from typing import Protocol
@@ -62,12 +63,12 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
     form = await AddForm.create_form()
 
     if await form.validate_on_submit():
-        return await _add_project(form)
+        return await _add_project(form, session.uid)
 
     return await quart.render_template("project-add.html", form=form)
 
 
-async def _add_project(form: AddFormProtocol) -> response.Response:
+async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
     base_project_name = str(form.project_name.data)
     derived_project_name = str(form.derived_project_name.data).strip()
 
@@ -122,7 +123,8 @@ async def _add_project(form: AddFormProtocol) -> response.Response:
             programming_languages=base_project.programming_languages,
             committee_id=base_project.committee_id,
             vote_policy_id=base_project.vote_policy_id,
-            # TODO: Add "created" and "created_by" to models.Project perhaps?
+            created=datetime.datetime.now(datetime.UTC),
+            created_by=asf_id,
         )
 
         data.add(project)

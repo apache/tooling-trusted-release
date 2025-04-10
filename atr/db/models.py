@@ -175,6 +175,9 @@ class Project(sqlmodel.SQLModel, table=True):
         cascade_delete=True, sa_relationship_kwargs={"cascade": "all, delete-orphan", "single_parent": True}
     )
 
+    created: datetime.datetime = sqlmodel.Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
+    created_by: str | None = sqlmodel.Field(default=None)
+
     @property
     def display_name(self) -> str:
         """Get the display name for the Project."""

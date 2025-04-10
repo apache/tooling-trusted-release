@@ -148,9 +148,9 @@ def _command_path_validate(path: str) -> tuple[str, str] | str:
         return "The fifth argument should be a /PROJECT/VERSION/ directory path"
 
     path_project, path_version = path.strip("/").split("/", 1)
-    alphanum = set(string.ascii_letters + string.digits)
+    alphanum = set(string.ascii_letters + string.digits + "-")
     if not all(c in alphanum for c in path_project):
-        return "The project name should contain only alphanumeric characters"
+        return "The project name should contain only alphanumeric characters or hyphens"
 
     # From a survey of version numbers we find that only . and - are used
     # We also allow + which is in common use

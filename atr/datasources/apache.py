@@ -79,7 +79,7 @@ class Committee(pydantic.BaseModel):
     name: str
     display_name: str
     site: str | None
-    description: str
+    description: str | None
     mail_list: str
     established: str | None
     report: list[str]
@@ -99,7 +99,7 @@ class RetiredCommittee(pydantic.BaseModel):
     name: str
     display_name: str
     retired: str
-    description: str
+    description: str | None
 
 
 class PodlingStatus(pydantic.BaseModel):
