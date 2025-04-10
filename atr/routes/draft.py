@@ -124,9 +124,13 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
     # The user_candidate_drafts call can use cached results from user_projects
     user_projects = await session.user_projects
     user_candidate_drafts = await session.user_candidate_drafts
+    # Sort the project choices reverse chronologically by their creation date
+    # This means that if the user added a project recently, it will be at the top of the list
+    sorted_projects = sorted(user_projects, key=lambda p: p.created, reverse=True)
+    project_choices = [(p.name, p.full_name or p.name) for p in sorted_projects]
 
     class AddForm(util.QuartFormTyped):
-        project_name = wtforms.SelectField("Project", choices=[(p.name, p.full_name or p.name) for p in user_projects])
+        project_name = wtforms.SelectField("Project", choices=project_choices)
         version_name = wtforms.StringField(
             "Version", validators=[wtforms.validators.InputRequired("Version is required")]
         )
@@ -154,11 +158,11 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
     return await quart.render_template(
         "draft-add.html",
         asf_id=session.uid,
-        projects=user_projects,
+        projects=sorted_projects,
         server_domain=session.host,
         number_of_release_files=_number_of_release_files,
         candidate_drafts=user_candidate_drafts,
-        user_projects=user_projects,
+        user_projects=sorted_projects,
         form=form,
     )
 
