@@ -38,7 +38,7 @@
     {% endif %}
 
     <form method="post"
-          class="striking py-4 px-5"
+          class="atr-canary py-4 px-5"
           action="{{ as_url(routes.candidate.vote_project, project_name=release.project.name, version=release.version) }}">
       {{ form.hidden_tag() if form.hidden_tag }}
       {{ form.release_name }}

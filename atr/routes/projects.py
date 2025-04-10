@@ -18,6 +18,8 @@
 """project.py"""
 
 import http.client
+import re
+from typing import Protocol
 
 import asfquart.base as base
 import quart
@@ -31,9 +33,102 @@ import atr.user as user
 import atr.util as util
 
 
+class AddFormProtocol(Protocol):
+    project_name: wtforms.SelectField
+    derived_project_name: wtforms.StringField
+    submit: wtforms.SubmitField
+
+
 @routes.committer("/project/add", methods=["GET", "POST"])
 async def add(session: routes.CommitterSession) -> response.Response | str:
-    raise NotImplementedError("Not implemented")
+    def long_name(project: models.Project) -> str:
+        if project.full_name:
+            return project.full_name
+        return project.name
+
+    user_projects = await session.user_projects
+
+    class AddForm(util.QuartFormTyped):
+        project_name = wtforms.SelectField("Project", choices=[(p.name, long_name(p)) for p in user_projects])
+        derived_project_name = wtforms.StringField(
+            "Derived project",
+            validators=[
+                wtforms.validators.InputRequired("Please provide a derived project name."),
+                wtforms.validators.Length(min=1, max=100),
+            ],
+        )
+        submit = wtforms.SubmitField("Create derived project")
+
+    form = await AddForm.create_form()
+
+    if await form.validate_on_submit():
+        return await _add_project(form)
+
+    return await quart.render_template("project-add.html", form=form)
+
+
+async def _add_project(form: AddFormProtocol) -> response.Response:
+    base_project_name = str(form.project_name.data)
+    derived_project_name = str(form.derived_project_name.data).strip()
+
+    def _generate_label(text: str) -> str:
+        # TODO: We should probably add long name validation
+        text = text.lower()
+        text = re.sub(r" +", "-", text)
+        text = re.sub(r"[^a-z0-9-]", "", text)
+        return text
+
+    async with db.session() as data:
+        # Get the base project to derive from
+        base_project = await data.project(name=base_project_name).get()
+        if not base_project:
+            # This should not happen, assuming that the dropdown is populated correctly
+            raise routes.FlashError(f"Base project {base_project_name} not found")
+
+        # Construct the new label
+        derived_label = _generate_label(derived_project_name)
+        if not derived_label:
+            raise routes.FlashError("Derived project name must contain valid characters for label generation")
+        new_project_label = f"{base_project.name}-{derived_label}"
+
+        # Construct the new full name
+        # We ensure that parenthesised suffixes like "(Incubating)" are preserved
+        base_name = base_project.full_name or base_project.name
+        match = re.match(r"^(.*?) *(\(.*\))?$", base_name)
+        if match:
+            main_part = match.group(1).strip()
+            suffix_part = match.group(2)
+        else:
+            main_part = base_name.strip()
+            suffix_part = None
+
+        if suffix_part:
+            new_project_full_name = f"{main_part} {derived_project_name} {suffix_part}"
+        else:
+            new_project_full_name = f"{main_part} {derived_project_name}"
+        new_project_full_name = re.sub(r"  +", " ", new_project_full_name).strip()
+
+        # Check whether the derived project already exists by its constructed label
+        if await data.project(name=new_project_label).get():
+            raise routes.FlashError(f"Derived project {new_project_label} already exists")
+
+        project = models.Project(
+            name=new_project_label,
+            full_name=new_project_full_name,
+            is_podling=base_project.is_podling,
+            is_retired=base_project.is_retired,
+            description=base_project.description,
+            category=base_project.category,
+            programming_languages=base_project.programming_languages,
+            committee_id=base_project.committee_id,
+            vote_policy_id=base_project.vote_policy_id,
+            # TODO: Add "created" and "created_by" to models.Project perhaps?
+        )
+
+        data.add(project)
+        await data.commit()
+
+    return quart.redirect(util.as_url(view, name=new_project_label))
 
 
 @routes.public("/projects")

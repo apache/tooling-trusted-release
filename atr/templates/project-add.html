@@ -1,0 +1,123 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Add project ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Add a new project based on an existing one.
+{% endblock description %}
+
+{% block content %}
+  <h1>Add derived project</h1>
+  <p class="intro">Derive a new project from an existing one, by adding a suffix.</p>
+
+  <form method="post" class="atr-canary py-4">
+    {{ form.hidden_tag() }}
+    <div class="mb-3 pb-3 row border-bottom">
+      <label for="{{ form.project_name.id }}"
+             class="col-sm-3 col-form-label text-sm-end">{{ form.project_name.label.text }}:</label>
+      <div class="col-sm-8">
+        {{ form.project_name(class_="form-select") }}
+        {% if form.project_name.errors -%}<span class="text-danger small">{{ form.project_name.errors[0] }}</span>{%- endif %}
+          <p class="text-muted small mt-1">Select the base ASF project.</p>
+        </div>
+      </div>
+
+      <div class="mb-3 pb-3 row border-bottom">
+        <label for="{{ form.derived_project_name.id }}"
+               class="col-sm-3 col-form-label text-sm-end">{{ form.derived_project_name.label.text }}:</label>
+        <div class="col-sm-8">
+          {{ form.derived_project_name(class_="form-control") }}
+          {% if form.derived_project_name.errors -%}
+            <span class="text-danger small">{{ form.derived_project_name.errors[0] }}</span>{%- endif %}
+            <p class="text-muted small mt-1">The desired suffix for the full project name.</p>
+          </div>
+        </div>
+
+        <div class="mb-3 pb-3 row border-bottom">
+          <label id="new-project-name-label"
+                 for="new-project-name-display"
+                 class="col-sm-3 col-form-label text-sm-end">New project name:</label>
+          <div class="col-sm-8">
+            <code id="new-project-name-display"
+                  class="form-control-plaintext bg-light p-2 rounded d-block"></code>
+            <p class="text-muted small mt-1">This will be the full display name for the derived project.</p>
+          </div>
+        </div>
+
+        <div class="mb-3 pb-3 row border-bottom">
+          <label id="new-project-label-label"
+                 for="new-project-label-display"
+                 class="col-sm-3 col-form-label text-sm-end">New project label:</label>
+          <div class="col-sm-8">
+            <code id="new-project-label-display"
+                  class="form-control-plaintext bg-light p-2 rounded d-block"></code>
+            <p class="text-muted small mt-1">This will be the short label used in URLs and identifiers.</p>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-sm-9 offset-sm-3">{{ form.submit(class_="btn btn-primary mt-3") }}</div>
+        </div>
+      </form>
+    {% endblock content %}
+
+    {% block javascripts %}
+      {{ super() }}
+      <script>
+          document.addEventListener("DOMContentLoaded", () => {
+              const projectSelect = document.getElementById("{{ form.project_name.id }}");
+              const derivedNameInput = document.getElementById("{{ form.derived_project_name.id }}");
+              const newNameDisplay = document.getElementById("new-project-name-display");
+              const newLabelDisplay = document.getElementById("new-project-label-display");
+
+              if (!projectSelect || !derivedNameInput || !newNameDisplay || !newLabelDisplay) return;
+
+              function generateSlug(text) {
+                  return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+              }
+
+              function updatePreview() {
+                  const selectedOption = projectSelect.options[projectSelect.selectedIndex];
+                  const baseLabel = selectedOption ? selectedOption.value : "";
+                  const baseFullName = selectedOption ? selectedOption.text : "";
+                  const derivedNameValue = derivedNameInput.value.trim();
+
+                  let newFullName = baseFullName;
+                  if (derivedNameValue) {
+                      const match = baseFullName.match(/^(.*?)\s*(\(.*\))?$/);
+                      let mainPart = baseFullName.trim();
+                      let suffixPart = null;
+
+                      if (match) {
+                          mainPart = match[1] ? match[1].trim() : mainPart;
+                          suffixPart = match[2];
+                      }
+
+                      if (suffixPart) {
+                          newFullName = `${mainPart} ${derivedNameValue} ${suffixPart}`;
+                      } else {
+                          newFullName = `${mainPart} ${derivedNameValue}`;
+                      }
+                      newFullName = newFullName.replace(/\s{2,}/g, " ").trim();
+                  }
+                  newNameDisplay.textContent = newFullName || "(Select base project)";
+
+                  let newLabel = baseLabel;
+                  if (derivedNameValue) {
+                      const derivedSlug = generateSlug(derivedNameValue);
+                      if (derivedSlug) {
+                          newLabel = `${baseLabel}-${derivedSlug}`;
+                      }
+                  }
+                  newLabelDisplay.textContent = newLabel || "(Enter derived project name)";
+              }
+
+              projectSelect.addEventListener("change", updatePreview);
+              derivedNameInput.addEventListener("input", updatePreview);
+
+              updatePreview();
+          });
+      </script>
+    {% endblock javascripts %}

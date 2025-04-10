@@ -16,7 +16,7 @@
     {% if form.errors %}<div class="alert alert-danger">Please correct the errors below:</div>{% endif %}
 
     <form method="post"
-          class="striking py-4 px-5"
+          class="atr-canary py-4 px-5"
           action="{{ as_url(routes.keys.add) }}"
           novalidate>
       {{ form.hidden_tag() if form.hidden_tag }}
