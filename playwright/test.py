@@ -127,6 +127,7 @@ def show_default_gateway_ip() -> None:
 
 def test_all(page: sync_api.Page, credentials: Credentials) -> None:
     test_login(page, credentials)
+    test_tidy_up(page)
     test_lifecycle(page)
 
 
@@ -290,6 +291,46 @@ def test_login(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Redirected to /")
     logging.info(f"Page URL: {page.url}")
     logging.info("Login actions completed successfully")
+
+
+def test_tidy_up(page: sync_api.Page) -> None:
+    logging.info("Navigating to the admin delete release page")
+    gateway_ip = get_default_gateway_ip()
+    if gateway_ip is None:
+        logging.error("Could not determine gateway IP for tidy up")
+        raise RuntimeError("Could not determine gateway IP for tidy up")
+    delete_url = f"https://{gateway_ip}:8080/admin/delete-release"
+    page.goto(delete_url)
+    wait_for_path(page, "/admin/delete-release")
+    logging.info("Admin delete release page loaded")
+
+    logging.info("Checking whether the tooling-0.1 release exists")
+    release_checkbox_locator = page.locator('input[name="releases_to_delete"][value="tooling-0.1"]')
+
+    if release_checkbox_locator.is_visible():
+        logging.info("Found the tooling-0.1 release, proceeding with deletion")
+        logging.info("Selecting tooling-0.1 for deletion")
+        release_checkbox_locator.check()
+
+        logging.info("Filling deletion confirmation")
+        page.locator("#confirm_delete").fill("DELETE")
+
+        logging.info("Submitting deletion form")
+        submit_button_locator = page.locator('input[type="submit"][value="Delete selected releases permanently"]')
+        sync_api.expect(submit_button_locator).to_be_enabled()
+        submit_button_locator.click()
+
+        logging.info("Waiting for page load after deletion submission")
+        page.wait_for_load_state()
+        logging.info("Page loaded after deletion")
+
+        logging.info("Checking for success flash message")
+        flash_message_locator = page.locator("div.flash-success")
+        sync_api.expect(flash_message_locator).to_be_visible()
+        sync_api.expect(flash_message_locator).to_contain_text("Successfully deleted 1 release(s)")
+        logging.info("Deletion successful")
+    else:
+        logging.info("Could not find the tooling-0.1 release, no deletion needed")
 
 
 def wait_for_path(page: sync_api.Page, path: str) -> None:
