@@ -40,6 +40,7 @@ import atr.db as db
 import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
+import atr.routes.candidate as candidate
 import atr.tasks.sbom as sbom
 import atr.user as user
 import atr.util as util
@@ -62,7 +63,6 @@ class AddProtocol(Protocol):
 
     version_name: wtforms.StringField
     project_name: wtforms.SelectField
-    project_label_suffix: wtforms.StringField
 
 
 class DeleteForm(util.QuartFormTyped):
@@ -134,17 +134,6 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
         project_name = wtforms.SelectField("Project", choices=project_choices)
         version_name = wtforms.StringField(
             "Version", validators=[wtforms.validators.InputRequired("Version is required")]
-        )
-        project_label_suffix = wtforms.StringField(
-            "Project label suffix",
-            validators=[
-                wtforms.validators.Optional(),
-                wtforms.validators.Regexp(
-                    r"^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$",
-                    message="Suffix must contain only alphanumeric characters and hyphens, "
-                    "and cannot start or end with a hyphen.",
-                ),
-            ],
         )
         submit = wtforms.SubmitField("Create candidate draft")
 
@@ -946,68 +935,42 @@ async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -
 async def _add(session: routes.CommitterSession, form: AddProtocol) -> None:
     """Handle POST request for creating a new release candidate draft."""
     version = str(form.version_name.data)
-    base_project_name = str(form.project_name.data)
-    suffix = str(form.project_label_suffix.data or "")
+    project_name = str(form.project_name.data)
 
     # Create the release record in the database
     async with db.session() as data:
         async with data.begin():
-            project = await data.project(name=base_project_name).get()
+            project = await data.project(name=project_name).get()
             if not project:
                 raise routes.FlashError("Base project not found")
 
-            if base_project_name not in (p.name for p in await session.user_projects):
+            if project_name not in (p.name for p in await session.user_projects):
                 raise routes.FlashError(
-                    f"You must be a participant of {base_project_name} to submit a release candidate",
+                    f"You must be a participant of {project_name} to submit a release candidate",
                 )
 
-            # Construct the final label
-            final_project_label = base_project_name
-            if suffix:
-                final_project_label += f"-{suffix}"
+    async with revision.create_and_manage(project_name, version, session.uid) as (
+        _new_revision_dir,
+        _new_revision_name,
+    ):
+        # TODO: Consider using Release.revision instead of ./latest
+        async with db.session() as data:
+            async with data.begin():
+                if release := await data.release(project_id=project.id, version=version).get():
+                    raise routes.FlashError(f"{release.phase.value.upper()} with this name already exists")
 
-            # Check whether the subproject already exists
-            if final_project_label != base_project_name:
-                sub_project = await data.project(name=final_project_label).get()
-                if sub_project is not None:
-                    project = sub_project
-                else:
-                    # Create the new subproject
-                    # TODO: We're letting any participant do this
-                    # But we should probably limit this to committee members
-                    project = models.Project(
-                        name=final_project_label,
-                        full_name=f"{project.full_name} {suffix.title()}",
-                        is_podling=project.is_podling,
-                        is_retired=project.is_retired,
-                        description=project.description,
-                        category=project.category,
-                        programming_languages=project.programming_languages,
-                        committee_id=project.committee_id,
-                        vote_policy_id=project.vote_policy_id,
-                        # TODO: Add "created" and "created_by" to models.Project
-                        # created=datetime.datetime.now(datetime.UTC),
-                        # created_by=session.uid,
-                    )
-                    data.add(project)
-
-    async with db.session() as data:
-        async with data.begin():
-            if release := await data.release(project_id=project.id, version=version).get():
-                raise routes.FlashError(f"{release.phase.value.upper()} with this name already exists")
-
-            # Release is now linked to the appropriate project or subproject
-            if version_name_error := util.version_name_error(version):
-                raise routes.FlashError(f'Invalid version name "{version}": {version_name_error}')
-            release = models.Release(
-                stage=models.ReleaseStage.RELEASE_CANDIDATE,
-                phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
-                project_id=project.id,
-                project=project,
-                version=version,
-                created=datetime.datetime.now(datetime.UTC),
-            )
-            data.add(release)
+                # Release is now linked to the appropriate project or subproject
+                if version_name_error := util.version_name_error(version):
+                    raise routes.FlashError(f'Invalid version name "{version}": {version_name_error}')
+                release = models.Release(
+                    stage=models.ReleaseStage.RELEASE_CANDIDATE,
+                    phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+                    project_id=project.id,
+                    project=project,
+                    version=version,
+                    created=datetime.datetime.now(datetime.UTC),
+                )
+                data.add(release)
 
 
 async def _promote(
@@ -1062,7 +1025,9 @@ async def _promote(
     await aioshutil.move(str(source_dir), str(target_dir))
     await aioshutil.rmtree(str(base_dir))  # type: ignore[call-arg]
 
-    return await session.redirect(promote, success=success_message)
+    # Seems to be yet another mypy Protocol handling issue
+    candidate_vote: routes.RouteHandler[str] = candidate.vote  # type: ignore[has-type]
+    return await session.redirect(candidate_vote, success=success_message)
 
 
 async def _revisions_process(

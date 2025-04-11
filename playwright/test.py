@@ -22,6 +22,7 @@ import dataclasses
 import getpass
 import logging
 import socket
+import urllib.parse
 
 import netifaces
 import rich.logging
@@ -157,23 +158,12 @@ def test_lifecycle_01_add_draft(page: sync_api.Page) -> None:
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info("Waiting for page load after adding draft")
-    page.wait_for_load_state()
-    logging.info("Page loaded after add draft submission")
-    logging.info(f"Current URL: {page.url}")
+    logging.info("Waiting for navigation to /drafts after adding draft")
+    wait_for_path(page, "/drafts")
     logging.info("Add draft actions completed successfully")
 
 
 def test_lifecycle_02_check_draft_added(page: sync_api.Page) -> None:
-    logging.info("Following link to view drafts")
-    view_drafts_link_locator = page.get_by_role("link", name="View drafts")
-    sync_api.expect(view_drafts_link_locator).to_be_visible()
-    view_drafts_link_locator.click()
-
-    logging.info("Waiting for the view drafts page")
-    page.wait_for_load_state()
-    logging.info("View drafts page loaded")
-
     logging.info("Checking for draft 'tooling-0.1'")
     draft_card_locator = page.locator(r"#tooling-0\.1")
     sync_api.expect(draft_card_locator).to_be_visible()
@@ -189,10 +179,29 @@ def test_lifecycle_03_promote_to_candidate(page: sync_api.Page) -> None:
     logging.info("Follow the draft promotion link")
     promote_link_locator.click()
 
-    logging.info("Waiting for page load after clicking promote link")
+    logging.info("Waiting for page load after following the promote link")
     page.wait_for_load_state()
-    logging.info("Page loaded after clicking promote link")
+    logging.info("Page loaded after following the promote link")
     logging.info(f"Current URL: {page.url}")
+
+    logging.info("Locating the promotion form for tooling-0.1")
+    form_locator = page.locator('form:has(input[name="candidate_draft_name"][value="tooling-0.1"])')
+    sync_api.expect(form_locator).to_be_visible()
+
+    logging.info("Locating the confirmation checkbox within the form")
+    checkbox_locator = form_locator.locator('input[name="confirm_promote"]')
+    sync_api.expect(checkbox_locator).to_be_visible()
+
+    logging.info("Checking the confirmation checkbox")
+    checkbox_locator.check()
+
+    logging.info("Locating and activating the promote button within the form")
+    submit_button_locator = form_locator.get_by_role("button", name="Promote candidate draft")
+    sync_api.expect(submit_button_locator).to_be_enabled()
+    submit_button_locator.click()
+
+    logging.info("Waiting for navigation to /candidate/vote after submitting promotion")
+    wait_for_path(page, "/candidate/vote")
     logging.info("Promote draft actions completed successfully")
 
 
@@ -236,6 +245,15 @@ def test_login(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Redirected to /")
     logging.info(f"Page URL: {page.url}")
     logging.info("Login actions completed successfully")
+
+
+def wait_for_path(page: sync_api.Page, path: str) -> None:
+    page.wait_for_load_state()
+    parsed_url = urllib.parse.urlparse(page.url)
+    if parsed_url.path != path:
+        logging.error(f"Expected URL path '{path}', but got '{parsed_url.path}'")
+        raise RuntimeError(f"Expected URL path '{path}', but got '{parsed_url.path}'")
+    logging.info(f"Current URL: {page.url}")
 
 
 if __name__ == "__main__":
