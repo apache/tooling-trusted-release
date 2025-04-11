@@ -11,7 +11,8 @@ RUN <<-EOF
         python3-dev
     pip3 install --no-cache-dir \
         netifaces \
-        playwright
+        playwright \
+        rich
     apt-get clean
     rm -rf /var/lib/apt/lists/*
 EOF
