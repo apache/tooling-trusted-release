@@ -34,6 +34,35 @@ class Credentials:
     password: str
 
 
+def add_draft(page: sync_api.Page) -> None:
+    logging.info("Following link to add draft")
+    add_draft_link_locator = page.get_by_role("link", name="Add draft")
+    sync_api.expect(add_draft_link_locator).to_be_visible()
+    add_draft_link_locator.click()
+
+    logging.info("Waiting for the add draft page")
+    project_select_locator = page.locator('select[name="project_name"]')
+    sync_api.expect(project_select_locator).to_be_visible()
+    logging.info("Add draft page loaded")
+
+    logging.info("Selecting project 'tooling'")
+    project_select_locator.select_option(label="Apache Tooling")
+
+    logging.info("Filling version '0.1'")
+    page.locator('input[name="version_name"]').fill("0.1")
+
+    logging.info("Submitting the add draft form")
+    submit_button_locator = page.locator('input[type="submit"][value="Create candidate draft"]')
+    sync_api.expect(submit_button_locator).to_be_enabled()
+    submit_button_locator.click()
+
+    logging.info("Waiting for page load after adding draft")
+    page.wait_for_load_state()
+    logging.info("Page loaded after add draft submission")
+    logging.info(f"Current URL: {page.url}")
+    logging.info("Add draft actions completed successfully")
+
+
 def get_credentials() -> Credentials | None:
     try:
         username = input("Enter ASF Username: ")
@@ -153,6 +182,7 @@ def run_tests_in_context(context: sync_api.BrowserContext, ip_address: str, cred
     start_url = f"https://{ip_address}:8080/"
     # Tests go here
     perform_login(page, start_url, credentials)
+    add_draft(page)
     logging.info("Tests finished successfully")
 
 
