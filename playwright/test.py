@@ -134,9 +134,10 @@ def test_all(page: sync_api.Page, credentials: Credentials) -> None:
 def test_lifecycle(page: sync_api.Page) -> None:
     test_lifecycle_01_add_draft(page)
     test_lifecycle_02_check_draft_added(page)
-    test_lifecycle_03_promote_to_candidate(page)
-    test_lifecycle_04_vote_on_candidate(page)
-    test_lifecycle_05_resolve_vote(page)
+    test_lifecycle_03_add_file(page)
+    test_lifecycle_04_promote_to_candidate(page)
+    test_lifecycle_05_vote_on_candidate(page)
+    test_lifecycle_06_resolve_vote(page)
 
 
 def test_lifecycle_01_add_draft(page: sync_api.Page) -> None:
@@ -173,7 +174,45 @@ def test_lifecycle_02_check_draft_added(page: sync_api.Page) -> None:
     logging.info("Draft 'tooling-0.1' found successfully")
 
 
-def test_lifecycle_03_promote_to_candidate(page: sync_api.Page) -> None:
+def test_lifecycle_03_add_file(page: sync_api.Page) -> None:
+    logging.info("Navigating to the add file page for tooling-0.1")
+    gateway_ip = get_default_gateway_ip()
+    if gateway_ip is None:
+        logging.error("Could not determine gateway IP for adding file")
+        raise RuntimeError("Could not determine gateway IP for adding file")
+    add_file_url = f"https://{gateway_ip}:8080/draft/add/tooling/0.1"
+    page.goto(add_file_url)
+    wait_for_path(page, "/draft/add/tooling/0.1")
+    logging.info("Add file page loaded")
+
+    logging.info("Locating the file input")
+    file_input_locator = page.locator('input[name="file_data"]')
+    sync_api.expect(file_input_locator).to_be_visible()
+
+    logging.info("Setting the input file to /run/tests/example.txt")
+    file_input_locator.set_input_files("/run/tests/example.txt")
+
+    logging.info("Locating and activating the add files button")
+    submit_button_locator = page.locator('input[type="submit"][value="Add files"]')
+    sync_api.expect(submit_button_locator).to_be_enabled()
+    submit_button_locator.click()
+
+    logging.info("Waiting for navigation to /draft/evaluate/tooling/0.1 after adding file")
+    wait_for_path(page, "/draft/evaluate/tooling/0.1")
+    logging.info("Add file actions completed successfully")
+
+    logging.info("Navigating back to /drafts")
+    gateway_ip = get_default_gateway_ip()
+    if gateway_ip is None:
+        logging.error("Could not determine gateway IP for navigating back to drafts")
+        raise RuntimeError("Could not determine gateway IP for navigating back to drafts")
+    drafts_url = f"https://{gateway_ip}:8080/drafts"
+    page.goto(drafts_url)
+    wait_for_path(page, "/drafts")
+    logging.info("Navigation back to /drafts completed successfully")
+
+
+def test_lifecycle_04_promote_to_candidate(page: sync_api.Page) -> None:
     logging.info("Locating draft promotion link for tooling-0.1")
     draft_card_locator = page.locator(r"#tooling-0\.1")
     promote_link_locator = draft_card_locator.locator('a[title="Promote draft for Apache Tooling 0.1"]')
@@ -208,7 +247,7 @@ def test_lifecycle_03_promote_to_candidate(page: sync_api.Page) -> None:
     logging.info("Promote draft actions completed successfully")
 
 
-def test_lifecycle_04_vote_on_candidate(page: sync_api.Page) -> None:
+def test_lifecycle_05_vote_on_candidate(page: sync_api.Page) -> None:
     logging.info("Locating the link to start a vote for tooling-0.1")
     card_locator = page.locator('div.card:has(input[name="candidate_name"][value="tooling-0.1"])')
     start_vote_link_locator = card_locator.locator('a[title="Start vote for Apache Tooling 0.1"]')
@@ -231,7 +270,7 @@ def test_lifecycle_04_vote_on_candidate(page: sync_api.Page) -> None:
     logging.info("Vote initiation actions completed successfully")
 
 
-def test_lifecycle_05_resolve_vote(page: sync_api.Page) -> None:
+def test_lifecycle_06_resolve_vote(page: sync_api.Page) -> None:
     logging.info("Locating the form to resolve the vote for tooling-0.1")
     form_locator = page.locator('form:has(input[name="candidate_name"][value="tooling-0.1"])')
     sync_api.expect(form_locator).to_be_visible()

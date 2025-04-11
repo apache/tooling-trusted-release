@@ -996,6 +996,11 @@ async def _promote(
     target_dir: pathlib.Path
     success_message: str
 
+    # Count how many files are in the source directory
+    file_count = await _number_of_release_files(release)
+    if file_count == 0:
+        return await session.redirect(promote, error="This candidate draft is empty, containing no files")
+
     # Promote it to the target phase
     # TODO: Obtain a lock for this
     if target_phase_enum == models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE:
