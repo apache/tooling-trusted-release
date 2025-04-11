@@ -77,7 +77,7 @@ types-aiofiles = ">=24.1.0.20241221,<25.0.0.0"
 # Additional tools
 
 [tool.pyright]
-include = ["atr"]
+include = ["atr", "playwright"]
 exclude = [
   "**/node_modules",
   "**/__pycache__",

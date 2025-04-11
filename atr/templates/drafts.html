@@ -36,17 +36,23 @@
             {% endif %}
             <div class="d-flex gap-2 mb-2">
               <a href="{{ as_url(routes.draft.evaluate, project_name=release.project.name, version_name=release.version) }}"
+                 title="Evaluate files for {{ release.project.display_name }} {{ release.version }}"
                  class="btn btn-sm btn-outline-primary">Evaluate files</a>
               <a href="{{ as_url(routes.draft.promote) }}#{{ release.name }}"
+                 title="Promote draft for {{ release.project.display_name }} {{ release.version }}"
                  class="btn btn-sm btn-outline-success">Promote draft</a>
               <button class="btn btn-sm btn-outline-danger me-2"
+                      title="Delete draft for {{ release.project.display_name }} {{ release.version }}"
                       data-bs-toggle="modal"
                       data-bs-target="#delete-{{ release_id }}">Delete draft</button>
               <a href="{{ as_url(routes.draft.view, project_name=release.project.name, version_name=release.version) }}"
+                 title="View files for {{ release.project.display_name }} {{ release.version }}"
                  class="btn btn-sm btn-outline-secondary">View files</a>
               <a href="{{ as_url(routes.draft.add_file, project_name=release.project.name, version_name=release.version) }}"
+                 title="Upload file for {{ release.project.display_name }} {{ release.version }}"
                  class="btn btn-sm btn-outline-secondary">Upload file</a>
               <a href="{{ as_url(routes.draft.revisions, project_name=release.project.name, version_name=release.version) }}"
+                 title="Revisions for {{ release.project.display_name }} {{ release.version }}"
                  class="btn btn-sm btn-outline-secondary">Revisions</a>
             </div>
             <p class="card-text mt-3">

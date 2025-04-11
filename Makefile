@@ -15,7 +15,7 @@ build-alpine:
 	$(SCRIPTS)/build Dockerfile.alpine $(IMAGE)
 
 build-playwright:
-	docker build -t atr-playwright -f tests/Dockerfile.playwright tests/playwright
+	docker build -t atr-playwright -f tests/Dockerfile.playwright playwright
 
 build-ubuntu:
 	$(SCRIPTS)/build Dockerfile.ubuntu $(IMAGE)
