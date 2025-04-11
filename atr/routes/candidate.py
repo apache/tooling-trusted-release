@@ -33,6 +33,7 @@ import atr.db as db
 import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
+import atr.routes.preview as preview
 import atr.tasks.vote as tasks_vote
 import atr.user as user
 import atr.util as util
@@ -284,7 +285,7 @@ Thanks,
             # (The message should be shown on the vote resolution page)
             # TODO: Link to the vote resolution page in the flash message
             return await session.redirect(
-                vote,
+                resolve,
                 success=f"The vote announcement email will soon be sent to {email_to}.",
             )
 
@@ -418,7 +419,7 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
             await data.commit()
 
     await _resolve_post_files(project_name, release, vote_result, session.uid)
-    return await session.redirect(resolve, success=success_message)
+    return await session.redirect(preview.previews, success=success_message)
 
 
 async def _resolve_post_files(project_name: str, release: models.Release, vote_result: str, asf_uid: str) -> None:

@@ -134,6 +134,8 @@ def test_lifecycle(page: sync_api.Page) -> None:
     test_lifecycle_01_add_draft(page)
     test_lifecycle_02_check_draft_added(page)
     test_lifecycle_03_promote_to_candidate(page)
+    test_lifecycle_04_vote_on_candidate(page)
+    test_lifecycle_05_resolve_vote(page)
 
 
 def test_lifecycle_01_add_draft(page: sync_api.Page) -> None:
@@ -203,6 +205,49 @@ def test_lifecycle_03_promote_to_candidate(page: sync_api.Page) -> None:
     logging.info("Waiting for navigation to /candidate/vote after submitting promotion")
     wait_for_path(page, "/candidate/vote")
     logging.info("Promote draft actions completed successfully")
+
+
+def test_lifecycle_04_vote_on_candidate(page: sync_api.Page) -> None:
+    logging.info("Locating the link to start a vote for tooling-0.1")
+    card_locator = page.locator('div.card:has(input[name="candidate_name"][value="tooling-0.1"])')
+    start_vote_link_locator = card_locator.locator('a[title="Start vote for Apache Tooling 0.1"]')
+    sync_api.expect(start_vote_link_locator).to_be_visible()
+
+    logging.info("Following the link to start the vote")
+    start_vote_link_locator.click()
+
+    logging.info("Waiting for navigation to /candidate/vote/tooling/0.1")
+    wait_for_path(page, "/candidate/vote/tooling/0.1")
+    logging.info("Vote start page loaded successfully")
+
+    logging.info("Locating and activating the button to prepare the vote email")
+    submit_button_locator = page.locator('input[type="submit"][value="Prepare vote email"]')
+    sync_api.expect(submit_button_locator).to_be_enabled()
+    submit_button_locator.click()
+
+    logging.info("Waiting for navigation to /candidate/resolve after submitting vote email")
+    wait_for_path(page, "/candidate/resolve")
+    logging.info("Vote initiation actions completed successfully")
+
+
+def test_lifecycle_05_resolve_vote(page: sync_api.Page) -> None:
+    logging.info("Locating the form to resolve the vote for tooling-0.1")
+    form_locator = page.locator('form:has(input[name="candidate_name"][value="tooling-0.1"])')
+    sync_api.expect(form_locator).to_be_visible()
+
+    logging.info("Locating and selecting the 'Passed' radio button")
+    passed_radio_locator = form_locator.locator('input[name="vote_result"][value="passed"]')
+    sync_api.expect(passed_radio_locator).to_be_enabled()
+    passed_radio_locator.check()
+
+    logging.info("Locating and activating the button to resolve the vote")
+    submit_button_locator = form_locator.locator('input[type="submit"][value="Resolve vote"]')
+    sync_api.expect(submit_button_locator).to_be_enabled()
+    submit_button_locator.click()
+
+    logging.info("Waiting for navigation to /previews after resolving the vote")
+    wait_for_path(page, "/previews")
+    logging.info("Vote resolution actions completed successfully")
 
 
 def test_login(page: sync_api.Page, credentials: Credentials) -> None:
