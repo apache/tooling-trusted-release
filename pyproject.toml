@@ -46,7 +46,9 @@ dev = [
 ]
 test = [
   "pytest>=8.0",
-  "pytest-asyncio>=0.24"
+  "pytest-asyncio>=0.24",
+  "playwright>=1.51.0",
+  "netifaces>=0.11.0"
 ]
 
 # Other configuration
@@ -59,6 +61,8 @@ package-mode = false
 [tool.poetry.group.test.dependencies]
 pytest = ">=8.0"
 pytest-asyncio = ">=0.24"
+playwright = "^1.51.0"
+netifaces = "^0.11.0"
 
 [tool.poetry.group.dev.dependencies]
 decouple-types = ">=1.0"

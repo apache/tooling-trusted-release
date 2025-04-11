@@ -1,0 +1,22 @@
+FROM mcr.microsoft.com/playwright/python:v1.51.0-noble
+
+RUN <<-EOF
+    set -eux
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        iproute2 \
+        nano \
+        openssh-client \
+        python3-dev
+    pip3 install --no-cache-dir \
+        netifaces \
+        playwright
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+EOF
+RUN playwright install --with-deps
+
+COPY . /run/tests
+WORKDIR /run/tests
+CMD ["/bin/bash"]

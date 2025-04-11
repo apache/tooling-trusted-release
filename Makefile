@@ -1,4 +1,6 @@
-.PHONY: build build-alpine build-ubuntu certs check docs generate-version obvfix report run run-dev run-staging stop serve sync sync-dev
+.PHONY: build build-alpine build-playwright build-ubuntu certs check \
+  docs generate-version obvfix report run run-dev run-playwright \
+  run-staging stop serve sync sync-dev
 
 BIND ?= 127.0.0.1:8080
 IMAGE ?= tooling-trusted-release
@@ -11,6 +13,9 @@ build: build-alpine
 
 build-alpine:
 	$(SCRIPTS)/build Dockerfile.alpine $(IMAGE)
+
+build-playwright:
+	docker build -t atr-playwright -f tests/Dockerfile.playwright tests/playwright
 
 build-ubuntu:
 	$(SCRIPTS)/build Dockerfile.ubuntu $(IMAGE)
@@ -48,6 +53,9 @@ run: run-dev
 
 run-dev:
 	BIND=127.0.0.1:4443 scripts/run
+
+run-playwright:
+	docker run --net=host -it atr-playwright
 
 run-staging:
 	BIND=127.0.0.1:8443 scripts/run
