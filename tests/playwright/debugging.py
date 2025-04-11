@@ -17,14 +17,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import getpass
 import socket
 
 import netifaces
-from playwright.sync_api import sync_playwright
+import playwright.sync_api as sync_api
 
 
 def get_default_gateway_ip() -> str | None:
-    """Gets the default IPv4 gateway IP address."""
     gateways = netifaces.gateways()
     match gateways.get("default", {}).get(socket.AF_INET):
         case (ip_address, _):
@@ -33,7 +33,7 @@ def get_default_gateway_ip() -> str | None:
             return None
 
 
-def show_default_gateway_ip():
+def show_default_gateway_ip() -> None:
     match get_default_gateway_ip():
         case str(ip_address):
             print(f"Default gateway IP: {ip_address}")
@@ -41,28 +41,57 @@ def show_default_gateway_ip():
             print("Could not determine gateway IP")
 
 
-def show_title(ip_address: str | None) -> None:
+def login_and_check(ip_address: str | None) -> None:
     if ip_address is None:
-        print("Cannot show title: no IP address provided")
+        print("Cannot login: no IP address provided")
         return
 
-    with sync_playwright() as p:
+    username = input("Enter ASF Username: ")
+    password = getpass.getpass("Enter ASF Password: ")
+
+    if (not username) or (not password):
+        print("Error: Username and password cannot be empty")
+        return
+
+    with sync_api.sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context(ignore_https_errors=True)
         page = context.new_page()
         try:
-            page.goto(f"https://{ip_address}:8080/")
-            print("Title:", page.title())
+            start_url = f"https://{ip_address}:8080/"
+            print(f"Navigating to {start_url}")
+            page.goto(start_url)
+            print("Initial page title:", page.title())
 
-            links_locator = page.locator("a[href]")
-            link_count = links_locator.count()
-            print(f"Found {link_count} hyperlinks:")
+            print("Following link to log in")
+            login_link_locator = page.get_by_role("link", name="Login")
+            sync_api.expect(login_link_locator).to_be_visible()
+            login_link_locator.click()
 
-            link_texts = links_locator.all_text_contents()
-            for i, text in enumerate(link_texts):
-                normalised_text = " ".join(text.split())
-                if normalised_text:
-                    print(f"  {i + 1}: {normalised_text}")
+            print("Waiting for the login page")
+            username_field_locator = page.locator('input[name="username"]')
+            sync_api.expect(username_field_locator).to_be_visible()
+            print("Login page loaded")
+
+            print("Filling credentials")
+            username_field_locator.fill(username)
+            page.locator('input[name="password"]').fill(password)
+
+            print("Submitting the login form")
+            submit_button_locator = page.locator('input[type="submit"][value="Authenticate"]')
+            sync_api.expect(submit_button_locator).to_be_enabled()
+            submit_button_locator.click()
+
+            print("Waiting for the page to load")
+            page.wait_for_load_state()
+            print("Page loaded after login")
+            print("Initial URL after login:", page.url)
+
+            print("Waiting for the redirect to /")
+            page.wait_for_url("https://*/")
+            print("Redirected to / ")
+            print("Page URL:", page.url)
+            print("Okay!")
 
         except Exception as e:
             print(f"Error during page interaction: {e}")
@@ -75,4 +104,4 @@ if __name__ == "__main__":
     show_default_gateway_ip()
     gateway_ip = get_default_gateway_ip()
     if gateway_ip:
-        show_title(gateway_ip)
+        login_and_check(gateway_ip)
