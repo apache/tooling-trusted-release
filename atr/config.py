@@ -90,6 +90,13 @@ _CONFIG_DICT: Final = {
 }
 
 
+def get() -> type[AppConfig]:
+    try:
+        return _CONFIG_DICT[get_mode()]
+    except KeyError:
+        exit("Error: Invalid <mode>. Expected values [Debug, Production, Profiling].")
+
+
 def get_mode() -> Mode:
     global _global_mode
 
@@ -102,10 +109,3 @@ def get_mode() -> Mode:
             _global_mode = Mode.Debug
 
     return _global_mode
-
-
-def get() -> type[AppConfig]:
-    try:
-        return _CONFIG_DICT[get_mode()]
-    except KeyError:
-        exit("Error: Invalid <mode>. Expected values [Debug, Production, Profiling].")

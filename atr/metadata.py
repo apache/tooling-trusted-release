@@ -16,6 +16,10 @@
 # under the License.
 
 
+def _get_undefined() -> tuple[str, str]:
+    return "undefined", "undefined"
+
+
 def _get_version_from_git() -> tuple[str, str] | None:
     """Returns the version when within a development environment."""
 
@@ -60,10 +64,6 @@ def _get_version_from_version_module() -> tuple[str, str] | None:
         return atr._version.ATR_VERSION, atr._version.ATR_COMMIT
     except ImportError:
         return None
-
-
-def _get_undefined() -> tuple[str, str]:
-    return "undefined", "undefined"
 
 
 # Try to determine the version from a development environment first.

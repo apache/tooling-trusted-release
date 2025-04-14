@@ -60,35 +60,13 @@ class ApiOnlyOpenAPIProvider(quart_schema.OpenAPIProvider):
                 yield rule
 
 
-def register_routes(app: base.QuartApp) -> ModuleType:
-    # NOTE: These imports are for their side effects only
-    import atr.routes.modules as modules
-
-    # Add a global error handler to show helpful error messages with tracebacks
-    @app.errorhandler(Exception)
-    async def handle_any_exception(error: Exception) -> Any:
-        import traceback
-
-        # Required to give to the error.html template
-        tb = traceback.format_exc()
-        app.logger.exception("Unhandled exception")
-        return await quart.render_template("error.html", error=str(error), traceback=tb, status_code=500), 500
-
-    @app.errorhandler(base.ASFQuartException)
-    async def handle_asfquart_exception(error: base.ASFQuartException) -> Any:
-        # TODO: Figure out why pyright doesn't know about this attribute
-        if not hasattr(error, "errorcode"):
-            errorcode = 500
-        else:
-            errorcode = getattr(error, "errorcode")
-        return await quart.render_template("error.html", error=str(error), status_code=errorcode), errorcode
-
-    # Add a global error handler in case a page does not exist.
-    @app.errorhandler(404)
-    async def handle_not_found(error: Exception) -> Any:
-        return await quart.render_template("notfound.html", error="404 Not Found", traceback="", status_code=404), 404
-
-    return modules
+def app_create_base(app_config: type[config.AppConfig]) -> base.QuartApp:
+    """Create the base Quart application."""
+    if asfquart.construct is ...:
+        raise ValueError("asfquart.construct is not set")
+    app = asfquart.construct(__name__)
+    app.config.from_object(app_config)
+    return app
 
 
 def app_dirs_setup(app_config: type[config.AppConfig]) -> None:
@@ -101,15 +79,6 @@ def app_dirs_setup(app_config: type[config.AppConfig]) -> None:
     util.get_release_candidate_dir().mkdir(parents=True, exist_ok=True)
     util.get_release_preview_dir().mkdir(parents=True, exist_ok=True)
     util.get_release_dir().mkdir(parents=True, exist_ok=True)
-
-
-def app_create_base(app_config: type[config.AppConfig]) -> base.QuartApp:
-    """Create the base Quart application."""
-    if asfquart.construct is ...:
-        raise ValueError("asfquart.construct is not set")
-    app = asfquart.construct(__name__)
-    app.config.from_object(app_config)
-    return app
 
 
 def app_setup_api_docs(app: base.QuartApp) -> None:
@@ -251,6 +220,37 @@ def main() -> None:
     if app is None:
         app = create_app(config.get())
     app.run(port=8080, ssl_keyfile="key.pem", ssl_certfile="cert.pem")
+
+
+def register_routes(app: base.QuartApp) -> ModuleType:
+    # NOTE: These imports are for their side effects only
+    import atr.routes.modules as modules
+
+    # Add a global error handler to show helpful error messages with tracebacks
+    @app.errorhandler(Exception)
+    async def handle_any_exception(error: Exception) -> Any:
+        import traceback
+
+        # Required to give to the error.html template
+        tb = traceback.format_exc()
+        app.logger.exception("Unhandled exception")
+        return await quart.render_template("error.html", error=str(error), traceback=tb, status_code=500), 500
+
+    @app.errorhandler(base.ASFQuartException)
+    async def handle_asfquart_exception(error: base.ASFQuartException) -> Any:
+        # TODO: Figure out why pyright doesn't know about this attribute
+        if not hasattr(error, "errorcode"):
+            errorcode = 500
+        else:
+            errorcode = getattr(error, "errorcode")
+        return await quart.render_template("error.html", error=str(error), status_code=errorcode), errorcode
+
+    # Add a global error handler in case a page does not exist.
+    @app.errorhandler(404)
+    async def handle_not_found(error: Exception) -> Any:
+        return await quart.render_template("notfound.html", error="404 Not Found", traceback="", status_code=404), 404
+
+    return modules
 
 
 # FIXME: when running in SSL mode, you will receive these exceptions upon termination at times:

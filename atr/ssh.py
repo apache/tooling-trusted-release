@@ -294,6 +294,33 @@ def _fail(proc: asyncssh.SSHServerProcess, message: str, return_value: T) -> T:
     return return_value
 
 
+async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
+    """Process client command by executing it and redirecting I/O."""
+    asf_uid = process.get_extra_info("username")
+    _LOGGER.info(f"Handling command for authenticated user: {asf_uid}")
+
+    if not process.command:
+        process.stderr.write(b"ATR SSH error: No command specified\n")
+        process.exit(1)
+        return
+
+    _LOGGER.info(f"Command received: {process.command}")
+    argv = process.command.split()
+
+    simple_validation_error, path_index = _command_simple_validate(argv)
+    if simple_validation_error:
+        process.stderr.write(f"ATR SSH error: {simple_validation_error}\nCommand: {process.command}\n".encode())
+        process.exit(1)
+        return
+
+    validation_results = await _command_validate(process, argv, path_index)
+    if not validation_results:
+        return
+    project_name, version_name = validation_results
+
+    await _process_validated_rsync(process, argv, path_index, project_name, version_name)
+
+
 async def _process_validated_rsync(
     process: asyncssh.SSHServerProcess,
     argv: list[str],
@@ -337,30 +364,3 @@ async def _process_validated_rsync(
         _fail(process, f"Internal error processing revision: {e}", None)
         if not process.is_closing():
             process.exit(1)
-
-
-async def _handle_client(process: asyncssh.SSHServerProcess) -> None:
-    """Process client command by executing it and redirecting I/O."""
-    asf_uid = process.get_extra_info("username")
-    _LOGGER.info(f"Handling command for authenticated user: {asf_uid}")
-
-    if not process.command:
-        process.stderr.write(b"ATR SSH error: No command specified\n")
-        process.exit(1)
-        return
-
-    _LOGGER.info(f"Command received: {process.command}")
-    argv = process.command.split()
-
-    simple_validation_error, path_index = _command_simple_validate(argv)
-    if simple_validation_error:
-        process.stderr.write(f"ATR SSH error: {simple_validation_error}\nCommand: {process.command}\n".encode())
-        process.exit(1)
-        return
-
-    validation_results = await _command_validate(process, argv, path_index)
-    if not validation_results:
-        return
-    project_name, version_name = validation_results
-
-    await _process_validated_rsync(process, argv, path_index, project_name, version_name)

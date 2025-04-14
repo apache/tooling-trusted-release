@@ -174,24 +174,6 @@ async def _task_next_claim() -> tuple[int, str, list[str] | dict[str, Any]] | No
             return None
 
 
-async def _task_result_process(
-    task_id: int, task_results: tuple[Any, ...], status: models.TaskStatus, error: str | None = None
-) -> None:
-    """Process and store task results in the database."""
-    async with db.session() as data:
-        async with data.begin():
-            # Find the task by ID
-            task_obj = await data.task(id=task_id).get()
-            if task_obj:
-                # Update task properties
-                task_obj.status = status
-                task_obj.completed = datetime.datetime.now(datetime.UTC)
-                task_obj.result = task_results
-
-                if (status == task.FAILED) and error:
-                    task_obj.error = error
-
-
 async def _task_process(task_id: int, task_type: str, task_args: list[str] | dict[str, Any]) -> None:
     """Process a claimed task."""
     _LOGGER.info(f"Processing task {task_id} ({task_type}) with raw args {task_args}")
@@ -259,6 +241,24 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
         _LOGGER.error(f"Task {task_id} failed processing: {error_details}")
         error = str(e)
     await _task_result_process(task_id, task_results, status, error)
+
+
+async def _task_result_process(
+    task_id: int, task_results: tuple[Any, ...], status: models.TaskStatus, error: str | None = None
+) -> None:
+    """Process and store task results in the database."""
+    async with db.session() as data:
+        async with data.begin():
+            # Find the task by ID
+            task_obj = await data.task(id=task_id).get()
+            if task_obj:
+                # Update task properties
+                task_obj.status = status
+                task_obj.completed = datetime.datetime.now(datetime.UTC)
+                task_obj.result = task_results
+
+                if (status == task.FAILED) and error:
+                    task_obj.error = error
 
 
 # Worker functions

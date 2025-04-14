@@ -16,8 +16,8 @@ class ExitCode(enum.IntEnum):
 def _extract_top_level_function_names(tree: ast.Module) -> list[str]:
     function_names: list[str] = []
     for node in tree.body:
-        if isinstance(node, ast.FunctionDef):
-            function_names.append(node.name)
+        if isinstance(node, ast.AsyncFunctionDef) or isinstance(node, ast.FunctionDef):
+            function_names.append(_toggle_sortability(node.name))
     return function_names
 
 
@@ -40,6 +40,13 @@ def _read_file_content(file_path: pathlib.Path) -> str | None:
         return None
 
 
+def _toggle_sortability(name: str) -> str:
+    if name.startswith("_"):
+        return name[1:]
+    else:
+        return "_" + name
+
+
 def _verify_names_are_sorted(names: Sequence[str], filename: str) -> bool:
     is_sorted = all(names[i] <= names[i + 1] for i in range(len(names) - 1))
     if is_sorted:
@@ -47,8 +54,10 @@ def _verify_names_are_sorted(names: Sequence[str], filename: str) -> bool:
 
     for i in range(len(names) - 1):
         if names[i] > names[i + 1]:
+            a = _toggle_sortability(names[i])
+            b = _toggle_sortability(names[i + 1])
             print(
-                f"Error: Function '{names[i + 1]}' in {filename} is not ordered correctly relative to '{names[i]}'",
+                f"Error: Function '{b}' in {filename} is not ordered correctly relative to '{a}'",
                 file=sys.stderr,
             )
     return False
@@ -72,11 +81,11 @@ def main() -> None:
     function_names = _extract_top_level_function_names(tree)
 
     if not function_names:
-        print(f"No top-level functions found in {file_path}. Nothing to check")
+        print(f"No top level functions found in {file_path}. Nothing to check")
         sys.exit(ExitCode.SUCCESS)
 
     if _verify_names_are_sorted(function_names, str(file_path)):
-        print(f"Top-level functions in {file_path} are alphabetically ordered")
+        print(f"Top level functions in {file_path} are alphabetically ordered")
         sys.exit(ExitCode.SUCCESS)
     else:
         sys.exit(ExitCode.FAILURE)

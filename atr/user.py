@@ -47,16 +47,16 @@ def is_admin(user_id: str | None) -> bool:
     return user_id in get_admin_users()
 
 
-def is_committer(committee: models.Committee | None, uid: str) -> bool:
-    if committee is None:
-        return False
-    return any((committer_uid == uid) for committer_uid in committee.committers)
-
-
 def is_committee_member(committee: models.Committee | None, uid: str) -> bool:
     if committee is None:
         return False
     return any((member_uid == uid) for member_uid in committee.committee_members)
+
+
+def is_committer(committee: models.Committee | None, uid: str) -> bool:
+    if committee is None:
+        return False
+    return any((committer_uid == uid) for committer_uid in committee.committers)
 
 
 async def projects(uid: str, committee_only: bool = False) -> list[models.Project]:
