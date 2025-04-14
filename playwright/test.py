@@ -26,7 +26,8 @@ import re
 import socket
 import subprocess
 import urllib.parse
-from typing import Final
+from collections.abc import Callable
+from typing import Any, Final
 
 import netifaces
 import rich.logging
@@ -91,6 +92,11 @@ def main() -> None:
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Set the logging level, default is INFO",
     )
+    parser.add_argument(
+        "--skip-slow",
+        action="store_true",
+        help="Skip slow tests",
+    )
     args = parser.parse_args()
     log_level = getattr(logging, args.log.upper(), logging.INFO)
 
@@ -103,10 +109,10 @@ def main() -> None:
     )
 
     logging.debug(f"Log level set to {args.log.upper()}")
-    run_tests()
+    run_tests(args.skip_slow)
 
 
-def run_tests() -> None:
+def run_tests(skip_slow: bool) -> None:
     if (credentials := get_credentials()) is None:
         logging.error("Cannot run tests: no credentials provided")
         return
@@ -117,7 +123,7 @@ def run_tests() -> None:
         try:
             browser = p.chromium.launch()
             context = browser.new_context(ignore_https_errors=True)
-            run_tests_in_context(context, credentials)
+            run_tests_in_context(context, credentials, skip_slow)
 
         except Exception as e:
             logging.error(f"Error during page interaction: {e}", exc_info=True)
@@ -128,11 +134,19 @@ def run_tests() -> None:
                 browser.close()
 
 
-def run_tests_in_context(context: sync_api.BrowserContext, credentials: Credentials) -> None:
+def run_tests_in_context(context: sync_api.BrowserContext, credentials: Credentials, skip_slow: bool) -> None:
     ssh_keys_generate()
     page = context.new_page()
-    test_all(page, credentials)
+    test_all(page, credentials, skip_slow)
     logging.info("Tests finished successfully")
+
+
+def run_tests_skipping_slow(tests: list[Callable[..., Any]], page: sync_api.Page, skip_slow: bool) -> None:
+    for test in tests:
+        if skip_slow and ("slow" in test.__annotations__):
+            logging.info(f"Skipping slow test: {test.__name__}")
+            continue
+        test(page)
 
 
 def show_default_gateway_ip() -> None:
@@ -141,6 +155,11 @@ def show_default_gateway_ip() -> None:
             logging.info(f"Default gateway IP: {ip_address}")
         case None:
             logging.warning("Could not determine gateway IP")
+
+
+def slow(func: Callable[..., Any]) -> Callable[..., Any]:
+    func.__annotations__["slow"] = True
+    return func
 
 
 def ssh_keys_generate() -> None:
@@ -158,7 +177,7 @@ def ssh_keys_generate() -> None:
         os.makedirs(ssh_dir, mode=0o700, exist_ok=True)
 
         logging.info(f"Generating new SSH key at {ssh_key_path}")
-        result = subprocess.run(
+        subprocess.run(
             ["ssh-keygen", "-t", "ed25519", "-f", ssh_key_path, "-N", ""],
             check=True,
             capture_output=True,
@@ -172,30 +191,37 @@ def ssh_keys_generate() -> None:
             logging.error(f"ssh-keygen stderr: {e.stderr}")
         raise RuntimeError("SSH key generation failed") from e
 
-    if result.returncode != 0:
-        logging.error(f"ssh-keygen returned {result.returncode}")
-        logging.error(f"ssh-keygen stdout: {result.stdout}")
-        logging.error(f"ssh-keygen stderr: {result.stderr}")
-        raise RuntimeError("SSH key generation failed")
 
-
-def test_all(page: sync_api.Page, credentials: Credentials) -> None:
+def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> None:
     test_login(page, credentials)
     test_tidy_up(page)
-    test_lifecycle(page)
-    test_projects(page)
-    test_ssh(page)
 
+    # Declare all tests
+    tests = {}
+    tests["lifecycle"] = [
+        test_lifecycle_01_add_draft,
+        test_lifecycle_02_check_draft_added,
+        test_lifecycle_03_add_file,
+        test_lifecycle_04_promote_to_candidate,
+        test_lifecycle_05_vote_on_candidate,
+        test_lifecycle_06_resolve_vote,
+        test_lifecycle_07_promote_preview,
+        test_lifecycle_08_release_exists,
+    ]
+    tests["projects"] = [
+        test_projects_01_update,
+        test_projects_02_check_directory,
+        test_projects_03_add_project,
+    ]
+    tests["ssh"] = [
+        test_ssh_01_add_key,
+    ]
 
-def test_lifecycle(page: sync_api.Page) -> None:
-    test_lifecycle_01_add_draft(page)
-    test_lifecycle_02_check_draft_added(page)
-    test_lifecycle_03_add_file(page)
-    test_lifecycle_04_promote_to_candidate(page)
-    test_lifecycle_05_vote_on_candidate(page)
-    test_lifecycle_06_resolve_vote(page)
-    test_lifecycle_07_promote_preview(page)
-    test_lifecycle_08_release_exists(page)
+    # Order between our tests must be preserved
+    # Insertion order is reliable since Python 3.6
+    # Therefore iteration over tests matches the insertion order above
+    for key in tests:
+        run_tests_skipping_slow(tests[key], page, skip_slow)
 
 
 def test_lifecycle_01_add_draft(page: sync_api.Page) -> None:
@@ -432,12 +458,7 @@ def test_login(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Login actions completed successfully")
 
 
-def test_projects(page: sync_api.Page) -> None:
-    test_projects_01_update(page)
-    test_projects_02_check_directory(page)
-    test_projects_03_add_project(page)
-
-
+@slow
 def test_projects_01_update(page: sync_api.Page) -> None:
     logging.info("Navigating to the admin update projects page")
     go_to_path(page, "/admin/projects/update")
@@ -499,6 +520,68 @@ def test_projects_03_add_project(page: sync_api.Page) -> None:
     title_locator = page.locator(f'h1:has-text("{project_name}")')
     sync_api.expect(title_locator).to_be_visible()
     logging.info("Project title confirmed on view page")
+
+
+def test_ssh_01_add_key(page: sync_api.Page) -> None:
+    logging.info("Starting SSH key addition test")
+    go_to_path(page, "/")
+
+    logging.info("Navigating to Your Public Keys page")
+    page.locator('a[href="/keys"]:has-text("Your public keys")').click()
+    wait_for_path(page, "/keys")
+    logging.info("Navigated to Your Public Keys page")
+
+    logging.info("Clicking Add an SSH key button")
+    page.locator('a[href="/keys/ssh/add"]:has-text("Add an SSH key")').click()
+    wait_for_path(page, "/keys/ssh/add")
+    logging.info("Navigated to Add SSH Key page")
+
+    public_key_path = f"{_SSH_KEY_PATH}.pub"
+    try:
+        logging.info(f"Reading public key from {public_key_path}")
+        with open(public_key_path, encoding="utf-8") as f:
+            public_key_content = f.read().strip()
+        logging.info("Public key read successfully")
+    except OSError as e:
+        logging.error(f"Failed to read public key file {public_key_path}: {e}")
+        raise RuntimeError("Failed to read public key file") from e
+
+    logging.info("Pasting public key into textarea")
+    page.locator('textarea[name="key"]').fill(public_key_content)
+
+    logging.info("Submitting the Add SSH key form")
+    page.locator('input[type="submit"][value="Add SSH key"]').click()
+
+    logging.info("Waiting for navigation back to /keys page")
+    wait_for_path(page, "/keys")
+    logging.info("Navigated back to /keys page")
+
+    try:
+        logging.info("Calculating expected SSH key fingerprint using ssh-keygen -lf")
+        result = subprocess.run(
+            ["ssh-keygen", "-lf", public_key_path],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fingerprint_output = result.stdout.strip()
+        match = re.search(r"SHA256:([\w\+/=]+)", fingerprint_output)
+        if not match:
+            logging.error(f"Could not parse fingerprint from ssh-keygen output: {fingerprint_output}")
+            raise RuntimeError("Failed to parse SSH key fingerprint")
+        expected_fingerprint = f"SHA256:{match.group(1)}"
+        logging.info(f"Expected fingerprint: {expected_fingerprint}")
+
+    except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError) as e:
+        logging.error(f"Failed to get SSH key fingerprint: {e}")
+        if isinstance(e, subprocess.CalledProcessError):
+            logging.error(f"ssh-keygen stderr: {e.stderr}")
+        raise RuntimeError("Failed to get SSH key fingerprint") from e
+
+    logging.info("Verifying that the added SSH key fingerprint is visible")
+    key_card_locator = page.locator(f'div.card:has(td:has-text("{expected_fingerprint}"))')
+    sync_api.expect(key_card_locator).to_be_visible()
+    logging.info("SSH key fingerprint verified successfully on /keys page")
 
 
 def test_tidy_up(page: sync_api.Page) -> None:
@@ -575,72 +658,6 @@ def test_tidy_up_release(page: sync_api.Page) -> None:
         logging.info("Deletion successful")
     else:
         logging.info("Could not find the tooling-0.1 release, no deletion needed")
-
-
-def test_ssh(page: sync_api.Page) -> None:
-    test_ssh_01_add_key(page)
-
-
-def test_ssh_01_add_key(page: sync_api.Page) -> None:
-    logging.info("Starting SSH key addition test")
-    go_to_path(page, "/")
-
-    logging.info("Navigating to Your Public Keys page")
-    page.locator('a[href="/keys"]:has-text("Your public keys")').click()
-    wait_for_path(page, "/keys")
-    logging.info("Navigated to Your Public Keys page")
-
-    logging.info("Clicking Add an SSH key button")
-    page.locator('a[href="/keys/ssh/add"]:has-text("Add an SSH key")').click()
-    wait_for_path(page, "/keys/ssh/add")
-    logging.info("Navigated to Add SSH Key page")
-
-    public_key_path = f"{_SSH_KEY_PATH}.pub"
-    try:
-        logging.info(f"Reading public key from {public_key_path}")
-        with open(public_key_path, encoding="utf-8") as f:
-            public_key_content = f.read().strip()
-        logging.info("Public key read successfully")
-    except OSError as e:
-        logging.error(f"Failed to read public key file {public_key_path}: {e}")
-        raise RuntimeError("Failed to read public key file") from e
-
-    logging.info("Pasting public key into textarea")
-    page.locator('textarea[name="key"]').fill(public_key_content)
-
-    logging.info("Submitting the Add SSH key form")
-    page.locator('input[type="submit"][value="Add SSH key"]').click()
-
-    logging.info("Waiting for navigation back to /keys page")
-    wait_for_path(page, "/keys")
-    logging.info("Navigated back to /keys page")
-
-    try:
-        logging.info("Calculating expected SSH key fingerprint using ssh-keygen -lf")
-        result = subprocess.run(
-            ["ssh-keygen", "-lf", public_key_path],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        fingerprint_output = result.stdout.strip()
-        match = re.search(r"SHA256:([\w\+/=]+)", fingerprint_output)
-        if not match:
-            logging.error(f"Could not parse fingerprint from ssh-keygen output: {fingerprint_output}")
-            raise RuntimeError("Failed to parse SSH key fingerprint")
-        expected_fingerprint = f"SHA256:{match.group(1)}"
-        logging.info(f"Expected fingerprint: {expected_fingerprint}")
-
-    except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError) as e:
-        logging.error(f"Failed to get SSH key fingerprint: {e}")
-        if isinstance(e, subprocess.CalledProcessError):
-            logging.error(f"ssh-keygen stderr: {e.stderr}")
-        raise RuntimeError("Failed to get SSH key fingerprint") from e
-
-    logging.info("Verifying that the added SSH key fingerprint is visible")
-    key_card_locator = page.locator(f'div.card:has(td:has-text("{expected_fingerprint}"))')
-    sync_api.expect(key_card_locator).to_be_visible()
-    logging.info("SSH key fingerprint verified successfully on /keys page")
 
 
 def wait_for_path(page: sync_api.Page, path: str) -> None:

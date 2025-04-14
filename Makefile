@@ -55,7 +55,7 @@ run-dev:
 	BIND=127.0.0.1:4443 scripts/run
 
 run-playwright:
-	docker run --net=host -it atr-playwright python3 test.py
+	docker run --net=host -it atr-playwright python3 test.py --skip-slow
 
 run-staging:
 	BIND=127.0.0.1:8443 scripts/run
