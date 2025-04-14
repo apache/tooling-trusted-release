@@ -134,11 +134,11 @@ async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
 
 
 @routes.public("/projects")
-async def directory() -> str:
+async def projects() -> str:
     """Main project directory page."""
     async with db.session() as data:
         projects = await data.project(_committee=True).order_by(models.Project.full_name).all()
-        return await quart.render_template("project-directory.html", projects=projects)
+        return await quart.render_template("projects.html", projects=projects)
 
 
 @routes.public("/projects/<name>")

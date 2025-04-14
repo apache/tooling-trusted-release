@@ -280,7 +280,7 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
             }, 200
 
     # For GET requests, show the update form
-    return await quart.render_template("update-committees.html")
+    return await quart.render_template("update-projects.html")
 
 
 @admin.BLUEPRINT.route("/releases")
