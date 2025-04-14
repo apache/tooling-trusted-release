@@ -21,6 +21,7 @@ import argparse
 import dataclasses
 import getpass
 import logging
+import re
 import socket
 import urllib.parse
 
@@ -66,7 +67,18 @@ def get_default_gateway_ip() -> str | None:
             return None
 
 
+def go_to_path(page: sync_api.Page, path: str, wait: bool = True) -> None:
+    gateway_ip = get_default_gateway_ip()
+    if gateway_ip is None:
+        logging.error("Could not determine gateway IP")
+        raise RuntimeError("Could not determine gateway IP")
+    page.goto(f"https://{gateway_ip}:8080{path}")
+    if wait:
+        wait_for_path(page, path)
+
+
 def main() -> None:
+    # TODO: Only members of ASF Tooling can run these tests
     parser = argparse.ArgumentParser(description="Run Playwright debugging test")
     parser.add_argument(
         "--log",
@@ -129,6 +141,7 @@ def test_all(page: sync_api.Page, credentials: Credentials) -> None:
     test_login(page, credentials)
     test_tidy_up(page)
     test_lifecycle(page)
+    test_projects(page)
 
 
 def test_lifecycle(page: sync_api.Page) -> None:
@@ -178,13 +191,7 @@ def test_lifecycle_02_check_draft_added(page: sync_api.Page) -> None:
 
 def test_lifecycle_03_add_file(page: sync_api.Page) -> None:
     logging.info("Navigating to the add file page for tooling-0.1")
-    gateway_ip = get_default_gateway_ip()
-    if gateway_ip is None:
-        logging.error("Could not determine gateway IP for adding file")
-        raise RuntimeError("Could not determine gateway IP for adding file")
-    add_file_url = f"https://{gateway_ip}:8080/draft/add/tooling/0.1"
-    page.goto(add_file_url)
-    wait_for_path(page, "/draft/add/tooling/0.1")
+    go_to_path(page, "/draft/add/tooling/0.1")
     logging.info("Add file page loaded")
 
     logging.info("Locating the file input")
@@ -204,13 +211,7 @@ def test_lifecycle_03_add_file(page: sync_api.Page) -> None:
     logging.info("Add file actions completed successfully")
 
     logging.info("Navigating back to /drafts")
-    gateway_ip = get_default_gateway_ip()
-    if gateway_ip is None:
-        logging.error("Could not determine gateway IP for navigating back to drafts")
-        raise RuntimeError("Could not determine gateway IP for navigating back to drafts")
-    drafts_url = f"https://{gateway_ip}:8080/drafts"
-    page.goto(drafts_url)
-    wait_for_path(page, "/drafts")
+    go_to_path(page, "/drafts")
     logging.info("Navigation back to /drafts completed successfully")
 
 
@@ -353,14 +354,7 @@ def test_lifecycle_08_release_exists(page: sync_api.Page) -> None:
 
 
 def test_login(page: sync_api.Page, credentials: Credentials) -> None:
-    gateway_ip = get_default_gateway_ip()
-    if gateway_ip is None:
-        logging.error("Could not determine gateway IP")
-        raise RuntimeError("Could not determine gateway IP")
-
-    start_url = f"https://{gateway_ip}:8080/"
-    logging.info(f"Navigating to {start_url}")
-    page.goto(start_url)
+    go_to_path(page, "/")
     logging.info(f"Initial page title: {page.title()}")
 
     logging.info("Following link to log in")
@@ -397,13 +391,7 @@ def test_login(page: sync_api.Page, credentials: Credentials) -> None:
 
 def test_tidy_up(page: sync_api.Page) -> None:
     logging.info("Navigating to the admin delete release page")
-    gateway_ip = get_default_gateway_ip()
-    if gateway_ip is None:
-        logging.error("Could not determine gateway IP for tidy up")
-        raise RuntimeError("Could not determine gateway IP for tidy up")
-    delete_url = f"https://{gateway_ip}:8080/admin/delete-release"
-    page.goto(delete_url)
-    wait_for_path(page, "/admin/delete-release")
+    go_to_path(page, "/admin/delete-release")
     logging.info("Admin delete release page loaded")
 
     logging.info("Checking whether the tooling-0.1 release exists")
@@ -442,6 +430,31 @@ def wait_for_path(page: sync_api.Page, path: str) -> None:
         logging.error(f"Expected URL path '{path}', but got '{parsed_url.path}'")
         raise RuntimeError(f"Expected URL path '{path}', but got '{parsed_url.path}'")
     logging.info(f"Current URL: {page.url}")
+
+
+def test_projects(page: sync_api.Page) -> None:
+    test_projects_01_update(page)
+
+
+def test_projects_01_update(page: sync_api.Page) -> None:
+    logging.info("Navigating to the admin update projects page")
+    go_to_path(page, "/admin/projects/update")
+    logging.info("Admin update projects page loaded")
+
+    logging.info("Locating and activating the button to update projects")
+    update_button_locator = page.get_by_role("button", name="Update projects")
+    sync_api.expect(update_button_locator).to_be_enabled()
+    update_button_locator.click()
+
+    logging.info("Waiting for project update completion message")
+    # Wait for a message that matches the pattern, allowing for different numbers
+    success_message_locator = page.locator("div.status-message.success")
+    sync_api.expect(success_message_locator).to_contain_text(
+        re.compile(
+            r"Successfully added \d+ and updated \d+ committees and projects \(PMCs and PPMCs\) with membership data"
+        )
+    )
+    logging.info("Project update completed successfully")
 
 
 if __name__ == "__main__":
