@@ -238,7 +238,13 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
     test_tidy_up(page)
 
     # Declare all tests
-    tests = {}
+    # The order here is important
+    tests: dict[str, list[Callable[..., Any]]] = {}
+    tests["projects"] = [
+        test_projects_01_update,
+        test_projects_02_check_directory,
+        test_projects_03_add_project,
+    ]
     tests["lifecycle"] = [
         test_lifecycle_01_add_draft,
         test_lifecycle_02_check_draft_added,
@@ -248,11 +254,6 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
         test_lifecycle_06_resolve_vote,
         test_lifecycle_07_promote_preview,
         test_lifecycle_08_release_exists,
-    ]
-    tests["projects"] = [
-        test_projects_01_update,
-        test_projects_02_check_directory,
-        test_projects_03_add_project,
     ]
     tests["ssh"] = [
         test_ssh_01_add_key,
@@ -277,8 +278,8 @@ def test_lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials) -
     sync_api.expect(project_select_locator).to_be_visible()
     logging.info("Add draft page loaded")
 
-    logging.info("Selecting project 'tooling'")
-    project_select_locator.select_option(label="Apache Tooling")
+    logging.info("Selecting project 'tooling-test-example'")
+    project_select_locator.select_option(label="Apache Tooling Test Example")
 
     logging.info("Filling version '0.1'")
     page.locator('input[name="version_name"]').fill("0.1")
@@ -294,15 +295,15 @@ def test_lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials) -
 
 
 def test_lifecycle_02_check_draft_added(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Checking for draft 'tooling-0.1'")
-    draft_card_locator = page.locator(r"#tooling-0\.1")
+    logging.info("Checking for draft 'tooling-test-example-0.1'")
+    draft_card_locator = page.locator(r"#tooling-test-example-0\.1")
     sync_api.expect(draft_card_locator).to_be_visible()
-    logging.info("Draft 'tooling-0.1' found successfully")
+    logging.info("Draft 'tooling-test-example-0.1' found successfully")
 
 
 def test_lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Navigating to the add file page for tooling-0.1")
-    go_to_path(page, "/draft/add/tooling/0.1")
+    logging.info("Navigating to the add file page for tooling-test-example-0.1")
+    go_to_path(page, "/draft/add/tooling-test-example/0.1")
     logging.info("Add file page loaded")
 
     logging.info("Locating the file input")
@@ -317,8 +318,8 @@ def test_lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials) ->
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info("Waiting for navigation to /draft/evaluate/tooling/0.1 after adding file")
-    wait_for_path(page, "/draft/evaluate/tooling/0.1")
+    logging.info("Waiting for navigation to /draft/evaluate/tooling-test-example/0.1 after adding file")
+    wait_for_path(page, "/draft/evaluate/tooling-test-example/0.1")
     logging.info("Add file actions completed successfully")
 
     logging.info("Navigating back to /drafts")
@@ -327,9 +328,9 @@ def test_lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials) ->
 
 
 def test_lifecycle_04_promote_to_candidate(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Locating draft promotion link for tooling-0.1")
-    draft_card_locator = page.locator(r"#tooling-0\.1")
-    promote_link_locator = draft_card_locator.locator('a[title="Promote draft for Apache Tooling 0.1"]')
+    logging.info("Locating draft promotion link for tooling-test-example-0.1")
+    draft_card_locator = page.locator(r"#tooling-test-example-0\.1")
+    promote_link_locator = draft_card_locator.locator('a[title="Promote draft for Apache Tooling Test Example 0.1"]')
     sync_api.expect(promote_link_locator).to_be_visible()
 
     logging.info("Follow the draft promotion link")
@@ -340,8 +341,8 @@ def test_lifecycle_04_promote_to_candidate(page: sync_api.Page, credentials: Cre
     logging.info("Page loaded after following the promote link")
     logging.info(f"Current URL: {page.url}")
 
-    logging.info("Locating the promotion form for tooling-0.1")
-    form_locator = page.locator('form:has(input[name="candidate_draft_name"][value="tooling-0.1"])')
+    logging.info("Locating the promotion form for tooling-test-example-0.1")
+    form_locator = page.locator('form:has(input[name="candidate_draft_name"][value="tooling-test-example-0.1"])')
     sync_api.expect(form_locator).to_be_visible()
 
     logging.info("Locating the confirmation checkbox within the form")
@@ -362,16 +363,16 @@ def test_lifecycle_04_promote_to_candidate(page: sync_api.Page, credentials: Cre
 
 
 def test_lifecycle_05_vote_on_candidate(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Locating the link to start a vote for tooling-0.1")
-    card_locator = page.locator('div.card:has(input[name="candidate_name"][value="tooling-0.1"])')
-    start_vote_link_locator = card_locator.locator('a[title="Start vote for Apache Tooling 0.1"]')
+    logging.info("Locating the link to start a vote for tooling-test-example-0.1")
+    card_locator = page.locator('div.card:has(input[name="candidate_name"][value="tooling-test-example-0.1"])')
+    start_vote_link_locator = card_locator.locator('a[title="Start vote for Apache Tooling Test Example 0.1"]')
     sync_api.expect(start_vote_link_locator).to_be_visible()
 
     logging.info("Following the link to start the vote")
     start_vote_link_locator.click()
 
-    logging.info("Waiting for navigation to /candidate/vote/tooling/0.1")
-    wait_for_path(page, "/candidate/vote/tooling/0.1")
+    logging.info("Waiting for navigation to /candidate/vote/tooling-test-example/0.1")
+    wait_for_path(page, "/candidate/vote/tooling-test-example/0.1")
     logging.info("Vote start page loaded successfully")
 
     logging.info("Locating and activating the button to prepare the vote email")
@@ -385,8 +386,8 @@ def test_lifecycle_05_vote_on_candidate(page: sync_api.Page, credentials: Creden
 
 
 def test_lifecycle_06_resolve_vote(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Locating the form to resolve the vote for tooling-0.1")
-    form_locator = page.locator('form:has(input[name="candidate_name"][value="tooling-0.1"])')
+    logging.info("Locating the form to resolve the vote for tooling-test-example-0.1")
+    form_locator = page.locator('form:has(input[name="candidate_name"][value="tooling-test-example-0.1"])')
     sync_api.expect(form_locator).to_be_visible()
 
     logging.info("Locating and selecting the 'Passed' radio button")
@@ -405,8 +406,8 @@ def test_lifecycle_06_resolve_vote(page: sync_api.Page, credentials: Credentials
 
 
 def test_lifecycle_07_promote_preview(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Locating the link to promote the preview for tooling-0.1")
-    promote_link_locator = page.locator('a[title="Promote Apache Tooling 0.1 to release"]')
+    logging.info("Locating the link to promote the preview for tooling-test-example-0.1")
+    promote_link_locator = page.locator('a[title="Promote Apache Tooling Test Example 0.1 to release"]')
     sync_api.expect(promote_link_locator).to_be_visible()
 
     logging.info("Following the link to promote the preview")
@@ -416,8 +417,8 @@ def test_lifecycle_07_promote_preview(page: sync_api.Page, credentials: Credenti
     wait_for_path(page, "/preview/promote")
     logging.info("Promote preview navigation completed successfully")
 
-    logging.info("Locating the promotion form for tooling-0.1")
-    form_locator = page.locator(r'#tooling-0\.1 form[action="/preview/promote"]')
+    logging.info("Locating the promotion form for tooling-test-example-0.1")
+    form_locator = page.locator(r'#tooling-test-example-0\.1 form[action="/preview/promote"]')
     sync_api.expect(form_locator).to_be_visible()
 
     logging.info("Locating the confirmation checkbox within the form")
@@ -438,15 +439,15 @@ def test_lifecycle_07_promote_preview(page: sync_api.Page, credentials: Credenti
 
 
 def test_lifecycle_08_release_exists(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Checking for release tooling-0.1 on the /releases page")
+    logging.info("Checking for release tooling-test-example-0.1 on the /releases page")
 
-    release_card_locator = page.locator('div.card:has(h3:has-text("Apache Tooling 0.1"))')
+    release_card_locator = page.locator('div.card:has(h3:has-text("Apache Tooling Test Example 0.1"))')
     sync_api.expect(release_card_locator).to_be_visible()
-    logging.info("Found card for tooling-0.1 release")
-    logging.info("Release tooling-0.1 confirmed exists on /releases page")
+    logging.info("Found card for tooling-test-example-0.1 release")
+    logging.info("Release tooling-test-example-0.1 confirmed exists on /releases page")
 
-    logging.info("Locating the announcement marking button for tooling-0.1")
-    mark_announced_button_locator = page.locator('button[title="Mark Apache Tooling 0.1 as announced"]')
+    logging.info("Locating the announcement marking button for tooling-test-example-0.1")
+    mark_announced_button_locator = page.locator('button[title="Mark Apache Tooling Test Example 0.1 as announced"]')
     sync_api.expect(mark_announced_button_locator).to_be_visible()
 
     logging.info("Activating the button to mark the release as announced")
@@ -456,8 +457,8 @@ def test_lifecycle_08_release_exists(page: sync_api.Page, credentials: Credentia
     wait_for_path(page, "/releases")
     logging.info("Navigation back to /releases completed successfully")
 
-    logging.info("Verifying release tooling-0.1 phase is now RELEASE_AFTER_ANNOUNCEMENT")
-    release_card_locator = page.locator('div.card:has(h3:has-text("Apache Tooling 0.1"))')
+    logging.info("Verifying release tooling-test-example-0.1 phase is now RELEASE_AFTER_ANNOUNCEMENT")
+    release_card_locator = page.locator('div.card:has(h3:has-text("Apache Tooling Test Example 0.1"))')
     sync_api.expect(release_card_locator).to_be_visible()
     phase_locator = release_card_locator.locator('span.release-meta-item:has-text("Phase: RELEASE_AFTER_ANNOUNCEMENT")')
     sync_api.expect(phase_locator).to_be_visible()
@@ -817,7 +818,7 @@ def test_tidy_up_releases(page: sync_api.Page) -> None:
     go_to_path(page, "/admin/delete-release")
     logging.info("Admin delete release page loaded")
 
-    release_remove(page, "tooling-0.1")
+    release_remove(page, "tooling-test-example-0.1")
     release_remove(page, "tooling-test-example-0.2")
 
 
