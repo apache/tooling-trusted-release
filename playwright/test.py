@@ -34,6 +34,7 @@ import rich.logging
 
 import playwright.sync_api as sync_api
 
+_SSH_KEY_COMMENT: Final[str] = "atr-playwright-test@127.0.0.1"
 _SSH_KEY_PATH: Final[str] = "/root/.ssh/id_ed25519"
 
 
@@ -216,9 +217,9 @@ def ssh_keys_generate() -> None:
 
         os.makedirs(ssh_dir, mode=0o700, exist_ok=True)
 
-        logging.info(f"Generating new SSH key at {ssh_key_path}")
+        logging.info(f"Generating new SSH key at {ssh_key_path} with comment {_SSH_KEY_COMMENT}")
         subprocess.run(
-            ["ssh-keygen", "-t", "ed25519", "-f", ssh_key_path, "-N", ""],
+            ["ssh-keygen", "-t", "ed25519", "-f", ssh_key_path, "-N", "", "-C", _SSH_KEY_COMMENT],
             check=True,
             capture_output=True,
             text=True,
@@ -689,7 +690,7 @@ def test_tidy_up(page: sync_api.Page) -> None:
     # Therefore, we need to delete releases first
     test_tidy_up_releases(page)
     test_tidy_up_project(page)
-    # TODO: Tidy up SSH keys
+    test_tidy_up_ssh_keys(page)
 
 
 def test_tidy_up_project(page: sync_api.Page) -> None:
@@ -727,6 +728,88 @@ def test_tidy_up_project(page: sync_api.Page) -> None:
             logging.info(f"Delete button not visible for '{project_name}', no deletion performed")
     else:
         logging.info(f"Project card for '{project_name}' not found, no deletion needed")
+
+
+def test_tidy_up_ssh_keys(page: sync_api.Page) -> None:
+    logging.info("Starting SSH key tidy up")
+    go_to_path(page, "/keys")
+    logging.info("Navigated to /keys page for SSH key cleanup")
+
+    ssh_key_section_locator = page.locator("h2:has-text('SSH keys')")
+    key_cards_locator = ssh_key_section_locator.locator("xpath=following-sibling::div//div[contains(@class, 'card')]")
+
+    key_cards = key_cards_locator.all()
+    logging.info(f"Found {len(key_cards)} potential SSH key cards to check")
+
+    fingerprints_to_delete = []
+
+    # Identify keys with the test comment
+    for card in key_cards:
+        # Ensure that the details section is open by clicking the summary
+        # TODO: We should consider always displaying the key content instead
+        summary_locator = card.locator("details > summary")
+        # Check that summary exists before clicking
+        if summary_locator.is_visible():
+            # Open the details
+            summary_locator.click()
+        else:
+            logging.warning("Could not find summary element in key card, skipping")
+            continue
+
+        # Check the content of the pre element
+        details_locator = card.locator("details > pre")
+        # Even after clicking summary, wait for visibility just in case
+        sync_api.expect(details_locator).to_be_visible(timeout=1000)
+
+        if details_locator.is_visible():
+            key_content = details_locator.inner_text()
+            if _SSH_KEY_COMMENT in key_content:
+                fingerprint_locator = card.locator('td:has-text("SHA256:")')
+                fingerprint = fingerprint_locator.inner_text()
+                if fingerprint:
+                    logging.info(f"Found test SSH key with fingerprint {fingerprint} for deletion")
+                    fingerprints_to_delete.append(fingerprint)
+                else:
+                    logging.warning("Found test key card but could not extract fingerprint")
+        else:
+            logging.warning("Key details <pre> not visible even after clicking summary")
+
+    if not fingerprints_to_delete:
+        logging.info("No test SSH keys found to delete")
+        return
+
+    # Delete identified keys
+    logging.info(f"Attempting to delete {len(fingerprints_to_delete)} test SSH keys")
+    for fingerprint in fingerprints_to_delete:
+        logging.info(f"Locating delete form for fingerprint: {fingerprint}")
+        # Locate again by fingerprint for robustness in case of changes
+        card_to_delete_locator = page.locator(f"div.card:has(td:has-text('{fingerprint}'))")
+        delete_button_locator = card_to_delete_locator.locator(
+            'form[action="/keys/delete"] input[type="submit"][value="Delete key"]'
+        )
+
+        if delete_button_locator.is_visible():
+            logging.info(f"Delete button found for {fingerprint}, proceeding with deletion")
+
+            def handle_dialog(dialog: sync_api.Dialog) -> None:
+                logging.info(f"Accepting dialog for key deletion: {dialog.message}")
+                dialog.accept()
+
+            page.once("dialog", handle_dialog)
+            delete_button_locator.click()
+
+            logging.info(f"Waiting for page reload after deleting key {fingerprint}")
+            page.wait_for_load_state()
+            wait_for_path(page, "/keys")
+
+            flash_message_locator = page.locator("div.flash-success")
+            sync_api.expect(flash_message_locator).to_contain_text("SSH key deleted successfully")
+            logging.info(f"Deletion successful for key {fingerprint}")
+
+        else:
+            logging.warning(f"Could not find delete button for fingerprint {fingerprint} after re-locating")
+
+    logging.info("SSH key tidy up finished")
 
 
 def test_tidy_up_releases(page: sync_api.Page) -> None:
