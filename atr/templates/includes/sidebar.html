@@ -32,12 +32,12 @@
       <h3>Release candidate drafts</h3>
       <ul>
         <li>
-          <a href="{{ as_url(routes.draft.drafts) }}">View drafts</a>
-        </li>
-        <li>
           <a href="{{ as_url(routes.draft.add) }}">Add draft</a>
         </li>
-        <!-- TODO: Don't show this if the user doesn't have any release candidates? -->
+        <li>
+          <a href="{{ as_url(routes.draft.drafts) }}">View drafts</a>
+        </li>
+        <!-- TODO: Don't show this if the user doesn't have any drafts? -->
         <li>
           <a href="{{ as_url(routes.draft.promote) }}">Promote draft</a>
         </li>
