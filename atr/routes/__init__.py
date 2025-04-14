@@ -46,6 +46,7 @@ if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
 
 P = ParamSpec("P")
+R = TypeVar("R", covariant=True)
 T = TypeVar("T")
 
 # TODO: Should get this from config, checking debug there
@@ -77,14 +78,6 @@ algorithms: Final[dict[int, str]] = {
     21: "Diffie-Hellman",
     22: "EdDSA",
 }
-
-
-class FlashError(RuntimeError): ...
-
-
-class MicrosecondsFormatter(logging.Formatter):
-    # Answers on a postcard if you know why Python decided to use a comma by default
-    default_msec_format = "%s.%03d"
 
 
 class AsyncFileHandler(logging.Handler):
@@ -158,7 +151,81 @@ class AsyncFileHandler(logging.Handler):
         super().close()
 
 
+# This is the type of functions to which we apply @committer_get
+# In other words, functions which accept CommitterSession as their first arg
+class CommitterRouteHandler(Protocol[R]):
+    """Protocol for @committer_get decorated functions."""
+
+    __name__: str
+    __doc__: str | None
+
+    def __call__(self, session: CommitterSession, *args: Any, **kwargs: Any) -> Awaitable[R]: ...
+
+
+class CommitterSession:
+    """Session with extra information about committers."""
+
+    def __init__(self, web_session: session.ClientSession) -> None:
+        self._projects: list[models.Project] | None = None
+        self._session = web_session
+
+    def __getattr__(self, name: str) -> Any:
+        # TODO: Not type safe, should subclass properly if possible
+        # For example, we can access session.no_such_attr and the type checkers won't notice
+        return getattr(self._session, name)
+
+    @property
+    def host(self) -> str:
+        request_host = quart.request.host
+        if ":" in request_host:
+            domain, port = request_host.split(":")
+            # Could be an IPv6 address, so need to check whether port is a valid integer
+            if port.isdigit():
+                return domain
+        return request_host
+
+    def only_user_releases(self, releases: Sequence[models.Release]) -> list[models.Release]:
+        return util.user_releases(self.uid, releases)
+
+    async def redirect(
+        self, route: CommitterRouteHandler[R], success: str | None = None, error: str | None = None, **kwargs: Any
+    ) -> response.Response:
+        """Redirect to a route with a success or error message."""
+        if success is not None:
+            await quart.flash(success, "success")
+        elif error is not None:
+            await quart.flash(error, "error")
+        return quart.redirect(util.as_url(route, **kwargs))
+
+    @property
+    async def user_candidate_drafts(self) -> list[models.Release]:
+        return await user.candidate_drafts(self.uid, user_projects=self._projects)
+
+    # @property
+    # async def user_committees(self) -> list[models.Committee]:
+    #     return ...
+
+    @property
+    async def user_projects(self) -> list[models.Project]:
+        if self._projects is None:
+            self._projects = await user.projects(self.uid)
+        return self._projects
+
+    @property
+    async def user_releases(self) -> list[models.Release]:
+        return await user.releases(self.uid)
+
+
+class FlashError(RuntimeError): ...
+
+
+class MicrosecondsFormatter(logging.Formatter):
+    # Answers on a postcard if you know why Python decided to use a comma by default
+    default_msec_format = "%s.%03d"
+
+
 # Setup a dedicated logger for route performance metrics
+# NOTE: This code block must come after AsyncFileHandler and MicrosecondsFormatter
 route_logger = logging.getLogger("route.performance")
 # Use custom formatter that properly includes microseconds
 # TODO: Is this actually UTC?
@@ -168,6 +235,17 @@ route_logger.addHandler(route_logger_handler)
 route_logger.setLevel(logging.INFO)
 # If we don't set propagate to False then it logs to the term as well
 route_logger.propagate = False
+
+
+# This is the type of functions to which we apply @app_route
+# In other words, functions which accept no session
+class RouteHandler(Protocol[R]):
+    """Protocol for @app_route decorated functions."""
+
+    __name__: str
+    __doc__: str | None
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Awaitable[R]: ...
 
 
 def app_route(
@@ -269,6 +347,40 @@ def app_route_performance_measure(route_path: str, http_methods: list[str] | Non
     return decorator
 
 
+# This decorator is an adaptor between @committer_get and @app_route functions
+def committer(
+    path: str, methods: list[str] | None = None, measure_performance: bool = True
+) -> Callable[[CommitterRouteHandler[R]], RouteHandler[R]]:
+    """Decorator for committer GET routes that provides an enhanced session object."""
+
+    def decorator(func: CommitterRouteHandler[R]) -> RouteHandler[R]:
+        async def wrapper(*args: Any, **kwargs: Any) -> R:
+            web_session = await session.read()
+            if web_session is None:
+                _authentication_failed()
+
+            enhanced_session = CommitterSession(web_session)
+            return await func(enhanced_session, *args, **kwargs)
+
+        # Generate a unique endpoint name
+        endpoint = func.__module__ + "_" + func.__name__
+
+        # Set the name before applying decorators
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        wrapper.__annotations__["endpoint"] = endpoint
+
+        # Apply decorators in reverse order
+        decorated = auth.require(auth.Requirements.committer)(wrapper)
+        decorated = app_route(
+            path, methods=methods or ["GET"], endpoint=endpoint, measure_performance=measure_performance
+        )(decorated)
+
+        return decorated
+
+    return decorator
+
+
 def format_datetime(timestamp: int) -> str:
     """Format a Unix timestamp into a human readable datetime string."""
     return datetime.datetime.fromtimestamp(timestamp, tz=datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
@@ -358,119 +470,6 @@ async def get_form(request: quart.Request) -> datastructures.MultiDict:
     if blockbuster is not None:
         blockbuster.activate()
     return form
-
-
-R = TypeVar("R", covariant=True)
-
-
-# This is the type of functions to which we apply @committer_get
-# In other words, functions which accept CommitterSession as their first arg
-class CommitterRouteHandler(Protocol[R]):
-    """Protocol for @committer_get decorated functions."""
-
-    __name__: str
-    __doc__: str | None
-
-    def __call__(self, session: CommitterSession, *args: Any, **kwargs: Any) -> Awaitable[R]: ...
-
-
-class CommitterSession:
-    """Session with extra information about committers."""
-
-    def __init__(self, web_session: session.ClientSession) -> None:
-        self._projects: list[models.Project] | None = None
-        self._session = web_session
-
-    def __getattr__(self, name: str) -> Any:
-        # TODO: Not type safe, should subclass properly if possible
-        # For example, we can access session.no_such_attr and the type checkers won't notice
-        return getattr(self._session, name)
-
-    @property
-    def host(self) -> str:
-        request_host = quart.request.host
-        if ":" in request_host:
-            domain, port = request_host.split(":")
-            # Could be an IPv6 address, so need to check whether port is a valid integer
-            if port.isdigit():
-                return domain
-        return request_host
-
-    def only_user_releases(self, releases: Sequence[models.Release]) -> list[models.Release]:
-        return util.user_releases(self.uid, releases)
-
-    async def redirect(
-        self, route: CommitterRouteHandler[R], success: str | None = None, error: str | None = None, **kwargs: Any
-    ) -> response.Response:
-        """Redirect to a route with a success or error message."""
-        if success is not None:
-            await quart.flash(success, "success")
-        elif error is not None:
-            await quart.flash(error, "error")
-        return quart.redirect(util.as_url(route, **kwargs))
-
-    @property
-    async def user_candidate_drafts(self) -> list[models.Release]:
-        return await user.candidate_drafts(self.uid, user_projects=self._projects)
-
-    # @property
-    # async def user_committees(self) -> list[models.Committee]:
-    #     return ...
-
-    @property
-    async def user_projects(self) -> list[models.Project]:
-        if self._projects is None:
-            self._projects = await user.projects(self.uid)
-        return self._projects
-
-    @property
-    async def user_releases(self) -> list[models.Release]:
-        return await user.releases(self.uid)
-
-
-# This is the type of functions to which we apply @app_route
-# In other words, functions which accept no session
-class RouteHandler(Protocol[R]):
-    """Protocol for @app_route decorated functions."""
-
-    __name__: str
-    __doc__: str | None
-
-    def __call__(self, *args: Any, **kwargs: Any) -> Awaitable[R]: ...
-
-
-# This decorator is an adaptor between @committer_get and @app_route functions
-def committer(
-    path: str, methods: list[str] | None = None, measure_performance: bool = True
-) -> Callable[[CommitterRouteHandler[R]], RouteHandler[R]]:
-    """Decorator for committer GET routes that provides an enhanced session object."""
-
-    def decorator(func: CommitterRouteHandler[R]) -> RouteHandler[R]:
-        async def wrapper(*args: Any, **kwargs: Any) -> R:
-            web_session = await session.read()
-            if web_session is None:
-                _authentication_failed()
-
-            enhanced_session = CommitterSession(web_session)
-            return await func(enhanced_session, *args, **kwargs)
-
-        # Generate a unique endpoint name
-        endpoint = func.__module__ + "_" + func.__name__
-
-        # Set the name before applying decorators
-        wrapper.__name__ = func.__name__
-        wrapper.__doc__ = func.__doc__
-        wrapper.__annotations__["endpoint"] = endpoint
-
-        # Apply decorators in reverse order
-        decorated = auth.require(auth.Requirements.committer)(wrapper)
-        decorated = app_route(
-            path, methods=methods or ["GET"], endpoint=endpoint, measure_performance=measure_performance
-        )(decorated)
-
-        return decorated
-
-    return decorator
 
 
 def public(
