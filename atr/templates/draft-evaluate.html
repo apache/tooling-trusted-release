@@ -106,14 +106,18 @@
                   </td>
                   <td class="atr-sans">
                     <a href="{{ as_url(routes.draft.evaluate_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                       title="Evaluate file {{ path }}"
                        class="btn btn-sm btn-outline-primary">Evaluate file</a>
                     <a href="{{ as_url(routes.download.phase, phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}"
+                       title="Download file {{ path }}"
                        class="btn btn-sm btn-outline-secondary ms-2">Download</a>
                     <a href="{{ as_url(routes.draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
+                       title="Tools for file {{ path }}"
                        class="btn btn-sm btn-outline-secondary ms-2">Tools</a>
                     <button class="btn btn-sm btn-outline-danger ms-2"
                             data-bs-toggle="modal"
-                            data-bs-target="#delete-{{ path|slugify }}">Delete file</button>
+                            data-bs-target="#delete-{{ path|slugify }}"
+                            title="Delete file {{ path }}">Delete file</button>
                   </td>
                 </tr>
                 {% set file_id = path|string %}

@@ -259,12 +259,50 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
         test_ssh_01_add_key,
         test_ssh_02_rsync_upload,
     ]
+    tests["checks"] = [
+        test_checks_hashing_01_sha512,
+    ]
 
     # Order between our tests must be preserved
     # Insertion order is reliable since Python 3.6
     # Therefore iteration over tests matches the insertion order above
     for key in tests:
         run_tests_skipping_slow(tests[key], page, credentials, skip_slow)
+
+
+def test_checks_hashing_01_sha512(page: sync_api.Page, credentials: Credentials) -> None:
+    project_name = "tooling-test-example"
+    version_name = "0.2"
+    filename_sha512 = f"apache-{project_name}-{version_name}.tar.gz.sha512"
+    evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
+    evaluate_file_path = f"{evaluate_page_path}/{filename_sha512}"
+
+    logging.info(f"Starting hashing check test for {filename_sha512}")
+
+    logging.info(f"Navigating to evaluate page {evaluate_page_path}")
+    go_to_path(page, evaluate_page_path)
+
+    logging.info(f"Locating 'Evaluate file' link for {filename_sha512}")
+    row_locator = page.locator(f"tr:has(:text('{filename_sha512}'))")
+    evaluate_link_title = f"Evaluate file {filename_sha512}"
+    evaluate_link_locator = row_locator.locator(f'a[title="{evaluate_link_title}"]')
+    sync_api.expect(evaluate_link_locator).to_be_visible()
+
+    logging.info(f"Clicking 'Evaluate file' link for {filename_sha512}")
+    evaluate_link_locator.click()
+
+    logging.info(f"Waiting for navigation to {evaluate_file_path}")
+    wait_for_path(page, evaluate_file_path)
+    logging.info(f"Successfully navigated to {evaluate_file_path}")
+
+    logging.info("Verifying Hashing Check status")
+    hashing_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Hashing Check'))")
+    sync_api.expect(hashing_check_div_locator).to_be_visible()
+    logging.info("Located Hashing Check block")
+
+    passed_badge_locator = hashing_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
+    sync_api.expect(passed_badge_locator).to_be_visible()
+    logging.info("Hashing Check status verified as Passed")
 
 
 def test_lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials) -> None:
