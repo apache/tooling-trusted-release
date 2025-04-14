@@ -19,6 +19,7 @@
 
 import asyncio
 import base64
+import binascii
 import contextlib
 import datetime
 import hashlib
@@ -29,7 +30,6 @@ import re
 from collections.abc import AsyncGenerator, Sequence
 
 import asfquart as asfquart
-import cryptography.hazmat.primitives.serialization as serialization
 import gnupg
 import quart
 import werkzeug.datastructures as datastructures
@@ -89,24 +89,21 @@ def key_ssh_fingerprint(ssh_key_string: str) -> str:
     # I.e. TYPE DATA COMMENT
     ssh_key_parts = ssh_key_string.strip().split()
     if len(ssh_key_parts) >= 2:
-        key_type = ssh_key_parts[0]
+        # We discard the type, which is ssh_key_parts[0]
         key_data = ssh_key_parts[1]
         # We discard the comment, which is ssh_key_parts[2]
 
-        # Parse the key
-        key = serialization.load_ssh_public_key(f"{key_type} {key_data}".encode())
+        # Standard fingerprint calculation
+        try:
+            decoded_key_data = base64.b64decode(key_data)
+        except binascii.Error as e:
+            raise ValueError(f"Invalid base64 encoding in key data: {e}") from e
 
-        # Get raw public key bytes
-        public_bytes = key.public_bytes(
-            encoding=serialization.Encoding.DER, format=serialization.PublicFormat.SubjectPublicKeyInfo
-        )
+        digest = hashlib.sha256(decoded_key_data).digest()
+        fingerprint_b64 = base64.b64encode(digest).decode("utf-8").rstrip("=")
 
-        # Calculate SHA256 hash
-        digest = hashlib.sha256(public_bytes).digest()
-        fingerprint = base64.b64encode(digest).decode("utf-8").rstrip("=")
-
-        # TODO: Do we really want to use a prefix?
-        return f"SHA256:{fingerprint}"
+        # Prefix follows the standard format
+        return f"SHA256:{fingerprint_b64}"
 
     raise ValueError("Invalid SSH key format")
 

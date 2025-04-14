@@ -26,11 +26,14 @@ import re
 import socket
 import subprocess
 import urllib.parse
+from typing import Final
 
 import netifaces
 import rich.logging
 
 import playwright.sync_api as sync_api
+
+_SSH_KEY_PATH: Final[str] = "/root/.ssh/id_ed25519"
 
 
 @dataclasses.dataclass
@@ -141,7 +144,7 @@ def show_default_gateway_ip() -> None:
 
 
 def ssh_keys_generate() -> None:
-    ssh_key_path = "/root/.ssh/id_ed25519"
+    ssh_key_path = _SSH_KEY_PATH
     ssh_dir = os.path.dirname(ssh_key_path)
 
     try:
@@ -181,6 +184,7 @@ def test_all(page: sync_api.Page, credentials: Credentials) -> None:
     test_tidy_up(page)
     test_lifecycle(page)
     test_projects(page)
+    test_ssh(page)
 
 
 def test_lifecycle(page: sync_api.Page) -> None:
@@ -571,6 +575,72 @@ def test_tidy_up_release(page: sync_api.Page) -> None:
         logging.info("Deletion successful")
     else:
         logging.info("Could not find the tooling-0.1 release, no deletion needed")
+
+
+def test_ssh(page: sync_api.Page) -> None:
+    test_ssh_01_add_key(page)
+
+
+def test_ssh_01_add_key(page: sync_api.Page) -> None:
+    logging.info("Starting SSH key addition test")
+    go_to_path(page, "/")
+
+    logging.info("Navigating to Your Public Keys page")
+    page.locator('a[href="/keys"]:has-text("Your public keys")').click()
+    wait_for_path(page, "/keys")
+    logging.info("Navigated to Your Public Keys page")
+
+    logging.info("Clicking Add an SSH key button")
+    page.locator('a[href="/keys/ssh/add"]:has-text("Add an SSH key")').click()
+    wait_for_path(page, "/keys/ssh/add")
+    logging.info("Navigated to Add SSH Key page")
+
+    public_key_path = f"{_SSH_KEY_PATH}.pub"
+    try:
+        logging.info(f"Reading public key from {public_key_path}")
+        with open(public_key_path, encoding="utf-8") as f:
+            public_key_content = f.read().strip()
+        logging.info("Public key read successfully")
+    except OSError as e:
+        logging.error(f"Failed to read public key file {public_key_path}: {e}")
+        raise RuntimeError("Failed to read public key file") from e
+
+    logging.info("Pasting public key into textarea")
+    page.locator('textarea[name="key"]').fill(public_key_content)
+
+    logging.info("Submitting the Add SSH key form")
+    page.locator('input[type="submit"][value="Add SSH key"]').click()
+
+    logging.info("Waiting for navigation back to /keys page")
+    wait_for_path(page, "/keys")
+    logging.info("Navigated back to /keys page")
+
+    try:
+        logging.info("Calculating expected SSH key fingerprint using ssh-keygen -lf")
+        result = subprocess.run(
+            ["ssh-keygen", "-lf", public_key_path],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fingerprint_output = result.stdout.strip()
+        match = re.search(r"SHA256:([\w\+/=]+)", fingerprint_output)
+        if not match:
+            logging.error(f"Could not parse fingerprint from ssh-keygen output: {fingerprint_output}")
+            raise RuntimeError("Failed to parse SSH key fingerprint")
+        expected_fingerprint = f"SHA256:{match.group(1)}"
+        logging.info(f"Expected fingerprint: {expected_fingerprint}")
+
+    except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError) as e:
+        logging.error(f"Failed to get SSH key fingerprint: {e}")
+        if isinstance(e, subprocess.CalledProcessError):
+            logging.error(f"ssh-keygen stderr: {e.stderr}")
+        raise RuntimeError("Failed to get SSH key fingerprint") from e
+
+    logging.info("Verifying that the added SSH key fingerprint is visible")
+    key_card_locator = page.locator(f'div.card:has(td:has-text("{expected_fingerprint}"))')
+    sync_api.expect(key_card_locator).to_be_visible()
+    logging.info("SSH key fingerprint verified successfully on /keys page")
 
 
 def wait_for_path(page: sync_api.Page, path: str) -> None:
