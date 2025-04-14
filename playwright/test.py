@@ -328,15 +328,28 @@ def test_lifecycle_07_promote_preview(page: sync_api.Page) -> None:
 def test_lifecycle_08_release_exists(page: sync_api.Page) -> None:
     logging.info("Checking for release tooling-0.1 on the /releases page")
 
-    release_card_locator = page.locator('div.card:has(h3:has-text("tooling"))')
+    release_card_locator = page.locator('div.card:has(h3:has-text("Apache Tooling 0.1"))')
     sync_api.expect(release_card_locator).to_be_visible()
-    logging.info("Found card for project tooling")
-
-    version_locator = release_card_locator.locator('span.release-meta-item:has-text("Version: 0.1")')
-    sync_api.expect(version_locator).to_be_visible()
-    logging.info("Found version 0.1 within the tooling project card")
-
+    logging.info("Found card for tooling-0.1 release")
     logging.info("Release tooling-0.1 confirmed exists on /releases page")
+
+    logging.info("Locating the announcement marking button for tooling-0.1")
+    mark_announced_button_locator = page.locator('button[title="Mark Apache Tooling 0.1 as announced"]')
+    sync_api.expect(mark_announced_button_locator).to_be_visible()
+
+    logging.info("Activating the button to mark the release as announced")
+    mark_announced_button_locator.click()
+
+    logging.info("Waiting for navigation back to /releases after marking as announced")
+    wait_for_path(page, "/releases")
+    logging.info("Navigation back to /releases completed successfully")
+
+    logging.info("Verifying release tooling-0.1 phase is now RELEASE_AFTER_ANNOUNCEMENT")
+    release_card_locator = page.locator('div.card:has(h3:has-text("Apache Tooling 0.1"))')
+    sync_api.expect(release_card_locator).to_be_visible()
+    phase_locator = release_card_locator.locator('span.release-meta-item:has-text("Phase: RELEASE_AFTER_ANNOUNCEMENT")')
+    sync_api.expect(phase_locator).to_be_visible()
+    logging.info("Phase confirmed as RELEASE_AFTER_ANNOUNCEMENT")
 
 
 def test_login(page: sync_api.Page, credentials: Credentials) -> None:

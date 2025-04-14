@@ -30,14 +30,23 @@
     {% for release in releases %}
       <div class="card mb-3 bg-light">
         <div class="card-body">
-          <h3 class="card-title mb-2">{{ release.committee.display_name }}</h3>
+          <h3 class="card-title mb-2">{{ release.project.display_name }} {{ release.version }}</h3>
           <div class="d-flex flex-wrap gap-3 pb-3 mb-2 border-bottom text-secondary fs-6">
-            <span class="release-meta-item">Version: {{ release.version }}</span>
             <span class="release-meta-item">Stage: {{ release.stage.value.upper() }}</span>
             <span class="release-meta-item">Phase: {{ release.phase.value.upper() }}</span>
             <span class="release-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
           </div>
           <div class="d-flex gap-3 align-items-center pt-2">
+            {% if release.phase.value.upper() == "RELEASE_BEFORE_ANNOUNCEMENT" %}
+              <form method="post"
+                    action="{{ as_url(routes.release.mark_announced, project_name=release.project.name, version_name=release.version) }}"
+                    class="d-inline-block m-0">
+                <button class="btn btn-primary"
+                        title="Mark {{ release.project.display_name }} {{ release.version }} as announced">
+                  Mark as announced
+                </button>
+              </form>
+            {% endif %}
             <a class="btn btn-outline-primary"
                href="{{ as_url(routes.release.view, project_name=release.project.name, version_name=release.version) }}">View files</a>
           </div>

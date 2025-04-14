@@ -95,6 +95,27 @@ async def releases(session: routes.CommitterSession) -> str:
     )
 
 
+@routes.committer("/release/mark-announced/<project_name>/<version_name>", methods=["POST"])
+async def mark_announced(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
+    """Mark a release as announced."""
+    async with db.session() as data:
+        release_name = models.release_name(project_name, version_name)
+        release = await data.release(name=release_name, _project=True).get()
+
+        if not release:
+            return await session.redirect(releases, error=f"Release {release_name} not found.")
+
+        if release.phase != models.ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT:
+            return await session.redirect(
+                releases, error=f"Release {release_name} is not in the 'before announcement' phase."
+            )
+
+        release.phase = models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT
+        await data.commit()
+
+    return await session.redirect(releases, success=f"Release {release_name} marked as announced.")
+
+
 @routes.committer("/release/view/<project_name>/<version_name>")
 async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
