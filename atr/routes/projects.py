@@ -133,6 +133,46 @@ async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
     return quart.redirect(util.as_url(view, name=new_project_label))
 
 
+@routes.committer("/project/delete", methods=["POST"])
+async def delete(session: routes.CommitterSession) -> response.Response:
+    """Delete a project created by the user."""
+    form_data = await quart.request.form
+    project_name = form_data.get("project_name")
+    if not project_name:
+        return await session.redirect(projects, error="Missing project name for deletion.")
+
+    async with db.session() as data:
+        project = await data.project(name=project_name, _releases=True, _distribution_channels=True).get()
+
+        if not project:
+            return await session.redirect(projects, error=f"Project '{project_name}' not found.")
+
+        # Check for ownership or admin status
+        is_owner = project.created_by == session.uid
+        is_privileged = util.is_user_viewing_as_admin(session.uid)
+
+        if not (is_owner or is_privileged):
+            return await session.redirect(
+                projects, error=f"You do not have permission to delete project '{project_name}'."
+            )
+
+        # Prevent deletion if there are associated releases or channels
+        if project.releases:
+            return await session.redirect(
+                projects, error=f"Cannot delete project '{project_name}' because it has associated releases."
+            )
+        if project.distribution_channels:
+            return await session.redirect(
+                projects,
+                error=f"Cannot delete project '{project_name}' because it has associated distribution channels.",
+            )
+
+        await data.delete(project)
+        await data.commit()
+
+    return await session.redirect(projects, success=f"Project '{project_name}' deleted successfully.")
+
+
 @routes.public("/projects")
 async def projects() -> str:
     """Main project directory page."""
