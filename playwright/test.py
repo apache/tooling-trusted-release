@@ -21,8 +21,10 @@ import argparse
 import dataclasses
 import getpass
 import logging
+import os
 import re
 import socket
+import subprocess
 import urllib.parse
 
 import netifaces
@@ -124,6 +126,7 @@ def run_tests() -> None:
 
 
 def run_tests_in_context(context: sync_api.BrowserContext, credentials: Credentials) -> None:
+    ssh_keys_generate()
     page = context.new_page()
     test_all(page, credentials)
     logging.info("Tests finished successfully")
@@ -135,6 +138,42 @@ def show_default_gateway_ip() -> None:
             logging.info(f"Default gateway IP: {ip_address}")
         case None:
             logging.warning("Could not determine gateway IP")
+
+
+def ssh_keys_generate() -> None:
+    ssh_key_path = "/root/.ssh/id_ed25519"
+    ssh_dir = os.path.dirname(ssh_key_path)
+
+    try:
+        if os.path.exists(ssh_key_path):
+            os.remove(ssh_key_path)
+            logging.info(f"Removed existing SSH key at {ssh_key_path}")
+        if os.path.exists(f"{ssh_key_path}.pub"):
+            os.remove(f"{ssh_key_path}.pub")
+            logging.info(f"Removed existing SSH public key at {ssh_key_path}.pub")
+
+        os.makedirs(ssh_dir, mode=0o700, exist_ok=True)
+
+        logging.info(f"Generating new SSH key at {ssh_key_path}")
+        result = subprocess.run(
+            ["ssh-keygen", "-t", "ed25519", "-f", ssh_key_path, "-N", ""],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        logging.info("SSH key generated successfully")
+
+    except (OSError, subprocess.CalledProcessError) as e:
+        logging.error(f"Failed to generate SSH key: {e}", exc_info=True)
+        if isinstance(e, subprocess.CalledProcessError):
+            logging.error(f"ssh-keygen stderr: {e.stderr}")
+        raise RuntimeError("SSH key generation failed") from e
+
+    if result.returncode != 0:
+        logging.error(f"ssh-keygen returned {result.returncode}")
+        logging.error(f"ssh-keygen stdout: {result.stdout}")
+        logging.error(f"ssh-keygen stderr: {result.stderr}")
+        raise RuntimeError("SSH key generation failed")
 
 
 def test_all(page: sync_api.Page, credentials: Credentials) -> None:
