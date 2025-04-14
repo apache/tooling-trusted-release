@@ -1,6 +1,6 @@
 .PHONY: build build-alpine build-playwright build-ubuntu certs check \
   docs generate-version obvfix report run run-dev run-playwright \
-  run-staging stop serve sync sync-dev
+  run-playwright-slow run-staging stop serve sync sync-dev
 
 BIND ?= 127.0.0.1:8080
 IMAGE ?= tooling-trusted-release
@@ -56,6 +56,9 @@ run-dev:
 
 run-playwright:
 	docker run --net=host -it atr-playwright python3 test.py --skip-slow
+
+run-playwright-slow:
+	docker run --net=host -it atr-playwright python3 test.py
 
 run-staging:
 	BIND=127.0.0.1:8443 scripts/run

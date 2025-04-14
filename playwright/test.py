@@ -43,6 +43,13 @@ class Credentials:
     password: str
 
 
+# If we did this then we'd have to call e.g. test.page, which is verbose
+# @dataclasses.dataclass
+# class TestArguments:
+#     page: sync_api.Page
+#     credentials: Credentials
+
+
 def get_credentials() -> Credentials | None:
     try:
         username = input("Enter ASF Username: ")
@@ -112,6 +119,36 @@ def main() -> None:
     run_tests(args.skip_slow)
 
 
+def release_remove(page: sync_api.Page, release_name: str) -> None:
+    logging.info(f"Checking whether the {release_name} release exists")
+    release_checkbox_locator = page.locator(f'input[name="releases_to_delete"][value="{release_name}"]')
+
+    if release_checkbox_locator.is_visible():
+        logging.info(f"Found the {release_name} release, proceeding with deletion")
+        logging.info(f"Selecting {release_name} for deletion")
+        release_checkbox_locator.check()
+
+        logging.info(f"Filling deletion confirmation for {release_name}")
+        page.locator("#confirm_delete").fill("DELETE")
+
+        logging.info(f"Submitting deletion form for {release_name}")
+        submit_button_locator = page.locator('input[type="submit"][value="Delete selected releases permanently"]')
+        sync_api.expect(submit_button_locator).to_be_enabled()
+        submit_button_locator.click()
+
+        logging.info(f"Waiting for page load after deletion submission for {release_name}")
+        page.wait_for_load_state()
+        logging.info(f"Page loaded after deletion for {release_name}")
+
+        logging.info(f"Checking for success flash message for {release_name}")
+        flash_message_locator = page.locator("div.flash-success")
+        sync_api.expect(flash_message_locator).to_be_visible()
+        sync_api.expect(flash_message_locator).to_contain_text("Successfully deleted 1 release(s)")
+        logging.info(f"Deletion successful for {release_name}")
+    else:
+        logging.info(f"Could not find the {release_name} release, no deletion needed")
+
+
 def run_tests(skip_slow: bool) -> None:
     if (credentials := get_credentials()) is None:
         logging.error("Cannot run tests: no credentials provided")
@@ -141,12 +178,15 @@ def run_tests_in_context(context: sync_api.BrowserContext, credentials: Credenti
     logging.info("Tests finished successfully")
 
 
-def run_tests_skipping_slow(tests: list[Callable[..., Any]], page: sync_api.Page, skip_slow: bool) -> None:
+def run_tests_skipping_slow(
+    tests: list[Callable[..., Any]], page: sync_api.Page, credentials: Credentials, skip_slow: bool
+) -> None:
     for test in tests:
         if skip_slow and ("slow" in test.__annotations__):
             logging.info(f"Skipping slow test: {test.__name__}")
             continue
-        test(page)
+        # if "credentials" in test.__code__.co_varnames:
+        test(page, credentials)
 
 
 def show_default_gateway_ip() -> None:
@@ -215,16 +255,17 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
     ]
     tests["ssh"] = [
         test_ssh_01_add_key,
+        test_ssh_02_rsync_upload,
     ]
 
     # Order between our tests must be preserved
     # Insertion order is reliable since Python 3.6
     # Therefore iteration over tests matches the insertion order above
     for key in tests:
-        run_tests_skipping_slow(tests[key], page, skip_slow)
+        run_tests_skipping_slow(tests[key], page, credentials, skip_slow)
 
 
-def test_lifecycle_01_add_draft(page: sync_api.Page) -> None:
+def test_lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Following link to add draft")
     add_draft_link_locator = page.get_by_role("link", name="Add draft")
     sync_api.expect(add_draft_link_locator).to_be_visible()
@@ -251,14 +292,14 @@ def test_lifecycle_01_add_draft(page: sync_api.Page) -> None:
     logging.info("Add draft actions completed successfully")
 
 
-def test_lifecycle_02_check_draft_added(page: sync_api.Page) -> None:
+def test_lifecycle_02_check_draft_added(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Checking for draft 'tooling-0.1'")
     draft_card_locator = page.locator(r"#tooling-0\.1")
     sync_api.expect(draft_card_locator).to_be_visible()
     logging.info("Draft 'tooling-0.1' found successfully")
 
 
-def test_lifecycle_03_add_file(page: sync_api.Page) -> None:
+def test_lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Navigating to the add file page for tooling-0.1")
     go_to_path(page, "/draft/add/tooling/0.1")
     logging.info("Add file page loaded")
@@ -284,7 +325,7 @@ def test_lifecycle_03_add_file(page: sync_api.Page) -> None:
     logging.info("Navigation back to /drafts completed successfully")
 
 
-def test_lifecycle_04_promote_to_candidate(page: sync_api.Page) -> None:
+def test_lifecycle_04_promote_to_candidate(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Locating draft promotion link for tooling-0.1")
     draft_card_locator = page.locator(r"#tooling-0\.1")
     promote_link_locator = draft_card_locator.locator('a[title="Promote draft for Apache Tooling 0.1"]')
@@ -319,7 +360,7 @@ def test_lifecycle_04_promote_to_candidate(page: sync_api.Page) -> None:
     logging.info("Promote draft actions completed successfully")
 
 
-def test_lifecycle_05_vote_on_candidate(page: sync_api.Page) -> None:
+def test_lifecycle_05_vote_on_candidate(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Locating the link to start a vote for tooling-0.1")
     card_locator = page.locator('div.card:has(input[name="candidate_name"][value="tooling-0.1"])')
     start_vote_link_locator = card_locator.locator('a[title="Start vote for Apache Tooling 0.1"]')
@@ -342,7 +383,7 @@ def test_lifecycle_05_vote_on_candidate(page: sync_api.Page) -> None:
     logging.info("Vote initiation actions completed successfully")
 
 
-def test_lifecycle_06_resolve_vote(page: sync_api.Page) -> None:
+def test_lifecycle_06_resolve_vote(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Locating the form to resolve the vote for tooling-0.1")
     form_locator = page.locator('form:has(input[name="candidate_name"][value="tooling-0.1"])')
     sync_api.expect(form_locator).to_be_visible()
@@ -362,7 +403,7 @@ def test_lifecycle_06_resolve_vote(page: sync_api.Page) -> None:
     logging.info("Vote resolution actions completed successfully")
 
 
-def test_lifecycle_07_promote_preview(page: sync_api.Page) -> None:
+def test_lifecycle_07_promote_preview(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Locating the link to promote the preview for tooling-0.1")
     promote_link_locator = page.locator('a[title="Promote Apache Tooling 0.1 to release"]')
     sync_api.expect(promote_link_locator).to_be_visible()
@@ -395,7 +436,7 @@ def test_lifecycle_07_promote_preview(page: sync_api.Page) -> None:
     logging.info("Preview promotion actions completed successfully")
 
 
-def test_lifecycle_08_release_exists(page: sync_api.Page) -> None:
+def test_lifecycle_08_release_exists(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Checking for release tooling-0.1 on the /releases page")
 
     release_card_locator = page.locator('div.card:has(h3:has-text("Apache Tooling 0.1"))')
@@ -459,7 +500,7 @@ def test_login(page: sync_api.Page, credentials: Credentials) -> None:
 
 
 @slow
-def test_projects_01_update(page: sync_api.Page) -> None:
+def test_projects_01_update(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Navigating to the admin update projects page")
     go_to_path(page, "/admin/projects/update")
     logging.info("Admin update projects page loaded")
@@ -479,7 +520,7 @@ def test_projects_01_update(page: sync_api.Page) -> None:
     logging.info("Project update completed successfully")
 
 
-def test_projects_02_check_directory(page: sync_api.Page) -> None:
+def test_projects_02_check_directory(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Navigating to the project directory page")
     go_to_path(page, "/projects")
     logging.info("Project directory page loaded")
@@ -491,7 +532,7 @@ def test_projects_02_check_directory(page: sync_api.Page) -> None:
     logging.info("Apache Tooling project card found successfully")
 
 
-def test_projects_03_add_project(page: sync_api.Page) -> None:
+def test_projects_03_add_project(page: sync_api.Page, credentials: Credentials) -> None:
     project_name = "Apache Tooling Test Example"
     project_label = "tooling-test-example"
     base_project_option_label = "Apache Tooling"
@@ -522,7 +563,7 @@ def test_projects_03_add_project(page: sync_api.Page) -> None:
     logging.info("Project title confirmed on view page")
 
 
-def test_ssh_01_add_key(page: sync_api.Page) -> None:
+def test_ssh_01_add_key(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Starting SSH key addition test")
     go_to_path(page, "/")
 
@@ -584,9 +625,71 @@ def test_ssh_01_add_key(page: sync_api.Page) -> None:
     logging.info("SSH key fingerprint verified successfully on /keys page")
 
 
+def test_ssh_02_rsync_upload(page: sync_api.Page, credentials: Credentials) -> None:
+    project_name = "tooling-test-example"
+    version_name = "0.2"
+    source_dir_rel = f"apache-{project_name}-{version_name}"
+    source_dir_abs = f"/run/tests/{source_dir_rel}"
+    file1 = f"apache-{project_name}-{version_name}.tar.gz"
+    file2 = f"{file1}.sha512"
+
+    logging.info(f"Starting rsync upload test for {project_name}-{version_name}")
+
+    gateway_ip = get_default_gateway_ip()
+    if not gateway_ip:
+        raise RuntimeError("Cannot proceed without gateway IP")
+
+    username = credentials.username
+    ssh_command = "ssh -p 2222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    source_path = f"{source_dir_abs}/"
+    destination = f"{username}@{gateway_ip}:/{project_name}/{version_name}/"
+
+    rsync_cmd = [
+        "rsync",
+        "-av",
+        "-e",
+        ssh_command,
+        source_path,
+        destination,
+    ]
+
+    logging.info(f"Executing rsync command: {' '.join(rsync_cmd)}")
+    try:
+        result = subprocess.run(rsync_cmd, check=True, capture_output=True, text=True)
+        logging.info(f"rsync completed successfully. stdout:\n{result.stdout}")
+        if result.stderr:
+            logging.warning(f"rsync stderr:\n{result.stderr}")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"rsync command failed with exit code {e.returncode}")
+        logging.error(f"rsync stdout:\n{e.stdout}")
+        logging.error(f"rsync stderr:\n{e.stderr}")
+        raise RuntimeError("rsync upload failed") from e
+    except FileNotFoundError:
+        logging.error("rsync command not found. Is rsync installed in the container?")
+        raise RuntimeError("rsync command not found")
+
+    logging.info(f"Navigating to evaluate page for {project_name}-{version_name}")
+    evaluate_path = f"/draft/evaluate/{project_name}/{version_name}"
+    go_to_path(page, evaluate_path)
+    logging.info(f"Checking for uploaded files on {evaluate_path}")
+
+    # Check for the existence of the files in the table using exact match
+    file1_locator = page.get_by_role("cell", name=file1, exact=True)
+    file2_locator = page.get_by_role("cell", name=file2, exact=True)
+
+    sync_api.expect(file1_locator).to_be_visible()
+    logging.info(f"Found file: {file1}")
+    sync_api.expect(file2_locator).to_be_visible()
+    logging.info(f"Found file: {file2}")
+    logging.info("rsync upload test completed successfully")
+
+
 def test_tidy_up(page: sync_api.Page) -> None:
-    test_tidy_up_release(page)
+    # Projects cannot be deleted if they have associated releases
+    # Therefore, we need to delete releases first
+    test_tidy_up_releases(page)
     test_tidy_up_project(page)
+    # TODO: Tidy up SSH keys
 
 
 def test_tidy_up_project(page: sync_api.Page) -> None:
@@ -626,38 +729,13 @@ def test_tidy_up_project(page: sync_api.Page) -> None:
         logging.info(f"Project card for '{project_name}' not found, no deletion needed")
 
 
-def test_tidy_up_release(page: sync_api.Page) -> None:
+def test_tidy_up_releases(page: sync_api.Page) -> None:
     logging.info("Navigating to the admin delete release page")
     go_to_path(page, "/admin/delete-release")
     logging.info("Admin delete release page loaded")
 
-    logging.info("Checking whether the tooling-0.1 release exists")
-    release_checkbox_locator = page.locator('input[name="releases_to_delete"][value="tooling-0.1"]')
-
-    if release_checkbox_locator.is_visible():
-        logging.info("Found the tooling-0.1 release, proceeding with deletion")
-        logging.info("Selecting tooling-0.1 for deletion")
-        release_checkbox_locator.check()
-
-        logging.info("Filling deletion confirmation")
-        page.locator("#confirm_delete").fill("DELETE")
-
-        logging.info("Submitting deletion form")
-        submit_button_locator = page.locator('input[type="submit"][value="Delete selected releases permanently"]')
-        sync_api.expect(submit_button_locator).to_be_enabled()
-        submit_button_locator.click()
-
-        logging.info("Waiting for page load after deletion submission")
-        page.wait_for_load_state()
-        logging.info("Page loaded after deletion")
-
-        logging.info("Checking for success flash message")
-        flash_message_locator = page.locator("div.flash-success")
-        sync_api.expect(flash_message_locator).to_be_visible()
-        sync_api.expect(flash_message_locator).to_contain_text("Successfully deleted 1 release(s)")
-        logging.info("Deletion successful")
-    else:
-        logging.info("Could not find the tooling-0.1 release, no deletion needed")
+    release_remove(page, "tooling-0.1")
+    release_remove(page, "tooling-test-example-0.2")
 
 
 def wait_for_path(page: sync_api.Page, path: str) -> None:
