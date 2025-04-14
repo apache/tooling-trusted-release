@@ -30,6 +30,7 @@ import wtforms
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
+import atr.routes.release as routes_release
 import atr.util as util
 
 if asfquart.APP is ...:
@@ -187,7 +188,9 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
                 await data.commit()
                 await aioshutil.move(source, target)
 
-                return await session.redirect(promote, success="Preview successfully promoted to release")
+                return await session.redirect(
+                    routes_release.releases, success="Preview successfully promoted to release"
+                )
 
             except Exception as e:
                 logging.exception("Error promoting preview:")

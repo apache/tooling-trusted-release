@@ -32,7 +32,7 @@
     {% for preview in previews %}
       <div class="card mb-3 bg-light">
         <div class="card-body">
-          <h3 class="card-title mb-2">{{ preview.committee.display_name }}</h3>
+          <h3 class="card-title mb-2">{{ preview.project.display_name }}</h3>
           <div class="d-flex flex-wrap gap-3 pb-3 mb-2 border-bottom preview-meta text-secondary fs-6">
             <span class="preview-meta-item">Version: {{ preview.version }}</span>
             <span class="preview-meta-item">Stage: {{ preview.stage.value.upper() }}</span>
@@ -40,7 +40,11 @@
             <span class="preview-meta-item">Created: {{ preview.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
           </div>
           <div class="d-flex gap-3 align-items-center pt-2">
+            <a class="btn btn-primary"
+               title="Promote {{ preview.project.display_name }} {{ preview.version }} to release"
+               href="{{ as_url(routes.preview.promote) }}#{{ preview.project.name }}-{{ preview.version }}">Promote</a>
             <a class="btn btn-outline-primary"
+               title="View files for {{ preview.project.display_name }} {{ preview.version }}"
                href="{{ as_url(routes.preview.view, project_name=preview.project.name, version_name=preview.version) }}">View files</a>
           </div>
           <!--

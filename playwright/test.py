@@ -138,6 +138,8 @@ def test_lifecycle(page: sync_api.Page) -> None:
     test_lifecycle_04_promote_to_candidate(page)
     test_lifecycle_05_vote_on_candidate(page)
     test_lifecycle_06_resolve_vote(page)
+    test_lifecycle_07_promote_preview(page)
+    test_lifecycle_08_release_exists(page)
 
 
 def test_lifecycle_01_add_draft(page: sync_api.Page) -> None:
@@ -290,6 +292,53 @@ def test_lifecycle_06_resolve_vote(page: sync_api.Page) -> None:
     logging.info("Vote resolution actions completed successfully")
 
 
+def test_lifecycle_07_promote_preview(page: sync_api.Page) -> None:
+    logging.info("Locating the link to promote the preview for tooling-0.1")
+    promote_link_locator = page.locator('a[title="Promote Apache Tooling 0.1 to release"]')
+    sync_api.expect(promote_link_locator).to_be_visible()
+
+    logging.info("Following the link to promote the preview")
+    promote_link_locator.click()
+
+    logging.info("Waiting for navigation to /preview/promote")
+    wait_for_path(page, "/preview/promote")
+    logging.info("Promote preview navigation completed successfully")
+
+    logging.info("Locating the promotion form for tooling-0.1")
+    form_locator = page.locator(r'#tooling-0\.1 form[action="/preview/promote"]')
+    sync_api.expect(form_locator).to_be_visible()
+
+    logging.info("Locating the confirmation checkbox within the form")
+    checkbox_locator = form_locator.locator('input[name="confirm_promote"]')
+    sync_api.expect(checkbox_locator).to_be_visible()
+
+    logging.info("Checking the confirmation checkbox")
+    checkbox_locator.check()
+
+    logging.info("Locating and activating the promote button within the form")
+    submit_button_locator = form_locator.get_by_role("button", name="Promote to release")
+    sync_api.expect(submit_button_locator).to_be_enabled()
+    submit_button_locator.click()
+
+    logging.info("Waiting for navigation to /releases after submitting promotion")
+    wait_for_path(page, "/releases")
+    logging.info("Preview promotion actions completed successfully")
+
+
+def test_lifecycle_08_release_exists(page: sync_api.Page) -> None:
+    logging.info("Checking for release tooling-0.1 on the /releases page")
+
+    release_card_locator = page.locator('div.card:has(h3:has-text("tooling"))')
+    sync_api.expect(release_card_locator).to_be_visible()
+    logging.info("Found card for project tooling")
+
+    version_locator = release_card_locator.locator('span.release-meta-item:has-text("Version: 0.1")')
+    sync_api.expect(version_locator).to_be_visible()
+    logging.info("Found version 0.1 within the tooling project card")
+
+    logging.info("Release tooling-0.1 confirmed exists on /releases page")
+
+
 def test_login(page: sync_api.Page, credentials: Credentials) -> None:
     gateway_ip = get_default_gateway_ip()
     if gateway_ip is None:
@@ -326,6 +375,7 @@ def test_login(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info(f"Initial URL after login: {page.url}")
 
     logging.info("Waiting for the redirect to /")
+    # We can't use wait_for_path here because it goes through /auth
     page.wait_for_url("https://*/")
     logging.info("Redirected to /")
     logging.info(f"Page URL: {page.url}")

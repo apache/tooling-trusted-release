@@ -78,7 +78,11 @@
                         </div>
                       {% endif %}
                     </div>
-                    <button type="submit" class="btn btn-primary">{{ promote_form.submit.label.text }}</button>
+                    <button type="submit"
+                            class="btn btn-primary"
+                            title="Promote {{ preview.project.display_name }} {{ preview.version }} to release">
+                      {{ promote_form.submit.label.text }}
+                    </button>
                   </form>
                 </div>
               </div>
