@@ -392,6 +392,7 @@ def test_login(page: sync_api.Page, credentials: Credentials) -> None:
 def test_projects(page: sync_api.Page) -> None:
     test_projects_01_update(page)
     test_projects_02_check_directory(page)
+    test_projects_03_add_project(page)
 
 
 def test_projects_01_update(page: sync_api.Page) -> None:
@@ -426,7 +427,80 @@ def test_projects_02_check_directory(page: sync_api.Page) -> None:
     logging.info("Apache Tooling project card found successfully")
 
 
+def test_projects_03_add_project(page: sync_api.Page) -> None:
+    project_name = "Apache Tooling Test Example"
+    project_label = "tooling-test-example"
+    base_project_option_label = "Apache Tooling"
+    derived_project_input_value = "Test Example"
+
+    logging.info("Navigating to the add derived project page")
+    go_to_path(page, "/project/add")
+    logging.info("Add derived project page loaded")
+
+    logging.info(f"Selecting base project '{base_project_option_label}'")
+    page.locator('select[name="project_name"]').select_option(label=base_project_option_label)
+
+    logging.info(f"Filling derived project name '{derived_project_input_value}'")
+    page.locator('input[name="derived_project_name"]').fill(derived_project_input_value)
+
+    logging.info("Submitting the add derived project form")
+    submit_button_locator = page.locator('input[type="submit"][value="Add derived project"]')
+    sync_api.expect(submit_button_locator).to_be_enabled()
+    submit_button_locator.click()
+
+    logging.info(f"Waiting for navigation to project view page for {project_label}")
+    wait_for_path(page, f"/projects/{project_label}")
+    logging.info("Navigated to project view page successfully")
+
+    logging.info(f"Checking for project title '{project_name}' on view page")
+    title_locator = page.locator(f'h1:has-text("{project_name}")')
+    sync_api.expect(title_locator).to_be_visible()
+    logging.info("Project title confirmed on view page")
+
+
 def test_tidy_up(page: sync_api.Page) -> None:
+    test_tidy_up_release(page)
+    test_tidy_up_project(page)
+
+
+def test_tidy_up_project(page: sync_api.Page) -> None:
+    project_name = "Apache Tooling Test Example"
+    logging.info(f"Checking for project '{project_name}' at /projects")
+    go_to_path(page, "/projects")
+    logging.info("Project directory page loaded")
+
+    h3_locator = page.get_by_text(project_name, exact=True)
+    example_card_locator = h3_locator.locator("xpath=ancestor::div[contains(@class, 'project-card')]")
+
+    if example_card_locator.is_visible():
+        logging.info(f"Found project card for '{project_name}'")
+        delete_button_locator = example_card_locator.get_by_role("button", name="Delete Project")
+
+        if delete_button_locator.is_visible():
+            logging.info(f"Delete button found for '{project_name}', proceeding with deletion")
+
+            def handle_dialog(dialog: sync_api.Dialog) -> None:
+                logging.info(f"Accepting dialog: {dialog.message}")
+                dialog.accept()
+
+            page.once("dialog", handle_dialog)
+            delete_button_locator.click()
+
+            logging.info("Waiting for navigation back to /projects after deletion")
+            wait_for_path(page, "/projects")
+
+            logging.info(f"Verifying project card for '{project_name}' is no longer visible")
+            h3_locator_check = page.get_by_text(project_name, exact=True)
+            card_locator_check = h3_locator_check.locator("xpath=ancestor::div[contains(@class, 'project-card')]")
+            sync_api.expect(card_locator_check).not_to_be_visible()
+            logging.info(f"Project '{project_name}' deleted successfully")
+        else:
+            logging.info(f"Delete button not visible for '{project_name}', no deletion performed")
+    else:
+        logging.info(f"Project card for '{project_name}' not found, no deletion needed")
+
+
+def test_tidy_up_release(page: sync_api.Page) -> None:
     logging.info("Navigating to the admin delete release page")
     go_to_path(page, "/admin/delete-release")
     logging.info("Admin delete release page loaded")
