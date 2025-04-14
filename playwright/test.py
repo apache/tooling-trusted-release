@@ -389,6 +389,43 @@ def test_login(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Login actions completed successfully")
 
 
+def test_projects(page: sync_api.Page) -> None:
+    test_projects_01_update(page)
+    test_projects_02_check_directory(page)
+
+
+def test_projects_01_update(page: sync_api.Page) -> None:
+    logging.info("Navigating to the admin update projects page")
+    go_to_path(page, "/admin/projects/update")
+    logging.info("Admin update projects page loaded")
+
+    logging.info("Locating and activating the button to update projects")
+    update_button_locator = page.get_by_role("button", name="Update projects")
+    sync_api.expect(update_button_locator).to_be_enabled()
+    update_button_locator.click()
+
+    logging.info("Waiting for project update completion message")
+    success_message_locator = page.locator("div.status-message.success")
+    sync_api.expect(success_message_locator).to_contain_text(
+        re.compile(
+            r"Successfully added \d+ and updated \d+ committees and projects \(PMCs and PPMCs\) with membership data"
+        )
+    )
+    logging.info("Project update completed successfully")
+
+
+def test_projects_02_check_directory(page: sync_api.Page) -> None:
+    logging.info("Navigating to the project directory page")
+    go_to_path(page, "/projects")
+    logging.info("Project directory page loaded")
+
+    logging.info("Checking for the Apache Tooling project card")
+    h3_locator = page.get_by_text("Apache Tooling", exact=True)
+    tooling_card_locator = h3_locator.locator("xpath=ancestor::div[contains(@class, 'project-card')]")
+    sync_api.expect(tooling_card_locator).to_be_visible()
+    logging.info("Apache Tooling project card found successfully")
+
+
 def test_tidy_up(page: sync_api.Page) -> None:
     logging.info("Navigating to the admin delete release page")
     go_to_path(page, "/admin/delete-release")
@@ -430,31 +467,6 @@ def wait_for_path(page: sync_api.Page, path: str) -> None:
         logging.error(f"Expected URL path '{path}', but got '{parsed_url.path}'")
         raise RuntimeError(f"Expected URL path '{path}', but got '{parsed_url.path}'")
     logging.info(f"Current URL: {page.url}")
-
-
-def test_projects(page: sync_api.Page) -> None:
-    test_projects_01_update(page)
-
-
-def test_projects_01_update(page: sync_api.Page) -> None:
-    logging.info("Navigating to the admin update projects page")
-    go_to_path(page, "/admin/projects/update")
-    logging.info("Admin update projects page loaded")
-
-    logging.info("Locating and activating the button to update projects")
-    update_button_locator = page.get_by_role("button", name="Update projects")
-    sync_api.expect(update_button_locator).to_be_enabled()
-    update_button_locator.click()
-
-    logging.info("Waiting for project update completion message")
-    # Wait for a message that matches the pattern, allowing for different numbers
-    success_message_locator = page.locator("div.status-message.success")
-    sync_api.expect(success_message_locator).to_contain_text(
-        re.compile(
-            r"Successfully added \d+ and updated \d+ committees and projects \(PMCs and PPMCs\) with membership data"
-        )
-    )
-    logging.info("Project update completed successfully")
 
 
 if __name__ == "__main__":
