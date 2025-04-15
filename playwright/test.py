@@ -235,6 +235,7 @@ def ssh_keys_generate() -> None:
 
 
 def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> None:
+    start = time.perf_counter()
     test_login(page, credentials)
     test_tidy_up(page)
 
@@ -264,6 +265,7 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
         test_checks_01_hashing_sha512,
         test_checks_02_license_files,
         test_checks_03_license_headers,
+        test_checks_04_paths,
     ]
 
     # Order between our tests must be preserved
@@ -271,6 +273,9 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
     # Therefore iteration over tests matches the insertion order above
     for key in tests:
         run_tests_skipping_slow(tests[key], page, credentials, skip_slow)
+
+    finish = time.perf_counter()
+    logging.info(f"Tests took {round(finish - start, 3)} seconds")
 
 
 def test_checks_01_hashing_sha512(page: sync_api.Page, credentials: Credentials) -> None:
@@ -365,6 +370,31 @@ def test_checks_03_license_headers(page: sync_api.Page, credentials: Credentials
     passed_badge_locator = header_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
     sync_api.expect(passed_badge_locator).to_be_visible()
     logging.info("License Headers check status verified as Passed")
+
+
+def test_checks_04_paths(page: sync_api.Page, credentials: Credentials) -> None:
+    project_name = "tooling-test-example"
+    version_name = "0.2"
+    filename_sha512 = f"apache-{project_name}-{version_name}.tar.gz.sha512"
+    evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
+    evaluate_file_path = f"{evaluate_page_path}/{filename_sha512}"
+
+    logging.info(f"Starting Paths check test for {filename_sha512}")
+
+    logging.info(f"Navigating to evaluate file page {evaluate_file_path}")
+    go_to_path(page, evaluate_file_path)
+    logging.info(f"Successfully navigated to {evaluate_file_path}")
+
+    # TODO: It's a bit strange to have the status in the check name
+    # But we have to do this because we need separate Recorder objects
+    logging.info("Verifying Paths Check Success status")
+    paths_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Paths Check Success'))")
+    sync_api.expect(paths_check_div_locator).to_be_visible()
+    logging.info("Located Paths Check Success block")
+
+    passed_badge_locator = paths_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
+    sync_api.expect(passed_badge_locator).to_be_visible()
+    logging.info("Paths Check Success status verified as Passed")
 
 
 def test_lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials) -> None:
