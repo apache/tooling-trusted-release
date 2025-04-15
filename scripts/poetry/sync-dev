@@ -3,7 +3,7 @@ set -eu
 _python="$(which python3)"
 poetry env use "${1:-$_python}"
 poetry lock
-poetry sync
+poetry sync --with dev --without test
 if test -d ".vscode"
 then cat <<EOF > .vscode/settings.json
 {

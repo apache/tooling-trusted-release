@@ -52,7 +52,8 @@ RUN apk update && \
       make \
       nix \
       openjdk8 \
-      rsync
+      rsync \
+      subversion
 
 WORKDIR /opt/atr
 
