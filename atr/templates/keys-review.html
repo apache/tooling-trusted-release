@@ -26,6 +26,8 @@
        class="btn btn-outline-primary">Add an SSH key</a>
   </div>
 
+  <h2>GPG keys</h2>
+
   {% if user_keys %}
     <div class="mb-5 p-4 bg-light rounded">
       <div class="d-grid gap-4">
@@ -38,7 +40,7 @@
                   <td class="text-break">{{ key.fingerprint }}</td>
                 </tr>
                 <tr>
-                  <th class="p-2 text-dark">Key Type</th>
+                  <th class="p-2 text-dark">Type</th>
                   <td class="text-break">{{ algorithms[key.algorithm] }} ({{ key.length }} bits)</td>
                 </tr>
                 <tr>
@@ -73,12 +75,12 @@
                   <td class="text-break">{{ key.declared_uid or 'Not specified' }}</td>
                 </tr>
                 <tr>
-                  <th class="p-2 text-dark">Associated projects</th>
+                  <th class="p-2 text-dark">Associated PMCs</th>
                   <td class="text-break">
                     {% if key.committees %}
                       {{ key.committees|map(attribute='name') |join(', ') }}
                     {% else %}
-                      No projects associated
+                      No PMCs associated
                     {% endif %}
                   </td>
                 </tr>

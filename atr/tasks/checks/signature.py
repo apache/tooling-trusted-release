@@ -77,16 +77,16 @@ async def check(args: checks.FunctionArguments) -> str | None:
 async def _check_core_logic(committee_name: str, artifact_path: str, signature_path: str) -> dict[str, Any]:
     """Verify a signature file using the committee's public signing keys."""
     _LOGGER.info(f"Attempting to fetch keys for committee_name: '{committee_name}'")
-    name = db.validate_instrumented_attribute(models.Committee.name)
     async with db.session() as session:
         statement = (
             sqlmodel.select(models.PublicSigningKey)
             .join(models.KeyLink)
             .join(models.Committee)
-            .where(name == committee_name)
+            .where(db.validate_instrumented_attribute(models.Committee.name) == committee_name)
         )
         result = await session.execute(statement)
         public_keys = [key.ascii_armored_key for key in result.scalars().all()]
+    _LOGGER.info(f"Found {len(public_keys)} public keys for committee_name: '{committee_name}'")
 
     return await asyncio.to_thread(
         _check_core_logic_verify_signature,

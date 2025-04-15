@@ -299,6 +299,9 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
         test_lifecycle_07_promote_preview,
         test_lifecycle_08_release_exists,
     ]
+    tests["gpg"] = [
+        test_gpg_01_upload,
+    ]
     tests["ssh"] = [
         test_ssh_01_add_key,
         test_ssh_02_rsync_upload,
@@ -308,6 +311,7 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
         test_checks_02_license_files,
         test_checks_03_license_headers,
         test_checks_04_paths,
+        test_checks_05_signature,
     ]
 
     # Order between our tests must be preserved
@@ -437,6 +441,86 @@ def test_checks_04_paths(page: sync_api.Page, credentials: Credentials) -> None:
     passed_badge_locator = paths_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
     sync_api.expect(passed_badge_locator).to_be_visible()
     logging.info("Paths Check Success status verified as Passed")
+
+
+def test_checks_05_signature(page: sync_api.Page, credentials: Credentials) -> None:
+    project_name = "tooling-test-example"
+    version_name = "0.2"
+    filename_asc = f"apache-{project_name}-{version_name}.tar.gz.asc"
+    evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
+    evaluate_file_path = f"{evaluate_page_path}/{filename_asc}"
+
+    logging.info(f"Starting Signature check test for {filename_asc}")
+
+    logging.info(f"Navigating to evaluate file page {evaluate_file_path}")
+    go_to_path(page, evaluate_file_path)
+    logging.info(f"Successfully navigated to {evaluate_file_path}")
+
+    logging.info("Verifying Signature Check status")
+    signature_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Signature Check'))")
+    sync_api.expect(signature_check_div_locator).to_be_visible()
+    logging.info("Located Signature Check block")
+
+    passed_badge_locator = signature_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
+    sync_api.expect(passed_badge_locator).to_be_visible()
+    logging.info("Signature Check status verified as Passed")
+
+
+def test_gpg_01_upload(page: sync_api.Page, credentials: Credentials) -> None:
+    key_fingerprint_lower = "e35604dd9e2892e5465b3d8a203f105a7b33a64f"
+    key_path = f"/run/tests/{key_fingerprint_lower.upper()}.asc"
+
+    logging.info("Starting GPG key upload test")
+    go_to_path(page, "/keys")
+
+    logging.info("Following link to add GPG key")
+    add_key_link_locator = page.locator('a:has-text("Add a GPG key")')
+    sync_api.expect(add_key_link_locator).to_be_visible()
+    add_key_link_locator.click()
+
+    logging.info("Waiting for Add GPG key page")
+    wait_for_path(page, "/keys/add")
+
+    try:
+        logging.info(f"Reading public key from {key_path}")
+        with open(key_path, encoding="utf-8") as f:
+            public_key_content = f.read().strip()
+        logging.info("Public key read successfully")
+    except OSError as e:
+        logging.error(f"Failed to read public key file {key_path}: {e}")
+        raise RuntimeError("Failed to read public key file") from e
+
+    logging.info("Filling public key textarea")
+    public_key_textarea_locator = page.locator('textarea[name="public_key"]')
+    sync_api.expect(public_key_textarea_locator).to_be_visible()
+    public_key_textarea_locator.fill(public_key_content)
+
+    logging.info("Clicking Select all committees button")
+    select_all_button_locator = page.locator("#toggleCommitteesBtn")
+    sync_api.expect(select_all_button_locator).to_be_visible()
+    select_all_button_locator.click()
+
+    logging.info("Submitting the Add GPG key form")
+    submit_button_locator = page.locator('input[type="submit"][value="Add GPG key"]')
+    sync_api.expect(submit_button_locator).to_be_enabled()
+    submit_button_locator.click()
+
+    logging.info("Waiting for navigation back to /keys page")
+    wait_for_path(page, "/keys/add")
+
+    logging.info("Checking for success flash message on /keys/add page")
+    flash_message_locator = page.locator("div.flash-success")
+    sync_api.expect(flash_message_locator).to_be_visible()
+    sync_api.expect(flash_message_locator).to_contain_text(f"GPG key {key_fingerprint_lower} added successfully.")
+    logging.info("GPG key upload successful message shown")
+
+    logging.info("Navigating back to /keys to verify key presence")
+    go_to_path(page, "/keys")
+
+    logging.info(f"Verifying GPG key with fingerprint {key_fingerprint_lower} is visible")
+    key_card_locator = page.locator(f'div.card:has(td:has-text("{key_fingerprint_lower}"))')
+    sync_api.expect(key_card_locator).to_be_visible()
+    logging.info("GPG key fingerprint verified successfully on /keys page")
 
 
 def test_lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials) -> None:
@@ -876,6 +960,74 @@ def test_tidy_up(page: sync_api.Page) -> None:
     test_tidy_up_releases(page)
     test_tidy_up_project(page)
     test_tidy_up_ssh_keys(page)
+    test_tidy_up_gpg_keys(page)
+
+
+def test_tidy_up_gpg_keys(page: sync_api.Page) -> None:
+    logging.info("Starting GPG key tidy up")
+    go_to_path(page, "/keys")
+    logging.info("Navigated to /keys page for GPG key cleanup")
+
+    gpg_key_section_locator = page.locator("h2:has-text('GPG keys')")
+    # Find cards within the GPG section by looking for the fingerprint
+    key_cards_locator = gpg_key_section_locator.locator(
+        "xpath=following-sibling::div//div[contains(@class, 'card') and .//td[contains(text(), '@')]]"
+    )
+
+    key_cards = key_cards_locator.all()
+    logging.info(f"Found {len(key_cards)} potential GPG key cards to check")
+
+    fingerprints_to_delete = []
+    test_uid_substring = "<apache-tooling@example.invalid>"
+
+    # Identify keys with the test UID
+    for card in key_cards:
+        user_id_locator = card.locator(f'td:has-text("{test_uid_substring}")')
+        if user_id_locator.is_visible():
+            fingerprint_locator = card.locator('tr:has(th:has-text("Fingerprint")) > td')
+            fingerprint = fingerprint_locator.inner_text()
+            if fingerprint:
+                logging.info(f"Found test GPG key with fingerprint {fingerprint} for deletion")
+                fingerprints_to_delete.append(fingerprint)
+            else:
+                logging.warning("Found test GPG key card but could not extract fingerprint")
+
+    if not fingerprints_to_delete:
+        logging.info("No test GPG keys found to delete")
+        return
+
+    # Delete identified keys
+    logging.info(f"Attempting to delete {len(fingerprints_to_delete)} test GPG keys")
+    for fingerprint in fingerprints_to_delete:
+        logging.info(f"Locating delete form for fingerprint: {fingerprint}")
+        # Locate again by fingerprint for robustness
+        card_to_delete_locator = page.locator(f'div.card:has(td:has-text("{fingerprint}"))')
+        delete_button_locator = card_to_delete_locator.locator(
+            'form[action="/keys/delete"] input[type="submit"][value="Delete key"]'
+        )
+
+        if delete_button_locator.is_visible():
+            logging.info(f"Delete button found for {fingerprint}, proceeding with deletion")
+
+            def handle_dialog(dialog: sync_api.Dialog) -> None:
+                logging.info(f"Accepting dialog for GPG key deletion: {dialog.message}")
+                dialog.accept()
+
+            page.once("dialog", handle_dialog)
+            delete_button_locator.click()
+
+            logging.info(f"Waiting for page reload after deleting GPG key {fingerprint}")
+            page.wait_for_load_state()
+            wait_for_path(page, "/keys")
+
+            flash_message_locator = page.locator("div.flash-success")
+            sync_api.expect(flash_message_locator).to_contain_text("GPG key deleted successfully")
+            logging.info(f"Deletion successful for GPG key {fingerprint}")
+
+        else:
+            logging.warning(f"Could not find delete button for GPG fingerprint {fingerprint} after re-locating")
+
+    logging.info("GPG key tidy up finished")
 
 
 def test_tidy_up_project(page: sync_api.Page) -> None:

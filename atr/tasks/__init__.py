@@ -46,7 +46,7 @@ async def asc_checks(release: models.Release, draft_revision: str, signature_pat
                 release,
                 draft_revision,
                 signature_path,
-                {"extra_args": {"committee_name": release.committee.name}},
+                {"committee_name": release.committee.name},
             )
         )
 
