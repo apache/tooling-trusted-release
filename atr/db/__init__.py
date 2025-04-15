@@ -46,6 +46,9 @@ _global_atr_sessionmaker: sqlalchemy.ext.asyncio.async_sessionmaker | None = Non
 
 T = TypeVar("T")
 
+# TODO: The not set class should be NotSet
+# And the constant should be _NOT_SET
+
 
 class _NotSetType:
     """
@@ -70,16 +73,10 @@ class _NotSetType:
         return NotSet
 
 
-NotSet = _NotSetType()
+# TODO: Technically a constant, and only used in this file
+# Should be _NOT_SET
+NotSet: Final[_NotSetType] = _NotSetType()
 type Opt[T] = T | _NotSetType
-
-
-def is_defined(v: T | _NotSetType) -> TypeGuard[T]:
-    return not isinstance(v, _NotSetType)
-
-
-def is_undefined(v: T | _NotSetType) -> TypeGuard[_NotSetType]:  # pyright: ignore [reportInvalidTypeVarUse]
-    return isinstance(v, _NotSetType)
 
 
 class Query(Generic[T]):
@@ -482,6 +479,29 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         return Query(self, query)
 
 
+async def create_async_engine(app_config: type[config.AppConfig]) -> sqlalchemy.ext.asyncio.AsyncEngine:
+    sqlite_url = f"sqlite+aiosqlite://{app_config.SQLITE_DB_PATH}"
+    # Use aiosqlite for async SQLite access
+    engine = sqlalchemy.ext.asyncio.create_async_engine(
+        sqlite_url,
+        connect_args={
+            "check_same_thread": False,
+            "timeout": 30,
+        },
+    )
+
+    # Set SQLite pragmas for better performance
+    # Use 64 MB for the cache_size, and 5000ms for busy_timeout
+    async with engine.begin() as conn:
+        await conn.execute(sql.text("PRAGMA journal_mode=WAL"))
+        await conn.execute(sql.text("PRAGMA synchronous=NORMAL"))
+        await conn.execute(sql.text("PRAGMA cache_size=-64000"))
+        await conn.execute(sql.text("PRAGMA foreign_keys=ON"))
+        await conn.execute(sql.text("PRAGMA busy_timeout=5000"))
+
+    return engine
+
+
 def init_database(app: base.QuartApp) -> None:
     """
     Creates and initializes the database for a QuartApp.
@@ -532,35 +552,12 @@ async def init_database_for_worker() -> None:
     )
 
 
-async def shutdown_database() -> None:
-    if _global_atr_engine:
-        _LOGGER.info("Closing database")
-        await _global_atr_engine.dispose()
-    else:
-        _LOGGER.info("No database to close")
+def is_defined(v: T | _NotSetType) -> TypeGuard[T]:
+    return not isinstance(v, _NotSetType)
 
 
-async def create_async_engine(app_config: type[config.AppConfig]) -> sqlalchemy.ext.asyncio.AsyncEngine:
-    sqlite_url = f"sqlite+aiosqlite://{app_config.SQLITE_DB_PATH}"
-    # Use aiosqlite for async SQLite access
-    engine = sqlalchemy.ext.asyncio.create_async_engine(
-        sqlite_url,
-        connect_args={
-            "check_same_thread": False,
-            "timeout": 30,
-        },
-    )
-
-    # Set SQLite pragmas for better performance
-    # Use 64 MB for the cache_size, and 5000ms for busy_timeout
-    async with engine.begin() as conn:
-        await conn.execute(sql.text("PRAGMA journal_mode=WAL"))
-        await conn.execute(sql.text("PRAGMA synchronous=NORMAL"))
-        await conn.execute(sql.text("PRAGMA cache_size=-64000"))
-        await conn.execute(sql.text("PRAGMA foreign_keys=ON"))
-        await conn.execute(sql.text("PRAGMA busy_timeout=5000"))
-
-    return engine
+def is_undefined(v: T | _NotSetType) -> TypeGuard[_NotSetType]:  # pyright: ignore [reportInvalidTypeVarUse]
+    return isinstance(v, _NotSetType)
 
 
 # async def recent_tasks(data: Session, release_name: str, file_path: str, modified: int) -> dict[str, models.Task]:
@@ -625,6 +622,14 @@ def session() -> Session:
         raise RuntimeError("database not initialized")
     else:
         return util.validate_as_type(_global_atr_sessionmaker(), Session)
+
+
+async def shutdown_database() -> None:
+    if _global_atr_engine:
+        _LOGGER.info("Closing database")
+        await _global_atr_engine.dispose()
+    else:
+        _LOGGER.info("No database to close")
 
 
 def validate_instrumented_attribute(obj: Any) -> orm.InstrumentedAttribute:

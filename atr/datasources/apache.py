@@ -160,15 +160,6 @@ class ProjectsData(_DictRootModel[ProjectStatus]):
     pass
 
 
-async def get_ldap_projects_data() -> LDAPProjectsData:
-    async with httpx.AsyncClient() as client:
-        response = await client.get(_WHIMSY_PROJECTS_URL)
-        response.raise_for_status()
-        data = response.json()
-
-    return LDAPProjectsData.model_validate(data)
-
-
 async def get_active_committee_data() -> CommitteeData:
     """Returns the list of currently active committees."""
 
@@ -178,17 +169,6 @@ async def get_active_committee_data() -> CommitteeData:
         data = response.json()
 
     return CommitteeData.model_validate(data)
-
-
-async def get_retired_committee_data() -> RetiredCommitteeData:
-    """Returns the list of retired committees."""
-
-    async with httpx.AsyncClient() as client:
-        response = await client.get(_WHIMSY_COMMITTEE_RETIRED_URL)
-        response.raise_for_status()
-        data = response.json()
-
-    return RetiredCommitteeData.model_validate(data)
 
 
 async def get_current_podlings_data() -> PodlingsData:
@@ -211,6 +191,15 @@ async def get_groups_data() -> GroupsData:
     return GroupsData.model_validate(data)
 
 
+async def get_ldap_projects_data() -> LDAPProjectsData:
+    async with httpx.AsyncClient() as client:
+        response = await client.get(_WHIMSY_PROJECTS_URL)
+        response.raise_for_status()
+        data = response.json()
+
+    return LDAPProjectsData.model_validate(data)
+
+
 async def get_projects_data() -> ProjectsData:
     """Returns the list of projects."""
 
@@ -219,3 +208,14 @@ async def get_projects_data() -> ProjectsData:
         response.raise_for_status()
         data = response.json()
     return ProjectsData.model_validate(data)
+
+
+async def get_retired_committee_data() -> RetiredCommitteeData:
+    """Returns the list of retired committees."""
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(_WHIMSY_COMMITTEE_RETIRED_URL)
+        response.raise_for_status()
+        data = response.json()
+
+    return RetiredCommitteeData.model_validate(data)

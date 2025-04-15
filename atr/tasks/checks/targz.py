@@ -42,6 +42,25 @@ async def integrity(args: checks.FunctionArguments) -> str | None:
     return None
 
 
+def root_directory(tgz_path: str) -> str:
+    """Find the root directory in a tar archive and validate that it has only one root dir."""
+    root = None
+
+    with tarfile.open(tgz_path, mode="r|gz") as tf:
+        for member in tf:
+            parts = member.name.split("/", 1)
+            if len(parts) >= 1:
+                if not root:
+                    root = parts[0]
+                elif parts[0] != root:
+                    raise ValueError(f"Multiple root directories found: {root}, {parts[0]}")
+
+    if not root:
+        raise ValueError("No root directory found in archive")
+
+    return root
+
+
 async def structure(args: checks.FunctionArguments) -> str | None:
     """Check the structure of a .tar.gz file."""
     recorder = await args.recorder()
@@ -71,25 +90,6 @@ async def structure(args: checks.FunctionArguments) -> str | None:
     except Exception as e:
         await recorder.failure("Unable to verify archive structure", {"error": str(e)})
     return None
-
-
-def root_directory(tgz_path: str) -> str:
-    """Find the root directory in a tar archive and validate that it has only one root dir."""
-    root = None
-
-    with tarfile.open(tgz_path, mode="r|gz") as tf:
-        for member in tf:
-            parts = member.name.split("/", 1)
-            if len(parts) >= 1:
-                if not root:
-                    root = parts[0]
-                elif parts[0] != root:
-                    raise ValueError(f"Multiple root directories found: {root}, {parts[0]}")
-
-    if not root:
-        raise ValueError("No root directory found in archive")
-
-    return root
 
 
 def _integrity_core(tgz_path: str, chunk_size: int = 4096) -> int:

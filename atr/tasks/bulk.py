@@ -126,6 +126,188 @@ class Args:
         return args_obj
 
 
+class LinkExtractor(html.parser.HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.links: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "a":
+            for attr, value in attrs:
+                if attr == "href" and value:
+                    self.links.append(value)
+
+
+async def artifact_download(url: str, semaphore: asyncio.Semaphore) -> bool:
+    _LOGGER.debug(f"Starting download of artifact: {url}")
+    try:
+        success = await artifact_download_core(url, semaphore)
+        if success:
+            _LOGGER.info(f"Successfully downloaded artifact: {url}")
+        else:
+            _LOGGER.warning(f"Failed to download artifact: {url}")
+        return success
+    except Exception as e:
+        _LOGGER.exception(f"Error downloading artifact {url}: {e}")
+        return False
+
+
+async def artifact_download_core(url: str, semaphore: asyncio.Semaphore) -> bool:
+    _LOGGER.debug(f"Starting core download process for {url}")
+    async with semaphore:
+        _LOGGER.debug(f"Acquired semaphore for {url}")
+        # TODO: We flatten the hierarchy to get the filename
+        # We should preserve the hierarchy
+        filename = url.split("/")[-1]
+        if filename.startswith("."):
+            raise ValueError(f"Invalid filename: {filename}")
+        local_path = os.path.join("downloads", filename)
+
+        # Create download directory if it doesn't exist
+        # TODO: Check whether local_path itself exists first
+        os.makedirs("downloads", exist_ok=True)
+        _LOGGER.debug(f"Downloading {url} to {local_path}")
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                _LOGGER.debug(f"Created HTTP session for {url}")
+                async with session.get(url) as response:
+                    if response.status != 200:
+                        _LOGGER.warning(f"Failed to download {url}: HTTP {response.status}")
+                        return False
+
+                    total_size = int(response.headers.get("Content-Length", 0))
+                    if total_size:
+                        _LOGGER.info(f"Content-Length: {total_size} bytes for {url}")
+
+                    chunk_size = 8192
+                    downloaded = 0
+                    _LOGGER.debug(f"Writing file to {local_path} with chunk size {chunk_size}")
+
+                    async with aiofiles.open(local_path, "wb") as f:
+                        async for chunk in response.content.iter_chunked(chunk_size):
+                            await f.write(chunk)
+                            downloaded += len(chunk)
+                            # if total_size:
+                            #     progress = (downloaded / total_size) * 100
+                            #     if downloaded % (chunk_size * 128) == 0:
+                            #         _LOGGER.debug(
+                            #             f"Download progress for {filename}:"
+                            #             f" {progress:.1f}% ({downloaded}/{total_size} bytes)"
+                            #         )
+
+            _LOGGER.info(f"Download complete: {url} -> {local_path} ({downloaded} bytes)")
+            return True
+
+        except Exception as e:
+            _LOGGER.exception(f"Error during download of {url}: {e}")
+            # Remove partial download if an error occurred
+            if os.path.exists(local_path):
+                _LOGGER.debug(f"Removing partial download: {local_path}")
+                try:
+                    os.remove(local_path)
+                except Exception as del_err:
+                    _LOGGER.error(f"Error removing partial download {local_path}: {del_err}")
+            return False
+
+
+async def artifact_urls(args: Args, queue: asyncio.Queue, semaphore: asyncio.Semaphore) -> tuple[list[str], list[str]]:
+    _LOGGER.info(f"Starting URL crawling from {args.base_url}")
+    await database_message(f"Crawling artifact URLs from {args.base_url}")
+    signatures: list[str] = []
+    artifacts: list[str] = []
+    seen: set[str] = set()
+
+    _LOGGER.debug(f"Adding base URL to queue: {args.base_url}")
+    await queue.put(args.base_url)
+
+    _LOGGER.debug("Starting crawl loop")
+    depth = 0
+    # Start with just the base URL
+    urls_at_current_depth = 1
+    urls_at_next_depth = 0
+
+    while (not queue.empty()) and (depth < args.max_depth):
+        _LOGGER.debug(f"Processing depth {depth + 1}/{args.max_depth}, queue size: {queue.qsize()}")
+
+        # Process all URLs at the current depth before moving to the next
+        for _ in range(urls_at_current_depth):
+            if queue.empty():
+                break
+
+            url = await queue.get()
+            _LOGGER.debug(f"Processing URL: {url}")
+
+            if url_excluded(seen, url, args):
+                continue
+
+            seen.add(url)
+            _LOGGER.debug(f"Checking URL for file types: {args.file_types}")
+
+            # If not a target file type, try to parse HTML links
+            if not check_matches(args, url, artifacts, signatures):
+                _LOGGER.debug(f"URL is not a target file, parsing HTML: {url}")
+                try:
+                    new_urls = await download_html(url, semaphore)
+                    _LOGGER.debug(f"Found {len(new_urls)} new URLs in {url}")
+                    for new_url in new_urls:
+                        if new_url not in seen:
+                            _LOGGER.debug(f"Adding new URL to queue: {new_url}")
+                            await queue.put(new_url)
+                            urls_at_next_depth += 1
+                except Exception as e:
+                    _LOGGER.warning(f"Error parsing HTML from {url}: {e}")
+        # Move to next depth
+        depth += 1
+        urls_at_current_depth = urls_at_next_depth
+        urls_at_next_depth = 0
+
+        # Update database with progress message
+        progress_msg = f"Crawled {len(seen)} URLs, found {len(artifacts)} artifacts (depth {depth}/{args.max_depth})"
+        await database_message(progress_msg, progress=(30 + min(50, depth * 10), 100))
+        _LOGGER.debug(f"Moving to depth {depth + 1}, {urls_at_current_depth} URLs to process")
+
+    _LOGGER.info(f"URL crawling complete. Found {len(artifacts)} artifacts and {len(signatures)} signatures")
+    return signatures, artifacts
+
+
+async def artifacts_download(artifacts: list[str], semaphore: asyncio.Semaphore) -> list[str]:
+    """Download artifacts with progress tracking."""
+    size = len(artifacts)
+    _LOGGER.info(f"Starting download of {size} artifacts")
+    downloaded = []
+
+    for i, artifact in enumerate(artifacts):
+        progress_percent = int((i / size) * 100) if (size > 0) else 100
+        progress_msg = f"Downloading {i + 1}/{size} artifacts"
+        _LOGGER.info(f"{progress_msg}: {artifact}")
+        await database_message(progress_msg, progress=(progress_percent, 100))
+
+        success = await artifact_download(artifact, semaphore)
+        if success:
+            _LOGGER.debug(f"Successfully downloaded: {artifact}")
+            downloaded.append(artifact)
+        else:
+            _LOGGER.warning(f"Failed to download: {artifact}")
+
+    _LOGGER.info(f"Download complete. Successfully downloaded {len(downloaded)}/{size} artifacts")
+    await database_message(f"Downloaded {len(downloaded)} artifacts", progress=(100, 100))
+    return downloaded
+
+
+def check_matches(args: Args, url: str, artifacts: list[str], signatures: list[str]) -> bool:
+    for type in args.file_types:
+        if url.endswith(type):
+            _LOGGER.info(f"Found artifact: {url}")
+            artifacts.append(url)
+            return True
+        elif url.endswith(type + ".asc"):
+            _LOGGER.info(f"Found signature: {url}")
+            signatures.append(url)
+            return True
+    return False
+
+
 async def database_message(msg: str, progress: tuple[int, int] | None = None) -> None:
     """Update database with message and progress."""
     _LOGGER.debug(f"Updating database with message: '{msg}', progress: {progress}")
@@ -144,26 +326,23 @@ async def database_message(msg: str, progress: tuple[int, int] | None = None) ->
         _LOGGER.info(f"Continuing despite database error. Message was: '{msg}'")
 
 
-async def get_db_session() -> sqlalchemy.ext.asyncio.AsyncSession:
-    """Get a reusable database session."""
-    global global_db_connection
+def database_progress_percentage_calculate(progress: tuple[int, int] | None) -> int:
+    """Calculate percentage from progress tuple."""
+    _LOGGER.debug(f"Calculating percentage from progress tuple: {progress}")
+    if progress is None:
+        _LOGGER.debug("Progress is None, returning 0%")
+        return 0
 
-    try:
-        # Create connection only if it doesn't exist already
-        if global_db_connection is None:
-            db_url = "sqlite+aiosqlite:///atr.db"
-            _LOGGER.debug(f"Creating database engine: {db_url}")
+    current, total = progress
 
-            engine = sqlalchemy.ext.asyncio.create_async_engine(db_url)
-            global_db_connection = sqlalchemy.ext.asyncio.async_sessionmaker(
-                engine, class_=sqlalchemy.ext.asyncio.AsyncSession, expire_on_commit=False
-            )
+    # Avoid division by zero
+    if total == 0:
+        _LOGGER.warning("Total is zero in progress tuple, avoiding division by zero")
+        return 0
 
-        connection: sqlalchemy.ext.asyncio.AsyncSession = global_db_connection()
-        return connection
-    except Exception as e:
-        _LOGGER.exception(f"Error creating database session: {e}")
-        raise
+    percentage = min(100, int((current / total) * 100))
+    _LOGGER.debug(f"Calculated percentage: {percentage}% ({current}/{total})")
+    return percentage
 
 
 async def database_task_id_get() -> int | None:
@@ -265,25 +444,6 @@ async def database_task_update_execute(task_id: int, msg: str, progress_pct: int
         _LOGGER.exception(f"Error updating task {task_id} in database: {e}")
 
 
-def database_progress_percentage_calculate(progress: tuple[int, int] | None) -> int:
-    """Calculate percentage from progress tuple."""
-    _LOGGER.debug(f"Calculating percentage from progress tuple: {progress}")
-    if progress is None:
-        _LOGGER.debug("Progress is None, returning 0%")
-        return 0
-
-    current, total = progress
-
-    # Avoid division by zero
-    if total == 0:
-        _LOGGER.warning("Total is zero in progress tuple, avoiding division by zero")
-        return 0
-
-    percentage = min(100, int((current / total) * 100))
-    _LOGGER.debug(f"Calculated percentage: {percentage}% ({current}/{total})")
-    return percentage
-
-
 async def download(args: dict[str, Any]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
     """Download bulk package from URL."""
     # Returns (status, error, result)
@@ -360,99 +520,6 @@ async def download_core(args_dict: dict[str, Any]) -> tuple[models.TaskStatus, s
         )
 
 
-async def artifact_urls(args: Args, queue: asyncio.Queue, semaphore: asyncio.Semaphore) -> tuple[list[str], list[str]]:
-    _LOGGER.info(f"Starting URL crawling from {args.base_url}")
-    await database_message(f"Crawling artifact URLs from {args.base_url}")
-    signatures: list[str] = []
-    artifacts: list[str] = []
-    seen: set[str] = set()
-
-    _LOGGER.debug(f"Adding base URL to queue: {args.base_url}")
-    await queue.put(args.base_url)
-
-    _LOGGER.debug("Starting crawl loop")
-    depth = 0
-    # Start with just the base URL
-    urls_at_current_depth = 1
-    urls_at_next_depth = 0
-
-    while (not queue.empty()) and (depth < args.max_depth):
-        _LOGGER.debug(f"Processing depth {depth + 1}/{args.max_depth}, queue size: {queue.qsize()}")
-
-        # Process all URLs at the current depth before moving to the next
-        for _ in range(urls_at_current_depth):
-            if queue.empty():
-                break
-
-            url = await queue.get()
-            _LOGGER.debug(f"Processing URL: {url}")
-
-            if url_excluded(seen, url, args):
-                continue
-
-            seen.add(url)
-            _LOGGER.debug(f"Checking URL for file types: {args.file_types}")
-
-            # If not a target file type, try to parse HTML links
-            if not check_matches(args, url, artifacts, signatures):
-                _LOGGER.debug(f"URL is not a target file, parsing HTML: {url}")
-                try:
-                    new_urls = await download_html(url, semaphore)
-                    _LOGGER.debug(f"Found {len(new_urls)} new URLs in {url}")
-                    for new_url in new_urls:
-                        if new_url not in seen:
-                            _LOGGER.debug(f"Adding new URL to queue: {new_url}")
-                            await queue.put(new_url)
-                            urls_at_next_depth += 1
-                except Exception as e:
-                    _LOGGER.warning(f"Error parsing HTML from {url}: {e}")
-        # Move to next depth
-        depth += 1
-        urls_at_current_depth = urls_at_next_depth
-        urls_at_next_depth = 0
-
-        # Update database with progress message
-        progress_msg = f"Crawled {len(seen)} URLs, found {len(artifacts)} artifacts (depth {depth}/{args.max_depth})"
-        await database_message(progress_msg, progress=(30 + min(50, depth * 10), 100))
-        _LOGGER.debug(f"Moving to depth {depth + 1}, {urls_at_current_depth} URLs to process")
-
-    _LOGGER.info(f"URL crawling complete. Found {len(artifacts)} artifacts and {len(signatures)} signatures")
-    return signatures, artifacts
-
-
-def check_matches(args: Args, url: str, artifacts: list[str], signatures: list[str]) -> bool:
-    for type in args.file_types:
-        if url.endswith(type):
-            _LOGGER.info(f"Found artifact: {url}")
-            artifacts.append(url)
-            return True
-        elif url.endswith(type + ".asc"):
-            _LOGGER.info(f"Found signature: {url}")
-            signatures.append(url)
-            return True
-    return False
-
-
-def url_excluded(seen: set[str], url: str, args: Args) -> bool:
-    # Filter for sorting URLs to avoid redundant crawling
-    sorting_patterns = ["?C=N;O=", "?C=M;O=", "?C=S;O=", "?C=D;O="]
-
-    if not url.startswith(args.base_url):
-        _LOGGER.debug(f"Skipping URL outside base URL scope: {url}")
-        return True
-
-    if url in seen:
-        _LOGGER.debug(f"Skipping already seen URL: {url}")
-        return True
-
-    # Skip sorting URLs to avoid redundant crawling
-    if any(pattern in url for pattern in sorting_patterns):
-        _LOGGER.debug(f"Skipping sorting URL: {url}")
-        return True
-
-    return False
-
-
 async def download_html(url: str, semaphore: asyncio.Semaphore) -> list[str]:
     """Download HTML and extract links."""
     _LOGGER.debug(f"Downloading HTML from: {url}")
@@ -492,18 +559,6 @@ async def download_html_core(url: str, semaphore: asyncio.Semaphore) -> list[str
                 return urls
 
 
-class LinkExtractor(html.parser.HTMLParser):
-    def __init__(self) -> None:
-        super().__init__()
-        self.links: list[str] = []
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag == "a":
-            for attr, value in attrs:
-                if attr == "href" and value:
-                    self.links.append(value)
-
-
 def extract_links_from_html(html: str, base_url: str) -> list[str]:
     """Extract links from HTML content using html.parser."""
     parser = LinkExtractor()
@@ -525,98 +580,43 @@ def extract_links_from_html(html: str, base_url: str) -> list[str]:
     return processed_urls
 
 
-async def artifacts_download(artifacts: list[str], semaphore: asyncio.Semaphore) -> list[str]:
-    """Download artifacts with progress tracking."""
-    size = len(artifacts)
-    _LOGGER.info(f"Starting download of {size} artifacts")
-    downloaded = []
+async def get_db_session() -> sqlalchemy.ext.asyncio.AsyncSession:
+    """Get a reusable database session."""
+    global global_db_connection
 
-    for i, artifact in enumerate(artifacts):
-        progress_percent = int((i / size) * 100) if (size > 0) else 100
-        progress_msg = f"Downloading {i + 1}/{size} artifacts"
-        _LOGGER.info(f"{progress_msg}: {artifact}")
-        await database_message(progress_msg, progress=(progress_percent, 100))
-
-        success = await artifact_download(artifact, semaphore)
-        if success:
-            _LOGGER.debug(f"Successfully downloaded: {artifact}")
-            downloaded.append(artifact)
-        else:
-            _LOGGER.warning(f"Failed to download: {artifact}")
-
-    _LOGGER.info(f"Download complete. Successfully downloaded {len(downloaded)}/{size} artifacts")
-    await database_message(f"Downloaded {len(downloaded)} artifacts", progress=(100, 100))
-    return downloaded
-
-
-async def artifact_download(url: str, semaphore: asyncio.Semaphore) -> bool:
-    _LOGGER.debug(f"Starting download of artifact: {url}")
     try:
-        success = await artifact_download_core(url, semaphore)
-        if success:
-            _LOGGER.info(f"Successfully downloaded artifact: {url}")
-        else:
-            _LOGGER.warning(f"Failed to download artifact: {url}")
-        return success
+        # Create connection only if it doesn't exist already
+        if global_db_connection is None:
+            db_url = "sqlite+aiosqlite:///atr.db"
+            _LOGGER.debug(f"Creating database engine: {db_url}")
+
+            engine = sqlalchemy.ext.asyncio.create_async_engine(db_url)
+            global_db_connection = sqlalchemy.ext.asyncio.async_sessionmaker(
+                engine, class_=sqlalchemy.ext.asyncio.AsyncSession, expire_on_commit=False
+            )
+
+        connection: sqlalchemy.ext.asyncio.AsyncSession = global_db_connection()
+        return connection
     except Exception as e:
-        _LOGGER.exception(f"Error downloading artifact {url}: {e}")
-        return False
+        _LOGGER.exception(f"Error creating database session: {e}")
+        raise
 
 
-async def artifact_download_core(url: str, semaphore: asyncio.Semaphore) -> bool:
-    _LOGGER.debug(f"Starting core download process for {url}")
-    async with semaphore:
-        _LOGGER.debug(f"Acquired semaphore for {url}")
-        # TODO: We flatten the hierarchy to get the filename
-        # We should preserve the hierarchy
-        filename = url.split("/")[-1]
-        if filename.startswith("."):
-            raise ValueError(f"Invalid filename: {filename}")
-        local_path = os.path.join("downloads", filename)
+def url_excluded(seen: set[str], url: str, args: Args) -> bool:
+    # Filter for sorting URLs to avoid redundant crawling
+    sorting_patterns = ["?C=N;O=", "?C=M;O=", "?C=S;O=", "?C=D;O="]
 
-        # Create download directory if it doesn't exist
-        # TODO: Check whether local_path itself exists first
-        os.makedirs("downloads", exist_ok=True)
-        _LOGGER.debug(f"Downloading {url} to {local_path}")
+    if not url.startswith(args.base_url):
+        _LOGGER.debug(f"Skipping URL outside base URL scope: {url}")
+        return True
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                _LOGGER.debug(f"Created HTTP session for {url}")
-                async with session.get(url) as response:
-                    if response.status != 200:
-                        _LOGGER.warning(f"Failed to download {url}: HTTP {response.status}")
-                        return False
+    if url in seen:
+        _LOGGER.debug(f"Skipping already seen URL: {url}")
+        return True
 
-                    total_size = int(response.headers.get("Content-Length", 0))
-                    if total_size:
-                        _LOGGER.info(f"Content-Length: {total_size} bytes for {url}")
+    # Skip sorting URLs to avoid redundant crawling
+    if any(pattern in url for pattern in sorting_patterns):
+        _LOGGER.debug(f"Skipping sorting URL: {url}")
+        return True
 
-                    chunk_size = 8192
-                    downloaded = 0
-                    _LOGGER.debug(f"Writing file to {local_path} with chunk size {chunk_size}")
-
-                    async with aiofiles.open(local_path, "wb") as f:
-                        async for chunk in response.content.iter_chunked(chunk_size):
-                            await f.write(chunk)
-                            downloaded += len(chunk)
-                            # if total_size:
-                            #     progress = (downloaded / total_size) * 100
-                            #     if downloaded % (chunk_size * 128) == 0:
-                            #         _LOGGER.debug(
-                            #             f"Download progress for {filename}:"
-                            #             f" {progress:.1f}% ({downloaded}/{total_size} bytes)"
-                            #         )
-
-            _LOGGER.info(f"Download complete: {url} -> {local_path} ({downloaded} bytes)")
-            return True
-
-        except Exception as e:
-            _LOGGER.exception(f"Error during download of {url}: {e}")
-            # Remove partial download if an error occurred
-            if os.path.exists(local_path):
-                _LOGGER.debug(f"Removing partial download: {local_path}")
-                try:
-                    os.remove(local_path)
-                except Exception as del_err:
-                    _LOGGER.error(f"Error removing partial download {local_path}: {del_err}")
-            return False
+    return False

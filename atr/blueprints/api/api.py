@@ -35,23 +35,6 @@ import atr.db.models as models
 #        For now, just explicitly dump the model.
 
 
-@api.BLUEPRINT.route("/projects/<name>")
-@quart_schema.validate_response(models.Committee, 200)
-async def project_by_name(name: str) -> tuple[Mapping, int]:
-    async with db.session() as data:
-        committee = await data.committee(name=name).demand(exceptions.NotFound())
-        return committee.model_dump(), 200
-
-
-@api.BLUEPRINT.route("/projects")
-@quart_schema.validate_response(list[models.Committee], 200)
-async def projects() -> tuple[list[Mapping], int]:
-    """List all projects in the database."""
-    async with db.session() as data:
-        committees = await data.committee().all()
-        return [committee.model_dump() for committee in committees], 200
-
-
 @dataclasses.dataclass
 class Pagination:
     offset: int = 0
@@ -72,3 +55,20 @@ async def api_tasks(query_args: Pagination) -> quart.Response:
         count = (await data.execute(sqlalchemy.select(sqlalchemy.func.count(models.Task.id)))).scalar_one()  # type: ignore
         result = {"data": [x.model_dump(exclude={"result"}) for x in paged_tasks], "count": count}
         return quart.jsonify(result)
+
+
+@api.BLUEPRINT.route("/projects/<name>")
+@quart_schema.validate_response(models.Committee, 200)
+async def project_by_name(name: str) -> tuple[Mapping, int]:
+    async with db.session() as data:
+        committee = await data.committee(name=name).demand(exceptions.NotFound())
+        return committee.model_dump(), 200
+
+
+@api.BLUEPRINT.route("/projects")
+@quart_schema.validate_response(list[models.Committee], 200)
+async def projects() -> tuple[list[Mapping], int]:
+    """List all projects in the database."""
+    async with db.session() as data:
+        committees = await data.committee().all()
+        return [committee.model_dump() for committee in committees], 200

@@ -331,6 +331,27 @@ def _files_check_core_logic_license(tf: tarfile.TarFile, member: tarfile.TarInfo
     return sha3.hexdigest() == "8a0a8fb6c73ef27e4322391c7b28e5b38639e64e58c40a2c7a51cec6e7915a6a"
 
 
+def _files_check_core_logic_notice(tf: tarfile.TarFile, member: tarfile.TarInfo) -> tuple[bool, list[str]]:
+    """Verify that the NOTICE file follows the required format."""
+    f = tf.extractfile(member)
+    if not f:
+        return False, ["Could not read NOTICE file"]
+
+    content = f.read().decode("utf-8")
+    issues = []
+
+    if not re.search(r"Apache\s+[\w\-\.]+", content, re.MULTILINE):
+        issues.append("Missing or invalid Apache product header")
+    if not re.search(r"Copyright\s+(?:\d{4}|\d{4}-\d{4})\s+The Apache Software Foundation", content, re.MULTILINE):
+        issues.append("Missing or invalid copyright statement")
+    if not re.search(
+        r"This product includes software developed at\s*\nThe Apache Software Foundation \(.*?\)", content, re.DOTALL
+    ):
+        issues.append("Missing or invalid foundation attribution")
+
+    return len(issues) == 0, issues
+
+
 def _files_messages_build(
     root_dir: str,
     files_found: list[str],
@@ -356,28 +377,15 @@ def _files_messages_build(
     return messages
 
 
-def _files_check_core_logic_notice(tf: tarfile.TarFile, member: tarfile.TarInfo) -> tuple[bool, list[str]]:
-    """Verify that the NOTICE file follows the required format."""
-    f = tf.extractfile(member)
-    if not f:
-        return False, ["Could not read NOTICE file"]
-
-    content = f.read().decode("utf-8")
-    issues = []
-
-    if not re.search(r"Apache\s+[\w\-\.]+", content, re.MULTILINE):
-        issues.append("Missing or invalid Apache product header")
-    if not re.search(r"Copyright\s+(?:\d{4}|\d{4}-\d{4})\s+The Apache Software Foundation", content, re.MULTILINE):
-        issues.append("Missing or invalid copyright statement")
-    if not re.search(
-        r"This product includes software developed at\s*\nThe Apache Software Foundation \(.*?\)", content, re.DOTALL
-    ):
-        issues.append("Missing or invalid foundation attribution")
-
-    return len(issues) == 0, issues
-
-
 # Header helpers
+
+
+def _get_file_extension(filename: str) -> str | None:
+    """Get the file extension without the dot."""
+    _, ext = os.path.splitext(filename)
+    if not ext:
+        return None
+    return ext[1:].lower()
 
 
 def _headers_check_core_logic(artifact_path: str) -> dict[str, Any]:
@@ -487,14 +495,6 @@ def _headers_check_core_logic_should_check(filepath: str) -> bool:
             return True
 
     return False
-
-
-def _get_file_extension(filename: str) -> str | None:
-    """Get the file extension without the dot."""
-    _, ext = os.path.splitext(filename)
-    if not ext:
-        return None
-    return ext[1:].lower()
 
 
 def _headers_validate(content: bytes, filename: str) -> tuple[bool, str | None]:

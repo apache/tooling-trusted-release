@@ -29,6 +29,58 @@ import atr.util as util
 _LOGGER: Final = logging.getLogger(__name__)
 
 
+async def check(args: checks.FunctionArguments) -> None:
+    """Check file path structure and naming conventions against ASF release policy for all files in a release."""
+    # We refer to the following authoritative policies:
+    # - Release Creation Process (RCP)
+    # - Release Distribution Policy (RDP)
+
+    recorder_errors = await checks.Recorder.create(
+        checker=checks.function_key(check) + "_errors",
+        release_name=args.release_name,
+        draft_revision=args.draft_revision,
+        primary_rel_path=None,
+        afresh=True,
+    )
+    recorder_warnings = await checks.Recorder.create(
+        checker=checks.function_key(check) + "_warnings",
+        release_name=args.release_name,
+        draft_revision=args.draft_revision,
+        primary_rel_path=None,
+        afresh=True,
+    )
+    recorder_success = await checks.Recorder.create(
+        checker=checks.function_key(check) + "_success",
+        release_name=args.release_name,
+        draft_revision=args.draft_revision,
+        primary_rel_path=None,
+        afresh=True,
+    )
+
+    # As primary_rel_path is None, the base path is the release candidate draft directory
+    if not (base_path := await recorder_success.abs_path()):
+        return
+
+    if not await aiofiles.os.path.isdir(base_path):
+        _LOGGER.error("Base release directory does not exist or is not a directory: %s", base_path)
+        return
+
+    relative_paths = await util.paths_recursive(base_path)
+    relative_paths_set = set(str(p) for p in relative_paths)
+    for relative_path in relative_paths:
+        # Delegate processing of each path to the helper function
+        await _check_path_process_single(
+            base_path,
+            relative_path,
+            recorder_errors,
+            recorder_warnings,
+            recorder_success,
+            relative_paths_set,
+        )
+
+    return None
+
+
 async def _check_artifact_rules(
     base_path: pathlib.Path, relative_path: pathlib.Path, relative_paths: set[str], errors: list[str]
 ) -> None:
@@ -138,55 +190,3 @@ async def _check_path_process_single(
         await recorder_success.success(
             "Path structure and naming conventions conform to policy", {}, primary_rel_path=relative_path_str
         )
-
-
-async def check(args: checks.FunctionArguments) -> None:
-    """Check file path structure and naming conventions against ASF release policy for all files in a release."""
-    # We refer to the following authoritative policies:
-    # - Release Creation Process (RCP)
-    # - Release Distribution Policy (RDP)
-
-    recorder_errors = await checks.Recorder.create(
-        checker=checks.function_key(check) + "_errors",
-        release_name=args.release_name,
-        draft_revision=args.draft_revision,
-        primary_rel_path=None,
-        afresh=True,
-    )
-    recorder_warnings = await checks.Recorder.create(
-        checker=checks.function_key(check) + "_warnings",
-        release_name=args.release_name,
-        draft_revision=args.draft_revision,
-        primary_rel_path=None,
-        afresh=True,
-    )
-    recorder_success = await checks.Recorder.create(
-        checker=checks.function_key(check) + "_success",
-        release_name=args.release_name,
-        draft_revision=args.draft_revision,
-        primary_rel_path=None,
-        afresh=True,
-    )
-
-    # As primary_rel_path is None, the base path is the release candidate draft directory
-    if not (base_path := await recorder_success.abs_path()):
-        return
-
-    if not await aiofiles.os.path.isdir(base_path):
-        _LOGGER.error("Base release directory does not exist or is not a directory: %s", base_path)
-        return
-
-    relative_paths = await util.paths_recursive(base_path)
-    relative_paths_set = set(str(p) for p in relative_paths)
-    for relative_path in relative_paths:
-        # Delegate processing of each path to the helper function
-        await _check_path_process_single(
-            base_path,
-            relative_path,
-            recorder_errors,
-            recorder_warnings,
-            recorder_success,
-            relative_paths_set,
-        )
-
-    return None

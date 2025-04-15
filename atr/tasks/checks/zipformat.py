@@ -145,26 +145,6 @@ def _integrity_check_core_logic(artifact_path: str) -> dict[str, Any]:
         return {"error": f"Unexpected error: {e}"}
 
 
-def _license_files_check_file_zip(zf: zipfile.ZipFile, artifact_path: str, expected_path: str) -> tuple[bool, bool]:
-    """Check for the presence and basic validity of a specific file in a zip."""
-    found = False
-    valid = False
-    try:
-        with zf.open(expected_path) as file_handle:
-            found = True
-            content = file_handle.read().strip()
-            if content:
-                # TODO: Add more specific NOTICE checks if needed
-                valid = True
-    except KeyError:
-        # File not found in zip
-        ...
-    except Exception as e:
-        filename = os.path.basename(expected_path)
-        _LOGGER.warning(f"Error reading {filename} in zip {artifact_path}: {e}")
-    return found, valid
-
-
 def _license_files_check_core_logic_zip(artifact_path: str) -> dict[str, Any]:
     """Verify LICENSE and NOTICE files within a zip archive."""
     # TODO: Obviously we want to reuse the license files check logic from license.py
@@ -210,6 +190,26 @@ def _license_files_check_core_logic_zip(artifact_path: str) -> dict[str, Any]:
         return {"error": "File not found"}
     except Exception as e:
         return {"error": f"Unexpected error: {e}"}
+
+
+def _license_files_check_file_zip(zf: zipfile.ZipFile, artifact_path: str, expected_path: str) -> tuple[bool, bool]:
+    """Check for the presence and basic validity of a specific file in a zip."""
+    found = False
+    valid = False
+    try:
+        with zf.open(expected_path) as file_handle:
+            found = True
+            content = file_handle.read().strip()
+            if content:
+                # TODO: Add more specific NOTICE checks if needed
+                valid = True
+    except KeyError:
+        # File not found in zip
+        ...
+    except Exception as e:
+        filename = os.path.basename(expected_path)
+        _LOGGER.warning(f"Error reading {filename} in zip {artifact_path}: {e}")
+    return found, valid
 
 
 def _license_files_find_root_dir_zip(members: list[str]) -> str | None:
