@@ -110,6 +110,31 @@ class PromoteForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Promote candidate draft")
 
 
+class SvnImportForm(util.QuartFormTyped):
+    """Form for importing files from SVN into a draft."""
+
+    svn_url = wtforms.URLField(
+        "SVN URL",
+        validators=[
+            wtforms.validators.InputRequired("SVN URL is required."),
+            wtforms.validators.URL(require_tld=False),
+        ],
+        description="The URL to the public SVN directory",
+    )
+    revision = wtforms.StringField(
+        "Revision",
+        default="HEAD",
+        validators=[],
+        description="Specify an SVN revision number or leave as HEAD for the latest",
+    )
+    target_subdirectory = wtforms.StringField(
+        "Target subdirectory",
+        validators=[],
+        description="Subdirectory to place imported files, defaulting to the root (optional)",
+    )
+    submit = wtforms.SubmitField("Queue SVN import task")
+
+
 @routes.committer("/draft/add", methods=["GET", "POST"])
 async def add(session: routes.CommitterSession) -> response.Response | str:
     """Show a page to allow the user to rsync files to candidate drafts."""
@@ -798,6 +823,62 @@ async def sbomgen(
         success=f"SBOM generation task queued for {rel_path.name}",
         project_name=project_name,
         version_name=version_name,
+    )
+
+
+@routes.committer("/draft/svnload/<project_name>/<version_name>", methods=["GET", "POST"])
+async def svnload(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+    """Import files from SVN into a draft."""
+
+    form = await SvnImportForm.create_form()
+
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
+    async with db.session() as data:
+        release = await data.release(name=models.release_name(project_name, version_name)).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+        if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+            raise base.ASFQuartException("SVN import is only available for candidate drafts", errorcode=400)
+
+    if await form.validate_on_submit():
+        try:
+            task_args = {
+                "svn_url": str(form.svn_url.data),
+                "revision": str(form.revision.data),
+                "target_subdirectory": str(form.target_subdirectory.data) if form.target_subdirectory.data else None,
+                "project_name": project_name,
+                "version_name": version_name,
+                "asf_uid": session.uid,
+            }
+            async with db.session() as data:
+                svn_import_task = models.Task(
+                    task_type=models.TaskType.SVN_IMPORT_FILES,
+                    task_args=task_args,
+                    added=datetime.datetime.now(datetime.UTC),
+                    status=models.TaskStatus.QUEUED,
+                    release_name=release.name,
+                )
+                data.add(svn_import_task)
+                await data.commit()
+
+            return await session.redirect(
+                evaluate,
+                success="SVN import task queued successfully",
+                project_name=project_name,
+                version_name=version_name,
+            )
+        except Exception as e:
+            logging.exception("Error queueing SVN import task:")
+            await quart.flash(f"Error queueing SVN import task: {e!s}", "error")
+
+    return await quart.render_template(
+        "draft-svnload.html",
+        asf_id=session.uid,
+        project_name=project_name,
+        version_name=version_name,
+        form=form,
     )
 
 

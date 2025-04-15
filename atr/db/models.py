@@ -297,6 +297,7 @@ class TaskType(str, enum.Enum):
     # RSYNC_ANALYSE = "rsync_analyse"
     SBOM_GENERATE_CYCLONEDX = "sbom_generate_cyclonedx"
     SIGNATURE_CHECK = "signature_check"
+    SVN_IMPORT_FILES = "svn_import_files"
     TARGZ_INTEGRITY = "targz_integrity"
     TARGZ_STRUCTURE = "targz_structure"
     VOTE_INITIATE = "vote_initiate"

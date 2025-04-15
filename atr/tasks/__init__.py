@@ -31,6 +31,7 @@ import atr.tasks.checks.zipformat as zipformat
 
 # import atr.tasks.rsync as rsync
 import atr.tasks.sbom as sbom
+import atr.tasks.svn as svn
 import atr.tasks.vote as vote
 import atr.util as util
 
@@ -118,6 +119,8 @@ def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:
             return sbom.generate_cyclonedx
         case models.TaskType.SIGNATURE_CHECK:
             return signature.check
+        case models.TaskType.SVN_IMPORT_FILES:
+            return svn.import_files
         case models.TaskType.TARGZ_INTEGRITY:
             return targz.integrity
         case models.TaskType.TARGZ_STRUCTURE:

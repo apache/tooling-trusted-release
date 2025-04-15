@@ -51,6 +51,9 @@
               <a href="{{ as_url(routes.draft.add_file, project_name=release.project.name, version_name=release.version) }}"
                  title="Upload file for {{ release.project.display_name }} {{ release.version }}"
                  class="btn btn-sm btn-outline-secondary">Upload file</a>
+              <a href="{{ as_url(routes.draft.svnload, project_name=release.project.name, version_name=release.version) }}"
+                 title="Import from SVN for {{ release.project.display_name }} {{ release.version }}"
+                 class="btn btn-sm btn-outline-secondary">Import from SVN</a>
               <a href="{{ as_url(routes.draft.revisions, project_name=release.project.name, version_name=release.version) }}"
                  title="Revisions for {{ release.project.display_name }} {{ release.version }}"
                  class="btn btn-sm btn-outline-secondary">Revisions</a>
