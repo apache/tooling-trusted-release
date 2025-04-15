@@ -57,7 +57,7 @@ def _verify_names_are_sorted(names: Sequence[str], filename: str) -> bool:
             a = _toggle_sortability(names[i])
             b = _toggle_sortability(names[i + 1])
             print(
-                f"Error: Function '{b}' in {filename} is not ordered correctly relative to '{a}'",
+                f"!! {filename} - function '{b}' is misordered relative to '{a}'",
                 file=sys.stderr,
             )
     return False
@@ -81,11 +81,11 @@ def main() -> None:
     function_names = _extract_top_level_function_names(tree)
 
     if not function_names:
-        print(f"No top level functions found in {file_path}. Nothing to check")
+        print(f"ok {file_path} - no top level functions")
         sys.exit(ExitCode.SUCCESS)
 
     if _verify_names_are_sorted(function_names, str(file_path)):
-        print(f"Top level functions in {file_path} are alphabetically ordered")
+        print(f"ok {file_path}")
         sys.exit(ExitCode.SUCCESS)
     else:
         sys.exit(ExitCode.FAILURE)

@@ -110,14 +110,6 @@ class PromoteForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Promote candidate draft")
 
 
-async def _number_of_release_files(release: models.Release) -> int:
-    """Return the number of files in the release."""
-    path_project = release.project.name
-    path_version = release.version
-    path = util.get_release_candidate_draft_dir() / path_project / path_version / "latest"
-    return len(await util.paths_recursive(path))
-
-
 @routes.committer("/draft/add", methods=["GET", "POST"])
 async def add(session: routes.CommitterSession) -> response.Response | str:
     """Show a page to allow the user to rsync files to candidate drafts."""
@@ -915,23 +907,6 @@ async def view_path(
     )
 
 
-async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -> None:
-    """Delete a candidate draft and all its associated files."""
-    # Check that the release exists
-    release = await data.release(name=candidate_draft_name, _project=True, _packages=True).get()
-    if not release:
-        raise routes.FlashError("Candidate draft not found")
-    if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-        raise routes.FlashError("Candidate draft is not in the release candidate draft phase")
-
-    # Delete all associated packages first
-    for package in release.packages:
-        await data.delete(package)
-
-    # Delete the release record
-    await data.delete(release)
-
-
 async def _add(session: routes.CommitterSession, form: AddProtocol) -> None:
     """Handle POST request for creating a new release candidate draft."""
     version = str(form.version_name.data)
@@ -971,6 +946,31 @@ async def _add(session: routes.CommitterSession, form: AddProtocol) -> None:
                     created=datetime.datetime.now(datetime.UTC),
                 )
                 data.add(release)
+
+
+async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -> None:
+    """Delete a candidate draft and all its associated files."""
+    # Check that the release exists
+    release = await data.release(name=candidate_draft_name, _project=True, _packages=True).get()
+    if not release:
+        raise routes.FlashError("Candidate draft not found")
+    if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+        raise routes.FlashError("Candidate draft is not in the release candidate draft phase")
+
+    # Delete all associated packages first
+    for package in release.packages:
+        await data.delete(package)
+
+    # Delete the release record
+    await data.delete(release)
+
+
+async def _number_of_release_files(release: models.Release) -> int:
+    """Return the number of files in the release."""
+    path_project = release.project.name
+    path_version = release.version
+    path = util.get_release_candidate_draft_dir() / path_project / path_version / "latest"
+    return len(await util.paths_recursive(path))
 
 
 async def _promote(
@@ -1098,6 +1098,12 @@ async def _revisions_process(
     return revision_data, current_revision_files
 
 
+async def _save_file(file: datastructures.FileStorage, target_path: pathlib.Path) -> None:
+    async with aiofiles.open(target_path, "wb") as f:
+        while chunk := await asyncio.to_thread(file.stream.read, 8192):
+            await f.write(chunk)
+
+
 async def _upload_files(
     project_name: str,
     version_name: str,
@@ -1136,9 +1142,3 @@ async def _upload_files(
             await _save_file(file, target_path)
 
     return len(files)
-
-
-async def _save_file(file: datastructures.FileStorage, target_path: pathlib.Path) -> None:
-    async with aiofiles.open(target_path, "wb") as f:
-        while chunk := await asyncio.to_thread(file.stream.read, 8192):
-            await f.write(chunk)

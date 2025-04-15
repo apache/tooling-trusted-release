@@ -40,6 +40,39 @@ class AddFormProtocol(Protocol):
     submit: wtforms.SubmitField
 
 
+class VotePolicyForm(util.QuartFormTyped):
+    """
+    A Form to create/edit a VotePolicy.
+
+    TODO: Currently only a single mailto_address is supported.
+          see: https://stackoverflow.com/questions/49066046/append-entry-to-fieldlist-with-flask-wtforms-using-ajax
+    """
+
+    project_name = wtforms.HiddenField("project_name")
+    mailto_addresses = wtforms.FieldList(
+        wtforms.StringField(
+            "Email",
+            validators=[
+                wtforms.validators.InputRequired("Please provide a valid email address"),
+                wtforms.validators.Email(),
+            ],
+        ),
+        min_entries=1,
+    )
+    min_hours = wtforms.IntegerField(
+        "Minimum Voting Period:",
+        validators=[
+            wtforms.validators.NumberRange(min=0, max=144, message="Voting period must be between 0h and 144h")
+        ],
+        default=72,
+    )
+    manual_vote = wtforms.BooleanField("Voting Process:")
+    release_checklist = wtforms.StringField("Release Checklist:", widget=wtforms.widgets.TextArea())
+    pause_for_rm = wtforms.BooleanField("Pause for RM:")
+
+    submit = wtforms.SubmitField("Save")
+
+
 @routes.committer("/project/add", methods=["GET", "POST"])
 async def add(session: routes.CommitterSession) -> response.Response | str:
     def long_name(project: models.Project) -> str:
@@ -66,71 +99,6 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
         return await _add_project(form, session.uid)
 
     return await quart.render_template("project-add.html", form=form)
-
-
-async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
-    base_project_name = str(form.project_name.data)
-    derived_project_name = str(form.derived_project_name.data).strip()
-
-    def _generate_label(text: str) -> str:
-        # TODO: We should probably add long name validation
-        text = text.lower()
-        text = re.sub(r" +", "-", text)
-        text = re.sub(r"[^a-z0-9-]", "", text)
-        return text
-
-    async with db.session() as data:
-        # Get the base project to derive from
-        base_project = await data.project(name=base_project_name).get()
-        if not base_project:
-            # This should not happen, assuming that the dropdown is populated correctly
-            raise routes.FlashError(f"Base project {base_project_name} not found")
-
-        # Construct the new label
-        derived_label = _generate_label(derived_project_name)
-        if not derived_label:
-            raise routes.FlashError("Derived project name must contain valid characters for label generation")
-        new_project_label = f"{base_project.name}-{derived_label}"
-
-        # Construct the new full name
-        # We ensure that parenthesised suffixes like "(Incubating)" are preserved
-        base_name = base_project.full_name or base_project.name
-        match = re.match(r"^(.*?) *(\(.*\))?$", base_name)
-        if match:
-            main_part = match.group(1).strip()
-            suffix_part = match.group(2)
-        else:
-            main_part = base_name.strip()
-            suffix_part = None
-
-        if suffix_part:
-            new_project_full_name = f"{main_part} {derived_project_name} {suffix_part}"
-        else:
-            new_project_full_name = f"{main_part} {derived_project_name}"
-        new_project_full_name = re.sub(r"  +", " ", new_project_full_name).strip()
-
-        # Check whether the derived project already exists by its constructed label
-        if await data.project(name=new_project_label).get():
-            raise routes.FlashError(f"Derived project {new_project_label} already exists")
-
-        project = models.Project(
-            name=new_project_label,
-            full_name=new_project_full_name,
-            is_podling=base_project.is_podling,
-            is_retired=base_project.is_retired,
-            description=base_project.description,
-            category=base_project.category,
-            programming_languages=base_project.programming_languages,
-            committee_id=base_project.committee_id,
-            vote_policy_id=base_project.vote_policy_id,
-            created=datetime.datetime.now(datetime.UTC),
-            created_by=asf_id,
-        )
-
-        data.add(project)
-        await data.commit()
-
-    return quart.redirect(util.as_url(view, name=new_project_label))
 
 
 @routes.committer("/project/delete", methods=["POST"])
@@ -188,39 +156,6 @@ async def view(name: str) -> str:
             http.client.HTTPException(404)
         )
         return await quart.render_template("project-view.html", project=project, algorithms=routes.algorithms)
-
-
-class VotePolicyForm(util.QuartFormTyped):
-    """
-    A Form to create/edit a VotePolicy.
-
-    TODO: Currently only a single mailto_address is supported.
-          see: https://stackoverflow.com/questions/49066046/append-entry-to-fieldlist-with-flask-wtforms-using-ajax
-    """
-
-    project_name = wtforms.HiddenField("project_name")
-    mailto_addresses = wtforms.FieldList(
-        wtforms.StringField(
-            "Email",
-            validators=[
-                wtforms.validators.InputRequired("Please provide a valid email address"),
-                wtforms.validators.Email(),
-            ],
-        ),
-        min_entries=1,
-    )
-    min_hours = wtforms.IntegerField(
-        "Minimum Voting Period:",
-        validators=[
-            wtforms.validators.NumberRange(min=0, max=144, message="Voting period must be between 0h and 144h")
-        ],
-        default=72,
-    )
-    manual_vote = wtforms.BooleanField("Voting Process:")
-    release_checklist = wtforms.StringField("Release Checklist:", widget=wtforms.widgets.TextArea())
-    pause_for_rm = wtforms.BooleanField("Pause for RM:")
-
-    submit = wtforms.SubmitField("Save")
 
 
 @routes.committer("/projects/<project_name>/vote-policy/add", methods=["GET", "POST"])
@@ -287,6 +222,71 @@ async def vote_policy_edit(session: routes.CommitterSession, project_name: str) 
         project=project,
         form=form,
     )
+
+
+async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
+    base_project_name = str(form.project_name.data)
+    derived_project_name = str(form.derived_project_name.data).strip()
+
+    def _generate_label(text: str) -> str:
+        # TODO: We should probably add long name validation
+        text = text.lower()
+        text = re.sub(r" +", "-", text)
+        text = re.sub(r"[^a-z0-9-]", "", text)
+        return text
+
+    async with db.session() as data:
+        # Get the base project to derive from
+        base_project = await data.project(name=base_project_name).get()
+        if not base_project:
+            # This should not happen, assuming that the dropdown is populated correctly
+            raise routes.FlashError(f"Base project {base_project_name} not found")
+
+        # Construct the new label
+        derived_label = _generate_label(derived_project_name)
+        if not derived_label:
+            raise routes.FlashError("Derived project name must contain valid characters for label generation")
+        new_project_label = f"{base_project.name}-{derived_label}"
+
+        # Construct the new full name
+        # We ensure that parenthesised suffixes like "(Incubating)" are preserved
+        base_name = base_project.full_name or base_project.name
+        match = re.match(r"^(.*?) *(\(.*\))?$", base_name)
+        if match:
+            main_part = match.group(1).strip()
+            suffix_part = match.group(2)
+        else:
+            main_part = base_name.strip()
+            suffix_part = None
+
+        if suffix_part:
+            new_project_full_name = f"{main_part} {derived_project_name} {suffix_part}"
+        else:
+            new_project_full_name = f"{main_part} {derived_project_name}"
+        new_project_full_name = re.sub(r"  +", " ", new_project_full_name).strip()
+
+        # Check whether the derived project already exists by its constructed label
+        if await data.project(name=new_project_label).get():
+            raise routes.FlashError(f"Derived project {new_project_label} already exists")
+
+        project = models.Project(
+            name=new_project_label,
+            full_name=new_project_full_name,
+            is_podling=base_project.is_podling,
+            is_retired=base_project.is_retired,
+            description=base_project.description,
+            category=base_project.category,
+            programming_languages=base_project.programming_languages,
+            committee_id=base_project.committee_id,
+            vote_policy_id=base_project.vote_policy_id,
+            created=datetime.datetime.now(datetime.UTC),
+            created_by=asf_id,
+        )
+
+        data.add(project)
+        await data.commit()
+
+    return quart.redirect(util.as_url(view, name=new_project_label))
 
 
 async def _add_voting_policy(project: models.Project, form: VotePolicyForm, data: db.Session) -> response.Response:

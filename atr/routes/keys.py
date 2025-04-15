@@ -52,193 +52,6 @@ class AddSSHKeyForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Add SSH key")
 
 
-@contextlib.asynccontextmanager
-async def ephemeral_gpg_home() -> AsyncGenerator[str]:
-    """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
-    async with util.async_temporary_directory(prefix="gpg-") as temp_dir:
-        yield str(temp_dir)
-
-
-async def key_add_post(
-    session: routes.CommitterSession, request: quart.Request, user_committees: Sequence[models.Committee]
-) -> dict | None:
-    form = await routes.get_form(request)
-    public_key = form.get("public_key")
-    if not public_key:
-        raise routes.FlashError("Public key is required")
-
-    # Get selected PMCs from form
-    selected_committees = form.getlist("selected_committees")
-    if not selected_committees:
-        raise routes.FlashError("You must select at least one PMC")
-
-    # Ensure that the selected PMCs are ones of which the user is actually a member
-    invalid_committees = [
-        committee
-        for committee in selected_committees
-        if (committee not in session.committees) and (committee not in session.projects)
-    ]
-    if invalid_committees:
-        raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
-
-    return await key_user_add(session.uid, public_key, selected_committees)
-
-
-def key_ssh_fingerprint(ssh_key_string: str) -> str:
-    # The format should be as in *.pub or authorized_keys files
-    # I.e. TYPE DATA COMMENT
-    ssh_key_parts = ssh_key_string.strip().split()
-    if len(ssh_key_parts) >= 2:
-        # We discard the type, which is ssh_key_parts[0]
-        key_data = ssh_key_parts[1]
-        # We discard the comment, which is ssh_key_parts[2]
-
-        # Standard fingerprint calculation
-        try:
-            decoded_key_data = base64.b64decode(key_data)
-        except binascii.Error as e:
-            raise ValueError(f"Invalid base64 encoding in key data: {e}") from e
-
-        digest = hashlib.sha256(decoded_key_data).digest()
-        fingerprint_b64 = base64.b64encode(digest).decode("utf-8").rstrip("=")
-
-        # Prefix follows the standard format
-        return f"SHA256:{fingerprint_b64}"
-
-    raise ValueError("Invalid SSH key format")
-
-
-async def _key_user_add_validate_key_properties(public_key: str) -> tuple[dict, str]:
-    """Validate GPG key string, import it, and return its properties and fingerprint."""
-    async with ephemeral_gpg_home() as gpg_home:
-        gpg = gnupg.GPG(gnupghome=gpg_home)
-        import_result = await asyncio.to_thread(gpg.import_keys, public_key)
-
-        if not import_result.fingerprints:
-            raise routes.FlashError("Invalid public key format or failed import")
-
-        fingerprint = import_result.fingerprints[0]
-        if fingerprint is None:
-            # Should be unreachable given the previous check, but satisfy type checker
-            raise routes.FlashError("Failed to get fingerprint after import")
-        fingerprint_lower = fingerprint.lower()
-
-        # List keys to get details
-        keys = await asyncio.to_thread(gpg.list_keys)
-
-    # Find the specific key details from the list using the fingerprint
-    key_details = None
-    for k in keys:
-        if k.get("fingerprint") is not None and k["fingerprint"].lower() == fingerprint_lower:
-            key_details = k
-            break
-
-    if not key_details:
-        # This might indicate an issue with gpg.list_keys or the environment
-        logging.error(
-            f"Could not find key details for fingerprint {fingerprint_lower}"
-            f" after successful import. Keys listed: {keys}"
-        )
-        raise routes.FlashError("Failed to retrieve key details after import")
-
-    # Validate key algorithm and length
-    # https://infra.apache.org/release-signing.html#note
-    # Says that keys must be at least 2048 bits
-    if (key_details.get("algo") == "1") and (int(key_details.get("length", "0")) < 2048):
-        raise routes.FlashError("RSA Key is not long enough; must be at least 2048 bits")
-
-    return key_details, fingerprint_lower
-
-
-async def key_user_add(asf_uid: str | None, public_key: str, selected_committees: list[str]) -> dict | None:
-    if not public_key:
-        raise routes.FlashError("Public key is required")
-
-    # Validate the key using GPG and get its properties
-    key, _fingerprint = await _key_user_add_validate_key_properties(public_key)
-
-    # Determine ASF UID if not provided
-    if asf_uid is None:
-        for uid in key["uids"]:
-            match = re.search(r"([A-Za-z0-9]+)@apache.org", uid)
-            if match:
-                asf_uid = match.group(1).lower()
-                break
-        else:
-            logging.warning(f"key_user_add called with no ASF UID found in key UIDs: {key.get('uids')}")
-    if asf_uid is None:
-        # We place this here to make it easier on the type checkers
-        raise routes.FlashError("No Apache UID found in the key UIDs")
-
-    # Store key in database
-    async with db.session() as data:
-        return await key_user_session_add(asf_uid, public_key, key, selected_committees, data)
-
-
-async def key_user_session_add(
-    asf_uid: str,
-    public_key: str,
-    key: dict,
-    selected_committees: list[str],
-    data: db.Session,
-) -> dict | None:
-    # TODO: Check if key already exists
-    # psk_statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
-
-    # # If uncommented, this will prevent a user from adding a second key
-    # existing_key = (await db_session.execute(statement)).scalar_one_or_none()
-    # if existing_key:
-    #     return ("You already have a key registered", None)
-
-    fingerprint = key.get("fingerprint")
-    # for subkey in key.get("subkeys", []):
-    #     if subkey[1] == "s":
-    #         # It's a signing key, so use its fingerprint instead
-    #         # TODO: Not sure that we should do this
-    #         # TODO: Check for multiple signing subkeys
-    #         fingerprint = subkey[2]
-    #         break
-    if not isinstance(fingerprint, str):
-        raise routes.FlashError("Invalid key fingerprint")
-    fingerprint = fingerprint.lower()
-    uids = key.get("uids")
-    async with data.begin():
-        if existing := await data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid).get():
-            raise routes.FlashError(f"Key already exists: {existing.fingerprint}")
-
-        # Create new key record
-        key_record = models.PublicSigningKey(
-            fingerprint=fingerprint,
-            algorithm=int(key["algo"]),
-            length=int(key.get("length", "0")),
-            created=datetime.datetime.fromtimestamp(int(key["date"])),
-            expires=datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
-            declared_uid=uids[0] if uids else None,
-            apache_uid=asf_uid,
-            ascii_armored_key=public_key,
-        )
-        data.add(key_record)
-
-        # Link key to selected PMCs
-        for committee_name in selected_committees:
-            committee = await data.committee(name=committee_name).get()
-            if committee and committee.id:
-                link = models.KeyLink(committee_id=committee.id, key_fingerprint=key_record.fingerprint)
-                data.add(link)
-            else:
-                # TODO: Log? Add to "error"?
-                continue
-
-    return {
-        "key_id": key["keyid"],
-        "fingerprint": key["fingerprint"].lower() if key.get("fingerprint") else "Unknown",
-        "user_id": key["uids"][0] if key.get("uids") else "Unknown",
-        "creation_date": datetime.datetime.fromtimestamp(int(key["date"])),
-        "expiration_date": datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
-        "data": pprint.pformat(key),
-    }
-
-
 @routes.committer("/keys/add", methods=["GET", "POST"])
 async def add(session: routes.CommitterSession) -> str:
     """Add a new public signing key to the user's account."""
@@ -333,6 +146,151 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
             # No key was found
             return await session.redirect(keys, error="Key not found or not owned by you")
+
+
+@contextlib.asynccontextmanager
+async def ephemeral_gpg_home() -> AsyncGenerator[str]:
+    """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
+    async with util.async_temporary_directory(prefix="gpg-") as temp_dir:
+        yield str(temp_dir)
+
+
+async def key_add_post(
+    session: routes.CommitterSession, request: quart.Request, user_committees: Sequence[models.Committee]
+) -> dict | None:
+    form = await routes.get_form(request)
+    public_key = form.get("public_key")
+    if not public_key:
+        raise routes.FlashError("Public key is required")
+
+    # Get selected PMCs from form
+    selected_committees = form.getlist("selected_committees")
+    if not selected_committees:
+        raise routes.FlashError("You must select at least one PMC")
+
+    # Ensure that the selected PMCs are ones of which the user is actually a member
+    invalid_committees = [
+        committee
+        for committee in selected_committees
+        if (committee not in session.committees) and (committee not in session.projects)
+    ]
+    if invalid_committees:
+        raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
+
+    return await key_user_add(session.uid, public_key, selected_committees)
+
+
+def key_ssh_fingerprint(ssh_key_string: str) -> str:
+    # The format should be as in *.pub or authorized_keys files
+    # I.e. TYPE DATA COMMENT
+    ssh_key_parts = ssh_key_string.strip().split()
+    if len(ssh_key_parts) >= 2:
+        # We discard the type, which is ssh_key_parts[0]
+        key_data = ssh_key_parts[1]
+        # We discard the comment, which is ssh_key_parts[2]
+
+        # Standard fingerprint calculation
+        try:
+            decoded_key_data = base64.b64decode(key_data)
+        except binascii.Error as e:
+            raise ValueError(f"Invalid base64 encoding in key data: {e}") from e
+
+        digest = hashlib.sha256(decoded_key_data).digest()
+        fingerprint_b64 = base64.b64encode(digest).decode("utf-8").rstrip("=")
+
+        # Prefix follows the standard format
+        return f"SHA256:{fingerprint_b64}"
+
+    raise ValueError("Invalid SSH key format")
+
+
+async def key_user_add(asf_uid: str | None, public_key: str, selected_committees: list[str]) -> dict | None:
+    if not public_key:
+        raise routes.FlashError("Public key is required")
+
+    # Validate the key using GPG and get its properties
+    key, _fingerprint = await _key_user_add_validate_key_properties(public_key)
+
+    # Determine ASF UID if not provided
+    if asf_uid is None:
+        for uid in key["uids"]:
+            match = re.search(r"([A-Za-z0-9]+)@apache.org", uid)
+            if match:
+                asf_uid = match.group(1).lower()
+                break
+        else:
+            logging.warning(f"key_user_add called with no ASF UID found in key UIDs: {key.get('uids')}")
+    if asf_uid is None:
+        # We place this here to make it easier on the type checkers
+        raise routes.FlashError("No Apache UID found in the key UIDs")
+
+    # Store key in database
+    async with db.session() as data:
+        return await key_user_session_add(asf_uid, public_key, key, selected_committees, data)
+
+
+async def key_user_session_add(
+    asf_uid: str,
+    public_key: str,
+    key: dict,
+    selected_committees: list[str],
+    data: db.Session,
+) -> dict | None:
+    # TODO: Check if key already exists
+    # psk_statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
+
+    # # If uncommented, this will prevent a user from adding a second key
+    # existing_key = (await db_session.execute(statement)).scalar_one_or_none()
+    # if existing_key:
+    #     return ("You already have a key registered", None)
+
+    fingerprint = key.get("fingerprint")
+    # for subkey in key.get("subkeys", []):
+    #     if subkey[1] == "s":
+    #         # It's a signing key, so use its fingerprint instead
+    #         # TODO: Not sure that we should do this
+    #         # TODO: Check for multiple signing subkeys
+    #         fingerprint = subkey[2]
+    #         break
+    if not isinstance(fingerprint, str):
+        raise routes.FlashError("Invalid key fingerprint")
+    fingerprint = fingerprint.lower()
+    uids = key.get("uids")
+    async with data.begin():
+        if existing := await data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid).get():
+            raise routes.FlashError(f"Key already exists: {existing.fingerprint}")
+
+        # Create new key record
+        key_record = models.PublicSigningKey(
+            fingerprint=fingerprint,
+            algorithm=int(key["algo"]),
+            length=int(key.get("length", "0")),
+            created=datetime.datetime.fromtimestamp(int(key["date"])),
+            expires=datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
+            declared_uid=uids[0] if uids else None,
+            apache_uid=asf_uid,
+            ascii_armored_key=public_key,
+        )
+        data.add(key_record)
+
+        # Link key to selected PMCs
+        for committee_name in selected_committees:
+            committee = await data.committee(name=committee_name).get()
+            if committee and committee.id:
+                link = models.KeyLink(committee_id=committee.id, key_fingerprint=key_record.fingerprint)
+                data.add(link)
+            else:
+                # TODO: Log? Add to "error"?
+                continue
+
+    return {
+        "key_id": key["keyid"],
+        "fingerprint": key["fingerprint"].lower() if key.get("fingerprint") else "Unknown",
+        "user_id": key["uids"][0] if key.get("uids") else "Unknown",
+        "creation_date": datetime.datetime.fromtimestamp(int(key["date"])),
+        "expiration_date": datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
+        "data": pprint.pformat(key),
+    }
 
 
 @routes.committer("/keys")
@@ -448,6 +406,48 @@ async def upload(session: routes.CommitterSession) -> str:
             "success" if success_count > 0 else "error",
         )
     return await render()
+
+
+async def _key_user_add_validate_key_properties(public_key: str) -> tuple[dict, str]:
+    """Validate GPG key string, import it, and return its properties and fingerprint."""
+    async with ephemeral_gpg_home() as gpg_home:
+        gpg = gnupg.GPG(gnupghome=gpg_home)
+        import_result = await asyncio.to_thread(gpg.import_keys, public_key)
+
+        if not import_result.fingerprints:
+            raise routes.FlashError("Invalid public key format or failed import")
+
+        fingerprint = import_result.fingerprints[0]
+        if fingerprint is None:
+            # Should be unreachable given the previous check, but satisfy type checker
+            raise routes.FlashError("Failed to get fingerprint after import")
+        fingerprint_lower = fingerprint.lower()
+
+        # List keys to get details
+        keys = await asyncio.to_thread(gpg.list_keys)
+
+    # Find the specific key details from the list using the fingerprint
+    key_details = None
+    for k in keys:
+        if k.get("fingerprint") is not None and k["fingerprint"].lower() == fingerprint_lower:
+            key_details = k
+            break
+
+    if not key_details:
+        # This might indicate an issue with gpg.list_keys or the environment
+        logging.error(
+            f"Could not find key details for fingerprint {fingerprint_lower}"
+            f" after successful import. Keys listed: {keys}"
+        )
+        raise routes.FlashError("Failed to retrieve key details after import")
+
+    # Validate key algorithm and length
+    # https://infra.apache.org/release-signing.html#note
+    # Says that keys must be at least 2048 bits
+    if (key_details.get("algo") == "1") and (int(key_details.get("length", "0")) < 2048):
+        raise routes.FlashError("RSA Key is not long enough; must be at least 2048 bits")
+
+    return key_details, fingerprint_lower
 
 
 async def _upload_key_blocks(key_file: datastructures.FileStorage) -> list[str]:
