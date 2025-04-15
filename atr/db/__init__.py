@@ -627,6 +627,24 @@ async def shutdown_database() -> None:
         _LOGGER.info("No database to close")
 
 
+async def tasks_ongoing(project_name: str, version_name: str, draft_revision: str) -> int:
+    release_name = models.release_name(project_name, version_name)
+    async with session() as data:
+        query = (
+            sqlmodel.select(sqlalchemy.func.count())
+            .select_from(models.Task)
+            .where(
+                models.Task.release_name == release_name,
+                models.Task.draft_revision == draft_revision,
+                validate_instrumented_attribute(models.Task.status).in_(
+                    [models.TaskStatus.QUEUED, models.TaskStatus.ACTIVE]
+                ),
+            )
+        )
+        result = await data.execute(query)
+        return result.scalar_one()
+
+
 def validate_instrumented_attribute(obj: Any) -> orm.InstrumentedAttribute:
     """Check if the given object is an InstrumentedAttribute."""
     if not isinstance(obj, orm.InstrumentedAttribute):

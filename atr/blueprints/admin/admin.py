@@ -379,6 +379,16 @@ async def admin_toggle_view() -> response.Response:
     return quart.redirect(referrer or quart.url_for("admin.admin_data"))
 
 
+@admin.BLUEPRINT.route("/ongoing-tasks/<project_name>/<version_name>/<draft_revision>")
+async def ongoing_tasks(project_name: str, version_name: str, draft_revision: str) -> quart.wrappers.response.Response:
+    try:
+        ongoing = await db.tasks_ongoing(project_name, version_name, draft_revision)
+        return quart.Response(str(ongoing), mimetype="text/plain")
+    except Exception:
+        _LOGGER.exception(f"Error fetching ongoing task count for {project_name} {version_name} rev {draft_revision}:")
+        return quart.Response("", mimetype="text/plain")
+
+
 async def _delete_release_data(release_name: str) -> None:
     """Handle the deletion of database records and filesystem data for a release."""
     async with db.session() as data:
