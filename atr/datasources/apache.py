@@ -20,24 +20,19 @@
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Annotated, TypeVar
+from typing import Annotated, Final
 
 import httpx
 import pydantic
 
 import atr.util as util
 
-if TYPE_CHECKING:
-    from collections.abc import Generator, ItemsView
-
-_WHIMSY_COMMITTEE_INFO_URL = "https://whimsy.apache.org/public/committee-info.json"
-_WHIMSY_COMMITTEE_RETIRED_URL = "https://whimsy.apache.org/public/committee-retired.json"
-_WHIMSY_PROJECTS_URL = "https://whimsy.apache.org/public/public_ldap_projects.json"
-_PROJECTS_PROJECTS_URL = "https://projects.apache.org/json/foundation/projects.json"
-_PROJECTS_PODLINGS_URL = "https://projects.apache.org/json/foundation/podlings.json"
-_PROJECTS_GROUPS_URL = "https://projects.apache.org/json/foundation/groups.json"
-
-VT = TypeVar("VT")
+_WHIMSY_COMMITTEE_INFO_URL: Final[str] = "https://whimsy.apache.org/public/committee-info.json"
+_WHIMSY_COMMITTEE_RETIRED_URL: Final[str] = "https://whimsy.apache.org/public/committee-retired.json"
+_WHIMSY_PROJECTS_URL: Final[str] = "https://whimsy.apache.org/public/public_ldap_projects.json"
+_PROJECTS_PROJECTS_URL: Final[str] = "https://projects.apache.org/json/foundation/projects.json"
+_PROJECTS_PODLINGS_URL: Final[str] = "https://projects.apache.org/json/foundation/podlings.json"
+_PROJECTS_GROUPS_URL: Final[str] = "https://projects.apache.org/json/foundation/groups.json"
 
 
 class LDAPProjectsData(pydantic.BaseModel):
@@ -114,25 +109,11 @@ class PodlingStatus(pydantic.BaseModel):
     resolution: str | None = None
 
 
-class _DictRootModel(pydantic.RootModel[dict[str, VT]]):
-    def __iter__(self) -> Generator[tuple[str, VT]]:
-        yield from self.root.items()
-
-    def items(self) -> ItemsView[str, VT]:
-        return self.root.items()
-
-    def get(self, key: str) -> VT | None:
-        return self.root.get(key)
-
-    def __len__(self) -> int:
-        return len(self.root)
-
-
-class PodlingsData(_DictRootModel[PodlingStatus]):
+class PodlingsData(util.DictRootModel[PodlingStatus]):
     pass
 
 
-class GroupsData(_DictRootModel[list[str]]):
+class GroupsData(util.DictRootModel[list[str]]):
     pass
 
 
@@ -156,7 +137,7 @@ class ProjectStatus(pydantic.BaseModel):
     release: list[Release] = pydantic.Field(default_factory=list)
 
 
-class ProjectsData(_DictRootModel[ProjectStatus]):
+class ProjectsData(util.DictRootModel[ProjectStatus]):
     pass
 
 

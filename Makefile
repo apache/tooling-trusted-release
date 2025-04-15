@@ -28,6 +28,10 @@ certs:
 check:
 	$(SCRIPTS)/run pre-commit run --all-files
 
+check-extra:
+	@find atr -name '*.py' -exec python3 scripts/interface_order.py {} --quiet \;
+	@find atr -name '*.py' -exec python3 scripts/interface_privacy.py {} --quiet \;
+
 docs:
 	for fn in docs/*.md; \
 	do cmark "$$fn" > "$${fn%.md}.html"; \

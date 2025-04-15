@@ -59,9 +59,16 @@ def _read_file_content(file_path: pathlib.Path) -> str | None:
 
 def main() -> None:
     """Main entry point for the script."""
-    if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <filename.py>", file=sys.stderr)
-        sys.exit(ExitCode.USAGE_ERROR)
+    quiet = sys.argv[2:3] == ["--quiet"]
+    argc = len(sys.argv)
+    match (argc, quiet):
+        case (2, False):
+            ...
+        case (3, True):
+            ...
+        case _:
+            print(f"Usage: {sys.argv[0]} <filename.py> [ --quiet ]", file=sys.stderr)
+            sys.exit(ExitCode.USAGE_ERROR)
 
     file_path = pathlib.Path(sys.argv[1])
     filename = str(file_path)
@@ -87,7 +94,8 @@ def main() -> None:
             print(f"!! {filename}:{lineno}:{col} - access to {name}")
         sys.exit(ExitCode.FAILURE)
     else:
-        print(f"ok {filename}")
+        if not quiet:
+            print(f"ok {filename}")
         sys.exit(ExitCode.SUCCESS)
 
 

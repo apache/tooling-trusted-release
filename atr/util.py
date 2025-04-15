@@ -28,7 +28,7 @@ import tarfile
 import tempfile
 import uuid
 import zipfile
-from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Generator, ItemsView, Mapping, Sequence
 from typing import Annotated, Any, TypeVar
 
 import aiofiles.os
@@ -50,8 +50,23 @@ import atr.user as user
 
 F = TypeVar("F", bound="QuartFormTyped")
 T = TypeVar("T")
+VT = TypeVar("VT")
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class DictRootModel(pydantic.RootModel[dict[str, VT]]):
+    def __iter__(self) -> Generator[tuple[str, VT]]:
+        yield from self.root.items()
+
+    def items(self) -> ItemsView[str, VT]:
+        return self.root.items()
+
+    def get(self, key: str) -> VT | None:
+        return self.root.get(key)
+
+    def __len__(self) -> int:
+        return len(self.root)
 
 
 # from https://github.com/pydantic/pydantic/discussions/8755#discussioncomment-8417979

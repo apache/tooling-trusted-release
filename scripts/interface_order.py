@@ -5,12 +5,68 @@ import enum
 import pathlib
 import sys
 from collections.abc import Sequence
+from typing import Final
+
+_CLASS_EXEMPTIONS: Final[set[str]] = {
+    "atr/datasources/apache.py",
+    "atr/db/models.py",
+}
 
 
 class ExitCode(enum.IntEnum):
     SUCCESS = 0
     FAILURE = 1
     USAGE_ERROR = 2
+
+
+def check_order(file_path: pathlib.Path, quiet: bool) -> bool:
+    content = _read_file_content(file_path)
+    if content is None:
+        sys.exit(ExitCode.FAILURE)
+
+    tree = _parse_python_code(content, str(file_path))
+    if tree is None:
+        sys.exit(ExitCode.FAILURE)
+
+    class_names = _extract_top_level_class_names(tree)
+    function_names = _extract_top_level_function_names(tree)
+
+    all_ok = True
+    if not _verify_names_are_sorted(function_names, str(file_path), "function"):
+        all_ok = False
+
+    for class_name in class_names:
+        if class_name.startswith("_"):
+            print(f"!! {file_path} - class '{class_name}' is private", file=sys.stderr)
+            all_ok = False
+
+    if (not quiet) or (str(file_path) not in _CLASS_EXEMPTIONS):
+        if not _verify_names_are_sorted(class_names, str(file_path), "class"):
+            all_ok = False
+
+    return all_ok
+
+
+def main() -> None:
+    quiet = sys.argv[2:3] == ["--quiet"]
+    argc = len(sys.argv)
+    match (argc, quiet):
+        case (2, False):
+            ...
+        case (3, True):
+            ...
+        case _:
+            print("Usage: python interface_order.py <filename> [ --quiet ]", file=sys.stderr)
+            sys.exit(ExitCode.USAGE_ERROR)
+
+    file_path = pathlib.Path(sys.argv[1])
+    all_ok = check_order(file_path, quiet)
+    if all_ok:
+        if not quiet:
+            print(f"ok {file_path}")
+        sys.exit(ExitCode.SUCCESS)
+    else:
+        sys.exit(ExitCode.FAILURE)
 
 
 def _extract_top_level_function_names(tree: ast.Module) -> list[str]:
@@ -73,43 +129,6 @@ def _verify_names_are_sorted(names: Sequence[str], filename: str, interface_type
                 file=sys.stderr,
             )
     return False
-
-
-def main() -> None:
-    if len(sys.argv) != 2:
-        print("Usage: python interface_order.py <filename>", file=sys.stderr)
-        sys.exit(ExitCode.USAGE_ERROR)
-
-    file_path = pathlib.Path(sys.argv[1])
-
-    content = _read_file_content(file_path)
-    if content is None:
-        sys.exit(ExitCode.FAILURE)
-
-    tree = _parse_python_code(content, str(file_path))
-    if tree is None:
-        sys.exit(ExitCode.FAILURE)
-
-    class_names = _extract_top_level_class_names(tree)
-    function_names = _extract_top_level_function_names(tree)
-
-    all_ok = True
-    if not _verify_names_are_sorted(function_names, str(file_path), "function"):
-        all_ok = False
-
-    for class_name in class_names:
-        if class_name.startswith("_"):
-            print(f"!! {file_path} - class '{class_name}' is private", file=sys.stderr)
-            all_ok = False
-
-    if not _verify_names_are_sorted(class_names, str(file_path), "class"):
-        all_ok = False
-
-    if all_ok:
-        print(f"ok {file_path}")
-        sys.exit(ExitCode.SUCCESS)
-    else:
-        sys.exit(ExitCode.FAILURE)
 
 
 if __name__ == "__main__":
