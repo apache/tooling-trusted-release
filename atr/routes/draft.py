@@ -401,6 +401,11 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
 
     revision_name_from_link, revision_editor, revision_time = await revision.latest_info(project_name, version_name)
 
+    # Get the number of ongoing tasks for the current revision
+    ongoing_tasks_count = 0
+    if revision_name_from_link:
+        ongoing_tasks_count = await db.tasks_ongoing(project_name, version_name, revision_name_from_link)
+
     delete_file_form = await DeleteFileForm.create_form()
     return await quart.render_template(
         "draft-evaluate.html",
@@ -425,6 +430,7 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
         revision_editor=revision_editor,
         revision_time=revision_time,
         revision_name_from_link=revision_name_from_link,
+        ongoing_tasks_count=ongoing_tasks_count,
     )
 
 
