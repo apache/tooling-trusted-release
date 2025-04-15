@@ -59,9 +59,9 @@ def _get_version_from_version_module() -> tuple[str, str] | None:
     """Returns the version from _version module if it exists."""
 
     try:
-        import atr._version  # pyright: ignore [reportMissingImports]
+        import atr.version as version
 
-        return atr._version.ATR_VERSION, atr._version.ATR_COMMIT
+        return version.ATR_VERSION, version.ATR_COMMIT
     except ImportError:
         return None
 

@@ -34,10 +34,10 @@ docs:
 	done
 
 generate-version:
-	@rm -f atr/_version.py
-	@$(SCRIPTS)/run python atr/metadata.py > /tmp/_version.py
-	@mv /tmp/_version.py atr/_version.py
-	@cat atr/_version.py
+	@rm -f atr/version.py
+	@$(SCRIPTS)/run python atr/metadata.py > /tmp/version.py
+	@mv /tmp/version.py atr/version.py
+	@cat atr/version.py
 
 obvfix:
 	git add -A

@@ -68,7 +68,7 @@ class Recorder:
         self.draft_revision = draft_revision
         self.primary_rel_path = primary_rel_path
         self.afresh = afresh
-        self._constructed = False
+        self.constructed = False
 
         project_name, version_name = models.project_version(release_name)
         self.project_name = project_name
@@ -87,13 +87,13 @@ class Recorder:
         if afresh is True:
             # Clear outer path whether it's specified or not
             await recorder.clear(primary_rel_path)
-        recorder._constructed = True
+        recorder.constructed = True
         return recorder
 
     async def _add(
         self, status: models.CheckResultStatus, message: str, data: Any, primary_rel_path: str | None = None
     ) -> models.CheckResult:
-        if self._constructed is False:
+        if self.constructed is False:
             raise RuntimeError("Cannot add check result to a recorder that has not been constructed")
         if primary_rel_path is not None:
             if self.primary_rel_path is not None:

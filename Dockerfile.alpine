@@ -22,7 +22,7 @@ COPY . .
 # install development dependencies to generate version
 RUN make sync-dev
 
-# generate a _version.py module from git information
+# generate a version.py module from git information
 RUN make generate-version
 
 # only install runtime dependencies

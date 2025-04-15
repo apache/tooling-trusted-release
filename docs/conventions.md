@@ -21,6 +21,8 @@ Exceptions to this rule include:
 - Methods requiring interface compatibility with their superclass
 - Nested functions, i.e. functions appearing in other functions
 
+Scripts are explicitly _not_ an exception. Underscores should be used to prefix private interfaces in scripts for consistency, e.g. so that linters don't need to carry exceptions, and to ease potential migration to modules.
+
 ### Use UPPERCASE for top level constants
 
 Define top level constants using `UPPERCASE` letters. Don't forget to apply an underscore prefix to constants which are private to their module.
