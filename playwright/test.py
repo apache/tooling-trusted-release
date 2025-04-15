@@ -324,6 +324,7 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
         test_checks_03_license_headers,
         test_checks_04_paths,
         test_checks_05_signature,
+        test_checks_06_targz,
     ]
 
     # Order between our tests must be preserved
@@ -476,6 +477,36 @@ def test_checks_05_signature(page: sync_api.Page, credentials: Credentials) -> N
     passed_badge_locator = signature_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
     sync_api.expect(passed_badge_locator).to_be_visible()
     logging.info("Signature Check status verified as Passed")
+
+
+def test_checks_06_targz(page: sync_api.Page, credentials: Credentials) -> None:
+    project_name = "tooling-test-example"
+    version_name = "0.2"
+    filename_targz = f"apache-{project_name}-{version_name}.tar.gz"
+    evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
+    evaluate_file_path = f"{evaluate_page_path}/{filename_targz}"
+
+    logging.info(f"Starting Targz checks for {filename_targz}")
+
+    logging.info(f"Navigating to evaluate file page {evaluate_file_path}")
+    go_to_path(page, evaluate_file_path)
+    logging.info(f"Successfully navigated to {evaluate_file_path}")
+
+    logging.info("Verifying Targz Integrity status")
+    integrity_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Targz Integrity'))")
+    sync_api.expect(integrity_div_locator).to_be_visible()
+    logging.info("Located Targz Integrity block")
+    integrity_passed_badge = integrity_div_locator.locator("span.badge.bg-success:text-is('Passed')")
+    sync_api.expect(integrity_passed_badge).to_be_visible()
+    logging.info("Targz Integrity status verified as Passed")
+
+    logging.info("Verifying Targz Structure status")
+    structure_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Targz Structure'))")
+    sync_api.expect(structure_div_locator).to_be_visible()
+    logging.info("Located Targz Structure block")
+    structure_passed_badge = structure_div_locator.locator("span.badge.bg-success:text-is('Passed')")
+    sync_api.expect(structure_passed_badge).to_be_visible()
+    logging.info("Targz Structure status verified as Passed")
 
 
 def test_gpg_01_upload(page: sync_api.Page, credentials: Credentials) -> None:
