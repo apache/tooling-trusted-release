@@ -25,6 +25,7 @@ import os
 import re
 import socket
 import subprocess
+import time
 import urllib.parse
 from collections.abc import Callable
 from typing import Any, Final
@@ -260,7 +261,9 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
         test_ssh_02_rsync_upload,
     ]
     tests["checks"] = [
-        test_checks_hashing_01_sha512,
+        test_checks_01_hashing_sha512,
+        test_checks_02_license_files,
+        test_checks_03_license_headers,
     ]
 
     # Order between our tests must be preserved
@@ -270,7 +273,7 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
         run_tests_skipping_slow(tests[key], page, credentials, skip_slow)
 
 
-def test_checks_hashing_01_sha512(page: sync_api.Page, credentials: Credentials) -> None:
+def test_checks_01_hashing_sha512(page: sync_api.Page, credentials: Credentials) -> None:
     project_name = "tooling-test-example"
     version_name = "0.2"
     filename_sha512 = f"apache-{project_name}-{version_name}.tar.gz.sha512"
@@ -303,6 +306,65 @@ def test_checks_hashing_01_sha512(page: sync_api.Page, credentials: Credentials)
     passed_badge_locator = hashing_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
     sync_api.expect(passed_badge_locator).to_be_visible()
     logging.info("Hashing Check status verified as Passed")
+
+
+def test_checks_02_license_files(page: sync_api.Page, credentials: Credentials) -> None:
+    project_name = "tooling-test-example"
+    version_name = "0.2"
+    filename_targz = f"apache-{project_name}-{version_name}.tar.gz"
+    evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
+    evaluate_file_path = f"{evaluate_page_path}/{filename_targz}"
+
+    logging.info(f"Starting License Files check test for {filename_targz}")
+
+    logging.info(f"Navigating to evaluate page {evaluate_page_path}")
+    go_to_path(page, evaluate_page_path)
+
+    logging.info(f"Locating 'Evaluate file' link for {filename_targz}")
+    row_locator = page.locator(f"tr:has(:text('{filename_targz}'))")
+    evaluate_link_title = f"Evaluate file {filename_targz}"
+    evaluate_link_locator = row_locator.locator(f'a[title="{evaluate_link_title}"]')
+    sync_api.expect(evaluate_link_locator).to_be_visible()
+
+    logging.info(f"Clicking 'Evaluate file' link for {filename_targz}")
+    evaluate_link_locator.click()
+
+    logging.info(f"Waiting for navigation to {evaluate_file_path}")
+    wait_for_path(page, evaluate_file_path)
+    logging.info(f"Successfully navigated to {evaluate_file_path}")
+
+    logging.info("Verifying License Files check status")
+    license_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('License Files'))")
+    sync_api.expect(license_check_div_locator).to_be_visible()
+    logging.info("Located License Files check block")
+
+    passed_badge_locator = license_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
+    sync_api.expect(passed_badge_locator).to_be_visible()
+    logging.info("License Files check status verified as Passed")
+
+
+def test_checks_03_license_headers(page: sync_api.Page, credentials: Credentials) -> None:
+    project_name = "tooling-test-example"
+    version_name = "0.2"
+    filename_targz = f"apache-{project_name}-{version_name}.tar.gz"
+    evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
+    evaluate_file_path = f"{evaluate_page_path}/{filename_targz}"
+
+    logging.info(f"Starting License Headers check test for {filename_targz}")
+
+    # Don't repeat the link test, just go straight there
+    logging.info(f"Navigating to evaluate file page {evaluate_file_path}")
+    go_to_path(page, evaluate_file_path)
+    logging.info(f"Successfully navigated to {evaluate_file_path}")
+
+    logging.info("Verifying License Headers check status")
+    header_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('License Headers'))")
+    sync_api.expect(header_check_div_locator).to_be_visible()
+    logging.info("Located License Headers check block")
+
+    passed_badge_locator = header_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
+    sync_api.expect(passed_badge_locator).to_be_visible()
+    logging.info("License Headers check status verified as Passed")
 
 
 def test_lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials) -> None:
@@ -722,6 +784,9 @@ def test_ssh_02_rsync_upload(page: sync_api.Page, credentials: Credentials) -> N
     sync_api.expect(file2_locator).to_be_visible()
     logging.info(f"Found file: {file2}")
     logging.info("rsync upload test completed successfully")
+
+    # TODO: We need to wait for checks, but we should poll instead
+    time.sleep(2)
 
 
 def test_tidy_up(page: sync_api.Page) -> None:
