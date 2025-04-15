@@ -121,6 +121,48 @@ def main() -> None:
     run_tests(args.skip_slow)
 
 
+def poll_for_tasks_completion(page: sync_api.Page, project_name: str, version_name: str, draft_revision: str) -> None:
+    gateway_ip = get_default_gateway_ip()
+    if not gateway_ip:
+        raise RuntimeError("Cannot proceed without gateway IP")
+
+    rev_path = f"{project_name}/{version_name}/{draft_revision}"
+    polling_url = f"https://{gateway_ip}:8080/admin/ongoing-tasks/{rev_path}"
+    logging.info(f"Polling URL: {polling_url}")
+
+    max_wait_seconds = 12
+    poll_interval_seconds = 0.01
+    start_time = time.monotonic()
+
+    for attempt in range(int(max_wait_seconds / poll_interval_seconds)):
+        if attempt > 0:
+            time.sleep(poll_interval_seconds)
+
+        elapsed_time = time.monotonic() - start_time
+        if elapsed_time > max_wait_seconds:
+            raise TimeoutError(f"Tasks did not complete within {max_wait_seconds} seconds")
+
+        response = page.request.get(polling_url)
+        if not response.ok:
+            raise RuntimeError(f"Polling request failed with status {response.status}")
+        try:
+            ongoing_count_str = response.text()
+            if not ongoing_count_str:
+                raise RuntimeError("Polling request returned empty body")
+            ongoing_count = int(ongoing_count_str)
+            if ongoing_count == 0:
+                elapsed_time = time.monotonic() - start_time
+                logging.info(f"All tasks completed in {elapsed_time} seconds")
+                return
+        except ValueError:
+            raise RuntimeError(f"Polling request returned non-integer body: {response.text()}")
+        except Exception:
+            logging.exception("Unexpected error during polling response processing")
+            raise
+
+    raise TimeoutError(f"Tasks did not complete within {max_wait_seconds} seconds")
+
+
 def release_remove(page: sync_api.Page, release_name: str) -> None:
     logging.info(f"Checking whether the {release_name} release exists")
     release_checkbox_locator = page.locator(f'input[name="releases_to_delete"][value="{release_name}"]')
@@ -815,8 +857,17 @@ def test_ssh_02_rsync_upload(page: sync_api.Page, credentials: Credentials) -> N
     logging.info(f"Found file: {file2}")
     logging.info("rsync upload test completed successfully")
 
-    # TODO: We need to wait for checks, but we should poll instead
-    time.sleep(2)
+    logging.info(f"Extracting latest revision from {evaluate_path}")
+    revision_link_locator = page.locator(f'a[href^="/draft/revisions/{project_name}/{version_name}#"]')
+    sync_api.expect(revision_link_locator).to_be_visible()
+    revision_href = revision_link_locator.get_attribute("href")
+    if not revision_href:
+        raise RuntimeError("Could not find revision link href")
+    draft_revision = revision_href.split("#", 1)[-1]
+    logging.info(f"Found revision: {draft_revision}")
+
+    logging.info(f"Polling for task completion for revision {draft_revision}")
+    poll_for_tasks_completion(page, project_name, version_name, draft_revision)
 
 
 def test_tidy_up(page: sync_api.Page) -> None:
