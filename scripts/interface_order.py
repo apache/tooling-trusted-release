@@ -21,6 +21,14 @@ def _extract_top_level_function_names(tree: ast.Module) -> list[str]:
     return function_names
 
 
+def _extract_top_level_class_names(tree: ast.Module) -> list[str]:
+    class_names: list[str] = []
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef):
+            class_names.append(node.name)
+    return class_names
+
+
 def _parse_python_code(code: str, filename: str) -> ast.Module | None:
     try:
         return ast.parse(code, filename=filename)
@@ -47,17 +55,21 @@ def _toggle_sortability(name: str) -> str:
         return "_" + name
 
 
-def _verify_names_are_sorted(names: Sequence[str], filename: str) -> bool:
+def _verify_names_are_sorted(names: Sequence[str], filename: str, interface_type: str) -> bool:
     is_sorted = all(names[i] <= names[i + 1] for i in range(len(names) - 1))
     if is_sorted:
         return True
 
     for i in range(len(names) - 1):
         if names[i] > names[i + 1]:
-            a = _toggle_sortability(names[i])
-            b = _toggle_sortability(names[i + 1])
+            if interface_type == "class":
+                a = names[i]
+                b = names[i + 1]
+            else:
+                a = _toggle_sortability(names[i])
+                b = _toggle_sortability(names[i + 1])
             print(
-                f"!! {filename} - function '{b}' is misordered relative to '{a}'",
+                f"!! {filename} - {interface_type} '{b}' is misordered relative to '{a}'",
                 file=sys.stderr,
             )
     return False
@@ -78,13 +90,22 @@ def main() -> None:
     if tree is None:
         sys.exit(ExitCode.FAILURE)
 
+    class_names = _extract_top_level_class_names(tree)
     function_names = _extract_top_level_function_names(tree)
 
-    if not function_names:
-        print(f"ok {file_path} - no top level functions")
-        sys.exit(ExitCode.SUCCESS)
+    all_ok = True
+    if not _verify_names_are_sorted(function_names, str(file_path), "function"):
+        all_ok = False
 
-    if _verify_names_are_sorted(function_names, str(file_path)):
+    for class_name in class_names:
+        if class_name.startswith("_"):
+            print(f"!! {file_path} - class '{class_name}' is private", file=sys.stderr)
+            all_ok = False
+
+    if not _verify_names_are_sorted(class_names, str(file_path), "class"):
+        all_ok = False
+
+    if all_ok:
         print(f"ok {file_path}")
         sys.exit(ExitCode.SUCCESS)
     else:

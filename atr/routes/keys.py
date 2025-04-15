@@ -43,13 +43,13 @@ import atr.routes as routes
 import atr.util as util
 
 
-class DeleteKeyForm(util.QuartFormTyped):
-    submit = wtforms.SubmitField("Delete key")
-
-
 class AddSSHKeyForm(util.QuartFormTyped):
     key = wtforms.StringField("SSH key", widget=wtforms.widgets.TextArea())
     submit = wtforms.SubmitField("Add SSH key")
+
+
+class DeleteKeyForm(util.QuartFormTyped):
+    submit = wtforms.SubmitField("Delete key")
 
 
 @routes.committer("/keys/add", methods=["GET", "POST"])

@@ -42,7 +42,7 @@ _CONFIG: Final = config.get()
 T = TypeVar("T")
 
 
-class _SSHServer(asyncssh.SSHServer):
+class SSHServer(asyncssh.SSHServer):
     """Simple SSH server that handles connections."""
 
     def connection_made(self, conn: asyncssh.SSHServerConnection) -> None:
@@ -113,7 +113,7 @@ async def server_start() -> asyncssh.SSHAcceptor:
         _LOGGER.info(f"Generated SSH host key at {key_path}")
 
     server = await asyncssh.create_server(
-        _SSHServer,
+        SSHServer,
         server_host_keys=[key_path],
         process_factory=_handle_client,
         host=_CONFIG.SSH_HOST,

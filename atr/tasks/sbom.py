@@ -34,19 +34,19 @@ _CONFIG: Final = config.get()
 _LOGGER: Final = logging.getLogger(__name__)
 
 
+class GenerateCycloneDX(pydantic.BaseModel):
+    """Arguments for the task to generate a CycloneDX SBOM."""
+
+    artifact_path: str = pydantic.Field(..., description="Absolute path to the artifact")
+    output_path: str = pydantic.Field(..., description="Absolute path where the generated SBOM JSON should be written")
+
+
 class SBOMGenerationError(Exception):
     """Custom exception for SBOM generation failures."""
 
     def __init__(self, message: str, details: dict[str, Any] | None = None) -> None:
         super().__init__(message)
         self.details = details or {}
-
-
-class GenerateCycloneDX(pydantic.BaseModel):
-    """Arguments for the task to generate a CycloneDX SBOM."""
-
-    artifact_path: str = pydantic.Field(..., description="Absolute path to the artifact")
-    output_path: str = pydantic.Field(..., description="Absolute path where the generated SBOM JSON should be written")
 
 
 def archive_extract_safe(

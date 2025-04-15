@@ -33,9 +33,6 @@ _LOGGER: Final = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.DEBUG)
 
 
-class VoteInitiationError(Exception): ...
-
-
 class Initiate(pydantic.BaseModel):
     """Arguments for the task to start a vote."""
 
@@ -48,6 +45,9 @@ class Initiate(pydantic.BaseModel):
     )
     subject: str = pydantic.Field(..., description="Subject line for the vote email")
     body: str = pydantic.Field(..., description="Body content for the vote email")
+
+
+class VoteInitiationError(Exception): ...
 
 
 @checks.with_model(Initiate)

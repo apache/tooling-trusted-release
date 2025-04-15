@@ -65,6 +65,13 @@ class AddProtocol(Protocol):
     project_name: wtforms.SelectField
 
 
+class DeleteFileForm(util.QuartFormTyped):
+    """Form for deleting a file."""
+
+    file_path = wtforms.StringField("File path", validators=[wtforms.validators.InputRequired("File path is required")])
+    submit = wtforms.SubmitField("Delete file")
+
+
 class DeleteForm(util.QuartFormTyped):
     """Form for deleting a candidate draft."""
 
@@ -79,13 +86,6 @@ class DeleteForm(util.QuartFormTyped):
         ],
     )
     submit = wtforms.SubmitField("Delete candidate draft")
-
-
-class DeleteFileForm(util.QuartFormTyped):
-    """Form for deleting a file."""
-
-    file_path = wtforms.StringField("File path", validators=[wtforms.validators.InputRequired("File path is required")])
-    submit = wtforms.SubmitField("Delete file")
 
 
 class PromoteForm(util.QuartFormTyped):

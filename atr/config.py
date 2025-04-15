@@ -25,15 +25,6 @@ _MB: Final = 1024 * 1024
 _GB: Final = 1024 * _MB
 
 
-class Mode(enum.Enum):
-    Debug = "Debug"
-    Production = "Production"
-    Profiling = "Profiling"
-
-
-_global_mode: Mode | None = None
-
-
 class AppConfig:
     SSH_HOST = decouple.config("SSH_HOST", default="0.0.0.0")
     SSH_PORT = decouple.config("SSH_PORT", default=2222, cast=int)
@@ -67,13 +58,22 @@ class AppConfig:
     )
 
 
-class ProductionConfig(AppConfig): ...
-
-
 class DebugConfig(AppConfig):
     DEBUG = True
     TEMPLATES_AUTO_RELOAD = True
     USE_BLOCKBUSTER = False
+
+
+class Mode(enum.Enum):
+    Debug = "Debug"
+    Production = "Production"
+    Profiling = "Profiling"
+
+
+_global_mode: Mode | None = None
+
+
+class ProductionConfig(AppConfig): ...
 
 
 class ProfilingConfig(AppConfig):
