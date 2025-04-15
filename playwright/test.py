@@ -106,6 +106,11 @@ def main() -> None:
         action="store_true",
         help="Skip slow tests",
     )
+    parser.add_argument(
+        "--tidy",
+        action="store_true",
+        help="Run cleanup tasks after tests complete",
+    )
     args = parser.parse_args()
     log_level = getattr(logging, args.log.upper(), logging.INFO)
 
@@ -118,7 +123,7 @@ def main() -> None:
     )
 
     logging.debug(f"Log level set to {args.log.upper()}")
-    run_tests(args.skip_slow)
+    run_tests(args.skip_slow, args.tidy)
 
 
 def poll_for_tasks_completion(page: sync_api.Page, project_name: str, version_name: str, draft_revision: str) -> None:
@@ -193,7 +198,7 @@ def release_remove(page: sync_api.Page, release_name: str) -> None:
         logging.info(f"Could not find the {release_name} release, no deletion needed")
 
 
-def run_tests(skip_slow: bool) -> None:
+def run_tests(skip_slow: bool, tidy_after: bool) -> None:
     if (credentials := get_credentials()) is None:
         logging.error("Cannot run tests: no credentials provided")
         return
@@ -204,7 +209,7 @@ def run_tests(skip_slow: bool) -> None:
         try:
             browser = p.chromium.launch()
             context = browser.new_context(ignore_https_errors=True)
-            run_tests_in_context(context, credentials, skip_slow)
+            run_tests_in_context(context, credentials, skip_slow, tidy_after)
 
         except Exception as e:
             logging.error(f"Error during page interaction: {e}", exc_info=True)
@@ -215,11 +220,18 @@ def run_tests(skip_slow: bool) -> None:
                 browser.close()
 
 
-def run_tests_in_context(context: sync_api.BrowserContext, credentials: Credentials, skip_slow: bool) -> None:
+def run_tests_in_context(
+    context: sync_api.BrowserContext, credentials: Credentials, skip_slow: bool, tidy_after: bool
+) -> None:
     ssh_keys_generate()
     page = context.new_page()
     test_all(page, credentials, skip_slow)
     logging.info("Tests finished successfully")
+
+    if tidy_after:
+        logging.info("Tidying up after the tests")
+        test_tidy_up(page)
+        logging.info("Tidying up after the tests finished")
 
 
 def run_tests_skipping_slow(
