@@ -183,14 +183,13 @@ class Project(sqlmodel.SQLModel, table=True):
         """Get the display name for the Project."""
         return self.full_name or self.name
 
-    @property
-    async def candidate_drafts(self) -> list["Release"]:
-        """Get the candidate drafts for the project."""
+    async def releases_by_phase(self, phase: "ReleasePhase") -> list["Release"]:
+        """Get the releases for the project by phase."""
         query = (
             sqlmodel.select(Release)
             .where(
                 Release.project_id == self.id,
-                Release.phase == ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+                Release.phase == phase,
             )
             .order_by(db.validate_instrumented_attribute(Release.created).desc())
         )
@@ -204,6 +203,30 @@ class Project(sqlmodel.SQLModel, table=True):
             # Don't need to eager load and lose it when the session closes
             release.project = self
         return results
+
+    @property
+    async def candidate_drafts(self) -> list["Release"]:
+        """Get the candidate drafts for the project."""
+        return await self.releases_by_phase(ReleasePhase.RELEASE_CANDIDATE_DRAFT)
+
+    @property
+    async def candidates(self) -> list["Release"]:
+        """Get the candidate releases for the project."""
+        before_vote = await self.releases_by_phase(ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE)
+        during_vote = await self.releases_by_phase(ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE)
+        return before_vote + during_vote
+
+    @property
+    async def previews(self) -> list["Release"]:
+        """Get the preview releases for the project."""
+        return await self.releases_by_phase(ReleasePhase.RELEASE_PREVIEW)
+
+    @property
+    async def full_releases(self) -> list["Release"]:
+        """Get the full releases for the project."""
+        before_announcement = await self.releases_by_phase(ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT)
+        after_announcement = await self.releases_by_phase(ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT)
+        return before_announcement + after_announcement
 
 
 class DistributionChannel(sqlmodel.SQLModel, table=True):

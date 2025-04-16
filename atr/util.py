@@ -288,6 +288,24 @@ def is_user_viewing_as_admin(uid: str | None) -> bool:
         return True
 
 
+async def number_of_release_files(release: models.Release) -> int:
+    """Return the number of files in a release."""
+    path_project = release.project.name
+    path_version = release.version
+    match release.phase:
+        case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+            path = get_release_candidate_draft_dir() / path_project / path_version / "latest"
+        case models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE | models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE:
+            path = get_release_candidate_dir() / path_project / path_version
+        case models.ReleasePhase.RELEASE_PREVIEW:
+            path = get_release_preview_dir() / path_project / path_version
+        case models.ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT | models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT:
+            path = get_release_dir() / path_project / path_version
+        case _:
+            raise ValueError(f"Unknown release phase: {release.phase}")
+    return len(await paths_recursive(path))
+
+
 async def paths_recursive(base_path: pathlib.Path, sort: bool = True) -> list[pathlib.Path]:
     """List all paths recursively in alphabetical order from a given base path."""
     paths: list[pathlib.Path] = []

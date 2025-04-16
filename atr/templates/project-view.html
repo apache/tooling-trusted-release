@@ -178,25 +178,107 @@
     </div>
   </div>
 
-  {% if project.created_by == current_user.uid %}
-    <h2>Actions</h2>
-    <div class="mt-3">
-      <form method="post"
-            action="{{ as_url(routes.projects.delete) }}"
-            class="d-inline-block m-0"
-            onsubmit="return confirm('Are you sure you want to delete the project \'{{ project.display_name }}\'? This cannot be undone.');">
-        <input type="hidden" name="project_name" value="{{ project.name }}" />
-        <button type="submit"
-                class="btn btn-sm btn-outline-danger"
-                title="Delete {{ project.display_name }}">
-          <i class="fa-solid fa-trash"></i> Delete project
-        </button>
-      </form>
-    </div>
-  {% endif %}
+  {% if (is_committee_member or is_admin) %}
+    {% if candidate_drafts|length > 0 %}
+      <h2>Draft candidate releases</h2>
+      <div class="d-flex flex-wrap gap-2 mb-4">
+        {% for draft in candidate_drafts %}
+          <a href="{{ as_url(routes.draft.view, project_name=project.name, version_name=draft.version) }}"
+             class="btn btn-sm btn-outline-secondary py-2 px-3"
+             title="View draft {{ project.name }} {{ draft.version }}">
+            {{ project.name }} {{ draft.version }}
+            {% set file_count = number_of_release_files(draft) %}
+            <span class="badge bg-secondary ms-2">{{ file_count }}
+              {% if file_count == 1 %}
+                file
+              {% else %}
+                files
+              {% endif %}
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if candidates|length > 0 %}
+      <h2>Candidate releases</h2>
+      <div class="d-flex flex-wrap gap-2 mb-4">
+        {% for candidate in candidates %}
+          <a href="{{ as_url(routes.candidate.view, project_name=project.name, version_name=candidate.version) }}"
+             class="btn btn-sm btn-outline-info py-2 px-3"
+             title="View candidate {{ project.name }} {{ candidate.version }}">
+            {{ project.name }} {{ candidate.version }}
+            {% set file_count = number_of_release_files(candidate) %}
+            <span class="badge bg-info ms-2">{{ file_count }}
+              {% if file_count == 1 %}
+                file
+              {% else %}
+                files
+              {% endif %}
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if previews|length > 0 %}
+      <h2>Preview releases</h2>
+      <div class="d-flex flex-wrap gap-2 mb-4">
+        {% for preview in previews %}
+          <a href="{{ as_url(routes.preview.view, project_name=project.name, version_name=preview.version) }}"
+             class="btn btn-sm btn-outline-warning py-2 px-3"
+             title="View preview {{ project.name }} {{ preview.version }}">
+            {{ project.name }} {{ preview.version }}
+            {% set file_count = number_of_release_files(preview) %}
+            <span class="badge bg-warning ms-2">{{ file_count }}
+              {% if file_count == 1 %}
+                file
+              {% else %}
+                files
+              {% endif %}
+            </span>          </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% if full_releases|length > 0 %}
+        <h2>Full releases</h2>
+        <div class="d-flex flex-wrap gap-2 mb-4">
+          {% for release in full_releases %}
+            <a href="{{ as_url(routes.release.view, project_name=project.name, version_name=release.version) }}"
+               class="btn btn-sm btn-outline-success py-2 px-3"
+               title="View release {{ project.name }} {{ release.version }}">
+              {{ project.name }} {{ release.version }}
+              {% set file_count = number_of_release_files(release) %}
+              <span class="badge bg-success ms-2">{{ file_count }}
+                {% if file_count == 1 %}
+                  file
+                {% else %}
+                  files
+                {% endif %}
+              </span>
+            </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endif %}
 
-{% endblock content %}
+    {% if project.created_by == current_user.uid %}
+      <h2>Actions</h2>
+      <div class="mt-3">
+        <form method="post"
+              action="{{ as_url(routes.projects.delete) }}"
+              class="d-inline-block m-0"
+              onsubmit="return confirm('Are you sure you want to delete the project \'{{ project.display_name }}\'? This cannot be undone.');">
+          <input type="hidden" name="project_name" value="{{ project.name }}" />
+          <button type="submit"
+                  class="btn btn-sm btn-outline-danger"
+                  title="Delete {{ project.display_name }}">
+            <i class="fa-solid fa-trash"></i> Delete project
+          </button>
+        </form>
+      </div>
+    {% endif %}
 
-{% block javascripts %}
-  {{ super() }}
-{% endblock javascripts %}
+  {% endblock content %}
+
+  {% block javascripts %}
+    {{ super() }}
+  {% endblock javascripts %}

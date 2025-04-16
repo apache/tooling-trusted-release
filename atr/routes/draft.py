@@ -167,7 +167,7 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
         asf_id=session.uid,
         projects=sorted_projects,
         server_domain=session.host,
-        number_of_release_files=_number_of_release_files,
+        number_of_release_files=util.number_of_release_files,
         candidate_drafts=user_candidate_drafts,
         user_projects=sorted_projects,
         form=form,
@@ -343,7 +343,7 @@ async def drafts(session: routes.CommitterSession) -> str:
         asf_id=session.uid,
         projects=user_projects,
         server_domain=session.host,
-        number_of_release_files=_number_of_release_files,
+        number_of_release_files=util.number_of_release_files,
         candidate_drafts=user_candidate_drafts,
         delete_form=delete_form,
     )
@@ -621,7 +621,7 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
 
     candidate_draft_files = {}
     for candidate_draft in user_candidate_drafts:
-        candidate_draft_files[candidate_draft.name] = await _number_of_release_files(candidate_draft)
+        candidate_draft_files[candidate_draft.name] = await util.number_of_release_files(candidate_draft)
 
     return await quart.render_template(
         "draft-promote.html",
@@ -1052,14 +1052,6 @@ async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -
     await data.delete(release)
 
 
-async def _number_of_release_files(release: models.Release) -> int:
-    """Return the number of files in the release."""
-    path_project = release.project.name
-    path_version = release.version
-    path = util.get_release_candidate_draft_dir() / path_project / path_version / "latest"
-    return len(await util.paths_recursive(path))
-
-
 async def _promote(
     data: db.Session,
     candidate_draft_name: str,
@@ -1084,7 +1076,7 @@ async def _promote(
     success_message: str
 
     # Count how many files are in the source directory
-    file_count = await _number_of_release_files(release)
+    file_count = await util.number_of_release_files(release)
     if file_count == 0:
         return await session.redirect(promote, error="This candidate draft is empty, containing no files")
 

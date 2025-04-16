@@ -156,7 +156,16 @@ async def view(name: str) -> str:
         project = await data.project(name=name, _committee_public_signing_keys=True, _vote_policy=True).demand(
             http.client.HTTPException(404)
         )
-        return await quart.render_template("project-view.html", project=project, algorithms=routes.algorithms)
+        return await quart.render_template(
+            "project-view.html",
+            project=project,
+            algorithms=routes.algorithms,
+            candidate_drafts=await project.candidate_drafts,
+            candidates=await project.candidates,
+            previews=await project.previews,
+            full_releases=await project.full_releases,
+            number_of_release_files=util.number_of_release_files,
+        )
 
 
 @routes.committer("/projects/<project_name>/vote-policy/add", methods=["GET", "POST"])
