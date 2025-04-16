@@ -41,6 +41,7 @@ import pydantic_core
 import quart
 import quart_wtf
 import quart_wtf.typing
+import wtforms
 
 # NOTE: The atr.db module imports this module
 # Therefore, this module must not import atr.db
@@ -439,6 +440,12 @@ def validate_as_type(value: Any, t: type[T]) -> T:
     if not isinstance(value, t):
         raise ValueError(f"Expected {t}, got {type(value)}")
     return value
+
+
+def validate_vote_duration(form: wtforms.Form, field: wtforms.IntegerField) -> None:
+    """Checks if the value is 0 or between 72 and 144."""
+    if not ((field.data == 0) or (72 <= field.data <= 144)):
+        raise wtforms.validators.ValidationError("Minimum voting period must be 0 hours, or between 72 and 144 hours")
 
 
 def version_name_error(version_name: str) -> str | None:

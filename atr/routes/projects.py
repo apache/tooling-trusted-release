@@ -62,7 +62,8 @@ class VotePolicyForm(util.QuartFormTyped):
     min_hours = wtforms.IntegerField(
         "Minimum voting period:",
         validators=[
-            wtforms.validators.NumberRange(min=0, max=144, message="Voting period must be between 0h and 144h")
+            wtforms.validators.InputRequired("Please provide a minimum voting period"),
+            util.validate_vote_duration,
         ],
         default=72,
     )

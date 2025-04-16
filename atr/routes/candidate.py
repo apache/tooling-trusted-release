@@ -198,7 +198,7 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
                 default="user-tests@tooling.apache.org",
             )
             vote_duration = wtforms.SelectField(
-                "Vote duration",
+                "Vote duration in hours",
                 choices=[
                     ("72", "72 hours (minimum)"),
                     ("120", "5 days"),

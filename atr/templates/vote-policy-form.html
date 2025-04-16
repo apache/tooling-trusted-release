@@ -39,7 +39,7 @@
            class="col-sm-3 col-form-label text-sm-end">{{ form.min_hours.label.text }}</label>
     <div class="col-sm-8">
       {{ form.min_hours(class_="form-control" + (" is-invalid" if form.min_hours.errors else "") ) }}
-      <span id="min_hours-help" class="form-text text-muted">The minimum time to run the vote. If set to 0 then wait until 3 +1 votes and more +1 than -1.</span>
+      <span id="min_hours-help" class="form-text text-muted">The minimum time to run the vote, in hours. Must be 0 or between 72 and 144 inclusive. If 0, then wait until 3 +1 votes and more +1 than -1.</span>
       {% if form.min_hours.errors %}
         {% for error in form.min_hours.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
       {% endif %}
