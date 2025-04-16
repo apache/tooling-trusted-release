@@ -18,13 +18,13 @@
         <br />
         <a href="#"
            onclick="location.href='/auth?logout=/';"
-           class="logout-link"><i class="fa-solid fa-right-from-bracket"></i></a>
+           class="logout-link btn btn-sm btn-outline-secondary mt-2">Logout</a>
       </div>
     {% else %}
 
       <a href="#"
          onclick="location.href='/auth?login=' + window.location.pathname;"
-         class="login-link">Login&nbsp;<i class="fa-solid fa-right-to-bracket"></i></a>
+         class="login-link btn btn-sm btn-secondary">Login</a>
     {% endif %}
   </div>
   <nav>
