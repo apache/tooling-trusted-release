@@ -17,17 +17,32 @@
            id="project-filter"
            class="form-control d-inline-block w-auto" />
     <button type="button" class="btn btn-primary" id="filter-button">Filter</button>
+    <button type="button"
+            class="btn btn-secondary ms-2"
+            id="filter-participant-button"
+            data-showing="all">Show my projects</button>
   </div>
 
   <div class="mb-3">
-    <p>Total count: {{ projects|length }}</p>
+    <p>
+      Total count: <span id="project-count">{{ projects|length }}</span>
+    </p>
   </div>
 
   <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
     {% for project in projects %}
+      {% set is_part = false %}
+      {% if current_user and project.committee %}
+        {% if current_user.uid in project.committee.committee_members or
+          current_user.uid in project.committee.committers or
+          current_user.uid in project.committee.release_managers %}
+          {% set is_part = true %}
+        {% endif %}
+      {% endif %}
       <div class="col">
         <div class="card h-100 shadow-sm atr-cursor-pointer hover-lift project-card {{ 'bg-body-secondary' if project.is_retired else '' }}"
-             data-project-url="{{ as_url(routes.projects.view, name=project.name) }}">
+             data-project-url="{{ as_url(routes.projects.view, name=project.name) }}"
+             data-is-participant="{{ 'true' if is_part else 'false' }}">
           <div class="card-body">
             <div class="row g-1">
               <div class="col-sm">
@@ -91,15 +106,21 @@
       function filter() {
           const projectFilter = document.getElementById("project-filter").value;
           const cards = document.querySelectorAll(".project-card");
+          let visibleCount = 0;
           for (let card of cards) {
               const nameElement = card.querySelector(".card-title");
               const name = nameElement.innerHTML;
               if (!projectFilter) {
                   card.parentElement.hidden = false;
+                  visibleCount++;
               } else {
                   card.parentElement.hidden = !name.match(new RegExp(projectFilter, 'i'));
+                  if (!card.parentElement.hidden) {
+                      visibleCount++;
+                  }
               }
           }
+          document.getElementById("project-count").textContent = visibleCount;
       }
 
       // Add event listeners
@@ -120,6 +141,39 @@
               }
               window.location.href = this.getAttribute("data-project-url");
           });
+      });
+
+      // Participant filter logic
+      const participantButton = document.getElementById("filter-participant-button");
+      participantButton.addEventListener("click", function() {
+          const showing = this.dataset.showing;
+          const cards = document.querySelectorAll(".project-card");
+          let visibleCount = 0;
+
+          if (showing === "all") {
+              // Switch to showing only participant projects
+              cards.forEach(card => {
+                  const isParticipant = card.dataset.isParticipant === 'true';
+                  card.parentElement.hidden = !isParticipant;
+                  if (!card.parentElement.hidden) {
+                      visibleCount++;
+                  }
+              });
+              this.textContent = "Show all projects";
+              this.dataset.showing = "participant";
+          } else {
+              // Switch to showing all projects
+              cards.forEach(card => {
+                  card.parentElement.hidden = false;
+                  visibleCount++;
+              });
+              this.textContent = "Show my projects";
+              this.dataset.showing = "all";
+          }
+          // Reset text filter when toggling participant view
+          document.getElementById("project-filter").value = "";
+          // Update count
+          document.getElementById("project-count").textContent = visibleCount;
       });
   </script>
 {% endblock javascripts %}
