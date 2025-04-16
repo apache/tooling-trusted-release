@@ -27,14 +27,11 @@ WORKDIR /opt/atr
 
 COPY . .
 
-# install development dependencies to generate version
-RUN make sync-dev PYTHON="$(find /usr/bin -name python3.13 | head -n 1)"
+# only install runtime dependencies
+RUN make sync PYTHON="$(find /usr/bin -name python3.13 | head -n 1)"
 
 # generate a version.py module from git information
 RUN make generate-version
-
-# only install runtime dependencies
-RUN make sync PYTHON="$(find /usr/bin -name python3.13 | head -n 1)"
 
 # final image
 FROM ubuntu:24.04

@@ -19,14 +19,11 @@ WORKDIR /opt/atr
 
 COPY . .
 
-# install development dependencies to generate version
-RUN make sync-dev
+# only install runtime dependencies
+RUN make sync
 
 # generate a version.py module from git information
 RUN make generate-version
-
-# only install runtime dependencies
-RUN make sync
 
 # final image
 FROM python:3.13.2-alpine3.21
