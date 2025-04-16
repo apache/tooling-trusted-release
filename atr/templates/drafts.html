@@ -36,31 +36,37 @@
             {% endif %}
             <div class="d-flex gap-2 mb-2">
               <a href="{{ as_url(routes.draft.evaluate, project_name=release.project.name, version_name=release.version) }}"
-                 title="Evaluate files for {{ release.project.display_name }} {{ release.version }}"
-                 class="btn btn-sm btn-outline-primary">Evaluate files</a>
-              <a href="{{ as_url(routes.draft.promote) }}#{{ release.name }}"
-                 title="Promote draft for {{ release.project.display_name }} {{ release.version }}"
-                 class="btn btn-sm btn-outline-success">Promote draft</a>
-              <button class="btn btn-sm btn-outline-danger me-2"
-                      title="Delete draft for {{ release.project.display_name }} {{ release.version }}"
-                      data-bs-toggle="modal"
-                      data-bs-target="#delete-{{ release_id }}">Delete draft</button>
+                 title="Checks for {{ release.project.display_name }} {{ release.version }}"
+                 class="btn btn-sm btn-outline-secondary">Checks</a>
               <a href="{{ as_url(routes.draft.view, project_name=release.project.name, version_name=release.version) }}"
-                 title="View files for {{ release.project.display_name }} {{ release.version }}"
-                 class="btn btn-sm btn-outline-secondary">View files</a>
-              <a href="{{ as_url(routes.draft.add_file, project_name=release.project.name, version_name=release.version) }}"
-                 title="Upload file for {{ release.project.display_name }} {{ release.version }}"
-                 class="btn btn-sm btn-outline-secondary">Upload file</a>
-              <a href="{{ as_url(routes.draft.svnload, project_name=release.project.name, version_name=release.version) }}"
-                 title="Import from SVN for {{ release.project.display_name }} {{ release.version }}"
-                 class="btn btn-sm btn-outline-secondary">Import from SVN</a>
+                 title="Files for {{ release.project.display_name }} {{ release.version }}"
+                 class="btn btn-sm btn-outline-secondary">Files</a>
               <a href="{{ as_url(routes.draft.revisions, project_name=release.project.name, version_name=release.version) }}"
                  title="Revisions for {{ release.project.display_name }} {{ release.version }}"
                  class="btn btn-sm btn-outline-secondary">Revisions</a>
+              <a href="{{ as_url(routes.projects.view, name=release.project.name) }}"
+                 title="Project for {{ release.project.display_name }} {{ release.version }}"
+                 class="btn btn-sm btn-outline-secondary">Project</a>
+              <br />
+              <a href="{{ as_url(routes.draft.add_files, project_name=release.project.name, version_name=release.version) }}"
+                 title="Add files to {{ release.project.display_name }} {{ release.version }}"
+                 class="btn btn-sm btn-outline-primary">Add files</a>
+              <a href="{{ as_url(routes.draft.promote) }}#{{ release.name }}"
+                 title="Promote {{ release.project.display_name }} {{ release.version }}"
+                 class="btn btn-sm btn-outline-success">Promote</a>
+              <button class="btn btn-sm btn-outline-danger"
+                      title="Delete {{ release.project.display_name }} {{ release.version }}"
+                      data-bs-toggle="modal"
+                      data-bs-target="#delete-{{ release_id }}">Delete</button>
             </div>
             <p class="card-text mt-3">
               {% if number_of_release_files(release) > 0 %}
-                This candidate draft has {{ number_of_release_files(release) }} file(s).
+                This candidate draft has {{ number_of_release_files(release) }}
+                {% if number_of_release_files(release) == 1 %}
+                  file.
+                {% else %}
+                  files.
+                {% endif %}
               {% else %}
                 This candidate draft doesn't have any files yet.
               {% endif %}
@@ -76,7 +82,6 @@
           </div>
         </div>
       </div>
-
       {{ dialog.delete_modal_with_confirm(release_id, "Delete candidate draft", "candidate draft", as_url(routes.draft.delete) , delete_form, "candidate_draft_name") }}
     {% endfor %}
     {% if candidate_drafts|length == 0 %}

@@ -9,9 +9,11 @@
 {% endblock description %}
 
 {% block content %}
-  <a href="{{ as_url(routes.draft.add) }}" class="back-link">← Back to Add draft</a>
+  <a href="{{ as_url(routes.draft.drafts) }}" class="back-link">← Back to Candidate drafts</a>
 
   <h1>Add files to {{ project_name }} {{ version_name }}</h1>
+
+  <h2>File upload</h2>
   <p class="intro">Use this form to add files to this candidate draft.</p>
 
   <form method="post"
@@ -47,4 +49,74 @@
       <div class="col-sm-9 offset-sm-3">{{ form.submit(class_="btn btn-primary mt-3") }}</div>
     </div>
   </form>
+
+  <h2>SVN upload</h2>
+  <p class="intro">Import files from a publicly readable Subversion repository URL into this draft.</p>
+  <p>
+    The import will be processed in the background using the <code>svn export</code> command.
+    You can monitor progress on the <em>Evaluate files</em> page for this draft once the task is queued.
+  </p>
+
+  <div class="row">
+    <div class="col-md-8 w-100">
+      <form action="{{ as_url(routes.draft.svnload, project_name=project_name, version_name=version_name) }}"
+            method="post"
+            novalidate
+            class="atr-canary py-4 px-5">
+        {{ svn_form.hidden_tag() }}
+        <div class="mb-3 pb-3 row border-bottom">
+          <label for="{{ svn_form.svn_url.id }}"
+                 class="col-sm-3 col-form-label text-sm-end">{{ svn_form.svn_url.label.text }}:</label>
+          <div class="col-sm-9">
+            {{ svn_form.svn_url(class_="form-control") }}
+            {% if svn_form.svn_url.description %}
+              <small class="form-text text-muted">{{ svn_form.svn_url.description }}</small>
+            {% endif %}
+            {% if svn_form.svn_url.errors -%}
+              <div class="invalid-feedback d-block">{{ svn_form.svn_url.errors[0] }}</div>
+            {%- endif %}
+          </div>
+        </div>
+
+        <div class="mb-3 pb-3 row border-bottom">
+          <label for="{{ svn_form.revision.id }}"
+                 class="col-sm-3 col-form-label text-sm-end">{{ svn_form.revision.label.text }}:</label>
+          <div class="col-sm-9">
+            {{ svn_form.revision(class_="form-control") }}
+            {% if svn_form.revision.description %}
+              <small class="form-text text-muted">{{ svn_form.revision.description }}</small>
+            {% endif %}
+            {% if svn_form.revision.errors -%}
+              <div class="invalid-feedback d-block">{{ svn_form.revision.errors[0] }}</div>
+            {%- endif %}
+          </div>
+        </div>
+
+        <div class="mb-3 pb-3 row border-bottom">
+          <label for="{{ svn_form.target_subdirectory.id }}"
+                 class="col-sm-3 col-form-label text-sm-end">{{ svn_form.target_subdirectory.label.text }}:</label>
+          <div class="col-sm-9">
+            {{ svn_form.target_subdirectory(class_="form-control") }}
+            {% if svn_form.target_subdirectory.description %}
+              <small class="form-text text-muted">{{ svn_form.target_subdirectory.description }}</small>
+            {% endif %}
+            {% if svn_form.target_subdirectory.errors -%}
+              <div class="invalid-feedback d-block">{{ svn_form.target_subdirectory.errors[0] }}</div>
+            {%- endif %}
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-sm-9 offset-sm-3">{{ svn_form.submit(class_="btn btn-primary mt-3") }}</div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <h2>Rsync upload</h2>
+  <p class="intro">Import files from a remote server using rsync using the following command:</p>
+  <!-- TODO: Add a button to copy the command to the clipboard -->
+  <pre class="bg-light p-3 mb-0">
+rsync -av -e 'ssh -p 2222' ${YOUR_FILES}/ {{ asf_id }}@{{ server_domain }}:/{{ project_name }}/{{ version_name }}/
+</pre>
 {% endblock content %}

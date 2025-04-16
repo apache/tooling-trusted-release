@@ -175,7 +175,7 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
 
 
 @routes.committer("/draft/add/<project_name>/<version_name>", methods=["GET", "POST"])
-async def add_file(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+async def add_files(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show a page to allow the user to add files to a candidate draft."""
 
     class AddFilesForm(util.QuartFormTyped):
@@ -211,6 +211,8 @@ async def add_file(session: routes.CommitterSession, project_name: str, version_
             logging.exception("Error adding file:")
             await quart.flash(f"Error adding file: {e!s}", "error")
 
+    svn_form = await SvnImportForm.create_form()
+
     return await quart.render_template(
         "draft-add-files.html",
         asf_id=session.uid,
@@ -218,6 +220,7 @@ async def add_file(session: routes.CommitterSession, project_name: str, version_
         project_name=project_name,
         version_name=version_name,
         form=form,
+        svn_form=svn_form,
     )
 
 
@@ -826,7 +829,7 @@ async def sbomgen(
     )
 
 
-@routes.committer("/draft/svnload/<project_name>/<version_name>", methods=["GET", "POST"])
+@routes.committer("/draft/svnload/<project_name>/<version_name>", methods=["POST"])
 async def svnload(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Import files from SVN into a draft."""
 
@@ -842,43 +845,50 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
         if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
             raise base.ASFQuartException("SVN import is only available for candidate drafts", errorcode=400)
 
-    if await form.validate_on_submit():
-        try:
-            task_args = {
-                "svn_url": str(form.svn_url.data),
-                "revision": str(form.revision.data),
-                "target_subdirectory": str(form.target_subdirectory.data) if form.target_subdirectory.data else None,
-                "project_name": project_name,
-                "version_name": version_name,
-                "asf_uid": session.uid,
-            }
-            async with db.session() as data:
-                svn_import_task = models.Task(
-                    task_type=models.TaskType.SVN_IMPORT_FILES,
-                    task_args=task_args,
-                    added=datetime.datetime.now(datetime.UTC),
-                    status=models.TaskStatus.QUEUED,
-                    release_name=release.name,
-                )
-                data.add(svn_import_task)
-                await data.commit()
+    if not await form.validate_on_submit():
+        for _field, errors in form.errors.items():
+            for error in errors:
+                await quart.flash(f"{error}", "error")
+        return await session.redirect(
+            add_files,
+            project_name=project_name,
+            version_name=version_name,
+        )
 
-            return await session.redirect(
-                evaluate,
-                success="SVN import task queued successfully",
-                project_name=project_name,
-                version_name=version_name,
+    try:
+        task_args = {
+            "svn_url": str(form.svn_url.data),
+            "revision": str(form.revision.data),
+            "target_subdirectory": str(form.target_subdirectory.data) if form.target_subdirectory.data else None,
+            "project_name": project_name,
+            "version_name": version_name,
+            "asf_uid": session.uid,
+        }
+        async with db.session() as data:
+            svn_import_task = models.Task(
+                task_type=models.TaskType.SVN_IMPORT_FILES,
+                task_args=task_args,
+                added=datetime.datetime.now(datetime.UTC),
+                status=models.TaskStatus.QUEUED,
+                release_name=release.name,
             )
-        except Exception as e:
-            logging.exception("Error queueing SVN import task:")
-            await quart.flash(f"Error queueing SVN import task: {e!s}", "error")
+            data.add(svn_import_task)
+            await data.commit()
 
-    return await quart.render_template(
-        "draft-svnload.html",
-        asf_id=session.uid,
+    except Exception:
+        logging.exception("Error queueing SVN import task:")
+        return await session.redirect(
+            add_files,
+            error="Error queueing SVN import task",
+            project_name=project_name,
+            version_name=version_name,
+        )
+
+    return await session.redirect(
+        evaluate,
+        success="SVN import task queued successfully",
         project_name=project_name,
         version_name=version_name,
-        form=form,
     )
 
 

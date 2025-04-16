@@ -24,7 +24,8 @@
       <div class="row">
         <div class="col-md-6">
           <p>
-            <strong>Project:</strong> {{ release.project.display_name }}
+            <strong>Project:</strong>
+            <a href="{{ as_url(routes.projects.view, name=release.project.name) }}">{{ release.project.display_name }}</a>
           </p>
           <p>
             <strong>Version:</strong> {{ version_name }}
@@ -193,7 +194,7 @@
     </div>
     <div class="card-body">
       <p>
-        <a href="{{ as_url(routes.draft.add_file, project_name=release.project.name, version_name=release.version) }}">Upload a file in the browser</a>, or use the command below to add or modify files in this release using rsync:
+        <a href="{{ as_url(routes.draft.add_files, project_name=release.project.name, version_name=release.version) }}">Upload a file in the browser</a>, or use the command below to add or modify files in this release using rsync:
       </p>
     </div>
     <div class="card-footer bg-light border-1 pt-4 pb-4 position-relative">

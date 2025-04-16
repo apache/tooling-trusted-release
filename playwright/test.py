@@ -629,7 +629,7 @@ def test_lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials) ->
 def test_lifecycle_04_promote_to_candidate(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Locating draft promotion link for tooling-test-example-0.1")
     draft_card_locator = page.locator(r"#tooling-test-example-0\.1")
-    promote_link_locator = draft_card_locator.locator('a[title="Promote draft for Apache Tooling Test Example 0.1"]')
+    promote_link_locator = draft_card_locator.locator('a[title="Promote Apache Tooling Test Example 0.1"]')
     sync_api.expect(promote_link_locator).to_be_visible()
 
     logging.info("Follow the draft promotion link")
