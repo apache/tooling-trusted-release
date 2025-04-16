@@ -70,6 +70,10 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     tooling_test_recipients = ["user-tests"]
     _LOGGER.info("Starting initiate_core")
 
+    # Validate arguments
+    if not args.email_to.endswith("@apache.org") or args.email_to.endswith(".apache.org"):
+        raise VoteInitiationError("Invalid destination email address")
+
     async with db.session() as data:
         release = await data.release(name=args.release_name, _project=True, _committee=True).demand(
             VoteInitiationError(f"Release {args.release_name} not found")
@@ -116,14 +120,16 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     body = body.replace("[DURATION]", args.vote_duration)
     body = body.replace("[YOUR_NAME]", args.initiator_id)
 
-    # Store the original recipient for logging
+    # Set to a debugging recipient if the initiator is not sending to themselves
     original_recipient = args.email_to
-    # Only one test recipient is required for now
-    tooling_test_recipient = tooling_test_recipients[0] + "@tooling.apache.org"
-    _LOGGER.info(f"TEMPORARY: Overriding recipient from {original_recipient} to {tooling_test_recipient}")
+    if original_recipient == f"{args.initiator_id}@apache.org":
+        tooling_test_recipient = original_recipient
+    else:
+        # Send to a tooling test mailing list
+        tooling_test_recipient = tooling_test_recipients[0] + "@tooling.apache.org"
+        _LOGGER.info(f"TEMPORARY: Overriding recipient from {original_recipient} to {tooling_test_recipient}")
 
-    # Create mail event with test recipient
-    # Use test account instead of actual PMC list
+    # Create mail event
     event = mail.VoteEvent(
         release_name=args.release_name,
         email_sender=f"{args.initiator_id}@apache.org",

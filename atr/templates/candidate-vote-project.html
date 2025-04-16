@@ -60,6 +60,7 @@
                 {% for error in form.mailing_list.errors %}{{ error }}{% endfor %}
               </div>
             {% endif %}
+            <small class="form-text text-muted">NOTE: Sending a message to yourself for testing will not update the release phase.</small>
           </div>
         </div>
 
@@ -100,7 +101,7 @@
           </div>
         </div>
 
-        <div class="row mb-3 pb-3">
+        <div class="row mb-3 pb-3 border-bottom">
           <div class="col-md-9 offset-md-3">
             <details>
               <summary class="text-muted">Show live preview</summary>
@@ -115,7 +116,7 @@
 
       </div>
 
-      <div class="mt-4">
+      <div class="mt-4 col-md-9 offset-md-3">
         {{ form.submit(class_='btn btn-primary') }}
         <a href="{{ as_url(routes.candidate.vote) }}"
            class="btn btn-link text-secondary">Cancel</a>

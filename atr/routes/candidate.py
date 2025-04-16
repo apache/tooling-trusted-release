@@ -184,6 +184,7 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
                 choices=[
                     ("dev", f"dev@{committee.name}.apache.org"),
                     ("private", f"private@{committee.name}.apache.org"),
+                    ("_", f"{session.uid}@apache.org (for testing)"),
                 ],
                 validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
                 default="dev",
@@ -200,7 +201,7 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
             )
             subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
             body = wtforms.TextAreaField("Body", validators=[wtforms.validators.Optional()])
-            submit = wtforms.SubmitField("Prepare vote email")
+            submit = wtforms.SubmitField("Send vote email")
 
         user_key = await data.public_signing_key(apache_uid=session.uid).get()
         user_key_fingerprint = user_key.fingerprint if user_key else None
@@ -254,8 +255,17 @@ Thanks,
 
             if committee is None:
                 raise base.ASFQuartException("Release has no associated committee", errorcode=400)
-            release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE
-            email_to = f"{mailing_list_choice}@{committee.name}.apache.org"
+
+            match mailing_list_choice:
+                case "dev" | "private":
+                    email_to = f"{mailing_list_choice}@{committee.name}.apache.org"
+                    # Update the release phase to the voting phase if sending to the list
+                    release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE
+                case "_":
+                    email_to = f"{session.uid}@apache.org"
+                    # Do not update the release phase if sending a test message to the user
+                case _:
+                    raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
 
             # Create a task for vote initiation
             task = models.Task(
