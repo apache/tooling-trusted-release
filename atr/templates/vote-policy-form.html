@@ -14,7 +14,7 @@
 
   <div class="mb-3 pb-3 row border-bottom">
     <label for="{{ form.mailto_addresses.entries[0].id }}"
-           class="col-sm-3 col-form-label text-sm-end">{{ form.mailto_addresses.entries[0].label.text }}</label>
+           class="col-sm-3 col-form-label text-sm-end">{{ form.mailto_addresses.entries[0].label.text }}:</label>
     <div class="col-sm-8">
       {{ form.mailto_addresses.entries[0](size=30, class_="form-control" + (" is-invalid" if form.mailto_addresses[0].errors else "")) }}
       {% if form.mailto_addresses[0].errors %}

@@ -56,7 +56,7 @@
 
   <div class="card mb-4">
     <div class="card-header bg-light">
-      <h3 class="mb-2">Signing Keys</h3>
+      <h3 class="mb-2">Signing keys</h3>
     </div>
     <div class="card-body">
       <div class="row row-cols-1 g-4">
@@ -71,7 +71,7 @@
                       <td class="text-break border-0">{{ key.fingerprint }}</td>
                     </tr>
                     <tr>
-                      <th class="border-0">Key Type</th>
+                      <th class="border-0">Type</th>
                       <td class="text-break border-0">{{ algorithms[key.algorithm] }} ({{ key.length }} bits)</td>
                     </tr>
                     <tr>
@@ -117,7 +117,7 @@
 
   <div class="card mb-4">
     <div class="card-header bg-light d-flex justify-content-between align-items-center">
-      <h3 class="mb-0">Voting Policy</h3>
+      <h3 class="mb-0">Voting policy</h3>
       {% if not project.is_retired %}
         {% if project.vote_policy and (is_committee_member or is_admin) %}
           <div>
@@ -146,17 +146,21 @@
                   </td>
                 </tr>
                 <tr>
-                  <th class="border-0">Manual Vote Process</th>
+                  <th class="border-0">Manual vote process</th>
                   <td class="text-break border-0">{{ vp.manual_vote }}</td>
                 </tr>
                 <tr>
-                  <th class="border-0">Minimum Voting Period</th>
+                  <th class="border-0">Minimum voting period</th>
                   <td class="text-break border-0">{{ vp.min_hours }}h</td>
                 </tr>
                 <tr>
                   <th class="border-0">Release checklist</th>
                   <td class="text-break border-0">
-                    <textarea readonly>{{ vp.release_checklist }}</textarea>
+                    {% if vp.release_checklist|length > 0 %}
+                      <textarea readonly>{{ vp.release_checklist }}</textarea>
+                    {% else %}
+                      None
+                    {% endif %}
                   </td>
                 </tr>
                 <tr>

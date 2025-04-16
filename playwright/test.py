@@ -874,7 +874,8 @@ def test_ssh_01_add_key(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Navigated to Your Public Keys page")
 
     logging.info("Clicking Add an SSH key button")
-    page.locator('a[href="/keys/ssh/add"]:has-text("Add an SSH key")').click()
+    # There can be two buttons with the same text if the user did not upload an SSH key yet
+    page.locator('a[href="/keys/ssh/add"]:has-text("Add an SSH key")').first.click()
     wait_for_path(page, "/keys/ssh/add")
     logging.info("Navigated to Add SSH Key page")
 

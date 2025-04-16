@@ -17,6 +17,7 @@
 
 """candidate.py"""
 
+import datetime
 import json
 import logging
 
@@ -175,6 +176,14 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
             return await session.redirect(vote, error="You do not have access to this project")
         committee = util.unwrap(release.committee)
 
+        sender = f"{session.uid}@apache.org"
+        permitted_recipients = [
+            # f"dev@{committee.name}.apache.org",
+            # f"private@{committee.name}.apache.org",
+            "user-tests@tooling.apache.org",
+            sender,
+        ]
+
         class VoteInitiateForm(util.QuartFormTyped):
             """Form for initiating a release vote."""
 
@@ -182,12 +191,11 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
             mailing_list = wtforms.RadioField(
                 "Send vote email to",
                 choices=[
-                    ("dev", f"dev@{committee.name}.apache.org"),
-                    ("private", f"private@{committee.name}.apache.org"),
-                    ("_", f"{session.uid}@apache.org (for testing)"),
+                    (recipient, recipient) if (recipient != sender) else (recipient, f"{recipient} (preview only)")
+                    for recipient in permitted_recipients
                 ],
                 validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
-                default="dev",
+                default="user-tests@tooling.apache.org",
             )
             vote_duration = wtforms.SelectField(
                 "Vote duration",
@@ -248,7 +256,7 @@ Thanks,
             form.body.data = default_body
 
         if await form.validate_on_submit():
-            mailing_list_choice = util.unwrap(form.mailing_list.data)
+            email_to = util.unwrap(form.mailing_list.data)
             vote_duration_choice = util.unwrap(form.vote_duration.data)
             subject_data = util.unwrap(form.subject.data)
             body_data = util.unwrap(form.body.data)
@@ -256,16 +264,21 @@ Thanks,
             if committee is None:
                 raise base.ASFQuartException("Release has no associated committee", errorcode=400)
 
-            match mailing_list_choice:
-                case "dev" | "private":
-                    email_to = f"{mailing_list_choice}@{committee.name}.apache.org"
-                    # Update the release phase to the voting phase if sending to the list
-                    release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE
-                case "_":
-                    email_to = f"{session.uid}@apache.org"
-                    # Do not update the release phase if sending a test message to the user
-                case _:
-                    raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
+            if email_to not in permitted_recipients:
+                raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
+            if email_to != sender:
+                # Update the release phase to the voting phase only if not sending a test message to the user
+                release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE
+
+                # Store when the release was put into the voting phase
+                release.vote_started = datetime.datetime.now(datetime.UTC)
+
+                # TODO: We also need to store the duration of the vote
+                # We can't allow resolution of the vote until the duration has elapsed
+                # But we allow the user to specify in the form
+                # And yet we also have VotePolicy.min_hours
+                # Presumably this sets the default, and the form takes precedence?
+                # VotePolicy.min_hours can also be 0, though
 
             # Create a task for vote initiation
             task = models.Task(

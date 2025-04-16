@@ -392,6 +392,9 @@ class Release(sqlmodel.SQLModel, table=True):
 
     votes: list[VoteEntry] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
 
+    vote_started: datetime.datetime | None = sqlmodel.Field(default=None)
+    vote_resolved: datetime.datetime | None = sqlmodel.Field(default=None)
+
     # One-to-many: A release can have multiple tasks
     tasks: list["Task"] = sqlmodel.Relationship(
         back_populates="release", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
