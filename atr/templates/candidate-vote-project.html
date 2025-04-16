@@ -23,18 +23,6 @@
       <strong>Note:</strong> This feature is currently in development. The form below only sends email to <a href="https://lists.apache.org/list.html?user-tests@tooling.apache.org">a test mailing list</a> or yourself.
     </div>
 
-    {% if form.errors %}
-      <div class="alert alert-danger">
-        Please correct the errors below:
-        {# Optional: list general errors not tied to fields, if applicable #}
-        {% if form.non_field_errors() %}
-          <ul>
-            {% for error in form.non_field_errors() %}<li>{{ error }}</li>{% endfor %}
-          </ul>
-        {% endif %}
-      </div>
-    {% endif %}
-
     <form method="post"
           class="atr-canary py-4 px-5"
           action="{{ as_url(routes.candidate.vote_project, project_name=release.project.name, version=release.version) }}">

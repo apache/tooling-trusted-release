@@ -184,6 +184,11 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
             sender,
         ]
 
+        if release.vote_policy:
+            min_hours = release.vote_policy.min_hours
+        else:
+            min_hours = 72
+
         class VoteInitiateForm(util.QuartFormTyped):
             """Form for initiating a release vote."""
 
@@ -197,15 +202,13 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
                 validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
                 default="user-tests@tooling.apache.org",
             )
-            vote_duration = wtforms.SelectField(
-                "Vote duration in hours",
-                choices=[
-                    ("72", "72 hours (minimum)"),
-                    ("120", "5 days"),
-                    ("168", "7 days"),
+            vote_duration = wtforms.IntegerField(
+                "Minimum vote duration in hours",
+                validators=[
+                    wtforms.validators.InputRequired("Vote duration is required"),
+                    util.validate_vote_duration,
                 ],
-                validators=[wtforms.validators.InputRequired("Vote duration is required")],
-                default="72",
+                default=min_hours,
             )
             subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
             body = wtforms.TextAreaField("Body", validators=[wtforms.validators.Optional()])

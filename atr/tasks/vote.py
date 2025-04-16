@@ -38,7 +38,7 @@ class Initiate(pydantic.BaseModel):
 
     release_name: str = pydantic.Field(..., description="The name of the release to vote on")
     email_to: str = pydantic.Field(..., description="The mailing list address to send the vote email to")
-    vote_duration: str = pydantic.Field(..., description="Duration of the vote in hours, as a string")
+    vote_duration: int = pydantic.Field(..., description="Duration of the vote in hours")
     initiator_id: str = pydantic.Field(..., description="ASF ID of the vote initiator")
     gpg_key_fingerprint: str | None = pydantic.Field(
         ..., description="GPG key fingerprint of the initiator, if available"
@@ -80,7 +80,7 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
         )
 
     # Calculate vote end date
-    vote_duration_hours = int(args.vote_duration)
+    vote_duration_hours = args.vote_duration
     vote_start = datetime.datetime.now(datetime.UTC)
     vote_end = vote_start + datetime.timedelta(hours=vote_duration_hours)
 
@@ -116,8 +116,8 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     body = args.body
 
     # Perform substitutions in the body
+    body = body.replace("[DURATION]", str(args.vote_duration))
     body = body.replace("[KEY_FINGERPRINT]", args.gpg_key_fingerprint or "(No key found)")
-    body = body.replace("[DURATION]", args.vote_duration)
     body = body.replace("[YOUR_NAME]", args.initiator_id)
 
     # Set to a debugging recipient if the initiator is not sending to themselves
