@@ -228,6 +228,14 @@ class Project(sqlmodel.SQLModel, table=True):
         after_announcement = await self.releases_by_phase(ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT)
         return before_announcement + after_announcement
 
+    @property
+    async def releases_in_progress(self) -> list["Release"]:
+        """Get the releases in progress for the project."""
+        drafts = await self.candidate_drafts
+        candidates = await self.candidates
+        previews = await self.previews
+        return drafts + candidates + previews
+
 
 class DistributionChannel(sqlmodel.SQLModel, table=True):
     id: int = sqlmodel.Field(default=None, primary_key=True)

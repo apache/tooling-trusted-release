@@ -138,6 +138,9 @@ class SvnImportForm(util.QuartFormTyped):
 @routes.committer("/draft/add", methods=["GET", "POST"])
 async def add(session: routes.CommitterSession) -> response.Response | str:
     """Show a page to allow the user to rsync files to candidate drafts."""
+    # Allow selection of projects via a query parameter
+    preselected_project = quart.request.args.get("project")
+
     # Do them outside of the template rendering call to ensure order
     # The user_candidate_drafts call can use cached results from user_projects
     user_projects = await user.projects(session.uid, committee_only=True)
@@ -155,6 +158,14 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
         submit = wtforms.SubmitField("Create candidate draft")
 
     form = await AddForm.create_form()
+
+    if preselected_project and quart.request.method == "GET":
+        # Ensure the preselected project is valid for the user
+        if any(p.name == preselected_project for p in user_projects):
+            form.project_name.data = preselected_project
+        else:
+            await quart.flash(f"Project '{preselected_project}' is not available for selection.", "warning")
+
     if quart.request.method == "POST":
         if not await form.validate_on_submit():
             # TODO: Show the form with errors
@@ -171,6 +182,7 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
         candidate_drafts=user_candidate_drafts,
         user_projects=sorted_projects,
         form=form,
+        preselected_project=preselected_project,
     )
 
 

@@ -92,7 +92,7 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
                 wtforms.validators.Length(min=1, max=100),
             ],
         )
-        submit = wtforms.SubmitField("Add derived project")
+        submit = wtforms.SubmitField("Add project")
 
     form = await AddForm.create_form()
 
@@ -100,6 +100,29 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
         return await _add_project(form, session.uid)
 
     return await quart.render_template("project-add.html", form=form)
+
+
+@routes.committer("/project/choose")
+async def choose(session: routes.CommitterSession) -> str:
+    """Choose a project to work on."""
+    user_projects = []
+    if session.uid:
+        # TODO: Move this filtering logic somewhere else
+        async with db.session() as data:
+            all_projects = await data.project(_committee=True).all()
+            user_projects = [
+                p
+                for p in all_projects
+                if p.committee
+                and (
+                    (session.uid in p.committee.committee_members)
+                    or (session.uid in p.committee.committers)
+                    or (session.uid in p.committee.release_managers)
+                )
+            ]
+            user_projects.sort(key=lambda p: p.display_name)
+
+    return await quart.render_template("project-choose.html", user_projects=user_projects)
 
 
 @routes.committer("/project/delete", methods=["POST"])
@@ -140,6 +163,19 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         await data.commit()
 
     return await session.redirect(projects, success=f"Project '{project_name}' deleted successfully.")
+
+
+@routes.committer("/project/progress/<project_name>")
+async def progress(session: routes.CommitterSession, project_name: str) -> str:
+    """Show releases in progress for a project."""
+    async with db.session() as data:
+        project = await data.project(name=project_name, _releases=True).demand(
+            base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
+        )
+        releases = await project.releases_in_progress
+        return await quart.render_template(
+            "project-progress.html", project=project, releases=releases, format_datetime=routes.format_datetime
+        )
 
 
 @routes.public("/projects")

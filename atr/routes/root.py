@@ -17,12 +17,26 @@
 
 """root.py"""
 
+import asfquart.session
 import quart
+import werkzeug.wrappers.response as response
 
 import atr.routes as routes
+import atr.routes.projects as projects
+import atr.util as util
 
 
 @routes.public("/")
-async def index() -> str:
+async def index() -> response.Response | str:
     """Main page."""
-    return await quart.render_template("index.html")
+    if await asfquart.session.read():
+        # Redirect to /project/choose
+        return quart.redirect(util.as_url(projects.choose))
+    else:
+        return await quart.render_template("index.html")
+
+
+@routes.public("/tutorial")
+async def tutorial() -> str:
+    """Tutorial page."""
+    return await quart.render_template("tutorial.html")

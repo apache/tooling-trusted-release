@@ -381,9 +381,20 @@ def committer(
     return decorator
 
 
-def format_datetime(timestamp: int) -> str:
-    """Format a Unix timestamp into a human readable datetime string."""
-    return datetime.datetime.fromtimestamp(timestamp, tz=datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+def format_datetime(dt_obj: datetime.datetime | int) -> str:
+    """Format a datetime object or Unix timestamp into a human readable datetime string."""
+    # Integers are unix timestamps
+    if isinstance(dt_obj, int):
+        dt_obj = datetime.datetime.fromtimestamp(dt_obj, tz=datetime.UTC)
+
+    # Ensure UTC native timezone awareness
+    if dt_obj.tzinfo is None:
+        dt_obj = dt_obj.replace(tzinfo=datetime.UTC)
+    else:
+        # Convert to UTC if not already
+        dt_obj = dt_obj.astimezone(datetime.UTC)
+
+    return dt_obj.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def format_file_size(size_in_bytes: int) -> str:

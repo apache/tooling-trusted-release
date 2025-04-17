@@ -1,0 +1,47 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Choose a project ~ ATR
+{% endblock title %}
+
+{% block content %}
+
+  <h1>Choose a project</h1>
+  {% if user_projects %}
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+      {% for project in user_projects %}
+        <div class="col">
+          <a href="{{ as_url(routes.projects.progress, project_name=project.name) }}"
+             class="text-decoration-none">
+            {# TODO: We're only setting data-project-url for style #}
+            <div class="card h-100 shadow-sm atr-cursor-pointer hover-lift project-card {{ 'bg-body-secondary' if project.is_retired else 'bg-body-tertiary-hover' }}"
+                 data-project-url="{{ as_url(routes.draft.add, project=project.name) }}">
+              <div class="card-body">
+                <h3 class="card-title fs-5 mb-2">{{ project.display_name }}</h3>
+                <h4 class="card-subtitle mb-2 text-muted fs-6">{{ project.name }}</h4>
+              </div>
+            </div>
+          </a>
+        </div>
+      {% endfor %}
+
+      {# Pseudocard to add a project #}
+      <div class="col">
+        <a href="{{ as_url(routes.projects.add) }}" class="text-decoration-none">
+          <div class="card h-100 shadow-sm atr-cursor-pointer hover-lift atr-border-dashed">
+            <div class="card-body d-flex flex-column justify-content-center align-items-center text-center">
+              <i class="fas fa-plus text-secondary fa-2x mb-2"></i>
+              <h5 class="card-title text-body-secondary fs-6">Add a new project</h5>
+            </div>
+          </div>
+        </a>
+      </div>
+
+    </div>
+  {% else %}
+    <div class="alert alert-warning" role="alert">
+      You are not currently listed as a participant (committer, PMC member, or RM) in any projects known to ATR.
+      You may need to <a href="{{ as_url(routes.projects.add) }}">add a project</a> or check your committee memberships.
+    </div>
+  {% endif %}
+{% endblock content %}

@@ -1,7 +1,7 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Add project ~ ATR
+  Add a new project ~ ATR
 {% endblock title %}
 
 {% block description %}
@@ -9,8 +9,8 @@
 {% endblock description %}
 
 {% block content %}
-  <h1>Add derived project</h1>
-  <p class="intro">Derive a new project from an existing one, by adding a suffix.</p>
+  <h1>Add a new project</h1>
+  <p class="intro">New projects can only be derived from existing projects, by adding a suffix.</p>
 
   <form method="post" class="atr-canary py-4">
     {{ form.hidden_tag() }}
@@ -42,7 +42,7 @@
         <div class="mb-3 pb-3 row border-bottom">
           <label id="new-project-name-label"
                  for="new-project-name-display"
-                 class="col-sm-3 col-form-label text-sm-end">New project name:</label>
+                 class="col-sm-3 col-form-label text-sm-end">Project name preview:</label>
           <div class="col-sm-8">
             <code id="new-project-name-display"
                   class="form-control-plaintext bg-light p-2 rounded d-block"></code>
@@ -53,7 +53,7 @@
         <div class="mb-3 pb-3 row border-bottom">
           <label id="new-project-label-label"
                  for="new-project-label-display"
-                 class="col-sm-3 col-form-label text-sm-end">New project label:</label>
+                 class="col-sm-3 col-form-label text-sm-end">Project label preview:</label>
           <div class="col-sm-8">
             <code id="new-project-label-display"
                   class="form-control-plaintext bg-light p-2 rounded d-block"></code>

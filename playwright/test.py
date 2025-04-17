@@ -792,10 +792,10 @@ def test_login(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Page loaded after login")
     logging.info(f"Initial URL after login: {page.url}")
 
-    logging.info("Waiting for the redirect to /")
+    logging.info("Waiting for the redirect to /project/choose")
     # We can't use wait_for_path here because it goes through /auth
-    page.wait_for_url("https://*/")
-    logging.info("Redirected to /")
+    page.wait_for_url("https://*/project/choose")
+    logging.info("Redirected to /project/choose")
     logging.info(f"Page URL: {page.url}")
     logging.info("Login actions completed successfully")
 
@@ -841,7 +841,7 @@ def test_projects_03_add_project(page: sync_api.Page, credentials: Credentials) 
 
     logging.info("Navigating to the add derived project page")
     go_to_path(page, "/project/add")
-    logging.info("Add derived project page loaded")
+    logging.info("Add a new project page loaded")
 
     logging.info(f"Selecting base project '{base_project_option_label}'")
     page.locator('select[name="project_name"]').select_option(label=base_project_option_label)
@@ -850,7 +850,7 @@ def test_projects_03_add_project(page: sync_api.Page, credentials: Credentials) 
     page.locator('input[name="derived_project_name"]').fill(derived_project_input_value)
 
     logging.info("Submitting the add derived project form")
-    submit_button_locator = page.locator('input[type="submit"][value="Add derived project"]')
+    submit_button_locator = page.locator('input[type="submit"][value="Add project"]')
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
@@ -866,7 +866,7 @@ def test_projects_03_add_project(page: sync_api.Page, credentials: Credentials) 
 
 def test_ssh_01_add_key(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Starting SSH key addition test")
-    go_to_path(page, "/")
+    go_to_path(page, "/committees")
 
     logging.info("Navigating to Your Public Keys page")
     page.locator('a[href="/keys"]:has-text("Your public keys")').click()

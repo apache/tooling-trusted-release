@@ -383,3 +383,11 @@ span.warning {
 .card[data-project-url]:hover {
     border-color: gray;
 }
+
+.atr-border-dashed {
+    border-style: dashed !important;
+}
+
+.atr-border-dashed:hover {
+    border-color: gray;
+}
