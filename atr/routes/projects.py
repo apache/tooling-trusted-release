@@ -102,29 +102,6 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
     return await quart.render_template("project-add.html", form=form)
 
 
-@routes.committer("/project/choose")
-async def choose(session: routes.CommitterSession) -> str:
-    """Choose a project to work on."""
-    user_projects = []
-    if session.uid:
-        # TODO: Move this filtering logic somewhere else
-        async with db.session() as data:
-            all_projects = await data.project(_committee=True).all()
-            user_projects = [
-                p
-                for p in all_projects
-                if p.committee
-                and (
-                    (session.uid in p.committee.committee_members)
-                    or (session.uid in p.committee.committers)
-                    or (session.uid in p.committee.release_managers)
-                )
-            ]
-            user_projects.sort(key=lambda p: p.display_name)
-
-    return await quart.render_template("project-choose.html", user_projects=user_projects)
-
-
 @routes.committer("/project/delete", methods=["POST"])
 async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a project created by the user."""
@@ -165,25 +142,35 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     return await session.redirect(projects, success=f"Project '{project_name}' deleted successfully.")
 
 
-@routes.committer("/project/progress/<project_name>")
-async def progress(session: routes.CommitterSession, project_name: str) -> str:
-    """Show releases in progress for a project."""
-    async with db.session() as data:
-        project = await data.project(name=project_name, _releases=True).demand(
-            base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
-        )
-        releases = await project.releases_in_progress
-        return await quart.render_template(
-            "project-progress.html", project=project, releases=releases, format_datetime=routes.format_datetime
-        )
-
-
 @routes.public("/projects")
 async def projects() -> str:
     """Main project directory page."""
     async with db.session() as data:
         projects = await data.project(_committee=True).order_by(models.Project.full_name).all()
         return await quart.render_template("projects.html", projects=projects)
+
+
+@routes.committer("/project/select")
+async def select(session: routes.CommitterSession) -> str:
+    """Select a project to work on."""
+    user_projects = []
+    if session.uid:
+        # TODO: Move this filtering logic somewhere else
+        async with db.session() as data:
+            all_projects = await data.project(_committee=True).all()
+            user_projects = [
+                p
+                for p in all_projects
+                if p.committee
+                and (
+                    (session.uid in p.committee.committee_members)
+                    or (session.uid in p.committee.committers)
+                    or (session.uid in p.committee.release_managers)
+                )
+            ]
+            user_projects.sort(key=lambda p: p.display_name)
+
+    return await quart.render_template("project-select.html", user_projects=user_projects)
 
 
 @routes.public("/projects/<name>")

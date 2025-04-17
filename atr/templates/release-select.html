@@ -1,22 +1,24 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Releases in progress for {{ project.display_name }} ~ ATR
+  Select a release of {{ project.display_name }} ~ ATR
 {% endblock title %}
 
 {% block content %}
-  <p>
-    <a href="{{ as_url(routes.projects.choose) }}" class="back-link">← Back to Choose a project</a>
+  <p class="atr-breadcrumbs">
+    <a href="{{ as_url(routes.projects.select) }}" class="back-link">Select a project</a>
+    <span>→</span> Select an {{ project.display_name }} release
   </p>
-  <h1>Choose a release</h1>
+
+  <h1>Select a release</h1>
 
   {% if releases %}
     <p>
-      Releases in progress for <strong>{{ project.display_name }}</strong>:
+      Releases of <strong>{{ project.display_name }}</strong>:
     </p>
   {% else %}
     <p>
-      There are no releases currently in progress for <strong>{{ project.display_name }}</strong>.
+      There are no releases of <strong>{{ project.display_name }}</strong>.
     </p>
   {% endif %}
 
@@ -26,14 +28,17 @@
       {% for release in releases %}
         {% set phase = release.phase.value %}
         {% set target_url = None %}
-        {% if phase == 'release_candidate_draft' %}
+        {% if phase == "release_candidate_draft" %}
           {% set target_url = as_url(routes.draft.evaluate, project_name=project.name, version_name=release.version) %}
           {% set badge_class = "bg-primary" %}
-        {% elif phase == 'release_candidate_before_vote' or phase == 'release_candidate_during_vote' %}
-          {% set target_url = as_url(routes.candidate.view, project_name=project.name, version_name=release.version) %}
+        {% elif phase == "release_candidate_before_vote" %}
+          {% set target_url = as_url(routes.candidate.vote_project, project_name=project.name, version=release.version) %}
           {% set badge_class = "bg-warning text-dark" %}
-        {% elif phase == 'release_preview' %}
-          {% set target_url = as_url(routes.preview.view, project_name=project.name, version_name=release.version) %}
+        {% elif phase == "release_candidate_during_vote" %}
+          {% set target_url = as_url(routes.candidate.resolve) %}
+          {% set badge_class = "bg-warning text-dark" %}
+        {% elif phase == "release_preview" %}
+          {% set target_url = as_url(routes.preview.promote, project_name=project.name, version_name=release.version) %}
           {% set badge_class = "bg-success" %}
         {% endif %}
 
@@ -42,11 +47,12 @@
             <a href="{{ target_url }}" class="text-decoration-none">
               <div class="card h-100 shadow-sm atr-cursor-pointer hover-lift project-card bg-body-tertiary-hover">
                 <div class="card-body position-relative">
-                  <div class="position-absolute top-0 end-0 p-2">
+                  <div class="position-absolute top-0 end-0 p-2"></div>
+                  <h3 class="card-title fs-2 my-3">{{ release.version }}</h3>
+                  <p class="card-text text-muted small">Created on {{ format_datetime(release.created)[:10] }}</p>
+                  <p class="mt-3">
                     <span class="badge {{ badge_class }}">{{ phase|replace('_', ' ') |title }}</span>
-                  </div>
-                  <h3 class="card-title fs-5 mb-2">{{ release.version }}</h3>
-                  <p class="card-text text-muted small">Created: {{ format_datetime(release.created) }}</p>
+                  </p>
                 </div>
               </div>
             </a>

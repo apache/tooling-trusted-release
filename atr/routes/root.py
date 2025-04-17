@@ -30,8 +30,8 @@ import atr.util as util
 async def index() -> response.Response | str:
     """Main page."""
     if await asfquart.session.read():
-        # Redirect to /project/choose
-        return quart.redirect(util.as_url(projects.choose))
+        # Redirect to /project/select
+        return quart.redirect(util.as_url(projects.select))
     else:
         return await quart.render_template("index.html")
 

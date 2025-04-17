@@ -396,3 +396,12 @@ img {
     max-width: 100%;
     height: auto;
 }
+
+.atr-breadcrumbs {
+    font-size: 1.2rem;
+    font-weight: 475;
+}
+
+.atr-breadcrumbs span {
+    padding: 0 0.5rem;
+}

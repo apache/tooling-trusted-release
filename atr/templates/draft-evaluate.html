@@ -11,6 +11,13 @@
 {% import 'macros/dialog.html' as dialog %}
 
 {% block content %}
+  <p class="atr-breadcrumbs">
+    <a href="{{ as_url(routes.projects.select) }}" class="back-link">Select a project</a>
+    <span>→</span> <a href="{{ as_url(routes.release.select, project_name=project_name) }}"
+    class="back-link">Select an {{ release.project.display_name }} release</a>
+    <span>→</span> {{ version_name }}
+  </p>
+
   <h1>Evaluation of {{ release.project.display_name }} {{ version_name }}</h1>
   <p class="intro">
     This page shows the evaluation of the files in the {{ project_name }} {{ version_name }} <strong>candidate draft</strong>.

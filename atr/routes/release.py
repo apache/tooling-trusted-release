@@ -116,6 +116,19 @@ async def releases(session: routes.CommitterSession) -> str:
     )
 
 
+@routes.committer("/release/select/<project_name>")
+async def select(session: routes.CommitterSession, project_name: str) -> str:
+    """Show releases in progress for a project."""
+    async with db.session() as data:
+        project = await data.project(name=project_name, _releases=True).demand(
+            base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
+        )
+        releases = await project.releases_in_progress
+        return await quart.render_template(
+            "release-select.html", project=project, releases=releases, format_datetime=routes.format_datetime
+        )
+
+
 @routes.committer("/release/view/<project_name>/<version_name>")
 async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""

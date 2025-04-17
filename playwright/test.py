@@ -792,10 +792,10 @@ def test_login(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Page loaded after login")
     logging.info(f"Initial URL after login: {page.url}")
 
-    logging.info("Waiting for the redirect to /project/choose")
+    logging.info("Waiting for the redirect to /project/select")
     # We can't use wait_for_path here because it goes through /auth
-    page.wait_for_url("https://*/project/choose")
-    logging.info("Redirected to /project/choose")
+    page.wait_for_url("https://*/project/select")
+    logging.info("Redirected to /project/select")
     logging.info(f"Page URL: {page.url}")
     logging.info("Login actions completed successfully")
 
