@@ -335,6 +335,16 @@ async def paths_recursive(base_path: pathlib.Path, sort: bool = True) -> list[pa
     return paths
 
 
+def permitted_vote_recipients(asf_uid: str) -> list[str]:
+    test_list = "user-tests"
+    return [
+        # f"dev@{committee.name}.apache.org",
+        # f"private@{committee.name}.apache.org",
+        f"{test_list}@tooling.apache.org",
+        f"{asf_uid}@apache.org",
+    ]
+
+
 async def read_file_for_viewer(full_path: pathlib.Path, max_size: int) -> tuple[str | None, bool, bool, str | None]:
     """Read file content for viewer."""
     content: str | None = None

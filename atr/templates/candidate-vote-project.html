@@ -24,6 +24,7 @@
     </div>
 
     <form method="post"
+          id="vote-initiate-form"
           class="atr-canary py-4 px-5"
           action="{{ as_url(routes.candidate.vote_project, project_name=release.project.name, version=release.version) }}">
       {{ form.hidden_tag() if form.hidden_tag }}
@@ -92,10 +93,9 @@
             <details>
               <summary class="text-muted">Show live preview</summary>
               <pre id="email-body-preview"
-                   class="mt-2 p-3 bg-white border rounded font-monospace overflow-auto"
-                   data-key-fingerprint="{{ preview_data.gpg_key_fingerprint }}"
-                   data-duration="{{ preview_data.vote_duration }}"
-                   data-your-name="{{ preview_data.initiator_id }}"></pre>
+                   data-preview-url="{{ as_url(routes.candidate.vote_preview) }}"
+                   data-asf-uid="{{ current_user.uid }}"
+                   class="mt-2 p-3 bg-white border rounded font-monospace overflow-auto"></pre>
             </details>
           </div>
         </div>
@@ -115,27 +115,75 @@
   {{ super() }}
   <script>
       document.addEventListener("DOMContentLoaded", () => {
+          let debounceTimeout;
+          const debounceDelay = 500;
+
           const bodyTextarea = document.getElementById("body");
+          const voteDurationInput = document.getElementById("vote_duration");
           const previewPre = document.getElementById("email-body-preview");
+          const voteForm = document.getElementById("vote-initiate-form");
 
-          if (!bodyTextarea || !previewPre) return;
-
-          const previewData = {
-              keyFingerprint: previewPre.dataset.keyFingerprint,
-              duration: previewPre.dataset.duration,
-              yourName: previewPre.dataset.yourName
-          };
-
-          function updatePreview() {
-              let bodyContent = bodyTextarea.value;
-              bodyContent = bodyContent.replace(/\[KEY_FINGERPRINT\]/g, previewData.keyFingerprint || "(No key found)");
-              bodyContent = bodyContent.replace(/\[DURATION\]/g, previewData.duration);
-              bodyContent = bodyContent.replace(/\[YOUR_NAME\]/g, previewData.yourName);
-              previewPre.textContent = bodyContent;
+          if (!bodyTextarea || !previewPre || !voteDurationInput || !voteForm) {
+              console.error("Required elements for preview not found.");
+              return;
           }
 
-          bodyTextarea.addEventListener("input", updatePreview);
-          updatePreview();
+          const previewUrl = previewPre.dataset.previewUrl;
+          const asfUid = previewPre.dataset.asfUid;
+          const csrfTokenInput = voteForm.querySelector('input[name="csrf_token"]');
+
+          if (!previewUrl || !asfUid || !csrfTokenInput) {
+              console.error("Required data attributes or CSRF token not found.");
+              return
+          }
+          const csrfToken = csrfTokenInput.value;
+
+
+          function fetchAndUpdatePreview() {
+              const bodyContent = bodyTextarea.value;
+              const voteDuration = voteDurationInput.value;
+
+              fetch(previewUrl, {
+                      method: 'POST',
+                      headers: {
+                          "Content-Type": "application/x-www-form-urlencoded",
+                          "X-CSRFToken": csrfToken
+                      },
+                      body: new URLSearchParams({
+                          "body": bodyContent,
+                          "asfuid": asfUid,
+                          "vote_duration": voteDuration,
+                          "csrf_token": csrfToken
+                      })
+                  })
+                  .then(response => {
+                      if (!response.ok) {
+                          return response.text().then(text => {
+                              throw new Error(`HTTP error ${response.status}: ${text}`)
+                          });
+                      }
+                      return response.text();
+                  })
+                  .then(previewText => {
+                      previewPre.textContent = previewText;
+                  })
+                  .catch(error => {
+                      console.error("Error fetching email preview:", error);
+                      previewPre.textContent = `Error loading preview:\n${error.message}`;
+                  });
+          }
+
+          bodyTextarea.addEventListener("input", () => {
+              clearTimeout(debounceTimeout);
+              debounceTimeout = setTimeout(fetchAndUpdatePreview, debounceDelay);
+          });
+
+          voteDurationInput.addEventListener("change", () => {
+              clearTimeout(debounceTimeout);
+              debounceTimeout = setTimeout(fetchAndUpdatePreview, debounceDelay);
+          });
+
+          fetchAndUpdatePreview();
       });
   </script>
 {% endblock javascripts %}

@@ -32,6 +32,7 @@ import wtforms
 
 import atr.db as db
 import atr.db.models as models
+import atr.mail as mail
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.preview as preview
@@ -163,6 +164,29 @@ async def vote(session: routes.CommitterSession) -> str:
         )
 
 
+@routes.committer("/candidate/vote/preview", methods=["POST"])
+async def vote_preview(session: routes.CommitterSession) -> quart.wrappers.response.Response | response.Response | str:
+    """Show the vote email preview for a release."""
+
+    class VotePreviewForm(util.QuartFormTyped):
+        body = wtforms.TextAreaField("Body", validators=[wtforms.validators.InputRequired("Body is required")])
+        asfuid = wtforms.StringField("ASF ID", validators=[wtforms.validators.InputRequired("ASF ID is required")])
+        # TODO: Validate the vote duration again? Probably not necessary in a preview
+        # Note that tasks/vote.py does not use this form
+        vote_duration = wtforms.IntegerField(
+            "Vote duration", validators=[wtforms.validators.InputRequired("Vote duration is required")]
+        )
+
+    form = await VotePreviewForm.create_form(data=await quart.request.form)
+    if not await form.validate_on_submit():
+        return await session.redirect(vote, error="Invalid form data")
+
+    body = await mail.generate_preview(
+        util.unwrap(form.body.data), util.unwrap(form.asfuid.data), util.unwrap(form.vote_duration.data)
+    )
+    return quart.Response(body, mimetype="text/plain")
+
+
 @routes.committer("/candidate/vote/<project_name>/<version>", methods=["GET", "POST"])
 async def vote_project(session: routes.CommitterSession, project_name: str, version: str) -> response.Response | str:
     """Show the vote initiation form for a release."""
@@ -177,12 +201,7 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
         committee = util.unwrap(release.committee)
 
         sender = f"{session.uid}@apache.org"
-        permitted_recipients = [
-            # f"dev@{committee.name}.apache.org",
-            # f"private@{committee.name}.apache.org",
-            "user-tests@tooling.apache.org",
-            sender,
-        ]
+        permitted_recipients = util.permitted_vote_recipients(session.uid)
 
         if release.vote_policy:
             min_hours = release.vote_policy.min_hours
@@ -213,9 +232,6 @@ async def vote_project(session: routes.CommitterSession, project_name: str, vers
             subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
             body = wtforms.TextAreaField("Body", validators=[wtforms.validators.Optional()])
             submit = wtforms.SubmitField("Send vote email")
-
-        user_key = await data.public_signing_key(apache_uid=session.uid).get()
-        user_key_fingerprint = user_key.fingerprint if user_key else None
 
         version = release.version
         committee_name = committee.name
@@ -268,6 +284,7 @@ Thanks,
                 raise base.ASFQuartException("Release has no associated committee", errorcode=400)
 
             if email_to not in permitted_recipients:
+                # This will be checked again by tasks/vote.py for extra safety
                 raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
             if email_to != sender:
                 # Update the release phase to the voting phase only if not sending a test message to the user
@@ -292,7 +309,6 @@ Thanks,
                     email_to=email_to,
                     vote_duration=vote_duration_choice,
                     initiator_id=session.uid,
-                    gpg_key_fingerprint=user_key_fingerprint,
                     subject=subject_data,
                     body=body_data,
                 ).model_dump(),
@@ -315,18 +331,11 @@ Thanks,
                 success=f"The vote announcement email will soon be sent to {email_to}.",
             )
 
-        preview_data = {
-            "initiator_id": session.uid,
-            "vote_duration": form.vote_duration.data or "72",
-            "gpg_key_fingerprint": user_key_fingerprint or "0000000000000000000000000000000000000000",
-        }
-
         # For GET requests or failed POST validation
         return await quart.render_template(
             "candidate-vote-project.html",
             release=release,
             form=form,
-            preview_data=preview_data,
         )
 
 

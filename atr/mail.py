@@ -27,6 +27,8 @@ from typing import Final
 import aiosmtplib
 import dkim
 
+import atr.db as db
+
 _LOGGER = logging.getLogger(__name__)
 
 # TODO: We should choose a pattern for globals
@@ -52,6 +54,21 @@ class VoteEvent:
     subject: str
     body: str
     vote_end: datetime.datetime
+
+
+async def generate_preview(body: str, asfuid: str, vote_duration: int) -> str:
+    # TODO: Should potentially be moved a different module
+    async with db.session() as data:
+        user_key = await data.public_signing_key(apache_uid=asfuid).get()
+        user_key_fingerprint = user_key.fingerprint if user_key else "0000000000000000000000000000000000000000"
+
+    # Perform substitutions in the body
+    # TODO: Handle the DURATION == 0 case
+    body = body.replace("[DURATION]", str(vote_duration))
+    body = body.replace("[KEY_FINGERPRINT]", user_key_fingerprint or "(No key found)")
+    body = body.replace("[YOUR_NAME]", asfuid)
+
+    return body
 
 
 async def send(event: VoteEvent) -> str:

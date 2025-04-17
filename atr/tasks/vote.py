@@ -27,6 +27,7 @@ import pydantic
 import atr.db as db
 import atr.mail as mail
 import atr.tasks.checks as checks
+import atr.util as util
 
 # Configure detailed logging
 _LOGGER: Final = logging.getLogger(__name__)
@@ -40,9 +41,6 @@ class Initiate(pydantic.BaseModel):
     email_to: str = pydantic.Field(..., description="The mailing list address to send the vote email to")
     vote_duration: int = pydantic.Field(..., description="Duration of the vote in hours")
     initiator_id: str = pydantic.Field(..., description="ASF ID of the vote initiator")
-    gpg_key_fingerprint: str | None = pydantic.Field(
-        ..., description="GPG key fingerprint of the initiator, if available"
-    )
     subject: str = pydantic.Field(..., description="Subject line for the vote email")
     body: str = pydantic.Field(..., description="Body content for the vote email")
 
@@ -67,7 +65,6 @@ async def initiate(args: Initiate) -> str | None:
 
 async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     """Get arguments, create an email, and then send it to the recipient."""
-    tooling_test_recipients = ["user-tests"]
     _LOGGER.info("Starting initiate_core")
 
     # Validate arguments
@@ -107,33 +104,21 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
         _LOGGER.error(error_msg)
         raise VoteInitiationError(error_msg)
 
-    # committee_name = release.committee.name
-    # committee_display = release.committee.display_name
-    # project_name = release.project.name if release.project else "Unknown"
-    # version = release.version
-
+    # Construct email
     subject = args.subject
-    body = args.body
 
     # Perform substitutions in the body
-    body = body.replace("[DURATION]", str(args.vote_duration))
-    body = body.replace("[KEY_FINGERPRINT]", args.gpg_key_fingerprint or "(No key found)")
-    body = body.replace("[YOUR_NAME]", args.initiator_id)
+    body = await mail.generate_preview(args.body, args.initiator_id, args.vote_duration)
 
-    # Set to a debugging recipient if the initiator is not sending to themselves
-    original_recipient = args.email_to
-    if original_recipient == f"{args.initiator_id}@apache.org":
-        tooling_test_recipient = original_recipient
-    else:
-        # Send to a tooling test mailing list
-        tooling_test_recipient = tooling_test_recipients[0] + "@tooling.apache.org"
-        _LOGGER.info(f"TEMPORARY: Overriding recipient from {original_recipient} to {tooling_test_recipient}")
+    permitted_recipients = util.permitted_vote_recipients(args.initiator_id)
+    if args.email_to not in permitted_recipients:
+        raise VoteInitiationError("Invalid mailing list choice")
 
     # Create mail event
     event = mail.VoteEvent(
         release_name=args.release_name,
         email_sender=f"{args.initiator_id}@apache.org",
-        email_recipient=tooling_test_recipient,
+        email_recipient=args.email_to,
         subject=subject,
         body=body,
         vote_end=vote_end,
@@ -141,14 +126,11 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
 
     # Send the email
     mid = await mail.send(event)
-    _LOGGER.info(
-        f"Vote email sent successfully to test account {tooling_test_recipient} (would have been {original_recipient})"
-    )
+    _LOGGER.info(f"Vote email sent successfully to {args.email_to}")
 
     return {
-        "message": "Vote initiated successfully, and sent to test account",
-        "original_email_to": original_recipient,
-        "actual_email_to": tooling_test_recipient,
+        "message": "Vote announcement email sent successfully",
+        "email_to": args.email_to,
         "vote_end": vote_end_str,
         "subject": subject,
         "mid": mid,
