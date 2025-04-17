@@ -22,6 +22,7 @@ import os
 from typing import TYPE_CHECKING, Any, Final, Generic, TypeGuard, TypeVar
 
 import sqlalchemy
+import sqlalchemy.dialects.sqlite
 import sqlalchemy.ext.asyncio
 import sqlalchemy.orm as orm
 import sqlalchemy.sql as sql
@@ -185,6 +186,37 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.options(select_in_load(models.Committee.public_signing_keys))
 
         return Query(self, query)
+
+    async def ns_text_del(self, ns: str, key: str, commit: bool = True) -> None:
+        stmt = sql.delete(models.TextValue).where(
+            validate_instrumented_attribute(models.TextValue.ns) == ns,
+            validate_instrumented_attribute(models.TextValue.key) == key,
+        )
+        await self.execute(stmt)
+        if commit is True:
+            await self.commit()
+
+    async def ns_text_get(self, ns: str, key: str) -> str | None:
+        stmt = sql.select(models.TextValue).where(
+            validate_instrumented_attribute(models.TextValue.ns) == ns,
+            validate_instrumented_attribute(models.TextValue.key) == key,
+        )
+        result = await self.execute(stmt)
+        match result.scalar_one_or_none():
+            case models.TextValue(value=value):
+                return value
+            case None:
+                return None
+
+    async def ns_text_set(self, ns: str, key: str, value: str, commit: bool = True) -> None:
+        # Don't use sql.insert(), it won't give on_conflict_do_update()
+        stmt = sqlalchemy.dialects.sqlite.insert(models.TextValue).values((ns, key, value))
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[models.TextValue.ns, models.TextValue.key], set_=dict(value=value)
+        )
+        await self.execute(stmt)
+        if commit is True:
+            await self.commit()
 
     def package(
         self,
