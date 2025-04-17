@@ -391,3 +391,8 @@ span.warning {
 .atr-border-dashed:hover {
     border-color: gray;
 }
+
+img {
+    max-width: 100%;
+    height: auto;
+}
