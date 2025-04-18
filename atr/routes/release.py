@@ -35,29 +35,8 @@ if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
 
 
-@routes.committer("/release/mark-announced/<project_name>/<version_name>", methods=["POST"])
-async def mark_announced(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
-    """Mark a release as announced."""
-    async with db.session() as data:
-        release_name = models.release_name(project_name, version_name)
-        release = await data.release(name=release_name, _project=True).get()
-
-        if not release:
-            return await session.redirect(releases, error=f"Release {release_name} not found.")
-
-        if release.phase != models.ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT:
-            return await session.redirect(
-                releases, error=f"Release {release_name} is not in the 'before announcement' phase."
-            )
-
-        release.phase = models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT
-        await data.commit()
-
-    return await session.redirect(releases, success=f"Release {release_name} marked as announced.")
-
-
 @routes.committer("/release/bulk/<int:task_id>", methods=["GET"])
-async def release_bulk_status(session: routes.CommitterSession, task_id: int) -> str | response.Response:
+async def bulk_status(session: routes.CommitterSession, task_id: int) -> str | response.Response:
     """Show status for a bulk download task."""
     async with db.session() as data:
         # Query for the task with the given ID
@@ -89,6 +68,27 @@ async def release_bulk_status(session: routes.CommitterSession, task_id: int) ->
                     return await session.redirect(candidate.vote, error="You don't have permission to view this task.")
 
     return await quart.render_template("release-bulk.html", task=task, release=release, TaskStatus=models.TaskStatus)
+
+
+@routes.committer("/release/mark-announced/<project_name>/<version_name>", methods=["POST"])
+async def mark_announced(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
+    """Mark a release as announced."""
+    async with db.session() as data:
+        release_name = models.release_name(project_name, version_name)
+        release = await data.release(name=release_name, _project=True).get()
+
+        if not release:
+            return await session.redirect(releases, error=f"Release {release_name} not found.")
+
+        if release.phase != models.ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT:
+            return await session.redirect(
+                releases, error=f"Release {release_name} is not in the 'before announcement' phase."
+            )
+
+        release.phase = models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT
+        await data.commit()
+
+    return await session.redirect(releases, success=f"Release {release_name} marked as announced.")
 
 
 @routes.committer("/releases")
