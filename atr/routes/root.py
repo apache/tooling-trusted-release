@@ -22,18 +22,14 @@ import quart
 import werkzeug.wrappers.response as response
 
 import atr.routes as routes
-import atr.routes.projects as projects
-import atr.util as util
 
 
 @routes.public("/")
 async def index() -> response.Response | str:
     """Main page."""
     if await asfquart.session.read():
-        # Redirect to /project/select
-        return quart.redirect(util.as_url(projects.select))
-    else:
-        return await quart.render_template("index.html")
+        return await quart.render_template("index-committer.html")
+    return await quart.render_template("index-public.html")
 
 
 @routes.public("/tutorial")
