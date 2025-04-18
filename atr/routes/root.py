@@ -19,16 +19,81 @@
 
 import asfquart.session
 import quart
+import sqlmodel
 import werkzeug.wrappers.response as response
+from sqlalchemy.orm import selectinload
 
+import atr.db as db
+import atr.db.models as models
 import atr.routes as routes
+import atr.user as user
 
 
 @routes.public("/")
 async def index() -> response.Response | str:
-    """Main page."""
-    if await asfquart.session.read():
-        return await quart.render_template("index-committer.html")
+    """Show public info or an entry portal for participants."""
+    session_data = await asfquart.session.read()
+    if session_data:
+        uid = session_data.get("uid")
+        if not uid:
+            return await quart.render_template("index-public.html")
+
+        phase_sequence = ["Compose", "Review", "Vote", "Stage", "Announce"]
+        phase_index_map = {
+            models.ReleasePhase.RELEASE_CANDIDATE_DRAFT: 0,
+            models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE: 1,
+            models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE: 2,
+            models.ReleasePhase.RELEASE_PREVIEW: 3,
+            models.ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT: 4,
+        }
+
+        async with db.session() as data:
+            user_projects = await user.projects(uid)
+            user_projects.sort(key=lambda p: p.display_name)
+
+            projects_with_releases = []
+            projects_without_releases = []
+
+            active_phases = list(phase_index_map.keys())
+            for project in user_projects:
+                stmt = (
+                    sqlmodel.select(models.Release)
+                    .where(
+                        models.Release.project_id == project.id,
+                        db.validate_instrumented_attribute(models.Release.phase).in_(active_phases),
+                    )
+                    .options(selectinload(db.validate_instrumented_attribute(models.Release.project)))
+                    .order_by(db.validate_instrumented_attribute(models.Release.created).desc())
+                )
+                result = await data.execute(stmt)
+                active_releases = result.scalars().all()
+
+                if active_releases:
+                    projects_with_releases.append({"project": project, "active_releases": active_releases})
+                else:
+                    projects_without_releases.append(project)
+
+        all_projects = projects_with_releases + [
+            {"project": p, "active_releases": []} for p in projects_without_releases
+        ]
+
+        def sort_key(item: dict) -> str:
+            project = item["project"]
+            if not isinstance(project, models.Project):
+                return ""
+            return project.display_name
+
+        all_projects.sort(key=sort_key)
+
+        return await quart.render_template(
+            "index-committer.html",
+            all_projects=all_projects,
+            phase_sequence=phase_sequence,
+            phase_index_map=phase_index_map,
+            format_datetime=routes.format_datetime,
+        )
+
+    # Public view
     return await quart.render_template("index-public.html")
 
 

@@ -4,7 +4,165 @@
   Apache Trusted Release
 {% endblock title %}
 
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .page-card {
+          min-width: 18rem;
+          min-height: 105px;
+      }
+
+      .page-muted {
+          color: #777777;
+      }
+
+      .page-phase-progression {
+          color: #555555;
+      }
+
+      .page-phase-progression strong {
+          font-weight: 650;
+      }
+
+      .page-version {
+          border-bottom: 1px solid #aaaaaa;
+          padding-bottom: 1rem;
+      }
+
+      .page-arrow {
+          margin-left: 0.333333rem;
+          margin-right: 0.333333rem;
+          color: #999999;
+      }
+
+      .page-semibold {
+          font-weight: 500;
+      }
+
+      .page-logo {
+          max-height: 72px;
+          background-color: #ffffff;
+          padding-left: 0.5rem;
+      }
+  </style>
+{% endblock stylesheets %}
+
 {% block content %}
-  <h1>Apache Trusted Release</h1>
-  <p>...</p>
+  {% if all_projects %}
+    <nav class="card p-3 mb-4">
+      <ul class="list-unstyled row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-2 mb-0">
+        {% for item in all_projects %}
+          {% set project = item.project %}
+          {% set display_name_cleaned = project.display_name %}
+          {% if display_name_cleaned and display_name_cleaned.lower().endswith(" (incubating)") %}
+            {% set display_name_cleaned = display_name_cleaned[:-13] %}
+          {% endif %}
+          {% set toc_name = display_name_cleaned %}
+          {% if toc_name and toc_name.startswith("Apache ") %}
+            {% set toc_name = toc_name[7:] %}
+          {% endif %}
+          {% set project_id = project.name|slugify %}
+          <li class="col">
+            <a href="#project-{{ project_id }}"
+               class="text-decoration-none page-semibold">{{ toc_name }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </nav>
+
+    {% for item in all_projects %}
+      {% set project = item.project %}
+      {% set active_releases = item.active_releases %}
+      {% set project_id = project.name|slugify %}
+
+      {% set display_name_cleaned = project.display_name %}
+      {% if display_name_cleaned and display_name_cleaned.lower().endswith(" (incubating)") %}
+        {% set display_name_cleaned = display_name_cleaned[:-13] %}
+      {% endif %}
+
+      <div class="mb-5" id="project-{{ project_id }}">
+        <h2 class="border-bottom border-secondary pb-2 mb-3">
+          {{ display_name_cleaned }}
+          {% if project.is_podling or project.name.startswith("incubator-") %}
+            <span class="text-muted fw-normal fs-5">(Incubating)</span>
+            <img src="{{ url_for('static', filename='svg/apache_incubator.svg') }}"
+                 alt=""
+                 class="float-end ms-3 page-logo"
+                 height="24" />
+          {% else %}
+            <img src="https://www.apache.org/logos/originals/{{ project.name }}.svg"
+                 alt=""
+                 class="float-end ms-3 page-logo"
+                 height="24" />
+          {% endif %}
+        </h2>
+
+        <p class="mb-3">
+          <a href="{{ as_url(routes.projects.view, name=project.name) }}"
+             class="text-decoration-none me-2">About this project</a>
+          <span class="text-muted me-2">/</span>
+          <a href="{{ as_url(routes.projects.add) }}" class="text-decoration-none">Create a sub-project</a>
+        </p>
+
+        <div class="d-flex flex-wrap gap-3">
+          {% for release in active_releases %}
+            {% set current_phase_index = phase_index_map.get(release.phase, -1) %}
+            {% set release_link = as_url(routes.draft.overview, project_name=release.project.name, version_name=release.version) if release.phase.value == "release_candidate_draft" else as_url(routes.candidate.view, project_name=release.project.name, version_name=release.version) %}
+
+            <a href="{{ release_link }}" class="text-decoration-none">
+              <div class="card h-100 shadow-sm hover-lift atr-cursor-pointer page-card">
+                <div class="card-body text-center d-flex flex-column justify-content-center">
+                  <div class="fw-bold mb-3 fs-3 page-version">{{ release.version }}</div>
+                  <div class="page-phase-progression">
+                    {# set phase_symbols = ["①", "②", "③", "④", "⑤"] #}
+                    {% set phase_symbols = ["1.", "2.", "3.", "4.", "5."] %}
+                    {% set num_phases = phase_sequence|length %}
+
+                    {% if current_phase_index > 0 %}
+                      {% set prev_index = current_phase_index - 1 %}
+                      {% set prev_symbol = phase_symbols[prev_index] if prev_index < phase_symbols|length else "?" %}
+                      <span class="page-muted">{{ phase_symbols[prev_index] }}</span> <span class="page-arrow">→</span>
+                    {% endif %}
+
+                    {% if current_phase_index >= 0 and current_phase_index < num_phases %}
+                      {% set current_symbol = phase_symbols[current_phase_index] if current_phase_index < phase_symbols|length else "?" %}
+                      <strong>{{ current_symbol }} {{ phase_sequence[current_phase_index] }}</strong>
+                    {% else %}
+                      <strong>Unknown phase</strong>
+                    {% endif %}
+
+                    {% if current_phase_index >= 0 and current_phase_index < num_phases - 1 %}
+                      {% set next_index = current_phase_index + 1 %}
+                      {% set next_symbol = phase_symbols[next_index] if next_index < phase_symbols|length else "?" %}
+                      {# TODO: This ellipsis logic needs to be fixed #}
+                      <span class="page-arrow">→</span> <span class="page-muted">{{ next_symbol }} …</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </a>
+          {% endfor %}
+
+          <a href="{{ as_url(routes.draft.add, project=project.name) }}"
+             class="text-decoration-none">
+            <div class="card h-100 shadow-sm hover-lift atr-cursor-pointer page-card">
+              <div class="card-body d-flex justify-content-center align-items-center text-center text-secondary">
+                <div>
+                  <i class="fas fa-plus me-2"></i>
+                </div>
+                <div>Start a new release</div>
+              </div>
+            </div>
+          </a>
+
+        </div>
+      </div>
+    {% endfor %}
+
+  {% else %}
+    <div class="alert alert-info" role="alert">
+      You are not currently listed as a participant in any projects known to ATR. You may need to add a project or check your committee memberships.
+    </div>
+  {% endif %}
+
 {% endblock content %}
