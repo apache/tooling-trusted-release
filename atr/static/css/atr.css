@@ -403,5 +403,7 @@ img {
 }
 
 .atr-breadcrumbs span {
+    color: #666666;
+    font-weight: 300;
     padding: 0 0.5rem;
 }
