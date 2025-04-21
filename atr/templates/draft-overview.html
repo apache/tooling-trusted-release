@@ -66,7 +66,7 @@
       <a href="{{ as_url(routes.draft.revisions, project_name=project_name, version_name=version_name) }}"
          title="View revision history"
          class="btn btn-secondary"><i class="fas fa-history me-1"></i> Revisions</a>
-      <a href="{{ as_url(routes.draft.vote_start, project_name=release.project.name, version=release.version, revision=latest_info(release.project.name, release.version)[0] ) }}"
+      <a href="{{ as_url(routes.draft.vote_start, project_name=release.project.name, version=release.version, revision=release.revision) }}"
          title="Start a vote on this draft"
          class="btn btn-success"><i class="fas fa-check-circle me-1"></i> Start vote</a>
       <button class="btn btn-danger"

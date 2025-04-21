@@ -407,6 +407,7 @@ class Release(sqlmodel.SQLModel, table=True):
     # For example, Apache Airflow Providers do not have an overall version
     # They have one version per package, i.e. per provider
     version: str
+    revision: str | None = sqlmodel.Field(default=None, index=True)
     # One-to-many: A release can have multiple packages
     packages: list[Package] = sqlmodel.Relationship(back_populates="release")
     sboms: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))

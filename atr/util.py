@@ -186,11 +186,15 @@ async def compute_sha512(file_path: pathlib.Path) -> str:
     return sha512.hexdigest()
 
 
-async def content_list(phase_subdir: pathlib.Path, project_name: str, version_name: str) -> AsyncGenerator[FileStat]:
+async def content_list(
+    phase_subdir: pathlib.Path, project_name: str, version_name: str, revision_name: str | None = None
+) -> AsyncGenerator[FileStat]:
     """List all the files in the given path."""
     base_path = phase_subdir / project_name / version_name
-    if phase_subdir.name == "release-candidate-draft":
-        base_path = base_path / "latest"
+    if (phase_subdir.name == "release-candidate-draft") and (revision_name is None):
+        raise ValueError("A revision name is required for release candidate draft content listing")
+    if revision_name:
+        base_path = base_path / revision_name
     for path in await paths_recursive(base_path):
         stat = await aiofiles.os.stat(base_path / path)
         yield FileStat(
@@ -294,7 +298,7 @@ async def number_of_release_files(release: models.Release) -> int:
     path_version = release.version
     match release.phase:
         case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-            path = get_release_candidate_draft_dir() / path_project / path_version / "latest"
+            path = get_release_candidate_draft_dir() / path_project / path_version / (release.revision or "force-error")
         case models.ReleasePhase.RELEASE_CANDIDATE:
             path = get_release_candidate_dir() / path_project / path_version
         case models.ReleasePhase.RELEASE_PREVIEW:

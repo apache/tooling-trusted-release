@@ -407,7 +407,6 @@ async def drafts(session: routes.CommitterSession) -> str:
         number_of_release_files=util.number_of_release_files,
         candidate_drafts=user_candidate_drafts,
         delete_form=delete_form,
-        latest_info=revision.latest_info,
     )
 
 
@@ -424,7 +423,10 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
-    base_path = util.get_release_candidate_draft_dir() / project_name / version_name / "latest"
+    if release.revision is None:
+        raise base.ASFQuartException("Release does not have a revision", errorcode=404)
+
+    base_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.revision
     paths = await util.paths_recursive(base_path)
     # paths_set = set(paths)
     path_templates = {}
@@ -462,7 +464,7 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
                 path_metadata.add(path)
 
         # Get modified time
-        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / "latest" / path)
+        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / release.revision / path)
         path_modified[path] = int(await aiofiles.os.path.getmtime(full_path))
 
         # Get successes, warnings, and errors
@@ -533,9 +535,11 @@ async def evaluate_path(session: routes.CommitterSession, project_name: str, ver
         release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
+        if release.revision is None:
+            raise base.ASFQuartException("Release does not have a revision", errorcode=404)
 
         # TODO: When we do more than one thing in a dir, we should use the revision directory directly
-        abs_path = util.get_release_candidate_draft_dir() / project_name / version_name / "latest" / rel_path
+        abs_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.revision / rel_path
 
         # Check that the file exists
         if not await aiofiles.os.path.exists(abs_path):
@@ -647,13 +651,14 @@ async def overview(session: routes.CommitterSession, project_name: str, version_
         return await session.redirect(add, error="You do not have access to this project")
 
     async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
-        if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-            raise base.ASFQuartException("This release is not currently a draft.", errorcode=400)
+        release_name = models.release_name(project_name, version_name)
+        release = await data.release(
+            name=release_name, phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT, _project=True
+        ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
+        if release.revision is None:
+            raise base.ASFQuartException("This release does not have a revision.", errorcode=400)
 
-        base_path = util.get_release_candidate_draft_dir() / project_name / version_name / "latest"
+        base_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.revision
         paths = await util.paths_recursive(base_path)
         path_templates = {}
         path_substitutions = {}
@@ -728,7 +733,6 @@ async def overview(session: routes.CommitterSession, project_name: str, version_
         server_domain=session.host,
         format_datetime=routes.format_datetime,
         models=models,
-        latest_info=revision.latest_info,
     )
 
 
@@ -745,7 +749,6 @@ async def revision_set(session: routes.CommitterSession, project_name: str, vers
 
     release_dir = util.get_release_candidate_draft_dir() / project_name / version_name
     target_revision_dir = release_dir / revision_name
-    latest_symlink_path = release_dir / "latest"
 
     # Check that the target revision directory exists
     if not await aiofiles.os.path.isdir(target_revision_dir):
@@ -754,9 +757,14 @@ async def revision_set(session: routes.CommitterSession, project_name: str, vers
     try:
         # Target must be relative for the symlink
         # TODO: We should probably log who is doing this, to create an audit trail
-        await util.update_atomic_symlink(latest_symlink_path, revision_name)
+        async with db.session() as data:
+            release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
+                base.ASFQuartException("Release does not exist", errorcode=404)
+            )
+            release.revision = revision_name
+            await data.commit()
     except Exception as e:
-        logging.exception("Error updating latest symlink:")
+        logging.exception("Error setting revision:")
         return await session.redirect(
             revisions,
             error=f"Failed to set revision {revision_name} as latest: {e!s}",
@@ -816,9 +824,7 @@ async def revisions(session: routes.CommitterSession, project_name: str, version
         parent_map = {link.key: link.value for link in parent_links_result.scalars().all()}
 
         # Determine the current latest revision
-        latest_revision_name: str | None = None
-        with contextlib.suppress(FileNotFoundError, OSError):
-            latest_revision_name = await aiofiles.os.readlink(str(release_dir / "latest"))
+        latest_revision_name = release.revision
 
         revision_history = []
         prev_revision_files: set[pathlib.Path] | None = None
@@ -1001,8 +1007,12 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
         release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
+        if release.revision is None:
+            raise base.ASFQuartException("Release does not have a revision", errorcode=404)
 
-        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / "latest" / file_path)
+        full_path = str(
+            util.get_release_candidate_draft_dir() / project_name / version_name / release.revision / file_path
+        )
 
         # Check that the file exists
         if not await aiofiles.os.path.exists(full_path):
@@ -1044,7 +1054,10 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
 
     # Convert async generator to list
     file_stats = [
-        stat async for stat in util.content_list(util.get_release_candidate_draft_dir(), project_name, version_name)
+        stat
+        async for stat in util.content_list(
+            util.get_release_candidate_draft_dir(), project_name, version_name, release.revision
+        )
     ]
 
     return await quart.render_template(
@@ -1074,10 +1087,12 @@ async def view_path(
         release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
+        if release.revision is None:
+            raise base.ASFQuartException("Release does not have a revision", errorcode=404)
 
     # Limit to 256 KiB
     _max_view_size = 256 * 1024
-    full_path = util.get_release_candidate_draft_dir() / project_name / version_name / "latest" / file_path
+    full_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.revision / file_path
 
     # Attempt to get an archive listing
     # This will be None if the file is not an archive
