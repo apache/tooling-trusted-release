@@ -357,6 +357,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         project_id: Opt[int] = _NOT_SET,
         package_managers: Opt[list[str]] = _NOT_SET,
         version: Opt[str] = _NOT_SET,
+        revision: Opt[str] = _NOT_SET,
         sboms: Opt[list[str]] = _NOT_SET,
         vote_policy_id: Opt[int] = _NOT_SET,
         votes: Opt[list[models.VoteEntry]] = _NOT_SET,
@@ -382,6 +383,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Release.package_managers == package_managers)
         if is_defined(version):
             query = query.where(models.Release.version == version)
+        if is_defined(revision):
+            query = query.where(models.Release.revision == revision)
         if is_defined(sboms):
             query = query.where(models.Release.sboms == sboms)
         if is_defined(vote_policy_id):

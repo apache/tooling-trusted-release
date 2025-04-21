@@ -18,6 +18,7 @@
 """preview.py"""
 
 import logging
+from typing import Protocol
 
 import aiofiles.os
 import aioshutil
@@ -37,6 +38,15 @@ if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
 
 
+class AnnounceFormProtocol(Protocol):
+    """Protocol for forms that announce a release preview."""
+
+    preview_name: wtforms.StringField
+    preview_revision: wtforms.StringField
+    confirm_announce: wtforms.BooleanField
+    submit: wtforms.SubmitField
+
+
 class DeleteForm(util.QuartFormTyped):
     """Form for deleting a release preview."""
 
@@ -53,6 +63,93 @@ class DeleteForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Delete preview")
 
 
+@routes.committer("/preview/announce", methods=["GET", "POST"])
+async def announce(session: routes.CommitterSession) -> str | response.Response:
+    """Allow the user to announce a release preview."""
+
+    class AnnounceForm(util.QuartFormTyped):
+        """Form for announcing a release preview."""
+
+        preview_name = wtforms.StringField(
+            "Preview name", validators=[wtforms.validators.InputRequired("Preview name is required")]
+        )
+        preview_revision = wtforms.StringField(
+            "Preview revision", validators=[wtforms.validators.InputRequired("Preview revision is required")]
+        )
+        confirm_announce = wtforms.BooleanField(
+            "Confirmation",
+            validators=[wtforms.validators.DataRequired("You must confirm to proceed with announcement")],
+        )
+        submit = wtforms.SubmitField("Announce release")
+
+    # Get user's preview releases
+    async with db.session() as data:
+        releases = await data.release(
+            stage=models.ReleaseStage.RELEASE,
+            phase=models.ReleasePhase.RELEASE_PREVIEW,
+            _committee=True,
+            _packages=True,
+        ).all()
+    user_previews = session.only_user_releases(releases)
+
+    # Create the forms
+    announce_form = await AnnounceForm.create_form(
+        data=await quart.request.form if (quart.request.method == "POST") else None
+    )
+    delete_form = await DeleteForm.create_form()
+
+    if (quart.request.method == "POST") and (await announce_form.validate_on_submit()):
+        try:
+            preview_name, project_name, version_name, preview_revision = _announce_form_validate(announce_form)
+        except ValueError as e:
+            return await session.redirect(announce, error=str(e))
+
+        # Check that the user has access to the project
+        async with db.session() as data:
+            project = await data.project(name=project_name).get()
+            if not project:
+                return await session.redirect(announce, error="Project not found")
+            if not any((p.id == project.id) for p in (await session.user_projects)):
+                return await session.redirect(announce, error="You do not have access to this project")
+
+            try:
+                # Get the release
+                release = await data.release(name=preview_name, revision=preview_revision, _project=True).demand(
+                    routes.FlashError("Preview not found")
+                )
+
+                # Verify that it's in the correct phase
+                if release.phase != models.ReleasePhase.RELEASE_PREVIEW:
+                    return await session.redirect(announce, error="This release is not in the preview phase")
+                if release.revision is None:
+                    # Impossible, but to satisfy the type checkers
+                    return await session.redirect(announce, error="This release does not have a revision")
+
+                # Announce it
+                source = str(util.get_release_preview_dir() / project_name / version_name / release.revision)
+                target = str(util.get_release_dir() / project_name / version_name)
+                if await aiofiles.os.path.exists(target):
+                    return await session.redirect(announce, error="Release already exists")
+
+                release.phase = models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT
+                release.revision = None
+                await data.commit()
+                await aioshutil.move(source, target)
+
+                return await session.redirect(routes_release.releases, success="Preview successfully announced")
+
+            except Exception as e:
+                logging.exception("Error announcing preview:")
+                return await session.redirect(announce, error=f"Error announcing preview: {e!s}")
+
+    return await quart.render_template(
+        "preview-announce.html",
+        previews=user_previews,
+        announce_form=announce_form,
+        delete_form=delete_form,
+    )
+
+
 @routes.committer("/preview/delete", methods=["POST"])
 async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a preview and all its associated files."""
@@ -62,17 +159,17 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         for _field, errors in form.errors.items():
             for error in errors:
                 await quart.flash(f"{error}", "error")
-        return await session.redirect(promote)
+        return await session.redirect(announce)
 
     preview_name = form.preview_name.data
     if not preview_name:
-        return await session.redirect(promote, error="Missing required parameters")
+        return await session.redirect(announce, error="Missing required parameters")
 
     # Extract project name and version
     try:
         project_name, version = preview_name.rsplit("-", 1)
     except ValueError:
-        return await session.redirect(promote, error="Invalid preview name format")
+        return await session.redirect(announce, error="Invalid preview name format")
 
     # Check that the user has access to the project
     async with db.session() as data:
@@ -81,7 +178,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
             (c.id == project.committee_id and (session.uid in c.committee_members or session.uid in c.committers))
             for c in (await session.user_committees)
         ):
-            return await session.redirect(promote, error="You do not have access to this project")
+            return await session.redirect(announce, error="You do not have access to this project")
 
         # Delete the metadata from the database
         async with data.begin():
@@ -89,14 +186,14 @@ async def delete(session: routes.CommitterSession) -> response.Response:
                 await _delete_preview(data, preview_name)
             except Exception as e:
                 logging.exception("Error deleting preview:")
-                return await session.redirect(promote, error=f"Error deleting preview: {e!s}")
+                return await session.redirect(announce, error=f"Error deleting preview: {e!s}")
 
     # Delete the files on disk, including all revisions
     preview_dir = util.get_release_preview_dir() / project_name / version
     if await aiofiles.os.path.exists(preview_dir):
         await aioshutil.rmtree(preview_dir)
 
-    return await session.redirect(promote, success="Preview deleted successfully")
+    return await session.redirect(announce, success="Preview deleted successfully")
 
 
 @routes.committer("/previews")
@@ -115,95 +212,6 @@ async def previews(session: routes.CommitterSession) -> str:
     return await quart.render_template(
         "previews.html",
         previews=user_previews,
-    )
-
-
-@routes.committer("/preview/promote", methods=["GET", "POST"])
-async def promote(session: routes.CommitterSession) -> str | response.Response:
-    """Allow the user to promote a release preview."""
-
-    class PromoteForm(util.QuartFormTyped):
-        """Form for promoting a release preview."""
-
-        preview_name = wtforms.StringField(
-            "Preview name", validators=[wtforms.validators.InputRequired("Preview name is required")]
-        )
-        confirm_promote = wtforms.BooleanField(
-            "Confirmation", validators=[wtforms.validators.DataRequired("You must confirm to proceed with promotion")]
-        )
-        submit = wtforms.SubmitField("Promote to release")
-
-    # Get user's preview releases
-    async with db.session() as data:
-        releases = await data.release(
-            stage=models.ReleaseStage.RELEASE,
-            phase=models.ReleasePhase.RELEASE_PREVIEW,
-            _committee=True,
-            _packages=True,
-        ).all()
-    user_previews = session.only_user_releases(releases)
-
-    # Create the forms
-    promote_form = await PromoteForm.create_form(
-        data=await quart.request.form if (quart.request.method == "POST") else None
-    )
-    delete_form = await DeleteForm.create_form()
-
-    if (quart.request.method == "POST") and (await promote_form.validate_on_submit()):
-        preview_name = promote_form.preview_name.data
-        if not preview_name:
-            return await session.redirect(promote, error="Missing required parameters")
-
-        # Extract project name and version
-        try:
-            project_name, version_name = preview_name.rsplit("-", 1)
-        except ValueError:
-            return await session.redirect(promote, error="Invalid preview name format")
-
-        # Check that the user has access to the project
-        async with db.session() as data:
-            project = await data.project(name=project_name).get()
-            if not project:
-                return await session.redirect(promote, error="Project not found")
-            if not any((p.id == project.id) for p in (await session.user_projects)):
-                return await session.redirect(promote, error="You do not have access to this project")
-
-            try:
-                # Get the release
-                release = await data.release(name=preview_name, _project=True).demand(
-                    routes.FlashError("Preview not found")
-                )
-
-                # Verify that it's in the correct phase
-                if release.phase != models.ReleasePhase.RELEASE_PREVIEW:
-                    return await session.redirect(promote, error="This release is not in the preview phase")
-                if release.revision is None:
-                    return await session.redirect(promote, error="This release does not have a revision")
-
-                # Promote it to a release
-                source = str(util.get_release_preview_dir() / project_name / version_name / release.revision)
-                target = str(util.get_release_dir() / project_name / version_name)
-                if await aiofiles.os.path.exists(target):
-                    return await session.redirect(promote, error="Release already exists")
-
-                release.phase = models.ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT
-                release.revision = None
-                await data.commit()
-                await aioshutil.move(source, target)
-
-                return await session.redirect(
-                    routes_release.releases, success="Preview successfully promoted to release"
-                )
-
-            except Exception as e:
-                logging.exception("Error promoting preview:")
-                return await session.redirect(promote, error=f"Error promoting preview: {e!s}")
-
-    return await quart.render_template(
-        "preview-promote.html",
-        previews=user_previews,
-        promote_form=promote_form,
-        delete_form=delete_form,
     )
 
 
@@ -274,6 +282,24 @@ async def view_path(
         format_file_size=routes.format_file_size,
         phase_key="preview",
     )
+
+
+def _announce_form_validate(announce_form: AnnounceFormProtocol) -> tuple[str, str, str, str]:
+    preview_name = announce_form.preview_name.data
+    if not preview_name:
+        raise ValueError("Missing required parameters")
+
+    # Extract project name and version
+    try:
+        project_name, version_name = preview_name.rsplit("-", 1)
+    except ValueError:
+        raise ValueError("Invalid preview name format")
+
+    preview_revision = announce_form.preview_revision.data
+    if not preview_revision:
+        raise ValueError("Missing required parameters")
+
+    return preview_name, project_name, version_name, preview_revision
 
 
 async def _delete_preview(data: db.Session, preview_name: str) -> None:

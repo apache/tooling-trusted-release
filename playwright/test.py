@@ -307,7 +307,7 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
         test_lifecycle_03_add_file,
         test_lifecycle_04_start_vote,
         test_lifecycle_05_resolve_vote,
-        test_lifecycle_06_promote_preview,
+        test_lifecycle_06_announce_preview,
         test_lifecycle_07_release_exists,
     ]
     tests["gpg"] = [
@@ -670,37 +670,37 @@ def test_lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials
     logging.info("Vote resolution actions completed successfully")
 
 
-def test_lifecycle_06_promote_preview(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Locating the link to promote the preview for tooling-test-example-0.1")
-    promote_link_locator = page.locator('a[title="Promote Apache Tooling Test Example 0.1 to release"]')
-    sync_api.expect(promote_link_locator).to_be_visible()
+def test_lifecycle_06_announce_preview(page: sync_api.Page, credentials: Credentials) -> None:
+    logging.info("Locating the link to announce the preview for tooling-test-example-0.1")
+    announce_link_locator = page.locator('a[title="Announce Apache Tooling Test Example 0.1"]')
+    sync_api.expect(announce_link_locator).to_be_visible()
 
-    logging.info("Following the link to promote the preview")
-    promote_link_locator.click()
+    logging.info("Following the link to announce the preview")
+    announce_link_locator.click()
 
-    logging.info("Waiting for navigation to /preview/promote")
-    wait_for_path(page, "/preview/promote")
-    logging.info("Promote preview navigation completed successfully")
+    logging.info("Waiting for navigation to /preview/announce")
+    wait_for_path(page, "/preview/announce")
+    logging.info("Announce preview navigation completed successfully")
 
-    logging.info("Locating the promotion form for tooling-test-example-0.1")
-    form_locator = page.locator(r'#tooling-test-example-0\.1 form[action="/preview/promote"]')
+    logging.info("Locating the announcement form for tooling-test-example-0.1")
+    form_locator = page.locator(r'#tooling-test-example-0\.1 form[action="/preview/announce"]')
     sync_api.expect(form_locator).to_be_visible()
 
     logging.info("Locating the confirmation checkbox within the form")
-    checkbox_locator = form_locator.locator('input[name="confirm_promote"]')
+    checkbox_locator = form_locator.locator('input[name="confirm_announce"]')
     sync_api.expect(checkbox_locator).to_be_visible()
 
     logging.info("Checking the confirmation checkbox")
     checkbox_locator.check()
 
-    logging.info("Locating and activating the promote button within the form")
-    submit_button_locator = form_locator.get_by_role("button", name="Promote to release")
+    logging.info("Locating and activating the announce button within the form")
+    submit_button_locator = form_locator.get_by_role("button", name="Announce release")
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info("Waiting for navigation to /releases after submitting promotion")
+    logging.info("Waiting for navigation to /releases after submitting announcement")
     wait_for_path(page, "/releases")
-    logging.info("Preview promotion actions completed successfully")
+    logging.info("Preview announcement actions completed successfully")
 
 
 def test_lifecycle_07_release_exists(page: sync_api.Page, credentials: Credentials) -> None:
@@ -711,18 +711,7 @@ def test_lifecycle_07_release_exists(page: sync_api.Page, credentials: Credentia
     logging.info("Found card for tooling-test-example-0.1 release")
     logging.info("Release tooling-test-example-0.1 confirmed exists on /releases page")
 
-    logging.info("Locating the announcement marking button for tooling-test-example-0.1")
-    mark_announced_button_locator = page.locator('button[title="Mark Apache Tooling Test Example 0.1 as announced"]')
-    sync_api.expect(mark_announced_button_locator).to_be_visible()
-
-    logging.info("Activating the button to mark the release as announced")
-    mark_announced_button_locator.click()
-
-    logging.info("Waiting for navigation back to /releases after marking as announced")
-    wait_for_path(page, "/releases")
-    logging.info("Navigation back to /releases completed successfully")
-
-    logging.info("Verifying release tooling-test-example-0.1 phase is now RELEASE_AFTER_ANNOUNCEMENT")
+    logging.info("Verifying release tooling-test-example-0.1 phase is RELEASE_AFTER_ANNOUNCEMENT")
     release_card_locator = page.locator('div.card:has(h3:has-text("Apache Tooling Test Example 0.1"))')
     sync_api.expect(release_card_locator).to_be_visible()
     phase_locator = release_card_locator.locator('span.release-meta-item:has-text("Phase: RELEASE_AFTER_ANNOUNCEMENT")')

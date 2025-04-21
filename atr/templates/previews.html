@@ -41,8 +41,8 @@
           </div>
           <div class="d-flex gap-3 align-items-center pt-2">
             <a class="btn btn-primary"
-               title="Promote {{ preview.project.display_name }} {{ preview.version }} to release"
-               href="{{ as_url(routes.preview.promote) }}#{{ preview.project.name }}-{{ preview.version }}">Promote</a>
+               title="Announce {{ preview.project.display_name }} {{ preview.version }}"
+               href="{{ as_url(routes.preview.announce) }}#{{ preview.project.name }}-{{ preview.version }}">Announce</a>
             <a class="btn btn-outline-primary"
                title="View files for {{ preview.project.display_name }} {{ preview.version }}"
                href="{{ as_url(routes.preview.view, project_name=preview.project.name, version_name=preview.version) }}">View files</a>
