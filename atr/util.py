@@ -295,7 +295,7 @@ async def number_of_release_files(release: models.Release) -> int:
     match release.phase:
         case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
             path = get_release_candidate_draft_dir() / path_project / path_version / "latest"
-        case models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE:
+        case models.ReleasePhase.RELEASE_CANDIDATE:
             path = get_release_candidate_dir() / path_project / path_version
         case models.ReleasePhase.RELEASE_PREVIEW:
             path = get_release_preview_dir() / path_project / path_version
@@ -400,7 +400,7 @@ def release_directory(release: models.Release) -> pathlib.Path:
     match phase:
         case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
             base_dir = get_release_candidate_draft_dir()
-        case models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE:
+        case models.ReleasePhase.RELEASE_CANDIDATE:
             base_dir = get_release_candidate_dir()
         case models.ReleasePhase.RELEASE_PREVIEW:
             base_dir = get_release_preview_dir()

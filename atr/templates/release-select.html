@@ -31,7 +31,7 @@
         {% if phase == "release_candidate_draft" %}
           {% set target_url = as_url(routes.draft.evaluate, project_name=project.name, version_name=release.version) %}
           {% set badge_class = "bg-primary" %}
-        {% elif phase == "release_candidate_during_vote" %}
+        {% elif phase == "release_candidate" %}
           {% set target_url = as_url(routes.candidate.resolve) %}
           {% set badge_class = "bg-warning text-dark" %}
         {% elif phase == "release_preview" %}

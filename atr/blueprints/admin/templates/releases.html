@@ -30,7 +30,7 @@
             {% if release.project %}
               {% if phase_value == "release_candidate_draft" %}
                 <a href="{{ as_url(routes.draft.evaluate, project_name=release.project.name, version_name=release.version) }}">{{ release.name }}</a>
-              {% elif phase_value == "release_candidate_during_vote" %}
+              {% elif phase_value == "release_candidate" %}
                 <a href="{{ as_url(routes.candidate.resolve) }}">{{ release.name }}</a>
               {% elif phase_value == "release_preview" %}
                 <a href="{{ as_url(routes.preview.review) }}">{{ release.name }}</a>
@@ -51,7 +51,7 @@
             {{ phase_value }} <br />
             {% if phase_value == "release_candidate_draft" %}
               <span class="badge bg-secondary">1. Draft</span>
-            {% elif phase_value == "release_candidate_during_vote" %}
+            {% elif phase_value == "release_candidate" %}
               <span class="badge bg-info">2. Candidate</span>
             {% elif phase_value == "release_preview" %}
               <span class="badge bg-warning text-dark">3. Preview</span>

@@ -175,10 +175,10 @@ def _format_artifact_name(project_name: str, version: str, is_podling: bool = Fa
 
 async def _resolve_get(session: routes.CommitterSession) -> str:
     async with db.session() as data:
-        # Get all RELEASE_CANDIDATE_DURING_VOTE releases
+        # Get all RELEASE_CANDIDATE releases
         releases = await data.release(
             stage=models.ReleaseStage.RELEASE_CANDIDATE,
-            phase=models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE,
+            phase=models.ReleasePhase.RELEASE_CANDIDATE,
             _committee=True,
             _project=True,
             _tasks=True,
@@ -248,7 +248,7 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
             )
 
             # Verify that it's in the correct phase
-            if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE:
+            if release.phase != models.ReleasePhase.RELEASE_CANDIDATE:
                 return await session.redirect(resolve, error="This release is not in the voting phase")
 
             # Update the release phase based on vote result

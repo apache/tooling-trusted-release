@@ -41,7 +41,7 @@ async def index() -> response.Response | str:
         phase_sequence = ["Compose", "Vote", "Stage", "Announce"]
         phase_index_map = {
             models.ReleasePhase.RELEASE_CANDIDATE_DRAFT: 0,
-            models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE: 1,
+            models.ReleasePhase.RELEASE_CANDIDATE: 1,
             models.ReleasePhase.RELEASE_PREVIEW: 2,
             models.ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT: 3,
         }

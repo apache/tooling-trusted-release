@@ -1211,7 +1211,7 @@ Thanks,
 
                 # This is now handled by the _promote call, above
                 # # Update the release phase to the voting phase only if not sending a test message to the user
-                # release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE
+                # release.phase = models.ReleasePhase.RELEASE_CANDIDATE
 
                 # Store when the release was put into the voting phase
                 release.vote_started = datetime.datetime.now(datetime.UTC)
@@ -1314,7 +1314,7 @@ async def _promote(
     # TODO: Obtain a lock for this
     # NOTE: The functionality for skipping phases has been removed
     release.stage = models.ReleaseStage.RELEASE_CANDIDATE
-    release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE
+    release.phase = models.ReleasePhase.RELEASE_CANDIDATE
     target_dir = util.get_release_candidate_dir() / project_name / version_name
 
     if await aiofiles.os.path.exists(target_dir):
