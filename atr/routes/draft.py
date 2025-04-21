@@ -218,6 +218,12 @@ async def add_files(session: routes.CommitterSession, project_name: str, version
 
     svn_form = await SvnImportForm.create_form()
 
+    async with db.session() as data:
+        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+        project_display_name = release.project.display_name
+
     return await quart.render_template(
         "draft-add-files.html",
         asf_id=session.uid,
@@ -226,6 +232,7 @@ async def add_files(session: routes.CommitterSession, project_name: str, version
         version_name=version_name,
         form=form,
         svn_form=svn_form,
+        project_display_name=project_display_name,
     )
 
 

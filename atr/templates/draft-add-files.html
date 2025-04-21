@@ -9,9 +9,10 @@
 {% endblock description %}
 
 {% block content %}
-  <a href="{{ as_url(routes.draft.drafts) }}" class="back-link">← Back to Candidate drafts</a>
+  <a href="{{ as_url(routes.draft.overview, project_name=project_name, version_name=version_name) }}"
+     class="back-link">← Back to {{ project_display_name }} {{ version_name }}</a>
 
-  <h1>Add files to {{ project_name }} {{ version_name }}</h1>
+  <h1>Add files to {{ project_display_name }} {{ version_name }}</h1>
 
   <h2>File upload</h2>
   <p class="intro">Use this form to add files to this candidate draft.</p>
