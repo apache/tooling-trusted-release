@@ -42,6 +42,7 @@ import atr.revision as revision
 import atr.routes as routes
 import atr.routes.candidate as candidate
 import atr.tasks.sbom as sbom
+import atr.tasks.vote as tasks_vote
 import atr.user as user
 import atr.util as util
 
@@ -86,28 +87,6 @@ class DeleteForm(util.QuartFormTyped):
         ],
     )
     submit = wtforms.SubmitField("Delete candidate draft")
-
-
-class PromoteForm(util.QuartFormTyped):
-    """Form for promoting a candidate draft."""
-
-    candidate_draft_name = wtforms.StringField(
-        "Candidate draft name", validators=[wtforms.validators.InputRequired("Candidate draft name is required")]
-    )
-    confirm_promote = wtforms.BooleanField(
-        "Confirmation", validators=[wtforms.validators.DataRequired("You must confirm to proceed with promotion")]
-    )
-    target_phase = wtforms.RadioField(
-        "Target phase",
-        choices=[
-            (models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE.value, "Release candidate (before vote) - RECOMMENDED"),
-            (models.ReleasePhase.RELEASE_PREVIEW.value, "Release preview"),
-            (models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT.value, "Release (after announcement)"),
-        ],
-        default=models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE.value,
-        validators=[wtforms.validators.InputRequired("Target phase selection is required")],
-    )
-    submit = wtforms.SubmitField("Promote candidate draft")
 
 
 class SvnImportForm(util.QuartFormTyped):
@@ -315,17 +294,17 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
     candidate_draft_name = form.candidate_draft_name.data
     if not candidate_draft_name:
-        return await session.redirect(promote, error="Missing required parameters")
+        return await session.redirect(drafts, error="Missing required parameters")
 
     # Extract project name and version
     try:
         project_name, version = candidate_draft_name.rsplit("-", 1)
     except ValueError:
-        return await session.redirect(promote, error="Invalid candidate draft name format")
+        return await session.redirect(drafts, error="Invalid candidate draft name format")
 
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(promote, error="You do not have access to this project")
+        return await session.redirect(drafts, error="You do not have access to this project")
 
     # Delete the metadata from the database
     async with db.session() as data:
@@ -334,7 +313,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
                 await _delete_candidate_draft(data, candidate_draft_name)
             except Exception as e:
                 logging.exception("Error deleting candidate draft:")
-                return await session.redirect(promote, error=f"Error deleting candidate draft: {e!s}")
+                return await session.redirect(drafts, error=f"Error deleting candidate draft: {e!s}")
 
     # Delete the files on disk
     draft_dir = util.get_release_candidate_draft_dir() / project_name / version
@@ -428,6 +407,7 @@ async def drafts(session: routes.CommitterSession) -> str:
         number_of_release_files=util.number_of_release_files,
         candidate_drafts=user_candidate_drafts,
         delete_form=delete_form,
+        latest_info=revision.latest_info,
     )
 
 
@@ -748,60 +728,7 @@ async def overview(session: routes.CommitterSession, project_name: str, version_
         server_domain=session.host,
         format_datetime=routes.format_datetime,
         models=models,
-    )
-
-
-@routes.committer("/draft/promote", methods=["GET", "POST"])
-async def promote(session: routes.CommitterSession) -> str | response.Response:
-    """Allow the user to promote a candidate draft."""
-    user_candidate_drafts = await session.user_candidate_drafts
-
-    # Create the forms
-    promote_form = await PromoteForm.create_form(
-        data=await quart.request.form if (quart.request.method == "POST") else None
-    )
-    delete_form = await DeleteForm.create_form()
-
-    if (quart.request.method == "POST") and (await promote_form.validate_on_submit()):
-        candidate_draft_name = promote_form.candidate_draft_name.data
-        if not candidate_draft_name:
-            return await session.redirect(promote, error="Missing required parameters")
-
-        # Extract project name and version
-        try:
-            project_name, version_name = candidate_draft_name.rsplit("-", 1)
-        except ValueError:
-            return await session.redirect(promote, error="Invalid candidate draft name format")
-
-        # Check that the user has access to the project
-        if not any((p.name == project_name) for p in (await session.user_projects)):
-            return await session.redirect(promote, error="You do not have access to this project")
-
-        selected_target_phase_value = promote_form.target_phase.data
-        try:
-            target_phase_enum = models.ReleasePhase(selected_target_phase_value)
-        except ValueError:
-            return await session.redirect(promote, error="Invalid target phase selected")
-
-        async with db.session() as data:
-            try:
-                return await _promote(
-                    data, candidate_draft_name, session, target_phase_enum, project_name, version_name
-                )
-            except Exception as e:
-                logging.exception("Error promoting candidate draft:")
-                return await session.redirect(promote, error=f"Error promoting candidate draft: {e!s}")
-
-    candidate_draft_files = {}
-    for candidate_draft in user_candidate_drafts:
-        candidate_draft_files[candidate_draft.name] = await util.number_of_release_files(candidate_draft)
-
-    return await quart.render_template(
-        "draft-promote.html",
-        candidate_drafts=user_candidate_drafts,
-        candidate_draft_files=candidate_draft_files,
-        promote_form=promote_form,
-        delete_form=delete_form,
+        latest_info=revision.latest_info,
     )
 
 
@@ -1174,6 +1101,169 @@ async def view_path(
     )
 
 
+@routes.committer("/draft/vote/start/<project_name>/<version>/<revision>", methods=["GET", "POST"])
+async def vote_start(
+    session: routes.CommitterSession, project_name: str, version: str, revision: str
+) -> response.Response | str:
+    """Show the vote initiation form for a release."""
+    async with db.session() as data:
+        project = await data.project(name=project_name).demand(routes.FlashError("Project not found"))
+        release = await data.release(project_id=project.id, version=version, _committee=True).demand(
+            routes.FlashError("Release candidate not found")
+        )
+        # Check that the user is on the project committee for the release
+        # TODO: Consider relaxing this to all committers
+        # Otherwise we must not show the vote form
+        if not user.is_committee_member(release.committee, session.uid):
+            return await session.redirect(overview, error="You must be on the PMC of this project to start a vote")
+        committee = util.unwrap(release.committee)
+
+        sender = f"{session.uid}@apache.org"
+        permitted_recipients = util.permitted_vote_recipients(session.uid)
+
+        if release.vote_policy:
+            min_hours = release.vote_policy.min_hours
+        else:
+            min_hours = 72
+
+        class VoteInitiateForm(util.QuartFormTyped):
+            """Form for initiating a release vote."""
+
+            release_name = wtforms.HiddenField("Release Name")
+            mailing_list = wtforms.RadioField(
+                "Send vote email to",
+                choices=[
+                    (recipient, recipient) if (recipient != sender) else (recipient, f"{recipient} (preview only)")
+                    for recipient in permitted_recipients
+                ],
+                validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
+                default="user-tests@tooling.apache.org",
+            )
+            vote_duration = wtforms.IntegerField(
+                "Minimum vote duration in hours",
+                validators=[
+                    wtforms.validators.InputRequired("Vote duration is required"),
+                    util.validate_vote_duration,
+                ],
+                default=min_hours,
+            )
+            subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
+            body = wtforms.TextAreaField("Body", validators=[wtforms.validators.Optional()])
+            submit = wtforms.SubmitField("Send vote email")
+
+        version = release.version
+        committee_name = committee.name
+        committee_display = committee.display_name
+        project_name = release.project.name if release.project else "Unknown"
+
+        default_subject = f"[VOTE] Release Apache {committee_display} {project_name} {version}"
+        default_body = f"""Hello {committee_name},
+
+I'd like to call a vote on releasing the following artifacts as
+Apache {committee_display} {project_name} {version}.
+
+The release candidate can be found at:
+
+https://apache.example.org/{committee_name}/{project_name}-{version}/
+
+The release artifacts are signed with the GPG key with fingerprint:
+
+  [KEY_FINGERPRINT]
+
+Please review the release candidate and vote accordingly.
+
+[ ] +1 Release this package
+[ ] +0 Abstain
+[ ] -1 Do not release this package (please provide specific comments)
+
+This vote will remain open for [DURATION] hours.
+
+Thanks,
+[YOUR_NAME]
+"""
+
+        form = await VoteInitiateForm.create_form(
+            data=await quart.request.form if quart.request.method == "POST" else None,
+        )
+        # Set hidden field data explicitly
+        form.release_name.data = release.name
+
+        if quart.request.method == "GET":
+            form.subject.data = default_subject
+            form.body.data = default_body
+
+        if await form.validate_on_submit():
+            email_to: str = util.unwrap(form.mailing_list.data)
+            vote_duration_choice: int = util.unwrap(form.vote_duration.data)
+            subject_data: str = util.unwrap(form.subject.data)
+            body_data: str = util.unwrap(form.body.data)
+
+            if committee is None:
+                raise base.ASFQuartException("Release has no associated committee", errorcode=400)
+
+            if email_to not in permitted_recipients:
+                # This will be checked again by tasks/vote.py for extra safety
+                raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
+            if email_to != sender:
+                error = await _promote(data, release.name, project_name, version, revision)
+                if error:
+                    return await session.redirect(drafts, error=error)
+
+                # This is now handled by the _promote call, above
+                # # Update the release phase to the voting phase only if not sending a test message to the user
+                # release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE
+
+                # Store when the release was put into the voting phase
+                release.vote_started = datetime.datetime.now(datetime.UTC)
+
+                # TODO: We also need to store the duration of the vote
+                # We can't allow resolution of the vote until the duration has elapsed
+                # But we allow the user to specify in the form
+                # And yet we also have VotePolicy.min_hours
+                # Presumably this sets the default, and the form takes precedence?
+                # VotePolicy.min_hours can also be 0, though
+
+            # Create a task for vote initiation
+            task = models.Task(
+                status=models.TaskStatus.QUEUED,
+                task_type=models.TaskType.VOTE_INITIATE,
+                task_args=tasks_vote.Initiate(
+                    release_name=release.name,
+                    email_to=email_to,
+                    vote_duration=vote_duration_choice,
+                    initiator_id=session.uid,
+                    subject=subject_data,
+                    body=body_data,
+                ).model_dump(),
+                release_name=release.name,
+            )
+
+            data.add(task)
+            # Flush to get the task ID
+            await data.flush()
+            await data.commit()
+
+            # NOTE: During debugging, this email is actually sent elsewhere
+            # TODO: We should perhaps move that logic here, so that we can show the debugging address
+            # We should also log all outgoing email and the session so that users can confirm
+            # And can be warned if there was a failure
+            # (The message should be shown on the vote resolution page)
+            # TODO: Link to the vote resolution page in the flash message
+            resolve: routes.RouteHandler[str] = candidate.resolve  # type: ignore[has-type]
+            return await session.redirect(
+                resolve,
+                success=f"The vote announcement email will soon be sent to {email_to}.",
+            )
+
+        # For GET requests or failed POST validation
+        return await quart.render_template(
+            "draft-vote-start.html",
+            release=release,
+            form=form,
+            revision=revision,
+        )
+
+
 async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -> None:
     """Delete a candidate draft and all its associated files."""
     # Check that the release exists
@@ -1194,11 +1284,11 @@ async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -
 async def _promote(
     data: db.Session,
     candidate_draft_name: str,
-    session: routes.CommitterSession,
-    target_phase_enum: models.ReleasePhase,
     project_name: str,
     version_name: str,
-) -> str | response.Response:
+    revision_name: str,
+) -> str | None:
+    """Promote a candidate draft to a new phase."""
     # Get the release
     release = await data.release(name=candidate_draft_name, _project=True).demand(
         routes.FlashError("Candidate draft not found")
@@ -1206,51 +1296,41 @@ async def _promote(
 
     # Verify that it's in the correct phase
     if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-        return await session.redirect(promote, error="This release is not in the candidate draft phase")
+        return "This release is not in the candidate draft phase"
 
     base_dir = util.get_release_candidate_draft_dir() / project_name / version_name
-    # Read the "latest" symlink and make an absolute path from it relative to base_dir
-    source_dir = base_dir / await aiofiles.os.readlink(str(base_dir / "latest"))
+    # Use the directory of the specified revision
+    # TODO: This ensures that we promote the correct revision, but does not stop conflicts
+    # We need to obtain a lock when promoting
+    source_dir = base_dir / revision_name
     target_dir: pathlib.Path
-    success_message: str
 
     # Count how many files are in the source directory
     file_count = await util.number_of_release_files(release)
     if file_count == 0:
-        return await session.redirect(promote, error="This candidate draft is empty, containing no files")
+        return "This candidate draft is empty, containing no files"
 
     # Promote it to the target phase
     # TODO: Obtain a lock for this
-    if target_phase_enum == models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE:
-        release.stage = models.ReleaseStage.RELEASE_CANDIDATE
-        release.phase = models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE
-        target_dir = util.get_release_candidate_dir() / project_name / version_name
-        success_message = "Candidate draft successfully promoted to candidate (before vote)"
-    elif target_phase_enum == models.ReleasePhase.RELEASE_PREVIEW:
-        release.stage = models.ReleaseStage.RELEASE
-        release.phase = models.ReleasePhase.RELEASE_PREVIEW
-        target_dir = util.get_release_preview_dir() / project_name / version_name
-        success_message = "Candidate draft successfully promoted to release preview"
-    elif target_phase_enum == models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT:
-        release.stage = models.ReleaseStage.RELEASE
-        release.phase = models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT
-        target_dir = util.get_release_dir() / project_name / version_name
-        success_message = "Candidate draft successfully promoted to release (after announcement)"
-    else:
-        # Should not happen, due to form validation
-        return await session.redirect(promote, error="Unsupported target phase")
+    # NOTE: The functionality for skipping phases has been removed
+    release.stage = models.ReleaseStage.RELEASE_CANDIDATE
+    release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE
+    target_dir = util.get_release_candidate_dir() / project_name / version_name
 
     if await aiofiles.os.path.exists(target_dir):
-        return await session.redirect(promote, error=f"Target directory {target_dir.name} already exists")
+        return f"Target directory {target_dir.name} already exists"
 
     await data.commit()
+    # We updated the release
+    # This could act like a lock, but it would be difficult
+    # TODO: Ideally we'd store the revision on the release object instead
+    # Then we could make it atomic through the database
+
     logging.warning(f"Moving {source_dir} to {target_dir} (base: {base_dir})")
     await aioshutil.move(str(source_dir), str(target_dir))
     await aioshutil.rmtree(str(base_dir))  # type: ignore[call-arg]
 
-    # Seems to be yet another mypy Protocol handling issue
-    candidate_vote: routes.RouteHandler[str] = candidate.vote  # type: ignore[has-type]
-    return await session.redirect(candidate_vote, success=success_message)
+    return None
 
 
 async def _revisions_process(

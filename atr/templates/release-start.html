@@ -7,7 +7,7 @@
 {% block content %}
   <h1>Start a new release</h1>
   <p class="intro">
-    Starting a new release creates an initial <strong>release candidate draft</strong>. You can then add files to this draft before promoting it for review and voting.
+    Starting a new release creates a <strong>release candidate draft</strong>. You can then add files to this draft before promoting it for voting.
   </p>
 
   <form method="post"
@@ -15,7 +15,8 @@
         enctype="multipart/form-data"
         class="atr-canary py-4 px-5 border rounded">
 
-    {{ form.hidden_tag() }} {# Includes csrf_token and project_name #}
+    {# Includes csrf_token and project_name #}
+    {{ form.hidden_tag() }}
 
     <div class="mb-4">
       <p class="fs-5">

@@ -25,7 +25,7 @@ import quart
 import werkzeug.wrappers.response as response
 
 import atr.routes as routes
-import atr.routes.candidate as candidate
+import atr.routes.draft as draft
 import atr.util as util
 
 
@@ -46,8 +46,7 @@ async def phase(
         # Even using the following type declaration, mypy does not know the type
         # The same pattern is used in release.py, so this is a bug in mypy
         # TODO: Report the bug upstream to mypy
-        # review: routes.RouteHandler[str] = candidate.vote
-        return await session.redirect(candidate.vote, error="File not found")  # type: ignore[has-type]
+        return await session.redirect(draft.drafts, error="File not found")
 
     # Send the file with original filename
     return await quart.send_file(

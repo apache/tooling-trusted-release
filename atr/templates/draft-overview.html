@@ -1,26 +1,19 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Draft: {{ project_name }} {{ version_name }} ~ ATR
+  {{ release.project.display_name }} {{ version_name }} ~ ATR
 {% endblock title %}
 
 {% block description %}
-  Overview and management page for the {{ project_name }} {{ version_name }} candidate draft.
+  Overview and management page for the {{ release.project.display_name }} {{ version_name }} candidate draft.
 {% endblock description %}
 
 {% import 'macros/dialog.html' as dialog %}
 
 {% block content %}
-  <p class="atr-breadcrumbs">
-    <a href="{{ as_url(routes.projects.select) }}" class="back-link">Select a project</a>
-    <span>→</span> <a href="{{ as_url(routes.release.select, project_name=project_name) }}"
-    class="back-link">Select an <em>{{ release.project.display_name }}</em> release</a>
-    <span>→</span> {{ version_name }}
-  </p>
-
-  <h1>Draft: {{ version_name }}</h1>
+  <h1>{{ release.project.display_name }} {{ version_name }}</h1>
   <p class="intro">
-    Manage the <strong>candidate draft</strong> for {{ project_name }} {{ version_name }}. Add files, review checks, and promote when ready.
+    Manage the <strong>candidate draft</strong> for {{ release.project.display_name }} {{ version_name }}. Add files, review checks, and promote when ready.
   </p>
 
   <div class="card mb-4">
@@ -73,9 +66,9 @@
       <a href="{{ as_url(routes.draft.revisions, project_name=project_name, version_name=version_name) }}"
          title="View revision history"
          class="btn btn-secondary"><i class="fas fa-history me-1"></i> Revisions</a>
-      <a href="{{ as_url(routes.draft.promote) }}#{{ release.name }}"
-         title="Promote this draft to the next stage"
-         class="btn btn-success"><i class="fas fa-check-circle me-1"></i> Promote draft</a>
+      <a href="{{ as_url(routes.draft.vote_start, project_name=release.project.name, version=release.version, revision=latest_info(release.project.name, release.version)[0] ) }}"
+         title="Start a vote on this draft"
+         class="btn btn-success"><i class="fas fa-check-circle me-1"></i> Start vote</a>
       <button class="btn btn-danger"
               title="Delete this entire draft"
               data-bs-toggle="modal"

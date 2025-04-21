@@ -17,7 +17,6 @@
 
 """candidate.py"""
 
-import datetime
 import json
 import logging
 
@@ -36,8 +35,6 @@ import atr.mail as mail
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.preview as preview
-import atr.tasks.vote as tasks_vote
-import atr.user as user
 import atr.util as util
 
 if asfquart.APP is ...:
@@ -61,7 +58,7 @@ class ResolveForm(util.QuartFormTyped):
 @routes.committer("/candidate/delete", methods=["POST"])
 async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a release candidate."""
-    return await session.redirect(vote, error="Not yet implemented")
+    return await session.redirect(resolve, error="Not yet implemented")
 
 
 @routes.committer("/candidate/resolve", methods=["GET", "POST"], measure_performance=False)
@@ -79,7 +76,7 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     """View all the files in the rsync upload directory for a release."""
     # Check that the user has access to the project
     if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(vote, error="You do not have access to this project")
+        return await session.redirect(resolve, error="You do not have access to this project")
 
     # Check that the release exists
     async with db.session() as data:
@@ -139,31 +136,7 @@ async def view_path(
     )
 
 
-@routes.committer("/candidate/vote")
-async def vote(session: routes.CommitterSession) -> str:
-    """Show all release candidates to which the user has access."""
-    async with db.session() as data:
-        # Get all releases where the user is a PMC member or committer
-        # TODO: We don't actually record who uploaded the release candidate
-        # We should probably add that information!
-        releases = await data.release(
-            stage=models.ReleaseStage.RELEASE_CANDIDATE,
-            phase=models.ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE,
-            _committee=True,
-            _packages=True,
-        ).all()
-        user_candidates = session.only_user_releases(releases)
-
-        # time.sleep(0.37)
-        # await asyncio.sleep(0.73)
-        return await quart.render_template(
-            "candidate-vote.html",
-            candidates=user_candidates,
-            format_file_size=routes.format_file_size,
-            format_artifact_name=_format_artifact_name,
-        )
-
-
+# TODO: Move this to draft.py
 @routes.committer("/candidate/vote/preview", methods=["POST"])
 async def vote_preview(session: routes.CommitterSession) -> quart.wrappers.response.Response | response.Response | str:
     """Show the vote email preview for a release."""
@@ -179,164 +152,12 @@ async def vote_preview(session: routes.CommitterSession) -> quart.wrappers.respo
 
     form = await VotePreviewForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
-        return await session.redirect(vote, error="Invalid form data")
+        return await session.redirect(resolve, error="Invalid form data")
 
     body = await mail.generate_preview(
         util.unwrap(form.body.data), util.unwrap(form.asfuid.data), util.unwrap(form.vote_duration.data)
     )
     return quart.Response(body, mimetype="text/plain")
-
-
-@routes.committer("/candidate/vote/<project_name>/<version>", methods=["GET", "POST"])
-async def vote_project(session: routes.CommitterSession, project_name: str, version: str) -> response.Response | str:
-    """Show the vote initiation form for a release."""
-    async with db.session() as data:
-        project = await data.project(name=project_name).demand(routes.FlashError("Project not found"))
-        release = await data.release(project_id=project.id, version=version, _committee=True).demand(
-            routes.FlashError("Release candidate not found")
-        )
-        # Check that the user is on the release project committee
-        if not user.is_committee_member(release.committee, session.uid):
-            return await session.redirect(vote, error="You do not have access to this project")
-        committee = util.unwrap(release.committee)
-
-        sender = f"{session.uid}@apache.org"
-        permitted_recipients = util.permitted_vote_recipients(session.uid)
-
-        if release.vote_policy:
-            min_hours = release.vote_policy.min_hours
-        else:
-            min_hours = 72
-
-        class VoteInitiateForm(util.QuartFormTyped):
-            """Form for initiating a release vote."""
-
-            release_name = wtforms.HiddenField("Release Name")
-            mailing_list = wtforms.RadioField(
-                "Send vote email to",
-                choices=[
-                    (recipient, recipient) if (recipient != sender) else (recipient, f"{recipient} (preview only)")
-                    for recipient in permitted_recipients
-                ],
-                validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
-                default="user-tests@tooling.apache.org",
-            )
-            vote_duration = wtforms.IntegerField(
-                "Minimum vote duration in hours",
-                validators=[
-                    wtforms.validators.InputRequired("Vote duration is required"),
-                    util.validate_vote_duration,
-                ],
-                default=min_hours,
-            )
-            subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
-            body = wtforms.TextAreaField("Body", validators=[wtforms.validators.Optional()])
-            submit = wtforms.SubmitField("Send vote email")
-
-        version = release.version
-        committee_name = committee.name
-        committee_display = committee.display_name
-        project_name = release.project.name if release.project else "Unknown"
-
-        default_subject = f"[VOTE] Release Apache {committee_display} {project_name} {version}"
-        default_body = f"""Hello {committee_name},
-
-I'd like to call a vote on releasing the following artifacts as
-Apache {committee_display} {project_name} {version}.
-
-The release candidate can be found at:
-
-https://apache.example.org/{committee_name}/{project_name}-{version}/
-
-The release artifacts are signed with the GPG key with fingerprint:
-
-  [KEY_FINGERPRINT]
-
-Please review the release candidate and vote accordingly.
-
-[ ] +1 Release this package
-[ ] +0 Abstain
-[ ] -1 Do not release this package (please provide specific comments)
-
-This vote will remain open for [DURATION] hours.
-
-Thanks,
-[YOUR_NAME]
-"""
-
-        form = await VoteInitiateForm.create_form(
-            data=await quart.request.form if quart.request.method == "POST" else None,
-        )
-        # Set hidden field data explicitly
-        form.release_name.data = release.name
-
-        if quart.request.method == "GET":
-            form.subject.data = default_subject
-            form.body.data = default_body
-
-        if await form.validate_on_submit():
-            email_to = util.unwrap(form.mailing_list.data)
-            vote_duration_choice = util.unwrap(form.vote_duration.data)
-            subject_data = util.unwrap(form.subject.data)
-            body_data = util.unwrap(form.body.data)
-
-            if committee is None:
-                raise base.ASFQuartException("Release has no associated committee", errorcode=400)
-
-            if email_to not in permitted_recipients:
-                # This will be checked again by tasks/vote.py for extra safety
-                raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
-            if email_to != sender:
-                # Update the release phase to the voting phase only if not sending a test message to the user
-                release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE
-
-                # Store when the release was put into the voting phase
-                release.vote_started = datetime.datetime.now(datetime.UTC)
-
-                # TODO: We also need to store the duration of the vote
-                # We can't allow resolution of the vote until the duration has elapsed
-                # But we allow the user to specify in the form
-                # And yet we also have VotePolicy.min_hours
-                # Presumably this sets the default, and the form takes precedence?
-                # VotePolicy.min_hours can also be 0, though
-
-            # Create a task for vote initiation
-            task = models.Task(
-                status=models.TaskStatus.QUEUED,
-                task_type=models.TaskType.VOTE_INITIATE,
-                task_args=tasks_vote.Initiate(
-                    release_name=release.name,
-                    email_to=email_to,
-                    vote_duration=vote_duration_choice,
-                    initiator_id=session.uid,
-                    subject=subject_data,
-                    body=body_data,
-                ).model_dump(),
-                release_name=release.name,
-            )
-
-            data.add(task)
-            # Flush to get the task ID
-            await data.flush()
-            await data.commit()
-
-            # NOTE: During debugging, this email is actually sent elsewhere
-            # TODO: We should perhaps move that logic here, so that we can show the debugging address
-            # We should also log all outgoing email and the session so that users can confirm
-            # And can be warned if there was a failure
-            # (The message should be shown on the vote resolution page)
-            # TODO: Link to the vote resolution page in the flash message
-            return await session.redirect(
-                resolve,
-                success=f"The vote announcement email will soon be sent to {email_to}.",
-            )
-
-        # For GET requests or failed POST validation
-        return await quart.render_template(
-            "candidate-vote-project.html",
-            release=release,
-            form=form,
-        )
 
 
 def _format_artifact_name(project_name: str, version: str, is_podling: bool = False) -> str:

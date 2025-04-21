@@ -212,9 +212,7 @@ class Project(sqlmodel.SQLModel, table=True):
     @property
     async def candidates(self) -> list["Release"]:
         """Get the candidate releases for the project."""
-        before_vote = await self.releases_by_phase(ReleasePhase.RELEASE_CANDIDATE_BEFORE_VOTE)
-        during_vote = await self.releases_by_phase(ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE)
-        return before_vote + during_vote
+        return await self.releases_by_phase(ReleasePhase.RELEASE_CANDIDATE_DURING_VOTE)
 
     @property
     async def previews(self) -> list["Release"]:
@@ -296,9 +294,7 @@ class ReleasePhase(str, enum.Enum):
     # [CANDIDATE]
     # Step 1: The candidate files are added from external sources and checked by ATR
     RELEASE_CANDIDATE_DRAFT = "release_candidate_draft"
-    # Step 2: The candidate files are frozen and promoted into a candidate release
-    RELEASE_CANDIDATE_BEFORE_VOTE = "release_candidate_before_vote"
-    # Step 3: The project members are voting on the candidate release
+    # Step 2: The project members are voting on the candidate release
     RELEASE_CANDIDATE_DURING_VOTE = "release_candidate_during_vote"
 
     # [RELEASE]

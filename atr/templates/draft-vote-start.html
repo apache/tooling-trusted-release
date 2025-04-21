@@ -13,9 +13,10 @@
     <h1 class="mb-4">Start release vote</h1>
 
     <div class="px-3 pb-4 mb-4 bg-light border rounded">
+      <!-- TODO: Specify the draft revision too? -->
       <h2 class="mt-4 mb-3 fs-5 border-0">{{ release.project.display_name }} {{ release.version }}</h2>
       <p class="mb-0">
-        Starting a vote for this release candidate will cause an email to be sent to the appropriate mailing list, and advance the draft to the "waiting for vote result" phase, unless you send a test message to yourself.
+        Starting a vote for this draft release will cause an email to be sent to the appropriate mailing list, and advance the draft to the "waiting for vote result" phase, unless you send a test message to yourself.
       </p>
     </div>
 
@@ -26,7 +27,7 @@
     <form method="post"
           id="vote-initiate-form"
           class="atr-canary py-4 px-5"
-          action="{{ as_url(routes.candidate.vote_project, project_name=release.project.name, version=release.version) }}">
+          action="{{ as_url(routes.draft.vote_start, project_name=release.project.name, version=release.version, revision=revision) }}">
       {{ form.hidden_tag() if form.hidden_tag }}
       {{ form.release_name }}
 
@@ -104,7 +105,7 @@
 
       <div class="mt-4 col-md-9 offset-md-3">
         {{ form.submit(class_='btn btn-primary') }}
-        <a href="{{ as_url(routes.candidate.vote) }}"
+        <a href="{{ as_url(routes.draft.overview, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-link text-secondary">Cancel</a>
       </div>
     </form>

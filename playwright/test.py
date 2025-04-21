@@ -305,11 +305,10 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
         test_lifecycle_01_add_draft,
         test_lifecycle_02_check_draft_added,
         test_lifecycle_03_add_file,
-        test_lifecycle_04_promote_to_candidate,
-        test_lifecycle_05_vote_on_candidate,
-        test_lifecycle_06_resolve_vote,
-        test_lifecycle_07_promote_preview,
-        test_lifecycle_08_release_exists,
+        test_lifecycle_04_start_vote,
+        test_lifecycle_05_resolve_vote,
+        test_lifecycle_06_promote_preview,
+        test_lifecycle_07_release_exists,
     ]
     tests["gpg"] = [
         test_gpg_01_upload,
@@ -627,53 +626,19 @@ def test_lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials) ->
     logging.info("Navigation back to /drafts completed successfully")
 
 
-def test_lifecycle_04_promote_to_candidate(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Locating draft promotion link for tooling-test-example-0.1")
+def test_lifecycle_04_start_vote(page: sync_api.Page, credentials: Credentials) -> None:
+    logging.info("Locating start vote link for tooling-test-example-0.1")
     draft_card_locator = page.locator(r"#tooling-test-example-0\.1")
-    promote_link_locator = draft_card_locator.locator('a[title="Promote Apache Tooling Test Example 0.1"]')
-    sync_api.expect(promote_link_locator).to_be_visible()
-
-    logging.info("Follow the draft promotion link")
-    promote_link_locator.click()
-
-    logging.info("Waiting for page load after following the promote link")
-    page.wait_for_load_state()
-    logging.info("Page loaded after following the promote link")
-    logging.info(f"Current URL: {page.url}")
-
-    logging.info("Locating the promotion form for tooling-test-example-0.1")
-    form_locator = page.locator('form:has(input[name="candidate_draft_name"][value="tooling-test-example-0.1"])')
-    sync_api.expect(form_locator).to_be_visible()
-
-    logging.info("Locating the confirmation checkbox within the form")
-    checkbox_locator = form_locator.locator('input[name="confirm_promote"]')
-    sync_api.expect(checkbox_locator).to_be_visible()
-
-    logging.info("Checking the confirmation checkbox")
-    checkbox_locator.check()
-
-    logging.info("Locating and activating the promote button within the form")
-    submit_button_locator = form_locator.get_by_role("button", name="Promote candidate draft")
-    sync_api.expect(submit_button_locator).to_be_enabled()
-    submit_button_locator.click()
-
-    logging.info("Waiting for navigation to /candidate/vote after submitting promotion")
-    wait_for_path(page, "/candidate/vote")
-    logging.info("Promote draft actions completed successfully")
-
-
-def test_lifecycle_05_vote_on_candidate(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Locating the link to start a vote for tooling-test-example-0.1")
-    card_locator = page.locator('div.card:has(input[name="candidate_name"][value="tooling-test-example-0.1"])')
-    start_vote_link_locator = card_locator.locator('a[title="Start vote for Apache Tooling Test Example 0.1"]')
+    start_vote_link_locator = draft_card_locator.locator('a[title="Start vote for Apache Tooling Test Example 0.1"]')
     sync_api.expect(start_vote_link_locator).to_be_visible()
 
-    logging.info("Following the link to start the vote")
+    logging.info("Follow the start vote link")
     start_vote_link_locator.click()
 
-    logging.info("Waiting for navigation to /candidate/vote/tooling-test-example/0.1")
-    wait_for_path(page, "/candidate/vote/tooling-test-example/0.1")
-    logging.info("Vote start page loaded successfully")
+    logging.info("Waiting for page load after following the start vote link")
+    page.wait_for_load_state()
+    logging.info("Page loaded after following the start vote link")
+    logging.info(f"Current URL: {page.url}")
 
     logging.info("Locating and activating the button to prepare the vote email")
     submit_button_locator = page.locator('input[type="submit"][value="Send vote email"]')
@@ -685,7 +650,7 @@ def test_lifecycle_05_vote_on_candidate(page: sync_api.Page, credentials: Creden
     logging.info("Vote initiation actions completed successfully")
 
 
-def test_lifecycle_06_resolve_vote(page: sync_api.Page, credentials: Credentials) -> None:
+def test_lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Locating the form to resolve the vote for tooling-test-example-0.1")
     form_locator = page.locator('form:has(input[name="candidate_name"][value="tooling-test-example-0.1"])')
     sync_api.expect(form_locator).to_be_visible()
@@ -705,7 +670,7 @@ def test_lifecycle_06_resolve_vote(page: sync_api.Page, credentials: Credentials
     logging.info("Vote resolution actions completed successfully")
 
 
-def test_lifecycle_07_promote_preview(page: sync_api.Page, credentials: Credentials) -> None:
+def test_lifecycle_06_promote_preview(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Locating the link to promote the preview for tooling-test-example-0.1")
     promote_link_locator = page.locator('a[title="Promote Apache Tooling Test Example 0.1 to release"]')
     sync_api.expect(promote_link_locator).to_be_visible()
@@ -738,7 +703,7 @@ def test_lifecycle_07_promote_preview(page: sync_api.Page, credentials: Credenti
     logging.info("Preview promotion actions completed successfully")
 
 
-def test_lifecycle_08_release_exists(page: sync_api.Page, credentials: Credentials) -> None:
+def test_lifecycle_07_release_exists(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Checking for release tooling-test-example-0.1 on the /releases page")
 
     release_card_locator = page.locator('div.card:has(h3:has-text("Apache Tooling Test Example 0.1"))')

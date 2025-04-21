@@ -29,7 +29,6 @@ import wtforms
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
-import atr.routes.candidate as candidate
 import atr.routes.draft as draft
 import atr.util as util
 
@@ -56,11 +55,11 @@ async def bulk_status(session: routes.CommitterSession, task_id: int) -> str | r
         # Query for the task with the given ID
         task = await data.task(id=task_id).get()
         if not task:
-            return await session.redirect(candidate.vote, error=f"Task with ID {task_id} not found.")
+            return await session.redirect(draft.drafts, error=f"Task with ID {task_id} not found.")
 
         # Verify this is a bulk download task
         if task.task_type != "package_bulk_download":
-            return await session.redirect(candidate.vote, error=f"Task with ID {task_id} is not a bulk download task.")
+            return await session.redirect(draft.drafts, error=f"Task with ID {task_id} is not a bulk download task.")
 
         # If result is a list or tuple with a single item, extract it
         if isinstance(task.result, list | tuple) and (len(task.result) == 1):
@@ -79,7 +78,7 @@ async def bulk_status(session: routes.CommitterSession, task_id: int) -> str | r
                 if (session.uid not in release.committee.committee_members) and (
                     session.uid not in release.committee.committers
                 ):
-                    return await session.redirect(candidate.vote, error="You don't have permission to view this task.")
+                    return await session.redirect(draft.drafts, error="You don't have permission to view this task.")
 
     return await quart.render_template("release-bulk.html", task=task, release=release, TaskStatus=models.TaskStatus)
 

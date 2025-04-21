@@ -18,10 +18,6 @@
   <div class="my-3">
     <nav class="mb-3">
       <ol class="breadcrumb">
-        <li class="breadcrumb-item">
-          <a href="{{ as_url(routes.candidate.vote) }}"
-             class="text-decoration-none">Release candidates</a>
-        </li>
         {% if release %}
           <li class="breadcrumb-item">{{ release.committee.display_name }}</li>
           <li class="breadcrumb-item">{{ release.project.name if release.project else "Unknown project" }}</li>
