@@ -33,11 +33,14 @@ _LOGGER = logging.getLogger(__name__)
 
 @contextlib.asynccontextmanager
 async def create_and_manage(
-    project_name: str, version_name: str, asf_uid: str
+    project_name: str, version_name: str, asf_uid: str, preview: bool = False
 ) -> AsyncGenerator[tuple[pathlib.Path, str]]:
-    """Manage the creation and symlinking of a draft release candidate revision."""
-    draft_base_dir = util.get_release_candidate_draft_dir()
-    release_dir = draft_base_dir / project_name / version_name
+    """Manage the creation and symlinking of a mutable release revision."""
+    if preview is False:
+        base_dir = util.get_release_candidate_draft_dir()
+    else:
+        base_dir = util.get_release_preview_dir()
+    release_dir = base_dir / project_name / version_name
     new_revision_name = _new_name(asf_uid)
     new_revision_dir = release_dir / new_revision_name
 
@@ -49,6 +52,7 @@ async def create_and_manage(
     parent_revision_dir: pathlib.Path | None = None
     async with db.session() as data:
         release_name = models.release_name(project_name, version_name)
+        namespace = release_name + (" draft" if (preview is False) else " preview")
         release = await data.release(name=release_name, _project=True).get()
         if release is not None:
             parent_revision_id = release.revision
@@ -72,19 +76,20 @@ async def create_and_manage(
             async with data.begin():
                 if parent_revision_id is not None:
                     _LOGGER.info(f"Storing parent link for {new_revision_name} -> {parent_revision_id}")
-                    data.add(models.TextValue(ns="draft_parent", key=new_revision_name, value=parent_revision_id))
+                    data.add(models.TextValue(ns=namespace, key=new_revision_name, value=parent_revision_id))
                 else:
                     _LOGGER.info(f"No parent revision for {new_revision_name}")
                 release = await data.release(name=release_name, _project=True).demand(
                     RuntimeError("Release does not exist")
                 )
                 release.revision = new_revision_name
-        # Schedule the checks to be run
-        await tasks.draft_checks(project_name, version_name, new_revision_name)
+        if preview is False:
+            # Schedule the checks to be run
+            await tasks.draft_checks(project_name, version_name, new_revision_name)
 
     except Exception:
-        _LOGGER.exception(f"Error during draft revision management for {new_revision_name}, cleaning up")
-        # Raise the exception again after the clean up attempt
+        _LOGGER.exception(f"Error during revision management for {new_revision_name}")
+        # Keep this in case we do clean up the new revision directory
         raise
     finally:
         # TODO: It's hard to know whether we should clean up the new revision directory

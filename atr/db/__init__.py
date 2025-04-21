@@ -196,6 +196,14 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         if commit is True:
             await self.commit()
 
+    async def ns_text_del_all(self, ns: str, commit: bool = True) -> None:
+        stmt = sql.delete(models.TextValue).where(
+            validate_instrumented_attribute(models.TextValue.ns) == ns,
+        )
+        await self.execute(stmt)
+        if commit is True:
+            await self.commit()
+
     async def ns_text_get(self, ns: str, key: str) -> str | None:
         stmt = sql.select(models.TextValue).where(
             validate_instrumented_attribute(models.TextValue.ns) == ns,

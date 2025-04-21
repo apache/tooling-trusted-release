@@ -410,6 +410,10 @@ async def _delete_release_data(release_name: str) -> None:
             await data.delete(check)
         _LOGGER.debug("Deleted %d check results for %s", len(checks_to_delete), release_name)
 
+        await data.ns_text_del_all(release_name + " draft")
+        await data.ns_text_del_all(release_name + " preview")
+        _LOGGER.debug("Deleted parent links for %s", release_name)
+
         await data.delete(release)
         _LOGGER.info("Deleted release record: %s", release_name)
         await data.commit()

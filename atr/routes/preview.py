@@ -91,7 +91,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
                 logging.exception("Error deleting preview:")
                 return await session.redirect(promote, error=f"Error deleting preview: {e!s}")
 
-    # Delete the files on disk
+    # Delete the files on disk, including all revisions
     preview_dir = util.get_release_preview_dir() / project_name / version
     if await aiofiles.os.path.exists(preview_dir):
         await aioshutil.rmtree(preview_dir)
@@ -177,14 +177,17 @@ async def promote(session: routes.CommitterSession) -> str | response.Response:
                 # Verify that it's in the correct phase
                 if release.phase != models.ReleasePhase.RELEASE_PREVIEW:
                     return await session.redirect(promote, error="This release is not in the preview phase")
+                if release.revision is None:
+                    return await session.redirect(promote, error="This release does not have a revision")
 
                 # Promote it to a release
-                source = str(util.get_release_preview_dir() / project_name / version_name)
+                source = str(util.get_release_preview_dir() / project_name / version_name / release.revision)
                 target = str(util.get_release_dir() / project_name / version_name)
                 if await aiofiles.os.path.exists(target):
                     return await session.redirect(promote, error="Release already exists")
 
                 release.phase = models.ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT
+                release.revision = None
                 await data.commit()
                 await aioshutil.move(source, target)
 
@@ -247,9 +250,16 @@ async def view_path(
         release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
+        if release.revision is None:
+            return await session.redirect(
+                view,
+                error="This release does not have a revision",
+                project_name=project_name,
+                version_name=version_name,
+            )
 
     _max_view_size = 1 * 1024 * 1024
-    full_path = util.get_release_preview_dir() / project_name / version_name / file_path
+    full_path = util.get_release_preview_dir() / project_name / version_name / release.revision / file_path
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
     return await quart.render_template(
         "phase-view-path.html",
@@ -275,9 +285,15 @@ async def _delete_preview(data: db.Session, preview_name: str) -> None:
     if release.phase != models.ReleasePhase.RELEASE_PREVIEW:
         raise routes.FlashError("Release is not in the preview phase")
 
+    # TODO: Abstract this to a function
+    # We do something similar in admin.py and draft.py
     # Delete all associated packages first
     for package in release.packages:
         await data.delete(package)
+
+    # Delete any parent links
+    await data.ns_text_del_all(release.name + " draft")
+    await data.ns_text_del_all(release.name + " preview")
 
     # Delete the release record
     await data.delete(release)

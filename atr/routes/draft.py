@@ -323,7 +323,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
                 logging.exception("Error deleting candidate draft:")
                 return await session.redirect(drafts, error=f"Error deleting candidate draft: {e!s}")
 
-    # Delete the files on disk
+    # Delete the files on disk, including all revisions
     draft_dir = util.get_release_candidate_draft_dir() / project_name / version
     if await aiofiles.os.path.exists(draft_dir):
         # Believe this to be another bug in mypy Protocol handling
@@ -825,7 +825,7 @@ async def revisions(session: routes.CommitterSession, project_name: str, version
 
         # Get parent links using a direct query due to the use of in_(...)
         query = sqlmodel.select(models.TextValue).where(
-            models.TextValue.ns == "draft_parent",
+            models.TextValue.ns == release.name + " draft",
             db.validate_instrumented_attribute(models.TextValue.key).in_(revision_dirs),
         )
         parent_links_result = await data.execute(query)
@@ -1323,6 +1323,9 @@ async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -
     for package in release.packages:
         await data.delete(package)
 
+    # Delete any parent links
+    await data.ns_text_del_all(release.name + " draft")
+    await data.ns_text_del_all(release.name + " preview")
     # Delete the release record
     await data.delete(release)
 
@@ -1361,6 +1364,7 @@ async def _promote(
     # NOTE: The functionality for skipping phases has been removed
     release.stage = models.ReleaseStage.RELEASE_CANDIDATE
     release.phase = models.ReleasePhase.RELEASE_CANDIDATE
+    release.revision = None
     target_dir = util.get_release_candidate_dir() / project_name / version_name
 
     if await aiofiles.os.path.exists(target_dir):

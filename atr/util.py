@@ -296,13 +296,14 @@ async def number_of_release_files(release: models.Release) -> int:
     """Return the number of files in a release."""
     path_project = release.project.name
     path_version = release.version
+    path_revision = release.revision or "force-error"
     match release.phase:
         case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-            path = get_release_candidate_draft_dir() / path_project / path_version / (release.revision or "force-error")
+            path = get_release_candidate_draft_dir() / path_project / path_version / path_revision
         case models.ReleasePhase.RELEASE_CANDIDATE:
             path = get_release_candidate_dir() / path_project / path_version
         case models.ReleasePhase.RELEASE_PREVIEW:
-            path = get_release_preview_dir() / path_project / path_version
+            path = get_release_preview_dir() / path_project / path_version / path_revision
         case models.ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT | models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT:
             path = get_release_dir() / path_project / path_version
         case _:

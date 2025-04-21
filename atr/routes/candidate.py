@@ -20,7 +20,6 @@
 import json
 import logging
 
-import aiofiles.os
 import aioshutil
 import asfquart
 import asfquart.base as base
@@ -256,16 +255,17 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
 async def _resolve_post_files(project_name: str, release: models.Release, vote_result: str, asf_uid: str) -> None:
     # TODO: Obtain a lock for this
     source = str(util.get_release_candidate_dir() / project_name / release.version)
-    if vote_result == "passed":
-        # The vote passed, so promote the release candidate to the release preview directory
-        target = str(util.get_release_preview_dir() / project_name / release.version)
-        if await aiofiles.os.path.exists(target):
-            raise base.ASFQuartException("Release already exists", errorcode=400)
-        await aioshutil.move(source, target)
-        return
+    if vote_result != "passed":
+        # The vote failed, so move the release candidate to the release draft directory
+        async with revision.create_and_manage(project_name, release.version, asf_uid) as (
+            new_revision_dir,
+            _new_revision_name,
+        ):
+            await aioshutil.move(source, new_revision_dir)
+            return
 
-    # The vote failed, so move the release candidate to the release draft directory
-    async with revision.create_and_manage(project_name, release.version, asf_uid) as (
+    # The vote passed, so promote the release candidate to the release preview directory
+    async with revision.create_and_manage(project_name, release.version, asf_uid, preview=True) as (
         new_revision_dir,
         _new_revision_name,
     ):
