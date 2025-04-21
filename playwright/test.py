@@ -52,6 +52,10 @@ class Credentials:
 #     credentials: Credentials
 
 
+def esc_id(text: str) -> str:
+    return re.escape(text)
+
+
 def get_credentials() -> Credentials | None:
     try:
         username = input("Enter ASF Username: ")
@@ -90,6 +94,170 @@ def go_to_path(page: sync_api.Page, path: str, wait: bool = True) -> None:
     page.goto(f"https://{gateway_ip}:8080{path}")
     if wait:
         wait_for_path(page, path)
+
+
+def lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
+    logging.info("Following link to add draft")
+    add_draft_link_locator = page.get_by_role("link", name="Add draft")
+    sync_api.expect(add_draft_link_locator).to_be_visible()
+    add_draft_link_locator.click()
+
+    logging.info("Waiting for the add draft page")
+    project_select_locator = page.locator('select[name="project_name"]')
+    sync_api.expect(project_select_locator).to_be_visible()
+    logging.info("Add draft page loaded")
+
+    logging.info("Selecting project 'tooling-test-example'")
+    project_select_locator.select_option(label="Apache Tooling Test Example")
+
+    logging.info(f"Filling version '{version_name}'")
+    page.locator('input[name="version_name"]').fill(version_name)
+
+    logging.info("Submitting the add draft form")
+    submit_button_locator = page.locator('input[type="submit"][value="Create candidate draft"]')
+    sync_api.expect(submit_button_locator).to_be_enabled()
+    submit_button_locator.click()
+
+    logging.info(f"Waiting for navigation to /draft/content/tooling-test-example/{version_name} after adding draft")
+    wait_for_path(page, f"/draft/content/tooling-test-example/{version_name}")
+    logging.info("Add draft actions completed successfully")
+
+
+def lifecycle_02_check_draft_added(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
+    logging.info(f"Checking for draft 'tooling-test-example {version_name}'")
+    go_to_path(page, "/drafts")
+    draft_card_locator = page.locator(f"#tooling-test-example-{esc_id(version_name)}")
+    sync_api.expect(draft_card_locator).to_be_visible()
+    logging.info(f"Draft 'tooling-test-example {version_name}' found successfully")
+
+
+def lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
+    logging.info(f"Navigating to the add file page for tooling-test-example {version_name}")
+    go_to_path(page, f"/draft/add/tooling-test-example/{version_name}")
+    logging.info("Add file page loaded")
+
+    logging.info("Locating the file input")
+    file_input_locator = page.locator('input[name="file_data"]')
+    sync_api.expect(file_input_locator).to_be_visible()
+
+    logging.info("Setting the input file to /run/tests/example.txt")
+    file_input_locator.set_input_files("/run/tests/example.txt")
+
+    logging.info("Locating and activating the add files button")
+    submit_button_locator = page.locator('input[type="submit"][value="Add files"]')
+    sync_api.expect(submit_button_locator).to_be_enabled()
+    submit_button_locator.click()
+
+    logging.info(f"Waiting for navigation to /draft/evaluate/tooling-test-example/{version_name} after adding file")
+    wait_for_path(page, f"/draft/evaluate/tooling-test-example/{version_name}")
+    logging.info("Add file actions completed successfully")
+
+    logging.info("Navigating back to /drafts")
+    go_to_path(page, "/drafts")
+    logging.info("Navigation back to /drafts completed successfully")
+
+
+def lifecycle_04_start_vote(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
+    logging.info(f"Navigating to the drafts page for tooling-test-example {version_name}")
+    go_to_path(page, "/drafts")
+    logging.info("Drafts page loaded successfully")
+
+    logging.info(f"Locating start vote link for tooling-test-example {version_name}")
+    draft_card_locator = page.locator(f"#tooling-test-example-{esc_id(version_name)}")
+    start_vote_link_locator = draft_card_locator.locator(
+        f'a[title="Start vote for Apache Tooling Test Example {version_name}"]'
+    )
+    sync_api.expect(start_vote_link_locator).to_be_visible()
+
+    logging.info("Follow the start vote link")
+    start_vote_link_locator.click()
+
+    logging.info("Waiting for page load after following the start vote link")
+    page.wait_for_load_state()
+    logging.info("Page loaded after following the start vote link")
+    logging.info(f"Current URL: {page.url}")
+
+    logging.info("Locating and activating the button to prepare the vote email")
+    submit_button_locator = page.locator('input[type="submit"][value="Send vote email"]')
+    sync_api.expect(submit_button_locator).to_be_enabled()
+    submit_button_locator.click()
+
+    logging.info("Waiting for navigation to /candidate/resolve after submitting vote email")
+    wait_for_path(page, "/candidate/resolve")
+    logging.info("Vote initiation actions completed successfully")
+
+
+def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
+    logging.info(f"Navigating to the candidate resolve page for tooling-test-example {version_name}")
+    go_to_path(page, "/candidate/resolve")
+    logging.info("Candidate resolve page loaded successfully")
+
+    logging.info(f"Locating the form to resolve the vote for tooling-test-example {version_name}")
+    form_locator = page.locator(
+        f'form:has(input[name="candidate_name"][value="tooling-test-example-{esc_id(version_name)}"])'
+    )
+    sync_api.expect(form_locator).to_be_visible()
+
+    logging.info("Locating and selecting the 'Passed' radio button")
+    passed_radio_locator = form_locator.locator('input[name="vote_result"][value="passed"]')
+    sync_api.expect(passed_radio_locator).to_be_enabled()
+    passed_radio_locator.check()
+
+    logging.info("Locating and activating the button to resolve the vote")
+    submit_button_locator = form_locator.locator('input[type="submit"][value="Resolve vote"]')
+    sync_api.expect(submit_button_locator).to_be_enabled()
+    submit_button_locator.click()
+
+    logging.info("Waiting for navigation to /previews after resolving the vote")
+    wait_for_path(page, "/previews")
+    logging.info("Vote resolution actions completed successfully")
+
+
+def lifecycle_06_announce_preview(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
+    logging.info(f"Locating the link to announce the preview for tooling-test-example {version_name}")
+    announce_link_locator = page.locator(f'a[title="Announce Apache Tooling Test Example {version_name}"]')
+    sync_api.expect(announce_link_locator).to_be_visible()
+
+    logging.info("Following the link to announce the preview")
+    announce_link_locator.click()
+
+    logging.info("Waiting for navigation to /preview/announce")
+    wait_for_path(page, "/preview/announce")
+    logging.info("Announce preview navigation completed successfully")
+
+    logging.info(f"Locating the announcement form for tooling-test-example {version_name}")
+    form_locator = page.locator(f'#tooling-test-example-{esc_id(version_name)} form[action="/preview/announce"]')
+    sync_api.expect(form_locator).to_be_visible()
+
+    logging.info("Locating the confirmation checkbox within the form")
+    checkbox_locator = form_locator.locator('input[name="confirm_announce"]')
+    sync_api.expect(checkbox_locator).to_be_visible()
+
+    logging.info("Checking the confirmation checkbox")
+    checkbox_locator.check()
+
+    logging.info("Locating and activating the announce button within the form")
+    submit_button_locator = form_locator.get_by_role("button", name="Announce release")
+    sync_api.expect(submit_button_locator).to_be_enabled()
+    submit_button_locator.click()
+
+    logging.info("Waiting for navigation to /releases after submitting announcement")
+    wait_for_path(page, "/releases")
+    logging.info("Preview announcement actions completed successfully")
+
+
+def lifecycle_07_release_exists(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
+    logging.info(f"Checking for release tooling-test-example {version_name} on the /releases page")
+
+    release_card_locator = page.locator(f'div.card:has(h3:has-text("Apache Tooling Test Example {version_name}"))')
+    sync_api.expect(release_card_locator).to_be_visible()
+    logging.info(f"Found card for tooling-test-example {version_name} release")
+    logging.info(f"Release tooling-test-example {version_name} confirmed exists on /releases page")
+
+    logging.info(f"Verifying release tooling-test-example {version_name} card exists")
+    release_card_locator = page.locator(f'div.card:has(h3:has-text("Apache Tooling Test Example {version_name}"))')
+    sync_api.expect(release_card_locator).to_be_visible()
+    logging.info(f"Release tooling-test-example {version_name} card found")
 
 
 def main() -> None:
@@ -566,155 +734,43 @@ def test_gpg_01_upload(page: sync_api.Page, credentials: Credentials) -> None:
 
 
 def test_lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Following link to add draft")
-    add_draft_link_locator = page.get_by_role("link", name="Add draft")
-    sync_api.expect(add_draft_link_locator).to_be_visible()
-    add_draft_link_locator.click()
-
-    logging.info("Waiting for the add draft page")
-    project_select_locator = page.locator('select[name="project_name"]')
-    sync_api.expect(project_select_locator).to_be_visible()
-    logging.info("Add draft page loaded")
-
-    logging.info("Selecting project 'tooling-test-example'")
-    project_select_locator.select_option(label="Apache Tooling Test Example")
-
-    logging.info("Filling version '0.1'")
-    page.locator('input[name="version_name"]').fill("0.1")
-
-    logging.info("Submitting the add draft form")
-    submit_button_locator = page.locator('input[type="submit"][value="Create candidate draft"]')
-    sync_api.expect(submit_button_locator).to_be_enabled()
-    submit_button_locator.click()
-
-    logging.info("Waiting for navigation to /draft/content/tooling-test-example/0.1 after adding draft")
-    wait_for_path(page, "/draft/content/tooling-test-example/0.1")
-    logging.info("Add draft actions completed successfully")
+    lifecycle_01_add_draft(page, credentials, version_name="0.1+draft")
+    lifecycle_01_add_draft(page, credentials, version_name="0.1+candidate")
+    lifecycle_01_add_draft(page, credentials, version_name="0.1+preview")
+    lifecycle_01_add_draft(page, credentials, version_name="0.1+release")
 
 
 def test_lifecycle_02_check_draft_added(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Checking for draft 'tooling-test-example-0.1'")
-    go_to_path(page, "/drafts")
-    draft_card_locator = page.locator(r"#tooling-test-example-0\.1")
-    sync_api.expect(draft_card_locator).to_be_visible()
-    logging.info("Draft 'tooling-test-example-0.1' found successfully")
+    lifecycle_02_check_draft_added(page, credentials, version_name="0.1+draft")
+    lifecycle_02_check_draft_added(page, credentials, version_name="0.1+candidate")
+    lifecycle_02_check_draft_added(page, credentials, version_name="0.1+preview")
+    lifecycle_02_check_draft_added(page, credentials, version_name="0.1+release")
 
 
 def test_lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Navigating to the add file page for tooling-test-example-0.1")
-    go_to_path(page, "/draft/add/tooling-test-example/0.1")
-    logging.info("Add file page loaded")
-
-    logging.info("Locating the file input")
-    file_input_locator = page.locator('input[name="file_data"]')
-    sync_api.expect(file_input_locator).to_be_visible()
-
-    logging.info("Setting the input file to /run/tests/example.txt")
-    file_input_locator.set_input_files("/run/tests/example.txt")
-
-    logging.info("Locating and activating the add files button")
-    submit_button_locator = page.locator('input[type="submit"][value="Add files"]')
-    sync_api.expect(submit_button_locator).to_be_enabled()
-    submit_button_locator.click()
-
-    logging.info("Waiting for navigation to /draft/evaluate/tooling-test-example/0.1 after adding file")
-    wait_for_path(page, "/draft/evaluate/tooling-test-example/0.1")
-    logging.info("Add file actions completed successfully")
-
-    logging.info("Navigating back to /drafts")
-    go_to_path(page, "/drafts")
-    logging.info("Navigation back to /drafts completed successfully")
+    lifecycle_03_add_file(page, credentials, version_name="0.1+draft")
+    lifecycle_03_add_file(page, credentials, version_name="0.1+candidate")
+    lifecycle_03_add_file(page, credentials, version_name="0.1+preview")
+    lifecycle_03_add_file(page, credentials, version_name="0.1+release")
 
 
 def test_lifecycle_04_start_vote(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Locating start vote link for tooling-test-example-0.1")
-    draft_card_locator = page.locator(r"#tooling-test-example-0\.1")
-    start_vote_link_locator = draft_card_locator.locator('a[title="Start vote for Apache Tooling Test Example 0.1"]')
-    sync_api.expect(start_vote_link_locator).to_be_visible()
-
-    logging.info("Follow the start vote link")
-    start_vote_link_locator.click()
-
-    logging.info("Waiting for page load after following the start vote link")
-    page.wait_for_load_state()
-    logging.info("Page loaded after following the start vote link")
-    logging.info(f"Current URL: {page.url}")
-
-    logging.info("Locating and activating the button to prepare the vote email")
-    submit_button_locator = page.locator('input[type="submit"][value="Send vote email"]')
-    sync_api.expect(submit_button_locator).to_be_enabled()
-    submit_button_locator.click()
-
-    logging.info("Waiting for navigation to /candidate/resolve after submitting vote email")
-    wait_for_path(page, "/candidate/resolve")
-    logging.info("Vote initiation actions completed successfully")
+    lifecycle_04_start_vote(page, credentials, version_name="0.1+candidate")
+    lifecycle_04_start_vote(page, credentials, version_name="0.1+preview")
+    lifecycle_04_start_vote(page, credentials, version_name="0.1+release")
 
 
 def test_lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Locating the form to resolve the vote for tooling-test-example-0.1")
-    form_locator = page.locator('form:has(input[name="candidate_name"][value="tooling-test-example-0.1"])')
-    sync_api.expect(form_locator).to_be_visible()
-
-    logging.info("Locating and selecting the 'Passed' radio button")
-    passed_radio_locator = form_locator.locator('input[name="vote_result"][value="passed"]')
-    sync_api.expect(passed_radio_locator).to_be_enabled()
-    passed_radio_locator.check()
-
-    logging.info("Locating and activating the button to resolve the vote")
-    submit_button_locator = form_locator.locator('input[type="submit"][value="Resolve vote"]')
-    sync_api.expect(submit_button_locator).to_be_enabled()
-    submit_button_locator.click()
-
-    logging.info("Waiting for navigation to /previews after resolving the vote")
-    wait_for_path(page, "/previews")
-    logging.info("Vote resolution actions completed successfully")
+    lifecycle_05_resolve_vote(page, credentials, version_name="0.1+preview")
+    lifecycle_05_resolve_vote(page, credentials, version_name="0.1+release")
 
 
 def test_lifecycle_06_announce_preview(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Locating the link to announce the preview for tooling-test-example-0.1")
-    announce_link_locator = page.locator('a[title="Announce Apache Tooling Test Example 0.1"]')
-    sync_api.expect(announce_link_locator).to_be_visible()
-
-    logging.info("Following the link to announce the preview")
-    announce_link_locator.click()
-
-    logging.info("Waiting for navigation to /preview/announce")
-    wait_for_path(page, "/preview/announce")
-    logging.info("Announce preview navigation completed successfully")
-
-    logging.info("Locating the announcement form for tooling-test-example-0.1")
-    form_locator = page.locator(r'#tooling-test-example-0\.1 form[action="/preview/announce"]')
-    sync_api.expect(form_locator).to_be_visible()
-
-    logging.info("Locating the confirmation checkbox within the form")
-    checkbox_locator = form_locator.locator('input[name="confirm_announce"]')
-    sync_api.expect(checkbox_locator).to_be_visible()
-
-    logging.info("Checking the confirmation checkbox")
-    checkbox_locator.check()
-
-    logging.info("Locating and activating the announce button within the form")
-    submit_button_locator = form_locator.get_by_role("button", name="Announce release")
-    sync_api.expect(submit_button_locator).to_be_enabled()
-    submit_button_locator.click()
-
-    logging.info("Waiting for navigation to /releases after submitting announcement")
-    wait_for_path(page, "/releases")
-    logging.info("Preview announcement actions completed successfully")
+    lifecycle_06_announce_preview(page, credentials, version_name="0.1+release")
 
 
 def test_lifecycle_07_release_exists(page: sync_api.Page, credentials: Credentials) -> None:
-    logging.info("Checking for release tooling-test-example-0.1 on the /releases page")
-
-    release_card_locator = page.locator('div.card:has(h3:has-text("Apache Tooling Test Example 0.1"))')
-    sync_api.expect(release_card_locator).to_be_visible()
-    logging.info("Found card for tooling-test-example-0.1 release")
-    logging.info("Release tooling-test-example-0.1 confirmed exists on /releases page")
-
-    logging.info("Verifying release tooling-test-example-0.1 card exists")
-    release_card_locator = page.locator('div.card:has(h3:has-text("Apache Tooling Test Example 0.1"))')
-    sync_api.expect(release_card_locator).to_be_visible()
-    logging.info("Release tooling-test-example-0.1 card found")
+    lifecycle_07_release_exists(page, credentials, version_name="0.1+release")
 
 
 def test_login(page: sync_api.Page, credentials: Credentials) -> None:
@@ -1151,7 +1207,11 @@ def test_tidy_up_releases(page: sync_api.Page) -> None:
     go_to_path(page, "/admin/delete-release")
     logging.info("Admin delete release page loaded")
 
-    release_remove(page, "tooling-test-example-0.1")
+    # TODO: Get these names automatically
+    release_remove(page, "tooling-test-example-0.1+draft")
+    release_remove(page, "tooling-test-example-0.1+candidate")
+    release_remove(page, "tooling-test-example-0.1+preview")
+    release_remove(page, "tooling-test-example-0.1+release")
     release_remove(page, "tooling-test-example-0.2")
 
 
