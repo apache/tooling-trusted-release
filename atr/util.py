@@ -304,7 +304,7 @@ async def number_of_release_files(release: models.Release) -> int:
             path = get_release_candidate_dir() / path_project / path_version
         case models.ReleasePhase.RELEASE_PREVIEW:
             path = get_release_preview_dir() / path_project / path_version / path_revision
-        case models.ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT | models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT:
+        case models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT:
             path = get_release_dir() / path_project / path_version
         case _:
             raise ValueError(f"Unknown release phase: {release.phase}")
@@ -409,7 +409,7 @@ def release_directory(release: models.Release) -> pathlib.Path:
             base_dir = get_release_candidate_dir()
         case models.ReleasePhase.RELEASE_PREVIEW:
             base_dir = get_release_preview_dir()
-        case models.ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT | models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT:
+        case models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT:
             base_dir = get_release_dir()
         # NOTE: Do NOT add "case _" here
 

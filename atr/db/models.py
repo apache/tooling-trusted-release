@@ -222,9 +222,7 @@ class Project(sqlmodel.SQLModel, table=True):
     @property
     async def full_releases(self) -> list["Release"]:
         """Get the full releases for the project."""
-        before_announcement = await self.releases_by_phase(ReleasePhase.RELEASE_BEFORE_ANNOUNCEMENT)
-        after_announcement = await self.releases_by_phase(ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT)
-        return before_announcement + after_announcement
+        return await self.releases_by_phase(ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT)
 
     @property
     async def releases_in_progress(self) -> list["Release"]:
@@ -300,9 +298,7 @@ class ReleasePhase(str, enum.Enum):
     # [RELEASE]
     # Step 1: The release files are being put in place
     RELEASE_PREVIEW = "release_preview"
-    # Step 2: The release files are available but not yet announced
-    RELEASE_BEFORE_ANNOUNCEMENT = "release_before_announcement"
-    # Step 3: The release has been announced
+    # Step 2: The release has been announced
     RELEASE_AFTER_ANNOUNCEMENT = "release_after_announcement"
 
 
