@@ -10,6 +10,20 @@
 
 {% import 'macros/dialog.html' as dialog %}
 
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .page-table-striped-odd {
+          background-color: #f8f9fa;
+      }
+
+      .page-icon-cell {
+          width: 2em;
+          text-align: center;
+      }
+  </style>
+{% endblock stylesheets %}
+
 {% block content %}
   <h1>{{ release.project.display_name }} {{ version_name }}</h1>
   <p class="intro">
@@ -88,64 +102,119 @@
 
   <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
-      <h5 class="mb-0">Files in latest revision</h5>
+      <h5 class="mb-0">Files in this revision</h5>
     </div>
     <div class="card-body">
       {% if paths|length > 0 %}
         <div class="table-responsive">
-          <table class="table table-striped table-hover align-middle table-borderless">
+          <table class="table table-hover align-middle table-sm mb-0 table-bordered border">
+            <thead>
+            </thead>
             <tbody>
               {% for path in paths %}
-                <tr class="border-bottom">
-                  <td colspan="3" class="pt-3 pb-1">
-                    <code>{{ path }}</code>
+                {% set has_errors = errors[path]|length > 0 %}
+                {% set has_warnings = warnings[path]|length > 0 %}
+                {% set row_id = path|string|slugify %}
+
+                {% set row_bg_class = "" %}
+                {% if has_errors %}
+                  {% set row_bg_class = "table-danger" %}
+                {% elif has_warnings %}
+                  {% set row_bg_class = "table-warning" %}
+                {% elif loop.index is odd %}
+                  {% set row_bg_class = "page-table-striped-odd" %}
+                {% endif %}
+
+                {% set path_style_class = "" %}
+                {% if has_errors %}
+                  {% set path_style_class = "text-danger" %}
+                {% elif has_warnings %}
+                  {% set path_style_class = "text-warning" %}
+                {% endif %}
+
+                <tr class="{{ row_bg_class }}">
+                  <td class="text-center px-1 py-2 page-icon-cell">
+                    {% set icon_class = "text-success" %}
+                    {% if has_errors %}
+                      {% set icon_class = "text-danger" %}
+                    {% elif has_warnings %}
+                      {% set icon_class = "text-warning" %}
+                    {% endif %}
+
+                    {% if path in artifacts %}
+                      <i class="fas fa-box-archive {{ icon_class }}"
+                         title="Artifact"
+                         aria-label="Artifact"></i>
+                    {% elif path in metadata %}
+                      <i class="fas fa-file-alt {{ icon_class }}"
+                         title="Metadata"
+                         aria-label="Metadata"></i>
+                    {% else %}
+                      <i class="fas fa-file {{ icon_class }}" title="File" aria-label="File"></i>
+                    {% endif %}
                   </td>
-                </tr>
-                <tr class="border-bottom">
-                  <td class="pb-3 pt-1">
-                    <div class="d-flex flex-wrap gap-1">
-                      {% if path in artifacts %}<span class="badge bg-info">Artifact</span>{% endif %}
-                      {% if path in metadata %}<span class="badge bg-secondary">Metadata</span>{% endif %}
-                    </div>
+                  <td class="py-2">
+                    <a href="{{ as_url(routes.draft.view_path, project_name=project_name, version_name=version_name, file_path=path) }}"
+                       title="View file {{ path }}"
+                       class="text-decoration-none text-reset">
+                      {% if has_errors or has_warnings %}
+                        <strong class="{{ path_style_class }}"><code>{{ path }}</code></strong>
+                      {% else %}
+                        <code>{{ path }}</code>
+                      {% endif %}
+                    </a>
                   </td>
-                  <td class="pb-3 pt-1">
-                    <div class="btn-group btn-group-sm"
-                         role="group"
-                         aria-label="Check status for {{ path }}">
-                      {% if successes[path] %}<a href="#" class="btn btn-outline-success">{{ successes[path]|length }} Okay</a>{% endif %}
-                      {% if warnings[path] %}
-                        <a href="#" class="btn btn-outline-warning">{{ warnings[path]|length }} {{ "Warning" if warnings[path]|length == 1 else "Warnings" }}</a>
-                      {% endif %}
-                      {% if errors[path] %}
-                        <a href="#" class="btn btn-outline-danger">{{ errors[path]|length }} {{ "Error" if errors[path]|length == 1 else "Errors" }}</a>
-                      {% endif %}
-                      {% if not errors[path] and not warnings[path] and not successes[path] %}
+                  <td class="text-end text-nowrap py-2">
+                    <div class="d-flex justify-content-end align-items-center gap-2">
+                      {% if has_errors %}
+                        <a href="{{ as_url(routes.draft.evaluate_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                           class="btn btn-sm btn-outline-danger">Show {{ errors[path]|length }} {{ "error" if errors[path]|length == 1 else "errors" }}</a>
+                      {% elif has_warnings %}
+                        <a href="{{ as_url(routes.draft.evaluate_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                           class="btn btn-sm btn-outline-warning">Show {{ warnings[path]|length }} {{ "warning" if warnings[path]|length == 1 else "warnings" }}</a>
+                      {% elif successes[path] %}
+                        <a href="{{ as_url(routes.draft.evaluate_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                           class="btn btn-sm btn-outline-success">Show report</a>
+                      {% else %}
                         <span class="btn btn-sm btn-outline-secondary disabled">No checks run</span>
                       {% endif %}
-                    </div>
-                  </td>
-                  <td class="text-end pb-3 pt-1">
-                    <div class="btn-group btn-group-sm"
-                         role="group"
-                         aria-label="File actions for {{ path }}">
-                      <a href="{{ as_url(routes.draft.evaluate_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
-                         title="Evaluate file {{ path }}"
-                         class="btn btn-outline-primary">Evaluate</a>
-                      <a href="{{ as_url(routes.download.phase, phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}"
-                         title="Download file {{ path }}"
-                         class="btn btn-outline-secondary">Download</a>
-                      <a href="{{ as_url(routes.draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
-                         title="Tools for file {{ path }}"
-                         class="btn btn-outline-secondary">Tools</a>
-                      <button class="btn btn-outline-danger"
-                              data-bs-toggle="modal"
-                              data-bs-target="#delete-{{ path|slugify }}"
-                              title="Delete file {{ path }}">Delete</button>
+
+                      <button class="btn btn-sm btn-outline-secondary"
+                              type="button"
+                              data-bs-toggle="collapse"
+                              data-bs-target="#actions-{{ row_id }}"
+                              aria-expanded="false"
+                              aria-controls="actions-{{ row_id }}"
+                              title="Show more actions for {{ path }}">
+                        <i class="fas fa-ellipsis-h" aria-hidden="true"></i><span class="visually-hidden">More actions</span>
+                      </button>
                     </div>
                   </td>
                 </tr>
-                {% set file_id = path|string %}
-                {{ dialog.delete_modal(file_id, "Delete file", "file, and any associated metadata files", as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
+
+                <tr class="{{ row_bg_class }}">
+                  <td colspan="3" class="p-0 border-0">
+                    <div class="collapse px-3 py-2" id="actions-{{ row_id }}">
+                      <div class="d-flex justify-content-end">
+                        <div class="btn-group btn-group-sm"
+                             role="group"
+                             aria-label="More file actions for {{ path }}">
+                          <a href="{{ as_url(routes.download.phase, phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}"
+                             title="Download file {{ path }}"
+                             class="btn btn-outline-secondary">Download</a>
+                          <a href="{{ as_url(routes.draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
+                             title="Tools for file {{ path }}"
+                             class="btn btn-outline-secondary">Tools</a>
+                          <button class="btn btn-outline-danger"
+                                  data-bs-toggle="modal"
+                                  data-bs-target="#delete-{{ row_id }}"
+                                  title="Delete file {{ path }}">Delete</button>
+                        </div>
+                        {{ dialog.delete_modal(row_id, "Delete file", "file, and any associated metadata files", as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
               {% endfor %}
             </tbody>
           </table>
