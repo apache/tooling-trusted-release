@@ -131,7 +131,7 @@ async def announce(session: routes.CommitterSession) -> str | response.Response:
                 if await aiofiles.os.path.exists(target):
                     return await session.redirect(announce, error="Release already exists")
 
-                release.phase = models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT
+                release.phase = models.ReleasePhase.RELEASE
                 release.revision = None
                 await data.commit()
                 await aioshutil.move(source, target)

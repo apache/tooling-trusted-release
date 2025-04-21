@@ -711,12 +711,12 @@ def test_lifecycle_07_release_exists(page: sync_api.Page, credentials: Credentia
     logging.info("Found card for tooling-test-example-0.1 release")
     logging.info("Release tooling-test-example-0.1 confirmed exists on /releases page")
 
-    logging.info("Verifying release tooling-test-example-0.1 phase is RELEASE_AFTER_ANNOUNCEMENT")
+    logging.info("Verifying release tooling-test-example-0.1 phase is RELEASE")
     release_card_locator = page.locator('div.card:has(h3:has-text("Apache Tooling Test Example 0.1"))')
     sync_api.expect(release_card_locator).to_be_visible()
-    phase_locator = release_card_locator.locator('span.release-meta-item:has-text("Phase: RELEASE_AFTER_ANNOUNCEMENT")')
+    phase_locator = release_card_locator.locator('span.release-meta-item:has-text("Phase: RELEASE")')
     sync_api.expect(phase_locator).to_be_visible()
-    logging.info("Phase confirmed as RELEASE_AFTER_ANNOUNCEMENT")
+    logging.info("Phase confirmed as RELEASE")
 
 
 def test_login(page: sync_api.Page, credentials: Credentials) -> None:

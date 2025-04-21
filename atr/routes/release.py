@@ -88,16 +88,16 @@ async def releases(session: routes.CommitterSession) -> str:
     """View all releases."""
     # Releases are public, so we don't need to filter by user
     async with db.session() as data:
-        releases_after_announcement = await data.release(
+        releases = await data.release(
             stage=models.ReleaseStage.RELEASE,
-            phase=models.ReleasePhase.RELEASE_AFTER_ANNOUNCEMENT,
+            phase=models.ReleasePhase.RELEASE,
             _committee=True,
             _packages=True,
         ).all()
 
     return await quart.render_template(
         "releases.html",
-        releases=list(releases_after_announcement),
+        releases=list(releases),
     )
 
 

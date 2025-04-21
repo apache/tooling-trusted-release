@@ -34,7 +34,7 @@
                 <a href="{{ as_url(routes.candidate.resolve) }}">{{ release.name }}</a>
               {% elif phase_value == "release_preview" %}
                 <a href="{{ as_url(routes.preview.review) }}">{{ release.name }}</a>
-              {% elif phase_value == "release_after_announcement" %}
+              {% elif phase_value == "release" %}
                 <a href="{{ as_url(routes.release.review) }}">{{ release.name }}</a>
               {% else %}
                 {{ release.name }}
@@ -55,7 +55,7 @@
               <span class="badge bg-info">2. Candidate</span>
             {% elif phase_value == "release_preview" %}
               <span class="badge bg-warning text-dark">3. Preview</span>
-            {% elif phase_value == "release_after_announcement" %}
+            {% elif phase_value == "release" %}
               <span class="badge bg-success">4. Release</span>
             {% else %}
               <span class="badge bg-dark">Unknown</span>
