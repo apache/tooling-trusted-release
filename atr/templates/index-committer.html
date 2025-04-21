@@ -77,6 +77,7 @@
     {% for item in all_projects %}
       {% set project = item.project %}
       {% set active_releases = item.active_releases %}
+      {% set completed_releases = item.completed_releases %}
       {% set project_id = project.name|slugify %}
 
       {% set display_name_cleaned = project.display_name %}
@@ -105,7 +106,13 @@
           <a href="{{ as_url(routes.projects.view, name=project.name) }}"
              class="text-decoration-none me-2">About this project</a>
           <span class="text-muted me-2">/</span>
-          <a href="{{ as_url(routes.projects.add) }}" class="text-decoration-none">Create a sub-project</a>
+          <a href="{{ as_url(routes.projects.add) }}"
+             class="text-decoration-none me-2">Create a sub-project</a>
+          {% if completed_releases %}
+            <span class="text-muted me-2">/</span>
+            <a href="{{ as_url(routes.release.completed, project_name=project.name) }}"
+               class="text-decoration-none">Show completed releases</a>
+          {% endif %}
         </p>
 
         <div class="d-flex flex-wrap gap-3">

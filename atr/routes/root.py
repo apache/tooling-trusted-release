@@ -65,15 +65,24 @@ async def index() -> response.Response | str:
                 )
                 result = await data.execute(stmt)
                 active_releases = result.scalars().all()
+                completed_releases = (
+                    len(await data.release(phase=models.ReleasePhase.RELEASE, project_id=project.id).all()) > 0
+                )
 
                 if active_releases:
-                    projects_with_releases.append({"project": project, "active_releases": active_releases})
+                    projects_with_releases.append(
+                        {
+                            "project": project,
+                            "active_releases": active_releases,
+                            "completed_releases": completed_releases,
+                        }
+                    )
                 else:
-                    projects_without_releases.append(project)
+                    projects_without_releases.append(
+                        {"project": project, "active_releases": [], "completed_releases": completed_releases}
+                    )
 
-        all_projects = projects_with_releases + [
-            {"project": p, "active_releases": []} for p in projects_without_releases
-        ]
+        all_projects = projects_with_releases + projects_without_releases
 
         def sort_key(item: dict) -> str:
             project = item["project"]
