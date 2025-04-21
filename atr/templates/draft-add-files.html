@@ -14,7 +14,19 @@
 
   <h1>Add files to {{ project_display_name }} {{ version_name }}</h1>
 
-  <h2>File upload</h2>
+  <ul>
+    <li>
+      <a href="#file-upload">File upload</a>
+    </li>
+    <li>
+      <a href="#svn-upload">SVN upload</a>
+    </li>
+    <li>
+      <a href="#rsync-upload">Rsync upload</a>
+    </li>
+  </ul>
+
+  <h2 id="file-upload">File upload</h2>
   <p class="intro">Use this form to add files to this candidate draft.</p>
 
   <form method="post"
@@ -51,7 +63,7 @@
     </div>
   </form>
 
-  <h2>SVN upload</h2>
+  <h2 id="svn-upload">SVN upload</h2>
   <p class="intro">Import files from a publicly readable Subversion repository URL into this draft.</p>
   <p>
     The import will be processed in the background using the <code>svn export</code> command.
@@ -114,8 +126,8 @@
     </div>
   </div>
 
-  <h2>Rsync upload</h2>
-  <p class="intro">Import files from a remote server using rsync using the following command:</p>
+  <h2 id="rsync-upload">Rsync upload</h2>
+  <p class="intro">Import files from a remote server using rsync with the following command:</p>
   <!-- TODO: Add a button to copy the command to the clipboard -->
   <pre class="bg-light p-3 mb-0">
 rsync -av -e 'ssh -p 2222' ${YOUR_FILES}/ {{ asf_id }}@{{ server_domain }}:/{{ project_name }}/{{ version_name }}/
