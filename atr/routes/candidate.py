@@ -31,7 +31,6 @@ import wtforms
 
 import atr.db as db
 import atr.db.models as models
-import atr.mail as mail
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.preview as preview
@@ -134,30 +133,6 @@ async def view_path(
         format_file_size=routes.format_file_size,
         phase_key="candidate",
     )
-
-
-# TODO: Move this to draft.py
-@routes.committer("/candidate/vote/preview", methods=["POST"])
-async def vote_preview(session: routes.CommitterSession) -> quart.wrappers.response.Response | response.Response | str:
-    """Show the vote email preview for a release."""
-
-    class VotePreviewForm(util.QuartFormTyped):
-        body = wtforms.TextAreaField("Body", validators=[wtforms.validators.InputRequired("Body is required")])
-        asfuid = wtforms.StringField("ASF ID", validators=[wtforms.validators.InputRequired("ASF ID is required")])
-        # TODO: Validate the vote duration again? Probably not necessary in a preview
-        # Note that tasks/vote.py does not use this form
-        vote_duration = wtforms.IntegerField(
-            "Vote duration", validators=[wtforms.validators.InputRequired("Vote duration is required")]
-        )
-
-    form = await VotePreviewForm.create_form(data=await quart.request.form)
-    if not await form.validate_on_submit():
-        return await session.redirect(resolve, error="Invalid form data")
-
-    body = await mail.generate_preview(
-        util.unwrap(form.body.data), util.unwrap(form.asfuid.data), util.unwrap(form.vote_duration.data)
-    )
-    return quart.Response(body, mimetype="text/plain")
 
 
 def _format_artifact_name(project_name: str, version: str, is_podling: bool = False) -> str:
