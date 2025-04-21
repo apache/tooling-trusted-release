@@ -170,8 +170,21 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
         if not await form.validate_on_submit():
             # TODO: Show the form with errors
             return await session.redirect(add, error="Invalid form data")
-        await _add(session, form)
-        return await session.redirect(drafts, success="Release candidate created successfully")
+
+        try:
+            new_release, project = await create_release_draft(
+                project_name=str(form.project_name.data), version=str(form.version_name.data), asf_uid=session.uid
+            )
+            return await session.redirect(
+                overview,
+                project_name=project.name,
+                version_name=new_release.version,
+                success="Release candidate draft created successfully",
+            )
+        except (routes.FlashError, base.ASFQuartException) as e:
+            await quart.flash(str(e), "error")
+            # Get the preselected project from the query parameters, then fall through to render the template
+            preselected_project = quart.request.args.get("project")
 
     return await quart.render_template(
         "draft-add.html",
@@ -234,6 +247,60 @@ async def add_files(session: routes.CommitterSession, project_name: str, version
         form=form,
         svn_form=svn_form,
     )
+
+
+async def create_release_draft(project_name: str, version: str, asf_uid: str) -> tuple[models.Release, models.Project]:
+    """Creates the initial release draft record and revision directory."""
+    # Get the project from the project name
+    async with db.session() as data:
+        async with data.begin():
+            project = await data.project(name=project_name, _committee=True).get()
+            if not project:
+                raise routes.FlashError(f"Project {project_name} not found")
+
+            # TODO: Temporarily allow committers to start drafts
+            if project.committee is None or (
+                asf_uid not in project.committee.committee_members and asf_uid not in project.committee.committers
+            ):
+                raise base.ASFQuartException(
+                    f"You must be a member or committer for the {project.display_name}"
+                    " committee to start a release draft.",
+                    errorcode=403,
+                )
+
+    async with revision.create_and_manage(project_name, version, asf_uid) as (
+        _new_revision_dir,
+        _new_revision_name,
+    ):
+        # TODO: Consider using Release.revision instead of ./latest
+        async with db.session() as data:
+            async with data.begin():
+                # Check whether the release already exists
+                if release := await data.release(project_id=project.id, version=version).get():
+                    if release.phase == models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+                        raise routes.FlashError(f"A draft for {project_name} {version} already exists.")
+                    else:
+                        raise routes.FlashError(
+                            f"A release ({release.phase.value}) for {project_name} {version} already exists."
+                        )
+
+                # Validate the version name
+                # TODO: We should check that it's bigger than the current version
+                if version_name_error := util.version_name_error(version):
+                    raise routes.FlashError(f'Invalid version name "{version}": {version_name_error}')
+
+                release = models.Release(
+                    stage=models.ReleaseStage.RELEASE_CANDIDATE,
+                    phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+                    project_id=project.id,
+                    project=project,
+                    version=version,
+                    created=datetime.datetime.now(datetime.UTC),
+                )
+                data.add(release)
+
+            await data.refresh(release)
+            return release, project
 
 
 @routes.committer("/draft/delete", methods=["POST"])
@@ -1105,47 +1172,6 @@ async def view_path(
         phase_key="draft",
         max_view_size=routes.format_file_size(_max_view_size),
     )
-
-
-async def _add(session: routes.CommitterSession, form: AddProtocol) -> None:
-    """Handle POST request for creating a new release candidate draft."""
-    version = str(form.version_name.data)
-    project_name = str(form.project_name.data)
-
-    # Create the release record in the database
-    async with db.session() as data:
-        async with data.begin():
-            project = await data.project(name=project_name).get()
-            if not project:
-                raise routes.FlashError("Base project not found")
-
-            if project_name not in (p.name for p in await session.user_projects):
-                raise routes.FlashError(
-                    f"You must be a participant of {project_name} to submit a release candidate",
-                )
-
-    async with revision.create_and_manage(project_name, version, session.uid) as (
-        _new_revision_dir,
-        _new_revision_name,
-    ):
-        # TODO: Consider using Release.revision instead of ./latest
-        async with db.session() as data:
-            async with data.begin():
-                if release := await data.release(project_id=project.id, version=version).get():
-                    raise routes.FlashError(f"{release.phase.value.upper()} with this name already exists")
-
-                # Release is now linked to the appropriate project or subproject
-                if version_name_error := util.version_name_error(version):
-                    raise routes.FlashError(f'Invalid version name "{version}": {version_name_error}')
-                release = models.Release(
-                    stage=models.ReleaseStage.RELEASE_CANDIDATE,
-                    phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
-                    project_id=project.id,
-                    project=project,
-                    version=version,
-                    created=datetime.datetime.now(datetime.UTC),
-                )
-                data.add(release)
 
 
 async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -> None:

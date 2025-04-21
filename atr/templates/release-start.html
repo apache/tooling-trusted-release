@@ -1,0 +1,42 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Start a new release for {{ project.display_name }} ~ ATR
+{% endblock title %}
+
+{% block content %}
+  <h1>Start a new release</h1>
+  <p class="intro">
+    Starting a new release creates an initial <strong>release candidate draft</strong>. You can then add files to this draft before promoting it for review and voting.
+  </p>
+
+  <form method="post"
+        action="{{ as_url(routes.release.start, project_name=project.name) }}"
+        enctype="multipart/form-data"
+        class="atr-canary py-4 px-5 border rounded">
+
+    {{ form.hidden_tag() }} {# Includes csrf_token and project_name #}
+
+    <div class="mb-4">
+      <p class="fs-5">
+        <label class="form-label fs-5">Project:</label>
+        <span class="fw-semibold">{{ project.display_name }}</span>
+      </p>
+    </div>
+
+    <div class="mb-3">
+      <label for="{{ form.version_name.id }}" class="form-label">{{ form.version_name.label.text }}:</label>
+      {{ form.version_name(class_="form-control form-control-lg", placeholder="E.g. 1.2.3+rc1 or 2.5") }}
+      {% if form.version_name.errors -%}
+        <div class="invalid-feedback d-block">{{ form.version_name.errors[0] }}</div>
+      {%- endif %}
+      <div id="versionHelp" class="form-text">Enter the version string for this new release.</div>
+    </div>
+
+    <div class="mt-4">
+      {{ form.submit(class_="btn btn-primary btn-lg") }}
+      <a href="{{ as_url(routes.root.index) }}" class="btn btn-link ms-2">Cancel</a>
+    </div>
+  </form>
+
+{% endblock content %}
