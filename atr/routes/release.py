@@ -137,7 +137,7 @@ async def start(session: routes.CommitterSession, project_name: str) -> response
             )[0]
             # Redirect to the new draft's overview page on success
             return await session.redirect(
-                draft.overview,
+                draft.content,
                 project_name=project.name,
                 version_name=new_release.version,
                 success="Release candidate draft created successfully",

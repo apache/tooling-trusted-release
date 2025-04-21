@@ -156,7 +156,7 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
                 project_name=str(form.project_name.data), version=str(form.version_name.data), asf_uid=session.uid
             )
             return await session.redirect(
-                overview,
+                content,
                 project_name=project.name,
                 version_name=new_release.version,
                 success="Release candidate draft created successfully",
@@ -233,6 +233,98 @@ async def add_files(session: routes.CommitterSession, project_name: str, version
         form=form,
         svn_form=svn_form,
         project_display_name=project_display_name,
+    )
+
+
+@routes.committer("/draft/content/<project_name>/<version_name>")
+async def content(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+    """Show the contents of the release candidate draft."""
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        return await session.redirect(add, error="You do not have access to this project")
+
+    async with db.session() as data:
+        release_name = models.release_name(project_name, version_name)
+        release = await data.release(
+            name=release_name, phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT, _project=True
+        ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
+        if release.revision is None:
+            raise base.ASFQuartException("This release does not have a revision.", errorcode=400)
+
+        base_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.revision
+        paths = await util.paths_recursive(base_path)
+        path_templates = {}
+        path_substitutions = {}
+        path_artifacts = set()
+        path_metadata = set()
+        path_successes = {}
+        path_warnings = {}
+        path_errors = {}
+
+        for path in paths:
+            # Get template and substitutions
+            elements = {
+                "core": project_name,
+                "version": version_name,
+                "sub": None,
+                "template": None,
+                "substitutions": None,
+            }
+            template, substitutions = analysis.filename_parse(str(path), elements)
+            path_templates[path] = template
+            path_substitutions[path] = analysis.substitutions_format(substitutions) or "none"
+
+            # Get artifacts and metadata
+            search = re.search(analysis.extension_pattern(), str(path))
+            if search:
+                if search.group("artifact"):
+                    path_artifacts.add(path)
+                elif search.group("metadata"):
+                    path_metadata.add(path)
+
+            # Get successes, warnings, and errors
+            path_successes[path] = await data.check_result(
+                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.SUCCESS
+            ).all()
+            path_warnings[path] = await data.check_result(
+                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.WARNING
+            ).all()
+            path_errors[path] = await data.check_result(
+                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.FAILURE
+            ).all()
+
+        revision_name_from_link, revision_editor, revision_time = await revision.latest_info(project_name, version_name)
+
+        # Get the number of ongoing tasks for the current revision
+        ongoing_tasks_count = 0
+        if revision_name_from_link:
+            ongoing_tasks_count = await db.tasks_ongoing(project_name, version_name, revision_name_from_link)
+
+    delete_draft_form = await DeleteForm.create_form()
+    delete_file_form = await DeleteFileForm.create_form()
+
+    return await quart.render_template(
+        "draft-content.html",
+        project_name=project_name,
+        version_name=version_name,
+        release=release,
+        paths=paths,
+        artifacts=path_artifacts,
+        metadata=path_metadata,
+        successes=path_successes,
+        warnings=path_warnings,
+        errors=path_errors,
+        templates=path_templates,
+        substitutions=path_substitutions,
+        revision_editor=revision_editor,
+        revision_time=revision_time,
+        revision_name_from_link=revision_name_from_link,
+        ongoing_tasks_count=ongoing_tasks_count,
+        delete_form=delete_draft_form,
+        delete_file_form=delete_file_form,
+        asf_id=session.uid,
+        server_domain=session.host,
+        format_datetime=routes.format_datetime,
+        models=models,
     )
 
 
@@ -649,98 +741,6 @@ async def hashgen(
         success=f"{hash_type} file generated successfully",
         project_name=project_name,
         version_name=version_name,
-    )
-
-
-@routes.committer("/draft/overview/<project_name>/<version_name>")
-async def overview(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
-    """Show an overview of the release candidate draft."""
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(add, error="You do not have access to this project")
-
-    async with db.session() as data:
-        release_name = models.release_name(project_name, version_name)
-        release = await data.release(
-            name=release_name, phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT, _project=True
-        ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
-        if release.revision is None:
-            raise base.ASFQuartException("This release does not have a revision.", errorcode=400)
-
-        base_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.revision
-        paths = await util.paths_recursive(base_path)
-        path_templates = {}
-        path_substitutions = {}
-        path_artifacts = set()
-        path_metadata = set()
-        path_successes = {}
-        path_warnings = {}
-        path_errors = {}
-
-        for path in paths:
-            # Get template and substitutions
-            elements = {
-                "core": project_name,
-                "version": version_name,
-                "sub": None,
-                "template": None,
-                "substitutions": None,
-            }
-            template, substitutions = analysis.filename_parse(str(path), elements)
-            path_templates[path] = template
-            path_substitutions[path] = analysis.substitutions_format(substitutions) or "none"
-
-            # Get artifacts and metadata
-            search = re.search(analysis.extension_pattern(), str(path))
-            if search:
-                if search.group("artifact"):
-                    path_artifacts.add(path)
-                elif search.group("metadata"):
-                    path_metadata.add(path)
-
-            # Get successes, warnings, and errors
-            path_successes[path] = await data.check_result(
-                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.SUCCESS
-            ).all()
-            path_warnings[path] = await data.check_result(
-                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.WARNING
-            ).all()
-            path_errors[path] = await data.check_result(
-                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.FAILURE
-            ).all()
-
-        revision_name_from_link, revision_editor, revision_time = await revision.latest_info(project_name, version_name)
-
-        # Get the number of ongoing tasks for the current revision
-        ongoing_tasks_count = 0
-        if revision_name_from_link:
-            ongoing_tasks_count = await db.tasks_ongoing(project_name, version_name, revision_name_from_link)
-
-    delete_draft_form = await DeleteForm.create_form()
-    delete_file_form = await DeleteFileForm.create_form()
-
-    return await quart.render_template(
-        "draft-overview.html",
-        project_name=project_name,
-        version_name=version_name,
-        release=release,
-        paths=paths,
-        artifacts=path_artifacts,
-        metadata=path_metadata,
-        successes=path_successes,
-        warnings=path_warnings,
-        errors=path_errors,
-        templates=path_templates,
-        substitutions=path_substitutions,
-        revision_editor=revision_editor,
-        revision_time=revision_time,
-        revision_name_from_link=revision_name_from_link,
-        ongoing_tasks_count=ongoing_tasks_count,
-        delete_form=delete_draft_form,
-        delete_file_form=delete_file_form,
-        asf_id=session.uid,
-        server_domain=session.host,
-        format_datetime=routes.format_datetime,
-        models=models,
     )
 
 
@@ -1161,7 +1161,7 @@ async def vote_start(
         # TODO: Consider relaxing this to all committers
         # Otherwise we must not show the vote form
         if not user.is_committee_member(release.committee, session.uid):
-            return await session.redirect(overview, error="You must be on the PMC of this project to start a vote")
+            return await session.redirect(content, error="You must be on the PMC of this project to start a vote")
         committee = util.unwrap(release.committee)
 
         sender = f"{session.uid}@apache.org"

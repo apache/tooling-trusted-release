@@ -587,8 +587,8 @@ def test_lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials) -
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info("Waiting for navigation to /draft/overview/tooling-test-example/0.1 after adding draft")
-    wait_for_path(page, "/draft/overview/tooling-test-example/0.1")
+    logging.info("Waiting for navigation to /draft/content/tooling-test-example/0.1 after adding draft")
+    wait_for_path(page, "/draft/content/tooling-test-example/0.1")
     logging.info("Add draft actions completed successfully")
 
 

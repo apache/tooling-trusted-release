@@ -9,7 +9,7 @@
 {% endblock description %}
 
 {% block content %}
-  <a href="{{ as_url(routes.draft.overview, project_name=project_name, version_name=version_name) }}"
+  <a href="{{ as_url(routes.draft.content, project_name=project_name, version_name=version_name) }}"
      class="back-link">← Back to {{ project_display_name }} {{ version_name }}</a>
 
   <h1>Add files to {{ project_display_name }} {{ version_name }}</h1>
