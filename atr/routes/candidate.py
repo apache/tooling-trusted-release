@@ -33,6 +33,7 @@ import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.preview as preview
+import atr.routes.root as root
 import atr.util as util
 
 if asfquart.APP is ...:
@@ -67,6 +68,49 @@ async def resolve(session: routes.CommitterSession) -> response.Response | str:
         return await _resolve_get(session)
     # For POST requests, process the form
     return await _resolve_post(session)
+
+
+@routes.committer("/resolve/<project_name>/<version_name>")
+async def resolve_release(
+    session: routes.CommitterSession, project_name: str, version_name: str
+) -> response.Response | str:
+    """Resolve the vote on a release candidate."""
+    if not any((p.name == project_name) for p in (await session.user_projects)):
+        return await session.redirect(root.index, error="You do not have access to this project")
+
+    async with db.session() as data:
+        release_name = models.release_name(project_name, version_name)
+        release = await data.release(name=release_name, _project=True, _committee=True, _tasks=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+
+    form = await ResolveForm.create_form()
+
+    # Find the most recent VOTE_INITIATE task for this release
+    # TODO: Make this a proper query
+    latest_vote_task = None
+    task_mid = None
+    archive_url = None
+    for task in sorted(release.tasks, key=lambda t: t.added, reverse=True):
+        if task.task_type == models.TaskType.VOTE_INITIATE:
+            latest_vote_task = task
+            break
+
+    logging.warning(f"Latest vote task 2: {latest_vote_task}")
+    if latest_vote_task and (latest_vote_task.status == models.TaskStatus.COMPLETED) and latest_vote_task.result:
+        task_mid = _task_mid(latest_vote_task)
+        archive_url = await _task_archive_url(task_mid)
+
+    return await quart.render_template(
+        "candidate-resolve-release.html",
+        release=release,
+        format_artifact_name=_format_artifact_name,
+        form=form,
+        format_datetime=routes.format_datetime,
+        vote_task=latest_vote_task,
+        task_mid=task_mid,
+        archive_url=archive_url,
+    )
 
 
 @routes.committer("/candidate/view/<project_name>/<version_name>")
@@ -176,6 +220,7 @@ async def _resolve_get(session: routes.CommitterSession) -> str:
                 latest_vote_task = task
                 break
 
+        logging.warning(f"Latest vote task: {latest_vote_task}")
         if latest_vote_task and (latest_vote_task.status == models.TaskStatus.COMPLETED) and latest_vote_task.result:
             task_mid = _task_mid(latest_vote_task)
             archive_url = await _task_archive_url(task_mid)
@@ -234,22 +279,10 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
                 release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
                 success_message = "Vote marked as failed"
 
-            # # Create a task for vote resolution notification
-            # task = models.Task(
-            #     status=models.TaskStatus.QUEUED,
-            #     task_type="vote_resolve",
-            #     task_args=[
-            #         candidate_name,
-            #         vote_result,
-            #         session.uid,
-            #     ],
-            # )
-            # data.add(task)
-
-            await data.commit()
-
     await _resolve_post_files(project_name, release, vote_result, session.uid)
-    return await session.redirect(preview.previews, success=success_message)
+    return await session.redirect(
+        preview.announce_release, success=success_message, project_name=project_name, version_name=release.version
+    )
 
 
 async def _resolve_post_files(project_name: str, release: models.Release, vote_result: str, asf_uid: str) -> None:

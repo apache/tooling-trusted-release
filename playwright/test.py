@@ -118,8 +118,8 @@ def lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials, versio
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info(f"Waiting for navigation to /draft/content/tooling-test-example/{version_name} after adding draft")
-    wait_for_path(page, f"/draft/content/tooling-test-example/{version_name}")
+    logging.info(f"Waiting for navigation to /compose/tooling-test-example/{version_name} after adding draft")
+    wait_for_path(page, f"/compose/tooling-test-example/{version_name}")
     logging.info("Add draft actions completed successfully")
 
 
@@ -132,9 +132,9 @@ def lifecycle_02_check_draft_added(page: sync_api.Page, credentials: Credentials
 
 
 def lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
-    logging.info(f"Navigating to the add file page for tooling-test-example {version_name}")
-    go_to_path(page, f"/draft/add/tooling-test-example/{version_name}")
-    logging.info("Add file page loaded")
+    logging.info(f"Navigating to the upload file page for tooling-test-example {version_name}")
+    go_to_path(page, f"/upload/tooling-test-example/{version_name}")
+    logging.info("Upload file page loaded")
 
     logging.info("Locating the file input")
     file_input_locator = page.locator('input[name="file_data"]')
@@ -208,25 +208,16 @@ def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, ver
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info("Waiting for navigation to /previews after resolving the vote")
-    wait_for_path(page, "/previews")
+    logging.info(
+        f"Waiting for navigation to /preview/announce/tooling-test-example/{version_name} after resolving the vote"
+    )
+    wait_for_path(page, f"/preview/announce/tooling-test-example/{version_name}")
     logging.info("Vote resolution actions completed successfully")
 
 
 def lifecycle_06_announce_preview(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
-    logging.info(f"Locating the link to announce the preview for tooling-test-example {version_name}")
-    announce_link_locator = page.locator(f'a[title="Announce Apache Tooling Test Example {version_name}"]')
-    sync_api.expect(announce_link_locator).to_be_visible()
-
-    logging.info("Following the link to announce the preview")
-    announce_link_locator.click()
-
-    logging.info("Waiting for navigation to /preview/announce")
-    wait_for_path(page, "/preview/announce")
-    logging.info("Announce preview navigation completed successfully")
-
     logging.info(f"Locating the announcement form for tooling-test-example {version_name}")
-    form_locator = page.locator(f'#tooling-test-example-{esc_id(version_name)} form[action="/preview/announce"]')
+    form_locator = page.locator('form[action="/preview/announce"]')
     sync_api.expect(form_locator).to_be_visible()
 
     logging.info("Locating the confirmation checkbox within the form")
@@ -509,7 +500,7 @@ def test_checks_01_hashing_sha512(page: sync_api.Page, credentials: Credentials)
     version_name = "0.2"
     filename_sha512 = f"apache-{project_name}-{version_name}.tar.gz.sha512"
     evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
-    evaluate_file_path = f"{evaluate_page_path}/{filename_sha512}"
+    report_file_path = f"/report/{project_name}/{version_name}/{filename_sha512}"
 
     logging.info(f"Starting hashing check test for {filename_sha512}")
 
@@ -525,9 +516,9 @@ def test_checks_01_hashing_sha512(page: sync_api.Page, credentials: Credentials)
     logging.info(f"Clicking 'Evaluate file' link for {filename_sha512}")
     evaluate_link_locator.click()
 
-    logging.info(f"Waiting for navigation to {evaluate_file_path}")
-    wait_for_path(page, evaluate_file_path)
-    logging.info(f"Successfully navigated to {evaluate_file_path}")
+    logging.info(f"Waiting for navigation to {report_file_path}")
+    wait_for_path(page, report_file_path)
+    logging.info(f"Successfully navigated to {report_file_path}")
 
     logging.info("Verifying Hashing Check status")
     hashing_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Hashing Check'))")
@@ -544,7 +535,7 @@ def test_checks_02_license_files(page: sync_api.Page, credentials: Credentials) 
     version_name = "0.2"
     filename_targz = f"apache-{project_name}-{version_name}.tar.gz"
     evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
-    evaluate_file_path = f"{evaluate_page_path}/{filename_targz}"
+    report_file_path = f"/report/{project_name}/{version_name}/{filename_targz}"
 
     logging.info(f"Starting License Files check test for {filename_targz}")
 
@@ -560,9 +551,9 @@ def test_checks_02_license_files(page: sync_api.Page, credentials: Credentials) 
     logging.info(f"Clicking 'Evaluate file' link for {filename_targz}")
     evaluate_link_locator.click()
 
-    logging.info(f"Waiting for navigation to {evaluate_file_path}")
-    wait_for_path(page, evaluate_file_path)
-    logging.info(f"Successfully navigated to {evaluate_file_path}")
+    logging.info(f"Waiting for navigation to {report_file_path}")
+    wait_for_path(page, report_file_path)
+    logging.info(f"Successfully navigated to {report_file_path}")
 
     logging.info("Verifying License Files check status")
     license_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('License Files'))")
@@ -578,15 +569,14 @@ def test_checks_03_license_headers(page: sync_api.Page, credentials: Credentials
     project_name = "tooling-test-example"
     version_name = "0.2"
     filename_targz = f"apache-{project_name}-{version_name}.tar.gz"
-    evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
-    evaluate_file_path = f"{evaluate_page_path}/{filename_targz}"
+    report_file_path = f"/report/{project_name}/{version_name}/{filename_targz}"
 
     logging.info(f"Starting License Headers check test for {filename_targz}")
 
     # Don't repeat the link test, just go straight there
-    logging.info(f"Navigating to evaluate file page {evaluate_file_path}")
-    go_to_path(page, evaluate_file_path)
-    logging.info(f"Successfully navigated to {evaluate_file_path}")
+    logging.info(f"Navigating to report page {report_file_path}")
+    go_to_path(page, report_file_path)
+    logging.info(f"Successfully navigated to {report_file_path}")
 
     logging.info("Verifying License Headers check status")
     header_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('License Headers'))")
@@ -602,14 +592,13 @@ def test_checks_04_paths(page: sync_api.Page, credentials: Credentials) -> None:
     project_name = "tooling-test-example"
     version_name = "0.2"
     filename_sha512 = f"apache-{project_name}-{version_name}.tar.gz.sha512"
-    evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
-    evaluate_file_path = f"{evaluate_page_path}/{filename_sha512}"
+    report_file_path = f"/report/{project_name}/{version_name}/{filename_sha512}"
 
     logging.info(f"Starting Paths check test for {filename_sha512}")
 
-    logging.info(f"Navigating to evaluate file page {evaluate_file_path}")
-    go_to_path(page, evaluate_file_path)
-    logging.info(f"Successfully navigated to {evaluate_file_path}")
+    logging.info(f"Navigating to report page {report_file_path}")
+    go_to_path(page, report_file_path)
+    logging.info(f"Successfully navigated to {report_file_path}")
 
     # TODO: It's a bit strange to have the status in the check name
     # But we have to do this because we need separate Recorder objects
@@ -627,14 +616,13 @@ def test_checks_05_signature(page: sync_api.Page, credentials: Credentials) -> N
     project_name = "tooling-test-example"
     version_name = "0.2"
     filename_asc = f"apache-{project_name}-{version_name}.tar.gz.asc"
-    evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
-    evaluate_file_path = f"{evaluate_page_path}/{filename_asc}"
+    report_file_path = f"/report/{project_name}/{version_name}/{filename_asc}"
 
     logging.info(f"Starting Signature check test for {filename_asc}")
 
-    logging.info(f"Navigating to evaluate file page {evaluate_file_path}")
-    go_to_path(page, evaluate_file_path)
-    logging.info(f"Successfully navigated to {evaluate_file_path}")
+    logging.info(f"Navigating to report page {report_file_path}")
+    go_to_path(page, report_file_path)
+    logging.info(f"Successfully navigated to {report_file_path}")
 
     logging.info("Verifying Signature Check status")
     signature_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Signature Check'))")
@@ -650,14 +638,13 @@ def test_checks_06_targz(page: sync_api.Page, credentials: Credentials) -> None:
     project_name = "tooling-test-example"
     version_name = "0.2"
     filename_targz = f"apache-{project_name}-{version_name}.tar.gz"
-    evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
-    evaluate_file_path = f"{evaluate_page_path}/{filename_targz}"
+    report_file_path = f"/report/{project_name}/{version_name}/{filename_targz}"
 
     logging.info(f"Starting Targz checks for {filename_targz}")
 
-    logging.info(f"Navigating to evaluate file page {evaluate_file_path}")
-    go_to_path(page, evaluate_file_path)
-    logging.info(f"Successfully navigated to {evaluate_file_path}")
+    logging.info(f"Navigating to report page {report_file_path}")
+    go_to_path(page, report_file_path)
+    logging.info(f"Successfully navigated to {report_file_path}")
 
     logging.info("Verifying Targz Integrity status")
     integrity_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Targz Integrity'))")
@@ -995,7 +982,7 @@ def test_ssh_02_rsync_upload(page: sync_api.Page, credentials: Credentials) -> N
     logging.info("rsync upload test completed successfully")
 
     logging.info(f"Extracting latest revision from {evaluate_path}")
-    revision_link_locator = page.locator(f'a[href^="/draft/revisions/{project_name}/{version_name}#"]')
+    revision_link_locator = page.locator(f'a[href^="/revisions/{project_name}/{version_name}#"]')
     sync_api.expect(revision_link_locator).to_be_visible()
     revision_href = revision_link_locator.get_attribute("href")
     if not revision_href:
