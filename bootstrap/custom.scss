@@ -1,7 +1,11 @@
 // Functions
 @import "../node_modules/bootstrap/scss/functions";
 
-// Custom variables
+// Variables
+@import "../node_modules/bootstrap/scss/variables";
+@import "../node_modules/bootstrap/scss/variables-dark";
+
+// Custom variable overrides
 $font-family-sans-serif: "Inter", sans-serif;
 $headings-font-family: $font-family-sans-serif;
 $table-cell-padding-y: 0.75rem;
@@ -9,9 +13,13 @@ $table-cell-padding-x: 0.75rem;
 $table-bg: transparent;
 $table-accent-bg: transparent;
 
-// Variables
-@import "../node_modules/bootstrap/scss/variables";
-@import "../node_modules/bootstrap/scss/variables-dark";
+// Merge custom colors after variables but before maps
+$theme-colors: map-merge(
+  $theme-colors,
+  (
+    "warning": #f49703
+  )
+);
 
 // Basics
 @import "../node_modules/bootstrap/scss/maps";
