@@ -31,10 +31,18 @@
       <h3 class="card-title mb-0">About this release preview</h3>
     </div>
     <div class="card-body">
-      <div class="d-flex flex-wrap gap-3 text-secondary fs-6">
+      <div class="d-flex flex-wrap gap-3 pb-3 mb-3 border-bottom text-secondary fs-6">
         <span class="atr-preview-meta-item">Phase: {{ release.phase.value.upper() }}</span>
         <span class="atr-preview-meta-item">Revision: {{ release.revision }}</span>
         <span class="atr-preview-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
+      </div>
+      <div>
+        <a title="Show files for {{ release.name }}"
+           href="{{ as_url(routes.preview.view, project_name=release.project.name, version_name=release.version) }}"
+           class="btn btn-sm btn-outline-secondary">
+          <i class="fas fa-file-archive"></i>
+          Show files
+        </a>
       </div>
     </div>
   </div>
@@ -44,7 +52,6 @@
       <h5 class="mb-0">Announce and distribute</h5>
     </div>
     <div class="card-body">
-      <!-- <p class="text-muted mb-3">Announcing will move this preview to the final release directory.</p> -->
       <form method="post" action="{{ as_url(routes.preview.announce) }}">
         {{ announce_form.hidden_tag() }}
         <input type="hidden" name="preview_name" value="{{ release.name }}" />
