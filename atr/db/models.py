@@ -183,6 +183,11 @@ class Project(sqlmodel.SQLModel, table=True):
         """Get the display name for the Project."""
         return self.full_name or self.name
 
+    @property
+    def short_display_name(self) -> str:
+        """Get the short display name for the Project."""
+        return self.display_name.removeprefix("Apache ")
+
     async def releases_by_phase(self, phase: "ReleasePhase") -> list["Release"]:
         """Get the releases for the project by phase."""
         query = (
@@ -436,6 +441,11 @@ class Release(sqlmodel.SQLModel, table=True):
         if project is None:
             return None
         return project.committee
+
+    @property
+    def short_display_name(self) -> str:
+        """Get the short display name for the release."""
+        return f"{self.project.short_display_name} {self.version}"
 
 
 class SSHKey(sqlmodel.SQLModel, table=True):

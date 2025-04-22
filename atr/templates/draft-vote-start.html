@@ -10,8 +10,11 @@
 
 {% block content %}
   <div class="my-4">
+    <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
+       class="back-link">← Back to Compose {{ release.short_display_name }}</a>
+
     <h1 class="mb-4">
-      Start a vote on <strong>{{ release.project.display_name.removeprefix("Apache ") }}</strong> <em>{{ release.version }}</em>
+      Start vote on <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
     </h1>
 
     <div class="px-3 py-4 mb-4 bg-light border rounded">

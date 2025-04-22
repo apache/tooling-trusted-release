@@ -1,25 +1,25 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  View {{ project_name }}/{{ version_name }}/{{ file_path }} ~ ATR
+  View {{ release.project.short_display_name }}/{{ release.version }}/{{ file_path }} ~ ATR
 {% endblock title %}
 
 {% block description %}
-  View the content of the {{ project_name }} {{ version_name }} {{ file_path }} file.
+  View the content of the {{ release.project.short_display_name }} {{ release.version }} {{ file_path }} file.
 {% endblock description %}
 
 {% block content %}
   {# Generate back link based on phase_key #}
   {% if phase_key == "draft" %}
-    {% set back_url = as_url(routes.draft.view, project_name=project_name, version_name=version_name) %}
+    {% set back_url = as_url(routes.draft.view, project_name=release.project.name, version_name=release.version) %}
   {% elif phase_key == "candidate" %}
-    {% set back_url = as_url(routes.candidate.view, project_name=project_name, version_name=version_name) %}
+    {% set back_url = as_url(routes.candidate.view, project_name=release.project.name, version_name=release.version) %}
   {% elif phase_key == "preview" %}
-    {% set back_url = as_url(routes.preview.view, project_name=project_name, version_name=version_name) %}
+    {% set back_url = as_url(routes.preview.view, project_name=release.project.name, version_name=release.version) %}
   {% elif phase_key == "release" %}
-    {% set back_url = as_url(routes.release.view, project_name=project_name, version_name=version_name) %}
+    {% set back_url = as_url(routes.release.view, project_name=release.project.name, version_name=release.version) %}
   {% endif %}
-  <a href="{{ back_url }}" class="back-link">← Back to View files</a>
+  <a href="{{ back_url }}" class="back-link">← Back to {{ phase_key }}</a>
 
   <div class="p-3 mb-4 bg-light border rounded">
     <h2 class="mt-0">Viewing file: {{ file_path }}</h2>

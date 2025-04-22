@@ -179,7 +179,8 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
     )
 
 
-@routes.committer("/draft/add/<project_name>/<version_name>", methods=["GET", "POST"])
+# TODO: Rename to upload.release?
+@routes.committer("/upload/<project_name>/<version_name>", methods=["GET", "POST"])
 async def add_files(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show a page to allow the user to add files to a candidate draft."""
 
@@ -228,8 +229,7 @@ async def add_files(session: routes.CommitterSession, project_name: str, version
         "draft-add-files.html",
         asf_id=session.uid,
         server_domain=session.host,
-        project_name=project_name,
-        version_name=version_name,
+        release=release,
         form=form,
         svn_form=svn_form,
         project_display_name=project_display_name,
@@ -624,7 +624,7 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
     )
 
 
-@routes.committer("/draft/evaluate/<project_name>/<version_name>/<path:rel_path>")
+@routes.committer("/report/<project_name>/<version_name>/<path:rel_path>")
 async def evaluate_path(session: routes.CommitterSession, project_name: str, version_name: str, rel_path: str) -> str:
     """Evaluate the status of all checks for a specific file."""
     # Check that the user has access to the project
@@ -789,7 +789,7 @@ async def revision_set(session: routes.CommitterSession, project_name: str, vers
     )
 
 
-@routes.committer("/draft/revisions/<project_name>/<version_name>")
+@routes.committer("/revisions/<project_name>/<version_name>")
 async def revisions(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
     """Show the revision history for a release candidate draft."""
     if not any((p.name == project_name) for p in (await session.user_projects)):
@@ -1081,7 +1081,7 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     )
 
 
-@routes.committer("/draft/view/<project_name>/<version_name>/<path:file_path>")
+@routes.committer("/file/<project_name>/<version_name>/<path:file_path>")
 async def view_path(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:

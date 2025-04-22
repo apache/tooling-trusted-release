@@ -1,7 +1,7 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Add files to {{ project_name }} {{ version_name }} ~ ATR
+  Upload files to {{ release.short_display_name }} ~ ATR
 {% endblock title %}
 
 {% block description %}
@@ -9,22 +9,20 @@
 {% endblock description %}
 
 {% block content %}
-  <a href="{{ as_url(routes.draft.compose, project_name=project_name, version_name=version_name) }}"
-     class="back-link">← Back to {{ project_display_name }} {{ version_name }}</a>
+  <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
+     class="back-link">← Back to Compose {{ release.short_display_name }}</a>
 
-  <h1>Add files to {{ project_display_name }} {{ version_name }}</h1>
+  <h1>
+    Upload to <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
+  </h1>
 
-  <ul>
-    <li>
-      <a href="#file-upload">File upload</a>
-    </li>
-    <li>
-      <a href="#svn-upload">SVN upload</a>
-    </li>
-    <li>
-      <a href="#rsync-upload">Rsync upload</a>
-    </li>
-  </ul>
+  <div class="card">
+    <div class="card-body">
+      <a href="#file-upload" class="btn btn-outline-primary me-2">Use the browser</a>
+      <a href="#svn-upload" class="btn btn-outline-primary me-2">Use SVN</a>
+      <a href="#rsync-upload" class="btn btn-outline-primary">Use rsync</a>
+    </div>
+  </div>
 
   <h2 id="file-upload">File upload</h2>
   <p class="intro">Use this form to add files to this candidate draft.</p>

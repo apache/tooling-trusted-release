@@ -1,35 +1,29 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Review {{ project_name }} {{ version_name }} {{ package.filename }} ~ ATR
+  Report for {{ release.short_display_name }} {{ package.filename }} ~ ATR
 {% endblock title %}
 
 {% block description %}
-  Review the {{ project_name }} {{ version_name }} {{ package.filename }} candidate draft file.
+  Show the report for the {{ release.short_display_name }} {{ package.filename }} candidate draft file.
 {% endblock description %}
 
 {% block content %}
-  <a href="{{ as_url(routes.draft.evaluate, project_name=project_name, version_name=version_name) }}"
-     class="back-link">← Back to Draft evaluation</a>
+  <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
+     class="back-link">← Back to Compose {{ release.short_display_name }}</a>
 
-  <div class="p-3 mb-4 bg-light border rounded">
-    <h2 class="mt-0">File evaluation</h2>
-    <p>
-      <strong>Filename:</strong> {{ package.filename }}
-    </p>
-    <p>
-      <strong>Size:</strong> {{ format_file_size(package.bytes_size) }}
-    </p>
-    <p class="mb-0">
-      <strong>Uploaded:</strong> {{ package.uploaded.strftime("%Y-%m-%d %H:%M:%S UTC") }}
-    </p>
+  <h1>
+    Report for <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
+  </h1>
+  <div class="fs-3 bg-light p-3 border rounded mb-4">
+    <code>{{ package.filename }}</code>
   </div>
 
   <p>
     <strong>Note:</strong> Refresh this page to see the latest status of the verification tasks.
   </p>
 
-  <h2>Verification tasks</h2>
+  <h2>Report results</h2>
 
   {% if check_results %}
     {# Define status_counts here so it's available globally in this block #}
@@ -218,6 +212,19 @@
     {% else %}
       <p>No verification tasks found for this file.</p>
     {% endif %}
+
+    <h2>Metadata</h2>
+    <div class="p-3 mb-4 bg-light border rounded">
+      <p>
+        <strong>Filename:</strong> {{ package.filename }}
+      </p>
+      <p>
+        <strong>Size:</strong> {{ format_file_size(package.bytes_size) }}
+      </p>
+      <p class="mb-0">
+        <strong>Uploaded:</strong> {{ package.uploaded.strftime("%Y-%m-%d %H:%M:%S UTC") }}
+      </p>
+    </div>
   </div>
 {% endblock content %}
 

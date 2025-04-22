@@ -29,8 +29,11 @@
 {% endblock stylesheets %}
 
 {% block content %}
+  <p>
+    <a href="{{ as_url(routes.root.index) }}" class="back-link">← Back to Select a release</a>
+  </p>
   <h1>
-    Compose <strong>{{ release.project.display_name.removeprefix("Apache ") }}</strong> <em>{{ version_name }}</em>
+    Compose <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
   </h1>
   <p class="intro">
     Manage the <strong>candidate draft</strong> for {{ release.project.display_name }} {{ version_name }}. Add files, review checks, and promote when ready.
@@ -81,9 +84,9 @@
     </div>
     <div class="card-body d-flex flex-wrap gap-2">
       <a href="{{ as_url(routes.draft.add_files, project_name=release.project.name, version_name=release.version) }}"
-         title="Add or replace files in this draft"
-         class="btn btn-primary"><i class="fas fa-upload me-1"></i> Add or replace files</a>
-      <a href="{{ as_url(routes.draft.revisions, project_name=project_name, version_name=version_name) }}"
+         title="Upload files to this draft"
+         class="btn btn-primary"><i class="fas fa-upload me-1"></i> Upload files</a>
+      <a href="{{ as_url(routes.draft.revisions, project_name=release.project.name, version_name=release.version) }}"
          title="View revision history"
          class="btn btn-secondary"><i class="fas fa-history me-1"></i> Revisions</a>
       <a href="{{ as_url(routes.draft.vote_start, project_name=release.project.name, version=release.version, revision=release.revision) }}"

@@ -1,17 +1,20 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Revisions for {{ project_name }} {{ version_name }} ~ ATR
+  Revisions of {{ release.short_display_name }} ~ ATR
 {% endblock title %}
 
 {% block description %}
-  View the revision history for the {{ project_name }} {{ version_name }} candidate draft.
+  View the revision history for the {{ release.short_display_name }} candidate draft.
 {% endblock description %}
 
 {% block content %}
-  <a href="{{ as_url(routes.draft.drafts) }}" class="back-link">← Back to View drafts</a>
+  <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
+     class="back-link">← Back to Compose {{ release.short_display_name }}</a>
 
-  <h1>Revision history for {{ release.project.display_name }} {{ release.version }}</h1>
+  <h1>
+    Revisions of <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
+  </h1>
 
   {% if revision_history %}
     {% for revision in revision_history %}

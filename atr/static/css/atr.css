@@ -210,7 +210,7 @@ span.warning {
 .back-link {
     display: inline-block;
     margin-bottom: 1rem;
-    color: #0000ee;
+    color: #0000cc;
     text-decoration: none;
 }
 
@@ -414,6 +414,15 @@ h1 strong {
 h1 em {
     font-weight: 425;
     font-style: normal;
-    font-variation-settings: "ital" 0.5;
+
+    /* font-variation-settings: "ital" 0.5; */
     color: #555555;
 }
+
+/* h1 em:before {
+    content: "(";
+}
+
+h1 em:after {
+    content: ")";
+} */
