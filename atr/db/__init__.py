@@ -31,6 +31,7 @@ import sqlmodel.sql.expression as expression
 
 import atr.config as config
 import atr.db.models as models
+import atr.user as user
 import atr.util as util
 
 if TYPE_CHECKING:
@@ -686,6 +687,36 @@ async def tasks_ongoing(project_name: str, version_name: str, draft_revision: st
         )
         result = await data.execute(query)
         return result.scalar_one()
+
+
+async def unfinished_releases(asfuid: str) -> dict[str, list[models.Release]]:
+    releases: dict[str, list[models.Release]] = {}
+    async with session() as data:
+        user_projects = await user.projects(asfuid)
+        user_projects.sort(key=lambda p: p.display_name)
+
+        active_phases = [
+            models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+            models.ReleasePhase.RELEASE_CANDIDATE,
+            models.ReleasePhase.RELEASE_PREVIEW,
+        ]
+        for project in user_projects:
+            stmt = (
+                sqlmodel.select(models.Release)
+                .where(
+                    models.Release.project_id == project.id,
+                    validate_instrumented_attribute(models.Release.phase).in_(active_phases),
+                )
+                .options(select_in_load(models.Release.project))
+                .order_by(validate_instrumented_attribute(models.Release.created).desc())
+            )
+            result = await data.execute(stmt)
+            active_releases = list(result.scalars().all())
+            if active_releases:
+                active_releases.sort(key=lambda r: r.created, reverse=True)
+                releases[project.short_display_name] = active_releases
+
+    return releases
 
 
 def validate_instrumented_attribute(obj: Any) -> orm.InstrumentedAttribute:

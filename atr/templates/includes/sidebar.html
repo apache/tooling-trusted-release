@@ -29,6 +29,19 @@
   </div>
   <nav>
     {% if current_user %}
+      {% set unfinished_releases = unfinished_releases_fn(current_user.uid) %}
+      {% if unfinished_releases %}
+        {% for project_short_display_name, releases in unfinished_releases.items() %}
+          <h3>{{ project_short_display_name }}</h3>
+          <ul>
+            {% for release in releases %}
+              <li>
+                <a href="{{ release_as_url(release) }}">{{ release.version }}</a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endfor %}
+      {% endif %}
       <h3>Release candidate drafts</h3>
       <ul>
         <li>

@@ -106,6 +106,7 @@ def app_setup_context(app: base.QuartApp) -> None:
     @app.context_processor
     async def app_wide() -> dict[str, Any]:
         import atr.metadata as metadata
+        import atr.routes.mapping as mapping
         import atr.routes.modules as modules
 
         return {
@@ -116,6 +117,8 @@ def app_setup_context(app: base.QuartApp) -> None:
             "is_viewing_as_admin_fn": util.is_user_viewing_as_admin,
             "is_committee_member_fn": user.is_committee_member,
             "routes": modules,
+            "unfinished_releases_fn": db.unfinished_releases,
+            "release_as_url": mapping.release_as_url,
             "version": metadata.version,
         }
 

@@ -96,7 +96,6 @@ async def resolve_release(
             latest_vote_task = task
             break
 
-    logging.warning(f"Latest vote task 2: {latest_vote_task}")
     if latest_vote_task and (latest_vote_task.status == models.TaskStatus.COMPLETED) and latest_vote_task.result:
         task_mid = _task_mid(latest_vote_task)
         archive_url = await _task_archive_url(task_mid)
@@ -220,7 +219,6 @@ async def _resolve_get(session: routes.CommitterSession) -> str:
                 latest_vote_task = task
                 break
 
-        logging.warning(f"Latest vote task: {latest_vote_task}")
         if latest_vote_task and (latest_vote_task.status == models.TaskStatus.COMPLETED) and latest_vote_task.result:
             task_mid = _task_mid(latest_vote_task)
             archive_url = await _task_archive_url(task_mid)

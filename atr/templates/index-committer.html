@@ -119,15 +119,7 @@
         <div class="d-flex flex-wrap gap-3">
           {% for release in active_releases %}
             {% set current_phase_index = phase_index_map.get(release.phase, -1) %}
-            {% if release.phase.value == "release_candidate_draft" %}
-              {% set release_link = as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) %}
-            {% elif release.phase.value == "release_candidate" %}
-              {% set release_link = as_url(routes.candidate.resolve_release, project_name=release.project.name, version_name=release.version) %}
-            {% elif release.phase.value == "release_preview" %}
-              {% set release_link = as_url(routes.preview.announce_release, project_name=release.project.name, version_name=release.version) %}
-            {% endif %}
-
-            <a href="{{ release_link }}" class="text-decoration-none">
+            <a href="{{ release_as_url(release) }}" class="text-decoration-none">
               <div class="card h-100 shadow-sm hover-lift atr-cursor-pointer page-card">
                 <div class="card-body text-center d-flex flex-column justify-content-center">
                   <div class="fw-semibold mb-3 fs-4 page-version">{{ release.version }}</div>
