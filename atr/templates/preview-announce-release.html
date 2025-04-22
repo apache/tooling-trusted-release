@@ -24,7 +24,13 @@
 {% endblock stylesheets %}
 
 {% block content %}
-  <h1>Announce and distribute {{ release.project.display_name.removeprefix("Apache ") }} {{ release.version }}</h1>
+  <p>
+    <a href="{{ as_url(routes.root.index) }}" class="back-link">← Back to Select a release</a>
+  </p>
+
+  <h1>
+    Announce <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
+  </h1>
 
   <div id="{{ release.name }}" class="card mb-4 shadow-sm">
     <div class="card-header bg-light">
@@ -32,7 +38,7 @@
     </div>
     <div class="card-body">
       <div class="d-flex flex-wrap gap-3 pb-3 mb-3 border-bottom text-secondary fs-6">
-        <span class="atr-preview-meta-item">Phase: {{ release.phase.value.upper() }}</span>
+        <span class="atr-preview-meta-item">Phase: <strong class="atr-phase-three">③ REFINE</strong></span>
         <span class="atr-preview-meta-item">Revision: {{ release.revision }}</span>
         <span class="atr-preview-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
       </div>

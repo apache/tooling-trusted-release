@@ -426,3 +426,15 @@ h1 em {
 h1 em:after {
     content: ")";
 } */
+
+.atr-phase-one {
+    color: #3333aa;
+}
+
+.atr-phase-two {
+    color: #337733;
+}
+
+.atr-phase-three {
+    color: #aa3333;
+}

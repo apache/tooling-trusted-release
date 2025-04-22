@@ -13,11 +13,11 @@
       }
 
       .page-muted {
-          color: #777777;
+          color: #aaaaaa;
       }
 
       .page-phase-progression {
-          color: #555555;
+          color: #777777;
       }
 
       .page-phase-progression strong {
@@ -32,7 +32,7 @@
       .page-arrow {
           margin-left: 0.333333rem;
           margin-right: 0.333333rem;
-          color: #999999;
+          color: #cccccc;
       }
 
       .page-semibold {
@@ -123,29 +123,36 @@
               <div class="card h-100 shadow-sm hover-lift atr-cursor-pointer page-card">
                 <div class="card-body text-center d-flex flex-column justify-content-center">
                   <div class="fw-semibold mb-3 fs-4 page-version">{{ release.version }}</div>
-                  <div class="page-phase-progression">
-                    {# set phase_symbols = ["①", "②", "③", "④", "⑤"] #}
-                    {% set phase_symbols = ["1.", "2.", "3.", "4.", "5."] %}
-                    {% set num_phases = phase_sequence|length %}
+                  <div class="page-phase-progression mb-2">
+                    {# set phase_symbols = ["1.", "2.", "3."] #}
+                    {% set phase_symbols = ["①", "②", "③"] %}
+                    {% set phase_labels = ["Compose", "Vote", "Refine"] %}
 
-                    {% if current_phase_index > 0 %}
-                      {% set prev_index = current_phase_index - 1 %}
-                      {% set prev_symbol = phase_symbols[prev_index] if prev_index < phase_symbols|length else "?" %}
-                      <span class="page-muted">{{ phase_symbols[prev_index] }}</span> <span class="page-arrow">→</span>
-                    {% endif %}
-
-                    {% if current_phase_index >= 0 and current_phase_index < num_phases %}
-                      {% set current_symbol = phase_symbols[current_phase_index] if current_phase_index < phase_symbols|length else "?" %}
-                      <strong>{{ current_symbol }} {{ phase_sequence[current_phase_index] }}</strong>
+                    {% if current_phase_index == 0 %}
+                      <strong class="atr-phase-one">{{ phase_symbols[0] }}</strong>
                     {% else %}
-                      <strong>Unknown phase</strong>
+                      <span class="page-muted">{{ phase_symbols[0] }}</span>
                     {% endif %}
-
-                    {% if current_phase_index >= 0 and current_phase_index < num_phases - 1 %}
-                      {% set next_index = current_phase_index + 1 %}
-                      {% set next_symbol = phase_symbols[next_index] if next_index < phase_symbols|length else "?" %}
-                      {# TODO: This ellipsis logic needs to be fixed #}
-                      <span class="page-arrow">→</span> <span class="page-muted">{{ next_symbol }} …</span>
+                    <span class="page-arrow">→</span>
+                    {% if current_phase_index == 1 %}
+                      <strong class="atr-phase-two">{{ phase_symbols[1] }}</strong>
+                    {% else %}
+                      <span class="page-muted">{{ phase_symbols[1] }}</span>
+                    {% endif %}
+                    <span class="page-arrow">→</span>
+                    {% if current_phase_index == 2 %}
+                      <strong class="atr-phase-three">{{ phase_symbols[2] }}</strong>
+                    {% else %}
+                      <span class="page-muted">{{ phase_symbols[2] }}</span>
+                    {% endif %}
+                  </div>
+                  <div class="page-phase-progression">
+                    {% if current_phase_index == 0 %}
+                      <strong class="atr-phase-one">{{ phase_labels[0] }}</strong>
+                    {% elif current_phase_index == 1 %}
+                      <strong class="atr-phase-two">{{ phase_labels[1] }}</strong>
+                    {% elif current_phase_index == 2 %}
+                      <strong class="atr-phase-three">{{ phase_labels[2] }}</strong>
                     {% endif %}
                   </div>
                 </div>
