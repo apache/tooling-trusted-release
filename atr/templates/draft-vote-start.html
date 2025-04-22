@@ -105,7 +105,7 @@
 
       <div class="mt-4 col-md-9 offset-md-3">
         {{ form.submit(class_='btn btn-primary') }}
-        <a href="{{ as_url(routes.draft.content, project_name=release.project.name, version_name=release.version) }}"
+        <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-link text-secondary">Cancel</a>
       </div>
     </form>

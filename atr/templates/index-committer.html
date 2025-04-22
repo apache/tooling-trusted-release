@@ -119,7 +119,7 @@
           {% for release in active_releases %}
             {% set current_phase_index = phase_index_map.get(release.phase, -1) %}
             {% if release.phase.value == "release_candidate_draft" %}
-              {% set release_link = as_url(routes.draft.content, project_name=release.project.name, version_name=release.version) %}
+              {% set release_link = as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) %}
             {% elif release.phase.value == "release_candidate" %}
               {% set release_link = as_url(routes.candidate.view, project_name=release.project.name, version_name=release.version) %}
             {% elif release.phase.value == "release_preview" %}

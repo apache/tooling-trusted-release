@@ -21,11 +21,24 @@
           width: 2em;
           text-align: center;
       }
+
+      h1 strong {
+          font-weight: 550;
+      }
+
+      h1 em {
+          font-weight: 425;
+          font-style: normal;
+          font-variation-settings: "ital" 0.5;
+          color: #555555;
+      }
   </style>
 {% endblock stylesheets %}
 
 {% block content %}
-  <h1>{{ release.project.display_name }} {{ version_name }}</h1>
+  <h1>
+    Compose <strong>{{ release.project.display_name.removeprefix("Apache ") }}</strong> <em>{{ version_name }}</em>
+  </h1>
   <p class="intro">
     Manage the <strong>candidate draft</strong> for {{ release.project.display_name }} {{ version_name }}. Add files, review checks, and promote when ready.
   </p>

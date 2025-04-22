@@ -156,7 +156,7 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
                 project_name=str(form.project_name.data), version=str(form.version_name.data), asf_uid=session.uid
             )
             return await session.redirect(
-                content,
+                compose,
                 project_name=project.name,
                 version_name=new_release.version,
                 success="Release candidate draft created successfully",
@@ -236,8 +236,9 @@ async def add_files(session: routes.CommitterSession, project_name: str, version
     )
 
 
-@routes.committer("/draft/content/<project_name>/<version_name>")
-async def content(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+# TODO: Rename to compose.release?
+@routes.committer("/compose/<project_name>/<version_name>")
+async def compose(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show the contents of the release candidate draft."""
     if not any((p.name == project_name) for p in (await session.user_projects)):
         return await session.redirect(add, error="You do not have access to this project")
@@ -1161,7 +1162,7 @@ async def vote_start(
         # TODO: Consider relaxing this to all committers
         # Otherwise we must not show the vote form
         if not user.is_committee_member(release.committee, session.uid):
-            return await session.redirect(content, error="You must be on the PMC of this project to start a vote")
+            return await session.redirect(compose, error="You must be on the PMC of this project to start a vote")
         committee = util.unwrap(release.committee)
 
         sender = f"{session.uid}@apache.org"
