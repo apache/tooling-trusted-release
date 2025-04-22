@@ -116,16 +116,23 @@ async def announce(session: routes.CommitterSession) -> str | response.Response:
                     # Impossible, but to satisfy the type checkers
                     return await session.redirect(announce, error="This release does not have a revision")
 
-                # Announce it
-                source = str(util.get_release_preview_dir() / project_name / version_name / release.revision)
+                source_base = util.get_release_preview_dir() / project_name / version_name
+                source = str(source_base / release.revision)
                 target = str(util.get_release_dir() / project_name / version_name)
                 if await aiofiles.os.path.exists(target):
                     return await session.redirect(announce, error="Release already exists")
 
+                # Update the database
                 release.phase = models.ReleasePhase.RELEASE
                 release.revision = None
                 await data.commit()
+
+                # Move the revision directory
                 await aioshutil.move(source, target)
+
+                # Remove the rest of the preview history
+                # This must come after moving the revision directory, otherwise it will be removed too
+                await aioshutil.rmtree(str(source_base))
 
                 return await session.redirect(routes_release.releases, success="Preview successfully announced")
 

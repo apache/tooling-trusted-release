@@ -33,7 +33,7 @@ _LOGGER = logging.getLogger(__name__)
 
 @contextlib.asynccontextmanager
 async def create_and_manage(
-    project_name: str, version_name: str, asf_uid: str, preview: bool = False
+    project_name: str, version_name: str, asf_uid: str, preview: bool = False, create_directory: bool = True
 ) -> AsyncGenerator[tuple[pathlib.Path, str]]:
     """Manage the creation and symlinking of a mutable release revision."""
     if preview is False:
@@ -64,9 +64,11 @@ async def create_and_manage(
         if parent_revision_dir:
             _LOGGER.info(f"Creating new revision {new_revision_name} by hard linking from {parent_revision_id}")
             await util.create_hard_link_clone(parent_revision_dir, new_revision_dir)
-        else:
+        elif create_directory:
             _LOGGER.info(f"Creating new empty revision directory {new_revision_name}")
             await aiofiles.os.makedirs(new_revision_dir)
+        else:
+            _LOGGER.info(f"Creating new empty revision with no directory for {new_revision_name}")
 
         # Yield control to the block within "async with"
         yield new_revision_dir, new_revision_name

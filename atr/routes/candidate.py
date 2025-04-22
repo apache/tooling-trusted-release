@@ -265,7 +265,9 @@ async def _resolve_post_files(project_name: str, release: models.Release, vote_r
             return
 
     # The vote passed, so promote the release candidate to the release preview directory
-    async with revision.create_and_manage(project_name, release.version, asf_uid, preview=True) as (
+    async with revision.create_and_manage(
+        project_name, release.version, asf_uid, preview=True, create_directory=False
+    ) as (
         new_revision_dir,
         _new_revision_name,
     ):
