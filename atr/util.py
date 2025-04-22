@@ -191,8 +191,9 @@ async def content_list(
 ) -> AsyncGenerator[FileStat]:
     """List all the files in the given path."""
     base_path = phase_subdir / project_name / version_name
-    if (phase_subdir.name == "release-candidate-draft") and (revision_name is None):
-        raise ValueError("A revision name is required for release candidate draft content listing")
+    if phase_subdir.name in {"release-candidate-draft", "release-preview"}:
+        if revision_name is None:
+            raise ValueError("A revision name is required for release candidate draft or preview content listing")
     if revision_name:
         base_path = base_path / revision_name
     for path in await paths_recursive(base_path):

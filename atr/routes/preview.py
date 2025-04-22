@@ -233,7 +233,12 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
         )
 
     # Convert async generator to list
-    file_stats = [stat async for stat in util.content_list(util.get_release_preview_dir(), project_name, version_name)]
+    file_stats = [
+        stat
+        async for stat in util.content_list(
+            util.get_release_preview_dir(), project_name, version_name, release.revision
+        )
+    ]
 
     return await quart.render_template(
         "phase-view.html",
