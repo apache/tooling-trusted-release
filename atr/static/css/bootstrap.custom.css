@@ -88,8 +88,8 @@
   --bs-tertiary-bg: #f8f9fa;
   --bs-tertiary-bg-rgb: 248, 249, 250;
   --bs-heading-color: inherit;
-  --bs-link-color: #0d6efd;
-  --bs-link-color-rgb: 13, 110, 253;
+  --bs-link-color: #0011cc;
+  --bs-link-color-rgb: 0, 17, 204;
   --bs-link-decoration: underline;
   --bs-link-hover-color: rgb(10.4, 88, 202.4);
   --bs-link-hover-color-rgb: 10, 88, 202;
@@ -186,6 +186,10 @@ small, .small {
 
 mark, .mark {
   display: inline;
+}
+
+a:not(.btn):not(.btn-link):link {
+  color: var(--bs-link-color, #0011cc);
 }
 
 .accordion {
@@ -11493,6 +11497,10 @@ small, .small, .text-muted {
 .btn-primary:active {
   background-color: rgb(0, 38.8571428571, 68);
   border-color: rgb(0, 38.8571428571, 68);
+}
+
+.btn-link {
+  text-decoration: none;
 }
 
 /*# sourceMappingURL=custom.css.map */

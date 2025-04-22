@@ -1148,7 +1148,8 @@ async def vote_preview(session: routes.CommitterSession) -> quart.wrappers.respo
     return quart.Response(body, mimetype="text/plain")
 
 
-@routes.committer("/draft/vote/start/<project_name>/<version>/<revision>", methods=["GET", "POST"])
+# TODO: Rename to vote.revision?
+@routes.committer("/vote/<project_name>/<version>/<revision>", methods=["GET", "POST"])
 async def vote_start(
     session: routes.CommitterSession, project_name: str, version: str, revision: str
 ) -> response.Response | str:

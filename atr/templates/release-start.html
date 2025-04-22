@@ -27,7 +27,7 @@
 
     <div class="mb-3">
       <label for="{{ form.version_name.id }}" class="form-label">{{ form.version_name.label.text }}:</label>
-      {{ form.version_name(class_="form-control form-control-lg", placeholder="E.g. 1.2.3+rc1 or 2.5") }}
+      {{ form.version_name(class_="form-control form-control-lg", placeholder="Examples: 1.2.3+rc1 or 2.5") }}
       {% if form.version_name.errors -%}
         <div class="invalid-feedback d-block">{{ form.version_name.errors[0] }}</div>
       {%- endif %}

@@ -48,8 +48,9 @@
 {% endblock stylesheets %}
 
 {% block content %}
+  <h1>Select a release</h1>
   <p>
-    Welcome to the <strong>Apache Trusted Release</strong> (ATR) platform, designed to assist you through the process of releasing a new version of an Apache software project. Get started by selecting from the options below.
+    Welcome to the <strong>Apache Trusted Release</strong> (ATR) platform, designed to assist you through the process of releasing a new version of an Apache software project. Get started by selecting a release below.
   </p>
 
   {% if all_projects %}
@@ -129,7 +130,7 @@
             <a href="{{ release_link }}" class="text-decoration-none">
               <div class="card h-100 shadow-sm hover-lift atr-cursor-pointer page-card">
                 <div class="card-body text-center d-flex flex-column justify-content-center">
-                  <div class="fw-bold mb-3 fs-3 page-version">{{ release.version }}</div>
+                  <div class="fw-semibold mb-3 fs-4 page-version">{{ release.version }}</div>
                   <div class="page-phase-progression">
                     {# set phase_symbols = ["①", "②", "③", "④", "⑤"] #}
                     {% set phase_symbols = ["1.", "2.", "3.", "4.", "5."] %}

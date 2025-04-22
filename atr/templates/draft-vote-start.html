@@ -10,11 +10,12 @@
 
 {% block content %}
   <div class="my-4">
-    <h1 class="mb-4">Start release vote</h1>
+    <h1 class="mb-4">
+      Start a vote on <strong>{{ release.project.display_name.removeprefix("Apache ") }}</strong> <em>{{ release.version }}</em>
+    </h1>
 
-    <div class="px-3 pb-4 mb-4 bg-light border rounded">
+    <div class="px-3 py-4 mb-4 bg-light border rounded">
       <!-- TODO: Specify the draft revision too? -->
-      <h2 class="mt-4 mb-3 fs-5 border-0">{{ release.project.display_name }} {{ release.version }}</h2>
       <p class="mb-0">
         Starting a vote for this draft release will cause an email to be sent to the appropriate mailing list, and advance the draft to the "waiting for vote result" phase, unless you send a test message to yourself.
       </p>

@@ -33,6 +33,10 @@ body {
     font-weight: 425;
 }
 
+a {
+    font-weight: 450;
+}
+
 input, textarea, select, option {
     font-size: 17px !important;
     font-weight: 425 !important;
@@ -70,10 +74,6 @@ select, input[type="file"] {
 
 input:not([type="submit"]), textarea, select, option {
     border-width: 2px !important;
-}
-
-a {
-    font-weight: 450;
 }
 
 strong a {
@@ -405,4 +405,15 @@ img {
     color: #666666;
     font-weight: 300;
     padding: 0 0.5rem;
+}
+
+h1 strong {
+    font-weight: 550;
+}
+
+h1 em {
+    font-weight: 425;
+    font-style: normal;
+    font-variation-settings: "ital" 0.5;
+    color: #555555;
 }

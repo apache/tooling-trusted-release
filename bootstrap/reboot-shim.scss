@@ -5,3 +5,7 @@
 h1, h2, h3, h4, h5, h6 { display: block; }
 small { display: inline; }
 mark { display: inline; }
+
+a:not(.btn):not(.btn-link):link {
+  color: var(--bs-link-color, #{$link-color});
+}

@@ -12,6 +12,7 @@ $table-cell-padding-y: 0.75rem;
 $table-cell-padding-x: 0.75rem;
 $table-bg: transparent;
 $table-accent-bg: transparent;
+$link-color: #0011cc;
 
 // Merge custom colors after variables but before maps
 $theme-colors: map-merge(
@@ -116,4 +117,10 @@ small, .text-muted {
 .btn-primary:active {
   background-color: darken(#004477, 10%);
   border-color: darken(#004477, 10%);
+}
+
+// Patch for btn-link due to using reboot-shim
+.btn-link {
+  // Set base state - remove underline from shim's a rule
+  text-decoration: none;
 }
