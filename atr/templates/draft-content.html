@@ -14,7 +14,7 @@
   {{ super() }}
   <style>
       .page-table-striped-odd {
-          background-color: #f8f9fa;
+          background-color: #eeeeee;
       }
 
       .page-icon-cell {
@@ -31,6 +31,10 @@
           font-style: normal;
           font-variation-settings: "ital" 0.5;
           color: #555555;
+      }
+
+      table tr {
+          border-bottom: none;
       }
   </style>
 {% endblock stylesheets %}
@@ -120,9 +124,7 @@
     <div class="card-body">
       {% if paths|length > 0 %}
         <div class="table-responsive">
-          <table class="table table-hover align-middle table-sm mb-0 table-bordered border">
-            <thead>
-            </thead>
+          <table class="table table-hover align-middle table-sm mb-0 border">
             <tbody>
               {% for path in paths %}
                 {% set has_errors = errors[path]|length > 0 %}
