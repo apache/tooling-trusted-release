@@ -18,7 +18,6 @@
 """preview.py"""
 
 import logging
-from typing import Protocol
 
 import aiofiles.os
 import aioshutil
@@ -38,13 +37,20 @@ if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
 
 
-class AnnounceFormProtocol(Protocol):
-    """Protocol for forms that announce a release preview."""
+class AnnounceForm(util.QuartFormTyped):
+    """Form for announcing a release preview."""
 
-    preview_name: wtforms.StringField
-    preview_revision: wtforms.StringField
-    confirm_announce: wtforms.BooleanField
-    submit: wtforms.SubmitField
+    preview_name = wtforms.StringField(
+        "Preview name", validators=[wtforms.validators.InputRequired("Preview name is required")]
+    )
+    preview_revision = wtforms.StringField(
+        "Preview revision", validators=[wtforms.validators.InputRequired("Preview revision is required")]
+    )
+    confirm_announce = wtforms.BooleanField(
+        "Confirmation",
+        validators=[wtforms.validators.DataRequired("You must confirm to proceed with announcement")],
+    )
+    submit = wtforms.SubmitField("Announce release")
 
 
 class DeleteForm(util.QuartFormTyped):
@@ -66,21 +72,6 @@ class DeleteForm(util.QuartFormTyped):
 @routes.committer("/preview/announce", methods=["GET", "POST"])
 async def announce(session: routes.CommitterSession) -> str | response.Response:
     """Allow the user to announce a release preview."""
-
-    class AnnounceForm(util.QuartFormTyped):
-        """Form for announcing a release preview."""
-
-        preview_name = wtforms.StringField(
-            "Preview name", validators=[wtforms.validators.InputRequired("Preview name is required")]
-        )
-        preview_revision = wtforms.StringField(
-            "Preview revision", validators=[wtforms.validators.InputRequired("Preview revision is required")]
-        )
-        confirm_announce = wtforms.BooleanField(
-            "Confirmation",
-            validators=[wtforms.validators.DataRequired("You must confirm to proceed with announcement")],
-        )
-        submit = wtforms.SubmitField("Announce release")
 
     # Get user's preview releases
     async with db.session() as data:
@@ -148,6 +139,19 @@ async def announce(session: routes.CommitterSession) -> str | response.Response:
         announce_form=announce_form,
         delete_form=delete_form,
     )
+
+
+@routes.committer("/preview/announce/<project_name>/<version_name>")
+async def announce_release(
+    session: routes.CommitterSession, project_name: str, version_name: str
+) -> str | response.Response:
+    """Allow the user to announce a release preview."""
+    announce_form = await AnnounceForm.create_form()
+    async with db.session() as data:
+        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
+            routes.FlashError("Release not found")
+        )
+    return await quart.render_template("preview-announce-release.html", release=release, announce_form=announce_form)
 
 
 @routes.committer("/preview/delete", methods=["POST"])
@@ -284,7 +288,7 @@ async def view_path(
     )
 
 
-def _announce_form_validate(announce_form: AnnounceFormProtocol) -> tuple[str, str, str, str]:
+def _announce_form_validate(announce_form: AnnounceForm) -> tuple[str, str, str, str]:
     preview_name = announce_form.preview_name.data
     if not preview_name:
         raise ValueError("Missing required parameters")

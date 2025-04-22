@@ -1,0 +1,77 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Announce and distribute {{ release.project.display_name }} {{ release.version }} ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Announce and distribute {{ release.project.display_name }} {{ release.version }} as a release.
+{% endblock description %}
+
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .atr-preview-meta-item::after {
+          content: "•";
+          margin-left: 1rem;
+          color: #ccc;
+      }
+
+      .atr-preview-meta-item:last-child::after {
+          content: none;
+      }
+  </style>
+{% endblock stylesheets %}
+
+{% block content %}
+  <h1>Announce and distribute {{ release.project.display_name.removeprefix("Apache ") }} {{ release.version }}</h1>
+
+  <div id="{{ release.name }}" class="card mb-4 shadow-sm">
+    <div class="card-header bg-light">
+      <h3 class="card-title mb-0">About this release preview</h3>
+    </div>
+    <div class="card-body">
+      <div class="d-flex flex-wrap gap-3 text-secondary fs-6">
+        <span class="atr-preview-meta-item">Phase: {{ release.phase.value.upper() }}</span>
+        <span class="atr-preview-meta-item">Revision: {{ release.revision }}</span>
+        <span class="atr-preview-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3 border-primary">
+    <div class="card-header bg-primary bg-opacity-10 text-primary">
+      <h5 class="mb-0">Announce and distribute</h5>
+    </div>
+    <div class="card-body">
+      <!-- <p class="text-muted mb-3">Announcing will move this preview to the final release directory.</p> -->
+      <form method="post" action="{{ as_url(routes.preview.announce) }}">
+        {{ announce_form.hidden_tag() }}
+        <input type="hidden" name="preview_name" value="{{ release.name }}" />
+        <input type="hidden" name="preview_revision" value="{{ release.revision }}" />
+        <div class="mb-3">
+          <div class="form-check">
+            {{ announce_form.confirm_announce(class="form-check-input", id="confirm_announce_" + release.name) }}
+            <label class="form-check-label" for="confirm_announce_{{ release.name }}">
+              I understand that this will formally announce the preview, and make it available for distribution.
+            </label>
+          </div>
+          {% if announce_form.confirm_announce.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in announce_form.confirm_announce.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+        <button type="submit"
+                class="btn btn-primary"
+                title="Announce {{ release.project.display_name }} {{ release.version }}">
+          {{ announce_form.submit.label.text }}
+        </button>
+      </form>
+    </div>
+  </div>
+{% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+{% endblock javascripts %}
