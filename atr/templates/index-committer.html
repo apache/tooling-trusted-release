@@ -36,7 +36,7 @@
       }
 
       .page-semibold {
-          font-weight: 500;
+          font-weight: 500 !important;
       }
 
       .page-logo {
@@ -148,11 +148,11 @@
                   </div>
                   <div class="page-phase-progression">
                     {% if current_phase_index == 0 %}
-                      <strong class="atr-phase-one">{{ phase_labels[0] }}</strong>
+                      <strong class="page-semibold atr-phase-one">{{ phase_labels[0] }}</strong>
                     {% elif current_phase_index == 1 %}
-                      <strong class="atr-phase-two">{{ phase_labels[1] }}</strong>
+                      <strong class="page-semibold atr-phase-two">{{ phase_labels[1] }}</strong>
                     {% elif current_phase_index == 2 %}
-                      <strong class="atr-phase-three">{{ phase_labels[2] }}</strong>
+                      <strong class="page-semibold atr-phase-three">{{ phase_labels[2] }}</strong>
                     {% endif %}
                   </div>
                 </div>
