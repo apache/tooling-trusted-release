@@ -206,12 +206,23 @@ def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, ver
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info(f"Waiting for navigation to /announce/tooling-test-example/{version_name} after resolving the vote")
-    wait_for_path(page, f"/announce/tooling-test-example/{version_name}")
+    logging.info(f"Waiting for navigation to /refine/tooling-test-example/{version_name} after resolving the vote")
+    wait_for_path(page, f"/refine/tooling-test-example/{version_name}")
     logging.info("Vote resolution actions completed successfully")
 
 
 def lifecycle_06_announce_preview(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
+    go_to_path(page, f"/refine/tooling-test-example/{version_name}")
+    logging.info("Refine page loaded successfully")
+
+    logging.info(f"Locating the announce link for tooling-test-example {version_name}")
+    announce_link_locator = page.locator(f'a[href="/announce/tooling-test-example/{esc_id(version_name)}"]')
+    sync_api.expect(announce_link_locator).to_be_visible()
+    announce_link_locator.click()
+
+    logging.info(f"Waiting for navigation to /announce/tooling-test-example/{version_name} after announcing preview")
+    wait_for_path(page, f"/announce/tooling-test-example/{version_name}")
+
     logging.info(f"Locating the announcement form for tooling-test-example {version_name}")
     form_locator = page.locator('form[action="/preview/announce"]')
     sync_api.expect(form_locator).to_be_visible()

@@ -395,6 +395,13 @@ async def read_file_for_viewer(full_path: pathlib.Path, max_size: int) -> tuple[
 
 
 def release_directory(release: models.Release) -> pathlib.Path:
+    """Return the absolute path to the directory containing the active files for a given release phase."""
+    if release.revision is None:
+        return release_directory_base(release)
+    return release_directory_base(release) / release.revision
+
+
+def release_directory_base(release: models.Release) -> pathlib.Path:
     """Determine the filesystem directory for a given release based on its phase."""
     phase = release.phase
     try:

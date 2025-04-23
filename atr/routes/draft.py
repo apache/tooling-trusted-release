@@ -250,7 +250,7 @@ async def compose(session: routes.CommitterSession, project_name: str, version_n
     await session.check_access(project_name)
     release = await session.release(project_name, version_name)
 
-    base_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.unwrap_revision
+    base_path = util.release_directory(release)
     paths = await util.paths_recursive(base_path)
     path_templates = {}
     path_substitutions = {}
@@ -414,6 +414,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
                 return await session.redirect(drafts, error=f"Error deleting candidate draft: {e!s}")
 
     # Delete the files on disk, including all revisions
+    # We can't use util.release_directory_base here because we don't have the release object
     draft_dir = util.get_release_candidate_draft_dir() / project_name / version
     if await aiofiles.os.path.exists(draft_dir):
         # Believe this to be another bug in mypy Protocol handling
@@ -512,7 +513,7 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
     await session.check_access(project_name)
     release = await session.release(project_name, version_name, with_committee=True, with_project=False)
 
-    base_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.unwrap_revision
+    base_path = util.release_directory(release)
     paths = await util.paths_recursive(base_path)
     # paths_set = set(paths)
     path_templates = {}
@@ -550,9 +551,7 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
                 path_metadata.add(path)
 
         # Get modified time
-        full_path = str(
-            util.get_release_candidate_draft_dir() / project_name / version_name / release.unwrap_revision / path
-        )
+        full_path = str(util.release_directory(release) / path)
         path_modified[path] = int(await aiofiles.os.path.getmtime(full_path))
 
         # Get successes, warnings, and errors
@@ -607,7 +606,7 @@ async def evaluate_path(session: routes.CommitterSession, project_name: str, ver
     release = await session.release(project_name, version_name)
 
     # TODO: When we do more than one thing in a dir, we should use the revision directory directly
-    abs_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.unwrap_revision / rel_path
+    abs_path = util.release_directory(release) / rel_path
 
     # Check that the file exists
     if not await aiofiles.os.path.exists(abs_path):
@@ -726,12 +725,11 @@ async def revision_set(session: routes.CommitterSession, project_name: str, vers
         async with db.session() as data:
             try:
                 release = await session.release(project_name, version_name, data=data)
-                release_dir = util.get_release_candidate_draft_dir() / project_name / version_name
             except base.ASFQuartException:
                 release = await session.release(
                     project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW, data=data
                 )
-                release_dir = util.get_release_preview_dir() / project_name / version_name
+            release_dir = util.release_directory_base(release)
 
             # Check that the target revision directory exists
             target_revision_dir = release_dir / revision_name
@@ -767,12 +765,11 @@ async def revisions(session: routes.CommitterSession, project_name: str, version
 
     try:
         release = await session.release(project_name, version_name)
-        release_dir = util.get_release_candidate_draft_dir() / project_name / version_name
         phase_key = "draft"
     except base.ASFQuartException:
         release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
-        release_dir = util.get_release_preview_dir() / project_name / version_name
         phase_key = "preview"
+    release_dir = util.release_directory_base(release)
 
     revision_dirs: list[str] = []
     with contextlib.suppress(FileNotFoundError):
@@ -1009,9 +1006,7 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
     await session.check_access(project_name)
     release = await session.release(project_name, version_name)
 
-    full_path = str(
-        util.get_release_candidate_draft_dir() / project_name / version_name / release.unwrap_revision / file_path
-    )
+    full_path = str(util.release_directory(release) / file_path)
 
     # Check that the file exists
     if not await aiofiles.os.path.exists(full_path):
@@ -1074,9 +1069,7 @@ async def view_path(
 
     # Limit to 256 KiB
     _max_view_size = 256 * 1024
-    full_path = (
-        util.get_release_candidate_draft_dir() / project_name / version_name / release.unwrap_revision / file_path
-    )
+    full_path = util.release_directory(release) / file_path
 
     # Attempt to get an archive listing
     # This will be None if the file is not an archive
@@ -1327,7 +1320,7 @@ async def _promote(
     if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
         return "This release is not in the candidate draft phase"
 
-    base_dir = util.get_release_candidate_draft_dir() / project_name / version_name
+    base_dir = util.release_directory_base(release)
     # Use the directory of the specified revision
     # TODO: This ensures that we promote the correct revision, but does not stop conflicts
     # We need to obtain a lock when promoting
@@ -1345,7 +1338,7 @@ async def _promote(
     release.stage = models.ReleaseStage.RELEASE_CANDIDATE
     release.phase = models.ReleasePhase.RELEASE_CANDIDATE
     release.revision = None
-    target_dir = util.get_release_candidate_dir() / project_name / version_name
+    target_dir = util.release_directory(release)
 
     if await aiofiles.os.path.exists(target_dir):
         return f"Target directory {target_dir.name} already exists"

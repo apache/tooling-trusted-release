@@ -59,6 +59,7 @@ async def draft_checks(
 ) -> int:
     """Core logic to analyse a draft revision and queue checks."""
     # Construct path to the specific revision
+    # We don't have the release object here, so we can't use util.release_directory
     revision_path = util.get_release_candidate_draft_dir() / project_name / release_version / draft_revision
     relative_paths = await util.paths_recursive(revision_path)
 

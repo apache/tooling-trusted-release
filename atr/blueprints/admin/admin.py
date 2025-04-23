@@ -395,7 +395,7 @@ async def _delete_release_data(release_name: str) -> None:
         release = await data.release(name=release_name).demand(
             base.ASFQuartException(f"Release '{release_name}' not found.", 404)
         )
-        release_dir = util.release_directory(release)
+        release_dir = util.release_directory_base(release)
 
         # Delete from the database
         _LOGGER.info("Deleting database records for release: %s", release_name)

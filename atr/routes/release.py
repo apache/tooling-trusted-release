@@ -148,7 +148,7 @@ async def view_path(
     """View the content of a specific file in the final release."""
     release = await session.release(project_name, version_name)
     _max_view_size = 1 * 1024 * 1024
-    full_path = util.get_release_dir() / project_name / version_name / file_path
+    full_path = util.release_directory(release) / file_path
     content_listing = await util.archive_listing(full_path)
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
     return await quart.render_template(

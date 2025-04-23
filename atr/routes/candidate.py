@@ -147,14 +147,10 @@ async def view_path(
 ) -> response.Response | str:
     """View the content of a specific file in the release candidate."""
     await session.check_access(project_name)
-
-    async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
+    release = await session.release(project_name, version_name)
 
     _max_view_size = 1 * 1024 * 1024
-    full_path = util.get_release_candidate_dir() / project_name / version_name / file_path
+    full_path = util.release_directory(release) / file_path
     content_listing = await util.archive_listing(full_path)
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
     return await quart.render_template(
@@ -245,7 +241,7 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
 
     # Extract project name
     try:
-        project_name = candidate_name.rsplit("-", 1)[0]
+        project_name, version_name = candidate_name.rsplit("-", 1)
     except ValueError:
         return await session.redirect(resolve, error="Invalid candidate name format")
 
@@ -255,13 +251,13 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
     # Update release status in the database
     async with db.session() as data:
         async with data.begin():
-            release = await data.release(name=candidate_name, _project=True).demand(
-                routes.FlashError("Release candidate not found")
+            release = await session.release(
+                project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE, data=data
             )
 
-            # Verify that it's in the correct phase
-            if release.phase != models.ReleasePhase.RELEASE_CANDIDATE:
-                return await session.redirect(resolve, error="This release is not in the voting phase")
+            # Get the source directory for the release candidate
+            # We need to do it here because we're updating the release status in the database
+            source = str(util.release_directory(release))
 
             # Update the release phase based on vote result
             if vote_result == "passed":
@@ -272,15 +268,16 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
                 release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
                 success_message = "Vote marked as failed"
 
-    await _resolve_post_files(project_name, release, vote_result, session.uid)
+    await _resolve_post_files(project_name, release, source, vote_result, session.uid)
     return await session.redirect(
-        preview.announce_release, success=success_message, project_name=project_name, version_name=release.version
+        preview.refine_release, success=success_message, project_name=project_name, version_name=release.version
     )
 
 
-async def _resolve_post_files(project_name: str, release: models.Release, vote_result: str, asf_uid: str) -> None:
+async def _resolve_post_files(
+    project_name: str, release: models.Release, source: str, vote_result: str, asf_uid: str
+) -> None:
     # TODO: Obtain a lock for this
-    source = str(util.get_release_candidate_dir() / project_name / release.version)
     if vote_result != "passed":
         # The vote failed, so move the release candidate to the release draft directory
         async with revision.create_and_manage(project_name, release.version, asf_uid) as (
