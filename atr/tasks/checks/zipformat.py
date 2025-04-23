@@ -19,12 +19,12 @@ import asyncio
 import logging
 import os
 import zipfile
-from typing import Any
+from typing import Any, Final
 
 import atr.tasks.checks as checks
 import atr.tasks.checks.license as license
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: Final = logging.getLogger(__name__)
 
 
 async def integrity(args: checks.FunctionArguments) -> str | None:

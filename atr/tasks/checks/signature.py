@@ -27,7 +27,7 @@ import atr.db as db
 import atr.db.models as models
 import atr.tasks.checks as checks
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: Final = logging.getLogger(__name__)
 
 
 async def check(args: checks.FunctionArguments) -> str | None:

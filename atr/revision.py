@@ -20,6 +20,7 @@ import datetime
 import logging
 import pathlib
 from collections.abc import AsyncGenerator
+from typing import Final
 
 import aiofiles.os
 
@@ -28,7 +29,7 @@ import atr.db.models as models
 import atr.tasks as tasks
 import atr.util as util
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: Final = logging.getLogger(__name__)
 
 
 @contextlib.asynccontextmanager

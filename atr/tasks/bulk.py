@@ -37,11 +37,11 @@ _LOGGER: Final = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.DEBUG)
 
 # Create file handler for test.log
-file_handler = logging.FileHandler("tasks-bulk.log")
+file_handler: Final[logging.FileHandler] = logging.FileHandler("tasks-bulk.log")
 file_handler.setLevel(logging.DEBUG)
 
 # Create formatter with detailed information
-formatter = logging.Formatter(
+formatter: Final[logging.Formatter] = logging.Formatter(
     "[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] [%(name)s:%(funcName)s:%(lineno)d] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )

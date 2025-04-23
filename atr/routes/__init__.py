@@ -272,10 +272,10 @@ class MicrosecondsFormatter(logging.Formatter):
 
 # Setup a dedicated logger for route performance metrics
 # NOTE: This code block must come after AsyncFileHandler and MicrosecondsFormatter
-route_logger = logging.getLogger("route.performance")
+route_logger: Final = logging.getLogger("route.performance")
 # Use custom formatter that properly includes microseconds
 # TODO: Is this actually UTC?
-route_logger_handler = AsyncFileHandler("route-performance.log")
+route_logger_handler: Final[AsyncFileHandler] = AsyncFileHandler("route-performance.log")
 route_logger_handler.setFormatter(MicrosecondsFormatter("%(asctime)s - %(message)s"))
 route_logger.addHandler(route_logger_handler)
 route_logger.setLevel(logging.INFO)

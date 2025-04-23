@@ -22,7 +22,7 @@ import pathlib
 import statistics
 import uuid
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import Any, Final
 
 import aiofiles.os
 import aioshutil
@@ -40,7 +40,7 @@ import atr.db as db
 import atr.db.models as models
 import atr.util as util
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: Final = logging.getLogger(__name__)
 
 
 class DeleteReleaseForm(util.QuartFormTyped):

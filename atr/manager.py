@@ -36,7 +36,7 @@ import atr.db.models as models
 _LOGGER: Final = logging.getLogger(__name__)
 
 # Global debug flag to control worker process output capturing
-global_worker_debug = False
+global_worker_debug: bool = False
 
 # Global worker manager instance
 # Can't use "StringClass" | None, must use Optional["StringClass"] for forward references

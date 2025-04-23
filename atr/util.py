@@ -29,7 +29,7 @@ import tempfile
 import uuid
 import zipfile
 from collections.abc import AsyncGenerator, Callable, Generator, ItemsView, Mapping, Sequence
-from typing import Annotated, Any, TypeVar
+from typing import Annotated, Any, Final, TypeVar
 
 import aiofiles.os
 import asfquart
@@ -53,7 +53,7 @@ F = TypeVar("F", bound="QuartFormTyped")
 T = TypeVar("T")
 VT = TypeVar("VT")
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: Final = logging.getLogger(__name__)
 
 
 class DictRootModel(pydantic.RootModel[dict[str, VT]]):

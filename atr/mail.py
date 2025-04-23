@@ -29,7 +29,7 @@ import dkim
 
 import atr.db as db
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: Final = logging.getLogger(__name__)
 
 # TODO: We should choose a pattern for globals
 # We could e.g. use uppercase instead of global_

@@ -26,7 +26,7 @@ from typing import Any, Final
 import atr.tasks.checks as checks
 import atr.tasks.checks.targz as targz
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: Final = logging.getLogger(__name__)
 
 
 # Constant that must be present in the Apache License header
