@@ -46,19 +46,18 @@
       <h3 class="card-title mb-0">About this release preview</h3>
     </div>
     <div class="card-body">
-      <div class="d-flex flex-wrap gap-3 pb-3 mb-3 border-bottom text-secondary fs-6">
-        <span class="page-preview-meta-item">Phase: <strong class="atr-phase-three">③ REFINE</strong></span>
+      <div class="d-flex flex-wrap gap-3 pb-1 text-secondary fs-6">
         <span class="page-preview-meta-item">Revision: {{ release.revision }}</span>
         <span class="page-preview-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
       </div>
+      <!--
       <div>
-        <a title="Show files for {{ release.name }}"
-           href="{{ as_url(routes.preview.view, project_name=release.project.name, version_name=release.version) }}"
-           class="btn btn-sm btn-outline-secondary">
+        <a title="Show files for {{ release.name }}" href="{{ as_url(routes.preview.view, project_name=release.project.name, version_name=release.version) }}" class="btn btn-sm btn-secondary">
           <i class="fas fa-file-archive"></i>
           Show files
         </a>
       </div>
+      -->
     </div>
   </div>
 

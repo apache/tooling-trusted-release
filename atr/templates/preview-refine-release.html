@@ -35,17 +35,23 @@
         <span class="page-preview-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
       </div>
       <div>
-        <a title="Announce and distribute {{ release.name }}"
-           href="{{ as_url(routes.preview.announce_release, project_name=release.project.name, version_name=release.version) }}"
-           class="btn btn-sm btn-primary me-2">
-          <i class="fas fa-check-circle"></i>
-          Announce and distribute
-        </a>
         <a title="Show files for {{ release.name }}"
            href="{{ as_url(routes.preview.view, project_name=release.project.name, version_name=release.version) }}"
-           class="btn btn-sm btn-secondary">
+           class="btn btn-sm btn-secondary me-2">
           <i class="fas fa-file-archive"></i>
           Show files
+        </a>
+        <a title="Show revisions for {{ release.name }}"
+           href="{{ as_url(routes.draft.revisions, project_name=release.project.name, version_name=release.version) }}"
+           class="btn btn-sm btn-secondary me-2">
+          <i class="fas fa-history"></i>
+          Show revisions
+        </a>
+        <a title="Announce and distribute {{ release.name }}"
+           href="{{ as_url(routes.preview.announce_release, project_name=release.project.name, version_name=release.version) }}"
+           class="btn btn-sm btn-success">
+          <i class="fas fa-check-circle"></i>
+          Announce and distribute
         </a>
       </div>
     </div>

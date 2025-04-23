@@ -10,16 +10,31 @@
 
 {% block content %}
   <p class="d-flex justify-content-between align-items-center">
-    <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
-       class="atr-back-link">← Back to Compose {{ release.short_display_name }}</a>
-    <span>
-      <strong class="atr-phase-one atr-phase-symbol">①</strong>
-      <span class="atr-phase-one atr-phase-label">COMPOSE</span>
-      <span class="atr-phase-arrow">→</span>
-      <span class="atr-phase-symbol-other">②</span>
-      <span class="atr-phase-arrow">→</span>
-      <span class="atr-phase-symbol-other">③</span>
-    </span>
+    {% if phase_key == "draft" %}
+      <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
+         class="atr-back-link">← Back to Compose {{ release.short_display_name }}</a>
+      <span>
+        <strong class="atr-phase-one atr-phase-symbol">①</strong>
+        <span class="atr-phase-one atr-phase-label">COMPOSE</span>
+        <span class="atr-phase-arrow">→</span>
+        <span class="atr-phase-symbol-other">②</span>
+        <span class="atr-phase-arrow">→</span>
+        <span class="atr-phase-symbol-other">③</span>
+      </span>
+    {% elif phase_key == "preview" %}
+      <a href="{{ as_url(routes.preview.refine_release, project_name=release.project.name, version_name=release.version) }}"
+         class="atr-back-link">← Back to Refine {{ release.short_display_name }}</a>
+      <span>
+        <span class="atr-phase-symbol-other">①</span>
+        <span class="atr-phase-arrow">→</span>
+        <strong class="atr-phase-symbol-other">②</strong>
+        <span class="atr-phase-arrow">→</span>
+        <strong class="atr-phase-three atr-phase-symbol">③</strong>
+        <span class="atr-phase-three atr-phase-label">REFINE</span>
+      </span>
+    {% else %}
+      <a href="{{ as_url(routes.root.index) }}" class="atr-back-link">← Back to Select a release</a>
+    {% endif %}
   </p>
 
   <h1>

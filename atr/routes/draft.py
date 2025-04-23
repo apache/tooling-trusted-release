@@ -711,29 +711,37 @@ async def hashgen(
     )
 
 
-@routes.committer("/draft/revision/set/<project_name>/<version_name>", methods=["POST"])
+@routes.committer("/revision/set/<project_name>/<version_name>", methods=["POST"])
 async def revision_set(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
-    """Set a specific revision as the latest for a candidate draft."""
+    """Set a specific revision as the latest for a candidate draft or release preview."""
     await session.check_access(project_name)
     form_data = await quart.request.form
     revision_name = form_data.get("revision_name")
     if not revision_name:
         raise base.ASFQuartException("Missing revision name", errorcode=400)
 
-    release_dir = util.get_release_candidate_draft_dir() / project_name / version_name
-    target_revision_dir = release_dir / revision_name
-
-    # Check that the target revision directory exists
-    if not await aiofiles.os.path.isdir(target_revision_dir):
-        raise base.ASFQuartException("Target revision directory not found", errorcode=404)
-
     try:
         # Target must be relative for the symlink
         # TODO: We should probably log who is doing this, to create an audit trail
         async with db.session() as data:
-            release = await session.release(project_name, version_name, data=data)
+            try:
+                release = await session.release(project_name, version_name, data=data)
+                release_dir = util.get_release_candidate_draft_dir() / project_name / version_name
+            except base.ASFQuartException:
+                release = await session.release(
+                    project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW, data=data
+                )
+                release_dir = util.get_release_preview_dir() / project_name / version_name
+
+            # Check that the target revision directory exists
+            target_revision_dir = release_dir / revision_name
+            if not await aiofiles.os.path.isdir(target_revision_dir):
+                raise base.ASFQuartException("Target revision directory not found", errorcode=404)
+
             release.revision = revision_name
             await data.commit()
+    except base.ASFQuartException as e:
+        raise e
     except Exception as e:
         logging.exception("Error setting revision:")
         return await session.redirect(
@@ -753,11 +761,19 @@ async def revision_set(session: routes.CommitterSession, project_name: str, vers
 
 @routes.committer("/revisions/<project_name>/<version_name>")
 async def revisions(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
-    """Show the revision history for a release candidate draft."""
+    """Show the revision history for a release candidate draft or release preview."""
+    # TODO: Move this to phase.py?
     await session.check_access(project_name)
-    release = await session.release(project_name, version_name)
 
-    release_dir = util.get_release_candidate_draft_dir() / project_name / version_name
+    try:
+        release = await session.release(project_name, version_name)
+        release_dir = util.get_release_candidate_draft_dir() / project_name / version_name
+        phase_key = "draft"
+    except base.ASFQuartException:
+        release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
+        release_dir = util.get_release_preview_dir() / project_name / version_name
+        phase_key = "preview"
+
     revision_dirs: list[str] = []
     with contextlib.suppress(FileNotFoundError):
         for entry in await aiofiles.os.listdir(str(release_dir)):
@@ -782,7 +798,7 @@ async def revisions(session: routes.CommitterSession, project_name: str, version
     async with db.session() as data:
         # Get parent links using a direct query due to the use of in_(...)
         query = sqlmodel.select(models.TextValue).where(
-            models.TextValue.ns == release.name + " draft",
+            models.TextValue.ns == release.name + f" {phase_key}",
             db.validate_instrumented_attribute(models.TextValue.key).in_(revision_dirs),
         )
         parent_links_result = await data.execute(query)
@@ -810,10 +826,12 @@ async def revisions(session: routes.CommitterSession, project_name: str, version
         prev_revision_name = rev_name
 
     return await quart.render_template(
+        # TODO: Move to phase-revisions.html
         "draft-revisions.html",
         project_name=project_name,
         version_name=version_name,
         release=release,
+        phase_key=phase_key,
         revision_history=list(reversed(revision_history)),
         current_revision_name=current_revision_name,
     )
