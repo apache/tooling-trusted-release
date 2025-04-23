@@ -32,6 +32,7 @@ import asfquart.base as base
 import asfquart.session as session
 import quart
 
+import atr.db as db
 import atr.db.models as models
 import atr.user as user
 import atr.util as util
@@ -174,6 +175,10 @@ class CommitterSession:
         # For example, we can access session.no_such_attr and the type checkers won't notice
         return getattr(self._session, name)
 
+    async def check_access(self, project_name: str) -> None:
+        if not any((p.name == project_name) for p in (await self.user_projects)):
+            raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
     @property
     def host(self) -> str:
         request_host = quart.request.host
@@ -196,6 +201,47 @@ class CommitterSession:
         elif error is not None:
             await quart.flash(error, "error")
         return quart.redirect(util.as_url(route, **kwargs))
+
+    async def release(
+        self,
+        project_name: str,
+        version_name: str,
+        phase: models.ReleasePhase | db.NotSet | None = db.NOT_SET,
+        data: db.Session | None = None,
+        with_committee: bool = False,
+        with_packages: bool = False,
+        with_project: bool = True,
+        with_tasks: bool = False,
+    ) -> models.Release:
+        # We reuse db.NOT_SET as an entirely different sentinel
+        # TODO: We probably shouldn't do that, or should make it clearer
+        if phase is None:
+            phase_value = db.NOT_SET
+        elif phase is db.NOT_SET:
+            phase_value = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+        else:
+            phase_value = phase
+        release_name = models.release_name(project_name, version_name)
+        if data is None:
+            async with db.session() as data:
+                release = await data.release(
+                    name=release_name,
+                    phase=phase_value,
+                    _committee=with_committee,
+                    _packages=with_packages,
+                    _project=with_project,
+                    _tasks=with_tasks,
+                ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
+        else:
+            release = await data.release(
+                name=release_name,
+                phase=phase_value,
+                _committee=with_committee,
+                _packages=with_packages,
+                _project=with_project,
+                _tasks=with_tasks,
+            ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
+        return release
 
     @property
     async def user_candidate_drafts(self) -> list[models.Release]:

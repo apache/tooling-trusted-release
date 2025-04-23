@@ -183,6 +183,7 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
 @routes.committer("/upload/<project_name>/<version_name>", methods=["GET", "POST"])
 async def add_files(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show a page to allow the user to add files to a candidate draft."""
+    await session.check_access(project_name)
 
     class AddFilesForm(util.QuartFormTyped):
         """Form for adding files to a release candidate."""
@@ -218,12 +219,7 @@ async def add_files(session: routes.CommitterSession, project_name: str, version
             await quart.flash(f"Error adding file: {e!s}", "error")
 
     svn_form = await SvnImportForm.create_form()
-
-    async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
-        project_display_name = release.project.display_name
+    release = await session.release(project_name, version_name)
 
     return await quart.render_template(
         "draft-add-files.html",
@@ -232,7 +228,6 @@ async def add_files(session: routes.CommitterSession, project_name: str, version
         release=release,
         form=form,
         svn_form=svn_form,
-        project_display_name=project_display_name,
     )
 
 
@@ -240,49 +235,42 @@ async def add_files(session: routes.CommitterSession, project_name: str, version
 @routes.committer("/compose/<project_name>/<version_name>")
 async def compose(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show the contents of the release candidate draft."""
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(add, error="You do not have access to this project")
+    await session.check_access(project_name)
+    release = await session.release(project_name, version_name)
 
-    async with db.session() as data:
-        release_name = models.release_name(project_name, version_name)
-        release = await data.release(
-            name=release_name, phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT, _project=True
-        ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
-        if release.revision is None:
-            raise base.ASFQuartException("This release does not have a revision.", errorcode=400)
+    base_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.unwrap_revision
+    paths = await util.paths_recursive(base_path)
+    path_templates = {}
+    path_substitutions = {}
+    path_artifacts = set()
+    path_metadata = set()
+    path_successes = {}
+    path_warnings = {}
+    path_errors = {}
 
-        base_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.revision
-        paths = await util.paths_recursive(base_path)
-        path_templates = {}
-        path_substitutions = {}
-        path_artifacts = set()
-        path_metadata = set()
-        path_successes = {}
-        path_warnings = {}
-        path_errors = {}
+    for path in paths:
+        # Get template and substitutions
+        elements = {
+            "core": project_name,
+            "version": version_name,
+            "sub": None,
+            "template": None,
+            "substitutions": None,
+        }
+        template, substitutions = analysis.filename_parse(str(path), elements)
+        path_templates[path] = template
+        path_substitutions[path] = analysis.substitutions_format(substitutions) or "none"
 
-        for path in paths:
-            # Get template and substitutions
-            elements = {
-                "core": project_name,
-                "version": version_name,
-                "sub": None,
-                "template": None,
-                "substitutions": None,
-            }
-            template, substitutions = analysis.filename_parse(str(path), elements)
-            path_templates[path] = template
-            path_substitutions[path] = analysis.substitutions_format(substitutions) or "none"
+        # Get artifacts and metadata
+        search = re.search(analysis.extension_pattern(), str(path))
+        if search:
+            if search.group("artifact"):
+                path_artifacts.add(path)
+            elif search.group("metadata"):
+                path_metadata.add(path)
 
-            # Get artifacts and metadata
-            search = re.search(analysis.extension_pattern(), str(path))
-            if search:
-                if search.group("artifact"):
-                    path_artifacts.add(path)
-                elif search.group("metadata"):
-                    path_metadata.add(path)
-
-            # Get successes, warnings, and errors
+        # Get successes, warnings, and errors
+        async with db.session() as data:
             path_successes[path] = await data.check_result(
                 release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.SUCCESS
             ).all()
@@ -293,12 +281,12 @@ async def compose(session: routes.CommitterSession, project_name: str, version_n
                 release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.FAILURE
             ).all()
 
-        revision_name_from_link, revision_editor, revision_time = await revision.latest_info(project_name, version_name)
+    revision_name_from_link, revision_editor, revision_time = await revision.latest_info(project_name, version_name)
 
-        # Get the number of ongoing tasks for the current revision
-        ongoing_tasks_count = 0
-        if revision_name_from_link:
-            ongoing_tasks_count = await db.tasks_ongoing(project_name, version_name, revision_name_from_link)
+    # Get the number of ongoing tasks for the current revision
+    ongoing_tasks_count = 0
+    if revision_name_from_link:
+        ongoing_tasks_count = await db.tasks_ongoing(project_name, version_name, revision_name_from_link)
 
     delete_draft_form = await DeleteForm.create_form()
     delete_file_form = await DeleteFileForm.create_form()
@@ -402,10 +390,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         project_name, version = candidate_draft_name.rsplit("-", 1)
     except ValueError:
         return await session.redirect(drafts, error="Invalid candidate draft name format")
-
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(drafts, error="You do not have access to this project")
+    await session.check_access(project_name)
 
     # Delete the metadata from the database
     async with db.session() as data:
@@ -431,13 +416,11 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 @routes.committer("/draft/delete-file/<project_name>/<version_name>", methods=["POST"])
 async def delete_file(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
     """Delete a specific file from the release candidate, creating a new revision."""
+    await session.check_access(project_name)
+
     form = await DeleteFileForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
         return await session.redirect(evaluate, project_name=project_name, version_name=version_name)
-
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
 
     rel_path_to_delete = pathlib.Path(str(form.file_path.data))
     metadata_files_deleted = 0
@@ -514,20 +497,10 @@ async def drafts(session: routes.CommitterSession) -> str:
 @routes.committer("/draft/evaluate/<project_name>/<version_name>")
 async def evaluate(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Evaluate all the files in the rsync upload directory for a release."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(add, error="You do not have access to this project")
+    await session.check_access(project_name)
+    release = await session.release(project_name, version_name, with_committee=True, with_project=False)
 
-    # Check that the release exists
-    async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name), _committee=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
-
-    if release.revision is None:
-        raise base.ASFQuartException("Release does not have a revision", errorcode=404)
-
-    base_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.revision
+    base_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.unwrap_revision
     paths = await util.paths_recursive(base_path)
     # paths_set = set(paths)
     path_templates = {}
@@ -565,29 +538,22 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
                 path_metadata.add(path)
 
         # Get modified time
-        full_path = str(util.get_release_candidate_draft_dir() / project_name / version_name / release.revision / path)
+        full_path = str(
+            util.get_release_candidate_draft_dir() / project_name / version_name / release.unwrap_revision / path
+        )
         path_modified[path] = int(await aiofiles.os.path.getmtime(full_path))
 
         # Get successes, warnings, and errors
-        path_successes[path] = await data.check_result(
-            release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.SUCCESS
-        ).all()
-        path_warnings[path] = await data.check_result(
-            release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.WARNING
-        ).all()
-        path_errors[path] = await data.check_result(
-            release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.FAILURE
-        ).all()
-
-    # # TODO: This is only accurate to a second
-    # oldest_check_result = None
-    # latest_check_result = None
-    # for path_success in path_successes:
-    #     for check_result in path_successes[path_success]:
-    #         if (oldest_check_result is None) or (check_result.created < oldest_check_result):
-    #             oldest_check_result = check_result.created
-    #         if (latest_check_result is None) or (check_result.created > latest_check_result):
-    #             latest_check_result = check_result.created
+        async with db.session() as data:
+            path_successes[path] = await data.check_result(
+                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.SUCCESS
+            ).all()
+            path_warnings[path] = await data.check_result(
+                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.WARNING
+            ).all()
+            path_errors[path] = await data.check_result(
+                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.FAILURE
+            ).all()
 
     revision_name_from_link, revision_editor, revision_time = await revision.latest_info(project_name, version_name)
 
@@ -605,8 +571,6 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
         release=release,
         paths=paths,
         server_domain=session.host,
-        # oldest_check_result=oldest_check_result,
-        # latest_check_result=latest_check_result,
         templates=path_templates,
         substitutions=path_substitutions,
         artifacts=path_artifacts,
@@ -627,43 +591,35 @@ async def evaluate(session: routes.CommitterSession, project_name: str, version_
 @routes.committer("/report/<project_name>/<version_name>/<path:rel_path>")
 async def evaluate_path(session: routes.CommitterSession, project_name: str, version_name: str, rel_path: str) -> str:
     """Evaluate the status of all checks for a specific file."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+    await session.check_access(project_name)
+    release = await session.release(project_name, version_name)
 
+    # TODO: When we do more than one thing in a dir, we should use the revision directory directly
+    abs_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.unwrap_revision / rel_path
+
+    # Check that the file exists
+    if not await aiofiles.os.path.exists(abs_path):
+        raise base.ASFQuartException("File does not exist", errorcode=404)
+
+    modified = int(await aiofiles.os.path.getmtime(abs_path))
+    file_size = await aiofiles.os.path.getsize(abs_path)
+
+    # Get all check results for this file
     async with db.session() as data:
-        # Check that the release exists
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
-        if release.revision is None:
-            raise base.ASFQuartException("Release does not have a revision", errorcode=404)
-
-        # TODO: When we do more than one thing in a dir, we should use the revision directory directly
-        abs_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.revision / rel_path
-
-        # Check that the file exists
-        if not await aiofiles.os.path.exists(abs_path):
-            raise base.ASFQuartException("File does not exist", errorcode=404)
-
-        modified = int(await aiofiles.os.path.getmtime(abs_path))
-        file_size = await aiofiles.os.path.getsize(abs_path)
-
-        # Get all check results for this file
         query = data.check_result(release_name=release.name, primary_rel_path=str(rel_path)).order_by(
             db.validate_instrumented_attribute(models.CheckResult.checker).asc(),
             db.validate_instrumented_attribute(models.CheckResult.created).desc(),
         )
         all_results = await query.all()
 
-        # Filter to get only the most recent result for each checker
-        latest_check_results: dict[str, models.CheckResult] = {}
-        for result in all_results:
-            if result.checker not in latest_check_results:
-                latest_check_results[result.checker] = result
+    # Filter to get only the most recent result for each checker
+    latest_check_results: dict[str, models.CheckResult] = {}
+    for result in all_results:
+        if result.checker not in latest_check_results:
+            latest_check_results[result.checker] = result
 
-        # Convert to a list for the template
-        check_results_list = list(latest_check_results.values())
+    # Convert to a list for the template
+    check_results_list = list(latest_check_results.values())
 
     file_data = {
         "filename": pathlib.Path(rel_path).name,
@@ -688,9 +644,7 @@ async def hashgen(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
     """Generate an sha256 or sha512 hash file for a candidate draft file, creating a new revision."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+    await session.check_access(project_name)
 
     # Get the hash type from the form data
     # This is just a button, so we don't make a whole form validation schema for it
@@ -748,9 +702,7 @@ async def hashgen(
 @routes.committer("/draft/revision/set/<project_name>/<version_name>", methods=["POST"])
 async def revision_set(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
     """Set a specific revision as the latest for a candidate draft."""
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
-
+    await session.check_access(project_name)
     form_data = await quart.request.form
     revision_name = form_data.get("revision_name")
     if not revision_name:
@@ -767,9 +719,7 @@ async def revision_set(session: routes.CommitterSession, project_name: str, vers
         # Target must be relative for the symlink
         # TODO: We should probably log who is doing this, to create an audit trail
         async with db.session() as data:
-            release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-                base.ASFQuartException("Release does not exist", errorcode=404)
-            )
+            release = await session.release(project_name, version_name, data=data)
             release.revision = revision_name
             await data.commit()
     except Exception as e:
@@ -792,38 +742,32 @@ async def revision_set(session: routes.CommitterSession, project_name: str, vers
 @routes.committer("/revisions/<project_name>/<version_name>")
 async def revisions(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
     """Show the revision history for a release candidate draft."""
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+    await session.check_access(project_name)
+    release = await session.release(project_name, version_name)
+
+    release_dir = util.get_release_candidate_draft_dir() / project_name / version_name
+    revision_dirs: list[str] = []
+    with contextlib.suppress(FileNotFoundError):
+        for entry in await aiofiles.os.listdir(str(release_dir)):
+            # Match pattern like "user@YYYY-MM-DDTHH.MM.SS.fffZ"
+            if "@" in entry and entry.endswith("Z"):
+                if await aiofiles.os.path.isdir(release_dir / entry):
+                    revision_dirs.append(entry)
+
+    # Sort revisions by timestamp
+    def sort_key(rev_name: str) -> datetime.datetime:
+        try:
+            # Remove trailing Z, though we could just put it in the template pattern
+            timestamp_str = rev_name.split("@", 1)[1][:-1]
+            return datetime.datetime.strptime(timestamp_str, "%Y-%m-%dT%H.%M.%S.%f")
+        except (IndexError, ValueError):
+            # Should not happen for valid names, put invalid ones last
+            return datetime.datetime.min
+
+    # Sort revisions by timestamp, newest first
+    revision_dirs.sort(key=sort_key, reverse=True)
 
     async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
-        if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-            raise base.ASFQuartException("Revisions are only available for candidate drafts", errorcode=400)
-
-        release_dir = util.get_release_candidate_draft_dir() / project_name / version_name
-        revision_dirs: list[str] = []
-        with contextlib.suppress(FileNotFoundError):
-            for entry in await aiofiles.os.listdir(str(release_dir)):
-                # Match pattern like "user@YYYY-MM-DDTHH.MM.SS.fffZ"
-                if "@" in entry and entry.endswith("Z"):
-                    if await aiofiles.os.path.isdir(release_dir / entry):
-                        revision_dirs.append(entry)
-
-        # Sort revisions by timestamp
-        def sort_key(rev_name: str) -> datetime.datetime:
-            try:
-                # Remove trailing Z, though we could just put it in the template pattern
-                timestamp_str = rev_name.split("@", 1)[1][:-1]
-                return datetime.datetime.strptime(timestamp_str, "%Y-%m-%dT%H.%M.%S.%f")
-            except (IndexError, ValueError):
-                # Should not happen for valid names, put invalid ones last
-                return datetime.datetime.min
-
-        # Sort revisions by timestamp, newest first
-        revision_dirs.sort(key=sort_key, reverse=True)
-
         # Get parent links using a direct query due to the use of in_(...)
         query = sqlmodel.select(models.TextValue).where(
             models.TextValue.ns == release.name + " draft",
@@ -832,26 +776,26 @@ async def revisions(session: routes.CommitterSession, project_name: str, version
         parent_links_result = await data.execute(query)
         parent_map = {link.key: link.value for link in parent_links_result.scalars().all()}
 
-        # Determine the current latest revision
-        latest_revision_name = release.revision
+    # Determine the current latest revision
+    latest_revision_name = release.revision
 
-        revision_history = []
-        prev_revision_files: set[pathlib.Path] | None = None
-        prev_revision_name: str | None = None
+    revision_history = []
+    prev_revision_files: set[pathlib.Path] | None = None
+    prev_revision_name: str | None = None
 
-        # Oldest to newest, to build diffs relative to previous revision
-        for rev_name in reversed(revision_dirs):
-            revision_data, current_revision_files = await _revisions_process(
-                rev_name,
-                release_dir,
-                parent_map,
-                prev_revision_files,
-                prev_revision_name,
-                sort_key,
-            )
-            revision_history.append(revision_data)
-            prev_revision_files = current_revision_files
-            prev_revision_name = rev_name
+    # Oldest to newest, to build diffs relative to previous revision
+    for rev_name in reversed(revision_dirs):
+        revision_data, current_revision_files = await _revisions_process(
+            rev_name,
+            release_dir,
+            parent_map,
+            prev_revision_files,
+            prev_revision_name,
+            sort_key,
+        )
+        revision_history.append(revision_data)
+        prev_revision_files = current_revision_files
+        prev_revision_name = rev_name
 
     return await quart.render_template(
         "draft-revisions.html",
@@ -868,9 +812,7 @@ async def sbomgen(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
     """Generate a CycloneDX SBOM file for a candidate draft file, creating a new revision."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+    await session.check_access(project_name)
 
     rel_path = pathlib.Path(file_path)
 
@@ -901,9 +843,7 @@ async def sbomgen(
             # Create and queue the task, using paths within the new revision
             async with db.session() as data:
                 # We still need release.name for the task metadata
-                release = await data.release(
-                    name=models.release_name(project_name, version_name), _project=True
-                ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
+                release = await session.release(project_name, version_name, data=data)
 
                 sbom_task = models.Task(
                     task_type=models.TaskType.SBOM_GENERATE_CYCLONEDX,
@@ -944,18 +884,9 @@ async def sbomgen(
 @routes.committer("/draft/svnload/<project_name>/<version_name>", methods=["POST"])
 async def svnload(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Import files from SVN into a draft."""
-
+    await session.check_access(project_name)
     form = await SvnImportForm.create_form()
-
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
-
-    async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name)).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
-        if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-            raise base.ASFQuartException("SVN import is only available for candidate drafts", errorcode=400)
+    release = await session.release(project_name, version_name, with_project=False)
 
     if not await form.validate_on_submit():
         for _field, errors in form.errors.items():
@@ -1007,28 +938,19 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
 @routes.committer("/draft/tools/<project_name>/<version_name>/<path:file_path>")
 async def tools(session: routes.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
     """Show the tools for a specific file."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+    await session.check_access(project_name)
+    release = await session.release(project_name, version_name)
 
-    async with db.session() as data:
-        # Check that the release exists
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
-        if release.revision is None:
-            raise base.ASFQuartException("Release does not have a revision", errorcode=404)
+    full_path = str(
+        util.get_release_candidate_draft_dir() / project_name / version_name / release.unwrap_revision / file_path
+    )
 
-        full_path = str(
-            util.get_release_candidate_draft_dir() / project_name / version_name / release.revision / file_path
-        )
+    # Check that the file exists
+    if not await aiofiles.os.path.exists(full_path):
+        raise base.ASFQuartException("File does not exist", errorcode=404)
 
-        # Check that the file exists
-        if not await aiofiles.os.path.exists(full_path):
-            raise base.ASFQuartException("File does not exist", errorcode=404)
-
-        modified = int(await aiofiles.os.path.getmtime(full_path))
-        file_size = await aiofiles.os.path.getsize(full_path)
+    modified = int(await aiofiles.os.path.getmtime(full_path))
+    file_size = await aiofiles.os.path.getsize(full_path)
 
     file_data = {
         "filename": pathlib.Path(file_path).name,
@@ -1051,15 +973,8 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
 @routes.committer("/draft/view/<project_name>/<version_name>")
 async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(add, error="You do not have access to this project")
-
-    # Check that the release exists
-    async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
+    await session.check_access(project_name)
+    release = await session.release(project_name, version_name)
 
     # Convert async generator to list
     file_stats = [
@@ -1086,22 +1001,14 @@ async def view_path(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:
     """View the content of a specific file in the release candidate draft."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(
-            view, error="You do not have access to this project", project_name=project_name, version_name=version_name
-        )
-
-    async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
-        if release.revision is None:
-            raise base.ASFQuartException("Release does not have a revision", errorcode=404)
+    await session.check_access(project_name)
+    release = await session.release(project_name, version_name)
 
     # Limit to 256 KiB
     _max_view_size = 256 * 1024
-    full_path = util.get_release_candidate_draft_dir() / project_name / version_name / release.revision / file_path
+    full_path = (
+        util.get_release_candidate_draft_dir() / project_name / version_name / release.unwrap_revision / file_path
+    )
 
     # Attempt to get an archive listing
     # This will be None if the file is not an archive
@@ -1154,6 +1061,7 @@ async def vote_start(
     session: routes.CommitterSession, project_name: str, version: str, revision: str
 ) -> response.Response | str:
     """Show the vote initiation form for a release."""
+    await session.check_access(project_name)
     async with db.session() as data:
         project = await data.project(name=project_name).demand(routes.FlashError("Project not found"))
         release = await data.release(project_id=project.id, version=version, _committee=True).demand(
@@ -1315,6 +1223,7 @@ Thanks,
 async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -> None:
     """Delete a candidate draft and all its associated files."""
     # Check that the release exists
+    # TODO: Use session.release here
     release = await data.release(name=candidate_draft_name, _project=True, _packages=True).get()
     if not release:
         raise routes.FlashError("Candidate draft not found")
@@ -1341,6 +1250,7 @@ async def _promote(
 ) -> str | None:
     """Promote a candidate draft to a new phase."""
     # Get the release
+    # TODO: Use session.release here
     release = await data.release(name=candidate_draft_name, _project=True).demand(
         routes.FlashError("Candidate draft not found")
     )

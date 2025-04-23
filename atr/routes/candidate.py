@@ -33,7 +33,6 @@ import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.preview as preview
-import atr.routes.root as root
 import atr.util as util
 
 if asfquart.APP is ...:
@@ -75,14 +74,9 @@ async def resolve_release(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
     """Resolve the vote on a release candidate."""
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(root.index, error="You do not have access to this project")
+    await session.check_access(project_name)
 
-    async with db.session() as data:
-        release_name = models.release_name(project_name, version_name)
-        release = await data.release(name=release_name, _project=True, _committee=True, _tasks=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
+    release = await session.release(project_name, version_name, with_committee=True, with_tasks=True)
 
     form = await ResolveForm.create_form()
 
@@ -115,9 +109,7 @@ async def resolve_release(
 @routes.committer("/candidate/view/<project_name>/<version_name>")
 async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(resolve, error="You do not have access to this project")
+    await session.check_access(project_name)
 
     # Check that the release exists
     async with db.session() as data:
@@ -148,11 +140,7 @@ async def view_path(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:
     """View the content of a specific file in the release candidate."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(
-            view, error="You do not have access to this project", project_name=project_name, version_name=version_name
-        )
+    await session.check_access(project_name)
 
     async with db.session() as data:
         release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
@@ -254,8 +242,7 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
         return await session.redirect(resolve, error="Invalid candidate name format")
 
     # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(resolve, error="You do not have access to this project")
+    await session.check_access(project_name)
 
     # Update release status in the database
     async with db.session() as data:

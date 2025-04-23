@@ -72,7 +72,7 @@ class NotSet:
         return NotSet
 
 
-_NOT_SET: Final[NotSet] = NotSet()
+NOT_SET: Final[NotSet] = NotSet()
 type Opt[T] = T | NotSet
 
 
@@ -109,14 +109,14 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def check_result(
         self,
-        id: Opt[int] = _NOT_SET,
-        release_name: Opt[str] = _NOT_SET,
-        checker: Opt[str] = _NOT_SET,
-        primary_rel_path: Opt[str | None] = _NOT_SET,
-        created: Opt[datetime.datetime] = _NOT_SET,
-        status: Opt[models.CheckResultStatus] = _NOT_SET,
-        message: Opt[str] = _NOT_SET,
-        data: Opt[Any] = _NOT_SET,
+        id: Opt[int] = NOT_SET,
+        release_name: Opt[str] = NOT_SET,
+        checker: Opt[str] = NOT_SET,
+        primary_rel_path: Opt[str | None] = NOT_SET,
+        created: Opt[datetime.datetime] = NOT_SET,
+        status: Opt[models.CheckResultStatus] = NOT_SET,
+        message: Opt[str] = NOT_SET,
+        data: Opt[Any] = NOT_SET,
         _release: bool = False,
     ) -> Query[models.CheckResult]:
         query = sqlmodel.select(models.CheckResult)
@@ -145,16 +145,16 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def committee(
         self,
-        id: Opt[int] = _NOT_SET,
-        name: Opt[str] = _NOT_SET,
-        full_name: Opt[str] = _NOT_SET,
-        is_podling: Opt[bool] = _NOT_SET,
-        parent_committee_id: Opt[int] = _NOT_SET,
-        committee_members: Opt[list[str]] = _NOT_SET,
-        committers: Opt[list[str]] = _NOT_SET,
-        release_managers: Opt[list[str]] = _NOT_SET,
-        vote_policy_id: Opt[int] = _NOT_SET,
-        name_in: Opt[list[str]] = _NOT_SET,
+        id: Opt[int] = NOT_SET,
+        name: Opt[str] = NOT_SET,
+        full_name: Opt[str] = NOT_SET,
+        is_podling: Opt[bool] = NOT_SET,
+        parent_committee_id: Opt[int] = NOT_SET,
+        committee_members: Opt[list[str]] = NOT_SET,
+        committers: Opt[list[str]] = NOT_SET,
+        release_managers: Opt[list[str]] = NOT_SET,
+        vote_policy_id: Opt[int] = NOT_SET,
+        name_in: Opt[list[str]] = NOT_SET,
         _projects: bool = False,
         _public_signing_keys: bool = False,
     ) -> Query[models.Committee]:
@@ -229,14 +229,14 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def package(
         self,
-        artifact_sha3: Opt[str] = _NOT_SET,
-        artifact_type: Opt[str] = _NOT_SET,
-        filename: Opt[str] = _NOT_SET,
-        sha512: Opt[str] = _NOT_SET,
-        signature_sha3: Opt[str | None] = _NOT_SET,
-        uploaded: Opt[datetime.datetime] = _NOT_SET,
-        bytes_size: Opt[int] = _NOT_SET,
-        release_name: Opt[str] = _NOT_SET,
+        artifact_sha3: Opt[str] = NOT_SET,
+        artifact_type: Opt[str] = NOT_SET,
+        filename: Opt[str] = NOT_SET,
+        sha512: Opt[str] = NOT_SET,
+        signature_sha3: Opt[str | None] = NOT_SET,
+        uploaded: Opt[datetime.datetime] = NOT_SET,
+        bytes_size: Opt[int] = NOT_SET,
+        release_name: Opt[str] = NOT_SET,
         _release: bool = False,
         _release_project: bool = False,
         _release_committee: bool = False,
@@ -273,12 +273,12 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def project(
         self,
-        id: Opt[int] = _NOT_SET,
-        name: Opt[str] = _NOT_SET,
-        full_name: Opt[str] = _NOT_SET,
-        is_podling: Opt[bool] = _NOT_SET,
-        committee_id: Opt[int] = _NOT_SET,
-        vote_policy_id: Opt[int] = _NOT_SET,
+        id: Opt[int] = NOT_SET,
+        name: Opt[str] = NOT_SET,
+        full_name: Opt[str] = NOT_SET,
+        is_podling: Opt[bool] = NOT_SET,
+        committee_id: Opt[int] = NOT_SET,
+        vote_policy_id: Opt[int] = NOT_SET,
         _committee: bool = False,
         _releases: bool = False,
         _distribution_channels: bool = False,
@@ -315,14 +315,14 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def public_signing_key(
         self,
-        fingerprint: Opt[str] = _NOT_SET,
-        algorithm: Opt[str] = _NOT_SET,
-        length: Opt[int] = _NOT_SET,
-        created: Opt[datetime.datetime] = _NOT_SET,
-        expires: Opt[datetime.datetime | None] = _NOT_SET,
-        declared_uid: Opt[str | None] = _NOT_SET,
-        apache_uid: Opt[str] = _NOT_SET,
-        ascii_armored_key: Opt[str] = _NOT_SET,
+        fingerprint: Opt[str] = NOT_SET,
+        algorithm: Opt[str] = NOT_SET,
+        length: Opt[int] = NOT_SET,
+        created: Opt[datetime.datetime] = NOT_SET,
+        expires: Opt[datetime.datetime | None] = NOT_SET,
+        declared_uid: Opt[str | None] = NOT_SET,
+        apache_uid: Opt[str] = NOT_SET,
+        ascii_armored_key: Opt[str] = NOT_SET,
         _committees: bool = False,
     ) -> Query[models.PublicSigningKey]:
         query = sqlmodel.select(models.PublicSigningKey)
@@ -351,17 +351,17 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def release(
         self,
-        name: Opt[str] = _NOT_SET,
-        stage: Opt[models.ReleaseStage] = _NOT_SET,
-        phase: Opt[models.ReleasePhase] = _NOT_SET,
-        created: Opt[datetime.datetime] = _NOT_SET,
-        project_id: Opt[int] = _NOT_SET,
-        package_managers: Opt[list[str]] = _NOT_SET,
-        version: Opt[str] = _NOT_SET,
-        revision: Opt[str] = _NOT_SET,
-        sboms: Opt[list[str]] = _NOT_SET,
-        vote_policy_id: Opt[int] = _NOT_SET,
-        votes: Opt[list[models.VoteEntry]] = _NOT_SET,
+        name: Opt[str] = NOT_SET,
+        stage: Opt[models.ReleaseStage] = NOT_SET,
+        phase: Opt[models.ReleasePhase] = NOT_SET,
+        created: Opt[datetime.datetime] = NOT_SET,
+        project_id: Opt[int] = NOT_SET,
+        package_managers: Opt[list[str]] = NOT_SET,
+        version: Opt[str] = NOT_SET,
+        revision: Opt[str] = NOT_SET,
+        sboms: Opt[list[str]] = NOT_SET,
+        vote_policy_id: Opt[int] = NOT_SET,
+        votes: Opt[list[models.VoteEntry]] = NOT_SET,
         _project: bool = False,
         _packages: bool = False,
         _vote_policy: bool = False,
@@ -408,9 +408,9 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def ssh_key(
         self,
-        fingerprint: Opt[str] = _NOT_SET,
-        key: Opt[str] = _NOT_SET,
-        asf_uid: Opt[str] = _NOT_SET,
+        fingerprint: Opt[str] = NOT_SET,
+        key: Opt[str] = NOT_SET,
+        asf_uid: Opt[str] = NOT_SET,
     ) -> Query[models.SSHKey]:
         query = sqlmodel.select(models.SSHKey)
 
@@ -425,19 +425,19 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def task(
         self,
-        id: Opt[int] = _NOT_SET,
-        status: Opt[models.TaskStatus] = _NOT_SET,
-        task_type: Opt[str] = _NOT_SET,
-        task_args: Opt[Any] = _NOT_SET,
-        added: Opt[datetime.datetime] = _NOT_SET,
-        started: Opt[datetime.datetime | None] = _NOT_SET,
-        pid: Opt[int | None] = _NOT_SET,
-        completed: Opt[datetime.datetime | None] = _NOT_SET,
-        result: Opt[Any | None] = _NOT_SET,
-        error: Opt[str | None] = _NOT_SET,
-        release_name: Opt[str | None] = _NOT_SET,
-        path: Opt[str | None] = _NOT_SET,
-        modified: Opt[int | None] = _NOT_SET,
+        id: Opt[int] = NOT_SET,
+        status: Opt[models.TaskStatus] = NOT_SET,
+        task_type: Opt[str] = NOT_SET,
+        task_args: Opt[Any] = NOT_SET,
+        added: Opt[datetime.datetime] = NOT_SET,
+        started: Opt[datetime.datetime | None] = NOT_SET,
+        pid: Opt[int | None] = NOT_SET,
+        completed: Opt[datetime.datetime | None] = NOT_SET,
+        result: Opt[Any | None] = NOT_SET,
+        error: Opt[str | None] = NOT_SET,
+        release_name: Opt[str | None] = NOT_SET,
+        path: Opt[str | None] = NOT_SET,
+        modified: Opt[int | None] = NOT_SET,
         _release: bool = False,
     ) -> Query[models.Task]:
         query = sqlmodel.select(models.Task)
@@ -472,12 +472,12 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def vote_policy(
         self,
-        id: Opt[int] = _NOT_SET,
-        mailto_addresses: Opt[list[str]] = _NOT_SET,
-        manual_vote: Opt[bool] = _NOT_SET,
-        min_hours: Opt[int] = _NOT_SET,
-        release_checklist: Opt[str] = _NOT_SET,
-        pause_for_rm: Opt[bool] = _NOT_SET,
+        id: Opt[int] = NOT_SET,
+        mailto_addresses: Opt[list[str]] = NOT_SET,
+        manual_vote: Opt[bool] = NOT_SET,
+        min_hours: Opt[int] = NOT_SET,
+        release_checklist: Opt[str] = NOT_SET,
+        pause_for_rm: Opt[bool] = NOT_SET,
         _project: bool = False,
     ) -> Query[models.VotePolicy]:
         query = sqlmodel.select(models.VotePolicy)
@@ -502,9 +502,9 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def text_value(
         self,
-        ns: Opt[str] = _NOT_SET,
-        key: Opt[str] = _NOT_SET,
-        value: Opt[str] = _NOT_SET,
+        ns: Opt[str] = NOT_SET,
+        key: Opt[str] = NOT_SET,
+        value: Opt[str] = NOT_SET,
     ) -> Query[models.TextValue]:
         query = sqlmodel.select(models.TextValue)
 

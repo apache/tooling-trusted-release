@@ -22,7 +22,6 @@ import logging
 import aiofiles.os
 import aioshutil
 import asfquart
-import asfquart.base as base
 import quart
 import werkzeug.wrappers.response as response
 import wtforms
@@ -105,13 +104,10 @@ async def announce(session: routes.CommitterSession) -> str | response.Response:
 
             try:
                 # Get the release
-                release = await data.release(name=preview_name, revision=preview_revision, _project=True).demand(
-                    routes.FlashError("Preview not found")
+                release = await session.release(
+                    project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW, data=data
                 )
 
-                # Verify that it's in the correct phase
-                if release.phase != models.ReleasePhase.RELEASE_PREVIEW:
-                    return await session.redirect(announce, error="This release is not in the preview phase")
                 if release.revision is None:
                     # Impossible, but to satisfy the type checkers
                     return await session.redirect(announce, error="This release does not have a revision")
@@ -153,11 +149,10 @@ async def announce_release(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> str | response.Response:
     """Allow the user to announce a release preview."""
+    await session.check_access(project_name)
+
     announce_form = await AnnounceForm.create_form()
-    async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            routes.FlashError("Release not found")
-        )
+    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
     return await quart.render_template("preview-announce-release.html", release=release, announce_form=announce_form)
 
 
@@ -231,28 +226,17 @@ async def refine_release(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
     """Refine a release preview."""
-    async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
-        if release.phase != models.ReleasePhase.RELEASE_PREVIEW:
-            return await session.redirect(previews, error="Release is not in the preview phase")
-
+    await session.check_access(project_name)
+    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
     return await quart.render_template("preview-refine-release.html", release=release)
 
 
 @routes.committer("/preview/view/<project_name>/<version_name>")
 async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(previews, error="You do not have access to this project")
+    await session.check_access(project_name)
 
-    # Check that the release exists
-    async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
+    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
 
     # Convert async generator to list
     file_stats = [
@@ -279,26 +263,11 @@ async def view_path(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:
     """View the content of a specific file in the release preview."""
-    # Check that the user has access to the project
-    if not any((p.name == project_name) for p in (await session.user_projects)):
-        return await session.redirect(
-            view, error="You do not have access to this project", project_name=project_name, version_name=version_name
-        )
+    await session.check_access(project_name)
 
-    async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
-            base.ASFQuartException("Release does not exist", errorcode=404)
-        )
-        if release.revision is None:
-            return await session.redirect(
-                view,
-                error="This release does not have a revision",
-                project_name=project_name,
-                version_name=version_name,
-            )
-
+    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
     _max_view_size = 1 * 1024 * 1024
-    full_path = util.get_release_preview_dir() / project_name / version_name / release.revision / file_path
+    full_path = util.get_release_preview_dir() / project_name / version_name / release.unwrap_revision / file_path
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
     return await quart.render_template(
         "phase-view-path.html",

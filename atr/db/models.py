@@ -447,6 +447,13 @@ class Release(sqlmodel.SQLModel, table=True):
         """Get the short display name for the release."""
         return f"{self.project.short_display_name} {self.version}"
 
+    @property
+    def unwrap_revision(self) -> str:
+        """Get the revision for the release."""
+        if self.revision is None:
+            raise ValueError("Release has no revision")
+        return self.revision
+
 
 class SSHKey(sqlmodel.SQLModel, table=True):
     fingerprint: str = sqlmodel.Field(primary_key=True)
