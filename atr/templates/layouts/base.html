@@ -38,9 +38,11 @@
 
         <div class="main-container {% block main_class %}{% endblock main_class %}">
           <main class="main-content">
-            <div class="warning-banner">
-              <strong>Pre-release Software:</strong> ATR is actively being developed. You cannot make releases.
-            </div>
+            {% if (not current_user) or (current_user.uid != "sbp") %}
+              <div class="warning-banner">
+                <strong>Pre-release Software:</strong> ATR is actively being developed. You cannot make releases.
+              </div>
+            {% endif %}
             {% from "macros/flash.html" import render_flash_messages %}
             {{ render_flash_messages() }}
             {% block content %}
