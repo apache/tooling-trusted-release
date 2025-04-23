@@ -98,9 +98,7 @@ def go_to_path(page: sync_api.Page, path: str, wait: bool = True) -> None:
 
 def lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
     logging.info("Following link to add draft")
-    add_draft_link_locator = page.get_by_role("link", name="Add draft")
-    sync_api.expect(add_draft_link_locator).to_be_visible()
-    add_draft_link_locator.click()
+    go_to_path(page, "/draft/add")
 
     logging.info("Waiting for the add draft page")
     project_select_locator = page.locator('select[name="project_name"]')
