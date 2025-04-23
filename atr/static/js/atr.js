@@ -13,7 +13,7 @@ function init() {
                     navigator.clipboard.writeText(textToCopy)
                         .then(() => {
                             const originalText = this.innerHTML;
-                            this.innerHTML = '<i class="bi bi-check2"></i> Copied!';
+                            this.innerHTML = '<i class="fas fa-check"></i> Copied!';
 
                             // Reset the button text after 2000ms
                             setTimeout(() => {
@@ -22,10 +22,10 @@ function init() {
                         })
                         .catch(err => {
                             console.error("Failed to copy: ", err);
-                            this.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Failed!';
+                            this.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Failed!';
 
                             setTimeout(() => {
-                                this.innerHTML = '<i class="bi bi-clipboard"></i> Copy';
+                                this.innerHTML = '<i class="fas fa-clipboard"></i> Copy';
                             }, 2000);
                         });
                 }

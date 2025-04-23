@@ -7,39 +7,39 @@
 {% block stylesheets %}
   {{ super() }}
   <style>
-      .performance-stats {
+      .page-performance-stats {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
           gap: 1rem;
           margin: 1rem 0;
       }
 
-      .route-card {
+      .page-route-card {
           background: #fff;
           border-radius: 8px;
           padding: 1rem;
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       }
 
-      .route-card.slow {
+      .page-route-card.slow {
           border-left: 4px solid #dc3545;
       }
 
-      .route-card.medium {
+      .page-route-card.medium {
           border-left: 4px solid #ffc107;
       }
 
-      .route-card.fast {
+      .page-route-card.fast {
           border-left: 4px solid #28a745;
       }
 
-      .route-card h3 {
+      .page-route-card h3 {
           margin: 0 0 0.5rem 0;
           font-size: 1.1rem;
           font-family: monospace;
       }
 
-      .route-meta {
+      .page-route-meta {
           display: flex;
           gap: 1rem;
           font-size: 0.9rem;
@@ -47,37 +47,37 @@
           margin-bottom: 1rem;
       }
 
-      .timing-grid {
+      .page-timing-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 1rem;
           margin-bottom: 1rem;
       }
 
-      .timing-section h4 {
+      .page-timing-section h4 {
           margin: 0 0 0.5rem 0;
           font-size: 0.9rem;
           color: #444;
       }
 
-      .timing-section dl {
+      .page-timing-section dl {
           margin: 0;
           font-size: 0.85rem;
       }
 
-      .timing-section dt {
+      .page-timing-section dt {
           color: #666;
           float: left;
           clear: left;
           margin-right: 0.5rem;
       }
 
-      .timing-section dd {
+      .page-timing-section dd {
           margin: 0;
           font-family: monospace;
       }
 
-      .last-seen {
+      .page-last-seen {
           font-size: 0.8rem;
           color: #666;
           border-top: 1px solid #eee;
@@ -92,18 +92,18 @@
   {% if not stats %}
     <p class="alert alert-warning">No performance data available.</p>
   {% else %}
-    <div class="performance-stats">
+    <div class="page-performance-stats">
       {% for path, data in stats.items() %}
-        <div class="route-card {% if data.total.mean > 100 %}slow{% elif data.total.mean < 20 %}fast{% else %}medium{% endif %}">
+        <div class="page-route-card {% if data.total.mean > 100 %}slow{% elif data.total.mean < 20 %}fast{% else %}medium{% endif %}">
           <h3>{{ path }}</h3>
-          <div class="route-meta">
+          <div class="page-route-meta">
             <span class="methods">{{ data.methods }}</span>
             <span class="function">{{ data.function }}</span>
             <span class="count">{{ data.count }} requests</span>
           </div>
 
-          <div class="timing-grid">
-            <div class="timing-section">
+          <div class="page-timing-grid">
+            <div class="page-timing-section">
               <h4>Total time (ms)</h4>
               <dl>
                 <dt>Mean</dt>
@@ -129,7 +129,7 @@
               </dl>
             </div>
 
-            <div class="timing-section">
+            <div class="page-timing-section">
               <h4>Sync time (ms)</h4>
               <dl>
                 <dt>Mean</dt>
@@ -151,7 +151,7 @@
               </dl>
             </div>
 
-            <div class="timing-section">
+            <div class="page-timing-section">
               <h4>Async time (ms)</h4>
               <dl>
                 <dt>Mean</dt>
@@ -174,7 +174,7 @@
             </div>
           </div>
 
-          <div class="last-seen">Last request: {{ data.last_timestamp }}</div>
+          <div class="page-last-seen">Last request: {{ data.last_timestamp }}</div>
         </div>
       {% endfor %}
     </div>

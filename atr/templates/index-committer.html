@@ -120,7 +120,7 @@
           {% for release in active_releases %}
             {% set current_phase_index = phase_index_map.get(release.phase, -1) %}
             <a href="{{ release_as_url(release) }}" class="text-decoration-none">
-              <div class="card h-100 shadow-sm hover-lift atr-cursor-pointer page-card">
+              <div class="card h-100 shadow-sm atr-cursor-pointer page-card">
                 <div class="card-body text-center d-flex flex-column justify-content-center">
                   <div class="fw-semibold mb-3 fs-4 page-version">{{ release.version }}</div>
                   <div class="page-phase-progression mb-2">
@@ -162,7 +162,7 @@
 
           <a href="{{ as_url(routes.release.start, project_name=project.name) }}"
              class="text-decoration-none">
-            <div class="card h-100 shadow-sm hover-lift atr-cursor-pointer page-card">
+            <div class="card h-100 shadow-sm atr-cursor-pointer page-card">
               <div class="card-body d-flex justify-content-center align-items-center text-center text-secondary">
                 <div>
                   <i class="fas fa-plus me-2"></i>

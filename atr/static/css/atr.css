@@ -207,14 +207,14 @@ span.warning {
     flex-direction: column;
 }
 
-.back-link {
+.atr-back-link {
     display: inline-block;
     margin-bottom: 1rem;
     color: #0000cc;
     text-decoration: none;
 }
 
-.back-link:hover {
+.atr-back-link:hover {
     text-decoration: underline;
 }
 
@@ -437,4 +437,9 @@ h1 em:after {
 
 .atr-phase-three {
     color: #cc0033;
+}
+
+/* There is no equivalent in Bootstrap */
+.atr-cursor-pointer {
+  cursor: pointer;
 }

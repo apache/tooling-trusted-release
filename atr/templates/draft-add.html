@@ -10,7 +10,7 @@
 
 {% block content %}
   <h1>Add a candidate draft</h1>
-  <p class="intro">
+  <p>
     A <strong>candidate draft</strong> is an editable set of files which can be <em>frozen and promoted into a candidate release</em> for voting on by the PMC.
   </p>
   <ul>
@@ -31,7 +31,7 @@
              class="col-sm-3 col-form-label text-sm-end">{{ form.project_name.label.text }}:</label>
       <div class="col-sm-8">
         {{ form.project_name(class_="mb-2 form-select") }}
-        {% if form.project_name.errors -%}<span class="error-message">{{ form.project_name.errors[0] }}</span>{%- endif %}
+        {% if form.project_name.errors -%}<span>{{ form.project_name.errors[0] }}</span>{%- endif %}
           {% if not user_projects %}
             <p class="text-danger">You must be a participant of a project to submit a release candidate.</p>
           {% endif %}
@@ -46,7 +46,7 @@
                class="col-sm-3 col-form-label text-sm-end">{{ form.version_name.label.text }}:</label>
         <div class="col-sm-8">
           {{ form.version_name(class_="form-control") }}
-          {% if form.version_name.errors -%}<span class="error-message">{{ form.version_name.errors[0] }}</span>{%- endif %}
+          {% if form.version_name.errors -%}<span>{{ form.version_name.errors[0] }}</span>{%- endif %}
           </div>
         </div>
 
@@ -97,7 +97,7 @@
                 <div class="card-footer bg-light border-1 pt-4 pb-4 position-relative">
                   <button class="btn btn-sm btn-outline-secondary atr-copy-btn fs-6 position-absolute top-0 end-0 m-2"
                           data-clipboard-target="#cmd-newdraft-{{ project.name|slugify }}">
-                    <i class="bi bi-clipboard"></i> Copy
+                    <i class="fas fa-clipboard"></i> Copy
                   </button>
                   <pre class="small mb-0" id="cmd-newdraft-{{ project.name|slugify }}">rsync -av -e 'ssh -p 2222' ${YOUR_FILES}/ {{ asf_id }}@{{ server_domain }}:/{{ project.name }}/${VERSION}/</pre>
                 </div>
@@ -136,7 +136,7 @@
                 <div class="card-footer bg-light border-1 pt-4 pb-4 position-relative">
                   <button class="btn btn-sm btn-outline-secondary atr-copy-btn fs-6 position-absolute top-0 end-0 m-2"
                           data-clipboard-target="#cmd-newdraft-{{ project.name|slugify }}">
-                    <i class="bi bi-clipboard"></i> Copy
+                    <i class="fas fa-clipboard"></i> Copy
                   </button>
                   <pre class="small mb-0" id="cmd-newdraft-{{ project.name|slugify }}">rsync -av -e 'ssh -p 2222' ${YOUR_FILES}/ {{ asf_id }}@{{ server_domain }}:/{{ project.name }}/${VERSION}/</pre>
                 </div>

@@ -46,7 +46,7 @@
             {% if vote_task %}
               {% if vote_task.status.value == "completed" %}
                 <p class="mb-0 text-success fw-semibold">
-                  <i class="bi bi-check-circle-fill me-1"></i> Vote email sent: {{ vote_task.completed.strftime("%Y-%m-%d %H:%M:%S UTC") }}
+                  <i class="fa-solid fa-check-circle me-1"></i> Vote email sent: {{ vote_task.completed.strftime("%Y-%m-%d %H:%M:%S UTC") }}
                 </p>
                 {% if task_mid %}
                   <p class="mt-2 mb-0 text-muted ps-4">
@@ -55,14 +55,14 @@
                 {% endif %}
               {% elif vote_task.status.value == "failed" %}
                 <p class="mb-1 text-danger fw-semibold">
-                  <i class="bi bi-x-octagon-fill me-1"></i> Vote email failed: {{ vote_task.completed.strftime("%Y-%m-%d %H:%M:%S UTC") }}
+                  <i class="fa-solid fa-circle-xmark me-1"></i> Vote email failed: {{ vote_task.completed.strftime("%Y-%m-%d %H:%M:%S UTC") }}
                 </p>
                 <div class="alert alert-danger mt-2 mb-0 p-2" role="alert">
                   <p class="mb-0 p-2 text-danger">{{ vote_task.error }}</p>
                 </div>
               {% else %}
                 <p class="mb-0 text-warning fw-semibold">
-                  <i class="bi bi-hourglass-split me-1"></i> Vote email status: {{ vote_task.status.value.upper() }}
+                  <i class="fa-solid fa-hourglass-half me-1"></i> Vote email status: {{ vote_task.status.value.upper() }}
                   {% if vote_task.started %}
                     (Started: {{ vote_task.started.strftime("%Y-%m-%d %H:%M:%S UTC") }})
                   {% else %}
@@ -77,7 +77,7 @@
               {% endif %}
             {% else %}
               <p class="mb-0 text-muted">
-                <i class="bi bi-question-circle me-1"></i> Vote email: No task found
+                <i class="fa-solid fa-circle-question me-1"></i> Vote email: No task found
               </p>
             {% endif %}
           </div>

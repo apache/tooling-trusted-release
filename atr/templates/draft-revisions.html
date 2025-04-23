@@ -10,7 +10,7 @@
 
 {% block content %}
   <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
-     class="back-link">← Back to Compose {{ release.short_display_name }}</a>
+     class="atr-back-link">← Back to Compose {{ release.short_display_name }}</a>
 
   <h1>
     Revisions of <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>

@@ -10,9 +10,9 @@
 
 {% block content %}
   <h1>Add SSH key</h1>
-  <p class="intro">Add your SSH public key to use for rsync authentication.</p>
+  <p>Add your SSH public key to use for rsync authentication.</p>
 
-  <div class="user-info">
+  <div>
     <p>
       Welcome, <strong>{{ asf_id }}</strong>! You are authenticated as an ASF committer.
     </p>
@@ -20,7 +20,7 @@
 
   {% if form.errors %}
     <h2 class="text-danger">Form errors</h2>
-    <div class="error-message mt-3 mb-3">
+    <div class="mt-3 mb-3">
       {% for field, errors in form.errors.items() %}
         {% for error in errors %}<p class="text-danger mb-1">{{ field }}: {{ error }}</p>{% endfor %}
       {% endfor %}

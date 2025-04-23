@@ -22,7 +22,7 @@
       {{ form.hidden_tag() if form.hidden_tag }}
 
       <div class="mb-4">
-        <div class="row mb-3 pb-3 border-bottom{% if form.public_key.errors %} has-danger{% endif %}">
+        <div class="row mb-3 pb-3 border-bottom">
           <div class="col-md-2 text-md-end fw-medium pt-2">{{ form.public_key.label }}</div>
           <div class="col-md-9">
             {{ form.public_key(class_='form-control font-monospace', rows=10, placeholder='Paste your ASCII-armored public GPG key here...') }}
@@ -39,7 +39,7 @@
           </div>
         </div>
 
-        <div class="row mb-3 pb-3 border-bottom{% if form.selected_committees.errors %} has-danger{% endif %}">
+        <div class="row mb-3 pb-3 border-bottom">
           <div class="col-md-2 text-md-end fw-medium pt-2">{{ form.selected_committees.label }}</div>
           <div class="col-md-9">
             <div class="row">

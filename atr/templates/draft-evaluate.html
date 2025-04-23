@@ -12,14 +12,14 @@
 
 {% block content %}
   <p class="atr-breadcrumbs">
-    <a href="{{ as_url(routes.projects.select) }}" class="back-link">Select a project</a>
+    <a href="{{ as_url(routes.projects.select) }}" class="atr-back-link">Select a project</a>
     <span>→</span> <a href="{{ as_url(routes.release.select, project_name=project_name) }}"
-    class="back-link">Select an {{ release.project.display_name }} release</a>
+    class="atr-back-link">Select an {{ release.project.display_name }} release</a>
     <span>→</span> {{ version_name }}
   </p>
 
   <h1>Evaluation of {{ release.project.display_name }} {{ version_name }}</h1>
-  <p class="intro">
+  <p>
     This page shows the evaluation of the files in the {{ project_name }} {{ version_name }} <strong>candidate draft</strong>.
   </p>
 
@@ -207,7 +207,7 @@
     <div class="card-footer bg-light border-1 pt-4 pb-4 position-relative">
       <button class="btn btn-sm btn-outline-secondary atr-copy-btn fs-6 position-absolute top-0 end-0 m-2"
               data-clipboard-target="#cmd-newdraft-{{ release.project.name|slugify }}">
-        <i class="bi bi-clipboard"></i> Copy
+        <i class="fas fa-clipboard"></i> Copy
       </button>
       <pre class="small mb-0" id="cmd-newdraft-{{ release.project.name|slugify }}">
 rsync -av -e 'ssh -p 2222' ${YOUR_FILES}/ {{ asf_id }}@{{ server_domain }}:/{{ project_name }}/{{ version_name }}/

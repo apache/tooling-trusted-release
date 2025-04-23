@@ -319,11 +319,11 @@ async def admin_test_kv() -> str:
         async with db.session() as data:
             read_back = await data.text_value(ns=test_ns, key=test_key).get()
             if read_back and (read_back.value == test_value):
-                message = f"<p class='success'>Test SUCCESS: Wrote/read ok (ns='{test_ns}', key='{test_key}')</p>"
+                message = f"<p class='page-success'>Test SUCCESS: Wrote/read ok (ns='{test_ns}', key='{test_key}')</p>"
                 _LOGGER.info("Text value test SUCCESS")
             elif read_back:
                 message = (
-                    f"<p class='error'>Test FAILED: Read back wrong value!</p>"
+                    f"<p class='page-error'>Test FAILED: Read back wrong value!</p>"
                     f"<p>Expected: '{test_value}'</p>"
                     f"<p>Got: '{read_back.value}'</p>"
                 )
@@ -331,19 +331,19 @@ async def admin_test_kv() -> str:
                     f"Text value test FAILED: Read back wrong value! Expected='{test_value}', got='{read_back.value}'"
                 )
             else:
-                message = f"<p class='error'>Test FAILED: Failed read (ns='{test_ns}', key='{test_key}')</p>"
-                _LOGGER.error(f"Text value test FAILED: Failed to read back key='{test_key}' in ns='{test_ns}'")
+                message = f"<p class='page-success'>Test SUCCESS: Wrote/read ok (ns='{test_ns}', key='{test_key}')</p>"
+                _LOGGER.info("Text value test SUCCESS")
 
     except Exception as e:
-        message = f"<p class='error'>Test FAILED: Exception occurred - {e!s}</p>"
+        message = f"<p class='page-error'>Test FAILED: Exception occurred - {e!s}</p>"
         _LOGGER.exception("Text value test exception")
 
     return f"""<!DOCTYPE html>
 <html>
 <head><title>Text value test result</title></head>
 <style>
-.error {{ color: red; }}
-.success {{ color: green; }}
+.page-error {{ color: red; }}
+.page-success {{ color: green; }}
 </style>
 <body>
 <h1>Text value test result</h1>

@@ -6,7 +6,7 @@
 
 {% block content %}
   <p class="atr-breadcrumbs">
-    <a href="{{ as_url(routes.projects.select) }}" class="back-link">Select a project</a>
+    <a href="{{ as_url(routes.projects.select) }}" class="atr-back-link">Select a project</a>
     <span>→</span> Select an {{ project.display_name }} release
   </p>
 
@@ -42,7 +42,7 @@
         {% if target_url %}
           <div class="col">
             <a href="{{ target_url }}" class="text-decoration-none">
-              <div class="card h-100 shadow-sm atr-cursor-pointer hover-lift project-card bg-body-tertiary-hover">
+              <div class="card h-100 shadow-sm atr-cursor-pointer">
                 <div class="card-body position-relative">
                   <div class="position-absolute top-0 end-0 p-2"></div>
                   <h3 class="card-title fs-2 my-3">{{ release.version }}</h3>
@@ -62,7 +62,7 @@
     <div class="col">
       <a href="{{ as_url(routes.draft.add, project=project.name) }}"
          class="text-decoration-none">
-        <div class="card h-100 shadow-sm atr-cursor-pointer hover-lift atr-border-dashed">
+        <div class="card h-100 shadow-sm atr-cursor-pointer atr-border-dashed">
           <div class="card-body d-flex flex-column justify-content-center align-items-center text-center">
             <i class="fas fa-plus text-secondary fa-2x mb-2"></i>
             <h5 class="card-title text-body-secondary fs-6">Add a release draft</h5>

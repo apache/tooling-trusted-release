@@ -10,7 +10,7 @@
 
 {% block content %}
   <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
-     class="back-link">← Back to Compose {{ release.short_display_name }}</a>
+     class="atr-back-link">← Back to Compose {{ release.short_display_name }}</a>
 
   <h1>
     Upload to <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
@@ -25,11 +25,11 @@
   </div>
 
   <h2 id="file-upload">File upload</h2>
-  <p class="intro">Use this form to add files to this candidate draft.</p>
+  <p>Use this form to add files to this candidate draft.</p>
 
   <form method="post"
         enctype="multipart/form-data"
-        class="atr-canary py-4 px-5 needs-validation"
+        class="atr-canary py-4 px-5"
         novalidate>
     {{ form.csrf_token }}
     <div class="mb-3 pb-3 row border-bottom">
@@ -62,7 +62,7 @@
   </form>
 
   <h2 id="svn-upload">SVN upload</h2>
-  <p class="intro">Import files from a publicly readable Subversion repository URL into this draft.</p>
+  <p>Import files from a publicly readable Subversion repository URL into this draft.</p>
   <p>
     The import will be processed in the background using the <code>svn export</code> command.
     You can monitor progress on the <em>Evaluate files</em> page for this draft once the task is queued.
@@ -125,7 +125,7 @@
   </div>
 
   <h2 id="rsync-upload">Rsync upload</h2>
-  <p class="intro">Import files from a remote server using rsync with the following command:</p>
+  <p>Import files from a remote server using rsync with the following command:</p>
   <!-- TODO: Add a button to copy the command to the clipboard -->
   <pre class="bg-light p-3 mb-0">
 rsync -av -e 'ssh -p 2222' ${YOUR_FILES}/ {{ asf_id }}@{{ server_domain }}:/{{ project_name }}/{{ version_name }}/

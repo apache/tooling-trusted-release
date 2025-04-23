@@ -11,53 +11,53 @@
 {% block stylesheets %}
   {{ super() }}
   <style>
-      .model-nav {
+      .page-model-nav {
           margin: 1rem 0;
           padding: 0.5rem;
           background: #f5f5f5;
           border-radius: 4px;
       }
 
-      .model-nav a {
+      .page-model-nav a {
           margin-right: 1rem;
           padding: 0.25rem 0.5rem;
           text-decoration: none;
           color: #333;
       }
 
-      .model-nav a.active {
+      .page-model-nav a.active {
           background: #333;
           color: white;
           border-radius: 2px;
       }
 
-      .record {
+      .page-record {
           border: 1px solid #ddd;
           padding: 1rem;
           margin-bottom: 1rem;
           border-radius: 4px;
       }
 
-      .record pre {
+      .page-record pre {
           background: #f5f5f5;
           padding: 0.5rem;
           border-radius: 2px;
           overflow-x: auto;
       }
 
-      .record-header {
+      .page-record-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           margin-bottom: 0.5rem;
       }
 
-      .record-meta {
+      .page-record-meta {
           color: #666;
           font-size: 0.9em;
       }
 
-      .no-records {
+      .page-no-records {
           color: #666;
           font-style: italic;
       }
@@ -66,9 +66,9 @@
 
 {% block content %}
   <h1>Data browser</h1>
-  <p class="intro">Browse all records in the database.</p>
+  <p>Browse all records in the database.</p>
 
-  <div class="model-nav">
+  <div class="page-model-nav">
     {% for model_name in models %}
       <a href="{{ url_for('admin.admin_data', model=model_name) }}"
          {% if model == model_name %}class="active"{% endif %}>{{ model_name }}</a>
@@ -76,18 +76,18 @@
   </div>
 
   {% if records %}
-    <div class="records">
+    <div>
       {% for record in records %}
-        <div class="record">
-          <div class="record-header">
+        <div class="page-record">
+          <div class="page-record-header">
             <h3>{{ record.get("id", record.get("name", "Unknown ID")) }}</h3>
-            <span class="record-meta">{{ model }}</span>
+            <span class="page-record-meta">{{ model }}</span>
           </div>
           <pre>{{ record | tojson(indent=2) }}</pre>
         </div>
       {% endfor %}
     </div>
   {% else %}
-    <p class="no-records">No records found for {{ model }}.</p>
+    <p class="page-no-records">No records found for {{ model }}.</p>
   {% endif %}
 {% endblock content %}

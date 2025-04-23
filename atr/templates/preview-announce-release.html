@@ -11,13 +11,13 @@
 {% block stylesheets %}
   {{ super() }}
   <style>
-      .atr-preview-meta-item::after {
+      .page-preview-meta-item::after {
           content: "•";
           margin-left: 1rem;
           color: #ccc;
       }
 
-      .atr-preview-meta-item:last-child::after {
+      .page-preview-meta-item:last-child::after {
           content: none;
       }
   </style>
@@ -25,7 +25,7 @@
 
 {% block content %}
   <p>
-    <a href="{{ as_url(routes.root.index) }}" class="back-link">← Back to Select a release</a>
+    <a href="{{ as_url(routes.root.index) }}" class="atr-back-link">← Back to Select a release</a>
   </p>
 
   <h1>
@@ -38,9 +38,9 @@
     </div>
     <div class="card-body">
       <div class="d-flex flex-wrap gap-3 pb-3 mb-3 border-bottom text-secondary fs-6">
-        <span class="atr-preview-meta-item">Phase: <strong class="atr-phase-three">③ REFINE</strong></span>
-        <span class="atr-preview-meta-item">Revision: {{ release.revision }}</span>
-        <span class="atr-preview-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
+        <span class="page-preview-meta-item">Phase: <strong class="atr-phase-three">③ REFINE</strong></span>
+        <span class="page-preview-meta-item">Revision: {{ release.revision }}</span>
+        <span class="page-preview-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
       </div>
       <div>
         <a title="Show files for {{ release.name }}"
