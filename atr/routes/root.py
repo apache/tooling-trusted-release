@@ -104,7 +104,7 @@ async def index() -> response.Response | str:
     return await quart.render_template("index-public.html")
 
 
-@routes.public("/tutorial")
-async def tutorial() -> str:
+@routes.committer("/tutorial")
+async def tutorial(session: routes.CommitterSession) -> str:
     """Tutorial page."""
     return await quart.render_template("tutorial.html")
