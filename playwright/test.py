@@ -206,10 +206,8 @@ def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, ver
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info(
-        f"Waiting for navigation to /preview/announce/tooling-test-example/{version_name} after resolving the vote"
-    )
-    wait_for_path(page, f"/preview/announce/tooling-test-example/{version_name}")
+    logging.info(f"Waiting for navigation to /announce/tooling-test-example/{version_name} after resolving the vote")
+    wait_for_path(page, f"/announce/tooling-test-example/{version_name}")
     logging.info("Vote resolution actions completed successfully")
 
 

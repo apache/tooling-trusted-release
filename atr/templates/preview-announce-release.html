@@ -25,7 +25,8 @@
 
 {% block content %}
   <p>
-    <a href="{{ as_url(routes.root.index) }}" class="atr-back-link">← Back to Select a release</a>
+    <a href="{{ as_url(routes.preview.refine_release, project_name=release.project.name, version_name=release.version) }}"
+       class="atr-back-link">← Back to Refine {{ release.short_display_name }}</a>
   </p>
 
   <h1>

@@ -148,7 +148,7 @@ async def announce(session: routes.CommitterSession) -> str | response.Response:
     )
 
 
-@routes.committer("/preview/announce/<project_name>/<version_name>")
+@routes.committer("/announce/<project_name>/<version_name>")
 async def announce_release(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> str | response.Response:
@@ -224,6 +224,21 @@ async def previews(session: routes.CommitterSession) -> str:
         "previews.html",
         previews=user_previews,
     )
+
+
+@routes.committer("/refine/<project_name>/<version_name>")
+async def refine_release(
+    session: routes.CommitterSession, project_name: str, version_name: str
+) -> response.Response | str:
+    """Refine a release preview."""
+    async with db.session() as data:
+        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
+            base.ASFQuartException("Release does not exist", errorcode=404)
+        )
+        if release.phase != models.ReleasePhase.RELEASE_PREVIEW:
+            return await session.redirect(previews, error="Release is not in the preview phase")
+
+    return await quart.render_template("preview-refine-release.html", release=release)
 
 
 @routes.committer("/preview/view/<project_name>/<version_name>")
