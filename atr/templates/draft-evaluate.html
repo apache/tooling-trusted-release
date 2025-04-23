@@ -35,9 +35,6 @@
             <a href="{{ as_url(routes.projects.view, name=release.project.name) }}">{{ release.project.display_name }}</a>
           </p>
           <p>
-            <strong>Version:</strong> {{ version_name }}
-          </p>
-          <p>
             <strong>Label:</strong> {{ release.name }}
           </p>
           {% if revision_editor %}
@@ -47,9 +44,6 @@
           {% endif %}
         </div>
         <div class="col-md-6">
-          <p>
-            <strong>Stage:</strong> <span class="badge bg-{% if release.stage == 'CURRENT' %}success{% elif release.stage == 'CANDIDATE' %}warning{% elif release.stage == 'BUILD' %}info{% else %}secondary{% endif %}">{{ release.stage.value.upper() }}</span>
-          </p>
           <p>
             <strong>Phase:</strong> <span class="badge bg-info">{{ release.phase.value.upper() }}</span>
           </p>

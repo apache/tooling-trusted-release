@@ -24,6 +24,10 @@
     box-sizing: border-box;
 }
 
+a {
+    font-weight: 450;
+}
+
 body {
     font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Oxygen", "Ubuntu", "Cantarell", "Open Sans", "Helvetica Neue", sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -33,16 +37,66 @@ body {
     font-weight: 425;
 }
 
-a {
-    font-weight: 450;
+footer {
+    padding: 1rem;
+    background: #eeeeee;
+    font-size: 15px;
+    margin: 2rem;
+    color: #333333;
+    font-variation-settings: "opsz" 14;
+    border-radius: 0.5rem;
+    border: 2px solid #d1d2d3;
+    display: table;
+    text-align: center;
 }
 
-input, textarea, select, option {
+h1 {
+    margin-bottom: 2rem;
+}
+
+h2 {
+    border-bottom: 1px solid #d1d2d3;
+    padding-bottom: 0.5rem;
+    margin-top: 2.5rem;
+    margin-bottom: 1.5rem;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+pre {
+    white-space: pre-wrap;
+
+    /* word-wrap: anywhere; */
+    word-break: break-all;
+}
+
+summary {
+    cursor: pointer;
+}
+
+
+textarea {
+    width: 100%;
+    min-height: 200px;
+}
+
+table {
+    border-collapse: collapse;
+}
+
+ul {
+    padding-left: 1rem;
+}
+
+input, option, select, textarea {
     font-size: 17px !important;
     font-weight: 425 !important;
 }
 
-input, textarea, button, select, option {
+button, input, option, select, textarea {
     font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Oxygen", "Ubuntu", "Cantarell", "Open Sans", "Helvetica Neue", sans-serif;
     font-size: 17px;
     line-height: 24px;
@@ -63,11 +117,6 @@ textarea {
     padding: 0.5rem;
 }
 
-textarea {
-    width: 100%;
-    min-height: 200px;
-}
-
 select, input[type="file"] {
     padding: 6px 12px;
 }
@@ -85,27 +134,8 @@ h1, h2, h3 {
     font-family: "Jost", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Oxygen", "Ubuntu", "Cantarell", "Open Sans", "Helvetica Neue", sans-serif;
 }
 
-h1 {
-    margin-bottom: 2rem;
-}
-
-h2 {
-    border-bottom: 1px solid #d1d2d3;
-    padding-bottom: 0.5rem;
-    margin-top: 2.5rem;
-    margin-bottom: 1.5rem;
-}
-
 h3, p, ul, form {
     margin-bottom: 1rem;
-}
-
-ul {
-    padding-left: 1rem;
-}
-
-table {
-    border-collapse: collapse;
 }
 
 table th {
@@ -145,27 +175,6 @@ aside h3 {
     margin-bottom: 0.5rem;
 }
 
-
-pre {
-    white-space: pre-wrap;
-
-    /* word-wrap: anywhere; */
-    word-break: break-all;
-}
-
-footer {
-    padding: 1rem;
-    background: #eeeeee;
-    font-size: 15px;
-    margin: 2rem;
-    color: #333333;
-    font-variation-settings: "opsz" 14;
-    border-radius: 0.5rem;
-    border: 2px solid #d1d2d3;
-    display: table;
-    text-align: center;
-}
-
 footer a {
     color: #333333;
     font-weight: 425;
@@ -180,9 +189,26 @@ footer p {
     margin-bottom: 0;
 }
 
-summary {
-    cursor: pointer;
+h1 strong {
+    font-weight: 525;
 }
+
+h1 em {
+    font-weight: 425;
+    font-style: normal;
+
+    /* font-variation-settings: "ital" 0.5; */
+    color: #555555;
+}
+
+/* h1 em:before {
+    content: "(";
+}
+
+h1 em:after {
+    content: ")";
+} */
+
 
 form.atr-canary {
     background-color: #ffffee;
@@ -205,17 +231,6 @@ span.warning {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-}
-
-.atr-back-link {
-    display: inline-block;
-    margin-bottom: 1rem;
-    color: #0000cc;
-    text-decoration: none;
-}
-
-.atr-back-link:hover {
-    text-decoration: underline;
 }
 
 .ribbon {
@@ -383,17 +398,23 @@ span.warning {
     border-color: gray;
 }
 
+.atr-back-link {
+    display: inline-block;
+    margin-bottom: 1rem;
+    color: #0000cc;
+    text-decoration: none;
+}
+
+.atr-back-link:hover {
+    text-decoration: underline;
+}
+
 .atr-border-dashed {
     border-style: dashed !important;
 }
 
 .atr-border-dashed:hover {
     border-color: gray;
-}
-
-img {
-    max-width: 100%;
-    height: auto;
 }
 
 .atr-breadcrumbs {
@@ -406,26 +427,6 @@ img {
     font-weight: 300;
     padding: 0 0.5rem;
 }
-
-h1 strong {
-    font-weight: 525;
-}
-
-h1 em {
-    font-weight: 425;
-    font-style: normal;
-
-    /* font-variation-settings: "ital" 0.5; */
-    color: #555555;
-}
-
-/* h1 em:before {
-    content: "(";
-}
-
-h1 em:after {
-    content: ")";
-} */
 
 /* There is no equivalent in Bootstrap */
 .atr-cursor-pointer {

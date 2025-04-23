@@ -26,9 +26,14 @@
     <p>The following keys were found in your KEYS file:</p>
 
     {% for key_info in results %}
-      <div class="my-3 p-3 rounded {% if key_info.status == 'success' %}bg-light{% else %}bg-danger-subtle{% endif %}">
+      {% if key_info.status == "success" %}
+        {% set bg_class = "bg-light" %}
+      {% else %}
+        {% set bg_class = "bg-danger-subtle" %}
+      {% endif %}
+      <div class="my-3 p-3 rounded {{ bg_class }}">
         <h3 class="mt-0">
-          {% if key_info.status == 'success' %}
+          {% if key_info.status == "success" %}
             Success: Added Key
           {% else %}
             Error: Failed to add key
