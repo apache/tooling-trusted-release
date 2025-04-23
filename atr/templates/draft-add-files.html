@@ -26,13 +26,11 @@
     Upload to <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
   </h1>
 
-  <div class="card">
-    <div class="card-body">
-      <a href="#file-upload" class="btn btn-outline-primary me-2">Use the browser</a>
-      <a href="#svn-upload" class="btn btn-outline-primary me-2">Use SVN</a>
-      <a href="#rsync-upload" class="btn btn-outline-primary">Use rsync</a>
-    </div>
-  </div>
+  <p>
+    <a href="#file-upload" class="btn btn-outline-primary me-2">Use the browser</a>
+    <a href="#svn-upload" class="btn btn-outline-primary me-2">Use SVN</a>
+    <a href="#rsync-upload" class="btn btn-outline-primary">Use rsync</a>
+  </p>
 
   <h2 id="file-upload">File upload</h2>
   <p>Use this form to add files to this candidate draft.</p>
@@ -138,6 +136,6 @@
   <p>Import files from a remote server using rsync with the following command:</p>
   <!-- TODO: Add a button to copy the command to the clipboard -->
   <pre class="bg-light p-3 mb-0">
-rsync -av -e 'ssh -p 2222' ${YOUR_FILES}/ {{ asf_id }}@{{ server_domain }}:/{{ project_name }}/{{ version_name }}/
+rsync -av -e 'ssh -p 2222' ${YOUR_FILES}/ {{ asf_id }}@{{ server_domain }}:/{{ release.project.name }}/{{ release.version }}/
 </pre>
 {% endblock content %}
