@@ -788,8 +788,8 @@ async def revisions(session: routes.CommitterSession, project_name: str, version
         parent_links_result = await data.execute(query)
         parent_map = {link.key: link.value for link in parent_links_result.scalars().all()}
 
-    # Determine the current latest revision
-    latest_revision_name = release.revision
+    # Determine the current revision
+    current_revision_name = release.revision
 
     revision_history = []
     prev_revision_files: set[pathlib.Path] | None = None
@@ -815,7 +815,7 @@ async def revisions(session: routes.CommitterSession, project_name: str, version
         version_name=version_name,
         release=release,
         revision_history=list(reversed(revision_history)),
-        latest_revision_name=latest_revision_name,
+        current_revision_name=current_revision_name,
     )
 
 
