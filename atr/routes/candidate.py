@@ -76,7 +76,13 @@ async def resolve_release(
     """Resolve the vote on a release candidate."""
     await session.check_access(project_name)
 
-    release = await session.release(project_name, version_name, with_committee=True, with_tasks=True)
+    release = await session.release(
+        project_name,
+        version_name,
+        phase=models.ReleasePhase.RELEASE_CANDIDATE,
+        with_committee=True,
+        with_tasks=True,
+    )
 
     form = await ResolveForm.create_form()
 
