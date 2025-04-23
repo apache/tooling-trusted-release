@@ -9,8 +9,18 @@
 {% endblock description %}
 
 {% block content %}
-  <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
-     class="atr-back-link">← Back to Compose {{ release.short_display_name }}</a>
+  <p class="d-flex justify-content-between align-items-center">
+    <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
+       class="atr-back-link">← Back to Compose {{ release.short_display_name }}</a>
+    <span>
+      <strong class="atr-phase-one atr-phase-symbol">①</strong>
+      <span class="atr-phase-one atr-phase-label">COMPOSE</span>
+      <span class="atr-phase-arrow">→</span>
+      <span class="atr-phase-symbol-other">②</span>
+      <span class="atr-phase-arrow">→</span>
+      <span class="atr-phase-symbol-other">③</span>
+    </span>
+  </p>
 
   <h1>
     Report for <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>:

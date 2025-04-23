@@ -90,6 +90,18 @@ class DeleteForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Delete candidate draft")
 
 
+class StartReleaseForm(util.QuartFormTyped):
+    project_name = wtforms.HiddenField()
+    version_name = wtforms.StringField(
+        "Version",
+        validators=[
+            wtforms.validators.InputRequired("Version is required"),
+            wtforms.validators.Length(min=1, max=100),
+        ],
+    )
+    submit = wtforms.SubmitField("Start new release")
+
+
 class SvnImportForm(util.QuartFormTyped):
     """Form for importing files from SVN into a draft."""
 
@@ -879,6 +891,44 @@ async def sbomgen(
         project_name=project_name,
         version_name=version_name,
     )
+
+
+@routes.committer("/start/<project_name>", methods=["GET", "POST"])
+async def start(session: routes.CommitterSession, project_name: str) -> response.Response | str:
+    """Allow the user to start a new release draft, or handle its submission."""
+    await session.check_access(project_name)
+
+    async with db.session() as data:
+        project = await data.project(name=project_name).demand(
+            base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
+        )
+
+    form = await StartReleaseForm.create_form(data=await quart.request.form if quart.request.method == "POST" else None)
+    if (quart.request.method == "GET") or (not form.project_name.data):
+        form.project_name.data = project_name
+
+    if (quart.request.method == "POST") and (await form.validate_on_submit()):
+        try:
+            # TODO: Move the helper somewhere else
+            # We already have the project, so we only need to get [0]
+            new_release = (
+                await create_release_draft(
+                    project_name=str(form.project_name.data), version=str(form.version_name.data), asf_uid=session.uid
+                )
+            )[0]
+            # Redirect to the new draft's overview page on success
+            return await session.redirect(
+                compose,
+                project_name=project.name,
+                version_name=new_release.version,
+                success="Release candidate draft created successfully",
+            )
+        except (routes.FlashError, base.ASFQuartException) as e:
+            # Flash the error and let the code fall through to render the template below
+            await quart.flash(str(e), "error")
+
+    # Render the template for GET requests or POST requests with validation errors
+    return await quart.render_template("release-start.html", project=project, form=form, routes=routes)
 
 
 @routes.committer("/draft/svnload/<project_name>/<version_name>", methods=["POST"])

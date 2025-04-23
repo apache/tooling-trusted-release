@@ -193,6 +193,8 @@ async def view(name: str) -> str:
 
 @routes.committer("/projects/<project_name>/vote-policy/add", methods=["GET", "POST"])
 async def vote_policy_add(session: routes.CommitterSession, project_name: str) -> response.Response | str:
+    await session.check_access(project_name)
+
     uid = await util.get_asf_id_or_die()
 
     async with db.session() as data:
@@ -223,6 +225,8 @@ async def vote_policy_add(session: routes.CommitterSession, project_name: str) -
 
 @routes.committer("/projects/<project_name>/vote-policy/edit", methods=["GET", "POST"])
 async def vote_policy_edit(session: routes.CommitterSession, project_name: str) -> response.Response | str:
+    await session.check_access(project_name)
+
     uid = await util.get_asf_id_or_die()
 
     async with db.session() as data:
