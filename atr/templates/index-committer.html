@@ -12,31 +12,9 @@
           min-height: 105px;
       }
 
-      .page-muted {
-          color: #aaaaaa;
-      }
-
-      .page-phase-progression {
-          color: #777777;
-      }
-
-      .page-phase-progression strong {
-          font-weight: 650;
-      }
-
       .page-version {
           border-bottom: 1px solid #aaaaaa;
           padding-bottom: 1rem;
-      }
-
-      .page-arrow {
-          margin-left: 0.333333rem;
-          margin-right: 0.333333rem;
-          color: #cccccc;
-      }
-
-      .page-semibold {
-          font-weight: 500 !important;
       }
 
       .page-logo {
@@ -120,39 +98,39 @@
           {% for release in active_releases %}
             {% set current_phase_index = phase_index_map.get(release.phase, -1) %}
             <a href="{{ release_as_url(release) }}" class="text-decoration-none">
-              <div class="card h-100 shadow-sm atr-cursor-pointer page-card">
+              <div class="card h-100 shadow-sm hover-lift atr-cursor-pointer page-card">
                 <div class="card-body text-center d-flex flex-column justify-content-center">
                   <div class="fw-semibold mb-3 fs-4 page-version">{{ release.version }}</div>
-                  <div class="page-phase-progression mb-2">
+                  <div class="atr-phase-themed mb-2">
                     {# set phase_symbols = ["1.", "2.", "3."] #}
                     {% set phase_symbols = ["①", "②", "③"] %}
                     {% set phase_labels = ["Compose", "Vote", "Refine"] %}
 
                     {% if current_phase_index == 0 %}
-                      <strong class="atr-phase-one">{{ phase_symbols[0] }}</strong>
+                      <strong class="atr-phase-one atr-phase-symbol">{{ phase_symbols[0] }}</strong>
                     {% else %}
-                      <span class="page-muted">{{ phase_symbols[0] }}</span>
+                      <span class="atr-phase-symbol-other">{{ phase_symbols[0] }}</span>
                     {% endif %}
-                    <span class="page-arrow">→</span>
+                    <span class="atr-phase-arrow">→</span>
                     {% if current_phase_index == 1 %}
-                      <strong class="atr-phase-two">{{ phase_symbols[1] }}</strong>
+                      <strong class="atr-phase-two atr-phase-symbol">{{ phase_symbols[1] }}</strong>
                     {% else %}
-                      <span class="page-muted">{{ phase_symbols[1] }}</span>
+                      <span class="atr-phase-symbol-other">{{ phase_symbols[1] }}</span>
                     {% endif %}
-                    <span class="page-arrow">→</span>
+                    <span class="atr-phase-arrow">→</span>
                     {% if current_phase_index == 2 %}
-                      <strong class="atr-phase-three">{{ phase_symbols[2] }}</strong>
+                      <strong class="atr-phase-three atr-phase-symbol">{{ phase_symbols[2] }}</strong>
                     {% else %}
-                      <span class="page-muted">{{ phase_symbols[2] }}</span>
+                      <span class="atr-phase-symbol-other">{{ phase_symbols[2] }}</span>
                     {% endif %}
                   </div>
-                  <div class="page-phase-progression">
+                  <div class="atr-phase-themed">
                     {% if current_phase_index == 0 %}
-                      <strong class="page-semibold atr-phase-one">{{ phase_labels[0] }}</strong>
+                      <span class="atr-phase-one atr-phase-label">{{ phase_labels[0] }}</span>
                     {% elif current_phase_index == 1 %}
-                      <strong class="page-semibold atr-phase-two">{{ phase_labels[1] }}</strong>
+                      <span class="atr-phase-two atr-phase-label">{{ phase_labels[1] }}</span>
                     {% elif current_phase_index == 2 %}
-                      <strong class="page-semibold atr-phase-three">{{ phase_labels[2] }}</strong>
+                      <span class="atr-phase-three atr-phase-label">{{ phase_labels[2] }}</span>
                     {% endif %}
                   </div>
                 </div>
@@ -162,7 +140,7 @@
 
           <a href="{{ as_url(routes.release.start, project_name=project.name) }}"
              class="text-decoration-none">
-            <div class="card h-100 shadow-sm atr-cursor-pointer page-card">
+            <div class="card h-100 shadow-sm hover-lift atr-cursor-pointer page-card">
               <div class="card-body d-flex justify-content-center align-items-center text-center text-secondary">
                 <div>
                   <i class="fas fa-plus me-2"></i>

@@ -427,19 +427,37 @@ h1 em:after {
     content: ")";
 } */
 
-.atr-phase-one {
+/* There is no equivalent in Bootstrap */
+.atr-cursor-pointer {
+    cursor: pointer;
+}
+
+.atr-phase-arrow {
+    margin-left: 0.3333rem;
+    margin-right: 0.3333rem;
+    color: #bbbbbb;
+}
+
+.atr-phase-label {
+    font-weight: 500 !important;
+}
+
+.atr-phase-symbol {
+    font-weight: 650 !important;
+}
+
+.atr-phase-symbol-other {
+    color: #aaaaaa;
+}
+
+.atr-phase-themed .atr-phase-one {
     color: #2277bb;
 }
 
-.atr-phase-two {
+.atr-phase-themed .atr-phase-two {
     color: #007700;
 }
 
-.atr-phase-three {
+.atr-phase-themed .atr-phase-three {
     color: #cc0033;
-}
-
-/* There is no equivalent in Bootstrap */
-.atr-cursor-pointer {
-  cursor: pointer;
 }

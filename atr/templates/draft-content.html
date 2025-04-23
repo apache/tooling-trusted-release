@@ -29,9 +29,18 @@
 {% endblock stylesheets %}
 
 {% block content %}
-  <p>
+  <p class="d-flex justify-content-between align-items-center">
     <a href="{{ as_url(routes.root.index) }}" class="atr-back-link">← Back to Select a release</a>
+    <span>
+      <strong class="atr-phase-one atr-phase-symbol">①</strong>
+      <span class="atr-phase-one atr-phase-label">COMPOSE</span>
+      <span class="atr-phase-arrow">→</span>
+      <span class="atr-phase-symbol-other">②</span>
+      <span class="atr-phase-arrow">→</span>
+      <span class="atr-phase-symbol-other">③</span>
+    </span>
   </p>
+
   <h1>
     Compose <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
   </h1>
@@ -51,16 +60,10 @@
             <a href="{{ as_url(routes.projects.view, name=release.project.name) }}">{{ release.project.display_name }}</a>
           </p>
           <p>
-            <strong>Version:</strong> {{ version_name }}
-          </p>
-          <p>
             <strong>Label:</strong> {{ release.name }}
           </p>
         </div>
         <div class="col-md-6">
-          <p>
-            <strong>Phase:</strong> <strong class="atr-phase-one">① COMPOSE</strong>
-          </p>
           <p>
             <strong>Created:</strong> {{ format_datetime(release.created) }}
           </p>

@@ -9,9 +9,18 @@
 {% endblock description %}
 
 {% block content %}
-  <p>
+  <p class="d-flex justify-content-between align-items-center">
     <a href="{{ as_url(routes.root.index) }}" class="atr-back-link">← Back to Select a release</a>
+    <span>
+      <span class="atr-phase-symbol-other">①</span>
+      <span class="atr-phase-arrow">→</span>
+      <strong class="atr-phase-two atr-phase-symbol">②</strong>
+      <span class="atr-phase-two atr-phase-label">VOTE</span>
+      <span class="atr-phase-arrow">→</span>
+      <span class="atr-phase-symbol-other">③</span>
+    </span>
   </p>
+
   <h1>
     Resolve vote for <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
   </h1>
@@ -31,16 +40,10 @@
             <a href="{{ as_url(routes.projects.view, name=release.project.name) }}">{{ release.project.display_name }}</a>
           </p>
           <p>
-            <strong>Version:</strong> {{ release.version }}
-          </p>
-          <p>
             <strong>Label:</strong> {{ release.name }}
           </p>
         </div>
         <div class="col-md-6">
-          <p>
-            <strong>Phase:</strong> <strong class="atr-phase-two">② VOTE</strong>
-          </p>
           <p>
             <strong>Created:</strong> {{ format_datetime(release.created) }}
           </p>

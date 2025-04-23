@@ -9,111 +9,119 @@
 {% endblock description %}
 
 {% block content %}
-  <div class="my-4">
+  <p class="d-flex justify-content-between align-items-center">
     <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
        class="atr-back-link">← Back to Compose {{ release.short_display_name }}</a>
+    <span>
+      <strong class="atr-phase-one atr-phase-symbol">①</strong>
+      <span class="atr-phase-one atr-phase-label">COMPOSE</span>
+      <span class="atr-phase-arrow">→</span>
+      <span class="atr-phase-symbol-other">②</span>
+      <span class="atr-phase-arrow">→</span>
+      <span class="atr-phase-symbol-other">③</span>
+    </span>
+  </p>
 
-    <h1 class="mb-4">
-      Start vote on <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
-    </h1>
+  <h1 class="mb-4">
+    Start vote on <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
+  </h1>
 
-    <div class="px-3 py-4 mb-4 bg-light border rounded">
-      <!-- TODO: Specify the draft revision too? -->
-      <p class="mb-0">
-        Starting a vote for this draft release will cause an email to be sent to the appropriate mailing list, and advance the draft to the "waiting for vote result" phase, unless you send a test message to yourself.
-      </p>
-    </div>
-
-    <div class="p-3 mb-4 bg-warning-subtle border border-warning rounded">
-      <strong>Note:</strong> This feature is currently in development. The form below only sends email to <a href="https://lists.apache.org/list.html?user-tests@tooling.apache.org">a test mailing list</a> or yourself.
-    </div>
-
-    <form method="post"
-          id="vote-initiate-form"
-          class="atr-canary py-4 px-5"
-          action="{{ as_url(routes.draft.vote_start, project_name=release.project.name, version=release.version, revision=revision) }}">
-      {{ form.hidden_tag() if form.hidden_tag }}
-      {{ form.release_name }}
-
-      <div class="mb-4">
-        <div class="row mb-3 pb-3 border-bottom">
-          <div class="col-md-3 text-md-end fw-medium">{{ form.mailing_list.label }}</div>
-          <div class="col-md-9">
-            <div class="d-flex gap-4">
-              {% for subfield in form.mailing_list %}
-                <div class="form-check">
-                  {{ subfield(class_='form-check-input') }}
-                  {{ subfield.label(class_='form-check-label') }}
-                </div>
-              {% endfor %}
-            </div>
-            {% if form.mailing_list.errors %}
-              <div class="invalid-feedback d-block">
-                {% for error in form.mailing_list.errors %}{{ error }}{% endfor %}
-              </div>
-            {% endif %}
-            <small class="form-text text-muted">NOTE: Sending a message to yourself for testing will not update the release phase.</small>
-          </div>
-        </div>
-
-        <div class="row mb-3 pb-3 border-bottom">
-          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.vote_duration.label }}</div>
-          <div class="col-md-9">
-            {{ form.vote_duration(class_='form-select w-75') }}
-            {% if form.vote_duration.errors %}
-              <div class="invalid-feedback d-block">
-                {% for error in form.vote_duration.errors %}{{ error }}{% endfor %}
-              </div>
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="row mb-3 pb-3 border-bottom">
-          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.subject.label }}</div>
-          <div class="col-md-9">
-            {{ form.subject(class_='form-control w-75') }}
-            {% if form.subject.errors %}
-              <div class="invalid-feedback d-block">
-                {% for error in form.subject.errors %}{{ error }}{% endfor %}
-              </div>
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="row mb-3 pb-3">
-          <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.body.label }}</div>
-          <div class="col-md-9">
-            {{ form.body(class_='form-control font-monospace', rows='20') }}
-            {% if form.body.errors %}
-              <div class="invalid-feedback d-block">
-                {% for error in form.body.errors %}{{ error }}{% endfor %}
-              </div>
-            {% endif %}
-            <small class="form-text text-muted">Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT], [DURATION], and [YOUR_NAME] will be filled in automatically when the email is sent.</small>
-          </div>
-        </div>
-
-        <div class="row mb-3 pb-3 border-bottom">
-          <div class="col-md-9 offset-md-3">
-            <details>
-              <summary class="text-muted">Show live preview</summary>
-              <pre id="email-body-preview"
-                   data-preview-url="{{ as_url(routes.draft.vote_preview) }}"
-                   data-asf-uid="{{ current_user.uid }}"
-                   class="mt-2 p-3 bg-white border rounded font-monospace overflow-auto"></pre>
-            </details>
-          </div>
-        </div>
-
-      </div>
-
-      <div class="mt-4 col-md-9 offset-md-3">
-        {{ form.submit(class_='btn btn-primary') }}
-        <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
-           class="btn btn-link text-secondary">Cancel</a>
-      </div>
-    </form>
+  <div class="px-3 py-4 mb-4 bg-light border rounded">
+    <!-- TODO: Specify the draft revision too? -->
+    <p class="mb-0">
+      Starting a vote for this draft release will cause an email to be sent to the appropriate mailing list, and advance the draft to the "waiting for vote result" phase, unless you send a test message to yourself.
+    </p>
   </div>
+
+  <div class="p-3 mb-4 bg-warning-subtle border border-warning rounded">
+    <strong>Note:</strong> This feature is currently in development. The form below only sends email to <a href="https://lists.apache.org/list.html?user-tests@tooling.apache.org">a test mailing list</a> or yourself.
+  </div>
+
+  <form method="post"
+        id="vote-initiate-form"
+        class="atr-canary py-4 px-5"
+        action="{{ as_url(routes.draft.vote_start, project_name=release.project.name, version=release.version, revision=revision) }}">
+    {{ form.hidden_tag() if form.hidden_tag }}
+    {{ form.release_name }}
+
+    <div class="mb-4">
+      <div class="row mb-3 pb-3 border-bottom">
+        <div class="col-md-3 text-md-end fw-medium">{{ form.mailing_list.label }}</div>
+        <div class="col-md-9">
+          <div class="d-flex gap-4">
+            {% for subfield in form.mailing_list %}
+              <div class="form-check">
+                {{ subfield(class_='form-check-input') }}
+                {{ subfield.label(class_='form-check-label') }}
+              </div>
+            {% endfor %}
+          </div>
+          {% if form.mailing_list.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in form.mailing_list.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+          <small class="form-text text-muted">NOTE: Sending a message to yourself for testing will not update the release phase.</small>
+        </div>
+      </div>
+
+      <div class="row mb-3 pb-3 border-bottom">
+        <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.vote_duration.label }}</div>
+        <div class="col-md-9">
+          {{ form.vote_duration(class_='form-select w-75') }}
+          {% if form.vote_duration.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in form.vote_duration.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="row mb-3 pb-3 border-bottom">
+        <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.subject.label }}</div>
+        <div class="col-md-9">
+          {{ form.subject(class_='form-control w-75') }}
+          {% if form.subject.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in form.subject.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="row mb-3 pb-3">
+        <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.body.label }}</div>
+        <div class="col-md-9">
+          {{ form.body(class_='form-control font-monospace', rows='20') }}
+          {% if form.body.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in form.body.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+          <small class="form-text text-muted">Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT], [DURATION], and [YOUR_NAME] will be filled in automatically when the email is sent.</small>
+        </div>
+      </div>
+
+      <div class="row mb-3 pb-3 border-bottom">
+        <div class="col-md-9 offset-md-3">
+          <details>
+            <summary class="text-muted">Show live preview</summary>
+            <pre id="email-body-preview"
+                 data-preview-url="{{ as_url(routes.draft.vote_preview) }}"
+                 data-asf-uid="{{ current_user.uid }}"
+                 class="mt-2 p-3 bg-white border rounded font-monospace overflow-auto"></pre>
+          </details>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="mt-4 col-md-9 offset-md-3">
+      {{ form.submit(class_='btn btn-primary') }}
+      <a href="{{ as_url(routes.draft.compose, project_name=release.project.name, version_name=release.version) }}"
+         class="btn btn-link text-secondary">Cancel</a>
+    </div>
+  </form>
 {% endblock content %}
 
 {% block javascripts %}
