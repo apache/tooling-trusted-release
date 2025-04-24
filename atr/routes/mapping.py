@@ -29,7 +29,7 @@ def release_as_url(release: models.Release) -> str:
         resolve_release = candidate.resolve_release  # type: ignore[has-type]
         return util.as_url(resolve_release, project_name=release.project.name, version_name=release.version)
     elif release.phase.value == "release_preview":
-        refine_release = preview.refine_release  # type: ignore[has-type]
-        return util.as_url(refine_release, project_name=release.project.name, version_name=release.version)
+        deploy_release = preview.deploy_release  # type: ignore[has-type]
+        return util.as_url(deploy_release, project_name=release.project.name, version_name=release.version)
     else:
         raise ValueError(f"Unknown release phase: {release.phase}")

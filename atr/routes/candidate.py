@@ -270,7 +270,7 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
 
     await _resolve_post_files(project_name, release, source, vote_result, session.uid)
     return await session.redirect(
-        preview.refine_release, success=success_message, project_name=project_name, version_name=release.version
+        preview.deploy_release, success=success_message, project_name=project_name, version_name=release.version
     )
 
 

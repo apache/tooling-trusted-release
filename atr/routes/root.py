@@ -38,7 +38,7 @@ async def index() -> response.Response | str:
         if not uid:
             return await quart.render_template("index-public.html")
 
-        phase_sequence = ["Compose", "Vote", "Refine"]
+        phase_sequence = ["Compose", "Vote", "Deploy"]
         phase_index_map = {
             models.ReleasePhase.RELEASE_CANDIDATE_DRAFT: 0,
             models.ReleasePhase.RELEASE_CANDIDATE: 1,
