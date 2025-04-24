@@ -188,6 +188,7 @@ async def view(name: str) -> str:
             previews=await project.previews,
             full_releases=await project.full_releases,
             number_of_release_files=util.number_of_release_files,
+            now=datetime.datetime.now(datetime.UTC),
         )
 
 

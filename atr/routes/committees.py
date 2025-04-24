@@ -17,6 +17,7 @@
 
 """project.py"""
 
+import datetime
 import http.client
 
 import quart
@@ -40,4 +41,9 @@ async def view(name: str) -> str:
         committee = await data.committee(name=name, _projects=True, _public_signing_keys=True).demand(
             http.client.HTTPException(404)
         )
-        return await quart.render_template("committee-view.html", committee=committee, algorithms=routes.algorithms)
+        return await quart.render_template(
+            "committee-view.html",
+            committee=committee,
+            algorithms=routes.algorithms,
+            now=datetime.datetime.now(datetime.UTC),
+        )

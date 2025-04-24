@@ -259,14 +259,15 @@ async def key_user_session_add(
     async with data.begin():
         if existing := await data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid).get():
             raise routes.FlashError(f"Key already exists: {existing.fingerprint}")
-
+        created = datetime.datetime.fromtimestamp(int(key["date"]), tz=datetime.UTC)
+        expires = datetime.datetime.fromtimestamp(int(key["expires"]), tz=datetime.UTC) if key.get("expires") else None
         # Create new key record
         key_record = models.PublicSigningKey(
             fingerprint=fingerprint,
             algorithm=int(key["algo"]),
             length=int(key.get("length", "0")),
-            created=datetime.datetime.fromtimestamp(int(key["date"])),
-            expires=datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
+            created=created,
+            expires=expires,
             declared_uid=uids[0] if uids else None,
             apache_uid=asf_uid,
             ascii_armored_key=public_key,
@@ -287,8 +288,8 @@ async def key_user_session_add(
         "key_id": key["keyid"],
         "fingerprint": key["fingerprint"].lower() if key.get("fingerprint") else "Unknown",
         "user_id": key["uids"][0] if key.get("uids") else "Unknown",
-        "creation_date": datetime.datetime.fromtimestamp(int(key["date"])),
-        "expiration_date": datetime.datetime.fromtimestamp(int(key["expires"])) if key.get("expires") else None,
+        "creation_date": created,
+        "expiration_date": expires,
         "data": pprint.pformat(key),
     }
 

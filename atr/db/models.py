@@ -87,9 +87,9 @@ class PublicSigningKey(sqlmodel.SQLModel, table=True):
     # Key length in bits
     length: int
     # Creation date
-    created: datetime.datetime
+    created: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
     # Expiration date
-    expires: datetime.datetime | None
+    expires: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
     # The UID declared in the key
     declared_uid: str | None
     # The UID used by Apache
@@ -175,7 +175,9 @@ class Project(sqlmodel.SQLModel, table=True):
         cascade_delete=True, sa_relationship_kwargs={"cascade": "all, delete-orphan", "single_parent": True}
     )
 
-    created: datetime.datetime = sqlmodel.Field(default_factory=lambda: datetime.datetime.now(datetime.UTC))
+    created: datetime.datetime = sqlmodel.Field(
+        default_factory=lambda: datetime.datetime.now(datetime.UTC), sa_column=sqlalchemy.Column(UTCDateTime)
+    )
     created_by: str | None = sqlmodel.Field(default=None)
 
     @property
@@ -264,7 +266,7 @@ class Package(sqlmodel.SQLModel, table=True):
     # The signature file
     signature_sha3: str | None = None
     # Uploaded timestamp
-    uploaded: datetime.datetime
+    uploaded: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
     # The size of the file in bytes
     bytes_size: int
 
@@ -393,7 +395,7 @@ class Release(sqlmodel.SQLModel, table=True):
     name: str = sqlmodel.Field(default="", primary_key=True, unique=True)
     stage: ReleaseStage
     phase: ReleasePhase
-    created: datetime.datetime
+    created: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
 
     # Many-to-one: A release belongs to one project, a project can have multiple releases
     project_id: int = sqlmodel.Field(foreign_key="project.id")
@@ -418,8 +420,8 @@ class Release(sqlmodel.SQLModel, table=True):
 
     votes: list[VoteEntry] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
 
-    vote_started: datetime.datetime | None = sqlmodel.Field(default=None)
-    vote_resolved: datetime.datetime | None = sqlmodel.Field(default=None)
+    vote_started: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
+    vote_resolved: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
 
     # One-to-many: A release can have multiple tasks
     tasks: list["Task"] = sqlmodel.Relationship(
@@ -474,7 +476,7 @@ class CheckResult(sqlmodel.SQLModel, table=True):
     release: Release = sqlmodel.Relationship(back_populates="check_results")
     checker: str
     primary_rel_path: str | None = sqlmodel.Field(default=None, index=True)
-    created: datetime.datetime
+    created: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
     status: CheckResultStatus
     message: str
     data: Any = sqlmodel.Field(sa_column=sqlalchemy.Column(sqlalchemy.JSON))
