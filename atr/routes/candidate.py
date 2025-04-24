@@ -283,7 +283,7 @@ async def _resolve_post_files(
     # TODO: Obtain a lock for this
     if vote_result != "passed":
         # The vote failed, so move the release candidate to the release draft directory
-        async with revision.create_and_manage(project_name, release.version, asf_uid) as (
+        async with revision.create_and_manage(project_name, release.version, asf_uid, create_directory=False) as (
             new_revision_dir,
             _new_revision_name,
         ):
