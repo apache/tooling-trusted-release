@@ -180,14 +180,14 @@ def lifecycle_04_start_vote(page: sync_api.Page, credentials: Credentials, versi
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info("Waiting for navigation to /candidate/resolve after submitting vote email")
-    wait_for_path(page, "/candidate/resolve")
+    logging.info(f"Waiting for navigation to /resolve/tooling-test-example/{version_name} after submitting vote email")
+    wait_for_path(page, f"/resolve/tooling-test-example/{version_name}")
     logging.info("Vote initiation actions completed successfully")
 
 
 def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
     logging.info(f"Navigating to the candidate resolve page for tooling-test-example {version_name}")
-    go_to_path(page, "/candidate/resolve")
+    go_to_path(page, f"/resolve/tooling-test-example/{version_name}")
     logging.info("Candidate resolve page loaded successfully")
 
     logging.info(f"Locating the form to resolve the vote for tooling-test-example {version_name}")
