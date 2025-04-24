@@ -558,7 +558,7 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
             # We add a special entry for Tooling, pretending to be a PMC, for debugging and testing
             tooling_committee = await data.committee(name="tooling").get()
             if not tooling_committee:
-                tooling_committee = models.Committee(name="tooling")
+                tooling_committee = models.Committee(name="tooling", full_name="Tooling")
                 data.add(tooling_committee)
                 tooling_project = models.Project(
                     name="tooling", full_name="Apache Tooling", committee=tooling_committee

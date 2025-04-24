@@ -77,35 +77,114 @@
     {% endfor %}
   {% endif %}
 
-  <form method="post" class="atr-canary" enctype="multipart/form-data">
-    {{ form.csrf_token }}
+  <form method="post"
+        class="atr-canary py-4 px-5"
+        enctype="multipart/form-data">
+    {# {{ form.csrf_token }} #}
+    {{ form.hidden_tag() if form.hidden_tag }}
 
     <div class="mb-4">
-      <div class="mb-3">
-        <label for="key" class="form-label">KEYS file:</label>
+      <div class="row mb-3 pb-3 border-bottom">
+        <div class="col-md-2 text-md-end fw-medium pt-2">{{ form.key.label(class="form-label") }}</div>
+        <div class="col-md-9">
+          {{ form.key(class="form-control", aria_describedby="keys-help") }}
+          <small id="keys-help" class="form-text text-muted mt-2">
+            Upload a KEYS file containing multiple PGP public keys. The file should contain keys in ASCII-armored format, starting with "-----BEGIN PGP PUBLIC KEY BLOCK-----".
+          </small>
+          {% if form.key.errors %}
+            <div class="invalid-feedback d-block">
+              {% for error in form.key.errors %}{{ error }}{% endfor %}
+            </div>
+          {% endif %}
+        </div>
       </div>
-      {{ form.key(class="form-control mb-2", aria_describedby="keys-help") }}
-      <small id="keys-help" class="form-text text-muted">
-        Upload a KEYS file containing multiple PGP public keys. The file should contain keys in ASCII-armored format, starting with "-----BEGIN PGP PUBLIC KEY BLOCK-----".
-      </small>
+
+      {% if user_committees %}
+        <div class="row mb-3 pb-3 border-bottom">
+          <div class="col-md-2 text-md-end fw-medium pt-2">Associate keys with committee</div>
+          <div class="col-md-9">
+            <div class="row">
+              {% for value, label in form.selected_committees.choices %}
+                <div class="col-sm-12 col-md-6 col-lg-4">
+                  <div class="form-check mb-2">
+                    <input type="checkbox"
+                           name="selected_committees"
+                           value="{{ value }}"
+                           id="committee_{{ loop.index }}"
+                           class="form-check-input" />
+                    <label for="committee_{{ loop.index }}" class="form-check-label">{{ label }}</label>
+                  </div>
+                </div>
+              {% else %}
+                <p class="text-muted fst-italic">No committees available for association.</p>
+              {% endfor %}
+            </div>
+            <div class="mt-2 mb-2">
+              <button type="button"
+                      id="toggleCommitteesBtn"
+                      class="btn btn-sm btn-outline-secondary">Select all</button>
+            </div>
+            <small class="form-text text-muted mt-2">
+              Select the committee with which to associate these keys. You must be a member of the selected committee.
+            </small>
+            {% if form.selected_committees.errors %}
+              <div class="invalid-feedback d-block">
+                {% for error in form.selected_committees.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% else %}
+        <div class="row mb-3 pb-3 border-bottom">
+          <div class="col-md-9 offset-md-2">
+            <p class="text-danger">You must be a member of at least one committee to add signing keys.</p>
+          </div>
+        </div>
+      {% endif %}
     </div>
 
-    {% if user_committees %}
-      <div class="mb-4">
-        <div class="mb-3">
-          <label for="selected_committee" class="form-label">Associate with project:</label>
-        </div>
-        {{ form.selected_committee(class="form-select", aria_describedby="committees-help") }}
-        <small id="committees-help" class="form-text text-muted mt-2">
-          Select the committee with which to associate these keys. You must be a member of the selected committee.
-        </small>
-      </div>
-    {% else %}
-      <div class="text-danger mt-1">
-        <p>You must be a member of at least one committee to add signing keys.</p>
-      </div>
-    {% endif %}
-
-    {{ form.submit(class="btn btn-primary") }}
+    <div class="mt-4 col-md-9 offset-md-2">
+      {{ form.submit(class="btn btn-primary") }}
+      <a href="{{ as_url(routes.keys.keys) }}"
+         class="btn btn-link text-secondary">Cancel</a>
+    </div>
   </form>
 {% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+  <script>
+      document.addEventListener("DOMContentLoaded", () => {
+          const btn = document.getElementById("toggleCommitteesBtn");
+          const checkboxes = document.querySelectorAll("input[name='selected_committees']");
+
+          if (!btn || checkboxes.length === 0) return;
+
+          function updateButtonText() {
+              let allChecked = true;
+              checkboxes.forEach(cb => {
+                  if (!cb.checked) allChecked = false;
+              });
+              btn.textContent = allChecked ? "Select none" : "Select all";
+          }
+
+          btn.addEventListener("click", () => {
+              let allChecked = true;
+              checkboxes.forEach(cb => {
+                  if (!cb.checked) allChecked = false;
+              });
+              const shouldCheck = !allChecked;
+              checkboxes.forEach(cb => {
+                  cb.checked = shouldCheck;
+              });
+              updateButtonText();
+          });
+
+          checkboxes.forEach(cb => {
+              cb.addEventListener("change", updateButtonText);
+          });
+
+          updateButtonText();
+      });
+  </script>
+{% endblock javascripts %}

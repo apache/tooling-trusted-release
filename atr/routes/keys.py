@@ -357,7 +357,14 @@ async def upload(session: routes.CommitterSession) -> str:
     class UploadKeyForm(util.QuartFormTyped):
         key = wtforms.FileField("KEYS file")
         submit = wtforms.SubmitField("Upload KEYS file")
-        selected_committee = wtforms.SelectField("PMCs", choices=[(c.name, c.name) for c in user_committees])
+        selected_committees = wtforms.SelectMultipleField(
+            "Associate keys with committees",
+            choices=[(c.name, c.display_name) for c in user_committees],
+            coerce=str,
+            option_widget=widgets.CheckboxInput(),
+            widget=widgets.ListWidget(prefix_label=False),
+            validators=[wtforms.validators.InputRequired("You must select at least one committee")],
+        )
 
     form = await UploadKeyForm.create_form()
     results: list[dict] = []
@@ -386,17 +393,20 @@ async def upload(session: routes.CommitterSession) -> str:
         if not key_blocks:
             return await render(error="No valid GPG keys found in the uploaded file")
 
-        # Get selected committee from the form
-        selected_committee = form.selected_committee.data
-        if not selected_committee:
+        # Get selected committee list from the form
+        selected_committees = form.selected_committees.data
+        if not selected_committees:
             return await render(error="You must select at least one committee")
 
-        # Ensure that the selected committee is one of which the user is actually a member
-        if selected_committee not in (session.committees + session.projects):
-            return await render(error=f"You are not a member of {selected_committee}")
+        # Ensure that the selected committees are ones of which the user is actually a member
+        invalid_committees = [
+            committee for committee in selected_committees if (committee not in (session.committees + session.projects))
+        ]
+        if invalid_committees:
+            return await render(error=f"Invalid committee selection: {', '.join(invalid_committees)}")
 
         # Process each key block
-        results = await _upload_process_key_blocks(key_blocks, selected_committee)
+        results = await _upload_process_key_blocks(key_blocks, selected_committees)
         if not results:
             return await render(error="No keys were added")
 
@@ -476,14 +486,14 @@ async def _upload_key_blocks(key_file: datastructures.FileStorage) -> list[str]:
     return key_blocks
 
 
-async def _upload_process_key_blocks(key_blocks: list[str], selected_committee: str) -> list[dict]:
+async def _upload_process_key_blocks(key_blocks: list[str], selected_committees: list[str]) -> list[dict]:
     """Process GPG key blocks and add them to the user's account."""
     results: list[dict] = []
 
     # Process each key block
     for i, key_block in enumerate(key_blocks):
         try:
-            key_info = await key_user_add(None, key_block, [selected_committee])
+            key_info = await key_user_add(None, key_block, selected_committees)
             if key_info:
                 key_info["status"] = "success"
                 key_info["message"] = "Key added successfully"
