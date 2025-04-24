@@ -244,11 +244,11 @@ async def previews(session: routes.CommitterSession) -> str:
     )
 
 
-@routes.committer("/deploy/<project_name>/<version_name>", methods=["GET", "POST"])
-async def deploy_release(
+@routes.committer("/finish/<project_name>/<version_name>", methods=["GET", "POST"])
+async def finish_release(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
-    """Deploy a release preview."""
+    """Finish a release preview."""
     await session.check_access(project_name)
     release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
 
@@ -279,7 +279,7 @@ async def deploy_release(
                 return r
 
     return await quart.render_template(
-        "preview-deploy-release.html", release=release, file_paths=sorted(file_paths_rel), form=form, can_move=can_move
+        "preview-finish-release.html", release=release, file_paths=sorted(file_paths_rel), form=form, can_move=can_move
     )
 
 
@@ -399,7 +399,7 @@ async def _move_file(
                         f"File '{source_file_rel.name}' already exists in '{target_dir_rel}' in new revision.",
                         "error",
                     )
-                    return await session.redirect(deploy_release, project_name=project_name, version_name=version_name)
+                    return await session.redirect(finish_release, project_name=project_name, version_name=version_name)
 
                 _LOGGER.info(f"Moving {source_path_in_new} to {target_path_in_new} in new revision {new_revision_name}")
                 await aiofiles.os.rename(source_path_in_new, target_path_in_new)
@@ -407,7 +407,7 @@ async def _move_file(
             await quart.flash(
                 f"File '{source_file_rel.name}' moved successfully to '{target_dir_rel}' in new revision.", "success"
             )
-            return await session.redirect(deploy_release, project_name=project_name, version_name=version_name)
+            return await session.redirect(finish_release, project_name=project_name, version_name=version_name)
 
         except FileNotFoundError:
             _LOGGER.exception("File not found during move operation in new revision")
@@ -418,7 +418,7 @@ async def _move_file(
         except Exception as e:
             _LOGGER.exception("Unexpected error during file move")
             await quart.flash(f"An unexpected error occurred: {e!s}", "error")
-            return await session.redirect(deploy_release, project_name=project_name, version_name=version_name)
+            return await session.redirect(finish_release, project_name=project_name, version_name=version_name)
     else:
         for field, errors in form.errors.items():
             field_label = getattr(getattr(form, field, None), "label", None)

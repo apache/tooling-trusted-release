@@ -25,15 +25,15 @@
 
 {% block content %}
   <p class="d-flex justify-content-between align-items-center">
-    <a href="{{ as_url(routes.preview.deploy_release, project_name=release.project.name, version_name=release.version) }}"
-       class="atr-back-link">← Back to Deploy {{ release.short_display_name }}</a>
+    <a href="{{ as_url(routes.preview.finish_release, project_name=release.project.name, version_name=release.version) }}"
+       class="atr-back-link">← Back to Finish {{ release.short_display_name }}</a>
     <span>
       <span class="atr-phase-symbol-other">①</span>
       <span class="atr-phase-arrow">→</span>
       <strong class="atr-phase-symbol-other">②</strong>
       <span class="atr-phase-arrow">→</span>
       <strong class="atr-phase-three atr-phase-symbol">③</strong>
-      <span class="atr-phase-three atr-phase-label">DEPLOY</span>
+      <span class="atr-phase-three atr-phase-label">FINISH</span>
     </span>
   </p>
 

@@ -265,7 +265,7 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
                 release.stage = models.ReleaseStage.RELEASE
                 release.phase = models.ReleasePhase.RELEASE_PREVIEW
                 success_message = "Vote marked as passed"
-                destination = preview.deploy_release
+                destination = preview.finish_release
             else:
                 release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
                 success_message = "Vote marked as failed"
