@@ -68,7 +68,8 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     _LOGGER.info("Starting initiate_core")
 
     # Validate arguments
-    if not args.email_to.endswith("@apache.org") or args.email_to.endswith(".apache.org"):
+    if not (args.email_to.endswith("@apache.org") or args.email_to.endswith(".apache.org")):
+        _LOGGER.error(f"Invalid destination email address: {args.email_to}")
         raise VoteInitiationError("Invalid destination email address")
 
     async with db.session() as data:
