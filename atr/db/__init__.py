@@ -595,7 +595,7 @@ def is_defined(v: T | NotSet) -> TypeGuard[T]:
     return not isinstance(v, NotSet)
 
 
-def is_undefined(v: T | NotSet) -> TypeGuard[NotSet]:
+def is_undefined(v: object | NotSet) -> TypeGuard[NotSet]:
     return isinstance(v, NotSet)
 
 

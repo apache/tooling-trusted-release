@@ -162,3 +162,11 @@ include = "atr/templates"
 minversion = "8.0"
 testpaths  = ["tests"]
 asyncio_mode = "auto"
+
+# Avoid CVE-2025-43859
+# But only with uv, because Poetry does not support this:
+# https://github.com/python-poetry/poetry/issues/697
+[tool.uv]
+override-dependencies = [
+    "h11>=0.16.0,<1.0.0",
+]
