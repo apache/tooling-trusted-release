@@ -1266,10 +1266,22 @@ Thanks,
             # And can be warned if there was a failure
             # (The message should be shown on the vote resolution page)
             # TODO: Link to the vote resolution page in the flash message
-            resolve: routes.RouteHandler[str] = candidate.resolve  # type: ignore[has-type]
+            if email_to == sender:
+                # Test email, with no promotion
+                return await session.redirect(
+                    compose,
+                    success=f"The vote announcement email will soon be sent to {email_to}. "
+                    "This is a test, and the release is not being voted on.",
+                    project_name=project_name,
+                    version_name=version,
+                )
+
+            resolve_release: routes.RouteHandler[str] = candidate.resolve_release  # type: ignore[has-type]
             return await session.redirect(
-                resolve,
+                resolve_release,
                 success=f"The vote announcement email will soon be sent to {email_to}.",
+                project_name=project_name,
+                version_name=version,
             )
 
         # For GET requests or failed POST validation
