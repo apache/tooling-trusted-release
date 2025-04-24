@@ -221,7 +221,7 @@ async def add_files(session: routes.CommitterSession, project_name: str, version
 
             number_of_files = await _upload_files(project_name, version_name, session.uid, file_name, file_data)
             return await session.redirect(
-                evaluate,
+                compose,
                 success=f"{number_of_files} file{'' if number_of_files == 1 else 's'} added successfully",
                 project_name=project_name,
                 version_name=version_name,
@@ -433,7 +433,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
 
     form = await DeleteFileForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
-        return await session.redirect(evaluate, project_name=project_name, version_name=version_name)
+        return await session.redirect(compose, project_name=project_name, version_name=version_name)
 
     rel_path_to_delete = pathlib.Path(str(form.file_path.data))
     metadata_files_deleted = 0
@@ -471,7 +471,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
     except Exception as e:
         logging.exception("Error deleting file:")
         await quart.flash(f"Error deleting file: {e!s}", "error")
-        return await session.redirect(evaluate, project_name=project_name, version_name=version_name)
+        return await session.redirect(compose, project_name=project_name, version_name=version_name)
 
     success_message = f"File '{rel_path_to_delete.name}' deleted successfully"
     if metadata_files_deleted:
@@ -480,7 +480,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
             f"file{'' if metadata_files_deleted == 1 else 's'} deleted"
         )
     return await session.redirect(
-        evaluate, success=success_message, project_name=project_name, version_name=version_name
+        compose, success=success_message, project_name=project_name, version_name=version_name
     )
 
 
@@ -700,10 +700,10 @@ async def hashgen(
     except Exception as e:
         logging.exception("Error generating hash file:")
         await quart.flash(f"Error generating hash file: {e!s}", "error")
-        return await session.redirect(evaluate, project_name=project_name, version_name=version_name)
+        return await session.redirect(compose, project_name=project_name, version_name=version_name)
 
     return await session.redirect(
-        evaluate,
+        compose,
         success=f"{hash_type} file generated successfully",
         project_name=project_name,
         version_name=version_name,
@@ -898,10 +898,10 @@ async def sbomgen(
     except Exception as e:
         logging.exception("Error generating SBOM:")
         await quart.flash(f"Error generating SBOM: {e!s}", "error")
-        return await session.redirect(evaluate, project_name=project_name, version_name=version_name)
+        return await session.redirect(compose, project_name=project_name, version_name=version_name)
 
     return await session.redirect(
-        evaluate,
+        compose,
         success=f"SBOM generation task queued for {rel_path.name}",
         project_name=project_name,
         version_name=version_name,
@@ -993,7 +993,7 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
         )
 
     return await session.redirect(
-        evaluate,
+        compose,
         success="SVN import task queued successfully",
         project_name=project_name,
         version_name=version_name,

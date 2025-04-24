@@ -146,8 +146,8 @@ def lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials, version
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info(f"Waiting for navigation to /draft/evaluate/tooling-test-example/{version_name} after adding file")
-    wait_for_path(page, f"/draft/evaluate/tooling-test-example/{version_name}")
+    logging.info(f"Waiting for navigation to /compose/tooling-test-example/{version_name} after adding file")
+    wait_for_path(page, f"/compose/tooling-test-example/{version_name}")
     logging.info("Add file actions completed successfully")
 
     logging.info("Navigating back to /drafts")
