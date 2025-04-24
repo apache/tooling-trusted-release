@@ -28,6 +28,13 @@
     {% endif %}
   </div>
   <nav>
+    <h3>Get started</h3>
+    <ul>
+      <li>
+        <a href="{{ as_url(routes.root.index) }}">Select a release</a>
+      </li>
+    </ul>
+
     {% if current_user %}
       {% set unfinished_releases = unfinished_releases_fn(current_user.uid) %}
       {% if unfinished_releases %}
