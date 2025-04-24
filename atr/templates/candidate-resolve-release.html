@@ -86,7 +86,7 @@
             </div>
           {% else %}
             <p class="mb-0 text-warning fw-semibold">
-              <i class="fa-solid fa-hourglass-half me-1"></i> Vote email status: {{ vote_task.status.value.upper() }}
+              <i class="fa-solid fa-hourglass-half me-1"></i> Vote email task status: {{ vote_task.status.value.upper() }}
               {% if vote_task.started %}
                 (Started: {{ format_datetime(vote_task.started) }})
               {% else %}
