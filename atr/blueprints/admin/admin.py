@@ -499,7 +499,7 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
 
                 podling = await data.project(name=podling_name).get()
                 if not podling:
-                    # create the associated podling project
+                    # Create the associated podling project
                     podling = models.Project(
                         name=podling_name, full_name=podling_data.name, committee=ppmc, is_podling=True
                     )
@@ -512,13 +512,24 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
                 podling.committee = ppmc
                 podling.is_podling = True
 
-            # Add projects and associated them to the right PMC
+            # Add projects and associate them with the right PMC
             for project_name, project_status in projects.items():
                 # FIXME: this is a quick workaround for inconsistent data wrt webservices PMC / projects
                 #        the PMC seems to be identified by the key ws, but the associated projects use webservices
                 if project_name.startswith("webservices-"):
                     project_name = project_name.replace("webservices-", "ws-")
                     project_status.pmc = "ws"
+
+                # TODO: Annotator is in both projects and ldap_projects
+                # The projects version is called "incubator-annotator", with "incubator" as its pmc
+                # This is not detected by us as incubating, because we create those above
+                # ("Create the associated podling project")
+                # Since the Annotator project is in ldap_projects, we can just skip it here
+                # Originally reported in https://github.com/apache/tooling-trusted-release/issues/35
+                # Ideally it would be removed from the upstream data source, which is:
+                # https://projects.apache.org/json/foundation/projects.json
+                if project_name == "incubator-annotator":
+                    continue
 
                 pmc = await data.committee(name=project_status.pmc).get()
                 if not pmc:
