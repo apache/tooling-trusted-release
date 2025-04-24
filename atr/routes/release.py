@@ -122,9 +122,13 @@ async def select(session: routes.CommitterSession, project_name: str) -> str:
 
 
 @routes.public("/release/view/<project_name>/<version_name>")
-async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+async def view(project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
-    release = await session.release(project_name, version_name)
+    async with db.session() as data:
+        release_name = models.release_name(project_name, version_name)
+        release = await data.release(name=release_name, _project=True).demand(
+            base.ASFQuartException(f"Release {version_name} not found", errorcode=404)
+        )
 
     # Convert async generator to list
     file_stats = [stat async for stat in util.content_list(util.get_release_dir(), project_name, version_name)]
@@ -142,11 +146,13 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
 
 
 @routes.public("/release/view/<project_name>/<version_name>/<path:file_path>")
-async def view_path(
-    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
-) -> response.Response | str:
+async def view_path(project_name: str, version_name: str, file_path: str) -> response.Response | str:
     """View the content of a specific file in the final release."""
-    release = await session.release(project_name, version_name)
+    async with db.session() as data:
+        release_name = models.release_name(project_name, version_name)
+        release = await data.release(name=release_name, _project=True).demand(
+            base.ASFQuartException(f"Release {version_name} not found", errorcode=404)
+        )
     _max_view_size = 1 * 1024 * 1024
     full_path = util.release_directory(release) / file_path
     content_listing = await util.archive_listing(full_path)
