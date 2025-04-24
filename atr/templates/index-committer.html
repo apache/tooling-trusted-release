@@ -85,7 +85,7 @@
           <a href="{{ as_url(routes.projects.view, name=project.name) }}"
              class="text-decoration-none me-2">About this project</a>
           <span class="text-muted me-2">/</span>
-          <a href="{{ as_url(routes.projects.add) }}"
+          <a href="{{ as_url(routes.projects.add_project, project_name=project.name) }}"
              class="text-decoration-none me-2">Create a sub-project</a>
           {% if completed_releases %}
             <span class="text-muted me-2">/</span>

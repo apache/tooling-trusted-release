@@ -33,24 +33,11 @@
           </a>
         </div>
       {% endfor %}
-
-      {# Pseudocard to add a project #}
-      <div class="col">
-        <a href="{{ as_url(routes.projects.add) }}" class="text-decoration-none">
-          <div class="card h-100 shadow-sm atr-cursor-pointer atr-border-dashed">
-            <div class="card-body d-flex flex-column justify-content-center align-items-center text-center py-5">
-              <i class="fas fa-plus text-secondary fa-3x mb-4"></i>
-              <h5 class="card-title text-body-secondary fs-6">Add a new project</h5>
-            </div>
-          </div>
-        </a>
-      </div>
-
     </div>
   {% else %}
     <div class="alert alert-warning" role="alert">
       You are not currently listed as a participant (committer, PMC member, or RM) in any projects known to ATR.
-      You may need to <a href="{{ as_url(routes.projects.add) }}">add a project</a> or check your committee memberships.
+      You may need to add a project or check your committee memberships.
     </div>
   {% endif %}
 {% endblock content %}

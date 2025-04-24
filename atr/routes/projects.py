@@ -35,7 +35,7 @@ import atr.util as util
 
 
 class AddFormProtocol(Protocol):
-    project_name: wtforms.SelectField
+    project_name: wtforms.HiddenField
     derived_project_name: wtforms.StringField
     submit: wtforms.SubmitField
 
@@ -74,17 +74,16 @@ class VotePolicyForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Save")
 
 
-@routes.committer("/project/add", methods=["GET", "POST"])
-async def add(session: routes.CommitterSession) -> response.Response | str:
-    def long_name(project: models.Project) -> str:
-        if project.full_name:
-            return project.full_name
-        return project.name
-
-    user_projects = await session.user_projects
+@routes.committer("/project/add/<project_name>", methods=["GET", "POST"])
+async def add_project(session: routes.CommitterSession, project_name: str) -> response.Response | str:
+    await session.check_access(project_name)
+    async with db.session() as data:
+        project = await data.project(name=project_name).demand(
+            base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
+        )
 
     class AddForm(util.QuartFormTyped):
-        project_name = wtforms.SelectField("Project", choices=[(p.name, long_name(p)) for p in user_projects])
+        project_name = wtforms.HiddenField("project_name")
         derived_project_name = wtforms.StringField(
             "Derived project",
             validators=[
@@ -94,12 +93,12 @@ async def add(session: routes.CommitterSession) -> response.Response | str:
         )
         submit = wtforms.SubmitField("Add project")
 
-    form = await AddForm.create_form()
+    form = await AddForm.create_form(data={"project_name": project_name})
 
     if await form.validate_on_submit():
         return await _add_project(form, session.uid)
 
-    return await quart.render_template("project-add.html", form=form)
+    return await quart.render_template("project-add-project.html", form=form, project_name=project.display_name)
 
 
 @routes.committer("/project/delete", methods=["POST"])
@@ -277,13 +276,14 @@ async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
         # Get the base project to derive from
         base_project = await data.project(name=base_project_name).get()
         if not base_project:
-            # This should not happen, assuming that the dropdown is populated correctly
-            raise routes.FlashError(f"Base project {base_project_name} not found")
+            # This should not happen
+            raise RuntimeError(f"Base project {base_project_name} not found")
 
         # Construct the new label
         derived_label = _generate_label(derived_project_name)
         if not derived_label:
-            raise routes.FlashError("Derived project name must contain valid characters for label generation")
+            await quart.flash("Derived project name must contain valid characters for label generation", "error")
+            return quart.redirect(util.as_url(add_project, project_name=base_project.name))
         new_project_label = f"{base_project.name}-{derived_label}"
 
         # Construct the new full name
@@ -305,7 +305,8 @@ async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
 
         # Check whether the derived project already exists by its constructed label
         if await data.project(name=new_project_label).get():
-            raise routes.FlashError(f"Derived project {new_project_label} already exists")
+            await quart.flash(f"Derived project {new_project_label} already exists", "error")
+            return quart.redirect(util.as_url(add_project, project_name=base_project.name))
 
         project = models.Project(
             name=new_project_label,

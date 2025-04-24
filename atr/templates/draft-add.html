@@ -35,9 +35,7 @@
           {% if not user_projects %}
             <p class="text-danger">You must be a participant of a project to submit a release candidate.</p>
           {% endif %}
-          <p class="text-muted">
-            If your project is not listed above, you may need to <a href="{{ as_url(routes.projects.add) }}">add it first</a>.
-          </p>
+          <p class="text-muted">If your project is not listed above, you may need to add it first.</p>
         </div>
       </div>
 

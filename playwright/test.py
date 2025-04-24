@@ -837,17 +837,14 @@ def test_projects_02_check_directory(page: sync_api.Page, credentials: Credentia
 
 
 def test_projects_03_add_project(page: sync_api.Page, credentials: Credentials) -> None:
+    base_project_label = "tooling"
     project_name = "Apache Tooling Test Example"
     project_label = "tooling-test-example"
-    base_project_option_label = "Apache Tooling"
     derived_project_input_value = "Test Example"
 
     logging.info("Navigating to the add derived project page")
-    go_to_path(page, "/project/add")
+    go_to_path(page, f"/project/add/{base_project_label}")
     logging.info("Add a new project page loaded")
-
-    logging.info(f"Selecting base project '{base_project_option_label}'")
-    page.locator('select[name="project_name"]').select_option(label=base_project_option_label)
 
     logging.info(f"Filling derived project name '{derived_project_input_value}'")
     page.locator('input[name="derived_project_name"]').fill(derived_project_input_value)
