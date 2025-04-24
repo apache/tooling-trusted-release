@@ -70,7 +70,7 @@ async def resolve(session: routes.CommitterSession) -> response.Response | str:
     return await _resolve_post(session)
 
 
-@routes.committer("/resolve/<project_name>/<version_name>")
+@routes.committer("/resolve/<project_name>/<version_name>", measure_performance=False)
 async def resolve_release(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
