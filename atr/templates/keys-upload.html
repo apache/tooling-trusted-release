@@ -8,6 +8,74 @@
   Upload a KEYS file containing multiple GPG public keys.
 {% endblock description %}
 
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .page-rotated-header {
+          height: 180px;
+          position: relative;
+          vertical-align: bottom;
+          padding-bottom: 5px;
+          width: 40px;
+      }
+
+      .page-rotated-header>div {
+          transform-origin: bottom left;
+          transform: translateX(25px) rotate(-90deg);
+          position: absolute;
+          bottom: 12px;
+          left: 6px;
+          white-space: nowrap;
+          text-align: left;
+      }
+
+      .table th,
+      .table td {
+          text-align: center;
+          vertical-align: middle;
+      }
+
+      .table td.page-key-details {
+          text-align: left;
+          font-family: ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas", monospace;
+          font-size: 0.9em;
+          word-break: break-all;
+      }
+
+      .page-status-cell-new {
+          background-color: #197a4e !important;
+      }
+
+      .page-status-cell-existing {
+          background-color: #868686 !important;
+      }
+
+      .page-status-cell-unknown {
+          background-color: #ffecb5 !important;
+      }
+
+      .page-status-cell-error {
+          background-color: #dc3545 !important;
+      }
+
+      .page-status-square {
+          display: inline-block;
+          width: 36px;
+          height: 36px;
+          vertical-align: middle;
+      }
+
+      .page-table-bordered th,
+      .page-table-bordered td {
+          border: 1px solid #dee2e6;
+      }
+
+      tbody tr {
+          height: 40px;
+      }
+  </style>
+{% endblock stylesheets %}
+
 {% block content %}
   <h1>Upload KEYS file</h1>
   <p>Upload a KEYS file containing multiple GPG public keys.</p>
@@ -21,60 +89,61 @@
     </div>
   {% endif %}
 
-  {% if results %}
+  {% if results and submitted_committees %}
     <h2>KEYS processing results</h2>
-    <p>The following keys were found in your KEYS file:</p>
+    <p>
+      The following keys were found in your KEYS file and processed against the selected committees. Green squares indicate that a key was added, grey squares indicate that a key already existed, and red squares indicate an error.
+    </p>
+    <div class="table-responsive">
+      <table class="table table-striped page-table-bordered table-sm mt-3">
+        <thead>
+          <tr>
+            <th scope="col">Fingerprint</th>
+            <th scope="col">User ID</th>
+            {% for committee_name in submitted_committees %}
+              <th scope="col" class="page-rotated-header">
+                <div>{{ committee_map.get(committee_name, committee_name) }}</div>
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for key_info in results %}
+            <tr>
+              <td class="page-key-details px-2">
+                <code>{{ key_info.fingerprint[:16]|upper }}</code>
+              </td>
+              <td class="page-key-details px-2">{{ key_info.email }}</td>
+              {% for committee_name in submitted_committees %}
+                {% set status = key_info.committee_statuses.get(committee_name) %}
+                {% set cell_class = 'page-status-cell-error' if key_info.status == 'error'
+                                  else 'page-status-cell-new' if status == 'newly_linked'
+                                  else 'page-status-cell-existing' if status == 'already_linked'
+                                else 'page-status-cell-unknown' %}
+                {% set title_text = 'Error processing key' if key_info.status == 'error'
+                                  else 'Newly linked' if status == 'newly_linked'
+                                  else 'Already linked' if status == 'already_linked'
+                                else 'Unknown status' %}
+                <td class="text-center align-middle page-status-cell-container">
+                  <span class="page-status-square {{ cell_class }}" title="{{ title_text }}"></span>
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
 
-    {% for key_info in results %}
-      {% if key_info.status == "success" %}
-        {% set bg_class = "bg-light" %}
-      {% else %}
-        {% set bg_class = "bg-danger-subtle" %}
-      {% endif %}
-      <div class="my-3 p-3 rounded {{ bg_class }}">
-        <h3 class="mt-0">
-          {% if key_info.status == "success" %}
-            Success: Added Key
-          {% else %}
-            Error: Failed to add key
-          {% endif %}
-        </h3>
-        <dl class="row mb-0">
-          <dt class="col-sm-3 fw-bold">Key ID</dt>
-          <dd class="col-sm-9 mb-2">
-            {{ key_info.key_id }}
-          </dd>
-          <dt class="col-sm-3 fw-bold">Fingerprint</dt>
-          <dd class="col-sm-9 mb-2">
-            {{ key_info.fingerprint }}
-          </dd>
-          <dt class="col-sm-3 fw-bold">User ID</dt>
-          <dd class="col-sm-9 mb-2">
-            {{ key_info.user_id }}
-          </dd>
-          {% if key_info.status == 'success' %}
-            <dt class="col-sm-3 fw-bold">Created</dt>
-            <dd class="col-sm-9 mb-2">
-              {{ key_info.creation_date }}
-            </dd>
-            <dt class="col-sm-3 fw-bold">Expires</dt>
-            <dd class="col-sm-9 mb-2">
-              {{ key_info.expiration_date or 'Never' }}
-            </dd>
-          {% endif %}
-          <dt class="col-sm-3 fw-bold">Status</dt>
-          <dd class="col-sm-9 mb-2">
-            {{ key_info.message }}
-          </dd>
-          {% if key_info.status == 'success' and key_info.data %}
-            <details>
-              <summary>Key Data</summary>
-              <pre class="mb-0">{{ key_info.data }}</pre>
-            </details>
-          {% endif %}
-        </dl>
-      </div>
-    {% endfor %}
+    {% set processing_errors = results | selectattr('status', 'equalto', 'error') | list %}
+    {% if processing_errors %}
+      <h3 class="text-danger mt-4">Processing errors</h3>
+      {% for error_info in processing_errors %}
+        <div class="alert alert-danger p-2 mb-3">
+          <strong>{{ error_info.key_id }} / {{ error_info.fingerprint }}</strong>: {{ error_info.message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
   {% endif %}
 
   <form method="post"
@@ -101,7 +170,7 @@
 
       {% if user_committees %}
         <div class="row mb-3 pb-3 border-bottom">
-          <div class="col-md-2 text-md-end fw-medium pt-2">Associate keys with committee</div>
+          <div class="col-md-2 text-md-end fw-medium pt-2">Associate keys with committees</div>
           <div class="col-md-9">
             <div class="row">
               {% for value, label in form.selected_committees.choices %}
@@ -125,7 +194,7 @@
                       class="btn btn-sm btn-outline-secondary">Select all</button>
             </div>
             <small class="form-text text-muted mt-2">
-              Select the committee with which to associate these keys. You must be a member of the selected committee.
+              Select the committees with which to associate these keys. You must be a member of the selected committees.
             </small>
             {% if form.selected_committees.errors %}
               <div class="invalid-feedback d-block">

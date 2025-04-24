@@ -32,6 +32,7 @@ from collections.abc import AsyncGenerator, Sequence
 import asfquart as asfquart
 import gnupg
 import quart
+import sqlmodel
 import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
 import wtforms
@@ -256,41 +257,80 @@ async def key_user_session_add(
         raise routes.FlashError("Invalid key fingerprint")
     fingerprint = fingerprint.lower()
     uids = key.get("uids")
-    async with data.begin():
-        if existing := await data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid).get():
-            raise routes.FlashError(f"Key already exists: {existing.fingerprint}")
-        created = datetime.datetime.fromtimestamp(int(key["date"]), tz=datetime.UTC)
-        expires = datetime.datetime.fromtimestamp(int(key["expires"]), tz=datetime.UTC) if key.get("expires") else None
-        # Create new key record
-        key_record = models.PublicSigningKey(
-            fingerprint=fingerprint,
-            algorithm=int(key["algo"]),
-            length=int(key.get("length", "0")),
-            created=created,
-            expires=expires,
-            declared_uid=uids[0] if uids else None,
-            apache_uid=asf_uid,
-            ascii_armored_key=public_key,
-        )
-        data.add(key_record)
+    key_record: models.PublicSigningKey | None = None
 
-        # Link key to selected PMCs
+    async with data.begin():
+        existing = await data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid).get()
+
+        if existing:
+            logging.info(f"Found existing key {fingerprint}, updating associations")
+            key_record = existing
+        else:
+            # Key doesn't exist, create it
+            logging.info(f"Adding new key {fingerprint}")
+            created = datetime.datetime.fromtimestamp(int(key["date"]), tz=datetime.UTC)
+            expires = (
+                datetime.datetime.fromtimestamp(int(key["expires"]), tz=datetime.UTC) if key.get("expires") else None
+            )
+
+            key_record = models.PublicSigningKey(
+                fingerprint=fingerprint,
+                algorithm=int(key["algo"]),
+                length=int(key.get("length", "0")),
+                created=created,
+                expires=expires,
+                declared_uid=uids[0] if uids else None,
+                apache_uid=asf_uid,
+                ascii_armored_key=public_key,
+            )
+            data.add(key_record)
+            await data.flush()
+            await data.refresh(key_record)
+
+        # Safety check, in case of strange flushes
+        if not key_record:
+            raise RuntimeError(f"Failed to obtain valid key record for fingerprint {fingerprint}")
+
+        # Link key to selected PMCs and track status for each
+        committee_statuses: dict[str, str] = {}
         for committee_name in selected_committees:
             committee = await data.committee(name=committee_name).get()
             if committee and committee.id:
-                link = models.KeyLink(committee_id=committee.id, key_fingerprint=key_record.fingerprint)
-                data.add(link)
+                # Check whether the link already exists
+                link_exists = await data.execute(
+                    sqlmodel.select(models.KeyLink).where(
+                        models.KeyLink.committee_id == committee.id,
+                        models.KeyLink.key_fingerprint == key_record.fingerprint,
+                    )
+                )
+                if link_exists.scalar_one_or_none() is None:
+                    committee_statuses[committee_name] = "newly_linked"
+                    # Link doesn't exist, create it
+                    logging.debug(f"Linking key {fingerprint} to committee {committee_name}")
+                    link = models.KeyLink(committee_id=committee.id, key_fingerprint=key_record.fingerprint)
+                    data.add(link)
+                else:
+                    committee_statuses[committee_name] = "already_linked"
+                    logging.debug(f"Link already exists for key {fingerprint} and committee {committee_name}")
             else:
-                # TODO: Log? Add to "error"?
+                logging.warning(f"Could not find committee {committee_name} to link key {fingerprint}")
                 continue
 
+    # Extract email for sorting
+    user_id_str = key_record.declared_uid or ""
+    email_match = re.search(r"<([^>]+)>", user_id_str)
+    email = email_match.group(1) if email_match else user_id_str
+
     return {
-        "key_id": key["keyid"],
-        "fingerprint": key["fingerprint"].lower() if key.get("fingerprint") else "Unknown",
-        "user_id": key["uids"][0] if key.get("uids") else "Unknown",
-        "creation_date": created,
-        "expiration_date": expires,
+        "key_id": key_record.fingerprint[:16],
+        "fingerprint": key_record.fingerprint,
+        "user_id": user_id_str,
+        "email": email,
+        "creation_date": key_record.created,
+        "expiration_date": key_record.expires,
         "data": pprint.pformat(key),
+        "committee_statuses": committee_statuses,
+        "status": "success",
     }
 
 
@@ -368,18 +408,30 @@ async def upload(session: routes.CommitterSession) -> str:
 
     form = await UploadKeyForm.create_form()
     results: list[dict] = []
+    submitted_committees: list[str] | None = None
 
-    async def render(error: str | None = None) -> str:
+    async def render(
+        error: str | None = None,
+        submitted_committees_list: list[str] | None = None,
+        all_user_committees: Sequence[models.Committee] | None = None,
+    ) -> str:
         # For easier happy pathing
         if error is not None:
             await quart.flash(error, "error")
+
+        # Determine which committee list to use
+        current_committees = all_user_committees if (all_user_committees is not None) else user_committees
+        committee_map = {c.name: c.display_name for c in current_committees}
+
         return await quart.render_template(
             "keys-upload.html",
             asf_id=session.uid,
-            user_committees=user_committees,
+            user_committees=current_committees,
+            committee_map=committee_map,
             form=form,
             results=results,
             algorithms=routes.algorithms,
+            submitted_committees=submitted_committees_list,
         )
 
     if await form.validate_on_submit():
@@ -405,6 +457,9 @@ async def upload(session: routes.CommitterSession) -> str:
         if invalid_committees:
             return await render(error=f"Invalid committee selection: {', '.join(invalid_committees)}")
 
+        # TODO: Do we modify this? Store a copy just in case, for the template to use
+        submitted_committees = selected_committees[:]
+
         # Process each key block
         results = await _upload_process_key_blocks(key_blocks, selected_committees)
         if not results:
@@ -416,6 +471,8 @@ async def upload(session: routes.CommitterSession) -> str:
             f"Processed {len(results)} keys: {success_count} successful, {error_count} failed",
             "success" if success_count > 0 else "error",
         )
+        return await render(submitted_committees_list=submitted_committees, all_user_committees=user_committees)
+
     return await render()
 
 
@@ -495,19 +552,51 @@ async def _upload_process_key_blocks(key_blocks: list[str], selected_committees:
         try:
             key_info = await key_user_add(None, key_block, selected_committees)
             if key_info:
-                key_info["status"] = "success"
-                key_info["message"] = "Key added successfully"
+                key_info["status"] = key_info.get("status", "success")
+                key_info["email"] = key_info.get("email", "Unknown")
+                key_info["committee_statuses"] = key_info.get("committee_statuses", {})
                 results.append(key_info)
-        except Exception as e:
-            logging.exception("Exception adding key:")
+            else:
+                # Handle case where key_user_add might return None
+                results.append(
+                    {
+                        "status": "error",
+                        "message": "Failed to process key (key_user_add returned None)",
+                        "key_id": f"Key #{i + 1}",
+                        "fingerprint": "Unknown",
+                        "user_id": "Unknown",
+                        "email": "Unknown",
+                        "committee_statuses": {},
+                    }
+                )
+        except routes.FlashError as e:
+            logging.warning(f"FlashError processing key #{i + 1}: {e}")
             results.append(
                 {
                     "status": "error",
-                    "message": f"Exception: {e}",
+                    "message": f"Validation Error: {e}",
+                    "key_id": f"Key #{i + 1}",
+                    "fingerprint": "Invalid",
+                    "user_id": "Unknown",
+                    "email": "Unknown",
+                    "committee_statuses": {},
+                }
+            )
+        except Exception as e:
+            logging.exception(f"Exception processing key #{i + 1}:")
+            results.append(
+                {
+                    "status": "error",
+                    "message": f"Internal Exception: {e}",
                     "key_id": f"Key #{i + 1}",
                     "fingerprint": "Error",
                     "user_id": "Unknown",
+                    "email": "Unknown",
+                    "committee_statuses": {},
                 }
             )
 
-    return results
+    # Primary key is email, secondary key is fingerprint
+    results_sorted = sorted(results, key=lambda x: (x.get("email", "").lower(), x.get("fingerprint", "")))
+
+    return results_sorted
