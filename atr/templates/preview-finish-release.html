@@ -1,11 +1,11 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Refine {{ release.project.display_name }} {{ release.version }} ~ ATR
+  Finish {{ release.project.display_name }} {{ release.version }} ~ ATR
 {% endblock title %}
 
 {% block description %}
-  Refine {{ release.project.display_name }} {{ release.version }} as a release preview.
+  Finish {{ release.project.display_name }} {{ release.version }} as a release preview.
 {% endblock description %}
 
 {% block content %}
@@ -17,12 +17,12 @@
       <strong class="atr-phase-symbol-other">②</strong>
       <span class="atr-phase-arrow">→</span>
       <strong class="atr-phase-three atr-phase-symbol">③</strong>
-      <span class="atr-phase-three atr-phase-label">REFINE</span>
+      <span class="atr-phase-three atr-phase-label">FINISH</span>
     </span>
   </p>
 
   <h1>
-    Refine <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
+    Finish <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
   </h1>
 
   <div id="{{ release.name }}" class="card mb-4 shadow-sm">
