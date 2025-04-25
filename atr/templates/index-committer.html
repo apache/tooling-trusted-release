@@ -149,6 +149,7 @@
           {% endfor %}
 
           <a href="{{ as_url(routes.draft.start, project_name=project.name) }}"
+             title="Start a new {{ project.display_name }} release"
              class="text-decoration-none">
             <div class="card h-100 shadow-sm atr-cursor-pointer page-card">
               <div class="card-body d-flex justify-content-center align-items-center text-center text-secondary">

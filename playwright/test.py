@@ -97,22 +97,19 @@ def go_to_path(page: sync_api.Page, path: str, wait: bool = True) -> None:
 
 
 def lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
-    logging.info("Following link to add draft")
-    go_to_path(page, "/draft/add")
+    logging.info("Following link to start a new release")
+    go_to_path(page, "/start/tooling-test-example")
 
-    logging.info("Waiting for the add draft page")
-    project_select_locator = page.locator('select[name="project_name"]')
-    sync_api.expect(project_select_locator).to_be_visible()
-    logging.info("Add draft page loaded")
-
-    logging.info("Selecting project 'tooling-test-example'")
-    project_select_locator.select_option(label="Apache Tooling Test Example")
+    logging.info("Waiting for the start new release page")
+    version_name_locator = page.locator("input#version_name")
+    sync_api.expect(version_name_locator).to_be_visible()
+    logging.info("Start new release page loaded")
 
     logging.info(f"Filling version '{version_name}'")
-    page.locator('input[name="version_name"]').fill(version_name)
+    version_name_locator.fill(version_name)
 
-    logging.info("Submitting the add draft form")
-    submit_button_locator = page.locator('input[type="submit"][value="Create candidate draft"]')
+    logging.info("Submitting the start new release form")
+    submit_button_locator = page.locator('input[type="submit"][value="Start new release"]')
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 

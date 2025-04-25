@@ -15,7 +15,7 @@
              class="text-decoration-none">
             {# TODO: We're only setting data-project-url for style #}
             <div class="card h-100 shadow-sm atr-cursor-pointer"
-                 data-project-url="{{ as_url(routes.draft.add, project=project.name) }}">
+                 data-project-url="{{ as_url(routes.release.select, project_name=project.name) }}">
               <div class="card-body">
                 <h3 class="card-title fs-5 mb-2">{{ project.display_name }}</h3>
                 <h4 class="card-subtitle mb-2 text-muted fs-6">{{ project.name }}</h4>
