@@ -28,6 +28,7 @@ import atr.routes.release as release
 import atr.routes.report as report
 import atr.routes.revisions as revisions
 import atr.routes.root as root
+import atr.routes.start as start
 import atr.routes.upload as upload
 
 
