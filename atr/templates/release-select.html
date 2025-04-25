@@ -29,7 +29,7 @@
         {% set phase = release.phase.value %}
         {% set target_url = None %}
         {% if phase == "release_candidate_draft" %}
-          {% set target_url = as_url(routes.draft.evaluate, project_name=project.name, version_name=release.version) %}
+          {% set target_url = as_url(routes.compose.release, project_name=project.name, version_name=release.version) %}
           {% set badge_class = "bg-primary" %}
         {% elif phase == "release_candidate" %}
           {% set target_url = as_url(routes.candidate.resolve) %}

@@ -25,7 +25,6 @@ import datetime
 import hashlib
 import logging
 import pathlib
-import re
 from typing import TYPE_CHECKING, Protocol, TypeVar
 
 import aiofiles.os
@@ -256,98 +255,6 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
         )
     return await session.redirect(
         compose.release, success=success_message, project_name=project_name, version_name=version_name
-    )
-
-
-@routes.committer("/draft/evaluate/<project_name>/<version_name>")
-async def evaluate(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
-    """Evaluate all the files in the rsync upload directory for a release."""
-    await session.check_access(project_name)
-    release = await session.release(project_name, version_name, with_committee=True, with_project=False)
-
-    base_path = util.release_directory(release)
-    paths = await util.paths_recursive(base_path)
-    # paths_set = set(paths)
-    path_templates = {}
-    path_substitutions = {}
-    path_artifacts = set()
-    path_metadata = set()
-    path_modified = {}
-    path_successes = {}
-    path_warnings = {}
-    path_errors = {}
-    for path in paths:
-        # Get template and substitutions
-        elements = {
-            "core": project_name,
-            "version": version_name,
-            "sub": None,
-            "template": None,
-            "substitutions": None,
-        }
-        template, substitutions = analysis.filename_parse(str(path), elements)
-        path_templates[path] = template
-        path_substitutions[path] = analysis.substitutions_format(substitutions) or "none"
-
-        # Get artifacts and metadata
-        search = re.search(analysis.extension_pattern(), str(path))
-        ext_artifact = None
-        ext_metadata = None
-        if search:
-            ext_artifact = search.group("artifact")
-            # ext_metadata_artifact = search.group("metadata_artifact")
-            ext_metadata = search.group("metadata")
-            if ext_artifact:
-                path_artifacts.add(path)
-            elif ext_metadata:
-                path_metadata.add(path)
-
-        # Get modified time
-        full_path = str(util.release_directory(release) / path)
-        path_modified[path] = int(await aiofiles.os.path.getmtime(full_path))
-
-        # Get successes, warnings, and errors
-        async with db.session() as data:
-            path_successes[path] = await data.check_result(
-                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.SUCCESS
-            ).all()
-            path_warnings[path] = await data.check_result(
-                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.WARNING
-            ).all()
-            path_errors[path] = await data.check_result(
-                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.FAILURE
-            ).all()
-
-    revision_name_from_link, revision_editor, revision_time = await revision.latest_info(project_name, version_name)
-
-    # Get the number of ongoing tasks for the current revision
-    ongoing_tasks_count = 0
-    if revision_name_from_link:
-        ongoing_tasks_count = await db.tasks_ongoing(project_name, version_name, revision_name_from_link)
-
-    delete_file_form = await DeleteFileForm.create_form()
-    return await quart.render_template(
-        "draft-evaluate.html",
-        asf_id=session.uid,
-        project_name=project_name,
-        version_name=version_name,
-        release=release,
-        paths=paths,
-        server_domain=session.host,
-        templates=path_templates,
-        substitutions=path_substitutions,
-        artifacts=path_artifacts,
-        metadata=path_metadata,
-        successes=path_successes,
-        warnings=path_warnings,
-        errors=path_errors,
-        modified=path_modified,
-        models=models,
-        delete_file_form=delete_file_form,
-        revision_editor=revision_editor,
-        revision_time=revision_time,
-        revision_name_from_link=revision_name_from_link,
-        ongoing_tasks_count=ongoing_tasks_count,
     )
 
 

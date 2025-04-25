@@ -502,21 +502,21 @@ def test_checks_01_hashing_sha512(page: sync_api.Page, credentials: Credentials)
     project_name = "tooling-test-example"
     version_name = "0.2"
     filename_sha512 = f"apache-{project_name}-{version_name}.tar.gz.sha512"
-    evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
+    compose_path = f"/compose/{project_name}/{version_name}"
     report_file_path = f"/report/{project_name}/{version_name}/{filename_sha512}"
 
     logging.info(f"Starting hashing check test for {filename_sha512}")
 
-    logging.info(f"Navigating to evaluate page {evaluate_page_path}")
-    go_to_path(page, evaluate_page_path)
+    logging.info(f"Navigating to compose page {compose_path}")
+    go_to_path(page, compose_path)
 
-    logging.info(f"Locating 'Evaluate file' link for {filename_sha512}")
+    logging.info(f"Locating 'Show report' link for {filename_sha512}")
     row_locator = page.locator(f"tr:has(:text('{filename_sha512}'))")
-    evaluate_link_title = f"Evaluate file {filename_sha512}"
+    evaluate_link_title = f"Show report for {filename_sha512}"
     evaluate_link_locator = row_locator.locator(f'a[title="{evaluate_link_title}"]')
     sync_api.expect(evaluate_link_locator).to_be_visible()
 
-    logging.info(f"Clicking 'Evaluate file' link for {filename_sha512}")
+    logging.info(f"Clicking 'Show report' link for {filename_sha512}")
     evaluate_link_locator.click()
 
     logging.info(f"Waiting for navigation to {report_file_path}")
@@ -537,21 +537,21 @@ def test_checks_02_license_files(page: sync_api.Page, credentials: Credentials) 
     project_name = "tooling-test-example"
     version_name = "0.2"
     filename_targz = f"apache-{project_name}-{version_name}.tar.gz"
-    evaluate_page_path = f"/draft/evaluate/{project_name}/{version_name}"
+    compose_path = f"/compose/{project_name}/{version_name}"
     report_file_path = f"/report/{project_name}/{version_name}/{filename_targz}"
 
     logging.info(f"Starting License Files check test for {filename_targz}")
 
-    logging.info(f"Navigating to evaluate page {evaluate_page_path}")
-    go_to_path(page, evaluate_page_path)
+    logging.info(f"Navigating to compose page {compose_path}")
+    go_to_path(page, compose_path)
 
-    logging.info(f"Locating 'Evaluate file' link for {filename_targz}")
+    logging.info(f"Locating 'Show report' link for {filename_targz}")
     row_locator = page.locator(f"tr:has(:text('{filename_targz}'))")
-    evaluate_link_title = f"Evaluate file {filename_targz}"
+    evaluate_link_title = f"Show report for {filename_targz}"
     evaluate_link_locator = row_locator.locator(f'a[title="{evaluate_link_title}"]')
     sync_api.expect(evaluate_link_locator).to_be_visible()
 
-    logging.info(f"Clicking 'Evaluate file' link for {filename_targz}")
+    logging.info(f"Clicking 'Show report' link for {filename_targz}")
     evaluate_link_locator.click()
 
     logging.info(f"Waiting for navigation to {report_file_path}")
@@ -966,10 +966,10 @@ def test_ssh_02_rsync_upload(page: sync_api.Page, credentials: Credentials) -> N
         logging.error("rsync command not found. Is rsync installed in the container?")
         raise RuntimeError("rsync command not found")
 
-    logging.info(f"Navigating to evaluate page for {project_name}-{version_name}")
-    evaluate_path = f"/draft/evaluate/{project_name}/{version_name}"
-    go_to_path(page, evaluate_path)
-    logging.info(f"Checking for uploaded files on {evaluate_path}")
+    logging.info(f"Navigating to compose page for {project_name}-{version_name}")
+    compose_path = f"/compose/{project_name}/{version_name}"
+    go_to_path(page, compose_path)
+    logging.info(f"Checking for uploaded files on {compose_path}")
 
     # Check for the existence of the files in the table using exact match
     file1_locator = page.get_by_role("cell", name=file1, exact=True)
@@ -981,7 +981,7 @@ def test_ssh_02_rsync_upload(page: sync_api.Page, credentials: Credentials) -> N
     logging.info(f"Found file: {file2}")
     logging.info("rsync upload test completed successfully")
 
-    logging.info(f"Extracting latest revision from {evaluate_path}")
+    logging.info(f"Extracting latest revision from {compose_path}")
     revision_link_locator = page.locator(f'a[href^="/revisions/{project_name}/{version_name}#"]')
     sync_api.expect(revision_link_locator).to_be_visible()
     revision_href = revision_link_locator.get_attribute("href")

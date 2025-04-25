@@ -182,7 +182,8 @@
                            class="btn btn-sm btn-outline-warning">Show {{ warnings[path]|length }} {{ "warning" if warnings[path]|length == 1 else "warnings" }}</a>
                       {% elif successes[path] %}
                         <a href="{{ as_url(routes.draft.evaluate_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
-                           class="btn btn-sm btn-outline-success">Show report</a>
+                           class="btn btn-sm btn-outline-success"
+                           title="Show report for {{ path }}">Show report</a>
                       {% else %}
                         <span class="btn btn-sm btn-outline-secondary disabled">No checks run</span>
                       {% endif %}

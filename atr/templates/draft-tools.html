@@ -9,8 +9,8 @@
 {% endblock description %}
 
 {% block content %}
-  <a href="{{ as_url(routes.draft.evaluate, project_name=project_name, version_name=version_name) }}"
-     class="atr-back-link">← Back to Draft evaluation</a>
+  <a href="{{ as_url(routes.compose.release, project_name=project_name, version_name=version_name) }}"
+     class="atr-back-link">← Back to Compose release</a>
 
   <div class="p-3 mb-4 bg-light border rounded">
     <h2 class="mt-0">File details</h2>
