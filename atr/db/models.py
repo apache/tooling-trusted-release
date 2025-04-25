@@ -148,12 +148,17 @@ class Project(sqlmodel.SQLModel, table=True):
     # Then we can use simply "name" for full_name, and make it str rather than str | None
     name: str = sqlmodel.Field(unique=True, primary_key=True)
     # TODO: Ideally full_name would be unique for str only, but that's complex
+    # We always include "Apache" in the full_name
     full_name: str | None = sqlmodel.Field(default=None)
 
     # True if this a podling project
     # TODO: We should have this on Committee too, or instead
     is_podling: bool = sqlmodel.Field(default=False)
     is_retired: bool = sqlmodel.Field(default=False)
+
+    super_project_name: str | None = sqlmodel.Field(default=None, foreign_key="project.name")
+    # NOTE: Neither "Project" | None nor "Project | None" works
+    super_project: Optional["Project"] = sqlmodel.Relationship()
 
     description: str | None = sqlmodel.Field(default=None)
     category: str | None = sqlmodel.Field(default=None)

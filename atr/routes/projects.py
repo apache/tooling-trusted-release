@@ -278,6 +278,9 @@ async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
         if not base_project:
             # This should not happen
             raise RuntimeError(f"Base project {base_project_name} not found")
+        if base_project.super_project_name:
+            await quart.flash(f"Project {base_project.name} is already a derived project", "error")
+            return quart.redirect(util.as_url(add_project, project_name=base_project.name))
 
         # Construct the new label
         derived_label = _generate_label(derived_project_name)
@@ -313,6 +316,7 @@ async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
             full_name=new_project_full_name,
             is_podling=base_project.is_podling,
             is_retired=base_project.is_retired,
+            super_project_name=base_project.name,
             description=base_project.description,
             category=base_project.category,
             programming_languages=base_project.programming_languages,
