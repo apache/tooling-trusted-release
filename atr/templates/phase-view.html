@@ -23,7 +23,7 @@
       </span>
     {% elif phase_key == "candidate" %}
       <a href="{{ as_url(routes.resolve.selected, project_name=release.project.name, version_name=release.version) }}"
-         class="atr-back-link">← Back to Resolve {{ release.short_display_name }}</a>
+         class="atr-back-link">← Back to Resolve vote for {{ release.short_display_name }}</a>
       <span>
         <span class="atr-phase-symbol-other">①</span>
         <span class="atr-phase-arrow">→</span>
