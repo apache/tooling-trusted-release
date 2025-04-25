@@ -48,7 +48,7 @@
                  title="Project for {{ release.project.display_name }} {{ release.version }}"
                  class="btn btn-sm btn-outline-secondary">Project</a>
               <br />
-              <a href="{{ as_url(routes.draft.add_files, project_name=release.project.name, version_name=release.version) }}"
+              <a href="{{ as_url(routes.upload.release, project_name=release.project.name, version_name=release.version) }}"
                  title="Add files to {{ release.project.display_name }} {{ release.version }}"
                  class="btn btn-sm btn-outline-primary">Add files</a>
               <a href="{{ as_url(routes.draft.vote_start, project_name=release.project.name, version=release.version, revision=release.revision) }}"
