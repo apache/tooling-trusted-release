@@ -281,6 +281,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         _committee: bool = False,
         _releases: bool = False,
         _distribution_channels: bool = False,
+        _super_project: bool = False,
         _vote_policy: bool = False,
         _committee_public_signing_keys: bool = False,
     ) -> Query[models.Project]:
@@ -303,6 +304,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.options(select_in_load(models.Project.releases))
         if _distribution_channels:
             query = query.options(select_in_load(models.Project.distribution_channels))
+        if _super_project:
+            query = query.options(select_in_load(models.Project.super_project))
         if _vote_policy:
             query = query.options(select_in_load(models.Project.vote_policy))
         if _committee_public_signing_keys:

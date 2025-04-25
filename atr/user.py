@@ -59,11 +59,11 @@ def is_committer(committee: models.Committee | None, uid: str) -> bool:
     return any((committer_uid == uid) for committer_uid in committee.committers)
 
 
-async def projects(uid: str, committee_only: bool = False) -> list[models.Project]:
+async def projects(uid: str, committee_only: bool = False, super_project: bool = False) -> list[models.Project]:
     user_projects: list[models.Project] = []
     async with db.session() as data:
         # Must have releases, because this is used in candidate_drafts
-        projects = await data.project(_committee=True, _releases=True).all()
+        projects = await data.project(_committee=True, _releases=True, _super_project=super_project).all()
         for p in projects:
             if p.committee is None:
                 continue
