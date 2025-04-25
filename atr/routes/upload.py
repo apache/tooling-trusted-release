@@ -99,7 +99,7 @@ async def release(session: routes.CommitterSession, project_name: str, version_n
     release = await session.release(project_name, version_name)
 
     return await quart.render_template(
-        "draft-add-files.html",
+        "upload-release.html",
         asf_id=session.uid,
         server_domain=session.host,
         release=release,
