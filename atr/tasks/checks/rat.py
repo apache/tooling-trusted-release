@@ -223,6 +223,8 @@ def _check_core_logic_execute_rat(
 
     # Run Apache RAT on the extracted directory
     # Use -x flag for XML output and -o to specify the output file
+    # TODO: From RAT 0.17, --exclude will become --input-exclude
+    # TODO: Check whether --exclude NAME works on inner files
     command = [
         "java",
         *_JAVA_MEMORY_ARGS,
@@ -233,6 +235,10 @@ def _check_core_logic_execute_rat(
         "-x",
         "-o",
         xml_output_path,
+        "--exclude",
+        "LICENSE",
+        "--exclude",
+        "NOTICE",
     ]
     _LOGGER.info(f"Running Apache RAT: {' '.join(command)}")
 
