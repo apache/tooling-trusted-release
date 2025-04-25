@@ -57,17 +57,10 @@ class LDAPProject(pydantic.BaseModel):
     podling: str | None = None
 
 
-class CommitteeData(pydantic.BaseModel):
-    last_updated: str
-    committee_count: int
-    pmc_count: int
-    committees: Annotated[list[Committee], util.DictToList(key="name")]
-
-
-class RetiredCommitteeData(pydantic.BaseModel):
-    last_updated: str
-    retired_count: int
-    retired: Annotated[list[RetiredCommittee], util.DictToList(key="name")]
+class User(pydantic.BaseModel):
+    id: str
+    name: str
+    date: str | None = None
 
 
 class Committee(pydantic.BaseModel):
@@ -84,10 +77,11 @@ class Committee(pydantic.BaseModel):
     pmc: bool
 
 
-class User(pydantic.BaseModel):
-    id: str
-    name: str
-    date: str | None = None
+class CommitteeData(pydantic.BaseModel):
+    last_updated: str
+    committee_count: int
+    pmc_count: int
+    committees: Annotated[list[Committee], util.DictToList(key="name")]
 
 
 class RetiredCommittee(pydantic.BaseModel):
@@ -95,6 +89,12 @@ class RetiredCommittee(pydantic.BaseModel):
     display_name: str
     retired: str
     description: str | None
+
+
+class RetiredCommitteeData(pydantic.BaseModel):
+    last_updated: str
+    retired_count: int
+    retired: Annotated[list[RetiredCommittee], util.DictToList(key="name")]
 
 
 class PodlingStatus(pydantic.BaseModel):
