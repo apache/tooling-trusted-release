@@ -122,25 +122,6 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     return await session.redirect(root.index, success="Preview deleted successfully")
 
 
-@routes.committer("/previews")
-async def previews(session: routes.CommitterSession) -> str:
-    """View all release previews to which the user has access."""
-    async with db.session() as data:
-        # Get all releases where the user is a PMC member or committer
-        releases = await data.release(
-            stage=models.ReleaseStage.RELEASE,
-            phase=models.ReleasePhase.RELEASE_PREVIEW,
-            _committee=True,
-            _packages=True,
-        ).all()
-    user_previews = session.only_user_releases(releases)
-
-    return await quart.render_template(
-        "previews.html",
-        previews=user_previews,
-    )
-
-
 @routes.committer("/finish/<project_name>/<version_name>", methods=["GET", "POST"])
 async def finish_release(
     session: routes.CommitterSession, project_name: str, version_name: str
@@ -159,7 +140,7 @@ async def finish_release(
             unique_dirs.add(path.parent)
     except FileNotFoundError:
         await quart.flash("Preview revision directory not found.", "error")
-        return await session.redirect(previews)
+        return await session.redirect(root.index)
 
     form = await MoveFileForm.create_form(data=await quart.request.form if (quart.request.method == "POST") else None)
 
