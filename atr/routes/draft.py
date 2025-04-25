@@ -258,57 +258,6 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
     )
 
 
-@routes.committer("/report/<project_name>/<version_name>/<path:rel_path>")
-async def evaluate_path(session: routes.CommitterSession, project_name: str, version_name: str, rel_path: str) -> str:
-    """Evaluate the status of all checks for a specific file."""
-    await session.check_access(project_name)
-    release = await session.release(project_name, version_name)
-
-    # TODO: When we do more than one thing in a dir, we should use the revision directory directly
-    abs_path = util.release_directory(release) / rel_path
-
-    # Check that the file exists
-    if not await aiofiles.os.path.exists(abs_path):
-        raise base.ASFQuartException("File does not exist", errorcode=404)
-
-    modified = int(await aiofiles.os.path.getmtime(abs_path))
-    file_size = await aiofiles.os.path.getsize(abs_path)
-
-    # Get all check results for this file
-    async with db.session() as data:
-        query = data.check_result(release_name=release.name, primary_rel_path=str(rel_path)).order_by(
-            db.validate_instrumented_attribute(models.CheckResult.checker).asc(),
-            db.validate_instrumented_attribute(models.CheckResult.created).desc(),
-        )
-        all_results = await query.all()
-
-    # Filter to get only the most recent result for each checker
-    latest_check_results: dict[str, models.CheckResult] = {}
-    for result in all_results:
-        if result.checker not in latest_check_results:
-            latest_check_results[result.checker] = result
-
-    # Convert to a list for the template
-    check_results_list = list(latest_check_results.values())
-
-    file_data = {
-        "filename": pathlib.Path(rel_path).name,
-        "bytes_size": file_size,
-        "uploaded": datetime.datetime.fromtimestamp(modified, tz=datetime.UTC),
-    }
-
-    return await quart.render_template(
-        "draft-evaluate-path.html",
-        project_name=project_name,
-        version_name=version_name,
-        rel_path=rel_path,
-        package=file_data,
-        release=release,
-        check_results=check_results_list,
-        format_file_size=routes.format_file_size,
-    )
-
-
 @routes.committer("/draft/fresh/<project_name>/<version_name>", methods=["POST"])
 async def fresh(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
     """Restart all checks for a whole release candidate draft."""

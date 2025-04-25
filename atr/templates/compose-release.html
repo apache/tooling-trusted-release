@@ -175,13 +175,13 @@
                   <td class="text-end text-nowrap py-2">
                     <div class="d-flex justify-content-end align-items-center gap-2">
                       {% if has_errors %}
-                        <a href="{{ as_url(routes.draft.evaluate_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                        <a href="{{ as_url(routes.report.release_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                            class="btn btn-sm btn-outline-danger"><i class="fas fa-exclamation-triangle me-1"></i> Show {{ errors[path]|length }} {{ "error" if errors[path]|length == 1 else "errors" }}</a>
                       {% elif has_warnings %}
-                        <a href="{{ as_url(routes.draft.evaluate_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                        <a href="{{ as_url(routes.report.release_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                            class="btn btn-sm btn-outline-warning">Show {{ warnings[path]|length }} {{ "warning" if warnings[path]|length == 1 else "warnings" }}</a>
                       {% elif successes[path] %}
-                        <a href="{{ as_url(routes.draft.evaluate_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                        <a href="{{ as_url(routes.report.release_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                            class="btn btn-sm btn-outline-success"
                            title="Show report for {{ path }}">Show report</a>
                       {% else %}
