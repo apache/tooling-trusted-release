@@ -28,7 +28,7 @@ import wtforms
 
 import atr.revision as revision
 import atr.routes as routes
-import atr.routes.draft as draft
+import atr.routes.compose as compose
 import atr.util as util
 
 
@@ -86,7 +86,7 @@ async def release(session: routes.CommitterSession, project_name: str, version_n
 
             number_of_files = await _upload_files(project_name, version_name, session.uid, file_name, file_data)
             return await session.redirect(
-                draft.compose,
+                compose.release,
                 success=f"{number_of_files} file{'' if number_of_files == 1 else 's'} added successfully",
                 project_name=project_name,
                 version_name=version_name,

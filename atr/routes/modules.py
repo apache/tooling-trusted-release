@@ -18,6 +18,7 @@
 # These are imported for their side effects and for access in templates
 import atr.routes.candidate as candidate
 import atr.routes.committees as committees
+import atr.routes.compose as compose
 import atr.routes.download as download
 import atr.routes.draft as draft
 import atr.routes.keys as keys

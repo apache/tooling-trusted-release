@@ -32,7 +32,7 @@ import atr.db as db
 import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
-import atr.routes.draft as draft
+import atr.routes.compose as compose
 import atr.routes.preview as preview
 import atr.util as util
 
@@ -269,7 +269,7 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
             else:
                 release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
                 success_message = "Vote marked as failed"
-                destination = draft.compose
+                destination = compose.release
 
     await _resolve_post_files(project_name, release, source, vote_result, session.uid)
     return await session.redirect(

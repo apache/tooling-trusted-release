@@ -42,6 +42,7 @@ import atr.mail as mail
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.candidate as candidate
+import atr.routes.compose as compose
 import atr.routes.upload as upload
 import atr.tasks.sbom as sbom
 import atr.tasks.vote as tasks_vote
@@ -100,92 +101,6 @@ class StartReleaseForm(util.QuartFormTyped):
         ],
     )
     submit = wtforms.SubmitField("Start new release")
-
-
-# TODO: Rename to compose.release?
-@routes.committer("/compose/<project_name>/<version_name>")
-async def compose(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
-    """Show the contents of the release candidate draft."""
-    await session.check_access(project_name)
-    release = await session.release(project_name, version_name)
-
-    base_path = util.release_directory(release)
-    paths = await util.paths_recursive(base_path)
-    path_templates = {}
-    path_substitutions = {}
-    path_artifacts = set()
-    path_metadata = set()
-    path_successes = {}
-    path_warnings = {}
-    path_errors = {}
-
-    for path in paths:
-        # Get template and substitutions
-        elements = {
-            "core": project_name,
-            "version": version_name,
-            "sub": None,
-            "template": None,
-            "substitutions": None,
-        }
-        template, substitutions = analysis.filename_parse(str(path), elements)
-        path_templates[path] = template
-        path_substitutions[path] = analysis.substitutions_format(substitutions) or "none"
-
-        # Get artifacts and metadata
-        search = re.search(analysis.extension_pattern(), str(path))
-        if search:
-            if search.group("artifact"):
-                path_artifacts.add(path)
-            elif search.group("metadata"):
-                path_metadata.add(path)
-
-        # Get successes, warnings, and errors
-        async with db.session() as data:
-            path_successes[path] = await data.check_result(
-                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.SUCCESS
-            ).all()
-            path_warnings[path] = await data.check_result(
-                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.WARNING
-            ).all()
-            path_errors[path] = await data.check_result(
-                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.FAILURE
-            ).all()
-
-    revision_name_from_link, revision_editor, revision_time = await revision.latest_info(project_name, version_name)
-
-    # Get the number of ongoing tasks for the current revision
-    ongoing_tasks_count = 0
-    if revision_name_from_link:
-        ongoing_tasks_count = await db.tasks_ongoing(project_name, version_name, revision_name_from_link)
-
-    delete_draft_form = await DeleteForm.create_form()
-    delete_file_form = await DeleteFileForm.create_form()
-
-    return await quart.render_template(
-        "draft-content.html",
-        project_name=project_name,
-        version_name=version_name,
-        release=release,
-        paths=paths,
-        artifacts=path_artifacts,
-        metadata=path_metadata,
-        successes=path_successes,
-        warnings=path_warnings,
-        errors=path_errors,
-        templates=path_templates,
-        substitutions=path_substitutions,
-        revision_editor=revision_editor,
-        revision_time=revision_time,
-        revision_name_from_link=revision_name_from_link,
-        ongoing_tasks_count=ongoing_tasks_count,
-        delete_form=delete_draft_form,
-        delete_file_form=delete_file_form,
-        asf_id=session.uid,
-        server_domain=session.host,
-        format_datetime=routes.format_datetime,
-        models=models,
-    )
 
 
 async def create_release_draft(project_name: str, version: str, asf_uid: str) -> tuple[models.Release, models.Project]:
@@ -292,7 +207,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
 
     form = await DeleteFileForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
-        return await session.redirect(compose, project_name=project_name, version_name=version_name)
+        return await session.redirect(compose.release, project_name=project_name, version_name=version_name)
 
     rel_path_to_delete = pathlib.Path(str(form.file_path.data))
     metadata_files_deleted = 0
@@ -330,7 +245,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
     except Exception as e:
         logging.exception("Error deleting file:")
         await quart.flash(f"Error deleting file: {e!s}", "error")
-        return await session.redirect(compose, project_name=project_name, version_name=version_name)
+        return await session.redirect(compose.release, project_name=project_name, version_name=version_name)
 
     success_message = f"File '{rel_path_to_delete.name}' deleted successfully"
     if metadata_files_deleted:
@@ -339,7 +254,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
             f"file{'' if metadata_files_deleted == 1 else 's'} deleted"
         )
     return await session.redirect(
-        compose, success=success_message, project_name=project_name, version_name=version_name
+        compose.release, success=success_message, project_name=project_name, version_name=version_name
     )
 
 
@@ -525,7 +440,7 @@ async def fresh(session: routes.CommitterSession, project_name: str, version_nam
         ...
 
     return await session.redirect(
-        compose,
+        compose.release,
         project_name=project_name,
         version_name=version_name,
         success="All checks restarted",
@@ -582,10 +497,10 @@ async def hashgen(
     except Exception as e:
         logging.exception("Error generating hash file:")
         await quart.flash(f"Error generating hash file: {e!s}", "error")
-        return await session.redirect(compose, project_name=project_name, version_name=version_name)
+        return await session.redirect(compose.release, project_name=project_name, version_name=version_name)
 
     return await session.redirect(
-        compose,
+        compose.release,
         success=f"{hash_type} file generated successfully",
         project_name=project_name,
         version_name=version_name,
@@ -780,10 +695,10 @@ async def sbomgen(
     except Exception as e:
         logging.exception("Error generating SBOM:")
         await quart.flash(f"Error generating SBOM: {e!s}", "error")
-        return await session.redirect(compose, project_name=project_name, version_name=version_name)
+        return await session.redirect(compose.release, project_name=project_name, version_name=version_name)
 
     return await session.redirect(
-        compose,
+        compose.release,
         success=f"SBOM generation task queued for {rel_path.name}",
         project_name=project_name,
         version_name=version_name,
@@ -815,7 +730,7 @@ async def start(session: routes.CommitterSession, project_name: str) -> response
             )[0]
             # Redirect to the new draft's overview page on success
             return await session.redirect(
-                compose,
+                compose.release,
                 project_name=project.name,
                 version_name=new_release.version,
                 success="Release candidate draft created successfully",
@@ -875,7 +790,7 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
         )
 
     return await session.redirect(
-        compose,
+        compose.release,
         success="SVN import task queued successfully",
         project_name=project_name,
         version_name=version_name,
@@ -1014,7 +929,9 @@ async def vote_start(
         # TODO: Consider relaxing this to all committers
         # Otherwise we must not show the vote form
         if not user.is_committee_member(release.committee, session.uid):
-            return await session.redirect(compose, error="You must be on the PMC of this project to start a vote")
+            return await session.redirect(
+                compose.release, error="You must be on the PMC of this project to start a vote"
+            )
         committee = util.unwrap(release.committee)
 
         sender = f"{session.uid}@apache.org"
@@ -1151,7 +1068,7 @@ Thanks,
             if email_to == sender:
                 # Test email, with no promotion
                 return await session.redirect(
-                    compose,
+                    compose.release,
                     success=f"The vote announcement email will soon be sent to {email_to}. "
                     "This is a test, and the release is not being voted on.",
                     project_name=project_name,
