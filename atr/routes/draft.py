@@ -356,7 +356,7 @@ async def create_release_draft(project_name: str, version: str, asf_uid: str) ->
         async with db.session() as data:
             async with data.begin():
                 # Check whether the release already exists
-                if release := await data.release(project_id=project.id, version=version).get():
+                if release := await data.release(project_name=project.name, version=version).get():
                     if release.phase == models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
                         raise routes.FlashError(f"A draft for {project_name} {version} already exists.")
                     else:
@@ -372,7 +372,7 @@ async def create_release_draft(project_name: str, version: str, asf_uid: str) ->
                 release = models.Release(
                     stage=models.ReleaseStage.RELEASE_CANDIDATE,
                     phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
-                    project_id=project.id,
+                    project_name=project.name,
                     project=project,
                     version=version,
                     created=datetime.datetime.now(datetime.UTC),
@@ -1125,7 +1125,7 @@ async def vote_start(
     await session.check_access(project_name)
     async with db.session() as data:
         project = await data.project(name=project_name).demand(routes.FlashError("Project not found"))
-        release = await data.release(project_id=project.id, version=version, _committee=True).demand(
+        release = await data.release(project_name=project.name, version=version, _committee=True).demand(
             routes.FlashError("Release candidate not found")
         )
         # Check that the user is on the project committee for the release

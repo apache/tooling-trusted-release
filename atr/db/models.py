@@ -144,9 +144,9 @@ class Committee(sqlmodel.SQLModel, table=True):
 
 
 class Project(sqlmodel.SQLModel, table=True):
-    id: int = sqlmodel.Field(default=None, primary_key=True)
-    # TODO: Make name the primary key, and remove id
-    name: str = sqlmodel.Field(unique=True)
+    # TODO: Consider using key or label for primary string keys
+    # Then we can use simply "name" for full_name, and make it str rather than str | None
+    name: str = sqlmodel.Field(unique=True, primary_key=True)
     # TODO: Ideally full_name would be unique for str only, but that's complex
     full_name: str | None = sqlmodel.Field(default=None)
 
@@ -195,7 +195,7 @@ class Project(sqlmodel.SQLModel, table=True):
         query = (
             sqlmodel.select(Release)
             .where(
-                Release.project_id == self.id,
+                Release.project_name == self.name,
                 Release.phase == phase,
             )
             .order_by(db.validate_instrumented_attribute(Release.created).desc())
@@ -249,7 +249,7 @@ class DistributionChannel(sqlmodel.SQLModel, table=True):
     automation_endpoint: str
 
     # Many-to-one: A distribution channel belongs to one project, a project can have multiple channels
-    project_id: int = sqlmodel.Field(foreign_key="project.id")
+    project_name: str = sqlmodel.Field(foreign_key="project.name")
     project: Project = sqlmodel.Relationship(back_populates="distribution_channels")
 
 
@@ -398,7 +398,7 @@ class Release(sqlmodel.SQLModel, table=True):
     created: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
 
     # Many-to-one: A release belongs to one project, a project can have multiple releases
-    project_id: int = sqlmodel.Field(foreign_key="project.id")
+    project_name: str = sqlmodel.Field(foreign_key="project.name")
     project: Project = sqlmodel.Relationship(back_populates="releases")
 
     package_managers: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
@@ -431,10 +431,8 @@ class Release(sqlmodel.SQLModel, table=True):
     # One-to-many: A release can have multiple check results
     check_results: list["CheckResult"] = sqlmodel.Relationship(back_populates="release")
 
-    # The combination of project_id and version must be unique
-    # Technically we want (project.name, version) to be unique
-    # But project.name is already unique, so project_id works as a proxy thereof
-    __table_args__ = (sqlalchemy.UniqueConstraint("project_id", "version", name="unique_project_version"),)
+    # The combination of project_name and version must be unique
+    __table_args__ = (sqlalchemy.UniqueConstraint("project_name", "version", name="unique_project_version"),)
 
     @property
     def committee(self) -> Committee | None:

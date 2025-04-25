@@ -273,7 +273,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def project(
         self,
-        id: Opt[int] = NOT_SET,
         name: Opt[str] = NOT_SET,
         full_name: Opt[str] = NOT_SET,
         is_podling: Opt[bool] = NOT_SET,
@@ -287,8 +286,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
     ) -> Query[models.Project]:
         query = sqlmodel.select(models.Project)
 
-        if is_defined(id):
-            query = query.where(models.Project.id == id)
         if is_defined(name):
             query = query.where(models.Project.name == name)
         if is_defined(full_name):
@@ -355,7 +352,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         stage: Opt[models.ReleaseStage] = NOT_SET,
         phase: Opt[models.ReleasePhase] = NOT_SET,
         created: Opt[datetime.datetime] = NOT_SET,
-        project_id: Opt[int] = NOT_SET,
+        project_name: Opt[str] = NOT_SET,
         package_managers: Opt[list[str]] = NOT_SET,
         version: Opt[str] = NOT_SET,
         revision: Opt[str] = NOT_SET,
@@ -378,8 +375,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Release.phase == phase)
         if is_defined(created):
             query = query.where(models.Release.created == created)
-        if is_defined(project_id):
-            query = query.where(models.Release.project_id == project_id)
+        if is_defined(project_name):
+            query = query.where(models.Release.project_name == project_name)
         if is_defined(package_managers):
             query = query.where(models.Release.package_managers == package_managers)
         if is_defined(version):
@@ -704,7 +701,7 @@ async def unfinished_releases(asfuid: str) -> dict[str, list[models.Release]]:
             stmt = (
                 sqlmodel.select(models.Release)
                 .where(
-                    models.Release.project_id == project.id,
+                    models.Release.project_name == project.name,
                     validate_instrumented_attribute(models.Release.phase).in_(active_phases),
                 )
                 .options(select_in_load(models.Release.project))

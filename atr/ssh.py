@@ -218,7 +218,7 @@ async def _command_validate(
             # Projects are public, so existence information is public
             _fail(process, "This project does not exist", None)
             return None
-        release = await data.release(project_id=project.id, version=path_version).get()
+        release = await data.release(project_name=project.name, version=path_version).get()
         # The SSH UID has also been validated by SSH as being the ASF UID
         # Since users can only set an SSH key when authenticated using ASF OAuth
         ssh_uid = process.get_extra_info("username")
@@ -256,7 +256,7 @@ async def _ensure_release_object(process: asyncssh.SSHServerProcess, project_nam
                         raise RuntimeError(f'Invalid version name "{version_name}": {version_name_error}')
                     # Create a new release object
                     release = models.Release(
-                        project_id=project.id,
+                        project_name=project.name,
                         project=project,
                         version=version_name,
                         stage=models.ReleaseStage.RELEASE_CANDIDATE,

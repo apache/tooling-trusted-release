@@ -57,7 +57,7 @@ async def index() -> response.Response | str:
                 stmt = (
                     sqlmodel.select(models.Release)
                     .where(
-                        models.Release.project_id == project.id,
+                        models.Release.project_name == project.name,
                         db.validate_instrumented_attribute(models.Release.phase).in_(active_phases),
                     )
                     .options(selectinload(db.validate_instrumented_attribute(models.Release.project)))
@@ -66,7 +66,7 @@ async def index() -> response.Response | str:
                 result = await data.execute(stmt)
                 active_releases = result.scalars().all()
                 completed_releases = (
-                    len(await data.release(phase=models.ReleasePhase.RELEASE, project_id=project.id).all()) > 0
+                    len(await data.release(phase=models.ReleasePhase.RELEASE, project_name=project.name).all()) > 0
                 )
 
                 if active_releases:

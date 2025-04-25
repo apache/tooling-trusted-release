@@ -79,7 +79,7 @@ async def completed(session: routes.CommitterSession, project_name: str) -> str:
         )
 
         releases = await data.release(
-            project_id=project.id,
+            project_name=project.name,
             phase=models.ReleasePhase.RELEASE,
             _committee=True,
             _packages=True,
