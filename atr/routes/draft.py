@@ -660,8 +660,8 @@ async def fresh(session: routes.CommitterSession, project_name: str, version_nam
     # This doesn't make sense unless the checks themselves have been updated
     # Therefore we only show the button for this to admins
     async with revision.create_and_manage(project_name, version_name, session.uid) as (
-        new_revision_dir,
-        new_revision_name,
+        _new_revision_dir,
+        _new_revision_name,
     ):
         ...
 
