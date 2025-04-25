@@ -98,7 +98,7 @@
                   <td>
                     {% if stat.is_file %}
                       {% if phase_key == "draft" %}
-                        {% set file_url = as_url(routes.draft.view_path, project_name=release.project.name, version_name=release.version, file_path=stat.path) %}
+                        {% set file_url = as_url(routes.file.selected_path, project_name=release.project.name, version_name=release.version, file_path=stat.path) %}
                       {% elif phase_key == "candidate" %}
                         {% set file_url = as_url(routes.candidate.view_path, project_name=release.project.name, version_name=release.version, file_path=stat.path) %}
                       {% elif phase_key == "preview" %}

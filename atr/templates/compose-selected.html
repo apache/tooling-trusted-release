@@ -162,7 +162,7 @@
                     {% endif %}
                   </td>
                   <td class="py-2">
-                    <a href="{{ as_url(routes.draft.view_path, project_name=project_name, version_name=version_name, file_path=path) }}"
+                    <a href="{{ as_url(routes.file.selected_path, project_name=project_name, version_name=version_name, file_path=path) }}"
                        title="View file {{ path }}"
                        class="text-decoration-none text-reset">
                       {% if has_errors or has_warnings %}

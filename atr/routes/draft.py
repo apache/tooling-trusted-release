@@ -458,40 +458,6 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     )
 
 
-@routes.committer("/file/<project_name>/<version_name>/<path:file_path>")
-async def view_path(
-    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
-) -> response.Response | str:
-    """View the content of a specific file in the release candidate draft."""
-    await session.check_access(project_name)
-    release = await session.release(project_name, version_name)
-
-    # Limit to 256 KiB
-    _max_view_size = 256 * 1024
-    full_path = util.release_directory(release) / file_path
-
-    # Attempt to get an archive listing
-    # This will be None if the file is not an archive
-    content_listing = await util.archive_listing(full_path)
-
-    content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
-    return await quart.render_template(
-        "phase-view-path.html",
-        release=release,
-        project_name=project_name,
-        version_name=version_name,
-        file_path=file_path,
-        content=content,
-        is_text=is_text,
-        is_truncated=is_truncated,
-        error_message=error_message,
-        content_listing=content_listing,
-        format_file_size=routes.format_file_size,
-        phase_key="draft",
-        max_view_size=routes.format_file_size(_max_view_size),
-    )
-
-
 @routes.committer("/draft/vote/preview", methods=["POST"])
 async def vote_preview(session: routes.CommitterSession) -> quart.wrappers.response.Response | response.Response | str:
     """Show the vote email preview for a release."""

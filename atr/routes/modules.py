@@ -21,6 +21,7 @@ import atr.routes.committees as committees
 import atr.routes.compose as compose
 import atr.routes.download as download
 import atr.routes.draft as draft
+import atr.routes.file as file
 import atr.routes.keys as keys
 import atr.routes.preview as preview
 import atr.routes.projects as projects
