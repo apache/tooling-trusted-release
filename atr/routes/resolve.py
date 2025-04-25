@@ -29,7 +29,7 @@ import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
-import atr.routes.preview as preview
+import atr.routes.finish as finish
 import atr.util as util
 
 
@@ -135,7 +135,7 @@ async def selected_post(
                 release.stage = models.ReleaseStage.RELEASE
                 release.phase = models.ReleasePhase.RELEASE_PREVIEW
                 success_message = "Vote marked as passed"
-                destination = preview.finish_release  # type: ignore[has-type]
+                destination = finish.selected
             else:
                 release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
                 success_message = "Vote marked as failed"

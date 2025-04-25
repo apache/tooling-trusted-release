@@ -17,7 +17,7 @@
 
 import atr.db.models as models
 import atr.routes.compose as compose
-import atr.routes.preview as preview
+import atr.routes.finish as finish
 import atr.routes.resolve as resolve
 import atr.util as util
 
@@ -28,7 +28,6 @@ def release_as_url(release: models.Release) -> str:
     elif release.phase.value == "release_candidate":
         return util.as_url(resolve.selected, project_name=release.project.name, version_name=release.version)
     elif release.phase.value == "release_preview":
-        finish_release = preview.finish_release  # type: ignore[has-type]
-        return util.as_url(finish_release, project_name=release.project.name, version_name=release.version)
+        return util.as_url(finish.selected, project_name=release.project.name, version_name=release.version)
     else:
         raise ValueError(f"Unknown release phase: {release.phase}")
