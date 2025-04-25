@@ -71,7 +71,7 @@ async def bulk_status(session: routes.CommitterSession, task_id: int) -> str | r
 
 
 @routes.public("/releases/completed/<project_name>")
-async def completed(session: routes.CommitterSession, project_name: str) -> str:
+async def completed(project_name: str) -> str:
     """View all completed releases for a project."""
     async with db.session() as data:
         project = await data.project(name=project_name).demand(
@@ -90,8 +90,8 @@ async def completed(session: routes.CommitterSession, project_name: str) -> str:
     )
 
 
-@routes.committer("/releases")
-async def releases(session: routes.CommitterSession) -> str:
+@routes.public("/releases")
+async def releases() -> str:
     """View all releases."""
     # Releases are public, so we don't need to filter by user
     async with db.session() as data:
