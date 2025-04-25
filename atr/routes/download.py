@@ -25,7 +25,7 @@ import quart
 import werkzeug.wrappers.response as response
 
 import atr.routes as routes
-import atr.routes.draft as draft
+import atr.routes.root as root
 import atr.util as util
 
 
@@ -46,7 +46,7 @@ async def phase(
         # Even using the following type declaration, mypy does not know the type
         # The same pattern is used in release.py, so this is a bug in mypy
         # TODO: Report the bug upstream to mypy
-        return await session.redirect(draft.drafts, error="File not found")
+        return await session.redirect(root.index, error="File not found")
 
     # Send the file with original filename
     return await quart.send_file(

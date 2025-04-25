@@ -120,9 +120,11 @@ def lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials, versio
 
 def lifecycle_02_check_draft_added(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
     logging.info(f"Checking for draft 'tooling-test-example {version_name}'")
-    go_to_path(page, "/drafts")
-    draft_card_locator = page.locator(f"#tooling-test-example-{esc_id(version_name)}")
-    sync_api.expect(draft_card_locator).to_be_visible()
+    go_to_path(page, f"/compose/tooling-test-example/{version_name}")
+    h1_strong_locator = page.locator("h1 strong:has-text('Tooling Test Example')")
+    sync_api.expect(h1_strong_locator).to_be_visible()
+    h1_em_locator = page.locator(f"h1 em:has-text('{esc_id(version_name)}')")
+    sync_api.expect(h1_em_locator).to_be_visible()
     logging.info(f"Draft 'tooling-test-example {version_name}' found successfully")
 
 
@@ -147,21 +149,18 @@ def lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials, version
     wait_for_path(page, f"/compose/tooling-test-example/{version_name}")
     logging.info("Add file actions completed successfully")
 
-    logging.info("Navigating back to /drafts")
-    go_to_path(page, "/drafts")
-    logging.info("Navigation back to /drafts completed successfully")
+    logging.info("Navigating back to /compose/tooling-test-example")
+    go_to_path(page, f"/compose/tooling-test-example/{version_name}")
+    logging.info("Navigation back to /compose/tooling-test-example completed successfully")
 
 
 def lifecycle_04_start_vote(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
-    logging.info(f"Navigating to the drafts page for tooling-test-example {version_name}")
-    go_to_path(page, "/drafts")
-    logging.info("Drafts page loaded successfully")
+    logging.info(f"Navigating to the compose/tooling-test-example page for tooling-test-example {version_name}")
+    go_to_path(page, f"/compose/tooling-test-example/{version_name}")
+    logging.info("Compose/tooling-test-example page loaded successfully")
 
     logging.info(f"Locating start vote link for tooling-test-example {version_name}")
-    draft_card_locator = page.locator(f"#tooling-test-example-{esc_id(version_name)}")
-    start_vote_link_locator = draft_card_locator.locator(
-        f'a[title="Start vote for Apache Tooling Test Example {version_name}"]'
-    )
+    start_vote_link_locator = page.locator('a[title="Start a vote on this draft"]')
     sync_api.expect(start_vote_link_locator).to_be_visible()
 
     logging.info("Follow the start vote link")

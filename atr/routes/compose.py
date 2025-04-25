@@ -89,7 +89,7 @@ async def release(session: routes.CommitterSession, project_name: str, version_n
     delete_file_form = await draft.DeleteFileForm.create_form()
 
     return await quart.render_template(
-        "draft-content.html",
+        "compose-release.html",
         project_name=project_name,
         version_name=version_name,
         release=release,

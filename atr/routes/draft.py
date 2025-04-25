@@ -43,6 +43,7 @@ import atr.revision as revision
 import atr.routes as routes
 import atr.routes.candidate as candidate
 import atr.routes.compose as compose
+import atr.routes.root as root
 import atr.routes.upload as upload
 import atr.tasks.sbom as sbom
 import atr.tasks.vote as tasks_vote
@@ -165,17 +166,17 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         for _field, errors in form.errors.items():
             for error in errors:
                 await quart.flash(f"{error}", "error")
-        return await session.redirect(drafts)
+        return await session.redirect(root.index)
 
     candidate_draft_name = form.candidate_draft_name.data
     if not candidate_draft_name:
-        return await session.redirect(drafts, error="Missing required parameters")
+        return await session.redirect(root.index, error="Missing required parameters")
 
     # Extract project name and version
     try:
         project_name, version = candidate_draft_name.rsplit("-", 1)
     except ValueError:
-        return await session.redirect(drafts, error="Invalid candidate draft name format")
+        return await session.redirect(root.index, error="Invalid candidate draft name format")
     await session.check_access(project_name)
 
     # Delete the metadata from the database
@@ -185,7 +186,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
                 await _delete_candidate_draft(data, candidate_draft_name)
             except Exception as e:
                 logging.exception("Error deleting candidate draft:")
-                return await session.redirect(drafts, error=f"Error deleting candidate draft: {e!s}")
+                return await session.redirect(root.index, error=f"Error deleting candidate draft: {e!s}")
 
     # Delete the files on disk, including all revisions
     # We can't use util.release_directory_base here because we don't have the release object
@@ -197,7 +198,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         # Yet it works in preview.py
         await aioshutil.rmtree(draft_dir)  # type: ignore[call-arg]
 
-    return await session.redirect(drafts, success="Candidate draft deleted successfully")
+    return await session.redirect(root.index, success="Candidate draft deleted successfully")
 
 
 @routes.committer("/draft/delete-file/<project_name>/<version_name>", methods=["POST"])
@@ -255,29 +256,6 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
         )
     return await session.redirect(
         compose.release, success=success_message, project_name=project_name, version_name=version_name
-    )
-
-
-@routes.committer("/drafts")
-async def drafts(session: routes.CommitterSession) -> str:
-    """Allow the user to view current candidate drafts."""
-    # Do them outside of the template rendering call to ensure order
-    # The user_candidate_drafts call can use cached results from user_projects
-    # TODO: admin users should be able to view and manipulate all candidates if needed
-    user_projects = await session.user_projects
-    user_candidate_drafts = await session.user_candidate_drafts
-
-    # Create the delete form
-    delete_form = await DeleteForm.create_form()
-
-    return await quart.render_template(
-        "drafts.html",
-        asf_id=session.uid,
-        projects=user_projects,
-        server_domain=session.host,
-        number_of_release_files=util.number_of_release_files,
-        candidate_drafts=user_candidate_drafts,
-        delete_form=delete_form,
     )
 
 
@@ -905,7 +883,7 @@ async def vote_preview(session: routes.CommitterSession) -> quart.wrappers.respo
 
     form = await VotePreviewForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
-        return await session.redirect(drafts, error="Invalid form data")
+        return await session.redirect(root.index, error="Invalid form data")
 
     body = await mail.generate_preview(
         util.unwrap(form.body.data), util.unwrap(form.asfuid.data), util.unwrap(form.vote_duration.data)
@@ -1023,7 +1001,7 @@ Thanks,
             if email_to != sender:
                 error = await _promote(data, release.name, project_name, version, revision)
                 if error:
-                    return await session.redirect(drafts, error=error)
+                    return await session.redirect(root.index, error=error)
 
                 # This is now handled by the _promote call, above
                 # # Update the release phase to the voting phase only if not sending a test message to the user
