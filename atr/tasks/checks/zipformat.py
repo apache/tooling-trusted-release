@@ -119,7 +119,10 @@ async def structure(args: checks.FunctionArguments) -> str | None:
 
     try:
         result_data = await asyncio.to_thread(_structure_check_core_logic, str(artifact_abs_path))
-        if result_data.get("error"):
+
+        if result_data.get("warning"):
+            await recorder.warning(result_data["warning"], result_data)
+        elif result_data.get("error"):
             await recorder.failure(result_data["error"], result_data)
         else:
             await recorder.success(f"Zip structure OK (root: {result_data['root_dir']})", result_data)
@@ -328,7 +331,10 @@ def _structure_check_core_logic(artifact_path: str) -> dict[str, Any]:
             )
 
             if error_msg:
-                return {"error": error_msg}
+                if error_msg.startswith("Root directory mismatch"):
+                    return {"warning": error_msg}
+                else:
+                    return {"error": error_msg}
             if actual_root:
                 return {"root_dir": actual_root}
             return {"error": "Unknown structure validation error"}
