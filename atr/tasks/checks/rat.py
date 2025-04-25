@@ -59,7 +59,9 @@ async def check(args: checks.FunctionArguments) -> str | None:
             chunk_size=args.extra_args.get("chunk_size", _CONFIG.EXTRACT_CHUNK_SIZE),
         )
 
-        if result_data.get("error"):
+        if result_data.get("warning"):
+            await recorder.warning(result_data["warning"], result_data)
+        elif result_data.get("error"):
             # Handle errors from within the core logic
             await recorder.failure(result_data["message"], result_data)
         elif not result_data["valid"]:
@@ -155,7 +157,8 @@ def _check_core_logic(
                     "unknown_licenses": 0,
                     "unapproved_files": [],
                     "unknown_license_files": [],
-                    "errors": [error_msg or "No root directory found"],
+                    "warning": error_msg or "No root directory found",
+                    "errors": [],
                 }
 
             extract_dir = os.path.join(temp_dir, root_dir)

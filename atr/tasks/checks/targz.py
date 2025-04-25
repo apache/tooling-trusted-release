@@ -87,7 +87,7 @@ async def structure(args: checks.FunctionArguments) -> str | None:
                 {"root": root, "expected": expected_root},
             )
         else:
-            await recorder.failure(
+            await recorder.warning(
                 f"Root directory '{root}' does not match expected name '{expected_root}'",
                 {"root": root, "expected": expected_root},
             )

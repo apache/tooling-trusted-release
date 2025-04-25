@@ -183,7 +183,9 @@ async def files(args: checks.FunctionArguments) -> str | None:
     try:
         result_data = await asyncio.to_thread(_files_check_core_logic, str(artifact_abs_path))
 
-        if result_data.get("error"):
+        if result_data.get("warning"):
+            await recorder.warning(result_data["warning"], result_data)
+        elif result_data.get("error"):
             await recorder.failure(result_data["error"], result_data)
         elif result_data["license_valid"] and result_data["notice_valid"]:
             await recorder.success("LICENSE and NOTICE files present and valid", result_data)
@@ -208,7 +210,9 @@ async def headers(args: checks.FunctionArguments) -> str | None:
     try:
         result_data = await asyncio.to_thread(_headers_check_core_logic, str(artifact_abs_path))
 
-        if result_data.get("error_message"):
+        if result_data.get("warning_message"):
+            await recorder.warning(result_data["warning_message"], result_data)
+        elif result_data.get("error_message"):
             # Handle errors during the check process itself
             await recorder.failure(result_data["error_message"], result_data)
         elif not result_data["valid"]:
@@ -291,7 +295,7 @@ def _files_check_core_logic(artifact_path: str) -> dict[str, Any]:
             "files_found": [],
             "license_valid": False,
             "notice_valid": False,
-            "error": f"Could not determine root directory: {e!s}",
+            "warning": f"Could not determine root directory: {e!s}",
         }
 
     # Check for license files in the root directory
@@ -408,7 +412,8 @@ def _headers_check_core_logic(artifact_path: str) -> dict[str, Any]:
             "files_checked": 0,
             "files_with_valid_headers": 0,
             "errors": [],
-            "error_message": f"Could not determine root directory: {e!s}",
+            "error_message": None,
+            "warning_message": f"Could not determine root directory: {e!s}",
             "valid": False,
         }
 
