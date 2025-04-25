@@ -16,6 +16,7 @@
 # under the License.
 
 # These are imported for their side effects and for access in templates
+import atr.routes.announce as announce
 import atr.routes.candidate as candidate
 import atr.routes.committees as committees
 import atr.routes.compose as compose

@@ -220,7 +220,7 @@ def lifecycle_06_announce_preview(page: sync_api.Page, credentials: Credentials,
     wait_for_path(page, f"/announce/tooling-test-example/{version_name}")
 
     logging.info(f"Locating the announcement form for tooling-test-example {version_name}")
-    form_locator = page.locator('form[action="/preview/announce"]')
+    form_locator = page.locator(f'form[action="/announce/tooling-test-example/{esc_id(version_name)}"]')
     sync_api.expect(form_locator).to_be_visible()
 
     logging.info("Locating the confirmation checkbox within the form")

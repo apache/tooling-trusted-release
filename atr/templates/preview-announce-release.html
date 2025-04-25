@@ -66,7 +66,8 @@
       <h5 class="mb-0">Announce and distribute</h5>
     </div>
     <div class="card-body">
-      <form method="post" action="{{ as_url(routes.preview.announce) }}">
+      <form method="post"
+            action="{{ as_url(routes.announce.selected_post, project_name=release.project.name, version_name=release.version) }}">
         {{ announce_form.hidden_tag() }}
         <input type="hidden" name="preview_name" value="{{ release.name }}" />
         <input type="hidden" name="preview_revision" value="{{ release.revision }}" />

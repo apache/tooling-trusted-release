@@ -48,7 +48,7 @@
           Show revisions
         </a>
         <a title="Announce and distribute {{ release.name }}"
-           href="{{ as_url(routes.preview.announce_release, project_name=release.project.name, version_name=release.version) }}"
+           href="{{ as_url(routes.announce.selected, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-sm btn-success">
           <i class="fas fa-check-circle"></i>
           Announce and distribute

@@ -40,6 +40,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     return await session.redirect(root.index, error="Not yet implemented")
 
 
+# TODO: Move these to routes/vote.py?
 @routes.committer("/candidate/view/<project_name>/<version_name>")
 async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""

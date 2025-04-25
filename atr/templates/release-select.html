@@ -35,7 +35,7 @@
           {% set target_url = as_url(routes.resolve.selected, project_name=project.name, version_name=release.version) %}
           {% set badge_class = "bg-warning text-dark" %}
         {% elif phase == "release_preview" %}
-          {% set target_url = as_url(routes.preview.announce, project_name=project.name, version_name=release.version) %}
+          {% set target_url = as_url(routes.announce.selected, project_name=project.name, version_name=release.version) %}
           {% set badge_class = "bg-success" %}
         {% endif %}
 

@@ -61,7 +61,8 @@
                 </div>
                 <div class="card-body">
                   <p class="text-muted mb-3">Announcing will move this preview to the final release directory.</p>
-                  <form method="post" action="{{ as_url(routes.preview.announce) }}">
+                  <form method="post"
+                        action="{{ as_url(routes.announce.selected_post, project_name=preview.project.name, version_name=preview.version) }}">
                     {{ announce_form.hidden_tag() }}
                     <input type="hidden" name="preview_name" value="{{ preview.name }}" />
                     <input type="hidden" name="preview_revision" value="{{ preview.revision }}" />
