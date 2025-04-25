@@ -83,7 +83,7 @@
           </div>
 
           <form method="post"
-                action="{{ as_url(routes.candidate.resolve) }}"
+                action="{{ as_url(routes.resolve.selected_post, project_name=candidate.project.name, version_name=candidate.version) }}"
                 class="mt-3 p-3 border rounded bg-white">
             <input type="hidden" name="candidate_name" value="{{ candidate.name }}" />
             {{ candidate_forms[candidate.name].csrf_token }}

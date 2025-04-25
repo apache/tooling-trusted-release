@@ -29,8 +29,8 @@ import wtforms
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
-import atr.routes.candidate as candidate
 import atr.routes.compose as compose
+import atr.routes.resolve as resolve
 import atr.routes.root as root
 import atr.tasks.vote as tasks_vote
 import atr.user as user
@@ -201,9 +201,8 @@ Thanks,
                     version_name=version,
                 )
 
-            resolve_release: routes.RouteHandler[str] = candidate.resolve_release  # type: ignore[has-type]
             return await session.redirect(
-                resolve_release,
+                resolve.selected,
                 success=f"The vote announcement email will soon be sent to {email_to}.",
                 project_name=project_name,
                 version_name=version,

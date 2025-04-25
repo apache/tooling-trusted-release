@@ -429,6 +429,8 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
     )
 
 
+# TODO: Should we deprecate this and ensure compose covers it all?
+# If we did that, we'd lose the exhaustive use of the abstraction
 @routes.committer("/draft/view/<project_name>/<version_name>")
 async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""

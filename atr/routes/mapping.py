@@ -16,9 +16,9 @@
 # under the License.
 
 import atr.db.models as models
-import atr.routes.candidate as candidate
 import atr.routes.compose as compose
 import atr.routes.preview as preview
+import atr.routes.resolve as resolve
 import atr.util as util
 
 
@@ -26,8 +26,7 @@ def release_as_url(release: models.Release) -> str:
     if release.phase.value == "release_candidate_draft":
         return util.as_url(compose.selected, project_name=release.project.name, version_name=release.version)
     elif release.phase.value == "release_candidate":
-        resolve_release = candidate.resolve_release  # type: ignore[has-type]
-        return util.as_url(resolve_release, project_name=release.project.name, version_name=release.version)
+        return util.as_url(resolve.selected, project_name=release.project.name, version_name=release.version)
     elif release.phase.value == "release_preview":
         finish_release = preview.finish_release  # type: ignore[has-type]
         return util.as_url(finish_release, project_name=release.project.name, version_name=release.version)
