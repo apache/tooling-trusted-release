@@ -42,7 +42,7 @@
           Show files
         </a>
         <a title="Show revisions for {{ release.name }}"
-           href="{{ as_url(routes.draft.revisions, project_name=release.project.name, version_name=release.version) }}"
+           href="{{ as_url(routes.revisions.selected, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-sm btn-secondary me-2">
           <i class="fas fa-history"></i>
           Show revisions

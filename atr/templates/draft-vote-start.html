@@ -10,7 +10,7 @@
 
 {% block content %}
   <p class="d-flex justify-content-between align-items-center">
-    <a href="{{ as_url(routes.compose.release, project_name=release.project.name, version_name=release.version) }}"
+    <a href="{{ as_url(routes.compose.selected, project_name=release.project.name, version_name=release.version) }}"
        class="atr-back-link">← Back to Compose {{ release.short_display_name }}</a>
     <span>
       <strong class="atr-phase-one atr-phase-symbol">①</strong>
@@ -118,7 +118,7 @@
 
     <div class="mt-4 col-md-9 offset-md-3">
       {{ form.submit(class_='btn btn-primary') }}
-      <a href="{{ as_url(routes.compose.release, project_name=release.project.name, version_name=release.version) }}"
+      <a href="{{ as_url(routes.compose.selected, project_name=release.project.name, version_name=release.version) }}"
          class="btn btn-link text-secondary">Cancel</a>
     </div>
   </form>

@@ -30,7 +30,7 @@ import atr.util as util
 
 
 @routes.committer("/compose/<project_name>/<version_name>")
-async def release(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show the contents of the release candidate draft."""
     await session.check_access(project_name)
     release = await session.release(project_name, version_name)

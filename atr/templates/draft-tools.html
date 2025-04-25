@@ -9,7 +9,7 @@
 {% endblock description %}
 
 {% block content %}
-  <a href="{{ as_url(routes.compose.release, project_name=project_name, version_name=version_name) }}"
+  <a href="{{ as_url(routes.compose.selected, project_name=project_name, version_name=version_name) }}"
      class="atr-back-link">← Back to Compose release</a>
 
   <div class="p-3 mb-4 bg-light border rounded">

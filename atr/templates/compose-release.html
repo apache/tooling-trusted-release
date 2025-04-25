@@ -70,7 +70,7 @@
           {% if revision_time %}
             <p>
               <strong>Revision:</strong>
-              <a href="{{ as_url(routes.draft.revisions, project_name=project_name, version_name=version_name) }}#{{ revision_name_from_link }}">
+              <a href="{{ as_url(routes.revisions.selected, project_name=project_name, version_name=version_name) }}#{{ revision_name_from_link }}">
                 {{ format_datetime(revision_time) }}
               </a>
               {% if revision_editor %}by {{ revision_editor }}{% endif %}
@@ -86,10 +86,10 @@
       <h5 class="mb-0">Draft actions</h5>
     </div>
     <div class="card-body d-flex flex-wrap gap-2">
-      <a href="{{ as_url(routes.upload.release, project_name=release.project.name, version_name=release.version) }}"
+      <a href="{{ as_url(routes.upload.selected, project_name=release.project.name, version_name=release.version) }}"
          title="Upload files to this draft"
          class="btn btn-primary"><i class="fas fa-upload me-1"></i> Upload files</a>
-      <a href="{{ as_url(routes.draft.revisions, project_name=release.project.name, version_name=release.version) }}"
+      <a href="{{ as_url(routes.revisions.selected, project_name=release.project.name, version_name=release.version) }}"
          title="View revision history"
          class="btn btn-secondary"><i class="fas fa-history me-1"></i> Revisions</a>
       <a href="{{ as_url(routes.draft.vote_start, project_name=release.project.name, version=release.version, revision=release.revision) }}"
@@ -175,13 +175,13 @@
                   <td class="text-end text-nowrap py-2">
                     <div class="d-flex justify-content-end align-items-center gap-2">
                       {% if has_errors %}
-                        <a href="{{ as_url(routes.report.release_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                        <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                            class="btn btn-sm btn-outline-danger"><i class="fas fa-exclamation-triangle me-1"></i> Show {{ errors[path]|length }} {{ "error" if errors[path]|length == 1 else "errors" }}</a>
                       {% elif has_warnings %}
-                        <a href="{{ as_url(routes.report.release_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                        <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                            class="btn btn-sm btn-outline-warning">Show {{ warnings[path]|length }} {{ "warning" if warnings[path]|length == 1 else "warnings" }}</a>
                       {% elif successes[path] %}
-                        <a href="{{ as_url(routes.report.release_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                        <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                            class="btn btn-sm btn-outline-success"
                            title="Show report for {{ path }}">Show report</a>
                       {% else %}

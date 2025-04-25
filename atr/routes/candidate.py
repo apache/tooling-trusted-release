@@ -269,7 +269,7 @@ async def _resolve_post(session: routes.CommitterSession) -> response.Response:
             else:
                 release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
                 success_message = "Vote marked as failed"
-                destination = compose.release
+                destination = compose.selected
 
     await _resolve_post_files(project_name, release, source, vote_result, session.uid)
     return await session.redirect(

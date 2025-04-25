@@ -29,7 +29,7 @@ import atr.util as util
 
 
 @routes.committer("/report/<project_name>/<version_name>/<path:rel_path>")
-async def release_path(session: routes.CommitterSession, project_name: str, version_name: str, rel_path: str) -> str:
+async def selected_path(session: routes.CommitterSession, project_name: str, version_name: str, rel_path: str) -> str:
     """Show the report for a specific file."""
     await session.check_access(project_name)
     release = await session.release(project_name, version_name)

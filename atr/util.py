@@ -152,12 +152,12 @@ def as_url(func: Callable, **kwargs: Any) -> str:
     """Return the URL for a function."""
     if isinstance(func, jinja2.runtime.Undefined):
         _LOGGER.exception("Undefined route in the calling template")
-        raise base.ASFQuartException("Undefined route", 500)
+        raise RuntimeError("Undefined route in the calling template")
     try:
         annotations = func.__annotations__
     except AttributeError as e:
         _LOGGER.error(f"Cannot get annotations for {func} (type: {type(func)})")
-        raise base.ASFQuartException(f"Cannot get annotations for {func} (type: {type(func)})", 500) from e
+        raise RuntimeError(f"Cannot get annotations for {func} (type: {type(func)})") from e
     return quart.url_for(annotations["endpoint"], **kwargs)
 
 

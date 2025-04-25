@@ -58,7 +58,7 @@ class SvnImportForm(util.QuartFormTyped):
 
 
 @routes.committer("/upload/<project_name>/<version_name>", methods=["GET", "POST"])
-async def release(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show a page to allow the user to add files to a candidate draft."""
     await session.check_access(project_name)
 
@@ -86,7 +86,7 @@ async def release(session: routes.CommitterSession, project_name: str, version_n
 
             number_of_files = await _upload_files(project_name, version_name, session.uid, file_name, file_data)
             return await session.redirect(
-                compose.release,
+                compose.selected,
                 success=f"{number_of_files} file{'' if number_of_files == 1 else 's'} added successfully",
                 project_name=project_name,
                 version_name=version_name,

@@ -24,7 +24,7 @@ import atr.util as util
 
 def release_as_url(release: models.Release) -> str:
     if release.phase.value == "release_candidate_draft":
-        return util.as_url(compose.release, project_name=release.project.name, version_name=release.version)
+        return util.as_url(compose.selected, project_name=release.project.name, version_name=release.version)
     elif release.phase.value == "release_candidate":
         resolve_release = candidate.resolve_release  # type: ignore[has-type]
         return util.as_url(resolve_release, project_name=release.project.name, version_name=release.version)
