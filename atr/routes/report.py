@@ -68,7 +68,7 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
     }
 
     return await quart.render_template(
-        "report-release-path.html",
+        "report-selected-path.html",
         project_name=project_name,
         version_name=version_name,
         rel_path=rel_path,

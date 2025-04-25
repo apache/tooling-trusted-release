@@ -99,8 +99,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         prev_revision_name = rev_name
 
     return await quart.render_template(
-        # TODO: Move to phase-revisions.html
-        "revisions-release.html",
+        "revisions-selected.html",
         project_name=project_name,
         version_name=version_name,
         release=release,

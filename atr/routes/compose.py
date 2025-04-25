@@ -89,7 +89,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     delete_file_form = await draft.DeleteFileForm.create_form()
 
     return await quart.render_template(
-        "compose-release.html",
+        "compose-selected.html",
         project_name=project_name,
         version_name=version_name,
         release=release,
