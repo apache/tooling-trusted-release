@@ -119,6 +119,7 @@
     <div class="card-body">
       {% if paths|length > 0 %}
         <div class="table-responsive">
+          {# This table uses pairs of rows, so it must be manually striped #}
           <table class="table table-hover align-middle table-sm mb-0 border">
             <tbody>
               {% for path in paths %}
@@ -126,12 +127,9 @@
                 {% set has_warnings = warnings[path]|length > 0 %}
                 {% set row_id = path|string|slugify %}
 
+                {# Manual striping for pairs of rows #}
                 {% set row_bg_class = "" %}
-                {% if has_errors %}
-                  {% set row_bg_class = "table-danger" %}
-                {% elif has_warnings %}
-                  {% set row_bg_class = "table-warning" %}
-                {% elif loop.index is odd %}
+                {% if loop.index is odd %}
                   {% set row_bg_class = "page-table-striped-odd" %}
                 {% endif %}
 
@@ -178,7 +176,7 @@
                     <div class="d-flex justify-content-end align-items-center gap-2">
                       {% if has_errors %}
                         <a href="{{ as_url(routes.draft.evaluate_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
-                           class="btn btn-sm btn-outline-danger">Show {{ errors[path]|length }} {{ "error" if errors[path]|length == 1 else "errors" }}</a>
+                           class="btn btn-sm btn-outline-danger"><i class="fas fa-exclamation-triangle me-1"></i> Show {{ errors[path]|length }} {{ "error" if errors[path]|length == 1 else "errors" }}</a>
                       {% elif has_warnings %}
                         <a href="{{ as_url(routes.draft.evaluate_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                            class="btn btn-sm btn-outline-warning">Show {{ warnings[path]|length }} {{ "warning" if warnings[path]|length == 1 else "warnings" }}</a>
@@ -195,8 +193,9 @@
                               data-bs-target="#actions-{{ row_id }}"
                               aria-expanded="false"
                               aria-controls="actions-{{ row_id }}"
-                              title="Show more actions for {{ path }}">
-                        <i class="fas fa-ellipsis-h" aria-hidden="true"></i><span class="visually-hidden">More actions</span>
+                              title="Show more actions for {{ path }}"
+                              onclick="this.innerHTML = (this.innerHTML.trim() === 'More') ? 'Less' : 'More';">
+                        More
                       </button>
                     </div>
                   </td>
