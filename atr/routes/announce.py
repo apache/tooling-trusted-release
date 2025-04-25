@@ -79,6 +79,7 @@ async def selected_post(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> str | response.Response:
     """Allow the user to announce a release preview."""
+    await session.check_access(project_name)
 
     # Get user's preview releases
     async with db.session() as data:
@@ -104,8 +105,6 @@ async def selected_post(
 
         # Check that the user has access to the project
         async with db.session() as data:
-            await session.check_access(project_name)
-
             try:
                 # Get the release
                 release = await session.release(

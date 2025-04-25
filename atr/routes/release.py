@@ -111,6 +111,8 @@ async def releases() -> str:
 @routes.committer("/release/select/<project_name>")
 async def select(session: routes.CommitterSession, project_name: str) -> str:
     """Show releases in progress for a project."""
+    await session.check_access(project_name)
+
     async with db.session() as data:
         project = await data.project(name=project_name, _releases=True).demand(
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)

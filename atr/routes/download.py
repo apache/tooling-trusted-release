@@ -29,17 +29,19 @@ import atr.routes.root as root
 import atr.util as util
 
 
-@routes.committer("/download/<phase>/<project>/<version>/<path>")
+@routes.committer("/download/<phase>/<project_name>/<version_name>/<path:file_path>")
 async def phase(
-    session: routes.CommitterSession, phase: str, project: str, version: str, path: pathlib.Path
+    session: routes.CommitterSession, phase: str, project_name: str, version_name: str, file_path: str
 ) -> response.Response | quart.Response:
     """Download a file from a release in any phase."""
+    await session.check_access(project_name)
+
     # Check that path is relative
-    path = pathlib.Path(path)
+    path = pathlib.Path(file_path)
     if not path.is_relative_to(path.anchor):
         raise routes.FlashError("Path must be relative")
 
-    file_path = util.get_phase_dir() / phase / project / version / path
+    full_path = util.get_phase_dir() / phase / project_name / version_name / file_path
 
     # Check that the file exists
     if not await aiofiles.os.path.exists(file_path):
@@ -50,5 +52,5 @@ async def phase(
 
     # Send the file with original filename
     return await quart.send_file(
-        file_path, as_attachment=True, attachment_filename=path.name, mimetype="application/octet-stream"
+        full_path, as_attachment=True, attachment_filename=path.name, mimetype="application/octet-stream"
     )

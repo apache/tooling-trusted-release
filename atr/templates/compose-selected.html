@@ -209,7 +209,7 @@
                         <div class="btn-group btn-group-sm"
                              role="group"
                              aria-label="More file actions for {{ path }}">
-                          <a href="{{ as_url(routes.download.phase, phase='candidate-draft', project=release.project.name, version=release.version, path=path) }}"
+                          <a href="{{ as_url(routes.download.phase, phase='candidate-draft', project_name=release.project.name, version_name=release.version, file_path=path) }}"
                              title="Download file {{ path }}"
                              class="btn btn-outline-secondary">Download</a>
                           <a href="{{ as_url(routes.draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"

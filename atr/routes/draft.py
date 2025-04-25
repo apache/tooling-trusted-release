@@ -346,6 +346,7 @@ async def sbomgen(
 async def svnload(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Import files from SVN into a draft."""
     await session.check_access(project_name)
+
     form = await upload.SvnImportForm.create_form()
     release = await session.release(project_name, version_name, with_project=False)
 
@@ -400,8 +401,8 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
 async def tools(session: routes.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
     """Show the tools for a specific file."""
     await session.check_access(project_name)
-    release = await session.release(project_name, version_name)
 
+    release = await session.release(project_name, version_name)
     full_path = str(util.release_directory(release) / file_path)
 
     # Check that the file exists
@@ -435,6 +436,7 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
 async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
     await session.check_access(project_name)
+
     release = await session.release(project_name, version_name)
 
     # Convert async generator to list

@@ -33,8 +33,8 @@ import atr.util as util
 async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show the contents of the release candidate draft."""
     await session.check_access(project_name)
-    release = await session.release(project_name, version_name)
 
+    release = await session.release(project_name, version_name)
     base_path = util.release_directory(release)
     paths = await util.paths_recursive(base_path)
     path_templates = {}

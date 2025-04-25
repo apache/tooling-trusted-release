@@ -28,6 +28,7 @@ async def selected_path(
 ) -> response.Response | str:
     """View the content of a specific file in the release candidate draft."""
     await session.check_access(project_name)
+
     release = await session.release(project_name, version_name)
 
     # Limit to 256 KiB

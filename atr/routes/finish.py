@@ -55,8 +55,8 @@ class MoveFileForm(util.QuartFormTyped):
 async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Finish a release preview."""
     await session.check_access(project_name)
-    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
 
+    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
     current_revision_dir = util.release_directory(release)
     file_paths_rel: list[pathlib.Path] = []
     unique_dirs: set[pathlib.Path] = {pathlib.Path(".")}

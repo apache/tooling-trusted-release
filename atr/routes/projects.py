@@ -77,6 +77,7 @@ class VotePolicyForm(util.QuartFormTyped):
 @routes.committer("/project/add/<project_name>", methods=["GET", "POST"])
 async def add_project(session: routes.CommitterSession, project_name: str) -> response.Response | str:
     await session.check_access(project_name)
+
     async with db.session() as data:
         project = await data.project(name=project_name).demand(
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)

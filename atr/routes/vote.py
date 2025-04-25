@@ -46,6 +46,7 @@ async def selected_revision(
 ) -> response.Response | str:
     """Show the vote initiation form for a release."""
     await session.check_access(project_name)
+
     async with db.session() as data:
         project = await data.project(name=project_name).demand(routes.FlashError("Project not found"))
         release = await data.release(project_name=project.name, version=version_name, _committee=True).demand(

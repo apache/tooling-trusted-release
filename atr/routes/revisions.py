@@ -113,6 +113,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
 async def selected_post(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
     """Set a specific revision as the latest for a candidate draft or release preview."""
     await session.check_access(project_name)
+
     form_data = await quart.request.form
     revision_name = form_data.get("revision_name")
     if not revision_name:

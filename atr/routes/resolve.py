@@ -93,6 +93,8 @@ async def selected_post(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
     """Resolve the vote on a release candidate."""
+    await session.check_access(project_name)
+
     form = await ResolveForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
         for _field, errors in form.errors.items():
