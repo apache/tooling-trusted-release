@@ -48,6 +48,10 @@ def root_directory(tgz_path: str) -> str:
 
     with tarfile.open(tgz_path, mode="r|gz") as tf:
         for member in tf:
+            if member.name and member.name.split("/")[-1].startswith("._"):
+                # Metadata convention
+                continue
+
             parts = member.name.split("/", 1)
             if len(parts) >= 1:
                 if not root:
@@ -98,6 +102,7 @@ def _integrity_core(tgz_path: str, chunk_size: int = 4096) -> int:
 
     with tarfile.open(tgz_path, mode="r|gz") as tf:
         for member in tf:
+            # Do not skip metadata here
             total_size += member.size
             # Verify file by extraction
             if member.isfile():

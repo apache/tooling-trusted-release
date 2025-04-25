@@ -297,6 +297,10 @@ def _files_check_core_logic(artifact_path: str) -> dict[str, Any]:
     # Check for license files in the root directory
     with tarfile.open(artifact_path, mode="r|gz") as tf:
         for member in tf:
+            if member.name and member.name.split("/")[-1].startswith("._"):
+                # Metadata convention
+                continue
+
             if member.name in [f"{root_dir}/LICENSE", f"{root_dir}/NOTICE"]:
                 filename = os.path.basename(member.name)
                 files_found.append(filename)
@@ -411,6 +415,10 @@ def _headers_check_core_logic(artifact_path: str) -> dict[str, Any]:
     # Check files in the archive
     with tarfile.open(artifact_path, mode="r|gz") as tf:
         for member in tf:
+            if member.name and member.name.split("/")[-1].startswith("._"):
+                # Metadata convention
+                continue
+
             processed, result = _headers_check_core_logic_process_file(tf, member, root_dir)
             if not processed:
                 continue

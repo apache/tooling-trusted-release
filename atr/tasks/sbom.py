@@ -61,6 +61,10 @@ def archive_extract_safe(
     try:
         with tarfile.open(archive_path, mode="r|gz") as tf:
             for member in tf:
+                if member.name and member.name.split("/")[-1].startswith("._"):
+                    # Metadata convention
+                    continue
+
                 # Skip anything that's not a file or directory
                 if not (member.isreg() or member.isdir()):
                     continue

@@ -129,6 +129,7 @@ async def archive_listing(file_path: pathlib.Path) -> list[str] | None:
             def _read_tar() -> list[str] | None:
                 with contextlib.suppress(tarfile.ReadError, EOFError, ValueError, OSError):
                     with tarfile.open(file_path, mode="r:*") as tf:
+                        # TODO: Skip metadata files
                         return sorted(tf.getnames())
                 return None
 
