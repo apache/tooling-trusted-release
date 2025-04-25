@@ -650,6 +650,29 @@ async def evaluate_path(session: routes.CommitterSession, project_name: str, ver
     )
 
 
+@routes.committer("/draft/fresh/<project_name>/<version_name>", methods=["POST"])
+async def fresh(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
+    """Restart all checks for a whole release candidate draft."""
+    # Admin only button, but it's okay if users find and use this manually
+    await session.check_access(project_name)
+
+    # Restart checks by creating a new identical draft revision
+    # This doesn't make sense unless the checks themselves have been updated
+    # Therefore we only show the button for this to admins
+    async with revision.create_and_manage(project_name, version_name, session.uid) as (
+        new_revision_dir,
+        new_revision_name,
+    ):
+        ...
+
+    return await session.redirect(
+        compose,
+        project_name=project_name,
+        version_name=version_name,
+        success="All checks restarted",
+    )
+
+
 @routes.committer("/draft/hashgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
 async def hashgen(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str

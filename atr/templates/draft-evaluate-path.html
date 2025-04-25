@@ -73,7 +73,13 @@
 
   <div class="d-flex gap-3 mb-3">
     <button type="button" onclick="toggleAllDetails()" class="btn btn-secondary">Toggle all details</button>
-    <!-- TODO: Currently there's no direct way to restart file checks through the UI -->
+    {% if is_viewing_as_admin_fn(current_user.uid) %}
+      <form method="post"
+            action="{{ as_url(routes.draft.fresh, project_name=release.project.name, version_name=release.version) }}"
+            class="mb-0">
+        <button type="submit" class="btn btn-primary">Restart all checks</button>
+      </form>
+    {% endif %}
   </div>
 
   <div class="mb-3">
