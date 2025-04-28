@@ -87,7 +87,6 @@ async def selected_post(
             stage=models.ReleaseStage.RELEASE,
             phase=models.ReleasePhase.RELEASE_PREVIEW,
             _committee=True,
-            _packages=True,
         ).all()
     user_previews = session.only_user_releases(releases)
 

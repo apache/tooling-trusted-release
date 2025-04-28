@@ -82,7 +82,6 @@ async def completed(project_name: str) -> str:
             project_name=project.name,
             phase=models.ReleasePhase.RELEASE,
             _committee=True,
-            _packages=True,
         ).all()
 
     return await quart.render_template(
@@ -99,7 +98,6 @@ async def releases() -> str:
             stage=models.ReleaseStage.RELEASE,
             phase=models.ReleasePhase.RELEASE,
             _committee=True,
-            _packages=True,
         ).all()
 
     return await quart.render_template(

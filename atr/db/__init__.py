@@ -152,7 +152,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         committee_members: Opt[list[str]] = NOT_SET,
         committers: Opt[list[str]] = NOT_SET,
         release_managers: Opt[list[str]] = NOT_SET,
-        vote_policy_id: Opt[int] = NOT_SET,
         name_in: Opt[list[str]] = NOT_SET,
         _projects: bool = False,
         _public_signing_keys: bool = False,
@@ -316,7 +315,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         vote_policy_id: Opt[int] = NOT_SET,
         votes: Opt[list[models.VoteEntry]] = NOT_SET,
         _project: bool = False,
-        _packages: bool = False,
         _vote_policy: bool = False,
         _committee: bool = False,
         _tasks: bool = False,
@@ -387,8 +385,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         result: Opt[Any | None] = NOT_SET,
         error: Opt[str | None] = NOT_SET,
         release_name: Opt[str | None] = NOT_SET,
-        path: Opt[str | None] = NOT_SET,
-        modified: Opt[int | None] = NOT_SET,
         _release: bool = False,
     ) -> Query[models.Task]:
         query = sqlmodel.select(models.Task)

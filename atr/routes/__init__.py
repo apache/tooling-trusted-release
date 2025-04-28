@@ -228,7 +228,6 @@ class CommitterSession:
                     name=release_name,
                     phase=phase_value,
                     _committee=with_committee,
-                    _packages=with_packages,
                     _project=with_project,
                     _tasks=with_tasks,
                 ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
@@ -237,7 +236,6 @@ class CommitterSession:
                 name=release_name,
                 phase=phase_value,
                 _committee=with_committee,
-                _packages=with_packages,
                 _project=with_project,
                 _tasks=with_tasks,
             ).demand(base.ASFQuartException("Release does not exist", errorcode=404))

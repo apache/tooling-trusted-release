@@ -161,7 +161,7 @@ async def view_path(
 async def _delete_preview(data: db.Session, preview_name: str) -> None:
     """Delete a release preview and all its associated files."""
     # Check that the release exists
-    release = await data.release(name=preview_name, _project=True, _packages=True).get()
+    release = await data.release(name=preview_name, _project=True).get()
     if not release:
         raise routes.FlashError("Preview not found")
     if release.phase != models.ReleasePhase.RELEASE_PREVIEW:

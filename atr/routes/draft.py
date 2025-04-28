@@ -487,7 +487,7 @@ async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -
     """Delete a candidate draft and all its associated files."""
     # Check that the release exists
     # TODO: Use session.release here
-    release = await data.release(name=candidate_draft_name, _project=True, _packages=True).get()
+    release = await data.release(name=candidate_draft_name, _project=True).get()
     if not release:
         raise routes.FlashError("Candidate draft not found")
     if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
