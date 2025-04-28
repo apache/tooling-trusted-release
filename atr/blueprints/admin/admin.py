@@ -88,10 +88,11 @@ async def admin_data(model: str = "Committee") -> str:
                 record_dict = record.dict()
             else:
                 # Fallback for models without dict() method
-                record_dict = {
-                    "id": getattr(record, "id", None),
-                    "name": getattr(record, "name", None),
-                }
+                record_dict = {}
+                # record_dict = {
+                #     "id": getattr(record, "id", None),
+                #     "name": getattr(record, "name", None),
+                # }
                 for key in record.__dict__:
                     if not key.startswith("_"):
                         record_dict[key] = getattr(record, key)

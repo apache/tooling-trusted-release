@@ -80,7 +80,17 @@
       {% for record in records %}
         <div class="page-record">
           <div class="page-record-header">
-            <h3>{{ record.get("id", record.get("name", "Unknown ID")) }}</h3>
+            {% set primary_key = "Unknown primary key" %}
+            {% if "id" in record %}
+              {% set primary_key = record["id"] %}
+            {% elif "name" in record %}
+              {% set primary_key = record["name"] %}
+            {% elif "fingerprint" in record %}
+              {% set primary_key = record["fingerprint"] %}
+            {% elif "key" in record %}
+              {% set primary_key = record["key"] %}
+            {% endif %}
+            <h3>{{ primary_key }}</h3>
             <span class="page-record-meta">{{ model }}</span>
           </div>
           <pre>{{ record | tojson(indent=2) }}</pre>
