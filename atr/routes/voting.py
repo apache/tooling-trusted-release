@@ -204,7 +204,7 @@ Thanks,
 
         # For GET requests or failed POST validation
         return await quart.render_template(
-            "vote-selected-revision.html",
+            "voting-selected-revision.html",
             release=release,
             form=form,
             revision=revision,
