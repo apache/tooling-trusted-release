@@ -75,7 +75,7 @@ class UserRole(str, enum.Enum):
 
 
 class KeyLink(sqlmodel.SQLModel, table=True):
-    committee_id: int = sqlmodel.Field(foreign_key="committee.id", primary_key=True)
+    committee_name: str = sqlmodel.Field(foreign_key="committee.name", primary_key=True)
     key_fingerprint: str = sqlmodel.Field(foreign_key="publicsigningkey.fingerprint", primary_key=True)
 
 
@@ -113,8 +113,9 @@ class VotePolicy(sqlmodel.SQLModel, table=True):
 
 
 class Committee(sqlmodel.SQLModel, table=True):
-    id: int = sqlmodel.Field(default=None, primary_key=True)
-    name: str = sqlmodel.Field(unique=True)
+    # TODO: Consider using key or label for primary string keys
+    # Then we can use simply "name" for full_name, and make it str rather than str | None
+    name: str = sqlmodel.Field(unique=True, primary_key=True)
     full_name: str | None = sqlmodel.Field(default=None)
     # True only if this is an incubator podling with a PPMC
     is_podling: bool = sqlmodel.Field(default=False)
@@ -122,10 +123,10 @@ class Committee(sqlmodel.SQLModel, table=True):
     # One-to-many: A committee can have multiple child committees, each child committee belongs to one parent committee
     child_committees: list["Committee"] = sqlmodel.Relationship(
         sa_relationship_kwargs=dict(
-            backref=sqlalchemy.orm.backref("parent_committee", remote_side="Committee.id"),
+            backref=sqlalchemy.orm.backref("parent_committee", remote_side="Committee.name"),
         ),
     )
-    parent_committee_id: int | None = sqlmodel.Field(default=None, foreign_key="committee.id")
+    parent_committee_name: str | None = sqlmodel.Field(default=None, foreign_key="committee.name")
     # One-to-many: A committee can have multiple projects, each project belongs to one committee
     projects: list["Project"] = sqlmodel.Relationship(back_populates="committee")
 
@@ -165,7 +166,7 @@ class Project(sqlmodel.SQLModel, table=True):
     programming_languages: str | None = sqlmodel.Field(default=None)
 
     # Many-to-one: A project belongs to one committee, a committee can have multiple projects
-    committee_id: int | None = sqlmodel.Field(default=None, foreign_key="committee.id")
+    committee_name: str | None = sqlmodel.Field(default=None, foreign_key="committee.name")
     committee: Committee | None = sqlmodel.Relationship(back_populates="projects")
 
     # One-to-many: A project can have multiple releases, each release belongs to one project

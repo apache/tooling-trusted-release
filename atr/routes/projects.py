@@ -321,7 +321,7 @@ async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
             description=base_project.description,
             category=base_project.category,
             programming_languages=base_project.programming_languages,
-            committee_id=base_project.committee_id,
+            committee_name=base_project.committee_name,
             vote_policy_id=base_project.vote_policy_id,
             created=datetime.datetime.now(datetime.UTC),
             created_by=asf_id,

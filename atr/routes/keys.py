@@ -295,11 +295,11 @@ async def key_user_session_add(
         committee_statuses: dict[str, str] = {}
         for committee_name in selected_committees:
             committee = await data.committee(name=committee_name).get()
-            if committee and committee.id:
+            if committee and committee.name:
                 # Check whether the link already exists
                 link_exists = await data.execute(
                     sqlmodel.select(models.KeyLink).where(
-                        models.KeyLink.committee_id == committee.id,
+                        models.KeyLink.committee_name == committee.name,
                         models.KeyLink.key_fingerprint == key_record.fingerprint,
                     )
                 )
@@ -307,7 +307,7 @@ async def key_user_session_add(
                     committee_statuses[committee_name] = "newly_linked"
                     # Link doesn't exist, create it
                     logging.debug(f"Linking key {fingerprint} to committee {committee_name}")
-                    link = models.KeyLink(committee_id=committee.id, key_fingerprint=key_record.fingerprint)
+                    link = models.KeyLink(committee_name=committee.name, key_fingerprint=key_record.fingerprint)
                     data.add(link)
                 else:
                     committee_statuses[committee_name] = "already_linked"

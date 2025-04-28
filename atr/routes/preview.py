@@ -77,7 +77,10 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     async with db.session() as data:
         project = await data.project(name=project_name).get()
         if not project or not any(
-            (c.id == project.committee_id and (session.uid in c.committee_members or session.uid in c.committers))
+            (
+                (c.name == project.committee_name)
+                and ((session.uid in c.committee_members) or (session.uid in c.committers))
+            )
             for c in (await session.user_committees)
         ):
             return await session.redirect(root.index, error="You do not have access to this project")

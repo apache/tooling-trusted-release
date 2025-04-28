@@ -145,11 +145,10 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     def committee(
         self,
-        id: Opt[int] = NOT_SET,
         name: Opt[str] = NOT_SET,
         full_name: Opt[str] = NOT_SET,
         is_podling: Opt[bool] = NOT_SET,
-        parent_committee_id: Opt[int] = NOT_SET,
+        parent_committee_name: Opt[str] = NOT_SET,
         committee_members: Opt[list[str]] = NOT_SET,
         committers: Opt[list[str]] = NOT_SET,
         release_managers: Opt[list[str]] = NOT_SET,
@@ -160,16 +159,14 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
     ) -> Query[models.Committee]:
         query = sqlmodel.select(models.Committee)
 
-        if is_defined(id):
-            query = query.where(models.Committee.id == id)
         if is_defined(name):
             query = query.where(models.Committee.name == name)
         if is_defined(full_name):
             query = query.where(models.Committee.full_name == full_name)
         if is_defined(is_podling):
             query = query.where(models.Committee.is_podling == is_podling)
-        if is_defined(parent_committee_id):
-            query = query.where(models.Committee.parent_committee_id == parent_committee_id)
+        if is_defined(parent_committee_name):
+            query = query.where(models.Committee.parent_committee_name == parent_committee_name)
         if is_defined(committee_members):
             query = query.where(models.Committee.committee_members == committee_members)
         if is_defined(committers):
@@ -276,7 +273,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         name: Opt[str] = NOT_SET,
         full_name: Opt[str] = NOT_SET,
         is_podling: Opt[bool] = NOT_SET,
-        committee_id: Opt[int] = NOT_SET,
+        committee_name: Opt[str] = NOT_SET,
         vote_policy_id: Opt[int] = NOT_SET,
         _committee: bool = False,
         _releases: bool = False,
@@ -293,8 +290,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Project.full_name == full_name)
         if is_defined(is_podling):
             query = query.where(models.Project.is_podling == is_podling)
-        if is_defined(committee_id):
-            query = query.where(models.Project.committee_id == committee_id)
+        if is_defined(committee_name):
+            query = query.where(models.Project.committee_name == committee_name)
         if is_defined(vote_policy_id):
             query = query.where(models.Project.vote_policy_id == vote_policy_id)
 
