@@ -40,7 +40,6 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     return await session.redirect(root.index, error="Not yet implemented")
 
 
-# TODO: Move these to routes/vote.py?
 @routes.committer("/candidate/view/<project_name>/<version_name>")
 async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
@@ -59,6 +58,7 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     logging.warning(f"File stats: {file_stats}")
 
     return await quart.render_template(
+        # TODO: Move to somewhere appropriate
         "phase-view.html",
         file_stats=file_stats,
         release=release,
@@ -83,7 +83,7 @@ async def view_path(
     content_listing = await util.archive_listing(full_path)
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
     return await quart.render_template(
-        "phase-view-path.html",
+        "file-selected-path.html",
         release=release,
         project_name=project_name,
         version_name=version_name,

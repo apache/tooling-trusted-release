@@ -27,6 +27,7 @@ async def selected_path(
     session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:
     """View the content of a specific file in the release candidate draft."""
+    # TODO: Make this independent of the release phase
     await session.check_access(project_name)
 
     release = await session.release(project_name, version_name)

@@ -448,6 +448,7 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     ]
 
     return await quart.render_template(
+        # TODO: Move to somewhere appropriate
         "phase-view.html",
         file_stats=file_stats,
         release=release,

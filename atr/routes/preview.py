@@ -115,6 +115,7 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     ]
 
     return await quart.render_template(
+        # TODO: Move to somewhere appropriate
         "phase-view.html",
         file_stats=file_stats,
         release=release,
@@ -139,7 +140,7 @@ async def view_path(
     content_listing = await util.archive_listing(full_path)
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
     return await quart.render_template(
-        "phase-view-path.html",
+        "file-selected-path.html",
         release=release,
         project_name=project_name,
         version_name=version_name,
