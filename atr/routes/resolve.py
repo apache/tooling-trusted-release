@@ -18,7 +18,6 @@
 import json
 import logging
 
-import aioshutil
 import httpx
 import quart
 import werkzeug.wrappers.response as response
@@ -26,7 +25,6 @@ import wtforms
 
 import atr.db as db
 import atr.db.models as models
-import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.finish as finish
@@ -128,10 +126,6 @@ async def selected_post(
                 project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE, data=data
             )
 
-            # Get the source directory for the release candidate
-            # We need to do it here because we're updating the release status in the database
-            source = str(util.release_directory(release))
-
             # Update the release phase based on vote result
             if vote_result == "passed":
                 release.stage = models.ReleaseStage.RELEASE
@@ -143,7 +137,6 @@ async def selected_post(
                 success_message = "Vote marked as failed"
                 destination = compose.selected
 
-    await _resolve_post_files(project_name, release, source, vote_result, session.uid)
     return await session.redirect(
         destination, success=success_message, project_name=project_name, version_name=release.version
     )
@@ -160,29 +153,6 @@ def _format_artifact_name(project_name: str, version: str, is_podling: bool = Fa
     if is_podling:
         return f"apache-{project_name}-incubating-{version}"
     return f"apache-{project_name}-{version}"
-
-
-async def _resolve_post_files(
-    project_name: str, release: models.Release, source: str, vote_result: str, asf_uid: str
-) -> None:
-    # TODO: Obtain a lock for this
-    if vote_result != "passed":
-        # The vote failed, so move the release candidate to the release draft directory
-        async with revision.create_and_manage(project_name, release.version, asf_uid, create_directory=False) as (
-            new_revision_dir,
-            _new_revision_name,
-        ):
-            await aioshutil.move(source, new_revision_dir)
-            return
-
-    # The vote passed, so promote the release candidate to the release preview directory
-    async with revision.create_and_manage(
-        project_name, release.version, asf_uid, preview=True, create_directory=False
-    ) as (
-        new_revision_dir,
-        _new_revision_name,
-    ):
-        await aioshutil.move(source, new_revision_dir)
 
 
 async def _task_archive_url(task_mid: str) -> str | None:

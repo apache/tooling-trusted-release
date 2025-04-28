@@ -53,9 +53,10 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
 
     # Convert async generator to list
     file_stats = [
-        stat async for stat in util.content_list(util.get_release_candidate_dir(), project_name, version_name)
+        stat
+        async for stat in util.content_list(util.get_unfinished_dir(), project_name, version_name, release.revision)
     ]
-    logging.warning(f"File stats: {file_stats}")
+    logging.debug(f"File stats: {file_stats}")
 
     return await quart.render_template(
         # TODO: Move to somewhere appropriate
@@ -77,7 +78,7 @@ async def view_path(
     """View the content of a specific file in the release candidate."""
     await session.check_access(project_name)
 
-    release = await session.release(project_name, version_name)
+    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE)
     _max_view_size = 1 * 1024 * 1024
     full_path = util.release_directory(release) / file_path
     content_listing = await util.archive_listing(full_path)

@@ -37,16 +37,13 @@ async def create_and_manage(
     project_name: str, version_name: str, asf_uid: str, preview: bool = False, create_directory: bool = True
 ) -> AsyncGenerator[tuple[pathlib.Path, str]]:
     """Manage the creation and symlinking of a mutable release revision."""
-    if preview is False:
-        base_dir = util.get_release_candidate_draft_dir()
-    else:
-        base_dir = util.get_release_preview_dir()
-    release_dir = base_dir / project_name / version_name
+    base_dir = util.get_unfinished_dir()
+    base_release_dir = base_dir / project_name / version_name
     new_revision_name = _new_name(asf_uid)
-    new_revision_dir = release_dir / new_revision_name
+    new_revision_dir = base_release_dir / new_revision_name
 
     # Ensure that the base directory for the release exists
-    await aiofiles.os.makedirs(release_dir, exist_ok=True)
+    await aiofiles.os.makedirs(base_release_dir, exist_ok=True)
 
     # Get the parent revision, if available
     parent_revision_id: str | None = None
@@ -58,7 +55,7 @@ async def create_and_manage(
         if release is not None:
             parent_revision_id = release.revision
             if parent_revision_id:
-                parent_revision_dir = release_dir / parent_revision_id
+                parent_revision_dir = base_release_dir / parent_revision_id
 
     try:
         # Create the new revision directory

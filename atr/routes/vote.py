@@ -16,11 +16,7 @@
 # under the License.
 
 import datetime
-import logging
-from typing import TYPE_CHECKING
 
-import aiofiles.os
-import aioshutil
 import asfquart.base as base
 import quart
 import werkzeug.wrappers.response as response
@@ -35,9 +31,6 @@ import atr.routes.root as root
 import atr.tasks.vote as tasks_vote
 import atr.user as user
 import atr.util as util
-
-if TYPE_CHECKING:
-    import pathlib
 
 
 @routes.committer("/vote/<project_name>/<version_name>/<revision>", methods=["GET", "POST"])
@@ -148,7 +141,7 @@ Thanks,
                 # This will be checked again by tasks/vote.py for extra safety
                 raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
             if email_to != sender:
-                error = await _promote(data, release.name, project_name, version, revision)
+                error = await _promote(data, release.name)
                 if error:
                     return await session.redirect(root.index, error=error)
 
@@ -220,28 +213,18 @@ Thanks,
 
 async def _promote(
     data: db.Session,
-    candidate_draft_name: str,
-    project_name: str,
-    version_name: str,
-    revision_name: str,
+    release_name: str,
 ) -> str | None:
-    """Promote a candidate draft to a new phase."""
+    """Promote a release candidate draft to a new phase."""
     # Get the release
     # TODO: Use session.release here
-    release = await data.release(name=candidate_draft_name, _project=True).demand(
-        routes.FlashError("Candidate draft not found")
+    release = await data.release(name=release_name, _project=True).demand(
+        routes.FlashError("Release candidate draft not found")
     )
 
     # Verify that it's in the correct phase
     if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
         return "This release is not in the candidate draft phase"
-
-    base_dir = util.release_directory_base(release)
-    # Use the directory of the specified revision
-    # TODO: This ensures that we promote the correct revision, but does not stop conflicts
-    # We need to obtain a lock when promoting
-    source_dir = base_dir / revision_name
-    target_dir: pathlib.Path
 
     # Count how many files are in the source directory
     file_count = await util.number_of_release_files(release)
@@ -253,20 +236,8 @@ async def _promote(
     # NOTE: The functionality for skipping phases has been removed
     release.stage = models.ReleaseStage.RELEASE_CANDIDATE
     release.phase = models.ReleasePhase.RELEASE_CANDIDATE
-    release.revision = None
-    target_dir = util.release_directory(release)
 
-    if await aiofiles.os.path.exists(target_dir):
-        return f"Target directory {target_dir.name} already exists"
-
-    await data.commit()
     # We updated the release
-    # This could act like a lock, but it would be difficult
-    # TODO: Ideally we'd store the revision on the release object instead
-    # Then we could make it atomic through the database
-
-    logging.warning(f"Moving {source_dir} to {target_dir} (base: {base_dir})")
-    await aioshutil.move(str(source_dir), str(target_dir))
-    await aioshutil.rmtree(str(base_dir))  # type: ignore[call-arg]
+    await data.commit()
 
     return None

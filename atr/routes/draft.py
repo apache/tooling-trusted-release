@@ -116,7 +116,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
     # Delete the files on disk, including all revisions
     # We can't use util.release_directory_base here because we don't have the release object
-    draft_dir = util.get_release_candidate_draft_dir() / project_name / version
+    draft_dir = util.get_unfinished_dir() / project_name / version
     if await aiofiles.os.path.exists(draft_dir):
         # Believe this to be another bug in mypy Protocol handling
         # TODO: Confirm that this is a bug, and report upstream
@@ -442,9 +442,7 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     # Convert async generator to list
     file_stats = [
         stat
-        async for stat in util.content_list(
-            util.get_release_candidate_draft_dir(), project_name, version_name, release.revision
-        )
+        async for stat in util.content_list(util.get_unfinished_dir(), project_name, version_name, release.revision)
     ]
 
     return await quart.render_template(

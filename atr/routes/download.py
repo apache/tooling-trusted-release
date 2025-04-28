@@ -41,7 +41,8 @@ async def phase(
     if not path.is_relative_to(path.anchor):
         raise routes.FlashError("Path must be relative")
 
-    full_path = util.get_phase_dir() / phase / project_name / version_name / file_path
+    release = await session.release(project_name, version_name, phase=None)
+    full_path = util.release_directory(release) / file_path
 
     # Check that the file exists
     if not await aiofiles.os.path.exists(file_path):

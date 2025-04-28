@@ -122,7 +122,7 @@ class Recorder:
 
     async def abs_path(self, rel_path: str | None = None) -> pathlib.Path | None:
         """Construct the absolute path using the required draft_revision."""
-        base_dir = util.get_release_candidate_draft_dir()
+        base_dir = util.get_unfinished_dir()
         project_part = self.project_name
         version_part = self.version_name
         revision_part = self.draft_revision

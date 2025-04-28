@@ -254,24 +254,12 @@ async def get_asf_id_or_die() -> str:
     return web_session.uid
 
 
-def get_phase_dir() -> pathlib.Path:
-    return pathlib.Path(config.get().PHASE_STORAGE_DIR)
+def get_finished_dir() -> pathlib.Path:
+    return pathlib.Path(config.get().FINISHED_STORAGE_DIR)
 
 
-def get_release_candidate_dir() -> pathlib.Path:
-    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "release-candidate"
-
-
-def get_release_candidate_draft_dir() -> pathlib.Path:
-    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "release-candidate-draft"
-
-
-def get_release_dir() -> pathlib.Path:
-    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "release"
-
-
-def get_release_preview_dir() -> pathlib.Path:
-    return pathlib.Path(config.get().PHASE_STORAGE_DIR) / "release-preview"
+def get_unfinished_dir() -> pathlib.Path:
+    return pathlib.Path(config.get().UNFINISHED_STORAGE_DIR)
 
 
 def is_user_viewing_as_admin(uid: str | None) -> bool:
@@ -301,13 +289,13 @@ async def number_of_release_files(release: models.Release) -> int:
     path_revision = release.revision or "force-error"
     match release.phase:
         case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-            path = get_release_candidate_draft_dir() / path_project / path_version / path_revision
+            path = get_unfinished_dir() / path_project / path_version / path_revision
         case models.ReleasePhase.RELEASE_CANDIDATE:
-            path = get_release_candidate_dir() / path_project / path_version
+            path = get_unfinished_dir() / path_project / path_version / path_revision
         case models.ReleasePhase.RELEASE_PREVIEW:
-            path = get_release_preview_dir() / path_project / path_version / path_revision
+            path = get_unfinished_dir() / path_project / path_version / path_revision
         case models.ReleasePhase.RELEASE:
-            path = get_release_dir() / path_project / path_version
+            path = get_finished_dir() / path_project / path_version
         case _:
             raise ValueError(f"Unknown release phase: {release.phase}")
     return len(await paths_recursive(path))
@@ -413,13 +401,13 @@ def release_directory_base(release: models.Release) -> pathlib.Path:
     base_dir: pathlib.Path | None = None
     match phase:
         case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-            base_dir = get_release_candidate_draft_dir()
+            base_dir = get_unfinished_dir()
         case models.ReleasePhase.RELEASE_CANDIDATE:
-            base_dir = get_release_candidate_dir()
+            base_dir = get_unfinished_dir()
         case models.ReleasePhase.RELEASE_PREVIEW:
-            base_dir = get_release_preview_dir()
+            base_dir = get_unfinished_dir()
         case models.ReleasePhase.RELEASE:
-            base_dir = get_release_dir()
+            base_dir = get_finished_dir()
         # NOTE: Do NOT add "case _" here
 
     return base_dir / project_name / version_name

@@ -131,7 +131,7 @@ async def view(project_name: str, version_name: str) -> response.Response | str:
         )
 
     # Convert async generator to list
-    file_stats = [stat async for stat in util.content_list(util.get_release_dir(), project_name, version_name)]
+    file_stats = [stat async for stat in util.content_list(util.get_finished_dir(), project_name, version_name)]
 
     return await quart.render_template(
         # TODO: Move to somewhere appropriate
