@@ -72,7 +72,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
 
     if latest_vote_task and (latest_vote_task.status == models.TaskStatus.COMPLETED) and latest_vote_task.result:
         task_mid = _task_mid(latest_vote_task)
-        archive_url = await _task_archive_url(task_mid)
+        archive_url = await _task_archive_url_cached(task_mid)
 
     return await quart.render_template(
         "candidate-resolve-release.html",
@@ -156,7 +156,6 @@ def _format_artifact_name(project_name: str, version: str, is_podling: bool = Fa
 
 
 async def _task_archive_url(task_mid: str) -> str | None:
-    # TODO: Should cache the result of this function in sqlite
     if "@" not in task_mid:
         return None
 
@@ -175,6 +174,29 @@ async def _task_archive_url(task_mid: str) -> str | None:
     except Exception:
         logging.exception("Failed to get archive URL for task %s", task_mid)
         return None
+
+
+async def _task_archive_url_cached(task_mid: str) -> str | None:
+    if "@" not in task_mid:
+        return None
+
+    async with db.session() as data:
+        url = await data.ns_text_get(
+            "mid-url-cache",
+            task_mid,
+        )
+        if url is not None:
+            return url
+
+    url = await _task_archive_url(task_mid)
+    if url is not None:
+        await data.ns_text_set(
+            "mid-url-cache",
+            task_mid,
+            url,
+        )
+
+    return url
 
 
 def _task_mid(latest_vote_task: models.Task) -> str:
