@@ -33,7 +33,11 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
     """Show the report for a specific file."""
     await session.check_access(project_name)
 
-    release = await session.release(project_name, version_name)
+    # If the draft is not found, we try to get the release candidate
+    try:
+        release = await session.release(project_name, version_name)
+    except base.ASFQuartException:
+        release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE)
 
     # TODO: When we do more than one thing in a dir, we should use the revision directory directly
     abs_path = util.release_directory(release) / rel_path

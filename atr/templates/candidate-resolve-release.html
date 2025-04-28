@@ -57,7 +57,9 @@
     </div>
     <div class="card-body">
       <a href="{{ as_url(routes.candidate.view, project_name=release.project.name, version_name=release.version) }}"
-         class="btn btn-primary">View files</a>
+         class="btn btn-primary me-2">View files</a>
+      <a href="{{ as_url(routes.vote.selected, project_name=release.project.name, version_name=release.version) }}"
+         class="btn btn-success">Vote on release</a>
     </div>
   </div>
 

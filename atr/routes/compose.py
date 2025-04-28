@@ -29,12 +29,7 @@ import atr.routes.draft as draft
 import atr.util as util
 
 
-@routes.committer("/compose/<project_name>/<version_name>")
-async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
-    """Show the contents of the release candidate draft."""
-    await session.check_access(project_name)
-
-    release = await session.release(project_name, version_name)
+async def check(session: routes.CommitterSession, release: models.Release) -> response.Response | str:
     base_path = util.release_directory(release)
     paths = await util.paths_recursive(base_path)
     path_templates = {}
@@ -48,8 +43,8 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     for path in paths:
         # Get template and substitutions
         elements = {
-            "core": project_name,
-            "version": version_name,
+            "core": release.project.name,
+            "version": release.version,
             "sub": None,
             "template": None,
             "substitutions": None,
@@ -78,20 +73,22 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
                 release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.FAILURE
             ).all()
 
-    revision_name_from_link, revision_editor, revision_time = await revision.latest_info(project_name, version_name)
+    revision_name_from_link, revision_editor, revision_time = await revision.latest_info(
+        release.project.name, release.version
+    )
 
     # Get the number of ongoing tasks for the current revision
     ongoing_tasks_count = 0
     if revision_name_from_link:
-        ongoing_tasks_count = await db.tasks_ongoing(project_name, version_name, revision_name_from_link)
+        ongoing_tasks_count = await db.tasks_ongoing(release.project.name, release.version, revision_name_from_link)
 
     delete_draft_form = await draft.DeleteForm.create_form()
     delete_file_form = await draft.DeleteFileForm.create_form()
 
     return await quart.render_template(
-        "compose-selected.html",
-        project_name=project_name,
-        version_name=version_name,
+        "check-selected.html",
+        project_name=release.project.name,
+        version_name=release.version,
         release=release,
         paths=paths,
         artifacts=path_artifacts,
@@ -112,3 +109,12 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         format_datetime=routes.format_datetime,
         models=models,
     )
+
+
+@routes.committer("/compose/<project_name>/<version_name>")
+async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+    """Show the contents of the release candidate draft."""
+    await session.check_access(project_name)
+
+    release = await session.release(project_name, version_name, with_committee=True)
+    return await check(session, release)

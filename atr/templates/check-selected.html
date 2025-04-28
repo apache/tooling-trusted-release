@@ -5,7 +5,7 @@
 {% endblock title %}
 
 {% block description %}
-  Overview and management page for the {{ release.project.display_name }} {{ version_name }} candidate draft.
+  Review page for the {{ release.project.display_name }} {{ version_name }} candidate.
 {% endblock description %}
 
 {% import 'macros/dialog.html' as dialog %}
@@ -29,24 +29,46 @@
 {% endblock stylesheets %}
 
 {% block content %}
+  {% set phase = release.phase.value %}
   <p class="d-flex justify-content-between align-items-center">
-    <a href="{{ as_url(routes.root.index) }}" class="atr-back-link">← Back to Select a release</a>
+    {% if phase == "release_candidate_draft" %}
+      <a href="{{ as_url(routes.root.index) }}" class="atr-back-link">← Back to Select a release</a>
+    {% else %}
+      <a href="{{ as_url(routes.resolve.selected, project_name=release.project.name, version_name=release.version) }}"
+         class="atr-back-link">← Back to Resolve vote for {{ release.project.short_display_name }} {{ release.version }}</a>
+    {% endif %}
     <span>
-      <strong class="atr-phase-one atr-phase-symbol">①</strong>
-      <span class="atr-phase-one atr-phase-label">COMPOSE</span>
-      <span class="atr-phase-arrow">→</span>
-      <span class="atr-phase-symbol-other">②</span>
+      {% if phase == "release_candidate_draft" %}
+        <strong class="atr-phase-one atr-phase-symbol">①</strong>
+        <span class="atr-phase-one atr-phase-label">COMPOSE</span>
+        <span class="atr-phase-arrow">→</span>
+        <span class="atr-phase-symbol-other">②</span>
+      {% else %}
+        <span class="atr-phase-symbol-other">①</span>
+        <span class="atr-phase-arrow">→</span>
+        <strong class="atr-phase-two atr-phase-symbol">②</strong>
+        <span class="atr-phase-two atr-phase-label">VOTE</span>
+      {% endif %}
       <span class="atr-phase-arrow">→</span>
       <span class="atr-phase-symbol-other">③</span>
     </span>
   </p>
 
-  <h1>
-    Compose <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
-  </h1>
-  <p>
-    Manage the <strong>candidate draft</strong> for {{ release.project.display_name }} {{ version_name }}. Add files, review checks, and promote when ready.
-  </p>
+  {% if phase == "release_candidate_draft" %}
+    <h1>
+      Compose <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
+    </h1>
+    <p>
+      Manage the <strong>candidate draft</strong> for {{ release.project.display_name }} {{ version_name }}. Add files, review checks, and promote when ready.
+    </p>
+  {% else %}
+    <h1>
+      Vote on <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
+    </h1>
+    <p>
+      The {{ release.committee.name }} committee is currently voting on the <strong>release candidate</strong> for {{ release.project.display_name }} {{ version_name }}. This page allows you to review the automated checks run on the files in the release.
+    </p>
+  {% endif %}
 
   <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -81,29 +103,31 @@
     </div>
   </div>
 
-  <div class="card mb-4">
-    <div class="card-header">
-      <h5 class="mb-0">Draft actions</h5>
+  {% if phase == "release_candidate_draft" %}
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="mb-0">Draft actions</h5>
+      </div>
+      <div class="card-body d-flex flex-wrap gap-2">
+        <a href="{{ as_url(routes.upload.selected, project_name=release.project.name, version_name=release.version) }}"
+           title="Upload files to this draft"
+           class="btn btn-primary"><i class="bi bi-upload me-1"></i> Upload files</a>
+        <a href="{{ as_url(routes.revisions.selected, project_name=release.project.name, version_name=release.version) }}"
+           title="View revision history"
+           class="btn btn-secondary"><i class="bi bi-clock-history me-1"></i> Revisions</a>
+        <a href="{{ as_url(routes.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=release.revision) }}"
+           title="Start a vote on this draft"
+           class="btn btn-success"><i class="bi bi-check-circle me-1"></i> Start voting</a>
+        <button class="btn btn-danger"
+                title="Delete this entire draft"
+                data-bs-toggle="modal"
+                data-bs-target="#delete-{{ release.name|slugify }}">
+          <i class="bi bi-trash me-1"></i> Delete draft
+        </button>
+      </div>
     </div>
-    <div class="card-body d-flex flex-wrap gap-2">
-      <a href="{{ as_url(routes.upload.selected, project_name=release.project.name, version_name=release.version) }}"
-         title="Upload files to this draft"
-         class="btn btn-primary"><i class="bi bi-upload me-1"></i> Upload files</a>
-      <a href="{{ as_url(routes.revisions.selected, project_name=release.project.name, version_name=release.version) }}"
-         title="View revision history"
-         class="btn btn-secondary"><i class="bi bi-clock-history me-1"></i> Revisions</a>
-      <a href="{{ as_url(routes.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=release.revision) }}"
-         title="Start a vote on this draft"
-         class="btn btn-success"><i class="bi bi-check-circle me-1"></i> Start voting</a>
-      <button class="btn btn-danger"
-              title="Delete this entire draft"
-              data-bs-toggle="modal"
-              data-bs-target="#delete-{{ release.name|slugify }}">
-        <i class="bi bi-trash me-1"></i> Delete draft
-      </button>
-    </div>
-  </div>
-  {{ dialog.delete_modal_with_confirm(release.name|slugify, "Delete candidate draft", "candidate draft", as_url(routes.draft.delete) , delete_form, "candidate_draft_name") }}
+    {{ dialog.delete_modal_with_confirm(release.name|slugify, "Delete candidate draft", "candidate draft", as_url(routes.draft.delete) , delete_form, "candidate_draft_name") }}
+  {% endif %}
 
   {% if ongoing_tasks_count > 0 %}
     <div class="alert alert-warning" role="alert">
@@ -114,7 +138,14 @@
 
   <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
-      <h5 class="mb-0">Files in this revision</h5>
+      <h5 class="mb-0">
+        Files
+        {% if phase == "release_candidate_draft" %}
+          in this revision
+        {% else %}
+          in the release candidate
+        {% endif %}
+      </h5>
     </div>
     <div class="card-body">
       {% if paths|length > 0 %}
@@ -190,43 +221,47 @@
                         <span class="btn btn-sm btn-outline-secondary disabled">No checks run</span>
                       {% endif %}
 
-                      <button class="btn btn-sm btn-outline-secondary"
-                              type="button"
-                              data-bs-toggle="collapse"
-                              data-bs-target="#actions-{{ row_id }}"
-                              aria-expanded="false"
-                              aria-controls="actions-{{ row_id }}"
-                              title="Show more actions for {{ path }}"
-                              onclick="this.innerHTML = (this.innerHTML.trim() === 'More') ? 'Less' : 'More';">
-                        More
-                      </button>
+                      {% if phase == "release_candidate_draft" %}
+                        <button class="btn btn-sm btn-outline-secondary"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#actions-{{ row_id }}"
+                                aria-expanded="false"
+                                aria-controls="actions-{{ row_id }}"
+                                title="Show more actions for {{ path }}"
+                                onclick="this.innerHTML = (this.innerHTML.trim() === 'More') ? 'Less' : 'More';">
+                          More
+                        </button>
+                      {% endif %}
                     </div>
                   </td>
                 </tr>
 
-                <tr class="{{ row_bg_class }}">
-                  <td colspan="3" class="p-0 border-0">
-                    <div class="collapse px-3 py-2" id="actions-{{ row_id }}">
-                      <div class="d-flex justify-content-end">
-                        <div class="btn-group btn-group-sm"
-                             role="group"
-                             aria-label="More file actions for {{ path }}">
-                          <a href="{{ as_url(routes.download.phase, phase='candidate-draft', project_name=release.project.name, version_name=release.version, file_path=path) }}"
-                             title="Download file {{ path }}"
-                             class="btn btn-outline-secondary">Download</a>
-                          <a href="{{ as_url(routes.draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
-                             title="Tools for file {{ path }}"
-                             class="btn btn-outline-secondary">Tools</a>
-                          <button class="btn btn-outline-danger"
-                                  data-bs-toggle="modal"
-                                  data-bs-target="#delete-{{ row_id }}"
-                                  title="Delete file {{ path }}">Delete</button>
+                {% if phase == "release_candidate_draft" %}
+                  <tr class="{{ row_bg_class }}">
+                    <td colspan="3" class="p-0 border-0">
+                      <div class="collapse px-3 py-2" id="actions-{{ row_id }}">
+                        <div class="d-flex justify-content-end">
+                          <div class="btn-group btn-group-sm"
+                               role="group"
+                               aria-label="More file actions for {{ path }}">
+                            <a href="{{ as_url(routes.download.phase, phase='candidate-draft', project_name=release.project.name, version_name=release.version, file_path=path) }}"
+                               title="Download file {{ path }}"
+                               class="btn btn-outline-secondary">Download</a>
+                            <a href="{{ as_url(routes.draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
+                               title="Tools for file {{ path }}"
+                               class="btn btn-outline-secondary">Tools</a>
+                            <button class="btn btn-outline-danger"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#delete-{{ row_id }}"
+                                    title="Delete file {{ path }}">Delete</button>
+                          </div>
+                          {{ dialog.delete_modal(row_id, "Delete file", "file, and any associated metadata files", as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
                         </div>
-                        {{ dialog.delete_modal(row_id, "Delete file", "file, and any associated metadata files", as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
                       </div>
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
+                {% endif %}
               {% endfor %}
             </tbody>
           </table>
@@ -236,6 +271,13 @@
       {% endif %}
     </div>
   </div>
+
+  {% if phase == "release_candidate" %}
+    <div class="alert alert-warning mb-4" role="alert">
+      <p class="fw-semibold mb-1">TODO</p>
+      <p class="mb-1">We plan to add a vote form here that allows you to send a vote in the thread.</p>
+    </div>
+  {% endif %}
 
 {% endblock content %}
 
