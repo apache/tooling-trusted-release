@@ -23,7 +23,7 @@
   </p>
 
   <h1 class="mb-4">
-    Start vote on <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
+    Start voting on <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
   </h1>
 
   <div class="px-3 py-4 mb-4 bg-light border rounded">
@@ -40,7 +40,7 @@
   <form method="post"
         id="vote-initiate-form"
         class="atr-canary py-4 px-5"
-        action="{{ as_url(routes.vote.selected_revision, project_name=release.project.name, version_name=release.version, revision=release.revision) }}">
+        action="{{ as_url(routes.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=release.revision) }}">
     {{ form.hidden_tag() if form.hidden_tag }}
     {{ form.release_name }}
 

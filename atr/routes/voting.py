@@ -33,7 +33,7 @@ import atr.user as user
 import atr.util as util
 
 
-@routes.committer("/vote/<project_name>/<version_name>/<revision>", methods=["GET", "POST"])
+@routes.committer("/voting/<project_name>/<version_name>/<revision>", methods=["GET", "POST"])
 async def selected_revision(
     session: routes.CommitterSession, project_name: str, version_name: str, revision: str
 ) -> response.Response | str:
