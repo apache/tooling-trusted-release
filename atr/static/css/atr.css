@@ -254,6 +254,18 @@ span.warning {
     padding: 2rem;
 }
 
+aside.sidebar nav i.bi {
+    color: #555555;
+}
+
+aside.sidebar nav a {
+    text-decoration: none;
+}
+
+aside.sidebar nav a:hover {
+    text-decoration: underline;
+}
+
 .sidebar {
     width: 250px;
     background-color: #f6f7f8;
@@ -279,14 +291,16 @@ span.warning {
 
 .sidebar nav {
     margin-top: 1.5rem;
+    margin-left: 0.5rem;
 }
 
 .sidebar nav ul {
     list-style: none;
+    padding-left: 0;
 }
 
 .sidebar nav li {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.3333rem;
 }
 
 .hamburger {

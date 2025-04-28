@@ -865,7 +865,7 @@ def test_ssh_01_add_key(page: sync_api.Page, credentials: Credentials) -> None:
     go_to_path(page, "/committees")
 
     logging.info("Navigating to Your Public Keys page")
-    page.locator('a[href="/keys"]:has-text("Your public keys")').click()
+    page.locator('a[href="/keys"]:has-text("Manage keys")').click()
     wait_for_path(page, "/keys")
     logging.info("Navigated to Your Public Keys page")
 

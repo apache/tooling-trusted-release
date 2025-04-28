@@ -88,18 +88,18 @@
     <div class="card-body d-flex flex-wrap gap-2">
       <a href="{{ as_url(routes.upload.selected, project_name=release.project.name, version_name=release.version) }}"
          title="Upload files to this draft"
-         class="btn btn-primary"><i class="fas fa-upload me-1"></i> Upload files</a>
+         class="btn btn-primary"><i class="bi bi-upload me-1"></i> Upload files</a>
       <a href="{{ as_url(routes.revisions.selected, project_name=release.project.name, version_name=release.version) }}"
          title="View revision history"
-         class="btn btn-secondary"><i class="fas fa-history me-1"></i> Revisions</a>
+         class="btn btn-secondary"><i class="bi bi-clock-history me-1"></i> Revisions</a>
       <a href="{{ as_url(routes.vote.selected_revision, project_name=release.project.name, version_name=release.version, revision=release.revision) }}"
          title="Start a vote on this draft"
-         class="btn btn-success"><i class="fas fa-check-circle me-1"></i> Start vote</a>
+         class="btn btn-success"><i class="bi bi-check-circle me-1"></i> Start vote</a>
       <button class="btn btn-danger"
               title="Delete this entire draft"
               data-bs-toggle="modal"
               data-bs-target="#delete-{{ release.name|slugify }}">
-        <i class="fas fa-trash me-1"></i> Delete draft
+        <i class="bi bi-trash me-1"></i> Delete draft
       </button>
     </div>
   </div>
@@ -107,7 +107,7 @@
 
   {% if ongoing_tasks_count > 0 %}
     <div class="alert alert-warning" role="alert">
-      <i class="fa-solid fa-triangle-exclamation me-2"></i>
+      <i class="bi bi-exclamation-triangle me-2"></i>
       There {{ 'is' if ongoing_tasks_count == 1 else 'are' }} currently <strong>{{ ongoing_tasks_count }}</strong> background verification {{ 'task' if ongoing_tasks_count == 1 else 'tasks' }} running for the latest revision. Results shown below may be incomplete or outdated until the tasks finish. Refresh the page to see updates.
     </div>
   {% endif %}
@@ -150,15 +150,17 @@
                     {% endif %}
 
                     {% if path in artifacts %}
-                      <i class="fas fa-box-archive {{ icon_class }}"
+                      <i class="bi bi-archive {{ icon_class }}"
                          title="Artifact"
                          aria-label="Artifact"></i>
                     {% elif path in metadata %}
-                      <i class="fas fa-file-alt {{ icon_class }}"
+                      <i class="bi bi-file-earmark-text {{ icon_class }}"
                          title="Metadata"
                          aria-label="Metadata"></i>
                     {% else %}
-                      <i class="fas fa-file {{ icon_class }}" title="File" aria-label="File"></i>
+                      <i class="bi bi-file-earmark {{ icon_class }}"
+                         title="File"
+                         aria-label="File"></i>
                     {% endif %}
                   </td>
                   <td class="py-2">
@@ -176,7 +178,7 @@
                     <div class="d-flex justify-content-end align-items-center gap-2">
                       {% if has_errors %}
                         <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
-                           class="btn btn-sm btn-outline-danger"><i class="fas fa-exclamation-triangle me-1"></i> Show {{ errors[path]|length }} {{ "error" if errors[path]|length == 1 else "errors" }}</a>
+                           class="btn btn-sm btn-outline-danger"><i class="bi bi-exclamation-triangle me-1"></i> Show {{ errors[path]|length }} {{ "error" if errors[path]|length == 1 else "errors" }}</a>
                       {% elif has_warnings %}
                         <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                            class="btn btn-sm btn-outline-warning">Show {{ warnings[path]|length }} {{ "warning" if warnings[path]|length == 1 else "warnings" }}</a>

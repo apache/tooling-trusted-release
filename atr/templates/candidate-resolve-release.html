@@ -70,7 +70,7 @@
         {% if vote_task %}
           {% if vote_task.status.value == "completed" %}
             <p class="mb-0 text-success fw-semibold">
-              <i class="fa-solid fa-check-circle me-1"></i> Vote email sent: {{ format_datetime(vote_task.completed) }}
+              <i class="bi bi-check-circle me-1"></i> Vote email sent: {{ format_datetime(vote_task.completed) }}
             </p>
             {% if task_mid %}
               <p class="mt-2 mb-0 text-muted ps-4">
@@ -79,14 +79,14 @@
             {% endif %}
           {% elif vote_task.status.value == "failed" %}
             <p class="mb-1 text-danger fw-semibold">
-              <i class="fa-solid fa-circle-xmark me-1"></i> Vote email failed: {{ format_datetime(vote_task.completed) }}
+              <i class="bi bi-x-circle me-1"></i> Vote email failed: {{ format_datetime(vote_task.completed) }}
             </p>
             <div class="alert alert-danger mt-2 mb-0 p-2" role="alert">
               <p class="mb-0 p-2 text-danger">{{ vote_task.error }}</p>
             </div>
           {% else %}
             <p class="mb-0 text-warning fw-semibold">
-              <i class="fa-solid fa-hourglass-half me-1"></i> Vote email task status: {{ vote_task.status.value.upper() }}
+              <i class="bi bi-hourglass-split me-1"></i> Vote email task status: {{ vote_task.status.value.upper() }}
               {% if vote_task.started %}
                 (Started: {{ format_datetime(vote_task.started) }})
               {% else %}
@@ -96,14 +96,14 @@
           {% endif %}
           {% if archive_url %}
             <p class="mt-2 mb-0 text-muted ps-4">
-              <a href="{{ archive_url }}">View vote email in the archive <i class="fa-solid fa-arrow-up-right-from-square ms-1"></i></a>
+              <a href="{{ archive_url }}">View vote email in the archive <i class="bi bi-box-arrow-up-right ms-1"></i></a>
             </p>
           {% elif task_mid %}
             <p class="mt-2 mb-0 text-muted ps-4">Could not retrieve archive URL for this message.</p>
           {% endif %}
         {% else %}
           <p class="mb-0 text-muted">
-            <i class="fa-solid fa-circle-question me-1"></i> Vote email: No vote initiation task found for this release.
+            <i class="bi bi-question-circle me-1"></i> Vote email: No vote initiation task found for this release.
           </p>
         {% endif %}
       </div>

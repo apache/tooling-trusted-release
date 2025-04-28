@@ -31,7 +31,8 @@
     <h3>Get started</h3>
     <ul>
       <li>
-        <a href="{{ as_url(routes.root.index) }}">Select a release</a>
+        <i class="bi bi-play-circle"></i>
+        <a href="{{ as_url(routes.root.index) }}">Select release</a>
       </li>
     </ul>
 
@@ -43,6 +44,7 @@
           <ul>
             {% for release in releases %}
               <li>
+                <i class="bi bi-tag"></i>
                 <a href="{{ release_as_url(release) }}">{{ release.version }}</a>
               </li>
             {% endfor %}
@@ -53,35 +55,36 @@
       <h3>Releases</h3>
       <ul>
         <li>
+          <i class="bi bi-view-list"></i>
           <a href="{{ as_url(routes.release.releases) }}">View releases</a>
         </li>
       </ul>
 
-      <h3>Key management</h3>
+      <h3>Public keys</h3>
       <ul>
         <li>
-          <i class="fa-solid fa-key"></i>
-          <a href="{{ as_url(routes.keys.keys) }}">Your public keys</a>
-        </li>
-      </ul>
-
-      <h3>Documentation</h3>
-      <ul>
-        <li>
-          <i class="fa-solid fa-book"></i>
-          <a href="{{ as_url(routes.root.tutorial) }}">Tutorial</a>
+          <i class="bi bi-key"></i>
+          <a href="{{ as_url(routes.keys.keys) }}">Manage keys</a>
         </li>
       </ul>
 
       <h3>Browse</h3>
       <ul>
         <li>
-          <i class="fa-solid fa-diagram-project"></i>
+          <i class="bi bi-collection"></i>
           <a href="{{ as_url(routes.committees.directory) }}">Committees</a>
         </li>
         <li>
-          <i class="fa-solid fa-diagram-project"></i>
+          <i class="bi bi-collection"></i>
           <a href="{{ as_url(routes.projects.projects) }}">Projects</a>
+        </li>
+      </ul>
+
+      <h3>Documentation</h3>
+      <ul>
+        <li>
+          <i class="bi bi-book"></i>
+          <a href="{{ as_url(routes.root.tutorial) }}">Tutorial</a>
         </li>
       </ul>
 
@@ -89,32 +92,32 @@
         <h3>Administration</h3>
         <ul>
           <li>
-            <i class="fa-solid fa-database"></i>
+            <i class="bi bi-database"></i>
             <a href="{{ url_for('admin.admin_data') }}"
                {% if request.endpoint == 'admin.admin_data' %}class="active"{% endif %}>Browse database</a>
           </li>
           <li>
-            <i class="fa-solid fa-list-ul"></i>
+            <i class="bi bi-list-ul"></i>
             <a href="{{ url_for('admin.admin_releases') }}"
                {% if request.endpoint == 'admin.admin_releases' %}class="active"{% endif %}>All releases</a>
           </li>
           <li>
-            <i class="fa-solid fa-rotate"></i>
+            <i class="bi bi-arrow-repeat"></i>
             <a href="{{ url_for('admin.admin_projects_update') }}"
                {% if request.endpoint == 'admin.admin_projects_update' %}class="active"{% endif %}>Update projects</a>
           </li>
           <li>
-            <i class="fa-solid fa-list-check"></i>
+            <i class="bi bi-list-task"></i>
             <a href="{{ url_for('admin.admin_tasks') }}"
-               {% if request.endpoint == 'admin.admin_tasks' %}class="active"{% endif %}>Background Tasks</a>
+               {% if request.endpoint == 'admin.admin_tasks' %}class="active"{% endif %}>Background tasks</a>
           </li>
           <li>
-            <i class="fa-solid fa-weight-scale"></i>
+            <i class="bi bi-speedometer2"></i>
             <a href="{{ url_for('admin.admin_performance') }}"
-               {% if request.endpoint == 'admin.admin_performance' %}class="active"{% endif %}>Performance dashboard</a>
+               {% if request.endpoint == 'admin.admin_performance' %}class="active"{% endif %}>Page performance</a>
           </li>
           <li>
-            <i class="fa-solid fa-trash"></i>
+            <i class="bi bi-trash"></i>
             <a href="{{ url_for('admin.admin_delete_release') }}"
                {% if request.endpoint == 'admin.admin_delete_release' %}class="active"{% endif %}>Delete release</a>
           </li>

@@ -122,12 +122,12 @@
         {% if project.vote_policy and (is_committee_member or is_admin) %}
           <div>
             <a class="btn btn-primary btn-sm"
-               href="{{ as_url(routes.projects.vote_policy_edit, project_name=project.name) }}"><i class="fa-solid fa-pen-to-square"></i></a>
+               href="{{ as_url(routes.projects.vote_policy_edit, project_name=project.name) }}"><i class="bi bi-pencil-square"></i></a>
           </div>
         {% elif (is_committee_member or is_admin) %}
           <div>
             <a class="btn btn-primary btn-sm"
-               href="{{ as_url(routes.projects.vote_policy_add, project_name=project.name) }}"><i class="fa-solid fa-plus"></i></a>
+               href="{{ as_url(routes.projects.vote_policy_add, project_name=project.name) }}"><i class="bi bi-plus"></i></a>
           </div>
         {% endif %}
       {% endif %}
@@ -271,7 +271,7 @@
           <button type="submit"
                   class="btn btn-sm btn-outline-danger"
                   title="Delete {{ project.display_name }}">
-            <i class="fa-solid fa-trash"></i> Delete project
+            <i class="bi bi-trash"></i> Delete project
           </button>
         </form>
       </div>
