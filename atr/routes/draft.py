@@ -493,10 +493,6 @@ async def _delete_candidate_draft(data: db.Session, candidate_draft_name: str) -
     if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
         raise routes.FlashError("Candidate draft is not in the release candidate draft phase")
 
-    # Delete all associated packages first
-    for package in release.packages:
-        await data.delete(package)
-
     # Delete any parent links
     await data.ns_text_del_all(release.name + " draft")
     await data.ns_text_del_all(release.name + " preview")

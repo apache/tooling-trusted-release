@@ -66,7 +66,6 @@ async def admin_data(model: str = "Committee") -> str:
         model_methods: dict[str, Callable[[], db.Query[Any]]] = {
             "CheckResult": data.check_result,
             "Committee": data.committee,
-            "Package": data.package,
             "Project": data.project,
             "PublicSigningKey": data.public_signing_key,
             "Release": data.release,

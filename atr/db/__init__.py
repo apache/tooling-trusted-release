@@ -224,50 +224,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         if commit is True:
             await self.commit()
 
-    def package(
-        self,
-        artifact_sha3: Opt[str] = NOT_SET,
-        artifact_type: Opt[str] = NOT_SET,
-        filename: Opt[str] = NOT_SET,
-        sha512: Opt[str] = NOT_SET,
-        signature_sha3: Opt[str | None] = NOT_SET,
-        uploaded: Opt[datetime.datetime] = NOT_SET,
-        bytes_size: Opt[int] = NOT_SET,
-        release_name: Opt[str] = NOT_SET,
-        _release: bool = False,
-        _release_project: bool = False,
-        _release_committee: bool = False,
-    ) -> Query[models.Package]:
-        query = sqlmodel.select(models.Package)
-
-        if is_defined(artifact_sha3):
-            query = query.where(models.Package.artifact_sha3 == artifact_sha3)
-        if is_defined(artifact_type):
-            query = query.where(models.Package.artifact_type == artifact_type)
-        if is_defined(filename):
-            query = query.where(models.Package.filename == filename)
-        if is_defined(sha512):
-            query = query.where(models.Package.sha512 == sha512)
-        if is_defined(signature_sha3):
-            query = query.where(models.Package.signature_sha3 == signature_sha3)
-        if is_defined(uploaded):
-            query = query.where(models.Package.uploaded == uploaded)
-        if is_defined(bytes_size):
-            query = query.where(models.Package.bytes_size == bytes_size)
-        if is_defined(release_name):
-            query = query.where(models.Package.release_name == release_name)
-
-        if _release:
-            query = query.options(select_in_load(models.Package.release))
-        if _release_project:
-            query = query.options(select_in_load_nested(models.Package.release, models.Release.project))
-        if _release_committee:
-            query = query.options(
-                select_in_load_nested(models.Package.release, models.Release.project, models.Project.committee)
-            )
-
-        return Query(self, query)
-
     def project(
         self,
         name: Opt[str] = NOT_SET,
@@ -392,8 +348,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
         if _project:
             query = query.options(select_in_load(models.Release.project))
-        if _packages:
-            query = query.options(select_in_load(models.Release.packages))
         if _vote_policy:
             query = query.options(select_in_load(models.Release.vote_policy))
         if _committee:

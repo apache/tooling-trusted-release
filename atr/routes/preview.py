@@ -169,10 +169,6 @@ async def _delete_preview(data: db.Session, preview_name: str) -> None:
 
     # TODO: Abstract this to a function
     # We do something similar in admin.py and draft.py
-    # Delete all associated packages first
-    for package in release.packages:
-        await data.delete(package)
-
     # Delete any parent links
     await data.ns_text_del_all(release.name + " draft")
     await data.ns_text_del_all(release.name + " preview")

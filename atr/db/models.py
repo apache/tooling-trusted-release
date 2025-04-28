@@ -259,28 +259,6 @@ class DistributionChannel(sqlmodel.SQLModel, table=True):
     project: Project = sqlmodel.Relationship(back_populates="distribution_channels")
 
 
-class Package(sqlmodel.SQLModel, table=True):
-    # The SHA3-256 hash of the file, used as filename in storage
-    # TODO: We should discuss making this unique
-    artifact_sha3: str = sqlmodel.Field(primary_key=True)
-    # The type of artifact (source, binary, reproducible binary)
-    artifact_type: str
-    # Original filename from uploader
-    filename: str
-    # SHA-512 hash of the file
-    sha512: str
-    # The signature file
-    signature_sha3: str | None = None
-    # Uploaded timestamp
-    uploaded: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
-    # The size of the file in bytes
-    bytes_size: int
-
-    # Many-to-one: A package belongs to one release
-    release_name: str = sqlmodel.Field(foreign_key="release.name")
-    release: "Release" = sqlmodel.Relationship(back_populates="packages")
-
-
 class VoteEntry(pydantic.BaseModel):
     result: bool
     summary: str
@@ -414,8 +392,6 @@ class Release(sqlmodel.SQLModel, table=True):
     # They have one version per package, i.e. per provider
     version: str
     revision: str | None = sqlmodel.Field(default=None, index=True)
-    # One-to-many: A release can have multiple packages
-    packages: list[Package] = sqlmodel.Relationship(back_populates="release")
     sboms: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
 
     # Many-to-one: A release can have one vote policy, a vote policy can be used by multiple releases
