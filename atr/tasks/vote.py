@@ -48,36 +48,6 @@ class Initiate(pydantic.BaseModel):
 class VoteInitiationError(Exception): ...
 
 
-class Cast(pydantic.BaseModel):
-    """Arguments for the task to cast a vote."""
-
-    email_sender: str = pydantic.Field(..., description="The email address of the sender")
-    email_recipient: str = pydantic.Field(..., description="The email address of the recipient")
-    subject: str = pydantic.Field(..., description="The subject of the email")
-    body: str = pydantic.Field(..., description="The body of the email")
-    in_reply_to: str = pydantic.Field(..., description="The message ID of the email to reply to")
-
-
-@checks.with_model(Cast)
-async def cast(args: Cast) -> str | None:
-    message = mail.Message(
-        email_sender=args.email_sender,
-        email_recipient=args.email_recipient,
-        subject=args.subject,
-        body=args.body,
-        in_reply_to=args.in_reply_to,
-    )
-
-    # Send the email
-    # TODO: Move this call into send itself?
-    await mail.set_secret_key_default()
-    mid = await mail.send(message)
-
-    # TODO: Record the vote in the database?
-    # We'd need to sync with manual votes too
-    return json.dumps({"mid": mid})
-
-
 @checks.with_model(Initiate)
 async def initiate(args: Initiate) -> str | None:
     """Initiate a vote for a release."""
@@ -141,7 +111,7 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
         args.body, args.initiator_id, release.project.name, release.version, args.vote_duration, host=app_host
     )
 
-    permitted_recipients = util.permitted_vote_recipients(args.initiator_id)
+    permitted_recipients = util.permitted_recipients(args.initiator_id)
     if args.email_to not in permitted_recipients:
         raise VoteInitiationError("Invalid mailing list choice")
 

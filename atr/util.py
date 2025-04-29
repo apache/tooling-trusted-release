@@ -330,7 +330,7 @@ async def paths_recursive(base_path: pathlib.Path, sort: bool = True) -> list[pa
     return paths
 
 
-def permitted_vote_recipients(asf_uid: str) -> list[str]:
+def permitted_recipients(asf_uid: str) -> list[str]:
     test_list = "user-tests"
     return [
         # f"dev@{committee.name}.apache.org",

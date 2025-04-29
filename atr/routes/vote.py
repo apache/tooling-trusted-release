@@ -24,7 +24,7 @@ import atr.db.models as models
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.resolve as resolve
-import atr.tasks.vote as tasks_vote
+import atr.tasks.message as message
 import atr.util as util
 
 
@@ -97,8 +97,8 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
 
         task = models.Task(
             status=models.TaskStatus.QUEUED,
-            task_type=models.TaskType.VOTE_CAST,
-            task_args=tasks_vote.Cast(
+            task_type=models.TaskType.MESSAGE_SEND,
+            task_args=message.Send(
                 email_sender=email_sender,
                 email_recipient=email_recipient,
                 subject=subject,

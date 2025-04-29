@@ -231,7 +231,7 @@ def lifecycle_06_announce_preview(page: sync_api.Page, credentials: Credentials,
     checkbox_locator.check()
 
     logging.info("Locating and activating the announce button within the form")
-    submit_button_locator = form_locator.get_by_role("button", name="Announce release")
+    submit_button_locator = form_locator.get_by_role("button", name="Send announcement email")
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 

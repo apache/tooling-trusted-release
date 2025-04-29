@@ -28,8 +28,7 @@ import atr.tasks.checks.rat as rat
 import atr.tasks.checks.signature as signature
 import atr.tasks.checks.targz as targz
 import atr.tasks.checks.zipformat as zipformat
-
-# import atr.tasks.rsync as rsync
+import atr.tasks.message as message
 import atr.tasks.sbom as sbom
 import atr.tasks.svn as svn
 import atr.tasks.vote as vote
@@ -110,6 +109,8 @@ def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:
             return license.files
         case models.TaskType.LICENSE_HEADERS:
             return license.headers
+        case models.TaskType.MESSAGE_SEND:
+            return message.send
         case models.TaskType.PATHS_CHECK:
             return paths.check
         case models.TaskType.RAT_CHECK:
@@ -126,8 +127,6 @@ def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:
             return targz.integrity
         case models.TaskType.TARGZ_STRUCTURE:
             return targz.structure
-        case models.TaskType.VOTE_CAST:
-            return vote.cast
         case models.TaskType.VOTE_INITIATE:
             return vote.initiate
         case models.TaskType.ZIPFORMAT_INTEGRITY:

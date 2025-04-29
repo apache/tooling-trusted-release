@@ -55,7 +55,7 @@ async def selected_revision(
         committee = util.unwrap(release.committee)
 
         sender = f"{session.uid}@apache.org"
-        permitted_recipients = util.permitted_vote_recipients(session.uid)
+        permitted_recipients = util.permitted_recipients(session.uid)
 
         if release.vote_policy:
             min_hours = release.vote_policy.min_hours

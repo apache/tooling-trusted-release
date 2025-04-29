@@ -16,6 +16,7 @@
 # under the License.
 
 import logging
+from typing import TYPE_CHECKING
 
 import aiofiles.os
 import aioshutil
@@ -23,29 +24,32 @@ import quart
 import werkzeug.wrappers.response as response
 import wtforms
 
+import atr.config as config
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 
 # TODO: Improve upon the routes_release pattern
 import atr.routes.release as routes_release
+import atr.tasks.message as message
 import atr.util as util
+
+if TYPE_CHECKING:
+    import pathlib
 
 
 class AnnounceForm(util.QuartFormTyped):
     """Form for announcing a release preview."""
 
-    preview_name = wtforms.StringField(
-        "Preview name", validators=[wtforms.validators.InputRequired("Preview name is required")]
-    )
-    preview_revision = wtforms.StringField(
-        "Preview revision", validators=[wtforms.validators.InputRequired("Preview revision is required")]
-    )
+    preview_name = wtforms.HiddenField()
+    preview_revision = wtforms.HiddenField()
     confirm_announce = wtforms.BooleanField(
-        "Confirmation",
+        "Confirm",
         validators=[wtforms.validators.DataRequired("You must confirm to proceed with announcement")],
     )
-    submit = wtforms.SubmitField("Announce release")
+    subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
+    body = wtforms.TextAreaField("Body", validators=[wtforms.validators.Optional()])
+    submit = wtforms.SubmitField("Send announcement email")
 
 
 class DeleteForm(util.QuartFormTyped):
@@ -69,8 +73,41 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     """Allow the user to announce a release preview."""
     await session.check_access(project_name)
 
+    release = await session.release(
+        project_name, version_name, with_committee=True, phase=models.ReleasePhase.RELEASE_PREVIEW
+    )
     announce_form = await AnnounceForm.create_form()
-    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
+    # Hidden fields
+    announce_form.preview_name.data = release.name
+    announce_form.preview_revision.data = release.unwrap_revision
+
+    # Variables used in defaults for subject and body
+    project_display_name = release.project.display_name or release.project.name
+    committee_name = release.committee.full_name if release.committee else project_display_name.removesuffix("Apache ")
+    version = release.version
+    host = config.get().APP_HOST
+    routes_release_view = routes_release.view  # type: ignore[has-type]
+    routes_release_view_path = util.as_url(routes_release_view, project_name=project_name, version_name=version_name)
+
+    # Defaults for subject and body
+    default_subject = f"[ANNOUNCE] {project_display_name} {version} released"
+    default_body = f"""\
+The Apache {committee_name} project team is pleased to announce the
+release of {project_display_name} {version}.
+
+This is a stable release available for production use.
+
+Downloads are available from the following URL:
+
+https://{host}{routes_release_view_path}
+
+On behalf of the Apache {committee_name} project team,
+
+{session.uid}
+"""
+    announce_form.subject.data = default_subject
+    announce_form.body.data = default_body
+
     return await quart.render_template("preview-announce-release.html", release=release, announce_form=announce_form)
 
 
@@ -78,103 +115,99 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
 async def selected_post(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> str | response.Response:
-    """Allow the user to announce a release preview."""
+    """Handle the announcement form submission and promote the preview to release."""
     await session.check_access(project_name)
 
-    # Get user's preview releases
+    announce_form = await AnnounceForm.create_form(data=await quart.request.form)
+
+    if not (await announce_form.validate_on_submit()):
+        error_message = "Invalid submission"
+        if announce_form.errors:
+            error_details = "; ".join([f"{field}: {', '.join(errs)}" for field, errs in announce_form.errors.items()])
+            error_message = f"{error_message}: {error_details}"
+
+        # Render the page again, with errors
+        release = await session.release(
+            project_name, version_name, with_committee=True, phase=models.ReleasePhase.RELEASE_PREVIEW
+        )
+        await quart.flash(error_message, "error")
+        return await quart.render_template(
+            "preview-announce-release.html", release=release, announce_form=announce_form
+        )
+
+    subject = str(announce_form.subject.data)
+    body = str(announce_form.body.data)
+
+    source: str = ""
+    target: str = ""
+    source_base: pathlib.Path | None = None
+
     async with db.session() as data:
-        releases = await data.release(
-            stage=models.ReleaseStage.RELEASE,
-            phase=models.ReleasePhase.RELEASE_PREVIEW,
-            _committee=True,
-        ).all()
-    user_previews = session.only_user_releases(releases)
-
-    # Create the forms
-    announce_form = await AnnounceForm.create_form(
-        data=await quart.request.form if (quart.request.method == "POST") else None
-    )
-    delete_form = await DeleteForm.create_form()
-
-    if (quart.request.method == "POST") and (await announce_form.validate_on_submit()):
         try:
-            _preview_name, project_name, version_name, _preview_revision = _announce_form_validate(announce_form)
-        except ValueError as e:
-            return await session.redirect(selected, error=str(e), project_name=project_name, version_name=version_name)
+            release = await session.release(
+                project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW, data=data
+            )
 
-        # Check that the user has access to the project
-        async with db.session() as data:
-            try:
-                # Get the release
-                release = await session.release(
-                    project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW, data=data
-                )
-
-                if release.revision is None:
-                    # Impossible, but to satisfy the type checkers
-                    return await session.redirect(
-                        selected,
-                        error="This release does not have a revision",
-                        project_name=project_name,
-                        version_name=version_name,
-                    )
-
-                source_base = util.release_directory_base(release)
-                source = str(source_base / release.revision)
-
-                # Update the database
-                release.phase = models.ReleasePhase.RELEASE
-                release.revision = None
-
-                # This must come after updating the release object
-                target = str(util.release_directory(release))
-                if await aiofiles.os.path.exists(target):
-                    return await session.redirect(
-                        selected, error="Release already exists", project_name=project_name, version_name=version_name
-                    )
-
-                await data.commit()
-
-                # Move the revision directory
-                await aioshutil.move(source, target)
-
-                # Remove the rest of the preview history
-                # This must come after moving the revision directory, otherwise it will be removed too
-                await aioshutil.rmtree(str(source_base))  # type: ignore[call-arg]
-
-                routes_release_releases = routes_release.releases  # type: ignore[has-type]
-                return await session.redirect(routes_release_releases, success="Preview successfully announced")
-
-            except Exception as e:
-                logging.exception("Error announcing preview:")
+            test_list = "user-tests"
+            recipient = f"{test_list}@tooling.apache.org"
+            if recipient not in util.permitted_recipients(session.uid):
                 return await session.redirect(
                     selected,
-                    error=f"Error announcing preview: {e!s}",
+                    error=f"You are not permitted to send announcements to {recipient}",
                     project_name=project_name,
                     version_name=version_name,
                 )
 
-    return await quart.render_template(
-        "preview-announce.html",
-        previews=user_previews,
-        announce_form=announce_form,
-        delete_form=delete_form,
-    )
+            task = models.Task(
+                status=models.TaskStatus.QUEUED,
+                task_type=models.TaskType.MESSAGE_SEND,
+                task_args=message.Send(
+                    email_sender=f"{session.uid}@apache.org",
+                    email_recipient=recipient,
+                    subject=subject,
+                    body=body,
+                    in_reply_to=None,
+                ).model_dump(),
+                release_name=release.name,
+            )
+            data.add(task)
 
+            # Prepare paths for file operations
+            source_base = util.release_directory_base(release)
+            source = str(source_base / release.unwrap_revision)
 
-def _announce_form_validate(announce_form: AnnounceForm) -> tuple[str, str, str, str]:
-    preview_name = announce_form.preview_name.data
-    if not preview_name:
-        raise ValueError("Missing required parameters")
+            # TODO: We should update only if the announcement email was sent
+            # That would require moving this, and the filesystem operations, into a task
+            release.phase = models.ReleasePhase.RELEASE
+            release.revision = None
+            await data.commit()
 
-    # Extract project name and version
+            # This must come after updating the release object
+            target = str(util.release_directory(release))
+            if await aiofiles.os.path.exists(target):
+                raise routes.FlashError("Release already exists")
+
+        except (routes.FlashError, Exception) as e:
+            logging.exception("Error during release announcement, database phase:")
+            return await session.redirect(
+                selected,
+                error=f"Error announcing preview: {e!s}",
+                project_name=project_name,
+                version_name=version_name,
+            )
+
     try:
-        project_name, version_name = preview_name.rsplit("-", 1)
-    except ValueError:
-        raise ValueError("Invalid preview name format")
+        await aioshutil.move(source, target)
+        if source_base:
+            await aioshutil.rmtree(str(source_base))  # type: ignore[call-arg]
+    except Exception as e:
+        logging.exception("Error during release announcement, file system phase:")
+        return await session.redirect(
+            selected,
+            error=f"Database updated, but error moving files: {e!s}. Manual cleanup needed.",
+            project_name=project_name,
+            version_name=version_name,
+        )
 
-    preview_revision = announce_form.preview_revision.data
-    if not preview_revision:
-        raise ValueError("Missing required parameters")
-
-    return preview_name, project_name, version_name, preview_revision
+    routes_release_releases = routes_release.releases  # type: ignore[has-type]
+    return await session.redirect(routes_release_releases, success="Preview successfully announced")
