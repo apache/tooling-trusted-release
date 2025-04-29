@@ -28,15 +28,15 @@
     {% endif %}
   </div>
   <nav>
-    <h3>Get started</h3>
-    <ul>
-      <li>
-        <i class="bi bi-play-circle"></i>
-        <a href="{{ as_url(routes.root.index) }}">Select release</a>
-      </li>
-    </ul>
-
     {% if current_user %}
+      <h3>Get started</h3>
+      <ul>
+        <li>
+          <i class="bi bi-play-circle"></i>
+          <a href="{{ as_url(routes.root.index) }}">Select release</a>
+        </li>
+      </ul>
+
       {% set unfinished_releases = unfinished_releases_fn(current_user.uid) %}
       {% if unfinished_releases %}
         {% for project_short_display_name, releases in unfinished_releases.items() %}
@@ -51,15 +51,15 @@
           </ul>
         {% endfor %}
       {% endif %}
-
-      <h3>Releases</h3>
-      <ul>
-        <li>
-          <i class="bi bi-view-list"></i>
-          <a href="{{ as_url(routes.release.releases) }}">View releases</a>
-        </li>
-      </ul>
-
+    {% endif %}
+    <h3>Releases</h3>
+    <ul>
+      <li>
+        <i class="bi bi-view-list"></i>
+        <a href="{{ as_url(routes.release.releases) }}">View releases</a>
+      </li>
+    </ul>
+    {% if current_user %}
       <h3>Public keys</h3>
       <ul>
         <li>
