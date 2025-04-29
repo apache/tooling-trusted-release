@@ -23,6 +23,7 @@ from typing import Any, Final
 
 import pydantic
 
+import atr.config as config
 import atr.db as db
 import atr.mail as mail
 import atr.tasks.checks as checks
@@ -131,9 +132,13 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     # Construct email
     subject = args.subject
 
+    # Get hostname from config
+    app_config = config.get()
+    app_host = app_config.APP_HOST
+
     # Perform substitutions in the body
     body = await mail.generate_preview(
-        args.body, args.initiator_id, release.project.name, release.version, args.vote_duration
+        args.body, args.initiator_id, release.project.name, release.version, args.vote_duration, host=app_host
     )
 
     permitted_recipients = util.permitted_vote_recipients(args.initiator_id)

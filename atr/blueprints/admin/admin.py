@@ -18,6 +18,7 @@
 import collections
 import datetime
 import logging
+import os
 import pathlib
 import statistics
 import uuid
@@ -152,6 +153,15 @@ async def admin_delete_release() -> str | response.Response:
     async with db.session() as data:
         releases = await data.release(_project=True).order_by(models.Release.name).all()
     return await quart.render_template("delete-release.html", form=form, releases=releases, stats=None)
+
+
+@admin.BLUEPRINT.route("/env")
+async def admin_env() -> quart.wrappers.response.Response:
+    """Display the environment variables."""
+    env_vars = []
+    for key, value in os.environ.items():
+        env_vars.append(f"{key}={value}")
+    return quart.Response("\n".join(env_vars), mimetype="text/plain")
 
 
 @admin.BLUEPRINT.route("/keys/delete-all")

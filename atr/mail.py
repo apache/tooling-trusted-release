@@ -57,13 +57,15 @@ class Message:
     in_reply_to: str | None = None
 
 
-async def generate_preview(body: str, asfuid: str, project_name: str, version_name: str, vote_duration: int) -> str:
+async def generate_preview(
+    body: str, asfuid: str, project_name: str, version_name: str, vote_duration: int, host: str | None = None
+) -> str:
     # TODO: Should potentially be moved a different module
     async with db.session() as data:
         user_key = await data.public_signing_key(apache_uid=asfuid).get()
         user_key_fingerprint = user_key.fingerprint if user_key else "0000000000000000000000000000000000000000"
 
-    review_url = f"https://{quart.request.host}/vote/{project_name}/{version_name}"
+    review_url = f"https://{host or quart.request.host}/vote/{project_name}/{version_name}"
 
     # Perform substitutions in the body
     # TODO: Handle the DURATION == 0 case
