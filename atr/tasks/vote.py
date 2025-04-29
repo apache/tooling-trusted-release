@@ -132,7 +132,9 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     subject = args.subject
 
     # Perform substitutions in the body
-    body = await mail.generate_preview(args.body, args.initiator_id, args.vote_duration)
+    body = await mail.generate_preview(
+        args.body, args.initiator_id, release.project.name, release.version, args.vote_duration
+    )
 
     permitted_recipients = util.permitted_vote_recipients(args.initiator_id)
     if args.email_to not in permitted_recipients:

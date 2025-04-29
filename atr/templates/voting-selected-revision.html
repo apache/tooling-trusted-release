@@ -98,7 +98,7 @@
               {% for error in form.body.errors %}{{ error }}{% endfor %}
             </div>
           {% endif %}
-          <small class="form-text text-muted">Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT], [DURATION], and [YOUR_NAME] will be filled in automatically when the email is sent.</small>
+          <small class="form-text text-muted">Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT], [DURATION], [REVIEW_URL], and [YOUR_ASF_ID] will be filled in automatically when the email is sent.</small>
         </div>
       </div>
 
@@ -155,6 +155,8 @@
           function fetchAndUpdatePreview() {
               const bodyContent = bodyTextarea.value;
               const voteDuration = voteDurationInput.value;
+              const projectName = "{{ release.project.name }}";
+              const versionName = "{{ release.version }}";
 
               fetch(previewUrl, {
                       method: 'POST',
@@ -165,6 +167,8 @@
                       body: new URLSearchParams({
                           "body": bodyContent,
                           "asfuid": asfUid,
+                          "project_name": projectName,
+                          "version_name": versionName,
                           "vote_duration": voteDuration,
                           "csrf_token": csrfToken
                       })

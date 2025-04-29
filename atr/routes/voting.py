@@ -98,9 +98,9 @@ async def selected_revision(
 I'd like to call a vote on releasing the following artifacts as
 Apache {committee_display} {project_name} {version}.
 
-The release candidate can be found at:
+The release candidate page, including downloads, can be found at:
 
-https://apache.example.org/{committee_name}/{project_name}-{version}/
+  [REVIEW_URL]
 
 The release artifacts are signed with the GPG key with fingerprint:
 
@@ -112,10 +112,12 @@ Please review the release candidate and vote accordingly.
 [ ] +0 Abstain
 [ ] -1 Do not release this package (please provide specific comments)
 
+You can vote on ATR at the URL above, or manually by replying to this email.
+
 This vote will remain open for [DURATION] hours.
 
 Thanks,
-[YOUR_NAME]
+[YOUR_ASF_ID]
 """
 
         form = await VoteInitiateForm.create_form(

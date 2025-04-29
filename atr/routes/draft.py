@@ -465,6 +465,12 @@ async def vote_preview(session: routes.CommitterSession) -> quart.wrappers.respo
     class VotePreviewForm(util.QuartFormTyped):
         body = wtforms.TextAreaField("Body", validators=[wtforms.validators.InputRequired("Body is required")])
         asfuid = wtforms.StringField("ASF ID", validators=[wtforms.validators.InputRequired("ASF ID is required")])
+        project_name = wtforms.StringField(
+            "Project name", validators=[wtforms.validators.InputRequired("Project name is required")]
+        )
+        version_name = wtforms.StringField(
+            "Version name", validators=[wtforms.validators.InputRequired("Version name is required")]
+        )
         # TODO: Validate the vote duration again? Probably not necessary in a preview
         # Note that tasks/vote.py does not use this form
         vote_duration = wtforms.IntegerField(
@@ -476,7 +482,11 @@ async def vote_preview(session: routes.CommitterSession) -> quart.wrappers.respo
         return await session.redirect(root.index, error="Invalid form data")
 
     body = await mail.generate_preview(
-        util.unwrap(form.body.data), util.unwrap(form.asfuid.data), util.unwrap(form.vote_duration.data)
+        util.unwrap(form.body.data),
+        util.unwrap(form.asfuid.data),
+        util.unwrap(form.project_name.data),
+        util.unwrap(form.version_name.data),
+        util.unwrap(form.vote_duration.data),
     )
     return quart.Response(body, mimetype="text/plain")
 
