@@ -19,6 +19,7 @@ import re
 
 import quart
 import werkzeug.wrappers.response as response
+import wtforms
 
 import atr.analysis as analysis
 import atr.db as db
@@ -29,7 +30,12 @@ import atr.routes.draft as draft
 import atr.util as util
 
 
-async def check(session: routes.CommitterSession, release: models.Release) -> response.Response | str:
+async def check(
+    session: routes.CommitterSession,
+    release: models.Release,
+    task_mid: str | None = None,
+    form: wtforms.Form | None = None,
+) -> response.Response | str:
     base_path = util.release_directory(release)
     paths = await util.paths_recursive(base_path)
     path_templates = {}
@@ -108,6 +114,8 @@ async def check(session: routes.CommitterSession, release: models.Release) -> re
         server_domain=session.host,
         format_datetime=routes.format_datetime,
         models=models,
+        task_mid=task_mid,
+        form=form,
     )
 
 

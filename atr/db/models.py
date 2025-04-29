@@ -311,6 +311,7 @@ class TaskType(str, enum.Enum):
     SVN_IMPORT_FILES = "svn_import_files"
     TARGZ_INTEGRITY = "targz_integrity"
     TARGZ_STRUCTURE = "targz_structure"
+    VOTE_CAST = "vote_cast"
     VOTE_INITIATE = "vote_initiate"
     ZIPFORMAT_INTEGRITY = "zipformat_integrity"
     ZIPFORMAT_LICENSE_FILES = "zipformat_license_files"

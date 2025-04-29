@@ -18,10 +18,9 @@
 import datetime
 import json
 import logging
-import os
+import time
 from typing import Any, Final
 
-import aiofiles
 import pydantic
 
 import atr.db as db
@@ -46,6 +45,36 @@ class Initiate(pydantic.BaseModel):
 
 
 class VoteInitiationError(Exception): ...
+
+
+class Cast(pydantic.BaseModel):
+    """Arguments for the task to cast a vote."""
+
+    email_sender: str = pydantic.Field(..., description="The email address of the sender")
+    email_recipient: str = pydantic.Field(..., description="The email address of the recipient")
+    subject: str = pydantic.Field(..., description="The subject of the email")
+    body: str = pydantic.Field(..., description="The body of the email")
+    in_reply_to: str = pydantic.Field(..., description="The message ID of the email to reply to")
+
+
+@checks.with_model(Cast)
+async def cast(args: Cast) -> str | None:
+    message = mail.Message(
+        email_sender=args.email_sender,
+        email_recipient=args.email_recipient,
+        subject=args.subject,
+        body=args.body,
+        in_reply_to=args.in_reply_to,
+    )
+
+    # Send the email
+    # TODO: Move this call into send itself?
+    await mail.set_secret_key_default()
+    mid = await mail.send(message)
+
+    # TODO: Record the vote in the database?
+    # We'd need to sync with manual votes too
+    return json.dumps({"mid": mid})
 
 
 @checks.with_model(Initiate)
@@ -87,13 +116,7 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
 
     # Load and set DKIM key
     try:
-        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        dkim_path = os.path.join(project_root, "state", "dkim.private")
-
-        async with aiofiles.open(dkim_path) as f:
-            dkim_key = await f.read()
-            mail.set_secret_key(dkim_key.strip())
-            _LOGGER.info("DKIM key loaded and set successfully")
+        await mail.set_secret_key_default()
     except Exception as e:
         error_msg = f"Failed to load DKIM key: {e}"
         _LOGGER.error(error_msg)
@@ -115,19 +138,25 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     if args.email_to not in permitted_recipients:
         raise VoteInitiationError("Invalid mailing list choice")
 
-    # Create mail event
-    event = mail.VoteEvent(
-        release_name=args.release_name,
+    # Create mail message
+    message = mail.Message(
         email_sender=f"{args.initiator_id}@apache.org",
         email_recipient=args.email_to,
         subject=subject,
         body=body,
-        vote_end=vote_end,
     )
 
     # Send the email
-    mid = await mail.send(event)
-    _LOGGER.info(f"Vote email sent successfully to {args.email_to}")
+    try:
+        mid = await mail.send(message)
+    except Exception:
+        _LOGGER.exception(f"Failed to send vote email to {args.email_to}:")
+        # This is here for falling through, for debugging
+        mid = f"{int(time.time())}@example.invalid"
+        # Remove this "raise" to fall through
+        raise
+    else:
+        _LOGGER.info(f"Vote email sent successfully to {args.email_to}")
 
     return {
         "message": "Vote announcement email sent successfully",

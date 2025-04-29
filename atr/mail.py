@@ -16,14 +16,15 @@
 # under the License.
 
 import dataclasses
-import datetime
 import email.utils as utils
 import logging
+import os.path
 import ssl
 import time
 import uuid
 from typing import Final
 
+import aiofiles
 import aiosmtplib
 import dkim
 
@@ -47,13 +48,12 @@ _SMTP_TIMEOUT: Final[int] = 30
 
 
 @dataclasses.dataclass
-class VoteEvent:
-    release_name: str
+class Message:
     email_sender: str
     email_recipient: str
     subject: str
     body: str
-    vote_end: datetime.datetime
+    in_reply_to: str | None = None
 
 
 async def generate_preview(body: str, asfuid: str, vote_duration: int) -> str:
@@ -71,33 +71,38 @@ async def generate_preview(body: str, asfuid: str, vote_duration: int) -> str:
     return body
 
 
-async def send(event: VoteEvent) -> str:
+async def send(message: Message) -> str:
     """Send an email notification about an artifact or a vote."""
-    _LOGGER.info(f"Sending email for event: {event}")
-    from_addr = event.email_sender
+    _LOGGER.info(f"Sending email for event: {message}")
+    from_addr = message.email_sender
     if not from_addr.endswith(f"@{global_dkim_domain}"):
         raise ValueError(f"from_addr must end with @{global_dkim_domain}, got {from_addr}")
-    to_addr = event.email_recipient
+    to_addr = message.email_recipient
     _validate_recipient(to_addr)
 
     # UUID4 is entirely random, with no timestamp nor namespace
     # It does have 6 version and variant bits, so only 122 bits are random
     mid = f"{uuid.uuid4()}@{global_dkim_domain}"
-    msg_text = f"""
-From: {from_addr}
-To: {to_addr}
-Subject: {event.subject}
-Date: {utils.formatdate(localtime=True)}
-Message-ID: <{mid}>
+    headers = [
+        f"From: {from_addr}",
+        f"To: {to_addr}",
+        f"Subject: {message.subject}",
+        f"Date: {utils.formatdate(localtime=True)}",
+        f"Message-ID: <{mid}>",
+    ]
+    if message.in_reply_to is not None:
+        headers.append(f"In-Reply-To: <{message.in_reply_to}>")
+        # TODO: Add message.references if necessary
+        headers.append(f"References: <{message.in_reply_to}>")
 
-{event.body}
-"""
+    # Normalise the body padding and ensure that line endings are CRLF
+    body = message.body.strip()
+    body = body.replace("\r\n", "\n")
+    body = body.replace("\n", "\r\n")
+    body = body + "\r\n"
 
-    # Normalise padding, and line endings to CRLF
-    msg_text = msg_text.strip()
-    msg_text = msg_text.replace("\r\n", "\n")
-    msg_text = msg_text.replace("\n", "\r\n")
-    msg_text = msg_text + "\r\n"
+    # Construct the message
+    msg_text = "\r\n".join(headers) + "\r\n\r\n" + body
 
     start = time.perf_counter()
     _LOGGER.info(f"sending message: {msg_text}")
@@ -120,6 +125,17 @@ def set_secret_key(key: str) -> None:
     """Set the secret key for DKIM signing."""
     global global_secret_key
     global_secret_key = key
+
+
+async def set_secret_key_default() -> None:
+    # TODO: Document this, or improve it
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dkim_path = os.path.join(project_root, "state", "dkim.private")
+
+    async with aiofiles.open(dkim_path) as f:
+        dkim_key = await f.read()
+        set_secret_key(dkim_key.strip())
+        _LOGGER.info("DKIM key loaded and set successfully")
 
 
 async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None:

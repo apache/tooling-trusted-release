@@ -126,6 +126,8 @@ def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:
             return targz.integrity
         case models.TaskType.TARGZ_STRUCTURE:
             return targz.structure
+        case models.TaskType.VOTE_CAST:
+            return vote.cast
         case models.TaskType.VOTE_INITIATE:
             return vote.initiate
         case models.TaskType.ZIPFORMAT_INTEGRITY:

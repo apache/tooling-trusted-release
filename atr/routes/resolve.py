@@ -60,18 +60,11 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
 
     form = await ResolveForm.create_form()
 
-    # Find the most recent VOTE_INITIATE task for this release
-    # TODO: Make this a proper query
-    latest_vote_task = None
+    latest_vote_task = release_latest_vote_task(release)
     task_mid = None
     archive_url = None
-    for task in sorted(release.tasks, key=lambda t: t.added, reverse=True):
-        if task.task_type == models.TaskType.VOTE_INITIATE:
-            latest_vote_task = task
-            break
-
-    if latest_vote_task and (latest_vote_task.status == models.TaskStatus.COMPLETED) and latest_vote_task.result:
-        task_mid = _task_mid(latest_vote_task)
+    if latest_vote_task is not None:
+        task_mid = task_mid_get(latest_vote_task)
         archive_url = await _task_archive_url_cached(task_mid)
 
     return await quart.render_template(
@@ -155,6 +148,22 @@ def _format_artifact_name(project_name: str, version: str, is_podling: bool = Fa
     return f"apache-{project_name}-{version}"
 
 
+def release_latest_vote_task(release: models.Release) -> models.Task | None:
+    # Find the most recent VOTE_INITIATE task for this release
+    # TODO: Make this a proper query
+    for task in sorted(release.tasks, key=lambda t: t.added, reverse=True):
+        if task.task_type != models.TaskType.VOTE_INITIATE:
+            continue
+        # if task.status != models.TaskStatus.COMPLETED:
+        #     continue
+        if (task.status == models.TaskStatus.QUEUED) or (task.status == models.TaskStatus.ACTIVE):
+            continue
+        if task.result is None:
+            continue
+        return task
+    return None
+
+
 async def _task_archive_url(task_mid: str) -> str | None:
     if "@" not in task_mid:
         return None
@@ -176,7 +185,9 @@ async def _task_archive_url(task_mid: str) -> str | None:
         return None
 
 
-async def _task_archive_url_cached(task_mid: str) -> str | None:
+async def _task_archive_url_cached(task_mid: str | None) -> str | None:
+    if task_mid is None:
+        return None
     if "@" not in task_mid:
         return None
 
@@ -199,8 +210,9 @@ async def _task_archive_url_cached(task_mid: str) -> str | None:
     return url
 
 
-def _task_mid(latest_vote_task: models.Task) -> str:
-    task_mid = "(no result)"
+def task_mid_get(latest_vote_task: models.Task) -> str | None:
+    # TODO: Improve this
+    task_mid = None
 
     try:
         for result in latest_vote_task.result or []:
