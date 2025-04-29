@@ -42,10 +42,12 @@ async def phase(
         raise routes.FlashError("Path must be relative")
 
     release = await session.release(project_name, version_name, phase=None)
+    # logging.warning(f"Downloading {file_path} from {release}")
     full_path = util.release_directory(release) / file_path
+    # logging.warning(f"Full path: {full_path}")
 
     # Check that the file exists
-    if not await aiofiles.os.path.exists(file_path):
+    if not await aiofiles.os.path.exists(full_path):
         # Even using the following type declaration, mypy does not know the type
         # The same pattern is used in release.py, so this is a bug in mypy
         # TODO: Report the bug upstream to mypy

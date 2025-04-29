@@ -232,6 +232,10 @@
                                 onclick="this.innerHTML = (this.innerHTML.trim() === 'More') ? 'Less' : 'More';">
                           More
                         </button>
+                      {% else %}
+                        <a href="{{ as_url(routes.download.phase, phase='candidate', project_name=release.project.name, version_name=release.version, file_path=path) }}"
+                           title="Download file {{ path }}"
+                           class="btn btn-sm btn-outline-secondary">Download</a>
                       {% endif %}
                     </div>
                   </td>
