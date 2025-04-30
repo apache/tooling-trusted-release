@@ -31,6 +31,7 @@ import atr.routes.root as root
 import atr.tasks.vote as tasks_vote
 import atr.user as user
 import atr.util as util
+from atr import construct
 
 
 @routes.committer("/voting/<project_name>/<version_name>/<revision>", methods=["GET", "POST"])
@@ -88,37 +89,13 @@ async def selected_revision(
             submit = wtforms.SubmitField("Send vote email")
 
         version = release.version
-        committee_name = committee.name
         committee_display = committee.display_name
         project_name = release.project.name if release.project else "Unknown"
 
+        # The subject can be changed by the user
+        # TODO: We should consider not allowing the subject to be changed
         default_subject = f"[VOTE] Release Apache {committee_display} {project_name} {version}"
-        default_body = f"""Hello {committee_name},
-
-I'd like to call a vote on releasing the following artifacts as
-Apache {committee_display} {project_name} {version}.
-
-The release candidate page, including downloads, can be found at:
-
-  [REVIEW_URL]
-
-The release artifacts are signed with the GPG key with fingerprint:
-
-  [KEY_FINGERPRINT]
-
-Please review the release candidate and vote accordingly.
-
-[ ] +1 Release this package
-[ ] +0 Abstain
-[ ] -1 Do not release this package (please provide specific comments)
-
-You can vote on ATR at the URL above, or manually by replying to this email.
-
-This vote will remain open for [DURATION] hours.
-
-Thanks,
-[YOUR_ASF_ID]
-"""
+        default_body = construct.start_vote_default()
 
         form = await VoteInitiateForm.create_form(
             data=await quart.request.form if quart.request.method == "POST" else None,

@@ -24,7 +24,6 @@ import quart
 import werkzeug.wrappers.response as response
 import wtforms
 
-import atr.config as config
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
@@ -33,6 +32,7 @@ import atr.routes as routes
 import atr.routes.release as routes_release
 import atr.tasks.message as message
 import atr.util as util
+from atr import construct
 
 if TYPE_CHECKING:
     import pathlib
@@ -83,31 +83,11 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
 
     # Variables used in defaults for subject and body
     project_display_name = release.project.display_name or release.project.name
-    committee_name = release.committee.full_name if release.committee else project_display_name.removesuffix("Apache ")
-    version = release.version
-    host = config.get().APP_HOST
-    routes_release_view = routes_release.view  # type: ignore[has-type]
-    routes_release_view_path = util.as_url(routes_release_view, project_name=project_name, version_name=version_name)
 
-    # Defaults for subject and body
-    default_subject = f"[ANNOUNCE] {project_display_name} {version} released"
-    default_body = f"""\
-The Apache {committee_name} project team is pleased to announce the
-release of {project_display_name} {version}.
-
-This is a stable release available for production use.
-
-Downloads are available from the following URL:
-
-https://{host}{routes_release_view_path}
-
-On behalf of the Apache {committee_name} project team,
-
-{session.uid}
-"""
-    announce_form.subject.data = default_subject
-    announce_form.body.data = default_body
-
+    # The subject cannot be changed by the user
+    announce_form.subject.data = f"[ANNOUNCE] {project_display_name} {version_name} released"
+    # The body can be changed, either from VoteTemplate or from the form
+    announce_form.body.data = construct.announce_release_default()
     return await quart.render_template("preview-announce-release.html", release=release, announce_form=announce_form)
 
 

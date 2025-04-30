@@ -72,6 +72,7 @@
   <p>This form will send an announcement to the ASF user-tests@tooling.apache.org mailing list.</p>
 
   <form method="post"
+        id="announce-release-form"
         action="{{ as_url(routes.announce.selected_post, project_name=release.project.name, version_name=release.version) }}"
         class="atr-canary py-4 px-5 mb-4 border rounded">
     {{ announce_form.hidden_tag() }}
@@ -107,6 +108,17 @@
         {% endif %}
       </div>
     </div>
+    <div class="row mb-3 pb-3 border-bottom">
+      <div class="col-md-9 offset-md-3">
+        <details>
+          <summary class="text-muted">Show live preview</summary>
+          <pre id="announce-email-body-preview"
+               data-preview-url="{{ as_url(routes.preview.announce_preview, project_name=release.project.name, version_name=release.version) }}"
+               data-asf-uid="{{ current_user.uid }}"
+               class="mt-2 p-3 bg-white border rounded font-monospace overflow-auto"></pre>
+        </details>
+      </div>
+    </div>
     <div class="row mb-3">
       <div class="col-md-9 offset-md-3">
         <div class="form-check">
@@ -126,4 +138,66 @@
 
 {% block javascripts %}
   {{ super() }}
+  <script>
+      document.addEventListener("DOMContentLoaded", () => {
+          let debounceTimeout;
+          const debounceDelay = 500;
+
+          const bodyTextarea = document.getElementById("body");
+          const previewPre = document.getElementById("announce-email-body-preview");
+          const announceForm = document.getElementById("announce-release-form");
+
+          if (!bodyTextarea || !previewPre || !announceForm) {
+              console.error("Required elements for preview not found.");
+              return;
+          }
+
+          const previewUrl = previewPre.dataset.previewUrl;
+          const csrfTokenInput = announceForm.querySelector('input[name="csrf_token"]');
+
+          if (!previewUrl || !csrfTokenInput) {
+              console.error("Required data attributes or CSRF token not found.");
+              return
+          }
+          const csrfToken = csrfTokenInput.value;
+
+          function fetchAndUpdatePreview() {
+              const bodyContent = bodyTextarea.value;
+
+              fetch(previewUrl, {
+                      method: "POST",
+                      headers: {
+                          "Content-Type": "application/x-www-form-urlencoded",
+                          "X-CSRFToken": csrfToken
+                      },
+                      body: new URLSearchParams({
+                          "body": bodyContent,
+                          "csrf_token": csrfToken
+                      })
+                  })
+                  .then(response => {
+                      if (!response.ok) {
+                          return response.text().then(text => {
+                              throw new Error(`HTTP error ${response.status}: ${text}`)
+                          });
+                      }
+                      return response.text();
+                  })
+                  .then(previewText => {
+                      previewPre.textContent = previewText;
+                  })
+                  .catch(error => {
+                      console.error("Error fetching email preview:", error);
+                      previewPre.textContent = `Error loading preview:\\n${error.message}`;
+                  });
+          }
+
+          bodyTextarea.addEventListener("input", () => {
+              clearTimeout(debounceTimeout);
+              debounceTimeout = setTimeout(fetchAndUpdatePreview, debounceDelay);
+          });
+
+          fetchAndUpdatePreview();
+      });
+  </script>
 {% endblock javascripts %}

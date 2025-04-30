@@ -69,6 +69,8 @@ class VotePolicyForm(util.QuartFormTyped):
     )
     manual_vote = wtforms.BooleanField("Voting process:")
     release_checklist = wtforms.StringField("Release checklist:", widget=wtforms.widgets.TextArea())
+    start_vote_template = wtforms.StringField("Start vote template:", widget=wtforms.widgets.TextArea())
+    announce_release_template = wtforms.StringField("Announce release template:", widget=wtforms.widgets.TextArea())
     pause_for_rm = wtforms.BooleanField("Pause for RM:")
 
     submit = wtforms.SubmitField("Save")

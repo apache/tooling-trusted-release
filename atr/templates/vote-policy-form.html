@@ -20,7 +20,13 @@
       {% if form.mailto_addresses[0].errors %}
         {% for error in form.mailto_addresses[0].errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
       {% endif %}
+      <span class="form-text text-muted">Note: This field determines where vote and finished release announcement emails are sent. You can set this value to your own mailing list, but ATR will currently only let you send to <code>user-tests@tooling.apache.org</code>.</span>
     </div>
+    <!--
+    <div class="col-sm-1">
+      <button class="btn btn-primary" type="button" id="add-mailto-address">+</button>
+    </div>
+    -->
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
@@ -52,6 +58,24 @@
     <div class="col-sm-8">
       {{ form.release_checklist(rows=10, class_="form-control") }}
       <span id="release_checklist-help" class="form-text text-muted">Markdown text describing how to test release candidates.</span>
+    </div>
+  </div>
+
+  <div class="mb-3 pb-3 row border-bottom">
+    <label for="{{ form.start_vote_template.id }}"
+           class="col-sm-3 col-form-label text-sm-end">{{ form.start_vote_template.label.text }}</label>
+    <div class="col-sm-8">
+      {{ form.start_vote_template(rows=10, class_="form-control") }}
+      <span id="start_vote_template-help" class="form-text text-muted">Email template for messages to start a vote on a release.</span>
+    </div>
+  </div>
+
+  <div class="mb-3 pb-3 row border-bottom">
+    <label for="{{ form.announce_release_template.id }}"
+           class="col-sm-3 col-form-label text-sm-end">{{ form.announce_release_template.label.text }}</label>
+    <div class="col-sm-8">
+      {{ form.announce_release_template(rows=10, class_="form-control") }}
+      <span id="announce_release_template-help" class="form-text text-muted">Email template for messages to announce a finished release.</span>
     </div>
   </div>
 

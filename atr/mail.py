@@ -27,9 +27,6 @@ from typing import Final
 import aiofiles
 import aiosmtplib
 import dkim
-import quart
-
-import atr.db as db
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -55,26 +52,6 @@ class Message:
     subject: str
     body: str
     in_reply_to: str | None = None
-
-
-async def generate_preview(
-    body: str, asfuid: str, project_name: str, version_name: str, vote_duration: int, host: str | None = None
-) -> str:
-    # TODO: Should potentially be moved a different module
-    async with db.session() as data:
-        user_key = await data.public_signing_key(apache_uid=asfuid).get()
-        user_key_fingerprint = user_key.fingerprint if user_key else "0000000000000000000000000000000000000000"
-
-    review_url = f"https://{host or quart.request.host}/vote/{project_name}/{version_name}"
-
-    # Perform substitutions in the body
-    # TODO: Handle the DURATION == 0 case
-    body = body.replace("[DURATION]", str(vote_duration))
-    body = body.replace("[KEY_FINGERPRINT]", user_key_fingerprint or "(No key found)")
-    body = body.replace("[REVIEW_URL]", review_url)
-    body = body.replace("[YOUR_ASF_ID]", asfuid)
-
-    return body
 
 
 async def send(message: Message) -> str:

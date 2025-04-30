@@ -107,8 +107,10 @@ class VotePolicy(sqlmodel.SQLModel, table=True):
     min_hours: int = sqlmodel.Field(default=0)
     release_checklist: str = sqlmodel.Field(default="")
     pause_for_rm: bool = sqlmodel.Field(default=False)
+    start_vote_template: str = sqlmodel.Field(default="")
+    announce_release_template: str = sqlmodel.Field(default="")
 
-    # # One-to-One: A vote policy is associated with a project
+    # One-to-One: A vote policy is associated with a project
     project: "Project" = sqlmodel.Relationship(back_populates="vote_policy")
 
 
@@ -140,7 +142,7 @@ class Committee(sqlmodel.SQLModel, table=True):
     @property
     def display_name(self) -> str:
         """Get the display name for the committee."""
-        name = self.full_name or self.name
+        name = self.full_name or self.name.title()
         return f"{name} (PPMC)" if self.is_podling else name
 
 

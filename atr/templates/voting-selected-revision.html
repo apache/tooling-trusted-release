@@ -107,7 +107,7 @@
           <details>
             <summary class="text-muted">Show live preview</summary>
             <pre id="email-body-preview"
-                 data-preview-url="{{ as_url(routes.draft.vote_preview) }}"
+                 data-preview-url="{{ as_url(routes.draft.vote_preview, project_name=release.project.name, version_name=release.version) }}"
                  data-asf-uid="{{ current_user.uid }}"
                  class="mt-2 p-3 bg-white border rounded font-monospace overflow-auto"></pre>
           </details>
@@ -142,33 +142,26 @@
           }
 
           const previewUrl = previewPre.dataset.previewUrl;
-          const asfUid = previewPre.dataset.asfUid;
           const csrfTokenInput = voteForm.querySelector('input[name="csrf_token"]');
 
-          if (!previewUrl || !asfUid || !csrfTokenInput) {
+          if (!previewUrl || !csrfTokenInput) {
               console.error("Required data attributes or CSRF token not found.");
               return
           }
           const csrfToken = csrfTokenInput.value;
 
-
           function fetchAndUpdatePreview() {
               const bodyContent = bodyTextarea.value;
               const voteDuration = voteDurationInput.value;
-              const projectName = "{{ release.project.name }}";
-              const versionName = "{{ release.version }}";
 
               fetch(previewUrl, {
-                      method: 'POST',
+                      method: "POST",
                       headers: {
                           "Content-Type": "application/x-www-form-urlencoded",
                           "X-CSRFToken": csrfToken
                       },
                       body: new URLSearchParams({
                           "body": bodyContent,
-                          "asfuid": asfUid,
-                          "project_name": projectName,
-                          "version_name": versionName,
                           "vote_duration": voteDuration,
                           "csrf_token": csrfToken
                       })

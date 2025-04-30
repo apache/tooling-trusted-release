@@ -35,7 +35,6 @@ import wtforms
 import atr.analysis as analysis
 import atr.db as db
 import atr.db.models as models
-import atr.mail as mail
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
@@ -43,6 +42,7 @@ import atr.routes.root as root
 import atr.routes.upload as upload
 import atr.tasks.sbom as sbom
 import atr.util as util
+from atr import construct
 
 if TYPE_CHECKING:
     import werkzeug.wrappers.response as response
@@ -458,19 +458,14 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     )
 
 
-@routes.committer("/draft/vote/preview", methods=["POST"])
-async def vote_preview(session: routes.CommitterSession) -> quart.wrappers.response.Response | response.Response | str:
+@routes.committer("/draft/vote/preview/<project_name>/<version_name>", methods=["POST"])
+async def vote_preview(
+    session: routes.CommitterSession, project_name: str, version_name: str
+) -> quart.wrappers.response.Response | response.Response | str:
     """Show the vote email preview for a release."""
 
     class VotePreviewForm(util.QuartFormTyped):
         body = wtforms.TextAreaField("Body", validators=[wtforms.validators.InputRequired("Body is required")])
-        asfuid = wtforms.StringField("ASF ID", validators=[wtforms.validators.InputRequired("ASF ID is required")])
-        project_name = wtforms.StringField(
-            "Project name", validators=[wtforms.validators.InputRequired("Project name is required")]
-        )
-        version_name = wtforms.StringField(
-            "Version name", validators=[wtforms.validators.InputRequired("Version name is required")]
-        )
         # TODO: Validate the vote duration again? Probably not necessary in a preview
         # Note that tasks/vote.py does not use this form
         vote_duration = wtforms.IntegerField(
@@ -481,12 +476,21 @@ async def vote_preview(session: routes.CommitterSession) -> quart.wrappers.respo
     if not await form.validate_on_submit():
         return await session.redirect(root.index, error="Invalid form data")
 
-    body = await mail.generate_preview(
-        util.unwrap(form.body.data),
-        util.unwrap(form.asfuid.data),
-        util.unwrap(form.project_name.data),
-        util.unwrap(form.version_name.data),
-        util.unwrap(form.vote_duration.data),
+    release = await session.release(project_name, version_name)
+    form_body: str = util.unwrap(form.body.data)
+    asfuid = session.uid
+    project_name = release.project.name
+    version_name = release.version
+    vote_duration: int = util.unwrap(form.vote_duration.data)
+
+    body = await construct.start_vote_body(
+        form_body,
+        construct.StartVoteOptions(
+            asfuid=asfuid,
+            project_name=project_name,
+            version_name=version_name,
+            vote_duration=vote_duration,
+        ),
     )
     return quart.Response(body, mimetype="text/plain")
 
