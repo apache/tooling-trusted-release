@@ -48,7 +48,7 @@
       <div class="row mb-3 pb-3 border-bottom">
         <div class="col-md-3 text-md-end fw-medium">{{ form.mailing_list.label }}</div>
         <div class="col-md-9">
-          <div class="d-flex gap-4">
+          <div class="d-flex gap-4 mb-2">
             {% for subfield in form.mailing_list %}
               <div class="form-check">
                 {{ subfield(class_='form-check-input') }}
@@ -61,7 +61,7 @@
               {% for error in form.mailing_list.errors %}{{ error }}{% endfor %}
             </div>
           {% endif %}
-          <small class="form-text text-muted">NOTE: Sending a message to yourself for testing will not update the release phase.</small>
+          <small class="form-text text-muted">NOTE: The limited options above are provided for testing purposes. In the finished version of ATR, you will be able to send to your own specified mailing lists.</small>
         </div>
       </div>
 

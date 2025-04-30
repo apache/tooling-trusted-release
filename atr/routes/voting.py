@@ -69,10 +69,7 @@ async def selected_revision(
             release_name = wtforms.HiddenField("Release Name")
             mailing_list = wtforms.RadioField(
                 "Send vote email to",
-                choices=[
-                    (recipient, recipient) if (recipient != sender) else (recipient, f"{recipient} (preview only)")
-                    for recipient in permitted_recipients
-                ],
+                choices=sorted([(recipient, recipient) for recipient in permitted_recipients]),
                 validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
                 default="user-tests@tooling.apache.org",
             )
@@ -119,24 +116,21 @@ async def selected_revision(
             if email_to not in permitted_recipients:
                 # This will be checked again by tasks/vote.py for extra safety
                 raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
-            if email_to != sender:
-                error = await _promote(data, release.name)
-                if error:
-                    return await session.redirect(root.index, error=error)
 
-                # This is now handled by the _promote call, above
-                # # Update the release phase to the voting phase only if not sending a test message to the user
-                # release.phase = models.ReleasePhase.RELEASE_CANDIDATE
+            # This sets the phase to RELEASE_CANDIDATE
+            error = await _promote(data, release.name)
+            if error:
+                return await session.redirect(root.index, error=error)
 
-                # Store when the release was put into the voting phase
-                release.vote_started = datetime.datetime.now(datetime.UTC)
+            # Store when the release was put into the voting phase
+            release.vote_started = datetime.datetime.now(datetime.UTC)
 
-                # TODO: We also need to store the duration of the vote
-                # We can't allow resolution of the vote until the duration has elapsed
-                # But we allow the user to specify in the form
-                # And yet we also have VotePolicy.min_hours
-                # Presumably this sets the default, and the form takes precedence?
-                # VotePolicy.min_hours can also be 0, though
+            # TODO: We also need to store the duration of the vote
+            # We can't allow resolution of the vote until the duration has elapsed
+            # But we allow the user to specify in the form
+            # And yet we also have VotePolicy.min_hours
+            # Presumably this sets the default, and the form takes precedence?
+            # VotePolicy.min_hours can also be 0, though
 
             # Create a task for vote initiation
             task = models.Task(
