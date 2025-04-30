@@ -63,12 +63,6 @@
 
   <h2>Announce this release</h2>
 
-  <div class="card bg-warning-subtle mb-3">
-    <div class="card-body p-3">
-      <i class="bi bi-exclamation-triangle me-1"></i>
-      <strong>TODO:</strong> We plan in the next phase of development to send the email specified in the vote policy, e.g. the project development list, for testing. Eventually we plan to allow sending to multiple mailing lists, such as announce@a.o, dev@project.a.o, and users@project.a.o.
-    </div>
-  </div>
   <p>This form will send an announcement to the ASF user-tests@tooling.apache.org mailing list.</p>
 
   <form method="post"
@@ -76,14 +70,31 @@
         action="{{ as_url(routes.announce.selected_post, project_name=release.project.name, version_name=release.version) }}"
         class="atr-canary py-4 px-5 mb-4 border rounded">
     {{ announce_form.hidden_tag() }}
-    <!--
     <div class="row mb-3 pb-3 border-bottom">
-      <label class="col-md-3 col-form-label text-md-end">To:</label>
+      <div class="col-md-3 text-md-end fw-medium">{{ announce_form.mailing_list.label }}</div>
       <div class="col-md-9">
-        <code>user-tests@tooling.apache.org</code>
+        <div class="d-flex gap-4 mb-3">
+          {% for subfield in announce_form.mailing_list %}
+            <div class="form-check">
+              {{ subfield(class_='form-check-input') }}
+              {{ subfield.label(class_='form-check-label') }}
+            </div>
+          {% endfor %}
+        </div>
+        {% if announce_form.mailing_list.errors %}
+          <div class="invalid-feedback d-block">
+            {% for error in announce_form.mailing_list.errors %}{{ error }}{% endfor %}
+          </div>
+        {% endif %}
+        <div class="card bg-warning-subtle mb-3">
+          <span class="card-body p-3">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            <strong>TODO:</strong> The limited options above are provided for testing purposes. In the finished version of ATR, you will be able to send to your own specified mailing lists.
+          </span>
+        </div>
       </div>
     </div>
-    -->
+
     <div class="row mb-3 pb-3 border-bottom">
       <label for="{{ announce_form.subject.id }}"
              class="col-md-3 col-form-label text-md-end">{{ announce_form.subject.label.text }}:</label>

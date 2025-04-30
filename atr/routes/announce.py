@@ -16,7 +16,7 @@
 # under the License.
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol
 
 import aiofiles.os
 import aioshutil
@@ -38,18 +38,21 @@ if TYPE_CHECKING:
     import pathlib
 
 
-class AnnounceForm(util.QuartFormTyped):
-    """Form for announcing a release preview."""
+class AnnounceFormProtocol(Protocol):
+    """Protocol for the dynamically generated AnnounceForm."""
 
-    preview_name = wtforms.HiddenField()
-    preview_revision = wtforms.HiddenField()
-    confirm_announce = wtforms.BooleanField(
-        "Confirm",
-        validators=[wtforms.validators.DataRequired("You must confirm to proceed with announcement")],
-    )
-    subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
-    body = wtforms.TextAreaField("Body", validators=[wtforms.validators.Optional()])
-    submit = wtforms.SubmitField("Send announcement email")
+    preview_name: wtforms.HiddenField
+    preview_revision: wtforms.HiddenField
+    mailing_list: wtforms.RadioField
+    confirm_announce: wtforms.BooleanField
+    subject: wtforms.StringField
+    body: wtforms.TextAreaField
+    submit: wtforms.SubmitField
+
+    @property
+    def errors(self) -> dict[str, Any]: ...
+
+    async def validate_on_submit(self) -> bool: ...
 
 
 class DeleteForm(util.QuartFormTyped):
@@ -76,7 +79,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     release = await session.release(
         project_name, version_name, with_committee=True, phase=models.ReleasePhase.RELEASE_PREVIEW
     )
-    announce_form = await AnnounceForm.create_form()
+    announce_form = await _create_announce_form_instance(util.permitted_recipients(session.uid))
     # Hidden fields
     announce_form.preview_name.data = release.name
     announce_form.preview_revision.data = release.unwrap_revision
@@ -98,7 +101,8 @@ async def selected_post(
     """Handle the announcement form submission and promote the preview to release."""
     await session.check_access(project_name)
 
-    announce_form = await AnnounceForm.create_form(data=await quart.request.form)
+    permitted_recipients = util.permitted_recipients(session.uid)
+    announce_form = await _create_announce_form_instance(permitted_recipients, data=await quart.request.form)
 
     if not (await announce_form.validate_on_submit()):
         error_message = "Invalid submission"
@@ -138,6 +142,14 @@ async def selected_post(
                     version_name=version_name,
                 )
 
+            body = await construct.announce_release_body(
+                body,
+                options=construct.AnnounceReleaseOptions(
+                    asfuid=session.uid,
+                    project_name=project_name,
+                    version_name=version_name,
+                ),
+            )
             task = models.Task(
                 status=models.TaskStatus.QUEUED,
                 task_type=models.TaskType.MESSAGE_SEND,
@@ -191,3 +203,31 @@ async def selected_post(
 
     routes_release_releases = routes_release.releases  # type: ignore[has-type]
     return await session.redirect(routes_release_releases, success="Preview successfully announced")
+
+
+async def _create_announce_form_instance(
+    permitted_recipients: list[str], *, data: dict[str, Any] | None = None
+) -> AnnounceFormProtocol:
+    """Create and return an instance of the AnnounceForm."""
+
+    class AnnounceForm(util.QuartFormTyped):
+        """Form for announcing a release preview."""
+
+        preview_name = wtforms.HiddenField()
+        preview_revision = wtforms.HiddenField()
+        mailing_list = wtforms.RadioField(
+            "Send vote email to",
+            choices=sorted([(recipient, recipient) for recipient in permitted_recipients]),
+            validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
+            default="user-tests@tooling.apache.org",
+        )
+        confirm_announce = wtforms.BooleanField(
+            "Confirm",
+            validators=[wtforms.validators.DataRequired("You must confirm to proceed with announcement")],
+        )
+        subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
+        body = wtforms.TextAreaField("Body", validators=[wtforms.validators.Optional()])
+        submit = wtforms.SubmitField("Send announcement email")
+
+    form_instance = await AnnounceForm.create_form(data=data)
+    return form_instance
