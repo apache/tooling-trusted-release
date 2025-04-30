@@ -108,9 +108,13 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
     async with db.session() as data:
         user_key = await data.public_signing_key(apache_uid=options.asfuid).get()
         user_key_fingerprint = user_key.fingerprint if user_key else "0000000000000000000000000000000000000000"
-        release = await data.release(name=options.project_name, version=options.version_name).demand(
-            RuntimeError(f"Release {options.project_name} {options.version_name} not found")
-        )
+        # Do not limit by phase, as it may be at RELEASE_CANDIDATE here if called by the task
+        release = await data.release(
+            project_name=options.project_name,
+            version=options.version_name,
+            _project=True,
+            _committee=True,
+        ).demand(RuntimeError(f"Release {options.project_name} {options.version_name} not found"))
 
     try:
         host = quart.request.host

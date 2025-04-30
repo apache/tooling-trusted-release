@@ -26,8 +26,8 @@ import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.routes.compose as compose
-import atr.routes.resolve as resolve
 import atr.routes.root as root
+import atr.routes.vote as vote
 import atr.tasks.vote as tasks_vote
 import atr.user as user
 import atr.util as util
@@ -54,8 +54,6 @@ async def selected_revision(
                 compose.selected, error="You must be on the PMC of this project to start a vote"
             )
         committee = util.unwrap(release.committee)
-
-        sender = f"{session.uid}@apache.org"
         permitted_recipients = util.permitted_recipients(session.uid)
 
         if release.vote_policy:
@@ -152,24 +150,11 @@ async def selected_revision(
             await data.flush()
             await data.commit()
 
-            # NOTE: During debugging, this email is actually sent elsewhere
-            # TODO: We should perhaps move that logic here, so that we can show the debugging address
-            # We should also log all outgoing email and the session so that users can confirm
+            # TODO: We should log all outgoing email and the session so that users can confirm
             # And can be warned if there was a failure
             # (The message should be shown on the vote resolution page)
-            # TODO: Link to the vote resolution page in the flash message
-            if email_to == sender:
-                # Test email, with no promotion
-                return await session.redirect(
-                    compose.selected,
-                    success=f"The vote announcement email will soon be sent to {email_to}. "
-                    "This is a test, and the release is not being voted on.",
-                    project_name=project_name,
-                    version_name=version,
-                )
-
             return await session.redirect(
-                resolve.selected,
+                vote.selected,
                 success=f"The vote announcement email will soon be sent to {email_to}.",
                 project_name=project_name,
                 version_name=version,
