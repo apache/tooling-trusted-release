@@ -31,12 +31,7 @@
 {% block content %}
   {% set phase = release.phase.value %}
   <p class="d-flex justify-content-between align-items-center">
-    {% if phase == "release_candidate_draft" %}
-      <a href="{{ as_url(routes.root.index) }}" class="atr-back-link">← Back to Select a release</a>
-    {% else %}
-      <a href="{{ as_url(routes.resolve.selected, project_name=release.project.name, version_name=release.version) }}"
-         class="atr-back-link">← Back to Resolve vote for {{ release.project.short_display_name }} {{ release.version }}</a>
-    {% endif %}
+    <a href="{{ as_url(routes.root.index) }}" class="atr-back-link">← Back to Select a release</a>
     <span>
       {% if phase == "release_candidate_draft" %}
         <strong class="atr-phase-one atr-phase-symbol">①</strong>
@@ -66,7 +61,7 @@
       Vote on <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
     </h1>
     <p>
-      The {{ release.committee.name }} committee is currently voting on the <strong>release candidate</strong> for {{ release.project.display_name }} {{ version_name }}. This page allows you to review the automated checks run on the files in the release.
+      The {{ release.committee.display_name }} committee is currently voting on the <strong>release candidate</strong> for {{ release.project.display_name }} {{ version_name }}. This page allows you to review the automated checks run on the files in the release.
     </p>
   {% endif %}
 
@@ -101,6 +96,14 @@
         </div>
       </div>
     </div>
+    {% if phase == "release_candidate" %}
+      <div class="card-body">
+        <a href="{{ as_url(routes.candidate.view, project_name=release.project.name, version_name=release.version) }}"
+           class="btn btn-primary me-2">View files</a>
+        <a href="{{ as_url(routes.resolve.selected, project_name=release.project.name, version_name=release.version) }}"
+           class="btn btn-success">Resolve vote</a>
+      </div>
+    {% endif %}
   </div>
 
   {% if phase == "release_candidate_draft" %}

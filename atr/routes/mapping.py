@@ -18,7 +18,7 @@
 import atr.db.models as models
 import atr.routes.compose as compose
 import atr.routes.finish as finish
-import atr.routes.resolve as resolve
+import atr.routes.vote as vote
 import atr.util as util
 
 
@@ -26,7 +26,7 @@ def release_as_url(release: models.Release) -> str:
     if release.phase.value == "release_candidate_draft":
         return util.as_url(compose.selected, project_name=release.project.name, version_name=release.version)
     elif release.phase.value == "release_candidate":
-        return util.as_url(resolve.selected, project_name=release.project.name, version_name=release.version)
+        return util.as_url(vote.selected, project_name=release.project.name, version_name=release.version)
     elif release.phase.value == "release_preview":
         return util.as_url(finish.selected, project_name=release.project.name, version_name=release.version)
     else:
