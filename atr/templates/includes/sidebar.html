@@ -54,9 +54,17 @@
     {% endif %}
     <h3>Releases</h3>
     <ul>
+      {% if current_user %}
+        <li>
+          <i class="bi bi-view-list"></i>
+          <a href="{{ as_url(routes.release.releases) }}">View releases</a>
+        </li>
+      {% endif %}
       <li>
-        <i class="bi bi-view-list"></i>
-        <a href="{{ as_url(routes.release.releases) }}">View releases</a>
+        <i class="bi bi-download"></i>
+        {# This path is handled by the frontend proxy server #}
+        {# https://djlint.com/docs/ignoring-code/ #}
+        {# djlint:off J018 #} <a href="/downloads/">View downloads</a> {# djlint:on #}
       </li>
     </ul>
     {% if current_user %}
