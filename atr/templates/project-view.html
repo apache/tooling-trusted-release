@@ -157,7 +157,27 @@
                   <th class="border-0">Release checklist</th>
                   <td class="text-break border-0">
                     {% if vp.release_checklist|length > 0 %}
-                      <textarea readonly>{{ vp.release_checklist }}</textarea>
+                      <textarea readonly class="form-control font-monospace" rows="10">{{ vp.release_checklist }}</textarea>
+                    {% else %}
+                      None
+                    {% endif %}
+                  </td>
+                </tr>
+                <tr>
+                  <th class="border-0">Start vote template</th>
+                  <td class="text-break border-0">
+                    {% if vp.start_vote_template|length > 0 %}
+                      <textarea readonly class="form-control font-monospace" rows="10">{{ vp.start_vote_template }}</textarea>
+                    {% else %}
+                      None
+                    {% endif %}
+                  </td>
+                </tr>
+                <tr>
+                  <th class="border-0">Announce release template</th>
+                  <td class="text-break border-0">
+                    {% if vp.announce_release_template|length > 0 %}
+                      <textarea readonly class="form-control font-monospace" rows="10">{{ vp.announce_release_template }}</textarea>
                     {% else %}
                       None
                     {% endif %}

@@ -76,8 +76,18 @@ async def announce_release_body(body: str, options: AnnounceReleaseOptions) -> s
     return body
 
 
-def announce_release_default() -> str:
-    # TODO: Get default from the VotePolicy
+async def announce_release_default(project_name: str) -> str:
+    async with db.session() as data:
+        project = await data.project(name=project_name, _vote_policy=True).demand(
+            RuntimeError(f"Project {project_name} not found")
+        )
+        vote_policy = project.vote_policy
+    if vote_policy is not None:
+        # NOTE: Do not use "if vote_policy.announce_release_template is None"
+        # We want to check for the empty string too
+        if vote_policy.announce_release_template:
+            return vote_policy.announce_release_template
+
     return """\
 The Apache [COMMITTEE] project team is pleased to announce the
 release of [PROJECT] [VERSION].
@@ -124,8 +134,18 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
     return body
 
 
-def start_vote_default() -> str:
-    # TODO: Get default from the VotePolicy
+async def start_vote_default(project_name: str) -> str:
+    async with db.session() as data:
+        project = await data.project(name=project_name, _vote_policy=True).demand(
+            RuntimeError(f"Project {project_name} not found")
+        )
+        vote_policy = project.vote_policy
+    if vote_policy is not None:
+        # NOTE: Do not use "if vote_policy.announce_release_template is None"
+        # We want to check for the empty string too
+        if vote_policy.start_vote_template:
+            return vote_policy.start_vote_template
+
     return """Hello [COMMITTEE],
 
 I'd like to call a vote on releasing the following artifacts as

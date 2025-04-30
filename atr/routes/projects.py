@@ -343,6 +343,8 @@ async def _add_voting_policy(project: models.Project, form: VotePolicyForm, data
         manual_vote=form.manual_vote.data,
         min_hours=util.unwrap(form.min_hours.data),
         release_checklist=util.unwrap(form.release_checklist.data),
+        start_vote_template=util.unwrap(form.start_vote_template.data),
+        announce_release_template=util.unwrap(form.announce_release_template.data),
         pause_for_rm=form.pause_for_rm.data,
     )
 
@@ -362,6 +364,8 @@ async def _edit_voting_policy(
     vote_policy.manual_vote = form.manual_vote.data
     vote_policy.min_hours = util.unwrap(form.min_hours.data)
     vote_policy.release_checklist = util.unwrap(form.release_checklist.data)
+    vote_policy.start_vote_template = util.unwrap(form.start_vote_template.data)
+    vote_policy.announce_release_template = util.unwrap(form.announce_release_template.data)
     vote_policy.pause_for_rm = form.pause_for_rm.data
     await data.commit()
 
