@@ -15,14 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import asfquart.base as base
+"""Blueprint for serving static icon files."""
 
+from typing import Final
 
-def register(app: base.QuartApp) -> None:
-    import atr.blueprints.admin.admin as admin
-    import atr.blueprints.api.api as api
-    import atr.blueprints.icons as icons
+import quart
 
-    app.register_blueprint(admin.admin.BLUEPRINT)
-    app.register_blueprint(api.api.BLUEPRINT)
-    app.register_blueprint(icons.BLUEPRINT)
+BLUEPRINT: Final = quart.Blueprint("icons", __name__, static_folder="../static/icons", static_url_path="/icons")
