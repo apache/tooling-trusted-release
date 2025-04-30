@@ -17,6 +17,7 @@
 
 import json
 import logging
+import os
 
 import httpx
 import quart
@@ -66,6 +67,10 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     if latest_vote_task is not None:
         task_mid = task_mid_get(latest_vote_task)
         archive_url = await _task_archive_url_cached(task_mid)
+
+    if ("LOCAL_DEBUG" in os.environ) and (latest_vote_task is not None):
+        latest_vote_task.status = models.TaskStatus.COMPLETED
+        latest_vote_task.result = [json.dumps({"mid": "818a44a3-6984-4aba-a650-834e86780b43@apache.org"})]
 
     return await quart.render_template(
         "candidate-resolve-release.html",
@@ -186,6 +191,8 @@ async def _task_archive_url(task_mid: str) -> str | None:
 
 
 async def _task_archive_url_cached(task_mid: str | None) -> str | None:
+    if "LOCAL_DEBUG" in os.environ:
+        return "https://lists.apache.org/thread/619hn4x796mh3hkk3kxg1xnl48dy2s64"
     if task_mid is None:
         return None
     if "@" not in task_mid:

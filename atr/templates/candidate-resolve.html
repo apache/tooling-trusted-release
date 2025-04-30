@@ -72,7 +72,10 @@
               {% endif %}
               {% if archive_url %}
                 <p class="mt-2 mb-0 text-muted ps-4">
-                  <a href="{{ archive_url }}">View vote email in the archive</a>
+                  <a href="{{ archive_url }}"
+                     rel="noopener"
+                     target="_blank"
+                     title="View vote email thread in the archive (opens in new window)">View vote email thread in the archive <i class="bi bi-box-arrow-up-right ms-1"></i></a>
                 </p>
               {% endif %}
             {% else %}
