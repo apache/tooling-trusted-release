@@ -176,8 +176,8 @@ def lifecycle_04_start_vote(page: sync_api.Page, credentials: Credentials, versi
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info(f"Waiting for navigation to /resolve/tooling-test-example/{version_name} after submitting vote email")
-    wait_for_path(page, f"/resolve/tooling-test-example/{version_name}")
+    logging.info(f"Waiting for navigation to /vote/tooling-test-example/{version_name} after submitting vote email")
+    wait_for_path(page, f"/vote/tooling-test-example/{version_name}")
     logging.info("Vote initiation actions completed successfully")
 
 
