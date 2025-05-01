@@ -29,6 +29,7 @@ import atr.revision as revision
 import atr.routes as routes
 import atr.routes.root as root
 import atr.util as util
+from atr import db
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -56,7 +57,12 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     """Finish a release preview."""
     await session.check_access(project_name)
 
-    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
+    async with db.session() as data:
+        release = await session.release(
+            project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW, data=data
+        )
+        user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
+
     current_revision_dir = util.release_directory(release)
     file_paths_rel: list[pathlib.Path] = []
     unique_dirs: set[pathlib.Path] = {pathlib.Path(".")}
@@ -91,6 +97,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         file_paths=sorted(file_paths_rel),
         form=form,
         can_move=can_move,
+        user_ssh_keys=user_ssh_keys,
     )
 
 

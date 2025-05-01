@@ -26,6 +26,7 @@ import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
 import wtforms
 
+import atr.db as db
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
@@ -96,15 +97,21 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
             await quart.flash(f"Error adding file: {e!s}", "error")
 
     svn_form = await SvnImportForm.create_form()
-    release = await session.release(project_name, version_name)
+
+    async with db.session() as data:
+        release = await session.release(project_name, version_name, data=data)
+        user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
 
     return await quart.render_template(
         "upload-selected.html",
         asf_id=session.uid,
         server_domain=session.host,
         release=release,
+        project_name=project_name,
+        version_name=version_name,
         form=form,
         svn_form=svn_form,
+        user_ssh_keys=user_ssh_keys,
     )
 
 

@@ -1,0 +1,31 @@
+{% set key_count = user_ssh_keys|length %}
+{# TODO: Abstract this and the section in finish-selected.html to a common include or macro #}
+<div class="card bg-warning-subtle mb-3">
+  <div class="card-body p-3">
+    <p>
+      {% if key_count == 0 %}
+        We have no SSH keys on file for you, so you cannot yet use this command. Please <a href="{{ as_url(routes.keys.ssh_add) }}">add an SSH key</a>.
+      {% elif key_count == 1 %}
+        {% set key = user_ssh_keys[0] %}
+        {% set key_parts = key.key.split(' ', 2) %}
+        {% set key_comment = key_parts[2] if key_parts|length > 2 else 'key' %}
+        We have the SSH key <a href="{{ as_url(routes.keys.keys, _anchor='ssh-key-' + key.fingerprint) }}"
+    title="{{ key.fingerprint }}"><code>{{- key_comment | trim -}}</code></a> on file for you. You can also <a href="{{ as_url(routes.keys.ssh_add) }}">add another SSH key</a>.
+      {% else %}
+        We have the SSH keys
+        {% for key in user_ssh_keys %}
+          {% if loop.last and key_count > 1 %}and{% endif %}
+          {% set key_parts = key.key.split(' ', 2) %}
+          {% set key_comment = key_parts[2] if key_parts|length > 2 else 'key' %}
+          <a href="{{ as_url(routes.keys.keys, _anchor='ssh-key-' + key.fingerprint) }}"
+             title="{{ key.fingerprint }}"><code>{{- key_comment | trim -}}</code></a>
+          {% if not loop.last %},{% endif %}
+        {% endfor %}
+        on file for you. You can also <a href="{{ as_url(routes.keys.ssh_add) }}">add another SSH key</a>.
+      {% endif %}
+    </p>
+    <p class="mb-0">
+      The ATR server should be compatible with long obsolete versions of rsync, as long as you use the command as shown, but as of May 2025 the only rsync version line without <a href="https://github.com/google/security-research/security/advisories/GHSA-p5pg-x43v-mvqj">known CVEs</a> is 3.4.*. Your package manager may have backports.
+    </p>
+  </div>
+</div>

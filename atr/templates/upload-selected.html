@@ -135,7 +135,9 @@
   <h2 id="rsync-upload">Rsync upload</h2>
   <p>Import files from a remote server using rsync with the following command:</p>
   <!-- TODO: Add a button to copy the command to the clipboard -->
-  <pre class="bg-light p-3 mb-0">
+  <pre class="bg-light p-3 mb-3">
 rsync -av -e 'ssh -p 2222' ${YOUR_FILES}/ {{ asf_id }}@{{ server_domain }}:/{{ release.project.name }}/{{ release.version }}/
 </pre>
+  {% include "user-ssh-keys.html" %}
+
 {% endblock content %}

@@ -16,6 +16,7 @@
 # under the License.
 
 import re
+from typing import TYPE_CHECKING
 
 import quart
 import werkzeug.wrappers.response as response
@@ -28,6 +29,9 @@ import atr.revision as revision
 import atr.routes as routes
 import atr.routes.draft as draft
 import atr.util as util
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 async def check(
@@ -45,6 +49,7 @@ async def check(
     path_successes = {}
     path_warnings = {}
     path_errors = {}
+    user_ssh_keys: Sequence[models.SSHKey] = []
 
     for path in paths:
         # Get template and substitutions
@@ -78,6 +83,7 @@ async def check(
             path_errors[path] = await data.check_result(
                 release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.FAILURE
             ).all()
+            user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
 
     revision_name_from_link, revision_editor, revision_time = await revision.latest_info(
         release.project.name, release.version
@@ -112,6 +118,7 @@ async def check(
         delete_file_form=delete_file_form,
         asf_id=session.uid,
         server_domain=session.host,
+        user_ssh_keys=user_ssh_keys,
         format_datetime=routes.format_datetime,
         models=models,
         task_mid=task_mid,

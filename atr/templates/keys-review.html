@@ -120,7 +120,7 @@
     <div class="mb-5 p-4 bg-light rounded">
       <div class="d-grid gap-4">
         {% for key in user_ssh_keys %}
-          <div class="card p-3 border">
+          <div id="ssh-key-{{ key.fingerprint }}" class="card p-3 border">
             <table class="mb-0">
               <tbody>
                 <tr>
