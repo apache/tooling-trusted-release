@@ -99,11 +99,11 @@
     {% if phase == "release_candidate" %}
       <div class="card-body">
         <a href="{{ as_url(routes.candidate.view, project_name=release.project.name, version_name=release.version) }}"
-           class="btn btn-primary me-2"><i class="bi bi-eye me-1"></i>View files</a>
+           class="btn btn-primary me-2"><i class="bi bi-eye me-1"></i> View files</a>
         <a href="{{ as_url(routes.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
-           class="btn btn-primary me-2"><i class="bi bi-download me-1"></i>Download files</a>
+           class="btn btn-primary me-2"><i class="bi bi-download me-1"></i> Download files</a>
         <a href="{{ as_url(routes.resolve.selected, project_name=release.project.name, version_name=release.version) }}"
-           class="btn btn-success"><i class="bi bi-clipboard-check me-1"></i>Resolve vote</a>
+           class="btn btn-success"><i class="bi bi-clipboard-check me-1"></i> Resolve vote</a>
       </div>
     {% endif %}
   </div>

@@ -190,6 +190,18 @@ dev = ["attribution (==1.7.1)", "black (==24.3.0)", "build (>=1.2)", "coverage[t
 docs = ["sphinx (==8.1.3)", "sphinx-mdinclude (==0.6.1)"]
 
 [[package]]
+name = "aiozipstream"
+version = "0.4"
+description = "Creating zip files on the fly"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "aiozipstream-0.4-py2.py3-none-any.whl", hash = "sha256:a58bad8c75aba319c07bd3d817da7caec7417c1eb4f4c692e00b173fb9ded9c6"},
+    {file = "aiozipstream-0.4.tar.gz", hash = "sha256:ccc5cec35c2580b8a13185c916b1581bfcb4278ddf6ea3f7f834b6c9c47d6c61"},
+]
+
+[[package]]
 name = "alembic"
 version = "1.15.2"
 description = "A database migration tool for SQLAlchemy."
@@ -2980,4 +2992,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "~=3.13"
-content-hash = "35f766c3f0adadcf4faf77453dce39cfbd488a0d780617f83422bcc14c805e9f"
+content-hash = "6ff06f78389576f0ae1fdda7a7547d7fa6d32cca37acf7eacecaf52108e7e20f"

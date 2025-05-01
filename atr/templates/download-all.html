@@ -41,41 +41,53 @@
   </p>
 
   <h1>
-    Download all files for <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
+    Download all files in <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
   </h1>
 
+  <h2 id="download-zip">Download ZIP archive</h2>
   <p>
+    Download a single ZIP archive containing all files for this release below.
+    The archive is generated on the fly, which may take a while for very large releases.
+  </p>
+  <p>
+    <a href="{{ as_url(routes.download.zip_selected, project_name=release.project.name, version_name=release.version) }}"
+       class="btn btn-primary btn-lg">
+      <i class="bi bi-file-earmark-zip me-2"></i>Download {{ release.name }}.zip
+    </a>
+  </p>
+
+  <h2>Alternative methods</h2>
+  <p>If you prefer, you can download the files using other methods.</p>
+  <p>
+    <a href="#download-browser"
+       class="btn btn-sm btn-outline-secondary"
+       title="Download using your browser">Browser</a>
     <a href="#download-rsync"
        class="btn btn-sm btn-outline-secondary me-2"
        title="Download using rsync">Rsync</a>
     <a href="#download-wget"
        class="btn btn-sm btn-outline-secondary me-2"
        title="Download using wget">Wget</a>
-    <a href="#download-browser"
-       class="btn btn-sm btn-outline-secondary"
-       title="Download using your browser">Browser</a>
   </p>
-
-  <h2 id="download-rsync">Using rsync</h2>
-  <p>You can download the files in this release using rsync with the following command:</p>
+  <h3 id="download-browser" class="mt-4">Using your browser</h3>
+  <p>
+    You can download the files one by one using your browser from the <a href="{{ as_url(routes.download.path_empty, project_name=release.project.name, version_name=release.version) }}">download folder</a>. Clicking a link to any file will download it, as it is served as <code>application/octet-stream</code>.
+  </p>
+  <h3 id="download-rsync" class="mt-4">Using rsync</h3>
+  <p>You can download all of the files in this release using rsync with the following command:</p>
   <!-- TODO: Add a button to copy the command to the clipboard -->
   <pre class="bg-light p-3 mb-3">
 rsync -av -e 'ssh -p 2222' {{ asf_id }}@{{ server_domain }}:/{{ release.project.name }}/{{ release.version }}/ ${DOWNLOAD_PATH}/
 </pre>
   {% include "user-ssh-keys.html" %}
 
-  <h2 id="download-wget">Using wget</h2>
-  <p>You can download the files in this release using wget with the following command:</p>
+  <h3 id="download-wget" class="mt-4">Using wget</h3>
+  <p>You can download all of the files in this release using wget with the following command:</p>
   <pre class="bg-light p-3 mb-3">
 wget -r -np -nH --cut-dirs=3{% if server_domain == "127.0.0.1" %} --no-check-certificate{% endif %} https://{{ server_domain }}{{ as_url(routes.download.path_empty, project_name=release.project.name, version_name=release.version) }}
 </pre>
   <p>
     This downloads the files into the <em>current directory</em>. Ensure that you create a new empty directory, and change to it, before running the command.
-  </p>
-
-  <h2 id="download-browser">Using your browser</h2>
-  <p>
-    You can also download the files one by one using your browser from the <a href="{{ as_url(routes.download.path_empty, project_name=release.project.name, version_name=release.version) }}">download folder</a>. Clicking a link to any file will download it, as it is served as <code>application/octet-stream</code>. We do not offer an archive of the entire release due to the size of large releases.
   </p>
 {% endblock content %}
 

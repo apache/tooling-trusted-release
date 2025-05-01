@@ -18,12 +18,14 @@
 """download.py"""
 
 import pathlib
+from collections.abc import AsyncGenerator
 
 import aiofiles
 import aiofiles.os
 import asfquart.base as base
 import quart
 import werkzeug.wrappers.response as response
+import zipstream
 
 import atr.db as db
 import atr.db.models as models
@@ -83,6 +85,39 @@ async def urls_selected(project_name: str, version_name: str) -> response.Respon
         return quart.Response(f"Error: {e}", status=404, mimetype="text/plain")
     except Exception as e:
         return quart.Response(f"Internal server error: {e}", status=500, mimetype="text/plain")
+
+
+@routes.committer("/download/zip/<project_name>/<version_name>")
+async def zip_selected(
+    session: routes.CommitterSession, project_name: str, version_name: str
+) -> response.Response | quart.wrappers.response.Response:
+    try:
+        release = await session.release(project_name=project_name, version_name=version_name, phase=None)
+    except ValueError as e:
+        return quart.Response(f"Error: {e}", status=404, mimetype="text/plain")
+    except Exception as e:
+        return quart.Response(f"Server error: {e}", status=500, mimetype="text/plain")
+
+    base_dir = util.release_directory(release)
+    files_to_zip = []
+    try:
+        for rel_path in await util.paths_recursive(base_dir):
+            full_item_path = base_dir / rel_path
+            if await aiofiles.os.path.isfile(full_item_path):
+                files_to_zip.append({"file": str(full_item_path), "name": str(rel_path)})
+    except FileNotFoundError:
+        return quart.Response("Error: Release directory not found.", status=404, mimetype="text/plain")
+
+    async def stream_zip(file_list: list[dict[str, str]]) -> AsyncGenerator[bytes]:
+        aiozip = zipstream.AioZipStream(file_list, chunksize=32768)
+        async for chunk in aiozip.stream():
+            yield chunk
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="{release.name}.zip"',
+        "Content-Type": "application/zip",
+    }
+    return quart.Response(stream_zip(files_to_zip), headers=headers, mimetype="application/zip")
 
 
 async def _download_or_list(project_name: str, version_name: str, file_path: str) -> response.Response | quart.Response:
