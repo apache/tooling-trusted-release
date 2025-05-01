@@ -37,19 +37,25 @@
       <div>
         <a title="Show files for {{ release.name }}"
            href="{{ as_url(routes.preview.view, project_name=release.project.name, version_name=release.version) }}"
-           class="btn btn-sm btn-secondary me-2">
+           class="btn btn-secondary me-2">
           <i class="bi bi-archive"></i>
           Show files
         </a>
+        <a title="Download all files"
+           href="{{ as_url(routes.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
+           class="btn btn-secondary me-2">
+          <i class="bi bi-download"></i>
+          Download all files
+        </a>
         <a title="Show revisions for {{ release.name }}"
            href="{{ as_url(routes.revisions.selected, project_name=release.project.name, version_name=release.version) }}"
-           class="btn btn-sm btn-secondary me-2">
+           class="btn btn-secondary me-2">
           <i class="bi bi-clock-history"></i>
           Show revisions
         </a>
         <a title="Announce and distribute {{ release.name }}"
            href="{{ as_url(routes.announce.selected, project_name=release.project.name, version_name=release.version) }}"
-           class="btn btn-sm btn-success">
+           class="btn btn-success">
           <i class="bi bi-check-circle"></i>
           Announce and distribute
         </a>
@@ -99,15 +105,6 @@
       File moving is disabled as all files are currently in the same directory or the revision is empty.
     </div>
   {% endif %}
-
-  <h2 id="rsync-download">Rsync download</h2>
-  <p>You can download the files in this release using rsync with the following command:</p>
-  <!-- TODO: Add a button to copy the command to the clipboard -->
-  <pre class="bg-light p-3 mb-3">
-rsync -av -e 'ssh -p 2222' {{ asf_id }}@{{ server_domain }}:/{{ release.project.name }}/{{ release.version }}/ ${DOWNLOAD_PATH}/
-</pre>
-  {% include "user-ssh-keys.html" %}
-
 {% endblock content %}
 
 {% block javascripts %}

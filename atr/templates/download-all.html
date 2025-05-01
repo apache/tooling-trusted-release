@@ -1,0 +1,88 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Download {{ release.project.display_name }} {{ release.version }} ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Download commands for {{ release.project.display_name }} {{ release.version }}.
+{% endblock description %}
+
+{% block content %}
+  {% set phase = release.phase.value %}
+  <p class="d-flex justify-content-between align-items-center">
+    <a href="{{ back_url }}" class="atr-back-link">← Back to {{ phase|replace('_', ' ') |title }}</a>
+    {% if phase != "release" %}
+      <span>
+        {% if phase == "release_candidate_draft" %}
+          <strong class="atr-phase-one atr-phase-symbol">①</strong>
+          <span class="atr-phase-one atr-phase-label">COMPOSE</span>
+          <span class="atr-phase-arrow">→</span>
+          <span class="atr-phase-symbol-other">②</span>
+          <span class="atr-phase-arrow">→</span>
+          <span class="atr-phase-symbol-other">③</span>
+        {% elif phase == "release_candidate" %}
+          <span class="atr-phase-symbol-other">①</span>
+          <span class="atr-phase-arrow">→</span>
+          <strong class="atr-phase-two atr-phase-symbol">②</strong>
+          <span class="atr-phase-two atr-phase-label">VOTE</span>
+          <span class="atr-phase-arrow">→</span>
+          <span class="atr-phase-symbol-other">③</span>
+        {% elif phase == "release_preview" %}
+          <span class="atr-phase-symbol-other">①</span>
+          <span class="atr-phase-arrow">→</span>
+          <span class="atr-phase-symbol-other">②</span>
+          <span class="atr-phase-arrow">→</span>
+          <strong class="atr-phase-three atr-phase-symbol">③</strong>
+          <span class="atr-phase-three atr-phase-label">FINISH</span>
+        {% endif %}
+      </span>
+    {% endif %}
+  </p>
+
+  <h1>
+    Download all files for <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
+  </h1>
+
+  <p>
+    <a href="#download-rsync"
+       class="btn btn-sm btn-outline-secondary me-2"
+       title="Download using rsync">Rsync</a>
+    <a href="#download-wget"
+       class="btn btn-sm btn-outline-secondary me-2"
+       title="Download using wget">Wget</a>
+    <a href="#download-browser"
+       class="btn btn-sm btn-outline-secondary"
+       title="Download using your browser">Browser</a>
+  </p>
+
+  <h2 id="download-rsync">Using rsync</h2>
+  <p>You can download the files in this release using rsync with the following command:</p>
+  <!-- TODO: Add a button to copy the command to the clipboard -->
+  <pre class="bg-light p-3 mb-3">
+rsync -av -e 'ssh -p 2222' {{ asf_id }}@{{ server_domain }}:/{{ release.project.name }}/{{ release.version }}/ ${DOWNLOAD_PATH}/
+</pre>
+  {% include "user-ssh-keys.html" %}
+
+  <h2 id="download-wget">Using wget</h2>
+  <p>You can download the files in this release using wget with the following command:</p>
+  <pre class="bg-light p-3 mb-3">
+wget -r -np -nH --cut-dirs=3{% if server_domain == "127.0.0.1" %} --no-check-certificate{% endif %} https://{{ server_domain }}{{ as_url(routes.download.path_empty, project_name=release.project.name, version_name=release.version) }}
+</pre>
+  <p>
+    This downloads the files into the <em>current directory</em>. Ensure that you create a new empty directory, and change to it, before running the command.
+  </p>
+
+  <h2 id="download-browser">Using your browser</h2>
+  <p>
+    You can also download the files one by one using your browser from the <a href="{{ as_url(routes.download.path_empty, project_name=release.project.name, version_name=release.version) }}">download folder</a>. Clicking a link to any file will download it, as it is served as <code>application/octet-stream</code>. We do not offer an archive of the entire release due to the size of large releases.
+  </p>
+{% endblock content %}
+
+{% block stylesheets %}
+  {{ super() }}
+{% endblock stylesheets %}
+
+{% block javascripts %}
+  {{ super() }}
+{% endblock javascripts %}

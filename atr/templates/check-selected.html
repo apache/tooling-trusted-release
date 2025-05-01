@@ -99,9 +99,11 @@
     {% if phase == "release_candidate" %}
       <div class="card-body">
         <a href="{{ as_url(routes.candidate.view, project_name=release.project.name, version_name=release.version) }}"
-           class="btn btn-primary me-2">View files</a>
+           class="btn btn-primary me-2"><i class="bi bi-eye me-1"></i>View files</a>
+        <a href="{{ as_url(routes.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
+           class="btn btn-primary me-2"><i class="bi bi-download me-1"></i>Download files</a>
         <a href="{{ as_url(routes.resolve.selected, project_name=release.project.name, version_name=release.version) }}"
-           class="btn btn-success">Resolve vote</a>
+           class="btn btn-success"><i class="bi bi-clipboard-check me-1"></i>Resolve vote</a>
       </div>
     {% endif %}
   </div>
@@ -115,6 +117,9 @@
         <a href="{{ as_url(routes.upload.selected, project_name=release.project.name, version_name=release.version) }}"
            title="Upload files to this draft"
            class="btn btn-primary"><i class="bi bi-upload me-1"></i> Upload files</a>
+        <a href="{{ as_url(routes.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
+           title="Download files"
+           class="btn btn-primary"><i class="bi bi-download me-1"></i> Download files</a>
         <a href="{{ as_url(routes.revisions.selected, project_name=release.project.name, version_name=release.version) }}"
            title="View revision history"
            class="btn btn-secondary"><i class="bi bi-clock-history me-1"></i> Revisions</a>
@@ -236,7 +241,7 @@
                           More
                         </button>
                       {% elif phase == "release_candidate" %}
-                        <a href="{{ as_url(routes.download.phase, phase='candidate', project_name=release.project.name, version_name=release.version, file_path=path) }}"
+                        <a href="{{ as_url(routes.download.path, project_name=release.project.name, version_name=release.version, file_path=path) }}"
                            title="Download file {{ path }}"
                            class="btn btn-sm btn-outline-secondary">Download</a>
                       {% endif %}
@@ -252,7 +257,7 @@
                           <div class="btn-group btn-group-sm"
                                role="group"
                                aria-label="More file actions for {{ path }}">
-                            <a href="{{ as_url(routes.download.phase, phase='candidate-draft', project_name=release.project.name, version_name=release.version, file_path=path) }}"
+                            <a href="{{ as_url(routes.download.path, project_name=release.project.name, version_name=release.version, file_path=path) }}"
                                title="Download file {{ path }}"
                                class="btn btn-outline-secondary">Download</a>
                             <a href="{{ as_url(routes.draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
@@ -325,15 +330,6 @@
       </div>
     </form>
   {% endif %}
-
-  <h2 id="rsync-download">Rsync download</h2>
-  <p>You can download the files in this release using rsync with the following command:</p>
-  <!-- TODO: Add a button to copy the command to the clipboard -->
-  <pre class="bg-light p-3 mb-3">
-rsync -av -e 'ssh -p 2222' {{ asf_id }}@{{ server_domain }}:/{{ release.project.name }}/{{ release.version }}/ ${DOWNLOAD_PATH}/
-</pre>
-  {% include "user-ssh-keys.html" %}
-
 {% endblock content %}
 
 {% block javascripts %}
