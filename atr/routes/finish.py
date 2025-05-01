@@ -84,7 +84,13 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
                 return r
 
     return await quart.render_template(
-        "finish-selected.html", release=release, file_paths=sorted(file_paths_rel), form=form, can_move=can_move
+        "finish-selected.html",
+        asf_id=session.uid,
+        server_domain=session.host,
+        release=release,
+        file_paths=sorted(file_paths_rel),
+        form=form,
+        can_move=can_move,
     )
 
 

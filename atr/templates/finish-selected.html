@@ -99,6 +99,13 @@
       File moving is disabled as all files are currently in the same directory or the revision is empty.
     </div>
   {% endif %}
+
+  <h2 id="rsync-download">Rsync download</h2>
+  <p>You can download the files in this release using rsync with the following command:</p>
+  <!-- TODO: Add a button to copy the command to the clipboard -->
+  <pre class="bg-light p-3 mb-0">
+rsync -av -e 'ssh -p 2222' {{ asf_id }}@{{ server_domain }}:/{{ release.project.name }}/{{ release.version }}/ ${DOWNLOAD_PATH}/
+</pre>
 {% endblock content %}
 
 {% block javascripts %}
