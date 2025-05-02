@@ -22,6 +22,7 @@ import quart
 import werkzeug.wrappers.response as response
 import wtforms
 
+import atr.construct as construct
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
@@ -31,7 +32,6 @@ import atr.routes.vote as vote
 import atr.tasks.vote as tasks_vote
 import atr.user as user
 import atr.util as util
-from atr import construct
 
 
 @routes.committer("/voting/<project_name>/<version_name>/<revision>", methods=["GET", "POST"])

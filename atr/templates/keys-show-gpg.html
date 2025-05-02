@@ -1,0 +1,72 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  GPG key details ~ ATR
+{% endblock title %}
+
+{% block description %}
+  View details for a specific GPG public key.
+{% endblock description %}
+
+{% block content %}
+  <p>
+    <a href="{{ as_url(routes.keys.keys) }}" class="atr-back-link">← Back to Manage keys</a>
+  </p>
+
+  <h1>GPG key details</h1>
+
+  <div class="card p-3 border mb-4">
+    <table class="mb-0">
+      <tbody>
+        <tr>
+          <th class="p-2 text-dark">Fingerprint</th>
+          <td class="text-break">{{ key.fingerprint }}</td>
+        </tr>
+        <tr>
+          <th class="p-2 text-dark">Type</th>
+          <td class="text-break">{{ algorithms[key.algorithm] }} ({{ key.length }} bits)</td>
+        </tr>
+        <tr>
+          <th class="p-2 text-dark">Created</th>
+          <td class="text-break">{{ key.created.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+        </tr>
+        <tr>
+          <th class="p-2 text-dark">Expires</th>
+          <td class="text-break">
+            {% if key.expires %}
+              {% set days_until_expiry = (key.expires - now).days %}
+              {% if days_until_expiry < 0 %}
+                <span class="text-danger fw-bold">
+                  {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
+                  <span class="badge bg-danger text-white ms-2">Expired</span>
+                </span>
+              {% elif days_until_expiry <= 30 %}
+                <span class="text-warning fw-bold">
+                  {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
+                  <span class="badge bg-warning text-dark ms-2">Expires in {{ days_until_expiry }} days</span>
+                </span>
+              {% else %}
+                {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
+              {% endif %}
+            {% else %}
+              Never
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <th class="p-2 text-dark">Apache UID</th>
+          <td class="text-break">{{ key.apache_uid }}</td>
+        </tr>
+        <tr>
+          <th class="p-2 text-dark">Declared UID</th>
+          <td class="text-break">{{ key.declared_uid or 'Not specified' }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <details class="mt-3 p-3 bg-light rounded">
+      <summary class="fw-bold">View ASCII Armored Key</summary>
+      <pre class="mt-3">{{ key.ascii_armored_key }}</pre>
+    </details>
+  </div>
+{% endblock content %}

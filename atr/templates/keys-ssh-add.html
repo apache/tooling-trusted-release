@@ -1,15 +1,19 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Add SSH key ~ ATR
+  Add your SSH key ~ ATR
 {% endblock title %}
 
 {% block description %}
-  Add an SSH public key to your account.
+  Add your SSH public key to your account.
 {% endblock description %}
 
 {% block content %}
-  <h1>Add SSH key</h1>
+  <p>
+    <a href="{{ as_url(routes.keys.keys) }}" class="atr-back-link">← Back to Manage keys</a>
+  </p>
+
+  <h1>Add your SSH key</h1>
   <p>Add your SSH public key to use for rsync authentication.</p>
 
   <div>

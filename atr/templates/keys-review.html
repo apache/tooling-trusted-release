@@ -1,7 +1,7 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Your public keys ~ ATR
+  Manage keys ~ ATR
 {% endblock title %}
 
 {% block description %}
@@ -9,7 +9,14 @@
 {% endblock description %}
 
 {% block content %}
-  <h1>Your public keys</h1>
+  <h1>Manage keys</h1>
+
+  <p class="mb-4">
+    <a href="#your-public-keys" class="btn btn-sm btn-secondary me-3">Your public keys</a>
+    <a href="#your-committee-keys" class="btn btn-sm btn-secondary">Your committee's keys</a>
+  </p>
+
+  <h2 id="your-public-keys">Your public keys</h2>
   <p>Review your public keys used for signing release artifacts.</p>
 
   <div>
@@ -18,15 +25,13 @@
     </p>
   </div>
 
-  <div class="d-flex gap-4">
-    <a href="{{ as_url(routes.keys.add) }}" class="btn btn-outline-primary">Add a GPG key</a>
-    <a href="{{ as_url(routes.keys.upload) }}"
-       class="btn btn-outline-primary">Upload a KEYS file</a>
+  <div class="d-flex gap-3 mb-4">
+    <a href="{{ as_url(routes.keys.add) }}" class="btn btn-outline-primary">Add your GPG key</a>
     <a href="{{ as_url(routes.keys.ssh_add) }}"
-       class="btn btn-outline-primary">Add an SSH key</a>
+       class="btn btn-outline-primary">Add your SSH key</a>
   </div>
 
-  <h2>GPG keys</h2>
+  <h3>GPG keys</h3>
 
   {% if user_keys %}
     <div class="mb-5 p-4 bg-light rounded">
@@ -106,16 +111,12 @@
       </div>
     </div>
   {% else %}
-    <h2>Keys</h2>
     <p>
-      <strong>You haven't added any signing keys yet.</strong>
-    </p>
-    <p>
-      <a href="{{ as_url(routes.keys.add) }}">Add a key</a>
+      <strong>You haven't added any personal GPG keys yet.</strong>
     </p>
   {% endif %}
 
-  <h2>SSH keys</h2>
+  <h3>SSH keys</h3>
   {% if user_ssh_keys %}
     <div class="mb-5 p-4 bg-light rounded">
       <div class="d-grid gap-4">
@@ -155,8 +156,46 @@
     <p>
       <strong>You haven't added any SSH keys yet.</strong>
     </p>
-    <p>
-      <a href="{{ as_url(routes.keys.ssh_add) }}">Add an SSH key</a>
-    </p>
   {% endif %}
+
+  <h2 id="your-committee-keys">Your committee's keys</h2>
+  <div class="mb-4">
+    <a href="{{ as_url(routes.keys.upload) }}"
+       class="btn btn-outline-primary">Upload a KEYS file</a>
+  </div>
+  {% for committee in committees %}
+    <h3 class="mt-3">{{ committee.display_name }}</h3>
+    {% if committee.public_signing_keys %}
+      <div class="table-responsive mb-2">
+        <table class="table border table-striped table-hover table-sm">
+          <thead>
+            <tr>
+              <th class="px-2" scope="col">Fingerprint</th>
+              <th class="px-2" scope="col">Email</th>
+              <th class="px-2" scope="col">Apache UID</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for key in committee.public_signing_keys %}
+              <tr>
+                <td class="text-break font-monospace px-2">
+                  <a href="{{ as_url(routes.keys.show_gpg_key, fingerprint=key.fingerprint) }}">{{ key.fingerprint[:16]|upper }}</a>
+                </td>
+                <td class="text-break px-2">{{ key.declared_uid or 'Not specified' }}</td>
+                <td class="text-break px-2">{{ key.apache_uid }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <form method="post"
+            action="{{ as_url(routes.keys.update_committee_keys, committee_name=committee.name) }}"
+            class="mb-4 d-inline-block">
+        {{ update_committee_keys_form.hidden_tag() }}
+        {{ update_committee_keys_form.submit(class_='btn btn-sm btn-outline-secondary') }}
+      </form>
+    {% else %}
+      <p class="mb-4">No keys uploaded for this committee yet.</p>
+    {% endif %}
+  {% endfor %}
 {% endblock content %}

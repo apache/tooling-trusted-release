@@ -25,18 +25,20 @@ import datetime
 import hashlib
 import logging
 import logging.handlers
+import pathlib
 import pprint
 import re
+import textwrap
 from collections.abc import AsyncGenerator, Sequence
 
 import asfquart as asfquart
+import asfquart.base as base
 import gnupg
 import quart
 import sqlmodel
 import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
 import wtforms
-from wtforms import widgets
 
 import atr.db as db
 import atr.db.models as models
@@ -51,6 +53,10 @@ class AddSSHKeyForm(util.QuartFormTyped):
 
 class DeleteKeyForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Delete key")
+
+
+class UpdateCommitteeKeysForm(util.QuartFormTyped):
+    submit = wtforms.SubmitField("Update KEYS file")
 
 
 @routes.committer("/keys/add", methods=["GET", "POST"])
@@ -74,8 +80,8 @@ async def add(session: routes.CommitterSession) -> str:
             validators=[wtforms.validators.InputRequired("You must select at least one committee")],
             coerce=str,
             choices=committee_choices,
-            option_widget=widgets.CheckboxInput(),
-            widget=widgets.ListWidget(prefix_label=False),
+            option_widget=wtforms.widgets.CheckboxInput(),
+            widget=wtforms.widgets.ListWidget(prefix_label=False),
         )
         submit = wtforms.SubmitField("Add GPG key")
 
@@ -337,26 +343,65 @@ async def key_user_session_add(
 @routes.committer("/keys")
 async def keys(session: routes.CommitterSession) -> str:
     """View all keys associated with the user's account."""
-    # Get all existing keys for the user
+    committees_to_query = list(set(session.committees + session.projects))
+
+    delete_form = await DeleteKeyForm.create_form()
+    update_committee_keys_form = await UpdateCommitteeKeysForm.create_form()
+
     async with db.session() as data:
         user_keys = await data.public_signing_key(apache_uid=session.uid, _committees=True).all()
         user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
+        user_committees_with_keys = await data.committee(name_in=committees_to_query, _public_signing_keys=True).all()
 
     status_message = quart.request.args.get("status_message")
     status_type = quart.request.args.get("status_type")
-
-    delete_form = await DeleteKeyForm.create_form()
 
     return await quart.render_template(
         "keys-review.html",
         asf_id=session.uid,
         user_keys=user_keys,
         user_ssh_keys=user_ssh_keys,
+        committees=user_committees_with_keys,
         algorithms=routes.algorithms,
         status_message=status_message,
         status_type=status_type,
         now=datetime.datetime.now(datetime.UTC),
         delete_form=delete_form,
+        update_committee_keys_form=update_committee_keys_form,
+    )
+
+
+@routes.committer("/keys/show-gpg/<fingerprint>", methods=["GET"])
+async def show_gpg_key(session: routes.CommitterSession, fingerprint: str) -> str:
+    """Display details for a specific GPG key."""
+    async with db.session() as data:
+        key = await data.public_signing_key(fingerprint=fingerprint).get()
+
+    if not key:
+        quart.abort(404, description="GPG key not found")
+
+    authorised = False
+    if key.apache_uid == session.uid:
+        authorised = True
+    else:
+        user_affiliations = set(session.committees + session.projects)
+        async with db.session() as data:
+            key_committees = await data.execute(
+                sqlmodel.select(models.KeyLink.committee_name).where(models.KeyLink.key_fingerprint == fingerprint)
+            )
+            key_committee_names = {row[0] for row in key_committees.all()}
+        if user_affiliations.intersection(key_committee_names):
+            authorised = True
+
+    if not authorised:
+        quart.abort(403, description="You are not authorised to view this key")
+
+    return await quart.render_template(
+        "keys-show-gpg.html",
+        key=key,
+        algorithms=routes.algorithms,
+        now=datetime.datetime.now(datetime.UTC),
+        asf_id=session.uid,
     )
 
 
@@ -386,6 +431,73 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
     )
 
 
+@routes.committer("/keys/update-committee-keys/<committee_name>", methods=["POST"])
+async def update_committee_keys(session: routes.CommitterSession, committee_name: str) -> response.Response:
+    """Generate and save the KEYS file for a specific committee."""
+    form = await UpdateCommitteeKeysForm.create_form()
+    if not await form.validate_on_submit():
+        return await session.redirect(keys, error="Invalid request to update KEYS file.")
+
+    if committee_name not in (session.committees + session.projects):
+        quart.abort(403, description=f"You are not authorised to update the KEYS file for {committee_name}")
+
+    async with db.session() as data:
+        committee = await data.committee(name=committee_name, _public_signing_keys=True, _projects=True).demand(
+            base.ASFQuartException(f"Committee {committee_name} not found", errorcode=404)
+        )
+
+        if not committee.public_signing_keys:
+            return await session.redirect(
+                keys, error=f"No keys found for committee {committee_name} to generate KEYS file."
+            )
+
+        if not committee.projects:
+            return await session.redirect(keys, error=f"No projects found associated with committee {committee_name}.")
+
+        sorted_keys = sorted(committee.public_signing_keys, key=lambda k: k.fingerprint)
+
+        keys_content_list = []
+        for key in sorted_keys:
+            fingerprint_short = key.fingerprint[:16].upper()
+            apache_uid = key.apache_uid
+            declared_uid_str = key.declared_uid or ""
+            email_match = re.search(r"<([^>]+)>", declared_uid_str)
+            email = email_match.group(1) if email_match else declared_uid_str
+            comment_line = f"# {fingerprint_short} {email} ({apache_uid})"
+            keys_content_list.append(f"{comment_line}\n\n{key.ascii_armored_key}")
+
+        key_blocks_str = "\n\n".join(keys_content_list) + "\n"
+
+        project_names_updated: list[str] = []
+        write_errors: list[str] = []
+        base_finished_dir = util.get_finished_dir()
+        committee_name_for_header = committee.display_name or committee.name
+        key_count_for_header = len(committee.public_signing_keys)
+
+        for project in committee.projects:
+            await _write_keys_file(
+                project,
+                base_finished_dir,
+                committee_name_for_header,
+                key_count_for_header,
+                key_blocks_str,
+                project_names_updated,
+                write_errors,
+            )
+    if write_errors:
+        error_summary = "; ".join(write_errors)
+        await quart.flash(
+            f"Completed KEYS update for {committee_name}, but encountered errors: {error_summary}", "error"
+        )
+    elif project_names_updated:
+        projects_str = ", ".join(project_names_updated)
+        await quart.flash(f"KEYS files updated successfully for projects: {projects_str}", "success")
+    else:
+        await quart.flash(f"No KEYS files were updated for committee {committee_name}.", "warning")
+
+    return await session.redirect(keys)
+
+
 @routes.committer("/keys/upload", methods=["GET", "POST"])
 async def upload(session: routes.CommitterSession) -> str:
     """Upload a KEYS file containing multiple GPG keys."""
@@ -401,8 +513,8 @@ async def upload(session: routes.CommitterSession) -> str:
             "Associate keys with committees",
             choices=[(c.name, c.display_name) for c in user_committees],
             coerce=str,
-            option_widget=widgets.CheckboxInput(),
-            widget=widgets.ListWidget(prefix_label=False),
+            option_widget=wtforms.widgets.CheckboxInput(),
+            widget=wtforms.widgets.ListWidget(prefix_label=False),
             validators=[wtforms.validators.InputRequired("You must select at least one committee")],
         )
 
@@ -600,3 +712,75 @@ async def _upload_process_key_blocks(key_blocks: list[str], selected_committees:
     results_sorted = sorted(results, key=lambda x: (x.get("email", "").lower(), x.get("fingerprint", "")))
 
     return results_sorted
+
+
+async def _write_keys_file(
+    project: models.Project,
+    base_finished_dir: pathlib.Path,
+    committee_name_for_header: str,
+    key_count_for_header: int,
+    key_blocks_str: str,
+    project_names_updated: list[str],
+    write_errors: list[str],
+) -> None:
+    project_name = project.name
+    project_keys_dir = base_finished_dir / project_name
+    project_keys_path = project_keys_dir / "KEYS"
+
+    timestamp_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    purpose_text = (
+        f"This file contains the PGP/GPG public keys used by committers of the "
+        f"Apache {project_name} project to sign official release artifacts. "
+        f"Verifying the signature on a downloaded artifact using one of the "
+        f"keys in this file provides confidence that the artifact is authentic "
+        f"and was published by the project team."
+    )
+    wrapped_purpose = "\n".join(
+        textwrap.wrap(
+            purpose_text,
+            width=62,
+            initial_indent="# ",
+            subsequent_indent="# ",
+            break_long_words=False,
+            replace_whitespace=False,
+        )
+    )
+
+    header_content = (
+        f"""\
+# Apache Software Foundation (ASF) project signing keys
+#
+# Project:   {project.display_name or project.name}
+# Committee: {committee_name_for_header}
+# Generated: {timestamp_str} UTC
+# Contains:  {key_count_for_header} PGP/GPG public {"key" if key_count_for_header == 1 else "keys"}
+#
+# Purpose:
+{wrapped_purpose}
+#
+# Usage (with GnuPG):
+# 1. Import these keys into your GPG keyring:
+#    gpg --import KEYS
+#
+# 2. Verify the signature file against the release artifact:
+#    gpg --verify <artifact-name>.asc <artifact-name>
+#
+# For details on Apache release signing and verification, see:
+# https://infra.apache.org/release-signing.html
+"""
+        + "\n"
+    )
+
+    full_keys_file_content = header_content + key_blocks_str
+    try:
+        await asyncio.to_thread(project_keys_dir.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(project_keys_path.write_text, full_keys_file_content, encoding="utf-8")
+        project_names_updated.append(project_name)
+    except OSError as e:
+        error_msg = f"Failed to write KEYS file for project {project_name}: {e}"
+        logging.exception(error_msg)
+        write_errors.append(error_msg)
+    except Exception as e:
+        error_msg = f"An unexpected error occurred writing KEYS for project {project_name}: {e}"
+        logging.exception(error_msg)
+        write_errors.append(error_msg)

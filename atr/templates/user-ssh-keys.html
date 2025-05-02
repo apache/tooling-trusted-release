@@ -4,7 +4,7 @@
   <div class="card-body p-3">
     <p>
       {% if key_count == 0 %}
-        We have no SSH keys on file for you, so you cannot yet use this command. Please <a href="{{ as_url(routes.keys.ssh_add) }}">add an SSH key</a>.
+        We have no SSH keys on file for you, so you cannot yet use this command. Please <a href="{{ as_url(routes.keys.ssh_add) }}">add your SSH key</a>.
       {% elif key_count == 1 %}
         {% set key = user_ssh_keys[0] %}
         {% set key_parts = key.key.split(' ', 2) %}

@@ -33,6 +33,7 @@ import quart
 import wtforms
 
 import atr.analysis as analysis
+import atr.construct as construct
 import atr.db as db
 import atr.db.models as models
 import atr.revision as revision
@@ -42,7 +43,6 @@ import atr.routes.root as root
 import atr.routes.upload as upload
 import atr.tasks.sbom as sbom
 import atr.util as util
-from atr import construct
 
 if TYPE_CHECKING:
     import werkzeug.wrappers.response as response

@@ -21,8 +21,8 @@ import quart
 
 import atr.config as config
 import atr.db as db
+import atr.db.models as models
 import atr.util as util
-from atr.db import models
 
 
 @dataclasses.dataclass

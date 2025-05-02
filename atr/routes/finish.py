@@ -24,12 +24,12 @@ import quart
 import werkzeug.wrappers.response as response
 import wtforms
 
+import atr.db as db
 import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.root as root
 import atr.util as util
-from atr import db
 
 _LOGGER: Final = logging.getLogger(__name__)
 

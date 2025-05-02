@@ -25,6 +25,7 @@ import quart
 import werkzeug.wrappers.response as response
 import wtforms
 
+import atr.construct as construct
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
@@ -33,7 +34,6 @@ import atr.routes as routes
 import atr.routes.release as routes_release
 import atr.tasks.message as message
 import atr.util as util
-from atr import construct
 
 if TYPE_CHECKING:
     import pathlib

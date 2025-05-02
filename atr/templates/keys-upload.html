@@ -1,7 +1,7 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Upload KEYS file ~ ATR
+  Upload a KEYS file ~ ATR
 {% endblock title %}
 
 {% block description %}
@@ -77,7 +77,11 @@
 {% endblock stylesheets %}
 
 {% block content %}
-  <h1>Upload KEYS file</h1>
+  <p>
+    <a href="{{ as_url(routes.keys.keys) }}" class="atr-back-link">← Back to Manage keys</a>
+  </p>
+
+  <h1>Upload a KEYS file</h1>
   <p>Upload a KEYS file containing multiple GPG public keys.</p>
 
   {% if form.errors %}

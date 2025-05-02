@@ -19,9 +19,9 @@
 
 import asfquart.session
 import quart
+import sqlalchemy.orm as orm
 import sqlmodel
 import werkzeug.wrappers.response as response
-from sqlalchemy.orm import selectinload
 
 import atr.db as db
 import atr.db.models as models
@@ -61,7 +61,7 @@ async def index() -> response.Response | str:
                         models.Release.project_name == project.name,
                         db.validate_instrumented_attribute(models.Release.phase).in_(active_phases),
                     )
-                    .options(selectinload(db.validate_instrumented_attribute(models.Release.project)))
+                    .options(orm.selectinload(db.validate_instrumented_attribute(models.Release.project)))
                     .order_by(db.validate_instrumented_attribute(models.Release.created).desc())
                 )
                 result = await data.execute(stmt)

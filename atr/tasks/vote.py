@@ -23,11 +23,11 @@ from typing import Any, Final
 
 import pydantic
 
+import atr.construct as construct
 import atr.db as db
 import atr.mail as mail
 import atr.tasks.checks as checks
 import atr.util as util
-from atr import construct
 
 # Configure detailed logging
 _LOGGER: Final = logging.getLogger(__name__)

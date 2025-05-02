@@ -19,8 +19,8 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import functools
 import pathlib
-from functools import wraps
 from typing import TYPE_CHECKING, Any
 
 import sqlmodel
@@ -171,7 +171,7 @@ def with_model(cls: type[pydantic.BaseModel]) -> Callable[[Callable[..., Any]], 
     """Decorator to specify the parameters for a check."""
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        @wraps(func)
+        @functools.wraps(func)
         async def wrapper(data_dict: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
             model_instance = cls(**data_dict)
             return await func(model_instance, *args, **kwargs)

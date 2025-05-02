@@ -675,7 +675,7 @@ def test_gpg_01_upload(page: sync_api.Page, credentials: Credentials) -> None:
     go_to_path(page, "/keys")
 
     logging.info("Following link to add GPG key")
-    add_key_link_locator = page.locator('a:has-text("Add a GPG key")')
+    add_key_link_locator = page.locator('a:has-text("Add your GPG key")')
     sync_api.expect(add_key_link_locator).to_be_visible()
     add_key_link_locator.click()
 
@@ -870,11 +870,11 @@ def test_ssh_01_add_key(page: sync_api.Page, credentials: Credentials) -> None:
     wait_for_path(page, "/keys")
     logging.info("Navigated to Your Public Keys page")
 
-    logging.info("Clicking Add an SSH key button")
+    logging.info("Clicking Add your SSH key button")
     # There can be two buttons with the same text if the user did not upload an SSH key yet
-    page.locator('a[href="/keys/ssh/add"]:has-text("Add an SSH key")').first.click()
+    page.locator('a[href="/keys/ssh/add"]:has-text("Add your SSH key")').first.click()
     wait_for_path(page, "/keys/ssh/add")
-    logging.info("Navigated to Add SSH Key page")
+    logging.info("Navigated to Add your SSH key page")
 
     public_key_path = f"{_SSH_KEY_PATH}.pub"
     try:

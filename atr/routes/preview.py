@@ -26,12 +26,12 @@ import quart
 import werkzeug.wrappers.response as response
 import wtforms
 
+import atr.construct as construct
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.routes.root as root
 import atr.util as util
-from atr import construct
 
 if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
