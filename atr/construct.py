@@ -178,6 +178,7 @@ You can vote on ATR at the URL above, or manually by replying to this email.
 
 This vote will remain open for [DURATION] hours.
 
+[RELEASE_CHECKLIST]
 Thanks,
 [YOUR_ASF_ID]
 """
