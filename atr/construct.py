@@ -123,7 +123,13 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
 
     review_url = f"https://{host}/vote/{options.project_name}/{options.version_name}"
     committee_name = release.committee.display_name if release.committee else release.project.display_name
-    project_short_display_name = release.project.short_display_name
+    project_short_display_name = release.project.short_display_name if release.project else options.project_name
+
+    checklist_content = ""
+    async with db.session() as data:
+        vote_policy = await db.get_project_vote_policy(data, options.project_name)
+        if vote_policy:
+            checklist_content = vote_policy.release_checklist or ""
 
     # Perform substitutions in the body
     # TODO: Handle the DURATION == 0 case
@@ -131,6 +137,7 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
     body = body.replace("[DURATION]", str(options.vote_duration))
     body = body.replace("[KEY_FINGERPRINT]", user_key_fingerprint or "(No key found)")
     body = body.replace("[PROJECT]", project_short_display_name)
+    body = body.replace("[RELEASE_CHECKLIST]", checklist_content)
     body = body.replace("[REVIEW_URL]", review_url)
     body = body.replace("[VERSION]", options.version_name)
     body = body.replace("[YOUR_ASF_ID]", options.asfuid)
@@ -140,10 +147,8 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
 
 async def start_vote_default(project_name: str) -> str:
     async with db.session() as data:
-        project = await data.project(name=project_name, _vote_policy=True).demand(
-            RuntimeError(f"Project {project_name} not found")
-        )
-        vote_policy = project.vote_policy
+        vote_policy = await db.get_project_vote_policy(data, project_name)
+
     if vote_policy is not None:
         # NOTE: Do not use "if vote_policy.announce_release_template is None"
         # We want to check for the empty string too

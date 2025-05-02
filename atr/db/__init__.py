@@ -488,6 +488,14 @@ async def create_async_engine(app_config: type[config.AppConfig]) -> sqlalchemy.
     return engine
 
 
+async def get_project_vote_policy(data: Session, project_name: str) -> models.VotePolicy | None:
+    """Fetch the VotePolicy for a project."""
+    project = await data.project(name=project_name, _vote_policy=True).demand(
+        RuntimeError(f"Project {project_name} not found")
+    )
+    return project.vote_policy
+
+
 def init_database(app: base.QuartApp) -> None:
     """
     Creates and initializes the database for a QuartApp.
