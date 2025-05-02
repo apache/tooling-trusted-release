@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import datetime
 import logging
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -172,6 +173,7 @@ async def selected_post(
             # That would require moving this, and the filesystem operations, into a task
             release.phase = models.ReleasePhase.RELEASE
             release.revision = None
+            release.released = datetime.datetime.now(datetime.UTC)
             await data.commit()
 
             # This must come after updating the release object

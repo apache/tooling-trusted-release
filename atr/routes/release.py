@@ -17,6 +17,7 @@
 
 """release.py"""
 
+import datetime
 import logging
 import logging.handlers
 
@@ -84,8 +85,13 @@ async def completed(project_name: str) -> str:
             _committee=True,
         ).all()
 
+    def sort_releases(release: models.Release) -> datetime.datetime:
+        return release.released or release.created
+
+    releases = sorted(releases, key=sort_releases, reverse=True)
+
     return await quart.render_template(
-        "releases-completed.html", releases=releases, format_datetime=routes.format_datetime
+        "releases-completed.html", project=project, releases=releases, format_datetime=routes.format_datetime
     )
 
 
@@ -98,11 +104,20 @@ async def releases() -> str:
             stage=models.ReleaseStage.RELEASE,
             phase=models.ReleasePhase.RELEASE,
             _committee=True,
+            _project=True,
         ).all()
+
+    projects = {}
+    for release in releases:
+        if release.project.display_name not in projects:
+            projects[release.project.display_name] = (release.project, 1)
+        else:
+            projects[release.project.display_name] = (release.project, projects[release.project.display_name][1] + 1)
 
     return await quart.render_template(
         "releases.html",
-        releases=list(releases),
+        projects=projects,
+        releases=releases,
     )
 
 

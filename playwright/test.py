@@ -241,17 +241,18 @@ def lifecycle_06_announce_preview(page: sync_api.Page, credentials: Credentials,
 
 
 def lifecycle_07_release_exists(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
-    logging.info(f"Checking for release tooling-test-example {version_name} on the /releases page")
+    logging.info(
+        f"Checking for release tooling-test-example {version_name} on /releases/completed/tooling-test-example"
+    )
+    go_to_path(page, "/releases/completed/tooling-test-example")
+    logging.info("Releases completed page loaded successfully")
 
-    release_card_locator = page.locator(f'div.card:has(h3:has-text("Apache Tooling Test Example {version_name}"))')
+    release_card_locator = page.locator(f'div.card:has(strong.card-title:has-text("{version_name}"))')
     sync_api.expect(release_card_locator).to_be_visible()
     logging.info(f"Found card for tooling-test-example {version_name} release")
-    logging.info(f"Release tooling-test-example {version_name} confirmed exists on /releases page")
-
-    logging.info(f"Verifying release tooling-test-example {version_name} card exists")
-    release_card_locator = page.locator(f'div.card:has(h3:has-text("Apache Tooling Test Example {version_name}"))')
-    sync_api.expect(release_card_locator).to_be_visible()
-    logging.info(f"Release tooling-test-example {version_name} card found")
+    logging.info(
+        f"Release tooling-test-example {version_name} confirmed exists on /releases/completed/tooling-test-example"
+    )
 
 
 def main() -> None:

@@ -35,17 +35,17 @@
         <span class="page-preview-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
       </div>
       <div>
+        <a title="Download all files"
+           href="{{ as_url(routes.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
+           class="btn btn-primary me-2">
+          <i class="bi bi-download"></i>
+          Download all files
+        </a>
         <a title="Show files for {{ release.name }}"
            href="{{ as_url(routes.preview.view, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-secondary me-2">
           <i class="bi bi-archive"></i>
           Show files
-        </a>
-        <a title="Download all files"
-           href="{{ as_url(routes.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
-           class="btn btn-secondary me-2">
-          <i class="bi bi-download"></i>
-          Download all files
         </a>
         <a title="Show revisions for {{ release.name }}"
            href="{{ as_url(routes.revisions.selected, project_name=release.project.name, version_name=release.version) }}"

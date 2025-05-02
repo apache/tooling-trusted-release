@@ -383,6 +383,7 @@ class Release(sqlmodel.SQLModel, table=True):
     stage: ReleaseStage
     phase: ReleasePhase
     created: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
+    released: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
 
     # Many-to-one: A release belongs to one project, a project can have multiple releases
     project_name: str = sqlmodel.Field(foreign_key="project.name")

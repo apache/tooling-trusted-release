@@ -27,19 +27,17 @@
   <h1>Releases</h1>
 
   {% if releases %}
-    {% for release in releases %}
+    {% for project_display_name in projects|sort %}
+      {% set project, count = projects[project_display_name] %}
       <div class="card mb-3 bg-light">
         <div class="card-body">
-          <h3 class="card-title mb-2">{{ release.project.display_name }} {{ release.version }}</h3>
-          <div class="d-flex flex-wrap gap-3 pb-3 mb-2 border-bottom text-secondary fs-6">
-            <span class="page-release-meta-item">Created: {{ release.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}</span>
-          </div>
-          <div class="d-flex gap-3 align-items-center pt-2">
-            <a class="btn btn-outline-primary"
-               href="{{ as_url(routes.release.view, project_name=release.project.name, version_name=release.version) }}"><i class="bi bi-eye me-1"></i> View files</a>
-            <a class="btn btn-outline-primary"
-               href="{{ as_url(routes.download.all_selected, project_name=release.project.name, version_name=release.version) }}"><i class="bi bi-download me-1"></i> Download files</a>
-          </div>
+          <h3 class="card-title mb-3">{{ project_display_name }}</h3>
+          <p class="card-text">
+            <a href="{{ as_url(routes.release.completed, project_name=project.name) }}"
+               class="btn btn-outline-primary">
+              <i class="bi bi-folder2-open me-1"></i> Completed releases (<code>{{ count }}</code>)
+            </a>
+          </p>
         </div>
       </div>
     {% endfor %}

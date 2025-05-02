@@ -1,32 +1,19 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Completed releases of {{ project_display_name }} ~ ATR
+  Completed releases of {{ project.display_name }} ~ ATR
 {% endblock title %}
 
 {% block description %}
-  All of the completed releases of {{ project_display_name }} on ATR.
+  All of the completed releases of {{ project.display_name }} on ATR.
 {% endblock description %}
 
 {% block content %}
-  {% set project_name = releases[0].project.name if releases else "" %}
-  {% set project_display_name = releases[0].project.display_name if releases else "Unknown project" %}
+  <p>
+    <a href="{{ as_url(routes.root.index) }}" class="atr-back-link">← Back to Select a release</a>
+  </p>
 
-  <nav aria-label="breadcrumb" class="mb-5">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item">
-        <a href="{{ as_url(routes.root.index) }}">ATR</a>
-      </li>
-      {% if project_name %}
-        <li class="breadcrumb-item">
-          <a href="{{ as_url(routes.projects.view, name=project_name) }}">{{ project_display_name }}</a>
-        </li>
-      {% endif %}
-      <li class="breadcrumb-item active" aria-current="page">Completed releases</li>
-    </ol>
-  </nav>
-
-  <h1>Completed releases of {{ project_display_name }}</h1>
+  <h1>Completed releases of {{ project.display_name }}</h1>
 
   {% if releases %}
     <p class="mb-4">The following releases have been completed and published for this project.</p>
@@ -38,9 +25,13 @@
               <strong class="card-title fs-5">{{ release.version }}</strong>
               <p class="card-text text-muted">Released on {{ format_datetime(release.created) }}</p>
               <div class="mt-auto">
+                <a href="{{ as_url(routes.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
+                   class="btn btn-outline-primary w-100 mb-2">
+                  <i class="bi bi-download me-1"></i> Download files
+                </a>
                 <a href="{{ as_url(routes.release.view, project_name=release.project.name, version_name=release.version) }}"
-                   class="btn btn-outline-primary w-100">
-                  <i class="bi bi-folder2-open me-1"></i> View release files
+                   class="btn btn-outline-secondary w-100">
+                  <i class="bi bi-folder2-open me-1"></i> View files
                 </a>
               </div>
             </div>
@@ -50,7 +41,7 @@
     </div>
   {% else %}
     <div class="alert alert-info mt-4" role="alert">
-      <i class="bi bi-info-circle me-2"></i> There are no completed releases recorded for {{ project_display_name }}.
+      <i class="bi bi-info-circle me-2"></i> There are no completed releases recorded for {{ project.display_name }}.
     </div>
   {% endif %}
 {% endblock content %}
