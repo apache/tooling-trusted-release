@@ -115,7 +115,7 @@ async def server_start() -> asyncssh.SSHAcceptor:
     server = await asyncssh.create_server(
         SSHServer,
         server_host_keys=[key_path],
-        process_factory=_01_handle_client,
+        process_factory=_step_01_handle_client,
         host=_CONFIG.SSH_HOST,
         port=_CONFIG.SSH_PORT,
         encoding=None,
@@ -132,7 +132,21 @@ async def server_stop(server: asyncssh.SSHAcceptor) -> None:
     _LOGGER.info("SSH server stopped")
 
 
-async def _01_handle_client(process: asyncssh.SSHServerProcess) -> None:
+def _fail(process: asyncssh.SSHServerProcess, message: str, return_value: T) -> T:
+    _LOGGER.error(message)
+    # Ensure message is encoded before writing to stderr
+    encoded_message = f"ATR SSH error: {message}\n".encode()
+    try:
+        process.stderr.write(encoded_message)
+    except BrokenPipeError:
+        _LOGGER.warning("Failed to write error to client stderr: Broken pipe")
+    except Exception as e:
+        _LOGGER.exception(f"Error writing to client stderr: {e}")
+    process.exit(1)
+    return return_value
+
+
+async def _step_01_handle_client(process: asyncssh.SSHServerProcess) -> None:
     """Process client command, validating and dispatching to read or write handlers."""
     asf_uid = process.get_extra_info("username")
     _LOGGER.info(f"Handling command for authenticated user: {asf_uid}")
@@ -144,17 +158,17 @@ async def _01_handle_client(process: asyncssh.SSHServerProcess) -> None:
     # TODO: Use shlex.split or similar if commands can contain quoted arguments
     argv = process.command.split()
 
-    #########################################
-    ### Calls _02_command_simple_validate ###
-    #########################################
-    simple_validation_error, path_index, is_read_request = _02_command_simple_validate(argv)
+    ##############################################
+    ### Calls _step_02_command_simple_validate ###
+    ##############################################
+    simple_validation_error, path_index, is_read_request = _step_02_command_simple_validate(argv)
     if simple_validation_error:
         return _fail(process, f"{simple_validation_error}\nCommand: {process.command}", None)
 
-    ##################################
-    ### Calls _04_command_validate ###
-    ##################################
-    validation_results = await _04_command_validate(process, argv, path_index, is_read_request)
+    #######################################
+    ### Calls _step_04_command_validate ###
+    #######################################
+    validation_results = await _step_04_command_validate(process, argv, path_index, is_read_request)
     if not validation_results:
         return
 
@@ -167,19 +181,19 @@ async def _01_handle_client(process: asyncssh.SSHServerProcess) -> None:
             # This should not happen if the validation logic is correct
             return _fail(process, "Internal error: Release object missing for read request after validation", None)
         _LOGGER.info(f"Processing READ request for {project_name}-{version_name}")
-        ###############################################
-        ### Calls _07a_process_validated_rsync_read ###
-        ###############################################
-        await _07a_process_validated_rsync_read(process, argv, path_index, release_obj)
+        ####################################################
+        ### Calls _step_07a_process_validated_rsync_read ###
+        ####################################################
+        await _step_07a_process_validated_rsync_read(process, argv, path_index, release_obj)
     else:
         _LOGGER.info(f"Processing WRITE request for {project_name}-{version_name}")
-        ################################################
-        ### Calls _07b_process_validated_rsync_write ###
-        ################################################
-        await _07b_process_validated_rsync_write(process, argv, path_index, project_name, version_name)
+        #####################################################
+        ### Calls _step_07b_process_validated_rsync_write ###
+        #####################################################
+        await _step_07b_process_validated_rsync_write(process, argv, path_index, project_name, version_name)
 
 
-def _02_command_simple_validate(argv: list[str]) -> tuple[str | None, int, bool]:
+def _step_02_command_simple_validate(argv: list[str]) -> tuple[str | None, int, bool]:
     """Validate the basic structure of the rsync command and detect read vs write."""
     # READ: ['rsync', '--server', '--sender', '-vlogDtpre.iLsfxCIvu', '.', '/proj/v1/']
     # WRITE: ['rsync', '--server', '-vlogDtpre.iLsfxCIvu', '.', '/proj/v1/']
@@ -213,17 +227,17 @@ def _02_command_simple_validate(argv: list[str]) -> tuple[str | None, int, bool]
     if options.split("e.", 1)[0] != "-vlogDtpr":
         return "The options argument (after --sender) must be '-vlogDtpre.[compatibility flags]'", -1, True
 
-    ###############################################
-    ### Calls _03_validate_rsync_args_structure ###
-    ###############################################
-    error, path_index = _03_validate_rsync_args_structure(argv, option_index, is_read_request)
+    ####################################################
+    ### Calls _step_03_validate_rsync_args_structure ###
+    ####################################################
+    error, path_index = _step_03_validate_rsync_args_structure(argv, option_index, is_read_request)
     if error:
         return error, -1, is_read_request
 
     return None, path_index, is_read_request
 
 
-def _03_validate_rsync_args_structure(
+def _step_03_validate_rsync_args_structure(
     argv: list[str], option_index: int, is_read_request: bool
 ) -> tuple[str | None, int]:
     """Validate the dot argument and path argument presence and count."""
@@ -254,14 +268,14 @@ def _03_validate_rsync_args_structure(
     return None, path_index
 
 
-async def _04_command_validate(
+async def _step_04_command_validate(
     process: asyncssh.SSHServerProcess, argv: list[str], path_index: int, is_read_request: bool
 ) -> tuple[str, str, models.Release | None] | None:
     """Validate the path and user permissions for read or write."""
-    #######################################
-    ### Calls _05_command_path_validate ###
-    #######################################
-    result = _05_command_path_validate(argv[path_index])
+    ############################################
+    ### Calls _step_05_command_path_validate ###
+    ############################################
+    result = _step_05_command_path_validate(argv[path_index])
     if isinstance(result, str):
         return _fail(process, result, None)
     path_project, path_version = result
@@ -277,27 +291,27 @@ async def _04_command_validate(
         release = await data.release(project_name=project.name, version=path_version).get()
 
         if is_read_request:
-            ############################################
-            ### Calls _06a_validate_read_permissions ###
-            ############################################
-            validated_release, success = await _06a_validate_read_permissions(
+            #################################################
+            ### Calls _step_06a_validate_read_permissions ###
+            #################################################
+            validated_release, success = await _step_06a_validate_read_permissions(
                 process, ssh_uid, project, release, path_project, path_version
             )
             if success is None:
                 return None
             return path_project, path_version, validated_release
         else:
-            #############################################
-            ### Calls _06b_validate_write_permissions ###
-            #############################################
-            success = await _06b_validate_write_permissions(process, ssh_uid, project, release)
+            ##################################################
+            ### Calls _step_06b_validate_write_permissions ###
+            ##################################################
+            success = await _step_06b_validate_write_permissions(process, ssh_uid, project, release)
             if success is None:
                 return None
             # Return None for the release object for write requests
             return path_project, path_version, None
 
 
-def _05_command_path_validate(path: str) -> tuple[str, str] | str:
+def _step_05_command_path_validate(path: str) -> tuple[str, str] | str:
     """Validate the path argument for rsync commands."""
     # READ: rsync --server --sender -vlogDtpre.iLsfxCIvu . /proj/v1/
     # Validating path: /proj/v1/
@@ -338,7 +352,7 @@ def _05_command_path_validate(path: str) -> tuple[str, str] | str:
     return path_project, path_version
 
 
-async def _06a_validate_read_permissions(
+async def _step_06a_validate_read_permissions(
     process: asyncssh.SSHServerProcess,
     ssh_uid: str,
     project: models.Project,
@@ -370,7 +384,7 @@ async def _06a_validate_read_permissions(
     return release, True
 
 
-async def _06b_validate_write_permissions(
+async def _step_06b_validate_write_permissions(
     process: asyncssh.SSHServerProcess,
     ssh_uid: str,
     project: models.Project,
@@ -404,7 +418,7 @@ async def _06b_validate_write_permissions(
     return True
 
 
-async def _07a_process_validated_rsync_read(
+async def _step_07a_process_validated_rsync_read(
     process: asyncssh.SSHServerProcess,
     argv: list[str],
     path_index: int,
@@ -429,10 +443,10 @@ async def _07a_process_validated_rsync_read(
         if not argv[path_index].endswith("/"):
             argv[path_index] += "/"
 
-        ##############################################
-        ### Calls _08_execute_rsync_sender_command ###
-        ##############################################
-        exit_status = await _08_execute_rsync(process, argv)
+        ###################################################
+        ### Calls _step_08_execute_rsync_sender_command ###
+        ###################################################
+        exit_status = await _step_08_execute_rsync(process, argv)
         if exit_status != 0:
             _LOGGER.error(
                 f"rsync --sender failed with exit status {exit_status} for release {release.name}. "
@@ -447,7 +461,7 @@ async def _07a_process_validated_rsync_read(
         process.exit(1)
 
 
-async def _07b_process_validated_rsync_write(
+async def _step_07b_process_validated_rsync_write(
     process: asyncssh.SSHServerProcess,
     argv: list[str],
     path_index: int,
@@ -461,10 +475,10 @@ async def _07b_process_validated_rsync_write(
     try:
         # Ensure the release object exists or is created
         # This must happen before creating the revision directory
-        ###################################################
-        ### Calls _07b2_ensure_release_object_for_write ###
-        ###################################################
-        if not await _07b2_ensure_release_object_for_write(process, project_name, version_name):
+        #######################################################
+        ### Calls _step_07c_ensure_release_object_for_write ###
+        #######################################################
+        if not await _step_07c_ensure_release_object_for_write(process, project_name, version_name):
             # The _fail function was already called in _07b2_ensure_release_object_for_write
             return
 
@@ -477,10 +491,10 @@ async def _07b_process_validated_rsync_write(
             # Update the rsync command path to the new revision directory
             argv[path_index] = str(new_revision_dir)
 
-            ##############################################
-            ### Calls _08_execute_rsync_upload_command ###
-            ##############################################
-            exit_status = await _08_execute_rsync(process, argv)
+            ###################################################
+            ### Calls _step_08_execute_rsync_upload_command ###
+            ###################################################
+            exit_status = await _step_08_execute_rsync(process, argv)
             if exit_status != 0:
                 _LOGGER.error(
                     f"rsync upload failed with exit status {exit_status} for revision {new_draft_revision}. "
@@ -498,7 +512,7 @@ async def _07b_process_validated_rsync_write(
         process.exit(1)
 
 
-async def _07b2_ensure_release_object_for_write(
+async def _step_07c_ensure_release_object_for_write(
     process: asyncssh.SSHServerProcess, project_name: str, version_name: str
 ) -> bool:
     """Ensure the release object exists or create it for a write operation."""
@@ -539,7 +553,7 @@ async def _07b2_ensure_release_object_for_write(
         return _fail(process, f"Internal error ensuring release object: {e}", False)
 
 
-async def _08_execute_rsync(process: asyncssh.SSHServerProcess, argv: list[str]) -> int:
+async def _step_08_execute_rsync(process: asyncssh.SSHServerProcess, argv: list[str]) -> int:
     """Execute the modified rsync command."""
     _LOGGER.info(f"Executing modified rsync command: {' '.join(argv)}")
     proc = await asyncio.create_subprocess_shell(
@@ -554,17 +568,3 @@ async def _08_execute_rsync(process: asyncssh.SSHServerProcess, argv: list[str])
     exit_status = await proc.wait()
     _LOGGER.info(f"Rsync finished with exit status {exit_status}")
     return exit_status
-
-
-def _fail(process: asyncssh.SSHServerProcess, message: str, return_value: T) -> T:
-    _LOGGER.error(message)
-    # Ensure message is encoded before writing to stderr
-    encoded_message = f"ATR SSH error: {message}\n".encode()
-    try:
-        process.stderr.write(encoded_message)
-    except BrokenPipeError:
-        _LOGGER.warning("Failed to write error to client stderr: Broken pipe")
-    except Exception as e:
-        _LOGGER.exception(f"Error writing to client stderr: {e}")
-    process.exit(1)
-    return return_value

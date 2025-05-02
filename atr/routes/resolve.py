@@ -46,6 +46,22 @@ class ResolveForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Resolve vote")
 
 
+def release_latest_vote_task(release: models.Release) -> models.Task | None:
+    # Find the most recent VOTE_INITIATE task for this release
+    # TODO: Make this a proper query
+    for task in sorted(release.tasks, key=lambda t: t.added, reverse=True):
+        if task.task_type != models.TaskType.VOTE_INITIATE:
+            continue
+        # if task.status != models.TaskStatus.COMPLETED:
+        #     continue
+        if (task.status == models.TaskStatus.QUEUED) or (task.status == models.TaskStatus.ACTIVE):
+            continue
+        if task.result is None:
+            continue
+        return task
+    return None
+
+
 @routes.committer("/resolve/<project_name>/<version_name>", measure_performance=False)
 async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Resolve the vote on a release candidate."""
@@ -140,6 +156,29 @@ async def selected_post(
     )
 
 
+def task_mid_get(latest_vote_task: models.Task) -> str | None:
+    # TODO: Improve this
+    task_mid = None
+
+    try:
+        for result in latest_vote_task.result or []:
+            if isinstance(result, str):
+                parsed_result = json.loads(result)
+            else:
+                # Shouldn't happen
+                parsed_result = result
+            if isinstance(parsed_result, dict):
+                task_mid = parsed_result.get("mid", "(mid not found in result)")
+                break
+            else:
+                task_mid = "(malformed result)"
+
+    except (json.JSONDecodeError, TypeError):
+        task_mid = "(malformed result)"
+
+    return task_mid
+
+
 def _format_artifact_name(project_name: str, version: str, is_podling: bool = False) -> str:
     """Format an artifact name according to Apache naming conventions.
 
@@ -151,22 +190,6 @@ def _format_artifact_name(project_name: str, version: str, is_podling: bool = Fa
     if is_podling:
         return f"apache-{project_name}-incubating-{version}"
     return f"apache-{project_name}-{version}"
-
-
-def release_latest_vote_task(release: models.Release) -> models.Task | None:
-    # Find the most recent VOTE_INITIATE task for this release
-    # TODO: Make this a proper query
-    for task in sorted(release.tasks, key=lambda t: t.added, reverse=True):
-        if task.task_type != models.TaskType.VOTE_INITIATE:
-            continue
-        # if task.status != models.TaskStatus.COMPLETED:
-        #     continue
-        if (task.status == models.TaskStatus.QUEUED) or (task.status == models.TaskStatus.ACTIVE):
-            continue
-        if task.result is None:
-            continue
-        return task
-    return None
 
 
 async def _task_archive_url(task_mid: str) -> str | None:
@@ -215,26 +238,3 @@ async def _task_archive_url_cached(task_mid: str | None) -> str | None:
         )
 
     return url
-
-
-def task_mid_get(latest_vote_task: models.Task) -> str | None:
-    # TODO: Improve this
-    task_mid = None
-
-    try:
-        for result in latest_vote_task.result or []:
-            if isinstance(result, str):
-                parsed_result = json.loads(result)
-            else:
-                # Shouldn't happen
-                parsed_result = result
-            if isinstance(parsed_result, dict):
-                task_mid = parsed_result.get("mid", "(mid not found in result)")
-                break
-            else:
-                task_mid = "(malformed result)"
-
-    except (json.JSONDecodeError, TypeError):
-        task_mid = "(malformed result)"
-
-    return task_mid

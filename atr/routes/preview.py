@@ -37,6 +37,13 @@ if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
 
 
+class AnnouncePreviewForm(util.QuartFormTyped):
+    """Form for validating preview request data."""
+
+    subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
+    body = wtforms.TextAreaField("Body", validators=[wtforms.validators.InputRequired("Body is required for preview")])
+
+
 class DeleteForm(util.QuartFormTyped):
     """Form for deleting a release preview."""
 
@@ -53,11 +60,34 @@ class DeleteForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Delete preview")
 
 
-class AnnouncePreviewForm(util.QuartFormTyped):
-    """Form for validating preview request data."""
+@routes.committer("/preview/announce/<project_name>/<version_name>", methods=["POST"])
+async def announce_preview(
+    session: routes.CommitterSession, project_name: str, version_name: str
+) -> quart.wrappers.response.Response | str:
+    """Generate a preview of the announcement email body."""
 
-    subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
-    body = wtforms.TextAreaField("Body", validators=[wtforms.validators.InputRequired("Body is required for preview")])
+    form = await AnnouncePreviewForm.create_form(data=await quart.request.form)
+    if not await form.validate_on_submit():
+        error_message = "Invalid preview request"
+        if form.errors:
+            error_details = "; ".join([f"{field}: {', '.join(errs)}" for field, errs in form.errors.items()])
+            error_message = f"{error_message}: {error_details}"
+        return quart.Response(f"Error: {error_message}", status=400, mimetype="text/plain")
+
+    try:
+        # Construct options and generate body
+        options = construct.AnnounceReleaseOptions(
+            asfuid=session.uid,
+            project_name=project_name,
+            version_name=version_name,
+        )
+        preview_body = await construct.announce_release_body(str(form.body.data), options)
+
+        return quart.Response(preview_body, mimetype="text/plain")
+
+    except Exception as e:
+        logging.exception("Error generating announcement preview:")
+        return quart.Response(f"Error generating preview: {e!s}", status=500, mimetype="text/plain")
 
 
 @routes.committer("/preview/delete", methods=["POST"])
@@ -134,36 +164,6 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
         phase="release preview",
         phase_key="preview",
     )
-
-
-@routes.committer("/preview/announce/<project_name>/<version_name>", methods=["POST"])
-async def announce_preview(
-    session: routes.CommitterSession, project_name: str, version_name: str
-) -> quart.wrappers.response.Response | str:
-    """Generate a preview of the announcement email body."""
-
-    form = await AnnouncePreviewForm.create_form(data=await quart.request.form)
-    if not await form.validate_on_submit():
-        error_message = "Invalid preview request"
-        if form.errors:
-            error_details = "; ".join([f"{field}: {', '.join(errs)}" for field, errs in form.errors.items()])
-            error_message = f"{error_message}: {error_details}"
-        return quart.Response(f"Error: {error_message}", status=400, mimetype="text/plain")
-
-    try:
-        # Construct options and generate body
-        options = construct.AnnounceReleaseOptions(
-            asfuid=session.uid,
-            project_name=project_name,
-            version_name=version_name,
-        )
-        preview_body = await construct.announce_release_body(str(form.body.data), options)
-
-        return quart.Response(preview_body, mimetype="text/plain")
-
-    except Exception as e:
-        logging.exception("Error generating announcement preview:")
-        return quart.Response(f"Error generating preview: {e!s}", status=500, mimetype="text/plain")
 
 
 @routes.committer("/preview/view/<project_name>/<version_name>/<path:file_path>")
