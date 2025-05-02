@@ -41,7 +41,7 @@ async def check(
     form: wtforms.Form | None = None,
 ) -> response.Response | str:
     base_path = util.release_directory(release)
-    paths = await util.paths_recursive(base_path)
+    paths = [path async for path in util.paths_recursive(base_path)]
     path_templates = {}
     path_substitutions = {}
     path_artifacts = set()

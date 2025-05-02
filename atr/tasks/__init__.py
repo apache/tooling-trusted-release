@@ -60,7 +60,7 @@ async def draft_checks(
     # Construct path to the specific revision
     # We don't have the release object here, so we can't use util.release_directory
     revision_path = util.get_unfinished_dir() / project_name / release_version / draft_revision
-    relative_paths = await util.paths_recursive(revision_path)
+    relative_paths = [path async for path in util.paths_recursive(revision_path)]
 
     session_context = db.session() if (caller_data is None) else contextlib.nullcontext(caller_data)
     async with session_context as data:

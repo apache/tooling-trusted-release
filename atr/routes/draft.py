@@ -159,7 +159,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
             # Check whether the file is an artifact
             if analysis.is_artifact(path_in_new_revision):
                 # If so, delete all associated metadata files in the new revision
-                for p in await util.paths_recursive(path_in_new_revision.parent):
+                async for p in util.paths_recursive(path_in_new_revision.parent):
                     # Construct full path within the new revision
                     metadata_path_obj = new_revision_dir / p
                     if p.name.startswith(rel_path_to_delete.name + "."):

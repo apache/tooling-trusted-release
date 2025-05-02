@@ -65,7 +65,7 @@ async def check(args: checks.FunctionArguments) -> None:
         _LOGGER.error("Base release directory does not exist or is not a directory: %s", base_path)
         return
 
-    relative_paths = await util.paths_recursive(base_path)
+    relative_paths = [p async for p in util.paths_recursive(base_path)]
     relative_paths_set = set(str(p) for p in relative_paths)
     for relative_path in relative_paths:
         # Delegate processing of each path to the helper function

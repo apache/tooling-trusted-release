@@ -68,7 +68,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     unique_dirs: set[pathlib.Path] = {pathlib.Path(".")}
 
     try:
-        for path in await util.paths_recursive(current_revision_dir):
+        async for path in util.paths_recursive(current_revision_dir):
             file_paths_rel.append(path)
             unique_dirs.add(path.parent)
     except FileNotFoundError:

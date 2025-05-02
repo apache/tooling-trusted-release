@@ -102,7 +102,7 @@ async def zip_selected(
     base_dir = util.release_directory(release)
     files_to_zip = []
     try:
-        for rel_path in await util.paths_recursive(base_dir):
+        async for rel_path in util.paths_recursive(base_dir):
             full_item_path = base_dir / rel_path
             if await aiofiles.os.path.isfile(full_item_path):
                 files_to_zip.append({"file": str(full_item_path), "name": str(rel_path)})
@@ -158,7 +158,7 @@ async def _download_or_list(project_name: str, version_name: str, file_path: str
 async def _generate_file_url_list(release: models.Release) -> str:
     base_dir = util.release_directory(release)
     urls = []
-    for rel_path in await util.paths_recursive(base_dir):
+    async for rel_path in util.paths_recursive(base_dir):
         full_item_path = base_dir / rel_path
         if await aiofiles.os.path.isfile(full_item_path):
             abs_url = util.as_url(

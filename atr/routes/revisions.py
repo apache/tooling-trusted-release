@@ -167,7 +167,7 @@ async def _revisions_process(
 ) -> tuple[dict, set[pathlib.Path]]:
     """Process a single revision and calculate its diff from the previous."""
     current_revision_dir = release_dir / rev_name
-    current_revision_files = set(await util.paths_recursive(current_revision_dir))
+    current_revision_files = {path async for path in util.paths_recursive(current_revision_dir)}
     parent_name = parent_map.get(rev_name)
 
     added_files: set[pathlib.Path] = set()

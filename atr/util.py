@@ -198,7 +198,7 @@ async def content_list(
             raise ValueError("A revision name is required for release candidate draft or preview content listing")
     if revision_name:
         base_path = base_path / revision_name
-    for path in await paths_recursive(base_path):
+    async for path in paths_recursive(base_path):
         stat = await aiofiles.os.stat(base_path / path)
         yield FileStat(
             path=str(path),
@@ -342,7 +342,7 @@ async def get_release_stats(release: models.Release) -> tuple[int, int, str]:
     count = 0
     total_bytes = 0
     try:
-        async for rel_path in paths_recursive_async(base_dir):
+        async for rel_path in paths_recursive(base_dir):
             full_path = base_dir / rel_path
             if await aiofiles.os.path.isfile(full_path):
                 try:
@@ -398,39 +398,13 @@ async def number_of_release_files(release: models.Release) -> int:
             path = get_finished_dir() / path_project / path_version
         case _:
             raise ValueError(f"Unknown release phase: {release.phase}")
-    return len(await paths_recursive(path))
+    count = 0
+    async for _ in paths_recursive(path):
+        count += 1
+    return count
 
 
-async def paths_recursive(base_path: pathlib.Path, sort: bool = True) -> list[pathlib.Path]:
-    """List all paths recursively in alphabetical order from a given base path."""
-    paths: list[pathlib.Path] = []
-
-    async def _recursive_list(current_path: pathlib.Path, relative_path: pathlib.Path = pathlib.Path()) -> None:
-        try:
-            entries = await aiofiles.os.listdir(current_path)
-            for entry in entries:
-                entry_path = current_path / entry
-                entry_rel_path = relative_path / entry
-
-                try:
-                    stat_info = await aiofiles.os.stat(entry_path)
-                    # If the entry is a directory, recurse into it
-                    if stat_info.st_mode & 0o040000:
-                        await _recursive_list(entry_path, entry_rel_path)
-                    else:
-                        paths.append(entry_rel_path)
-                except (FileNotFoundError, PermissionError):
-                    continue
-        except FileNotFoundError:
-            pass
-
-    await _recursive_list(base_path)
-    if sort is True:
-        paths.sort()
-    return paths
-
-
-async def paths_recursive_async(base_path: pathlib.Path) -> AsyncGenerator[pathlib.Path]:
+async def paths_recursive(base_path: pathlib.Path) -> AsyncGenerator[pathlib.Path]:
     """Yield all file paths recursively within a base path, relative to the base path."""
     try:
         abs_base_path = await asyncio.to_thread(base_path.resolve)
@@ -440,7 +414,7 @@ async def paths_recursive_async(base_path: pathlib.Path) -> AsyncGenerator[pathl
             if entry.is_file():
                 yield relative_path
             elif entry.is_dir():
-                async for sub_path in paths_recursive_async(entry_path):
+                async for sub_path in paths_recursive(entry_path):
                     yield relative_path / sub_path
     except FileNotFoundError:
         return
