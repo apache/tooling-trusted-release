@@ -426,7 +426,7 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
         file_path=file_path,
         file_data=file_data,
         release=release,
-        format_file_size=routes.format_file_size,
+        format_file_size=util.format_file_size,
     )
 
 
@@ -450,9 +450,9 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
         "phase-view.html",
         file_stats=file_stats,
         release=release,
-        format_datetime=routes.format_datetime,
-        format_file_size=routes.format_file_size,
-        format_permissions=routes.format_permissions,
+        format_datetime=util.format_datetime,
+        format_file_size=util.format_file_size,
+        format_permissions=util.format_permissions,
         phase="release candidate draft",
         phase_key="draft",
     )

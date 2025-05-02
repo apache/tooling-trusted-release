@@ -19,6 +19,7 @@ import asyncio
 import binascii
 import contextlib
 import dataclasses
+import datetime
 import hashlib
 import logging
 import pathlib
@@ -247,6 +248,83 @@ async def file_sha3(path: str) -> str:
     return sha3.hexdigest()
 
 
+def format_datetime(dt_obj: datetime.datetime | int) -> str:
+    """Format a datetime object or Unix timestamp into a human readable datetime string."""
+    # Integers are unix timestamps
+    if isinstance(dt_obj, int):
+        dt_obj = datetime.datetime.fromtimestamp(dt_obj, tz=datetime.UTC)
+
+    # Ensure UTC native timezone awareness
+    if dt_obj.tzinfo is None:
+        dt_obj = dt_obj.replace(tzinfo=datetime.UTC)
+    else:
+        # Convert to UTC if not already
+        dt_obj = dt_obj.astimezone(datetime.UTC)
+
+    return dt_obj.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def format_file_size(size_in_bytes: int) -> str:
+    """Format a file size with appropriate units and comma-separated digits."""
+    # Format the raw bytes with commas
+    formatted_bytes = f"{size_in_bytes:,}"
+
+    # Calculate the appropriate unit
+    if size_in_bytes >= 1_000_000_000:
+        size_in_gb = size_in_bytes // 1_000_000_000
+        return f"{size_in_gb:,} GB ({formatted_bytes} bytes)"
+    elif size_in_bytes >= 1_000_000:
+        size_in_mb = size_in_bytes // 1_000_000
+        return f"{size_in_mb:,} MB ({formatted_bytes} bytes)"
+    elif size_in_bytes >= 1_000:
+        size_in_kb = size_in_bytes // 1_000
+        return f"{size_in_kb:,} KB ({formatted_bytes} bytes)"
+    else:
+        return f"{formatted_bytes} bytes"
+
+
+def format_permissions(mode: int) -> str:
+    """Format Unix file permissions in ls -l style."""
+    # File type
+    if mode & 0o040000:
+        # Directory
+        perms = "d"
+    elif mode & 0o0100000:
+        # Regular file
+        perms = "-"
+    elif mode & 0o020000:
+        # Character special
+        perms = "c"
+    elif mode & 0o060000:
+        # Block special
+        perms = "b"
+    elif mode & 0o010000:
+        # FIFO
+        perms = "p"
+    elif mode & 0o0140000:
+        # Socket
+        perms = "s"
+    else:
+        perms = "?"
+
+    # Owner permissions
+    perms += "r" if mode & 0o400 else "-"
+    perms += "w" if mode & 0o200 else "-"
+    perms += "x" if mode & 0o100 else "-"
+
+    # Group permissions
+    perms += "r" if mode & 0o040 else "-"
+    perms += "w" if mode & 0o020 else "-"
+    perms += "x" if mode & 0o010 else "-"
+
+    # Others permissions
+    perms += "r" if mode & 0o004 else "-"
+    perms += "w" if mode & 0o002 else "-"
+    perms += "x" if mode & 0o001 else "-"
+
+    return perms
+
+
 async def get_asf_id_or_die() -> str:
     web_session = await session.read()
     if web_session is None or web_session.uid is None:
@@ -256,6 +334,28 @@ async def get_asf_id_or_die() -> str:
 
 def get_finished_dir() -> pathlib.Path:
     return pathlib.Path(config.get().FINISHED_STORAGE_DIR)
+
+
+async def get_release_stats(release: models.Release) -> tuple[int, int, str]:
+    """Calculate file count, total byte size, and formatted size for a release."""
+    base_dir = release_directory(release)
+    count = 0
+    total_bytes = 0
+    try:
+        async for rel_path in paths_recursive_async(base_dir):
+            full_path = base_dir / rel_path
+            if await aiofiles.os.path.isfile(full_path):
+                try:
+                    size = await aiofiles.os.path.getsize(full_path)
+                    count += 1
+                    total_bytes += size
+                except OSError:
+                    ...
+    except FileNotFoundError:
+        ...
+
+    formatted_size = format_file_size(total_bytes)
+    return count, total_bytes, formatted_size
 
 
 def get_unfinished_dir() -> pathlib.Path:
@@ -328,6 +428,22 @@ async def paths_recursive(base_path: pathlib.Path, sort: bool = True) -> list[pa
     if sort is True:
         paths.sort()
     return paths
+
+
+async def paths_recursive_async(base_path: pathlib.Path) -> AsyncGenerator[pathlib.Path]:
+    """Yield all file paths recursively within a base path, relative to the base path."""
+    try:
+        abs_base_path = await asyncio.to_thread(base_path.resolve)
+        for entry in await aiofiles.os.scandir(abs_base_path):
+            entry_path = pathlib.Path(entry.path)
+            relative_path = entry_path.relative_to(abs_base_path)
+            if entry.is_file():
+                yield relative_path
+            elif entry.is_dir():
+                async for sub_path in paths_recursive_async(entry_path):
+                    yield relative_path / sub_path
+    except FileNotFoundError:
+        return
 
 
 def permitted_recipients(asf_uid: str) -> list[str]:

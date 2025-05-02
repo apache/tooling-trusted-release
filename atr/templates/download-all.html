@@ -44,6 +44,18 @@
     Download all files in <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
   </h1>
 
+  <p class="border rounded p-3 mb-3">
+    <i class="bi bi-info-circle me-1"></i>
+    {% set file_count, total_bytes, formatted_size = get_release_stats(release) %}
+    This release consists of
+    {% if file_count == 1 %}
+      <code>{{ file_count }}</code> file
+    {% else %}
+      <code>{{ file_count }}</code> files
+    {% endif %}
+    with a total size of <code>{{ formatted_size }}</code>.
+  </p>
+
   <h2 id="download-zip">Download ZIP archive</h2>
   <p>
     Download a single ZIP archive containing all files for this release below.

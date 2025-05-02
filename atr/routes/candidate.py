@@ -63,9 +63,9 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
         "phase-view.html",
         file_stats=file_stats,
         release=release,
-        format_datetime=routes.format_datetime,
-        format_file_size=routes.format_file_size,
-        format_permissions=routes.format_permissions,
+        format_datetime=util.format_datetime,
+        format_file_size=util.format_file_size,
+        format_permissions=util.format_permissions,
         phase="release candidate",
         phase_key="candidate",
     )
@@ -93,7 +93,7 @@ async def view_path(
         is_text=is_text,
         is_truncated=is_truncated,
         error_message=error_message,
-        format_file_size=routes.format_file_size,
+        format_file_size=util.format_file_size,
         phase_key="candidate",
         content_listing=content_listing,
     )

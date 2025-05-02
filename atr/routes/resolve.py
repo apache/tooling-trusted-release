@@ -77,7 +77,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         release=release,
         format_artifact_name=_format_artifact_name,
         form=form,
-        format_datetime=routes.format_datetime,
+        format_datetime=util.format_datetime,
         vote_task=latest_vote_task,
         task_mid=task_mid,
         archive_url=archive_url,

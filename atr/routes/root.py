@@ -27,6 +27,7 @@ import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.user as user
+import atr.util as util
 
 
 @routes.public("/")
@@ -97,7 +98,7 @@ async def index() -> response.Response | str:
             all_projects=all_projects,
             phase_sequence=phase_sequence,
             phase_index_map=phase_index_map,
-            format_datetime=routes.format_datetime,
+            format_datetime=util.format_datetime,
         )
 
     # Public view

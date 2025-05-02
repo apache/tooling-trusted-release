@@ -91,7 +91,7 @@ async def completed(project_name: str) -> str:
     releases = sorted(releases, key=sort_releases, reverse=True)
 
     return await quart.render_template(
-        "releases-completed.html", project=project, releases=releases, format_datetime=routes.format_datetime
+        "releases-completed.html", project=project, releases=releases, format_datetime=util.format_datetime
     )
 
 
@@ -132,7 +132,7 @@ async def select(session: routes.CommitterSession, project_name: str) -> str:
         )
         releases = await project.releases_in_progress
         return await quart.render_template(
-            "release-select.html", project=project, releases=releases, format_datetime=routes.format_datetime
+            "release-select.html", project=project, releases=releases, format_datetime=util.format_datetime
         )
 
 
@@ -153,9 +153,9 @@ async def view(project_name: str, version_name: str) -> response.Response | str:
         "phase-view.html",
         file_stats=file_stats,
         release=release,
-        format_datetime=routes.format_datetime,
-        format_file_size=routes.format_file_size,
-        format_permissions=routes.format_permissions,
+        format_datetime=util.format_datetime,
+        format_file_size=util.format_file_size,
+        format_permissions=util.format_permissions,
         phase="release",
         phase_key="release",
     )
@@ -183,7 +183,7 @@ async def view_path(project_name: str, version_name: str, file_path: str) -> res
         is_text=is_text,
         is_truncated=is_truncated,
         error_message=error_message,
-        format_file_size=routes.format_file_size,
+        format_file_size=util.format_file_size,
         phase_key="release",
         content_listing=content_listing,
     )

@@ -80,5 +80,5 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
         package=file_data,
         release=release,
         check_results=check_results_list,
-        format_file_size=routes.format_file_size,
+        format_file_size=util.format_file_size,
     )

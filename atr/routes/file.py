@@ -52,7 +52,7 @@ async def selected_path(
         is_truncated=is_truncated,
         error_message=error_message,
         content_listing=content_listing,
-        format_file_size=routes.format_file_size,
+        format_file_size=util.format_file_size,
         phase_key="draft",
-        max_view_size=routes.format_file_size(_max_view_size),
+        max_view_size=util.format_file_size(_max_view_size),
     )

@@ -119,7 +119,7 @@ async def check(
         asf_id=session.uid,
         server_domain=session.host,
         user_ssh_keys=user_ssh_keys,
-        format_datetime=routes.format_datetime,
+        format_datetime=util.format_datetime,
         models=models,
         task_mid=task_mid,
         form=form,
