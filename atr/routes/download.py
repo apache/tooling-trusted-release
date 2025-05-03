@@ -33,6 +33,7 @@ import atr.routes as routes
 import atr.routes.mapping as mapping
 import atr.routes.root as root
 import atr.util as util
+from atr import config
 
 
 @routes.committer("/download/all/<project_name>/<version_name>")
@@ -71,6 +72,21 @@ async def path(project_name: str, version_name: str, file_path: str) -> response
 async def path_empty(project_name: str, version_name: str) -> response.Response | quart.Response:
     """List files at the root of a release directory for download."""
     return await _download_or_list(project_name, version_name, ".")
+
+
+@routes.public("/download/sh/<project_name>/<version_name>")
+async def sh_selected(project_name: str, version_name: str) -> response.Response | quart.Response:
+    """Shell script to download a release."""
+    conf = config.get()
+    app_host = conf.APP_HOST
+    script_path = (pathlib.Path(__file__).parent / "../static/sh/download-urls.sh").resolve()
+    async with aiofiles.open(script_path) as f:
+        content = await f.read()
+    download_urls_selected = util.as_url(urls_selected, project_name=project_name, version_name=version_name)
+    download_path = util.as_url(path, project_name=project_name, version_name=version_name, file_path="")
+    content = content.replace("[URL_OF_URLS]", f"https://{app_host}{download_urls_selected}")
+    content = content.replace("[URLS_PREFIX]", f"https://{app_host}{download_path}")
+    return quart.Response(content, mimetype="text/x-shellscript")
 
 
 @routes.public("/download/urls/<project_name>/<version_name>")
