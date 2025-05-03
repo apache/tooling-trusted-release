@@ -229,12 +229,12 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         full_name: Opt[str] = NOT_SET,
         is_podling: Opt[bool] = NOT_SET,
         committee_name: Opt[str] = NOT_SET,
-        vote_policy_id: Opt[int] = NOT_SET,
+        release_policy_id: Opt[int] = NOT_SET,
         _committee: bool = False,
         _releases: bool = False,
         _distribution_channels: bool = False,
         _super_project: bool = False,
-        _vote_policy: bool = False,
+        _release_policy: bool = False,
         _committee_public_signing_keys: bool = False,
     ) -> Query[models.Project]:
         query = sqlmodel.select(models.Project)
@@ -247,8 +247,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Project.is_podling == is_podling)
         if is_defined(committee_name):
             query = query.where(models.Project.committee_name == committee_name)
-        if is_defined(vote_policy_id):
-            query = query.where(models.Project.vote_policy_id == vote_policy_id)
+        if is_defined(release_policy_id):
+            query = query.where(models.Project.release_policy_id == release_policy_id)
 
         if _committee:
             query = query.options(select_in_load(models.Project.committee))
@@ -258,8 +258,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.options(select_in_load(models.Project.distribution_channels))
         if _super_project:
             query = query.options(select_in_load(models.Project.super_project))
-        if _vote_policy:
-            query = query.options(select_in_load(models.Project.vote_policy))
+        if _release_policy:
+            query = query.options(select_in_load(models.Project.release_policy))
         if _committee_public_signing_keys:
             query = query.options(select_in_load_nested(models.Project.committee, models.Committee.public_signing_keys))
 
@@ -312,10 +312,10 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         version: Opt[str] = NOT_SET,
         revision: Opt[str] = NOT_SET,
         sboms: Opt[list[str]] = NOT_SET,
-        vote_policy_id: Opt[int] = NOT_SET,
+        release_policy_id: Opt[int] = NOT_SET,
         votes: Opt[list[models.VoteEntry]] = NOT_SET,
         _project: bool = False,
-        _vote_policy: bool = False,
+        _release_policy: bool = False,
         _committee: bool = False,
         _tasks: bool = False,
     ) -> Query[models.Release]:
@@ -339,19 +339,49 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Release.revision == revision)
         if is_defined(sboms):
             query = query.where(models.Release.sboms == sboms)
-        if is_defined(vote_policy_id):
-            query = query.where(models.Release.vote_policy_id == vote_policy_id)
+        if is_defined(release_policy_id):
+            query = query.where(models.Release.release_policy_id == release_policy_id)
         if is_defined(votes):
             query = query.where(models.Release.votes == votes)
 
         if _project:
             query = query.options(select_in_load(models.Release.project))
-        if _vote_policy:
-            query = query.options(select_in_load(models.Release.vote_policy))
+        if _release_policy:
+            query = query.options(select_in_load(models.Release.release_policy))
         if _committee:
             query = query.options(select_in_load_nested(models.Release.project, models.Project.committee))
         if _tasks:
             query = query.options(select_in_load(models.Release.tasks))
+
+        return Query(self, query)
+
+    def release_policy(
+        self,
+        id: Opt[int] = NOT_SET,
+        mailto_addresses: Opt[list[str]] = NOT_SET,
+        manual_vote: Opt[bool] = NOT_SET,
+        min_hours: Opt[int] = NOT_SET,
+        release_checklist: Opt[str] = NOT_SET,
+        pause_for_rm: Opt[bool] = NOT_SET,
+        _project: bool = False,
+    ) -> Query[models.ReleasePolicy]:
+        query = sqlmodel.select(models.ReleasePolicy)
+
+        if is_defined(id):
+            query = query.where(models.ReleasePolicy.id == id)
+        if is_defined(mailto_addresses):
+            query = query.where(models.ReleasePolicy.mailto_addresses == mailto_addresses)
+        if is_defined(manual_vote):
+            query = query.where(models.ReleasePolicy.manual_vote == manual_vote)
+        if is_defined(min_hours):
+            query = query.where(models.ReleasePolicy.min_hours == min_hours)
+        if is_defined(release_checklist):
+            query = query.where(models.ReleasePolicy.release_checklist == release_checklist)
+        if is_defined(pause_for_rm):
+            query = query.where(models.ReleasePolicy.pause_for_rm == pause_for_rm)
+
+        if _project:
+            query = query.options(select_in_load(models.ReleasePolicy.project))
 
         return Query(self, query)
 
@@ -417,36 +447,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
         return Query(self, query)
 
-    def vote_policy(
-        self,
-        id: Opt[int] = NOT_SET,
-        mailto_addresses: Opt[list[str]] = NOT_SET,
-        manual_vote: Opt[bool] = NOT_SET,
-        min_hours: Opt[int] = NOT_SET,
-        release_checklist: Opt[str] = NOT_SET,
-        pause_for_rm: Opt[bool] = NOT_SET,
-        _project: bool = False,
-    ) -> Query[models.VotePolicy]:
-        query = sqlmodel.select(models.VotePolicy)
-
-        if is_defined(id):
-            query = query.where(models.VotePolicy.id == id)
-        if is_defined(mailto_addresses):
-            query = query.where(models.VotePolicy.mailto_addresses == mailto_addresses)
-        if is_defined(manual_vote):
-            query = query.where(models.VotePolicy.manual_vote == manual_vote)
-        if is_defined(min_hours):
-            query = query.where(models.VotePolicy.min_hours == min_hours)
-        if is_defined(release_checklist):
-            query = query.where(models.VotePolicy.release_checklist == release_checklist)
-        if is_defined(pause_for_rm):
-            query = query.where(models.VotePolicy.pause_for_rm == pause_for_rm)
-
-        if _project:
-            query = query.options(select_in_load(models.VotePolicy.project))
-
-        return Query(self, query)
-
     def text_value(
         self,
         ns: Opt[str] = NOT_SET,
@@ -488,12 +488,12 @@ async def create_async_engine(app_config: type[config.AppConfig]) -> sqlalchemy.
     return engine
 
 
-async def get_project_vote_policy(data: Session, project_name: str) -> models.VotePolicy | None:
-    """Fetch the VotePolicy for a project."""
-    project = await data.project(name=project_name, _vote_policy=True).demand(
+async def get_project_release_policy(data: Session, project_name: str) -> models.ReleasePolicy | None:
+    """Fetch the ReleasePolicy for a project."""
+    project = await data.project(name=project_name, _release_policy=True).demand(
         RuntimeError(f"Project {project_name} not found")
     )
-    return project.vote_policy
+    return project.release_policy
 
 
 def init_database(app: base.QuartApp) -> None:

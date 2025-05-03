@@ -100,7 +100,7 @@ class PublicSigningKey(sqlmodel.SQLModel, table=True):
     committees: list["Committee"] = sqlmodel.Relationship(back_populates="public_signing_keys", link_model=KeyLink)
 
 
-class VotePolicy(sqlmodel.SQLModel, table=True):
+class ReleasePolicy(sqlmodel.SQLModel, table=True):
     id: int = sqlmodel.Field(default=None, primary_key=True)
     mailto_addresses: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
     manual_vote: bool = sqlmodel.Field(default=False)
@@ -110,8 +110,8 @@ class VotePolicy(sqlmodel.SQLModel, table=True):
     start_vote_template: str = sqlmodel.Field(default="")
     announce_release_template: str = sqlmodel.Field(default="")
 
-    # One-to-One: A vote policy is associated with a project
-    project: "Project" = sqlmodel.Relationship(back_populates="vote_policy")
+    # One-to-One: A release policy is associated with a project
+    project: "Project" = sqlmodel.Relationship(back_populates="release_policy")
 
 
 class Committee(sqlmodel.SQLModel, table=True):
@@ -177,9 +177,9 @@ class Project(sqlmodel.SQLModel, table=True):
     # One-to-many: A project can have multiple distribution channels, each channel belongs to one project
     distribution_channels: list["DistributionChannel"] = sqlmodel.Relationship(back_populates="project")
 
-    # Many-to-one: A Project can have one vote policy, a vote policy can be used by multiple entities
-    vote_policy_id: int | None = sqlmodel.Field(default=None, foreign_key="votepolicy.id", ondelete="CASCADE")
-    vote_policy: VotePolicy | None = sqlmodel.Relationship(
+    # Many-to-one: A Project can have one release policy, a release policy can be used by multiple entities
+    release_policy_id: int | None = sqlmodel.Field(default=None, foreign_key="releasepolicy.id", ondelete="CASCADE")
+    release_policy: ReleasePolicy | None = sqlmodel.Relationship(
         cascade_delete=True, sa_relationship_kwargs={"cascade": "all, delete-orphan", "single_parent": True}
     )
 
@@ -398,9 +398,9 @@ class Release(sqlmodel.SQLModel, table=True):
     revision: str | None = sqlmodel.Field(default=None, index=True)
     sboms: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
 
-    # Many-to-one: A release can have one vote policy, a vote policy can be used by multiple releases
-    vote_policy_id: int | None = sqlmodel.Field(default=None, foreign_key="votepolicy.id")
-    vote_policy: VotePolicy | None = sqlmodel.Relationship(
+    # Many-to-one: A release can have one release policy, a release policy can be used by multiple releases
+    release_policy_id: int | None = sqlmodel.Field(default=None, foreign_key="releasepolicy.id")
+    release_policy: ReleasePolicy | None = sqlmodel.Relationship(
         cascade_delete=True, sa_relationship_kwargs={"cascade": "all, delete-orphan", "single_parent": True}
     )
 

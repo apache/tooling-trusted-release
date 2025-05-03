@@ -78,15 +78,15 @@ async def announce_release_body(body: str, options: AnnounceReleaseOptions) -> s
 
 async def announce_release_default(project_name: str) -> str:
     async with db.session() as data:
-        project = await data.project(name=project_name, _vote_policy=True).demand(
+        project = await data.project(name=project_name, _release_policy=True).demand(
             RuntimeError(f"Project {project_name} not found")
         )
-        vote_policy = project.vote_policy
-    if vote_policy is not None:
-        # NOTE: Do not use "if vote_policy.announce_release_template is None"
+        release_policy = project.release_policy
+    if release_policy is not None:
+        # NOTE: Do not use "if release_policy.announce_release_template is None"
         # We want to check for the empty string too
-        if vote_policy.announce_release_template:
-            return vote_policy.announce_release_template
+        if release_policy.announce_release_template:
+            return release_policy.announce_release_template
 
     return """\
 The Apache [COMMITTEE] project team is pleased to announce the
@@ -127,9 +127,9 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
 
     checklist_content = ""
     async with db.session() as data:
-        vote_policy = await db.get_project_vote_policy(data, options.project_name)
-        if vote_policy:
-            checklist_content = vote_policy.release_checklist or ""
+        release_policy = await db.get_project_release_policy(data, options.project_name)
+        if release_policy:
+            checklist_content = release_policy.release_checklist or ""
 
     # Perform substitutions in the body
     # TODO: Handle the DURATION == 0 case
@@ -147,13 +147,13 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
 
 async def start_vote_default(project_name: str) -> str:
     async with db.session() as data:
-        vote_policy = await db.get_project_vote_policy(data, project_name)
+        release_policy = await db.get_project_release_policy(data, project_name)
 
-    if vote_policy is not None:
-        # NOTE: Do not use "if vote_policy.announce_release_template is None"
+    if release_policy is not None:
+        # NOTE: Do not use "if release_policy.announce_release_template is None"
         # We want to check for the empty string too
-        if vote_policy.start_vote_template:
-            return vote_policy.start_vote_template
+        if release_policy.start_vote_template:
+            return release_policy.start_vote_template
 
     return """Hello [COMMITTEE],
 

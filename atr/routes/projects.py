@@ -40,9 +40,9 @@ class AddFormProtocol(Protocol):
     submit: wtforms.SubmitField
 
 
-class VotePolicyForm(util.QuartFormTyped):
+class ReleasePolicyForm(util.QuartFormTyped):
     """
-    A Form to create or edit a VotePolicy.
+    A Form to create or edit a ReleasePolicy.
 
     TODO: Currently only a single mailto_address is supported.
           see: https://stackoverflow.com/questions/49066046/append-entry-to-fieldlist-with-flask-wtforms-using-ajax
@@ -178,7 +178,7 @@ async def select(session: routes.CommitterSession) -> str:
 @routes.public("/projects/<name>")
 async def view(name: str) -> str:
     async with db.session() as data:
-        project = await data.project(name=name, _committee_public_signing_keys=True, _vote_policy=True).demand(
+        project = await data.project(name=name, _committee_public_signing_keys=True, _release_policy=True).demand(
             http.client.HTTPException(404)
         )
         return await quart.render_template(
@@ -194,70 +194,70 @@ async def view(name: str) -> str:
         )
 
 
-@routes.committer("/projects/<project_name>/vote-policy/add", methods=["GET", "POST"])
-async def vote_policy_add(session: routes.CommitterSession, project_name: str) -> response.Response | str:
+@routes.committer("/projects/<project_name>/release-policy/add", methods=["GET", "POST"])
+async def release_policy_add(session: routes.CommitterSession, project_name: str) -> response.Response | str:
     await session.check_access(project_name)
 
     uid = await util.get_asf_id_or_die()
 
     async with db.session() as data:
-        project = await data.project(name=project_name, _committee=True, _vote_policy=True).demand(
+        project = await data.project(name=project_name, _committee=True, _release_policy=True).demand(
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
         )
 
         if not (user.is_committee_member(project.committee, uid) or user.is_admin(uid)):
             raise base.ASFQuartException(
-                f"You must be a committee member of {project.display_name} to submit a voting policy", errorcode=403
+                f"You must be a committee member of {project.display_name} to submit a release policy", errorcode=403
             )
 
-        form = await VotePolicyForm.create_form(data={"project_name": project.name})
+        form = await ReleasePolicyForm.create_form(data={"project_name": project.name})
 
         if form.mailto_addresses.entries[0].data is None:
             form.mailto_addresses.entries[0].data = f"dev@{util.unwrap(project.committee).name}.apache.org"
 
         if await form.validate_on_submit():
-            return await _add_voting_policy(project, form, data)
+            return await _add_release_policy(project, form, data)
 
     return await quart.render_template(
-        "vote-policy-add.html",
+        "release-policy-add.html",
         asf_id=uid,
         project=project,
         form=form,
     )
 
 
-@routes.committer("/projects/<project_name>/vote-policy/edit", methods=["GET", "POST"])
-async def vote_policy_edit(session: routes.CommitterSession, project_name: str) -> response.Response | str:
+@routes.committer("/projects/<project_name>/release-policy/edit", methods=["GET", "POST"])
+async def release_policy_edit(session: routes.CommitterSession, project_name: str) -> response.Response | str:
     await session.check_access(project_name)
 
     uid = await util.get_asf_id_or_die()
 
     async with db.session() as data:
-        project = await data.project(name=project_name, _committee=True, _vote_policy=True).demand(
+        project = await data.project(name=project_name, _committee=True, _release_policy=True).demand(
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
         )
 
-        if project.vote_policy is None:
-            base.ASFQuartException(f"Vote Policy for project {project_name} does not exist", errorcode=404)
+        if project.release_policy is None:
+            base.ASFQuartException(f"Release Policy for project {project_name} does not exist", errorcode=404)
 
         if not (user.is_committee_member(project.committee, uid) or user.is_admin(uid)):
             raise base.ASFQuartException(
-                f"You must be a committee member of {project.display_name} to submit a voting policy", errorcode=403
+                f"You must be a committee member of {project.display_name} to submit a release policy", errorcode=403
             )
 
-        form = await VotePolicyForm.create_form()
+        form = await ReleasePolicyForm.create_form()
 
         # fill data
         if quart.request.method == "GET":
-            form.process(obj=project.vote_policy)
+            form.process(obj=project.release_policy)
             form.project_name.data = project.name
 
         if await form.validate_on_submit():
-            return await _edit_voting_policy(util.unwrap(project.vote_policy), form, data)
+            return await _edit_release_policy(util.unwrap(project.release_policy), form, data)
 
     # For GET requests, show the form
     return await quart.render_template(
-        "vote-policy-edit.html",
+        "release-policy-edit.html",
         asf_id=uid,
         project=project,
         form=form,
@@ -324,7 +324,7 @@ async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
             category=base_project.category,
             programming_languages=base_project.programming_languages,
             committee_name=base_project.committee_name,
-            vote_policy_id=base_project.vote_policy_id,
+            release_policy_id=base_project.release_policy_id,
             created=datetime.datetime.now(datetime.UTC),
             created_by=asf_id,
         )
@@ -335,10 +335,10 @@ async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
     return quart.redirect(util.as_url(view, name=new_project_label))
 
 
-async def _add_voting_policy(project: models.Project, form: VotePolicyForm, data: db.Session) -> response.Response:
+async def _add_release_policy(project: models.Project, form: ReleasePolicyForm, data: db.Session) -> response.Response:
     project_name = str(form.project_name.data)
 
-    vote_policy = models.VotePolicy(
+    release_policy = models.ReleasePolicy(
         mailto_addresses=[util.unwrap(form.mailto_addresses.entries[0].data)],
         manual_vote=form.manual_vote.data,
         min_hours=util.unwrap(form.min_hours.data),
@@ -348,25 +348,25 @@ async def _add_voting_policy(project: models.Project, form: VotePolicyForm, data
         pause_for_rm=form.pause_for_rm.data,
     )
 
-    vote_policy.project = project
-    data.add(vote_policy)
+    release_policy.project = project
+    data.add(release_policy)
     await data.commit()
 
     return quart.redirect(util.as_url(view, name=project_name))
 
 
-async def _edit_voting_policy(
-    vote_policy: models.VotePolicy, form: VotePolicyForm, data: db.Session
+async def _edit_release_policy(
+    release_policy: models.ReleasePolicy, form: ReleasePolicyForm, data: db.Session
 ) -> response.Response:
     project_name = str(form.project_name.data)
 
-    vote_policy.mailto_addresses = [util.unwrap(form.mailto_addresses.entries[0].data)]
-    vote_policy.manual_vote = form.manual_vote.data
-    vote_policy.min_hours = util.unwrap(form.min_hours.data)
-    vote_policy.release_checklist = util.unwrap(form.release_checklist.data)
-    vote_policy.start_vote_template = util.unwrap(form.start_vote_template.data)
-    vote_policy.announce_release_template = util.unwrap(form.announce_release_template.data)
-    vote_policy.pause_for_rm = form.pause_for_rm.data
+    release_policy.mailto_addresses = [util.unwrap(form.mailto_addresses.entries[0].data)]
+    release_policy.manual_vote = form.manual_vote.data
+    release_policy.min_hours = util.unwrap(form.min_hours.data)
+    release_policy.release_checklist = util.unwrap(form.release_checklist.data)
+    release_policy.start_vote_template = util.unwrap(form.start_vote_template.data)
+    release_policy.announce_release_template = util.unwrap(form.announce_release_template.data)
+    release_policy.pause_for_rm = form.pause_for_rm.data
     await data.commit()
 
     return quart.redirect(util.as_url(view, name=project_name))

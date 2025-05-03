@@ -56,8 +56,8 @@ async def selected_revision(
         committee = util.unwrap(release.committee)
         permitted_recipients = util.permitted_recipients(session.uid)
 
-        if release.vote_policy:
-            min_hours = release.vote_policy.min_hours
+        if release.release_policy:
+            min_hours = release.release_policy.min_hours
         else:
             min_hours = 72
 
@@ -126,9 +126,9 @@ async def selected_revision(
             # TODO: We also need to store the duration of the vote
             # We can't allow resolution of the vote until the duration has elapsed
             # But we allow the user to specify in the form
-            # And yet we also have VotePolicy.min_hours
+            # And yet we also have ReleasePolicy.min_hours
             # Presumably this sets the default, and the form takes precedence?
-            # VotePolicy.min_hours can also be 0, though
+            # ReleasePolicy.min_hours can also be 0, though
 
             # Create a task for vote initiation
             task = models.Task(

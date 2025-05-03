@@ -70,10 +70,10 @@ async def admin_data(model: str = "Committee") -> str:
             "Project": data.project,
             "PublicSigningKey": data.public_signing_key,
             "Release": data.release,
+            "ReleasePolicy": data.release_policy,
             "SSHKey": data.ssh_key,
             "Task": data.task,
             "TextValue": data.text_value,
-            "VotePolicy": data.vote_policy,
         }
 
         if model not in model_methods:

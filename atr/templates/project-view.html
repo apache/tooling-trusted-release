@@ -117,24 +117,24 @@
 
   <div class="card mb-4">
     <div class="card-header bg-light d-flex justify-content-between align-items-center">
-      <h3 class="mb-0">Voting policy</h3>
+      <h3 class="mb-0">Release policy</h3>
       {% if not project.is_retired %}
-        {% if project.vote_policy and (is_committee_member or is_admin) %}
+        {% if project.release_policy and (is_committee_member or is_admin) %}
           <div>
             <a class="btn btn-primary btn-sm"
-               href="{{ as_url(routes.projects.vote_policy_edit, project_name=project.name) }}"><i class="bi bi-pencil-square"></i></a>
+               href="{{ as_url(routes.projects.release_policy_edit, project_name=project.name) }}"><i class="bi bi-pencil-square"></i></a>
           </div>
         {% elif (is_committee_member or is_admin) %}
           <div>
             <a class="btn btn-primary btn-sm"
-               href="{{ as_url(routes.projects.vote_policy_add, project_name=project.name) }}"><i class="bi bi-plus"></i></a>
+               href="{{ as_url(routes.projects.release_policy_add, project_name=project.name) }}"><i class="bi bi-plus"></i></a>
           </div>
         {% endif %}
       {% endif %}
     </div>
     <div class="card-body">
-      {% if project.vote_policy %}
-        {% set vp = project.vote_policy %}
+      {% if project.release_policy %}
+        {% set rp = project.release_policy %}
         <div class="card h-100 border">
           <div class="card-body">
             <table class="table mb-0">
