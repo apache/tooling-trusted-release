@@ -35,6 +35,7 @@ import atr.db as db
 import atr.db.models as models
 import atr.user as user
 import atr.util as util
+from atr import config
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Coroutine, Sequence
@@ -177,6 +178,10 @@ class CommitterSession:
     async def check_access(self, project_name: str) -> None:
         if not any((p.name == project_name) for p in (await self.user_projects)):
             raise base.ASFQuartException("You do not have access to this project", errorcode=403)
+
+    @property
+    def app_host(self) -> str:
+        return config.get().APP_HOST
 
     @property
     def host(self) -> str:

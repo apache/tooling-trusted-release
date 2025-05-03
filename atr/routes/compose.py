@@ -117,7 +117,7 @@ async def check(
         delete_form=delete_draft_form,
         delete_file_form=delete_file_form,
         asf_id=session.uid,
-        server_domain=session.host,
+        server_domain=session.app_host,
         user_ssh_keys=user_ssh_keys,
         format_datetime=util.format_datetime,
         models=models,

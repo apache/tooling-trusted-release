@@ -55,7 +55,7 @@ async def all_selected(
         version_name=version_name,
         release=release,
         asf_id=session.uid,
-        server_domain=session.host,
+        server_domain=session.app_host,
         user_ssh_keys=user_ssh_keys,
         back_url=back_url,
         get_release_stats=util.get_release_stats,

@@ -72,8 +72,11 @@
   <p>If you prefer, you can download the files using other methods.</p>
   <p>
     <a href="#download-browser"
-       class="btn btn-sm btn-outline-secondary"
+       class="btn btn-sm btn-outline-secondary me-2"
        title="Download using your browser">Browser</a>
+    <a href="#download-curl"
+       class="btn btn-sm btn-outline-secondary me-2"
+       title="Download using curl">Curl</a>
     <a href="#download-rsync"
        class="btn btn-sm btn-outline-secondary me-2"
        title="Download using rsync">Rsync</a>
@@ -81,10 +84,22 @@
        class="btn btn-sm btn-outline-secondary me-2"
        title="Download using wget">Wget</a>
   </p>
+
   <h3 id="download-browser" class="mt-4">Using your browser</h3>
   <p>
     You can download the files one by one using your browser from the <a href="{{ as_url(routes.download.path_empty, project_name=release.project.name, version_name=release.version) }}">download folder</a>. Clicking a link to any file will download it, as it is served as <code>application/octet-stream</code>.
   </p>
+
+  <h3 id="download-curl" class="mt-4">Using curl</h3>
+  <p>You can download all of the files in this release using curl with the following command:</p>
+  <!-- TODO: Add a button to copy the command to the clipboard -->
+  <pre class="bg-light p-3 mb-3">
+curl -fsS "https://{{ server_domain }}{{ as_url(routes.download.sh_selected, project_name=release.project.name, version_name=release.version) }}" | sh
+  </pre>
+  <p>
+    This downloads the files into the <em>current directory</em>. Ensure that you create a new empty directory, and change to it, before running the command. The script requires curl and POSIX compliant versions of printf and sh. It works by downloading a POSIX complaint shell script straight into your shell. You can of course download the script and audit it before running it.
+  </p>
+
   <h3 id="download-rsync" class="mt-4">Using rsync</h3>
   <p>You can download all of the files in this release using rsync with the following command:</p>
   <!-- TODO: Add a button to copy the command to the clipboard -->
