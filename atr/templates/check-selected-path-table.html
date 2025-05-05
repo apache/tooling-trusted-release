@@ -1,0 +1,119 @@
+<div class="table-responsive">
+  {# This table uses pairs of rows, so it must be manually striped #}
+  <table class="table table-hover align-middle table-sm mb-0 border">
+    <tbody>
+      {% for path in paths %}
+        {% set has_errors = info.errors[path]|length > 0 %}
+        {% set has_warnings = info.warnings[path]|length > 0 %}
+        {% set row_id = path|string|slugify %}
+
+        {# Manual striping for pairs of rows #}
+        {% set row_bg_class = "" %}
+        {% if loop.index is odd %}
+          {% set row_bg_class = "page-table-striped-odd" %}
+        {% endif %}
+
+        {% set path_style_class = "" %}
+        {% if has_errors %}
+          {% set path_style_class = "text-danger" %}
+        {% elif has_warnings %}
+          {% set path_style_class = "text-warning" %}
+        {% endif %}
+
+        <tr class="{{ row_bg_class }}">
+          <td class="text-center px-1 py-2 page-icon-cell">
+            {% set icon_class = "text-success" %}
+            {% if has_errors %}
+              {% set icon_class = "text-danger" %}
+            {% elif has_warnings %}
+              {% set icon_class = "text-warning" %}
+            {% endif %}
+
+            {% if path in info.artifacts %}
+              <i class="bi bi-archive {{ icon_class }}"
+                 title="Artifact"
+                 aria-label="Artifact"></i>
+            {% elif path in info.metadata %}
+              <i class="bi bi-file-earmark-text {{ icon_class }}"
+                 title="Metadata"
+                 aria-label="Metadata"></i>
+            {% else %}
+              <i class="bi bi-file-earmark {{ icon_class }}"
+                 title="File"
+                 aria-label="File"></i>
+            {% endif %}
+          </td>
+          <td class="py-2">
+            <a href="{{ as_url(routes.file.selected_path, project_name=project_name, version_name=version_name, file_path=path) }}"
+               title="View file {{ path }}"
+               class="text-decoration-none text-reset">
+              {% if has_errors or has_warnings %}
+                <strong class="{{ path_style_class }}"><code>{{ path }}</code></strong>
+              {% else %}
+                <code>{{ path }}</code>
+              {% endif %}
+            </a>
+          </td>
+          <td class="text-end text-nowrap py-2">
+            <div class="d-flex justify-content-end align-items-center gap-2">
+              {% if has_errors %}
+                <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                   class="btn btn-sm btn-outline-danger"><i class="bi bi-exclamation-triangle me-1"></i> Show {{ info.errors[path]|length }} {{ "error" if info.errors[path]|length == 1 else "errors" }}</a>
+              {% elif has_warnings %}
+                <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                   class="btn btn-sm btn-outline-warning">Show {{ info.warnings[path]|length }} {{ "warning" if info.warnings[path]|length == 1 else "warnings" }}</a>
+              {% elif info.successes[path] %}
+                <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                   class="btn btn-sm btn-outline-success"
+                   title="Show report for {{ path }}">Show report</a>
+              {% else %}
+                <span class="btn btn-sm btn-outline-secondary disabled">No checks run</span>
+              {% endif %}
+
+              {% if phase == "release_candidate_draft" %}
+                <button class="btn btn-sm btn-outline-secondary"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#actions-{{ row_id }}"
+                        aria-expanded="false"
+                        aria-controls="actions-{{ row_id }}"
+                        title="Show more actions for {{ path }}"
+                        onclick="this.innerHTML = (this.innerHTML.trim() === 'More') ? 'Less' : 'More';">More</button>
+              {% elif phase == "release_candidate" %}
+                <a href="{{ as_url(routes.download.path, project_name=release.project.name, version_name=release.version, file_path=path) }}"
+                   title="Download file {{ path }}"
+                   class="btn btn-sm btn-outline-secondary">Download</a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+
+        {% if phase == "release_candidate_draft" %}
+          <tr class="{{ row_bg_class }}">
+            <td colspan="3" class="p-0 border-0">
+              <div class="collapse px-3 py-2" id="actions-{{ row_id }}">
+                <div class="d-flex justify-content-end">
+                  <div class="btn-group btn-group-sm"
+                       role="group"
+                       aria-label="More file actions for {{ path }}">
+                    <a href="{{ as_url(routes.download.path, project_name=release.project.name, version_name=release.version, file_path=path) }}"
+                       title="Download file {{ path }}"
+                       class="btn btn-outline-secondary">Download</a>
+                    <a href="{{ as_url(routes.draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
+                       title="Tools for file {{ path }}"
+                       class="btn btn-outline-secondary">Tools</a>
+                    <button class="btn btn-outline-danger"
+                            data-bs-toggle="modal"
+                            data-bs-target="#delete-{{ row_id }}"
+                            title="Delete file {{ path }}">Delete</button>
+                  </div>
+                  {{ dialog.delete_modal(row_id, "Delete file", "file, and any associated metadata files", as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
+                </div>
+              </div>
+            </td>
+          </tr>
+        {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

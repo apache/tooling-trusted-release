@@ -1,0 +1,81 @@
+
+<h2>Cast your vote</h2>
+<div class="card bg-warning-subtle mb-3">
+  <div class="card-body p-3">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    <strong>TODO:</strong> We plan to make "Binding" dynamic based on membership. Currently this form always says "Binding" which is known to be wrong.
+  </div>
+</div>
+<form method="post"
+      action="{{ as_url(routes.vote.selected_post, project_name=project_name, version_name=version_name) }}"
+      class="atr-canary py-4 px-5 mb-4 border rounded">
+  {{ form.hidden_tag() }}
+  <div class="row mb-3 pb-3 border-bottom">
+    <label class="col-md-3 col-form-label text-md-end">{{ form.vote_value.label.text }}:</label>
+    <div class="col-md-9">
+      <div class="btn-group" role="group" aria-label="Vote options">
+        {% for subfield in form.vote_value %}
+          {% set btn_class = "btn-outline-secondary" %}
+          {% if subfield.data == "+1" %}
+            {% set btn_class = "btn-outline-success" %}
+          {% endif %}
+          {% if subfield.data == "-1" %}
+            {% set btn_class = "btn-outline-danger" %}
+          {% endif %}
+          {{ subfield(class_="btn-check", autocomplete="off") }}
+          <label class="btn {{ btn_class }}" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
+        {% endfor %}
+      </div>
+      {% if form.vote_value.errors %}<div class="text-danger small mt-1">{{ form.vote_value.errors[0] }}</div>{% endif %}
+    </div>
+  </div>
+  <div class="row mb-3">
+    <label for="{{ form.vote_comment.id }}"
+           class="col-md-3 col-form-label text-md-end">{{ form.vote_comment.label.text }}:</label>
+    <div class="col-md-9">
+      {{ form.vote_comment(class_="form-control", rows="3") }}
+      {% if form.vote_comment.errors %}
+        <div class="text-danger small mt-1">{{ form.vote_comment.errors[0] }}</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-9 offset-md-3">{{ form.submit(class_="btn btn-primary") }}</div>
+  </div>
+</form>
+
+<h2 id="resolve-vote">Resolve vote</h2>
+<div class="border rounded bg-warning-subtle p-3 mb-3">
+  <i class="bi bi-info-circle me-1"></i>
+  <strong>NOTE:</strong> We are allowing a vote to be resolved early in order to facilitate testing. This is not the final behaviour.
+</div>
+<form method="post"
+      action="{{ as_url(routes.resolve.selected_post, project_name=release.project.name, version_name=release.version) }}"
+      class="atr-canary py-4 px-5"
+      novalidate>
+  <input type="hidden" name="candidate_name" value="{{ release.name }}" />
+  {{ resolve_form.csrf_token }}
+
+  <div class="mb-3 pb-3 row border-bottom">
+    <label class="col-sm-3 col-form-label text-sm-end fw-semibold">{{ resolve_form.vote_result.label.text }}:</label>
+    <div class="col-sm-9 pt-2">
+      {% for subfield in resolve_form.vote_result %}
+        <div class="form-check form-check-inline">
+          {{ subfield(class="form-check-input" + (" is-invalid" if resolve_form.vote_result.errors else "") , id=subfield.id ~ "_" ~ loop.index) }}
+          <label class="form-check-label" for="{{ subfield.id }}_{{ loop.index }}">{{ subfield.label.text }}</label>
+        </div>
+      {% endfor %}
+      {% if resolve_form.vote_result.errors %}
+        <div class="invalid-feedback d-block">{{ resolve_form.vote_result.errors[0] }}</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="row">
+    <label class="col-sm-3 col-form-label text-sm-end fw-semibold">{{ resolve_form.resolution_body.label.text }}:</label>
+    <div class="col-sm-9 pt-2">{{ resolve_form.resolution_body(class_="form-control", rows="3") }}</div>
+  </div>
+
+  <div class="row">
+    <div class="col-sm-9 offset-sm-3">{{ resolve_form.submit(class_="btn btn-primary mt-3") }}</div>
+  </div>
+</form>
