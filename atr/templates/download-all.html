@@ -93,7 +93,7 @@
   <h3 id="download-curl" class="mt-4">Using curl</h3>
   <p>You can download all of the files in this release using curl with the following command:</p>
   <!-- TODO: Add a button to copy the command to the clipboard -->
-  <pre class="bg-light p-3 mb-3">
+  <pre class="bg-light border rounded p-3 mb-3">
 curl -fsS https://{{ server_domain }}{{ as_url(routes.download.sh_selected, project_name=release.project.name, version_name=release.version) }} | sh
 </pre>
   <p>
@@ -103,14 +103,14 @@ curl -fsS https://{{ server_domain }}{{ as_url(routes.download.sh_selected, proj
   <h3 id="download-rsync" class="mt-4">Using rsync</h3>
   <p>You can download all of the files in this release using rsync with the following command:</p>
   <!-- TODO: Add a button to copy the command to the clipboard -->
-  <pre class="bg-light p-3 mb-3">
+  <pre class="bg-light border rounded p-3 mb-3">
 rsync -av -e 'ssh -p 2222' {{ asf_id }}@{{ server_domain }}:/{{ release.project.name }}/{{ release.version }}/ ${DOWNLOAD_PATH}/
 </pre>
   {% include "user-ssh-keys.html" %}
 
   <h3 id="download-wget" class="mt-4">Using wget</h3>
   <p>You can download all of the files in this release using wget with the following command:</p>
-  <pre class="bg-light p-3 mb-3">
+  <pre class="bg-light border rounded p-3 mb-3">
 wget -r -np -nH --cut-dirs=3{% if server_domain == "127.0.0.1" %} --no-check-certificate{% endif %} https://{{ server_domain }}{{ as_url(routes.download.path_empty, project_name=release.project.name, version_name=release.version) }}
 </pre>
   <p>
