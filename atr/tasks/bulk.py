@@ -31,6 +31,7 @@ import sqlalchemy.ext.asyncio
 
 import atr.db.models as models
 import atr.tasks.task as task
+from atr import config
 
 # Configure detailed logging
 _LOGGER: Final = logging.getLogger(__name__)
@@ -587,7 +588,10 @@ async def get_db_session() -> sqlalchemy.ext.asyncio.AsyncSession:
     try:
         # Create connection only if it doesn't exist already
         if global_db_connection is None:
-            db_url = "sqlite+aiosqlite:///atr.db"
+            conf = config.get()
+            absolute_db_path = os.path.join(conf.STATE_DIR, conf.SQLITE_DB_PATH)
+            # Three slashes are required before either a relative or absolute path
+            db_url = f"sqlite+aiosqlite://{absolute_db_path}"
             _LOGGER.debug(f"Creating database engine: {db_url}")
 
             engine = sqlalchemy.ext.asyncio.create_async_engine(db_url)

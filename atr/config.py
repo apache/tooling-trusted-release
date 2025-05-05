@@ -30,13 +30,13 @@ class AppConfig:
     SSH_HOST = decouple.config("SSH_HOST", default="0.0.0.0")
     SSH_PORT = decouple.config("SSH_PORT", default=2222, cast=int)
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    STATE_DIR = os.path.join(PROJECT_ROOT, "state")
+    STATE_DIR = decouple.config("STATE_DIR", default=os.path.join(PROJECT_ROOT, "state"))
     DEBUG = False
     TEMPLATES_AUTO_RELOAD = False
     USE_BLOCKBUSTER = False
     FINISHED_STORAGE_DIR = os.path.join(STATE_DIR, "finished")
     UNFINISHED_STORAGE_DIR = os.path.join(STATE_DIR, "unfinished")
-    SQLITE_DB_PATH = decouple.config("SQLITE_DB_PATH", default="/atr.db")
+    SQLITE_DB_PATH = decouple.config("SQLITE_DB_PATH", default="atr.db")
 
     # Apache RAT configuration
     APACHE_RAT_JAR_PATH = decouple.config("APACHE_RAT_JAR_PATH", default="/opt/tools/apache-rat-0.16.1.jar")
@@ -94,9 +94,28 @@ _CONFIG_DICT: Final = {
 
 def get() -> type[AppConfig]:
     try:
-        return _CONFIG_DICT[get_mode()]
+        config = _CONFIG_DICT[get_mode()]
     except KeyError:
         exit("Error: Invalid <mode>. Expected values [Debug, Production, Profiling].")
+
+    absolute_paths = [
+        (config.PROJECT_ROOT, "PROJECT_ROOT"),
+        (config.STATE_DIR, "STATE_DIR"),
+        (config.FINISHED_STORAGE_DIR, "FINISHED_STORAGE_DIR"),
+        (config.UNFINISHED_STORAGE_DIR, "UNFINISHED_STORAGE_DIR"),
+    ]
+    relative_paths = [
+        (config.SQLITE_DB_PATH, "SQLITE_DB_PATH"),
+    ]
+
+    for path, name in absolute_paths:
+        if not path.startswith("/"):
+            raise RuntimeError(f"{name} must be an absolute path")
+    for path, name in relative_paths:
+        if path.startswith("/"):
+            raise RuntimeError(f"{name} must be a relative path")
+
+    return config
 
 
 def get_mode() -> Mode:
