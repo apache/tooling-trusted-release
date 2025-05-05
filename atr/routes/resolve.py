@@ -31,6 +31,7 @@ import atr.routes.compose as compose
 import atr.routes.finish as finish
 import atr.routes.vote as vote
 import atr.util as util
+from atr.tasks import message
 
 
 class ResolveForm(util.QuartFormTyped):
@@ -44,6 +45,7 @@ class ResolveForm(util.QuartFormTyped):
         choices=[("passed", "Passed"), ("failed", "Failed")],
         validators=[wtforms.validators.InputRequired("Vote result is required")],
     )
+    resolution_body = wtforms.TextAreaField("Resolution email body", validators=[wtforms.validators.Optional()])
     submit = wtforms.SubmitField("Resolve vote")
 
 
@@ -79,7 +81,7 @@ async def selected_post(
 
     candidate_name = form.candidate_name.data
     vote_result = form.vote_result.data
-
+    resolution_body = util.unwrap_type(form.resolution_body.data, str)
     if not candidate_name:
         return await session.redirect(
             vote.selected, error="Missing candidate name", project_name=project_name, version_name=version_name
@@ -100,7 +102,12 @@ async def selected_post(
     async with db.session() as data:
         async with data.begin():
             release = await session.release(
-                project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE, data=data
+                project_name,
+                version_name,
+                with_tasks=True,
+                with_project=True,
+                phase=models.ReleasePhase.RELEASE_CANDIDATE,
+                data=data,
             )
 
             # Update the release phase based on vote result
@@ -113,6 +120,10 @@ async def selected_post(
                 release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
                 success_message = "Vote marked as failed"
                 destination = compose.selected
+
+    error_message = await _send_resolution(session, release, vote_result, resolution_body)
+    if error_message is not None:
+        await quart.flash(error_message, "error")
 
     return await session.redirect(
         destination, success=success_message, project_name=project_name, version_name=release.version
@@ -153,6 +164,49 @@ def _format_artifact_name(project_name: str, version: str, is_podling: bool = Fa
     if is_podling:
         return f"apache-{project_name}-incubating-{version}"
     return f"apache-{project_name}-{version}"
+
+
+async def _send_resolution(
+    session: routes.CommitterSession,
+    release: models.Release,
+    resolution: str,
+    body: str,
+) -> str | None:
+    # Get the email thread
+    latest_vote_task = release_latest_vote_task(release)
+    if latest_vote_task is None:
+        return "No vote task found, unable to send resolution message."
+    vote_thread_mid = task_mid_get(latest_vote_task)
+    if vote_thread_mid is None:
+        return "No vote thread found, unable to send resolution message."
+
+    # Construct the reply email
+    # original_subject = latest_vote_task.task_args["subject"]
+
+    # Arguments for the task to cast a vote
+    email_recipient = latest_vote_task.task_args["email_to"]
+    email_sender = f"{session.uid}@apache.org"
+    subject = f"[VOTE] [RESULT] Release {release.project.display_name} {release.version} {resolution.upper()}"
+    body = f"{body}\n\n--{session.uid}"
+    in_reply_to = vote_thread_mid
+
+    task = models.Task(
+        status=models.TaskStatus.QUEUED,
+        task_type=models.TaskType.MESSAGE_SEND,
+        task_args=message.Send(
+            email_sender=email_sender,
+            email_recipient=email_recipient,
+            subject=subject,
+            body=body,
+            in_reply_to=in_reply_to,
+        ).model_dump(),
+        release_name=release.name,
+    )
+    async with db.session() as data:
+        data.add(task)
+        await data.flush()
+        await data.commit()
+    return None
 
 
 async def _task_archive_url(task_mid: str) -> str | None:

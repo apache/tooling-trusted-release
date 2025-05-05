@@ -72,45 +72,11 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
 
         vote = str(form.vote_value.data)
         comment = str(form.vote_comment.data)
-
-        # Get the email thread
-        latest_vote_task = resolve.release_latest_vote_task(release)
-        if latest_vote_task is None:
+        email_recipient, error_message = await _send_vote(session, release, vote, comment)
+        if error_message:
             return await session.redirect(
-                selected, project_name=project_name, version_name=version_name, error="No vote task found."
+                selected, project_name=project_name, version_name=version_name, error=error_message
             )
-        vote_thread_mid = resolve.task_mid_get(latest_vote_task)
-        if vote_thread_mid is None:
-            return await session.redirect(
-                selected, project_name=project_name, version_name=version_name, error="No vote thread found."
-            )
-
-        # Construct the reply email
-        original_subject = latest_vote_task.task_args["subject"]
-
-        # Arguments for the task to cast a vote
-        email_recipient = latest_vote_task.task_args["email_to"]
-        email_sender = f"{session.uid}@apache.org"
-        subject = f"Re: {original_subject}"
-        body = f"{vote}{('\n\n' + comment) if comment else ''}\n\n--{session.uid}"
-        in_reply_to = vote_thread_mid
-
-        task = models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type=models.TaskType.MESSAGE_SEND,
-            task_args=message.Send(
-                email_sender=email_sender,
-                email_recipient=email_recipient,
-                subject=subject,
-                body=body,
-                in_reply_to=in_reply_to,
-            ).model_dump(),
-            release_name=release.name,
-        )
-        async with db.session() as data:
-            data.add(task)
-            await data.flush()
-            await data.commit()
 
         success_message = f"Sending your vote to {email_recipient}."
         return await session.redirect(
@@ -125,3 +91,47 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
         return await session.redirect(
             selected, project_name=project_name, version_name=version_name, error=error_message
         )
+
+
+async def _send_vote(
+    session: routes.CommitterSession,
+    release: models.Release,
+    vote: str,
+    comment: str,
+) -> tuple[str, str]:
+    # Get the email thread
+    latest_vote_task = resolve.release_latest_vote_task(release)
+    if latest_vote_task is None:
+        return "", "No vote task found."
+    vote_thread_mid = resolve.task_mid_get(latest_vote_task)
+    if vote_thread_mid is None:
+        return "", "No vote thread found."
+
+    # Construct the reply email
+    original_subject = latest_vote_task.task_args["subject"]
+
+    # Arguments for the task to cast a vote
+    email_recipient = latest_vote_task.task_args["email_to"]
+    email_sender = f"{session.uid}@apache.org"
+    subject = f"Re: {original_subject}"
+    body = f"{vote}{('\n\n' + comment) if comment else ''}\n\n--{session.uid}"
+    in_reply_to = vote_thread_mid
+
+    task = models.Task(
+        status=models.TaskStatus.QUEUED,
+        task_type=models.TaskType.MESSAGE_SEND,
+        task_args=message.Send(
+            email_sender=email_sender,
+            email_recipient=email_recipient,
+            subject=subject,
+            body=body,
+            in_reply_to=in_reply_to,
+        ).model_dump(),
+        release_name=release.name,
+    )
+    async with db.session() as data:
+        data.add(task)
+        await data.flush()
+        await data.commit()
+
+    return email_recipient, ""

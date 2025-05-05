@@ -517,6 +517,21 @@ def unwrap(value: T | None, error_message: str = "unexpected None when unwrappin
         return value
 
 
+def unwrap_type(value: T | None, t: type[T], error_message: str = "unexpected None when unwrapping value") -> T:
+    """
+    Will unwrap the given value or raise a TypeError if it is not of the expected type
+
+    :param value: the optional value to unwrap
+    :param t: the expected type of the value
+    :param error_message: the error message when failing to unwrap
+    """
+    if value is None:
+        raise ValueError(error_message)
+    if not isinstance(value, t):
+        raise ValueError(f"Expected {t}, got {type(value)}")
+    return value
+
+
 async def update_atomic_symlink(link_path: pathlib.Path, target_path: pathlib.Path | str) -> None:
     """Atomically update or create a symbolic link at link_path pointing to target_path."""
     target_str = str(target_path)

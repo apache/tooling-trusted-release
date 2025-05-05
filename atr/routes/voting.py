@@ -83,13 +83,12 @@ async def selected_revision(
             body = wtforms.TextAreaField("Body", validators=[wtforms.validators.Optional()])
             submit = wtforms.SubmitField("Send vote email")
 
+        project = release.project
         version = release.version
-        committee_display = committee.display_name
-        project_name = release.project.name if release.project else "Unknown"
 
         # The subject can be changed by the user
         # TODO: We should consider not allowing the subject to be changed
-        default_subject = f"[VOTE] Release Apache {committee_display} {project_name} {version}"
+        default_subject = f"[VOTE] Release {project.display_name} {version}"
         default_body = await construct.start_vote_default(project_name)
 
         form = await VoteInitiateForm.create_form(

@@ -355,6 +355,10 @@
           {% endif %}
         </div>
       </div>
+      <div class="row">
+        <label class="col-sm-3 col-form-label text-sm-end fw-semibold">{{ resolve_form.resolution_body.label.text }}:</label>
+        <div class="col-sm-9 pt-2">{{ resolve_form.resolution_body(class_="form-control", rows="3") }}</div>
+      </div>
 
       <div class="row">
         <div class="col-sm-9 offset-sm-3">{{ resolve_form.submit(class_="btn btn-primary mt-3") }}</div>
