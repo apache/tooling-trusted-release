@@ -29,6 +29,7 @@ import atr.db.models as models
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.finish as finish
+import atr.routes.vote as vote
 import atr.util as util
 
 
@@ -62,44 +63,6 @@ def release_latest_vote_task(release: models.Release) -> models.Task | None:
     return None
 
 
-@routes.committer("/resolve/<project_name>/<version_name>", measure_performance=False)
-async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
-    """Resolve the vote on a release candidate."""
-    await session.check_access(project_name)
-
-    release = await session.release(
-        project_name,
-        version_name,
-        phase=models.ReleasePhase.RELEASE_CANDIDATE,
-        with_committee=True,
-        with_tasks=True,
-    )
-
-    form = await ResolveForm.create_form()
-
-    latest_vote_task = release_latest_vote_task(release)
-    task_mid = None
-    archive_url = None
-    if latest_vote_task is not None:
-        task_mid = task_mid_get(latest_vote_task)
-        archive_url = await _task_archive_url_cached(task_mid)
-
-    if ("LOCAL_DEBUG" in os.environ) and (latest_vote_task is not None):
-        latest_vote_task.status = models.TaskStatus.COMPLETED
-        latest_vote_task.result = [json.dumps({"mid": "818a44a3-6984-4aba-a650-834e86780b43@apache.org"})]
-
-    return await quart.render_template(
-        "candidate-resolve-release.html",
-        release=release,
-        format_artifact_name=_format_artifact_name,
-        form=form,
-        format_datetime=util.format_datetime,
-        vote_task=latest_vote_task,
-        task_mid=task_mid,
-        archive_url=archive_url,
-    )
-
-
 @routes.committer("/resolve/<project_name>/<version_name>", methods=["POST"], measure_performance=False)
 async def selected_post(
     session: routes.CommitterSession, project_name: str, version_name: str
@@ -112,14 +75,14 @@ async def selected_post(
         for _field, errors in form.errors.items():
             for error in errors:
                 await quart.flash(f"{error}", "error")
-        return await session.redirect(selected, project_name=project_name, version_name=version_name)
+        return await session.redirect(vote.selected, project_name=project_name, version_name=version_name)
 
     candidate_name = form.candidate_name.data
     vote_result = form.vote_result.data
 
     if not candidate_name:
         return await session.redirect(
-            selected, error="Missing candidate name", project_name=project_name, version_name=version_name
+            vote.selected, error="Missing candidate name", project_name=project_name, version_name=version_name
         )
 
     # Extract project name
@@ -127,7 +90,7 @@ async def selected_post(
         project_name, version_name = candidate_name.rsplit("-", 1)
     except ValueError:
         return await session.redirect(
-            selected, error="Invalid candidate name format", project_name=project_name, version_name=version_name
+            vote.selected, error="Invalid candidate name format", project_name=project_name, version_name=version_name
         )
 
     # Check that the user has access to the project

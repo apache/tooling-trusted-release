@@ -28,6 +28,7 @@ import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.draft as draft
+import atr.routes.resolve as resolve
 import atr.util as util
 
 if TYPE_CHECKING:
@@ -96,6 +97,7 @@ async def check(
 
     delete_draft_form = await draft.DeleteForm.create_form()
     delete_file_form = await draft.DeleteFileForm.create_form()
+    resolve_form = await resolve.ResolveForm.create_form()
 
     return await quart.render_template(
         "check-selected.html",
@@ -123,6 +125,7 @@ async def check(
         models=models,
         task_mid=task_mid,
         form=form,
+        resolve_form=resolve_form,
     )
 
 

@@ -182,9 +182,9 @@ def lifecycle_04_start_vote(page: sync_api.Page, credentials: Credentials, versi
 
 
 def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
-    logging.info(f"Navigating to the candidate resolve page for tooling-test-example {version_name}")
-    go_to_path(page, f"/resolve/tooling-test-example/{version_name}")
-    logging.info("Candidate resolve page loaded successfully")
+    logging.info(f"Navigating to the vote page for tooling-test-example {version_name}")
+    go_to_path(page, f"/vote/tooling-test-example/{version_name}")
+    logging.info("Vote page loaded successfully")
 
     logging.info(f"Locating the form to resolve the vote for tooling-test-example {version_name}")
     form_locator = page.locator(

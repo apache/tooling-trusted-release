@@ -28,11 +28,12 @@
       {% for release in releases %}
         {% set phase = release.phase.value %}
         {% set target_url = None %}
+        {# TODO: Use mappings.py #}
         {% if phase == "release_candidate_draft" %}
           {% set target_url = as_url(routes.compose.selected, project_name=project.name, version_name=release.version) %}
           {% set badge_class = "bg-primary" %}
         {% elif phase == "release_candidate" %}
-          {% set target_url = as_url(routes.resolve.selected, project_name=project.name, version_name=release.version) %}
+          {% set target_url = as_url(routes.vote.selected, project_name=project.name, version_name=release.version) %}
           {% set badge_class = "bg-warning text-dark" %}
         {% elif phase == "release_preview" %}
           {% set target_url = as_url(routes.announce.selected, project_name=project.name, version_name=release.version) %}
