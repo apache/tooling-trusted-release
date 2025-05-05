@@ -97,7 +97,7 @@ async def urls_selected(project_name: str, version_name: str) -> response.Respon
                 ValueError("Release not found")
             )
         url_list_str = await _generate_file_url_list(release)
-        return quart.Response(url_list_str + "\n", mimetype="text/plain")
+        return quart.Response(url_list_str, mimetype="text/plain")
     except ValueError as e:
         return quart.Response(f"Error: {e}", status=404, mimetype="text/plain")
     except Exception as e:
@@ -184,8 +184,8 @@ async def _generate_file_url_list(release: models.Release) -> str:
                 file_path=str(rel_path),
                 _external=True,
             )
-            urls.append(abs_url)
-    return "\n".join(sorted(urls))
+            urls.append(abs_url + " " + str(rel_path))
+    return "\n".join(sorted(urls)) + "\n"
 
 
 async def _list(
