@@ -40,7 +40,7 @@
           <main class="main-content">
             {% if (not current_user) or (current_user.uid != "sbp") %}
               <div class="warning-banner">
-                <strong>Pre-release Software:</strong> ATR is actively being developed. You cannot make releases.
+                <strong>Pre-release Software:</strong> ATR is being shared for feedback. You can only make test releases.
               </div>
             {% endif %}
             {% from "macros/flash.html" import render_flash_messages %}
