@@ -38,6 +38,8 @@ async def check(
     release: models.Release,
     task_mid: str | None = None,
     form: wtforms.Form | None = None,
+    archive_url: str | None = None,
+    vote_task: models.Task | None = None,
 ) -> response.Response | str:
     base_path = util.release_directory(release)
 
@@ -82,6 +84,8 @@ async def check(
         task_mid=task_mid,
         form=form,
         resolve_form=resolve_form,
+        vote_task=vote_task,
+        archive_url=archive_url,
     )
 
 

@@ -1,0 +1,45 @@
+
+<div class="p-3 border rounded bg-white mb-3">
+  {% if vote_task %}
+    {% if vote_task.status.value == "completed" %}
+      <p class="mb-0 text-success fw-semibold">
+        <i class="bi bi-check-circle me-1"></i> Vote thread started: {{ format_datetime(vote_task.completed) }}
+      </p>
+      {% if task_mid %}
+        <p class="mt-2 mb-0 text-muted ps-4">
+          Message-ID: <code class="user-select-all">{{ task_mid }}</code>
+        </p>
+      {% endif %}
+    {% elif vote_task.status.value == "failed" %}
+      <p class="mb-1 text-danger fw-semibold">
+        <i class="bi bi-x-circle me-1"></i> Vote thread failed: {{ format_datetime(vote_task.completed) }}
+      </p>
+      <div class="alert alert-danger mt-2 mb-0 p-2" role="alert">
+        <p class="mb-0 p-2 text-danger">{{ vote_task.error }}</p>
+      </div>
+    {% else %}
+      <p class="mb-0 text-warning fw-semibold">
+        <i class="bi bi-hourglass-split me-1"></i> Vote thread task status: {{ vote_task.status.value.upper() }}
+        {% if vote_task.started %}
+          (Started: {{ format_datetime(vote_task.started) }})
+        {% else %}
+          (Added: {{ format_datetime(vote_task.added) }})
+        {% endif %}
+      </p>
+    {% endif %}
+    {% if archive_url %}
+      <p class="mt-2 mb-0 text-muted ps-4">
+        <a href="{{ archive_url }}"
+           rel="noopener"
+           target="_blank"
+           title="View vote email thread in the archive (opens in new window)">View vote email thread in the archive <i class="bi bi-box-arrow-up-right ms-1"></i></a>
+      </p>
+    {% elif task_mid %}
+      <p class="mt-2 mb-0 text-muted ps-4">Could not retrieve archive URL for this message.</p>
+    {% endif %}
+  {% else %}
+    <p class="mb-0 text-muted">
+      <i class="bi bi-question-circle me-1"></i> Vote email: No vote initiation task found for this release.
+    </p>
+  {% endif %}
+</div>

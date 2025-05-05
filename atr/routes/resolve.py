@@ -16,10 +16,7 @@
 # under the License.
 
 import json
-import logging
-import os
 
-import httpx
 import quart
 import werkzeug.wrappers.response as response
 import wtforms
@@ -207,51 +204,3 @@ async def _send_resolution(
         await data.flush()
         await data.commit()
     return None
-
-
-async def _task_archive_url(task_mid: str) -> str | None:
-    if "@" not in task_mid:
-        return None
-
-    # TODO: This List ID will be dynamic when we allow posting to arbitrary lists
-    lid = "user-tests.tooling.apache.org"
-    url = f"https://lists.apache.org/api/email.lua?id=%3C{task_mid}%3E&listid=%3C{lid}%3E"
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-        response.raise_for_status()
-        email_data = response.json()
-        mid = email_data["mid"]
-        if not isinstance(mid, str):
-            return None
-        return "https://lists.apache.org/thread/" + mid
-    except Exception:
-        logging.exception("Failed to get archive URL for task %s", task_mid)
-        return None
-
-
-async def _task_archive_url_cached(task_mid: str | None) -> str | None:
-    if "LOCAL_DEBUG" in os.environ:
-        return "https://lists.apache.org/thread/619hn4x796mh3hkk3kxg1xnl48dy2s64"
-    if task_mid is None:
-        return None
-    if "@" not in task_mid:
-        return None
-
-    async with db.session() as data:
-        url = await data.ns_text_get(
-            "mid-url-cache",
-            task_mid,
-        )
-        if url is not None:
-            return url
-
-    url = await _task_archive_url(task_mid)
-    if url is not None:
-        await data.ns_text_set(
-            "mid-url-cache",
-            task_mid,
-            url,
-        )
-
-    return url

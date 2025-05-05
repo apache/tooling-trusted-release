@@ -6,6 +6,9 @@
     <strong>TODO:</strong> We plan to make "Binding" dynamic based on membership. Currently this form always says "Binding" which is known to be wrong.
   </div>
 </div>
+
+{% include "check-selected-vote-email.html" %}
+
 <form method="post"
       action="{{ as_url(routes.vote.selected_post, project_name=project_name, version_name=version_name) }}"
       class="atr-canary py-4 px-5 mb-4 border rounded">
