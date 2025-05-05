@@ -17,8 +17,10 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import os
+import re
 from typing import TYPE_CHECKING, Any, Final, Generic, TypeGuard, TypeVar
 
 import sqlalchemy
@@ -33,9 +35,11 @@ import atr.config as config
 import atr.db.models as models
 import atr.user as user
 import atr.util as util
+from atr import analysis
 
 if TYPE_CHECKING:
     import datetime
+    import pathlib
     from collections.abc import Sequence
 
     import asfquart.base as base
@@ -74,6 +78,17 @@ class NotSet:
 
 NOT_SET: Final[NotSet] = NotSet()
 type Opt[T] = T | NotSet
+
+
+@dataclasses.dataclass
+class PathInfo:
+    artifacts: set[pathlib.Path] = dataclasses.field(default_factory=set)
+    errors: dict[pathlib.Path, list[models.CheckResult]] = dataclasses.field(default_factory=dict)
+    metadata: set[pathlib.Path] = dataclasses.field(default_factory=set)
+    # substitutions: dict[pathlib.Path, str] = dataclasses.field(default_factory=dict)
+    successes: dict[pathlib.Path, list[models.CheckResult]] = dataclasses.field(default_factory=dict)
+    # templates: dict[pathlib.Path, str] = dataclasses.field(default_factory=dict)
+    warnings: dict[pathlib.Path, list[models.CheckResult]] = dataclasses.field(default_factory=dict)
 
 
 class Query(Generic[T]):
@@ -571,6 +586,49 @@ def is_undefined(v: object | NotSet) -> TypeGuard[NotSet]:
 #             recent_tasks[task.task_type.value] = task
 #
 #     return recent_tasks
+
+
+async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathInfo:
+    info = PathInfo()
+    for path in paths:
+        # Get template and substitutions
+        # elements = {
+        #     "core": release.project.name,
+        #     "version": release.version,
+        #     "sub": None,
+        #     "template": None,
+        #     "substitutions": None,
+        # }
+        # template, substitutions = analysis.filename_parse(str(path), elements)
+        # info.templates[path] = template
+        # info.substitutions[path] = analysis.substitutions_format(substitutions) or "none"
+
+        # Get artifacts and metadata
+        search = re.search(analysis.extension_pattern(), str(path))
+        if search:
+            if search.group("artifact"):
+                info.artifacts.add(path)
+            elif search.group("metadata"):
+                info.metadata.add(path)
+
+        # Get successes, warnings, and errors
+        async with session() as data:
+            info.successes[path] = list(
+                await data.check_result(
+                    release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.SUCCESS
+                ).all()
+            )
+            info.warnings[path] = list(
+                await data.check_result(
+                    release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.WARNING
+                ).all()
+            )
+            info.errors[path] = list(
+                await data.check_result(
+                    release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.FAILURE
+                ).all()
+            )
+    return info
 
 
 def select_in_load(*entities: Any) -> orm.strategy_options._AbstractLoad:

@@ -15,14 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import re
 from typing import TYPE_CHECKING
 
 import quart
 import werkzeug.wrappers.response as response
 import wtforms
 
-import atr.analysis as analysis
 import atr.db as db
 import atr.db.models as models
 import atr.revision as revision
@@ -42,49 +40,13 @@ async def check(
     form: wtforms.Form | None = None,
 ) -> response.Response | str:
     base_path = util.release_directory(release)
+
     paths = [path async for path in util.paths_recursive(base_path)]
-    path_templates = {}
-    path_substitutions = {}
-    path_artifacts = set()
-    path_metadata = set()
-    path_successes = {}
-    path_warnings = {}
-    path_errors = {}
+    info = await db.path_info(release, paths)
+
     user_ssh_keys: Sequence[models.SSHKey] = []
-
-    for path in paths:
-        # Get template and substitutions
-        elements = {
-            "core": release.project.name,
-            "version": release.version,
-            "sub": None,
-            "template": None,
-            "substitutions": None,
-        }
-        template, substitutions = analysis.filename_parse(str(path), elements)
-        path_templates[path] = template
-        path_substitutions[path] = analysis.substitutions_format(substitutions) or "none"
-
-        # Get artifacts and metadata
-        search = re.search(analysis.extension_pattern(), str(path))
-        if search:
-            if search.group("artifact"):
-                path_artifacts.add(path)
-            elif search.group("metadata"):
-                path_metadata.add(path)
-
-        # Get successes, warnings, and errors
-        async with db.session() as data:
-            path_successes[path] = await data.check_result(
-                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.SUCCESS
-            ).all()
-            path_warnings[path] = await data.check_result(
-                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.WARNING
-            ).all()
-            path_errors[path] = await data.check_result(
-                release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.FAILURE
-            ).all()
-            user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
+    async with db.session() as data:
+        user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
 
     revision_name_from_link, revision_editor, revision_time = await revision.latest_info(
         release.project.name, release.version
@@ -105,13 +67,7 @@ async def check(
         version_name=release.version,
         release=release,
         paths=paths,
-        artifacts=path_artifacts,
-        metadata=path_metadata,
-        successes=path_successes,
-        warnings=path_warnings,
-        errors=path_errors,
-        templates=path_templates,
-        substitutions=path_substitutions,
+        info=info,
         revision_editor=revision_editor,
         revision_time=revision_time,
         revision_name_from_link=revision_name_from_link,
