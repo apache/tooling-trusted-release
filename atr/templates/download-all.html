@@ -97,7 +97,7 @@
 curl -fsS https://{{ server_domain }}{{ as_url(routes.download.sh_selected, project_name=release.project.name, version_name=release.version) }} | sh
 </pre>
   <p>
-    This downloads the files into the <em>current directory</em>. Ensure that you create a new empty directory, and change to it, before running the command. The script requires curl and POSIX compliant versions of printf and sh. It works by downloading a POSIX complaint shell script straight into your shell. You can of course download the script and audit it before running it.
+    This downloads the files into the <em>current directory</em>. Ensure that you create a new empty directory, and change to it, before running the command. The script requires curl and POSIX compliant versions of printf and sh. It works by downloading a POSIX complaint shell script straight into your shell. You can of course <a href="{{ as_url(routes.download.sh_selected, project_name=release.project.name, version_name=release.version) }}">download the script</a> and audit it before running it.
   </p>
 
   <h3 id="download-rsync" class="mt-4">Using rsync</h3>
