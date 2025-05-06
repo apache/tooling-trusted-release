@@ -1,6 +1,6 @@
 .PHONY: build build-alpine build-playwright build-ubuntu certs check \
   docs generate-version obvfix report run run-dev run-playwright \
-  run-playwright-slow run-staging stop serve sync sync-dev
+  run-playwright-slow run-staging stop serve serve-local sync sync-dev
 
 BIND ?= 127.0.0.1:8080
 IMAGE ?= tooling-trusted-release
@@ -69,6 +69,11 @@ run-staging:
 
 serve:
 	SSH_HOST=127.0.0.1 $(SCRIPTS)/run hypercorn --bind $(BIND) \
+		--keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
+
+serve-local:
+	APP_HOST=127.0.0.1:8080 LOCAL_DEBUG=1 \
+		SSH_HOST=127.0.0.1 $(SCRIPTS)/run hypercorn --bind $(BIND) \
 		--keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
 
 stop:

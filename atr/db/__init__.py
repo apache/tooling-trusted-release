@@ -30,6 +30,8 @@ import sqlalchemy.orm as orm
 import sqlalchemy.sql as sql
 import sqlmodel
 import sqlmodel.sql.expression as expression
+from alembic import command
+from alembic.config import Config
 
 import atr.config as config
 import atr.db.models as models
@@ -533,23 +535,37 @@ def init_database(app: base.QuartApp) -> None:
             bind=engine, class_=Session, expire_on_commit=False
         )
 
-        # Run any pending migrations
-        # In dev we'd do this first:
-        # poetry run alembic revision --autogenerate -m "description"
-        # Then review the generated migration in migrations/versions/ and commit it
-        # project_root = app_config.PROJECT_ROOT
-        # alembic_ini_path = os.path.join(project_root, "alembic.ini")
-        # alembic_cfg = config.Config(alembic_ini_path)
-        # # Override the migrations directory location to use project root
-        # # TODO: Is it possible to set this in alembic.ini?
-        # alembic_cfg.set_main_option("script_location", os.path.join(project_root, "migrations"))
-        # # Set the database URL in the config
-        # alembic_cfg.set_main_option("sqlalchemy.url", str(engine.url))
-        # # command.upgrade(alembic_cfg, "head")
+        # Run any pending migrations on startup
+        _LOGGER.info("Applying database migrations via init_database...")
+        alembic_ini_path = os.path.join(app_config.PROJECT_ROOT, "alembic.ini")
+        alembic_cfg = Config(alembic_ini_path)
 
-        # Create any tables that might be missing
-        async with engine.begin() as conn:
-            await conn.run_sync(sqlmodel.SQLModel.metadata.create_all)
+        # Construct synchronous URLs
+        absolute_db_path = os.path.join(app_config.STATE_DIR, app_config.SQLITE_DB_PATH)
+        sync_sqlalchemy_url = f"sqlite:///{absolute_db_path}"
+        _LOGGER.info(f"Setting Alembic URL for command: {sync_sqlalchemy_url}")
+        alembic_cfg.set_main_option("sqlalchemy.url", sync_sqlalchemy_url)
+
+        # Ensure that Alembic finds the migrations directory relative to project root
+        migrations_dir_path = os.path.join(app_config.PROJECT_ROOT, "migrations")
+        _LOGGER.info(f"Setting Alembic script_location for command: {migrations_dir_path}")
+        alembic_cfg.set_main_option("script_location", migrations_dir_path)
+
+        try:
+            _LOGGER.info("Running alembic upgrade head...")
+            command.upgrade(alembic_cfg, "head")
+            _LOGGER.info("Database migrations applied successfully")
+        except Exception:
+            _LOGGER.exception("Failed to apply database migrations during startup")
+            raise
+
+        try:
+            _LOGGER.info("Running alembic check...")
+            command.check(alembic_cfg)
+            _LOGGER.info("Alembic check passed: DB schema matches models")
+        except Exception:
+            _LOGGER.exception("Failed to check database migrations during startup")
+            raise
 
 
 async def init_database_for_worker() -> None:

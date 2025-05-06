@@ -119,6 +119,7 @@ select = [
 "atr/apache.py" = ["N815", "TC003"]
 "atr/db/__init__.py" = ["C901"]
 "atr/routes/modules.py" = ["F401"]
+"migrations/env.py" = ["E402"]
 "scripts/release_path_parse.py" = ["C901", "RUF001"]
 
 [tool.mypy]
