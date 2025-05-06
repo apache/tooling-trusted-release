@@ -16,6 +16,7 @@
 # under the License.
 
 import json
+import os
 
 import quart
 import werkzeug.wrappers.response as response
@@ -128,6 +129,8 @@ async def selected_post(
 
 
 def task_mid_get(latest_vote_task: models.Task) -> str | None:
+    if "LOCAL_DEBUG" in os.environ:
+        return "818a44a3-6984-4aba-a650-834e86780b43@apache.org"
     # TODO: Improve this
     task_mid = None
 
@@ -184,7 +187,7 @@ async def _send_resolution(
     email_recipient = latest_vote_task.task_args["email_to"]
     email_sender = f"{session.uid}@apache.org"
     subject = f"[VOTE] [RESULT] Release {release.project.display_name} {release.version} {resolution.upper()}"
-    body = f"{body}\n\n--{session.uid}"
+    body = f"{body}\n\n-- \n{session.fullname} ({session.uid})"
     in_reply_to = vote_thread_mid
 
     task = models.Task(

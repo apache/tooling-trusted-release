@@ -138,6 +138,7 @@ async def selected_revision(
                     email_to=email_to,
                     vote_duration=vote_duration_choice,
                     initiator_id=session.uid,
+                    initiator_fullname=session.fullname,
                     subject=subject_data,
                     body=body_data,
                 ).model_dump(),

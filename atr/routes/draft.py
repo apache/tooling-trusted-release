@@ -487,6 +487,7 @@ async def vote_preview(
         form_body,
         construct.StartVoteOptions(
             asfuid=asfuid,
+            fullname=session.fullname,
             project_name=project_name,
             version_name=version_name,
             vote_duration=vote_duration,

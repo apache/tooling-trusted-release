@@ -41,6 +41,7 @@ class Initiate(pydantic.BaseModel):
     email_to: str = pydantic.Field(..., description="The mailing list address to send the vote email to")
     vote_duration: int = pydantic.Field(..., description="Duration of the vote in hours")
     initiator_id: str = pydantic.Field(..., description="ASF ID of the vote initiator")
+    initiator_fullname: str = pydantic.Field(..., description="Full name of the vote initiator")
     subject: str = pydantic.Field(..., description="Subject line for the vote email")
     body: str = pydantic.Field(..., description="Body content for the vote email")
 
@@ -107,6 +108,7 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
         args.body,
         construct.StartVoteOptions(
             asfuid=args.initiator_id,
+            fullname=args.initiator_fullname,
             project_name=release.project.name,
             version_name=release.version,
             vote_duration=args.vote_duration,

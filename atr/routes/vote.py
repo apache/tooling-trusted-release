@@ -129,7 +129,12 @@ async def _send_vote(
     email_recipient = latest_vote_task.task_args["email_to"]
     email_sender = f"{session.uid}@apache.org"
     subject = f"Re: {original_subject}"
-    body = f"{vote}{('\n\n' + comment) if comment else ''}\n\n--{session.uid}"
+    body = [f"{vote.lower()} ({session.uid}) {session.fullname}"]
+    if comment:
+        body.append(f"{comment}")
+        # Only include the signature if there is a comment
+        body.append(f"-- \n{session.fullname} ({session.uid})")
+    body_text = "\n\n".join(body)
     in_reply_to = vote_thread_mid
 
     task = models.Task(
@@ -139,7 +144,7 @@ async def _send_vote(
             email_sender=email_sender,
             email_recipient=email_recipient,
             subject=subject,
-            body=body,
+            body=body_text,
             in_reply_to=in_reply_to,
         ).model_dump(),
         release_name=release.name,

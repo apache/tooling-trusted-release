@@ -78,6 +78,7 @@ async def announce_preview(
         # Construct options and generate body
         options = construct.AnnounceReleaseOptions(
             asfuid=session.uid,
+            fullname=session.fullname,
             project_name=project_name,
             version_name=version_name,
         )

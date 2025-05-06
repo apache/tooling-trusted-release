@@ -17,6 +17,7 @@
 
 import dataclasses
 
+import aiofiles.os
 import quart
 
 import atr.config as config
@@ -28,6 +29,7 @@ import atr.util as util
 @dataclasses.dataclass
 class AnnounceReleaseOptions:
     asfuid: str
+    fullname: str
     project_name: str
     version_name: str
 
@@ -35,6 +37,7 @@ class AnnounceReleaseOptions:
 @dataclasses.dataclass
 class StartVoteOptions:
     asfuid: str
+    fullname: str
     project_name: str
     version_name: str
     vote_duration: int
@@ -72,6 +75,7 @@ async def announce_release_body(body: str, options: AnnounceReleaseOptions) -> s
     body = body.replace("[PROJECT]", options.project_name)
     body = body.replace("[VERSION]", options.version_name)
     body = body.replace("[YOUR_ASF_ID]", options.asfuid)
+    body = body.replace("[YOUR_FULL_NAME]", options.fullname)
 
     return body
 
@@ -100,14 +104,12 @@ Downloads are available from the following URL:
 
 On behalf of the Apache [COMMITTEE] project team,
 
-[YOUR_ASF_ID]
+[YOUR_FULL_NAME] ([YOUR_ASF_ID])
 """
 
 
 async def start_vote_body(body: str, options: StartVoteOptions) -> str:
     async with db.session() as data:
-        user_key = await data.public_signing_key(apache_uid=options.asfuid).get()
-        user_key_fingerprint = user_key.fingerprint if user_key else "0000000000000000000000000000000000000000"
         # Do not limit by phase, as it may be at RELEASE_CANDIDATE here if called by the task
         release = await data.release(
             project_name=options.project_name,
@@ -125,6 +127,11 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
     committee_name = release.committee.display_name if release.committee else release.project.display_name
     project_short_display_name = release.project.short_display_name if release.project else options.project_name
 
+    keys_file = None
+    keys_file_path = util.get_finished_dir() / options.project_name / "KEYS"
+    if await aiofiles.os.path.isfile(keys_file_path):
+        keys_file = f"https://{host}/downloads/{options.project_name}/KEYS"
+
     checklist_content = ""
     async with db.session() as data:
         release_policy = await db.get_project_release_policy(data, options.project_name)
@@ -135,12 +142,13 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
     # TODO: Handle the DURATION == 0 case
     body = body.replace("[COMMITTEE]", committee_name)
     body = body.replace("[DURATION]", str(options.vote_duration))
-    body = body.replace("[KEY_FINGERPRINT]", user_key_fingerprint or "(No key found)")
+    body = body.replace("[KEYS_FILE]", keys_file or "[Sorry, the KEYS file is missing!]")
     body = body.replace("[PROJECT]", project_short_display_name)
     body = body.replace("[RELEASE_CHECKLIST]", checklist_content)
     body = body.replace("[REVIEW_URL]", review_url)
     body = body.replace("[VERSION]", options.version_name)
     body = body.replace("[YOUR_ASF_ID]", options.asfuid)
+    body = body.replace("[YOUR_FULL_NAME]", options.fullname)
 
     return body
 
@@ -164,9 +172,9 @@ The release candidate page, including downloads, can be found at:
 
   [REVIEW_URL]
 
-The release artifacts are signed with the GPG key with fingerprint:
+The release artifacts are signed with one or more GPG keys from:
 
-  [KEY_FINGERPRINT]
+  [KEYS_FILE]
 
 Please review the release candidate and vote accordingly.
 
@@ -180,5 +188,5 @@ This vote will remain open for [DURATION] hours.
 
 [RELEASE_CHECKLIST]
 Thanks,
-[YOUR_ASF_ID]
+[YOUR_FULL_NAME] ([YOUR_ASF_ID])
 """
