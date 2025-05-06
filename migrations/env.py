@@ -50,15 +50,19 @@ sync_sqlalchemy_url = f"sqlite:///{absolute_db_path}"
 
 
 def get_short_commit_hash(project_root_path: str) -> str:
-    """Get the short, eight character, git commit hash."""
-    process = subprocess.run(
-        ["git", "rev-parse", "--short=8", "HEAD"],
-        capture_output=True,
-        text=True,
-        cwd=project_root_path,
-        check=True,
-    )
-    return process.stdout.strip()
+    """Get an eight character git commit hash, or a fallback."""
+    try:
+        process = subprocess.run(
+            ["git", "rev-parse", "--short=8", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=project_root_path,
+            check=True,
+        )
+        return process.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # Return a placeholder if the git command fails
+        return "00000000"
 
 
 def process_revision_directives_custom_naming(
