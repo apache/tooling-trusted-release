@@ -1,71 +1,122 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Apache Trusted Release
+  Tutorial for release managers ~ ATR
 {% endblock title %}
 
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      img {
+          border: 1px solid #cccccc;
+          box-shadow: 0 0 1rem rgba(0, 0, 0, 0.2);
+          margin: 1rem 0;
+          max-width: 75%;
+      }
+  </style>
+{% endblock stylesheets %}
+
 {% block content %}
-  <h1>Quick tutorial</h1>
-  <p>
-    ATR is a release management platform for <a href="https://www.apache.org">Apache Software
-    Foundation</a> projects. It provides a standardized workflow for PMC members to submit,
-    verify, and track release candidates.
+  <h1>Tutorial for release managers</h1>
+  <p>The ATR is under development; the current version may not precisely match the screenshots below.</p>
+  <p class="btn-group my-3" role="group" aria-label="Tutorial sections">
+    <a href="#compose" class="btn btn-outline-secondary">Compose</a>
+    <a href="#vote" class="btn btn-outline-secondary">Vote</a>
+    <a href="#finish" class="btn btn-outline-secondary">Finish</a>
+    <a href="#releases" class="btn btn-outline-secondary">Releases</a>
   </p>
 
+  <h2 id="compose">Compose</h2>
   <p>
-    This is a preview of an early version of ATR, and we would like testers to try it out and give us feedback. This section provides a quick tutorial for using ATR. The basic workflow on ATR is Release Candidate Draft -> Release Candidate -> Release Preview -> Release. Note that, as the header says on every page, this is a preview and you cannot yet create actual releases with ATR.
+    Activate the <strong>Select release</strong> sidebar link [<code>1</code>], then use the <strong>Start a new release</strong> button for any project [<code>2</code>].
+  </p>
+  <p>
+    <img src="{{ url_for('static', filename='png/tutorial-compose-01.png') }}"
+         alt="Illustration: Follow the sidebar link, and use the button." />
+  </p>
+  <p>
+    Use the <strong>Upload files</strong> button on the empty <em>Compose</em> page to add files.
+  </p>
+  <p>
+    <img src="{{ url_for('static', filename='png/tutorial-compose-02.png') }}"
+         alt="Illustration: Use the Upload files button to add files." />
+  </p>
+  <p>
+    Upload files via the browser, <code>svn</code>, or <code>rsync</code>. To use <code>rsync</code>, first submit an SSH key to ATR. We plan to read this from LDAP in future.
+  </p>
+  <p>
+    After upload, ATR checks your files. Review the check results on the <em>Compose</em> page [<code>1</code>]. Use the <strong>Show report</strong>, <strong>Show warnings</strong>, or <strong>Show errors</strong> buttons for a detailed review of the check results.
+  </p>
+  <p>
+    When the files are present and the check results are satisfactory, use the <strong>Start voting</strong> button to proceed [<code>2</code>].
+  </p>
+  <p>
+    <img src="{{ url_for('static', filename='png/tutorial-compose-03.png') }}"
+         alt="Illustration: Review the results of your checks, and use the Start voting button." />
+  </p>
+  <p>
+    A form to start the vote is displayed. If necessary, use its ability to preview the vote announcement email body. When you submit the form, ATR sends an announcement message in your name to the chosen mailing list.
+  </p>
+  <p>
+    <img src="{{ url_for('static', filename='png/tutorial-compose-04.png') }}"
+         alt="Illustration: Use the form to start a vote." />
   </p>
 
-  <h2>Release candidate draft</h2>
-
+  <h2 id="vote">Vote</h2>
   <p>
-    We recommend that you start by <a href="{{ as_url(routes.keys.ssh_add) }}">uploading your SSH key</a>. This gives you rsync access which makes it easier to upload your files. We plan to obtain your SSH key from your ASF account via LDAP in the long run.
+    The <em>Vote</em> page is available to all project participants, and displays the report results.
+  </p>
+  <p>
+    <img src="{{ url_for('static', filename='png/tutorial-vote-01.png') }}"
+         alt="Illustration: Anybody can review the reports." />
+  </p>
+  <p>
+    A link allows review of the voting thread in the mailing list archives [<code>1</code>]. ATR does not yet tally votes; you must do this manually. A form on the page allows you to cast your vote on the mailing list [<code>2</code>].
+  </p>
+  <p>
+    <img src="{{ url_for('static', filename='png/tutorial-vote-02.png') }}"
+         alt="Illustration: Review the voting thread, and case your own vote." />
+  </p>
+  <p>
+    When the voting period concludes and the mandate is clear, record the outcome using the vote resolution form. This action also sends the outcome of the vote to the mailing list. A successful vote promotes the release candidate to the next phase; a failed vote returns it to the <em>Compose</em> phase.
+  </p>
+  <p>
+    <img src="{{ url_for('static', filename='png/tutorial-vote-03.png') }}"
+         alt="Illustration: Use the vote resolution form to progress to the next phase." />
   </p>
 
+  <h2 id="finish">Finish</h2>
   <p>
-    Once you've uploaded your SSH key, you may be able to >add a release candidate draft. Only Project Management Committee (PMC) members can do this. Once a draft has been created, all PMC members and committers can add files to the draft or delete files from it.
+    If the vote passes, the release enters the <em>Finish</em> phase. This phase may allow minor content adjustments before the announcement and final release.
+  </p>
+  <p>
+    ATR currently supports moving files between directories, preserving filenames. We plan to support more types of changes in future.
+  </p>
+  <p>
+    When the release is finished, use the <strong>Announce and distribute</strong> button.
+  </p>
+  <p>
+    <img src="{{ url_for('static', filename='png/tutorial-finish-01.png') }}"
+         alt="Illustration: Use the Announce and distribute button." />
+  </p>
+  <p>
+    Using the announcement form sends a message to your selected mailing list. Destination options are limited during the testing phase.
+  </p>
+  <p>
+    <img src="{{ url_for('static', filename='png/tutorial-finish-02.png') }}"
+         alt="Illustration: The announcement form sends a message to your selected mailing list." />
   </p>
 
+  <h2 id="releases">Releases</h2>
+  <p>When a release is finished, it is listed alongside any other finished releases for a project.</p>
   <p>
-    When you add files, ATR automatically runs some checks on the files. You'll be able to browse the results of those checks. Note that our checks are currently very basic, and we'll be adding more checks as we get feedback from testers.
+    <img src="{{ url_for('static', filename='png/tutorial-releases-01.png') }}"
+         alt="Illustration: Finished releases are shown for each individual project." />
   </p>
-
-  <p>When you're happy with the files in the draft, you can start a vote on it.</p>
-
-  <h2>Release candidate</h2>
-
+  <p>Each entry provides a link to download the artifacts.</p>
   <p>
-    When you've promoted the draft to a release candidate, you can use ATR to start a vote on the release candidate. Currently we allow any PMC member to start the vote, but in the future we may limit this to designated release managers. The ATR is designed to send the vote email itself, but we understand that projects send very detailed vote announcement emails. We plan to make it easier for you to send such announcement emails. We also plan to allow users to send the vote email themselves and record the fact on the ATR manually.
+    <img src="{{ url_for('static', filename='png/tutorial-releases-02.png') }}"
+         alt="Illustration: It is possible to browse the files within a finished release." />
   </p>
-
-  <p>
-    The vote email is not actually sent out, because ATR cannot yet be used to create releases. We are only testing the workflow.
-  </p>
-
-  <p>
-    When you're happy with the release candidate, you can record the vote resolution to promote the release candidate to a release preview.
-  </p>
-
-  <h2>Release preview</h2>
-
-  <p>
-    When you've promoted the release candidate to a release preview, you can review the files. We plan to make it possible to adjust the release preview before it's promoted to a release.
-  </p>
-
-  <p>
-    When you're happy with the release preview, you can announce the release preview. This, again, should be an action limited to designated release managers.
-  </p>
-
-  <h2>Release</h2>
-
-  <p>
-    When you've promoted the release preview to a release, you can <a href="{{ as_url(routes.release.releases) }}">browse the release</a>.
-  </p>
-
-  <h2>Key features</h2>
-  <ul>
-    <li>Support for rsync or HTML form based file uploads</li>
-    <li>Automatic checks of release artifacts</li>
-    <li>Templated email vote announcements</li>
-  </ul>
+  <p>This completes the ATR workflow, from private draft to finished public release.</p>
 {% endblock content %}
