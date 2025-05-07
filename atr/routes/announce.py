@@ -116,9 +116,7 @@ async def selected_post(
             project_name, version_name, with_committee=True, phase=models.ReleasePhase.RELEASE_PREVIEW
         )
         await quart.flash(error_message, "error")
-        return await quart.render_template(
-            "preview-announce-release.html", release=release, announce_form=announce_form
-        )
+        return await quart.render_template("announce-selected.html", release=release, announce_form=announce_form)
 
     subject = str(announce_form.subject.data)
     body = str(announce_form.body.data)
