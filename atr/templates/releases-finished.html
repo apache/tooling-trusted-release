@@ -1,11 +1,11 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Completed releases of {{ project.display_name }} ~ ATR
+  Releases of {{ project.display_name }} ~ ATR
 {% endblock title %}
 
 {% block description %}
-  All of the completed releases of {{ project.display_name }} on ATR.
+  All of the finished releases of {{ project.display_name }} on ATR.
 {% endblock description %}
 
 {% block content %}
@@ -13,10 +13,10 @@
     <a href="{{ as_url(routes.root.index) }}" class="atr-back-link">← Back to Select a release</a>
   </p>
 
-  <h1>Completed releases of {{ project.display_name }}</h1>
+  <h1>Releases of {{ project.display_name }}</h1>
 
   {% if releases %}
-    <p class="mb-4">The following releases have been completed and published for this project.</p>
+    <p class="mb-4">The following releases have been published for this project.</p>
     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
       {% for release in releases %}
         <div class="col">

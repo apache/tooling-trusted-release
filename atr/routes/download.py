@@ -225,5 +225,6 @@ async def _list(
         )
         display_name = f"{item_in_dir}/" if await aiofiles.os.path.isdir(full_path / item_in_dir) else str(item_in_dir)
         html.append(f'<a href="{link_url}">{display_name}</a>')
-    body = "<br>\n".join(html)
-    return quart.Response(body, mimetype="text/html")
+    head = "<style>body { margin: 1rem; font: 1.25rem/1.5 serif; }</style>"
+    response_body = head + "<br>\n".join(html)
+    return quart.Response(response_body, mimetype="text/html")

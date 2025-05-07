@@ -44,6 +44,7 @@ async def check(
     base_path = util.release_directory(release)
 
     paths = [path async for path in util.paths_recursive(base_path)]
+    paths.sort()
     info = await db.path_info(release, paths)
 
     user_ssh_keys: Sequence[models.SSHKey] = []
