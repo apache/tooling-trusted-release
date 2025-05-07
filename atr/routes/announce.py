@@ -204,8 +204,12 @@ async def selected_post(
             version_name=version_name,
         )
 
-    routes_release_releases = routes_release.releases  # type: ignore[has-type]
-    return await session.redirect(routes_release_releases, success="Preview successfully announced")
+    routes_release_finished = routes_release.finished  # type: ignore[has-type]
+    return await session.redirect(
+        routes_release_finished,
+        success="Preview successfully announced",
+        project_name=project_name,
+    )
 
 
 async def _create_announce_form_instance(

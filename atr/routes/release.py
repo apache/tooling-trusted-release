@@ -71,9 +71,9 @@ async def bulk_status(session: routes.CommitterSession, task_id: int) -> str | r
     return await quart.render_template("release-bulk.html", task=task, release=release, TaskStatus=models.TaskStatus)
 
 
-@routes.public("/releases/completed/<project_name>")
-async def completed(project_name: str) -> str:
-    """View all completed releases for a project."""
+@routes.public("/releases/finished/<project_name>")
+async def finished(project_name: str) -> str:
+    """View all finished releases for a project."""
     async with db.session() as data:
         project = await data.project(name=project_name).demand(
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
@@ -91,7 +91,7 @@ async def completed(project_name: str) -> str:
     releases = sorted(releases, key=sort_releases, reverse=True)
 
     return await quart.render_template(
-        "releases-completed.html", project=project, releases=releases, format_datetime=util.format_datetime
+        "releases-finished.html", project=project, releases=releases, format_datetime=util.format_datetime
     )
 
 

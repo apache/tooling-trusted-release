@@ -99,8 +99,8 @@
           {% endif %}
           {% if completed_releases %}
             <span class="text-muted me-2">/</span>
-            <a href="{{ as_url(routes.release.completed, project_name=project.name) }}"
-               class="text-decoration-none">Completed releases</a>
+            <a href="{{ as_url(routes.release.finished, project_name=project.name) }}"
+               class="text-decoration-none">Finished releases</a>
           {% endif %}
         </p>
 

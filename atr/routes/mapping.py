@@ -32,5 +32,5 @@ def release_as_url(release: models.Release) -> str:
         case models.ReleasePhase.RELEASE_PREVIEW:
             return util.as_url(finish.selected, project_name=release.project.name, version_name=release.version)
         case models.ReleasePhase.RELEASE:
-            completed = routes_release.completed  # type: ignore[has-type]
-            return util.as_url(completed, project_name=release.project.name)
+            finished = routes_release.finished  # type: ignore[has-type]
+            return util.as_url(finished, project_name=release.project.name)

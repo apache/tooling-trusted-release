@@ -33,9 +33,9 @@
         <div class="card-body">
           <h3 class="card-title mb-3">{{ project_display_name }}</h3>
           <p class="card-text">
-            <a href="{{ as_url(routes.release.completed, project_name=project.name) }}"
+            <a href="{{ as_url(routes.release.finished, project_name=project.name) }}"
                class="btn btn-outline-primary">
-              <i class="bi bi-folder2-open me-1"></i> Completed releases (<code>{{ count }}</code>)
+              <i class="bi bi-folder2-open me-1"></i> Finished releases (<code>{{ count }}</code>)
             </a>
           </p>
         </div>

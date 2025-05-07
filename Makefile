@@ -34,7 +34,8 @@ check-extra:
 
 docs:
 	for fn in docs/*.md; \
-	do cmark "$$fn" > "$${fn%.md}.html"; \
+	do \
+	  cmark "$$fn" > "$${fn%.md}.html"; \
 	done
 
 generate-version:
@@ -69,12 +70,12 @@ run-staging:
 
 serve:
 	SSH_HOST=127.0.0.1 $(SCRIPTS)/run hypercorn --bind $(BIND) \
-		--keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
+	  --keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
 
 serve-local:
 	APP_HOST=127.0.0.1:8080 LOCAL_DEBUG=1 \
-		SSH_HOST=127.0.0.1 $(SCRIPTS)/run hypercorn --bind $(BIND) \
-		--keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
+	  SSH_HOST=127.0.0.1 $(SCRIPTS)/run hypercorn --bind $(BIND) \
+	  --keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
 
 stop:
 	scripts/stop
