@@ -152,48 +152,6 @@ async def projects() -> str:
         return await quart.render_template("projects.html", projects=projects)
 
 
-@routes.committer("/project/select")
-async def select(session: routes.CommitterSession) -> str:
-    """Select a project to work on."""
-    user_projects = []
-    if session.uid:
-        # TODO: Move this filtering logic somewhere else
-        async with db.session() as data:
-            all_projects = await data.project(_committee=True).all()
-            user_projects = [
-                p
-                for p in all_projects
-                if p.committee
-                and (
-                    (session.uid in p.committee.committee_members)
-                    or (session.uid in p.committee.committers)
-                    or (session.uid in p.committee.release_managers)
-                )
-            ]
-            user_projects.sort(key=lambda p: p.display_name)
-
-    return await quart.render_template("project-select.html", user_projects=user_projects)
-
-
-@routes.public("/projects/<name>")
-async def view(name: str) -> str:
-    async with db.session() as data:
-        project = await data.project(name=name, _committee_public_signing_keys=True, _release_policy=True).demand(
-            http.client.HTTPException(404)
-        )
-        return await quart.render_template(
-            "project-view.html",
-            project=project,
-            algorithms=routes.algorithms,
-            candidate_drafts=await project.candidate_drafts,
-            candidates=await project.candidates,
-            previews=await project.previews,
-            full_releases=await project.full_releases,
-            number_of_release_files=util.number_of_release_files,
-            now=datetime.datetime.now(datetime.UTC),
-        )
-
-
 @routes.committer("/projects/<project_name>/release-policy/add", methods=["GET", "POST"])
 async def release_policy_add(session: routes.CommitterSession, project_name: str) -> response.Response | str:
     await session.check_access(project_name)
@@ -262,6 +220,48 @@ async def release_policy_edit(session: routes.CommitterSession, project_name: st
         project=project,
         form=form,
     )
+
+
+@routes.committer("/project/select")
+async def select(session: routes.CommitterSession) -> str:
+    """Select a project to work on."""
+    user_projects = []
+    if session.uid:
+        # TODO: Move this filtering logic somewhere else
+        async with db.session() as data:
+            all_projects = await data.project(_committee=True).all()
+            user_projects = [
+                p
+                for p in all_projects
+                if p.committee
+                and (
+                    (session.uid in p.committee.committee_members)
+                    or (session.uid in p.committee.committers)
+                    or (session.uid in p.committee.release_managers)
+                )
+            ]
+            user_projects.sort(key=lambda p: p.display_name)
+
+    return await quart.render_template("project-select.html", user_projects=user_projects)
+
+
+@routes.public("/projects/<name>")
+async def view(name: str) -> str:
+    async with db.session() as data:
+        project = await data.project(name=name, _committee_public_signing_keys=True, _release_policy=True).demand(
+            http.client.HTTPException(404)
+        )
+        return await quart.render_template(
+            "project-view.html",
+            project=project,
+            algorithms=routes.algorithms,
+            candidate_drafts=await project.candidate_drafts,
+            candidates=await project.candidates,
+            previews=await project.previews,
+            full_releases=await project.full_releases,
+            number_of_release_files=util.number_of_release_files,
+            now=datetime.datetime.now(datetime.UTC),
+        )
 
 
 async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
