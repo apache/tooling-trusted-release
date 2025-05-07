@@ -92,7 +92,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     announce_form.subject.data = f"[ANNOUNCE] {project_display_name} {version_name} released"
     # The body can be changed, either from VoteTemplate or from the form
     announce_form.body.data = await construct.announce_release_default(project_name)
-    return await quart.render_template("preview-announce-release.html", release=release, announce_form=announce_form)
+    return await quart.render_template("announce-selected.html", release=release, announce_form=announce_form)
 
 
 @routes.committer("/announce/<project_name>/<version_name>", methods=["POST"])
