@@ -29,16 +29,14 @@ import tarfile
 import tempfile
 import uuid
 import zipfile
-from collections.abc import AsyncGenerator, Callable, Generator, ItemsView, Mapping, Sequence
-from typing import Annotated, Any, Final, TypeVar
+from collections.abc import AsyncGenerator, Callable, Sequence
+from typing import Any, Final, TypeVar
 
 import aiofiles.os
 import asfquart
 import asfquart.base as base
 import asfquart.session as session
 import jinja2
-import pydantic
-import pydantic_core
 import quart
 import quart_wtf
 import quart_wtf.typing
@@ -52,41 +50,8 @@ import atr.user as user
 
 F = TypeVar("F", bound="QuartFormTyped")
 T = TypeVar("T")
-VT = TypeVar("VT")
 
 _LOGGER: Final = logging.getLogger(__name__)
-
-
-class DictRootModel(pydantic.RootModel[dict[str, VT]]):
-    def __iter__(self) -> Generator[tuple[str, VT]]:
-        yield from self.root.items()
-
-    def items(self) -> ItemsView[str, VT]:
-        return self.root.items()
-
-    def get(self, key: str) -> VT | None:
-        return self.root.get(key)
-
-    def __len__(self) -> int:
-        return len(self.root)
-
-
-# from https://github.com/pydantic/pydantic/discussions/8755#discussioncomment-8417979
-@dataclasses.dataclass
-class DictToList:
-    key: str
-
-    def __get_pydantic_core_schema__(
-        self,
-        source_type: Any,
-        handler: pydantic.GetCoreSchemaHandler,
-    ) -> pydantic_core.CoreSchema:
-        adapter = _get_dict_to_list_inner_type_adapter(source_type, self.key)
-
-        return pydantic_core.core_schema.no_info_before_validator_function(
-            _get_dict_to_list_validator(adapter, self.key),
-            handler(source_type),
-        )
 
 
 @dataclasses.dataclass
@@ -579,6 +544,9 @@ def validate_as_type(value: Any, t: type[T]) -> T:
 
 def validate_vote_duration(form: wtforms.Form, field: wtforms.IntegerField) -> None:
     """Checks if the value is 0 or between 72 and 144."""
+    if field.data is None:
+        # TODO: Check that this is what we intend
+        return
     if not ((field.data == 0) or (72 <= field.data <= 144)):
         raise wtforms.validators.ValidationError("Minimum voting period must be 0 hours, or between 72 and 144 hours")
 
@@ -612,51 +580,3 @@ def _generate_hexdump(data: bytes) -> str:
         line_num = f"{i:08x}"
         hex_lines.append(f"{line_num}  {hex_part_spaced}  |{ascii_part}|")
     return "\n".join(hex_lines)
-
-
-def _get_dict_to_list_inner_type_adapter(source_type: Any, key: str) -> pydantic.TypeAdapter[dict[Any, Any]]:
-    root_adapter = pydantic.TypeAdapter(source_type)
-    schema = root_adapter.core_schema
-
-    # support further nesting of model classes
-    if schema["type"] == "definitions":
-        schema = schema["schema"]
-
-    assert schema["type"] == "list"
-    assert (item_schema := schema["items_schema"])
-    assert item_schema["type"] == "model"
-    assert (cls := item_schema["cls"])  # noqa: RUF018
-
-    fields = cls.model_fields
-
-    assert (key_field := fields.get(key))  # noqa: RUF018
-    assert (other_fields := {k: v for k, v in fields.items() if k != key})  # noqa: RUF018
-
-    model_name = f"{cls.__name__}Inner"
-
-    # Create proper field definitions for create_model
-    inner_model = pydantic.create_model(model_name, **{k: (v.annotation, v) for k, v in other_fields.items()})  # type: ignore
-    return pydantic.TypeAdapter(dict[Annotated[str, key_field], inner_model])  # type: ignore
-
-
-def _get_dict_to_list_validator(inner_adapter: pydantic.TypeAdapter[dict[Any, Any]], key: str) -> Any:
-    def validator(val: Any) -> Any:
-        import pydantic.fields as fields
-
-        if isinstance(val, dict):
-            validated = inner_adapter.validate_python(val)
-
-            # need to get the alias of the field in the nested model
-            # as this will be fed into the actual model class
-            def get_alias(field_name: str, field_infos: Mapping[str, fields.FieldInfo]) -> Any:
-                field = field_infos[field_name]
-                return field.alias if field.alias else field_name
-
-            return [
-                {key: k, **{get_alias(f, v.model_fields): getattr(v, f) for f in v.model_fields}}
-                for k, v in validated.items()
-            ]
-
-        return val
-
-    return validator

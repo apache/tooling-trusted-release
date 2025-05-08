@@ -23,9 +23,9 @@ import tarfile
 from typing import Any, Final
 
 import aiofiles
-import pydantic
 
 import atr.config as config
+import atr.schema as schema
 import atr.tasks.checks as checks
 import atr.tasks.checks.targz as targz
 import atr.util as util
@@ -34,11 +34,11 @@ _CONFIG: Final = config.get()
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-class GenerateCycloneDX(pydantic.BaseModel):
+class GenerateCycloneDX(schema.Strict):
     """Arguments for the task to generate a CycloneDX SBOM."""
 
-    artifact_path: str = pydantic.Field(..., description="Absolute path to the artifact")
-    output_path: str = pydantic.Field(..., description="Absolute path where the generated SBOM JSON should be written")
+    artifact_path: str = schema.description("Absolute path to the artifact")
+    output_path: str = schema.description("Absolute path where the generated SBOM JSON should be written")
 
 
 class SBOMGenerationError(Exception):

@@ -21,11 +21,10 @@ import logging
 import time
 from typing import Any, Final
 
-import pydantic
-
 import atr.construct as construct
 import atr.db as db
 import atr.mail as mail
+import atr.schema as schema
 import atr.tasks.checks as checks
 import atr.util as util
 
@@ -34,16 +33,16 @@ _LOGGER: Final = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.DEBUG)
 
 
-class Initiate(pydantic.BaseModel):
+class Initiate(schema.Strict):
     """Arguments for the task to start a vote."""
 
-    release_name: str = pydantic.Field(..., description="The name of the release to vote on")
-    email_to: str = pydantic.Field(..., description="The mailing list address to send the vote email to")
-    vote_duration: int = pydantic.Field(..., description="Duration of the vote in hours")
-    initiator_id: str = pydantic.Field(..., description="ASF ID of the vote initiator")
-    initiator_fullname: str = pydantic.Field(..., description="Full name of the vote initiator")
-    subject: str = pydantic.Field(..., description="Subject line for the vote email")
-    body: str = pydantic.Field(..., description="Body content for the vote email")
+    release_name: str = schema.description("The name of the release to vote on")
+    email_to: str = schema.description("The mailing list address to send the vote email to")
+    vote_duration: int = schema.description("Duration of the vote in hours")
+    initiator_id: str = schema.description("ASF ID of the vote initiator")
+    initiator_fullname: str = schema.description("Full name of the vote initiator")
+    subject: str = schema.description("Subject line for the vote email")
+    body: str = schema.description("Body content for the vote email")
 
 
 class VoteInitiationError(Exception): ...

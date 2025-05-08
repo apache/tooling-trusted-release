@@ -19,9 +19,8 @@ import json
 import logging
 from typing import Final
 
-import pydantic
-
 import atr.mail as mail
+import atr.schema as schema
 import atr.tasks.checks as checks
 import atr.util as util
 
@@ -30,14 +29,14 @@ _LOGGER: Final = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.DEBUG)
 
 
-class Send(pydantic.BaseModel):
+class Send(schema.Strict):
     """Arguments for the task to send an email."""
 
-    email_sender: str = pydantic.Field(..., description="The email address of the sender")
-    email_recipient: str = pydantic.Field(..., description="The email address of the recipient")
-    subject: str = pydantic.Field(..., description="The subject of the email")
-    body: str = pydantic.Field(..., description="The body of the email")
-    in_reply_to: str | None = pydantic.Field(None, description="The message ID of the email to reply to")
+    email_sender: str = schema.description("The email address of the sender")
+    email_recipient: str = schema.description("The email address of the recipient")
+    subject: str = schema.description("The subject of the email")
+    body: str = schema.description("The body of the email")
+    in_reply_to: str | None = schema.description("The message ID of the email to reply to")
 
 
 class SendError(Exception): ...

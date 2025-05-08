@@ -84,7 +84,6 @@ exclude = [
   "**/__pycache__",
   ".venv*",
   "tests",
-  "atr/util.py"
 ]
 ignore = []
 defineConstant = { DEBUG = true }
@@ -116,7 +115,6 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "atr/analysis.py" = ["RUF001"]
-"atr/apache.py" = ["N815", "TC003"]
 "atr/db/__init__.py" = ["C901"]
 "atr/routes/modules.py" = ["F401"]
 "migrations/env.py" = ["E402"]

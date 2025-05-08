@@ -22,15 +22,15 @@ from typing import Any, Final
 
 import aiofiles.os
 import aioshutil
-import pydantic
 
 import atr.revision as revision
+import atr.schema as schema
 import atr.tasks.checks as checks
 
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-class SvnImport(pydantic.BaseModel):
+class SvnImport(schema.Strict):
     """Arguments for the task to import files from SVN."""
 
     svn_url: str

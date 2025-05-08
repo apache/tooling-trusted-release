@@ -20,12 +20,11 @@
 from __future__ import annotations
 
 import datetime
-from typing import Annotated, Final
+from typing import Annotated, Any, Final
 
 import httpx
-import pydantic
 
-import atr.util as util
+import atr.schema as schema
 
 _WHIMSY_COMMITTEE_INFO_URL: Final[str] = "https://whimsy.apache.org/public/committee-info.json"
 _WHIMSY_COMMITTEE_RETIRED_URL: Final[str] = "https://whimsy.apache.org/public/committee-retired.json"
@@ -35,20 +34,26 @@ _PROJECTS_PODLINGS_URL: Final[str] = "https://projects.apache.org/json/foundatio
 _PROJECTS_GROUPS_URL: Final[str] = "https://projects.apache.org/json/foundation/groups.json"
 
 
-class LDAPProjectsData(pydantic.BaseModel):
-    last_timestamp: str = pydantic.Field(alias="lastTimestamp")
+class RosterCountDetails(schema.Strict):
+    members: int
+    owners: int
+
+
+class LDAPProjectsData(schema.Strict):
+    last_timestamp: str = schema.alias("lastTimestamp")
     project_count: int
-    projects: Annotated[list[LDAPProject], util.DictToList(key="name")]
+    roster_counts: dict[str, RosterCountDetails]
+    projects: Annotated[list[LDAPProject], schema.DictToList(key="name")]
 
     @property
     def last_time(self) -> datetime.datetime:
         return datetime.datetime.strptime(self.last_timestamp, "%Y%m%d%H%M%S%z")
 
 
-class LDAPProject(pydantic.BaseModel):
+class LDAPProject(schema.Strict):
     name: str
-    create_timestamp: str = pydantic.Field(alias="createTimestamp")
-    modify_timestamp: str = pydantic.Field(alias="modifyTimestamp")
+    create_timestamp: str = schema.alias("createTimestamp")
+    modify_timestamp: str = schema.alias("modifyTimestamp")
     member_count: int
     owner_count: int
     members: list[str]
@@ -57,13 +62,13 @@ class LDAPProject(pydantic.BaseModel):
     podling: str | None = None
 
 
-class User(pydantic.BaseModel):
+class User(schema.Strict):
     id: str
     name: str
     date: str | None = None
 
 
-class Committee(pydantic.BaseModel):
+class Committee(schema.Strict):
     name: str
     display_name: str
     site: str | None
@@ -71,36 +76,39 @@ class Committee(pydantic.BaseModel):
     mail_list: str
     established: str | None
     report: list[str]
-    chair: Annotated[list[User], util.DictToList(key="id")]
+    chair: Annotated[list[User], schema.DictToList(key="id")]
     roster_count: int
-    roster: Annotated[list[User], util.DictToList(key="id")]
+    roster: Annotated[list[User], schema.DictToList(key="id")]
     pmc: bool
 
 
-class CommitteeData(pydantic.BaseModel):
+class CommitteeData(schema.Strict):
     last_updated: str
     committee_count: int
     pmc_count: int
-    committees: Annotated[list[Committee], util.DictToList(key="name")]
+    roster_counts: dict[str, int] = schema.factory(dict)
+    officers: dict[str, Any] = schema.factory(dict)
+    board: dict[str, Any] = schema.factory(dict)
+    committees: Annotated[list[Committee], schema.DictToList(key="name")]
 
 
-class RetiredCommittee(pydantic.BaseModel):
+class RetiredCommittee(schema.Strict):
     name: str
     display_name: str
     retired: str
     description: str | None
 
 
-class RetiredCommitteeData(pydantic.BaseModel):
+class RetiredCommitteeData(schema.Strict):
     last_updated: str
     retired_count: int
-    retired: Annotated[list[RetiredCommittee], util.DictToList(key="name")]
+    retired: Annotated[list[RetiredCommittee], schema.DictToList(key="name")]
 
 
-class PodlingStatus(pydantic.BaseModel):
+class PodlingStatus(schema.Strict):
     description: str
     homepage: str
-    name: str = pydantic.Field(alias="name")
+    name: str = schema.alias("name")
     pmc: str
     podling: bool
     started: str
@@ -109,35 +117,98 @@ class PodlingStatus(pydantic.BaseModel):
     resolution: str | None = None
 
 
-class PodlingsData(util.DictRootModel[PodlingStatus]):
+class PodlingsData(schema.DictRoot[PodlingStatus]):
     pass
 
 
-class GroupsData(util.DictRootModel[list[str]]):
+class GroupsData(schema.DictRoot[list[str]]):
     pass
 
 
-class Release(pydantic.BaseModel):
+class MaintainerInfo(schema.Strict):
+    mbox: str | None = None
+    name: str | None = None
+    homepage: str | None = None
+    mbox_sha1sum: str | None = None
+    nick: str | None = None
+    same_as: str | None = schema.alias_opt("sameAs")
+
+
+class PersonInfo(schema.Strict):
+    name: str | None = None
+    homepage: str | None = None
+    mbox: str | None = None
+
+
+class ChairInfo(schema.Strict):
+    person: PersonInfo | None = schema.alias_opt("Person")
+
+
+class HelperInfo(schema.Strict):
+    name: str | None = None
+    homepage: str | None = None
+
+
+class OnlineAccountInfo(schema.Strict):
+    account_service_homepage: str | None = schema.alias_opt("accountServiceHomepage")
+    account_name: str | None = schema.alias_opt("accountName")
+    account_profile_page: str | None = schema.alias_opt("accountProfilePage")
+
+
+class AccountInfo(schema.Strict):
+    online_account: OnlineAccountInfo | None = schema.alias_opt("OnlineAccount")
+
+
+class ImplementsInfo(schema.Strict):
+    body: str | None = None
+    id: str | None = None
+    resource: str | None = None
+    title: str | None = None
+    url: str | None = None
+
+
+class Release(schema.Strict):
     created: str | None = None
     name: str
     revision: str | None = None
+    file_release: str | None = schema.alias_opt("file-release")
+    description: str | None = None
+    branch: str | None = None
 
 
-class ProjectStatus(pydantic.BaseModel):
+class ProjectStatus(schema.Strict):
     category: str | None = None
     created: str | None = None
     description: str | None = None
-    programming_language: str | None = pydantic.Field(alias="programming-language", default=None)
+    programming_language: str | None = schema.alias_opt("programming-language")
     doap: str
     homepage: str
     name: str
     pmc: str
     shortdesc: str | None = None
-    repository: list[str | dict] = pydantic.Field(default_factory=list)
-    release: list[Release] = pydantic.Field(default_factory=list)
+    repository: list[str | dict] = schema.factory(list)
+    release: list[Release] = schema.factory(list)
+    bug_database: str | None = schema.alias_opt("bug-database")
+    download_page: str | None = schema.alias_opt("download-page")
+    license: str | None = None
+    mailing_list: str | None = schema.alias_opt("mailing-list")
+    maintainer: list[MaintainerInfo] = schema.factory(list)
+    implements: list[ImplementsInfo] = schema.factory(list)
+    same_as: str | None = schema.alias_opt("sameAs")
+    developer: list[MaintainerInfo] = schema.factory(list)
+    modified: str | None = None
+    chair: ChairInfo | None = None
+    charter: str | None = None
+    vendor: str | None = None
+    helper: list[HelperInfo] = schema.factory(list)
+    member: list[MaintainerInfo] = schema.factory(list)
+    shortname: str | None = None
+    wiki: str | None = None
+    account: AccountInfo | None = None
+    platform: str | None = None
 
 
-class ProjectsData(util.DictRootModel[ProjectStatus]):
+class ProjectsData(schema.DictRoot[ProjectStatus]):
     pass
 
 

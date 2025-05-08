@@ -28,7 +28,7 @@ import sqlmodel
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    import pydantic
+    import atr.schema as schema
 
 import atr.db as db
 import atr.db.models as models
@@ -210,7 +210,7 @@ def function_key(func: Callable[..., Any]) -> str:
     return func.__module__ + "." + func.__name__
 
 
-def with_model(cls: type[pydantic.BaseModel]) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+def with_model(cls: type[schema.Strict]) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator to specify the parameters for a check."""
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:

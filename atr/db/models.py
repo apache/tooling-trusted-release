@@ -24,12 +24,12 @@ import datetime
 import enum
 from typing import Any, Optional
 
-import pydantic
 import sqlalchemy
 import sqlalchemy.event as event
 import sqlmodel
 
 import atr.db as db
+import atr.schema as schema
 
 
 class UTCDateTime(sqlalchemy.types.TypeDecorator):
@@ -261,7 +261,7 @@ class DistributionChannel(sqlmodel.SQLModel, table=True):
     project: Project = sqlmodel.Relationship(back_populates="distribution_channels")
 
 
-class VoteEntry(pydantic.BaseModel):
+class VoteEntry(schema.Strict):
     result: bool
     summary: str
     binding_votes: int
