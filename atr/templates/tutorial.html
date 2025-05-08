@@ -96,10 +96,10 @@
 
   <h2 id="finish">Finish</h2>
   <p>
-    If the vote passes, the release enters the <em>Finish</em> phase. This phase may allow minor content adjustments before the announcement and final release.
+    If the vote passes, the release enters the <em>Finish</em> phase. This phase may allow minor content adjustments before the announcement and final release. ATR currently supports moving files between directories, preserving filenames. We plan to support more types of adjustments in future.
   </p>
   <p>
-    ATR currently supports moving files between directories, preserving filenames. We plan to support more types of changes in future.
+    During this phase you should distribute release artifacts to your package distribution networks such as Maven Central, PyPI, or Docker Hub. We also plan to add tools to assist with this.
   </p>
   <p>
     When the release is finished, use the <strong>Announce and distribute</strong> button.
@@ -122,6 +122,6 @@
     <img src="{{ url_for('static', filename='png/tutorial-releases-01.png') }}"
          alt="Illustration: Finished releases are shown for each individual project." />
   </p>
-  <p>Each entry provides a link to download the files in the release.</p>
+  <p>Each release entry provides a link to download the files in the release.</p>
   <p>This completes the ATR workflow, from private draft to finished public release.</p>
 {% endblock content %}
