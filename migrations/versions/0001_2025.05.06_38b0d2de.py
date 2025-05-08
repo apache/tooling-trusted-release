@@ -3,7 +3,6 @@
 Revision ID: 0001_2025.05.06_38b0d2de
 Revises:
 Create Date: 2025-05-06 14:44:00.401362+00:00
-
 """
 
 from collections.abc import Sequence
@@ -13,7 +12,7 @@ from alembic import op
 
 import atr.db.models
 
-# revision identifiers, used by Alembic.
+# Revision identifiers, used by Alembic
 revision: str = "0001_2025.05.06_38b0d2de"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None

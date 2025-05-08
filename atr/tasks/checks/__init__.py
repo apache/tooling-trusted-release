@@ -52,6 +52,7 @@ class Recorder:
     project_name: str
     version_name: str
     primary_rel_path: str | None
+    member_rel_path: str | None
     draft_revision: str
     afresh: bool
 
@@ -61,12 +62,14 @@ class Recorder:
         release_name: str,
         draft_revision: str,
         primary_rel_path: str | None = None,
+        member_rel_path: str | None = None,
         afresh: bool = True,
     ) -> None:
         self.checker = function_key(checker) if callable(checker) else checker
         self.release_name = release_name
         self.draft_revision = draft_revision
         self.primary_rel_path = primary_rel_path
+        self.member_rel_path = member_rel_path
         self.afresh = afresh
         self.constructed = False
 
@@ -81,17 +84,23 @@ class Recorder:
         release_name: str,
         draft_revision: str,
         primary_rel_path: str | None = None,
+        member_rel_path: str | None = None,
         afresh: bool = True,
     ) -> Recorder:
-        recorder = cls(checker, release_name, draft_revision, primary_rel_path, afresh)
+        recorder = cls(checker, release_name, draft_revision, primary_rel_path, member_rel_path, afresh)
         if afresh is True:
             # Clear outer path whether it's specified or not
-            await recorder.clear(primary_rel_path)
+            await recorder.clear(primary_rel_path=primary_rel_path, member_rel_path=member_rel_path)
         recorder.constructed = True
         return recorder
 
     async def _add(
-        self, status: models.CheckResultStatus, message: str, data: Any, primary_rel_path: str | None = None
+        self,
+        status: models.CheckResultStatus,
+        message: str,
+        data: Any,
+        primary_rel_path: str | None = None,
+        member_rel_path: str | None = None,
     ) -> models.CheckResult:
         if self.constructed is False:
             raise RuntimeError("Cannot add check result to a recorder that has not been constructed")
@@ -100,12 +109,13 @@ class Recorder:
                 raise ValueError("Cannot specify path twice")
             if self.afresh is True:
                 # Clear inner path only if it's specified
-                await self.clear(primary_rel_path)
+                await self.clear(primary_rel_path=primary_rel_path, member_rel_path=member_rel_path)
 
         result = models.CheckResult(
             release_name=self.release_name,
             checker=self.checker,
             primary_rel_path=primary_rel_path or self.primary_rel_path,
+            member_rel_path=member_rel_path,
             created=datetime.datetime.now(datetime.UTC),
             status=status,
             message=message,
@@ -140,27 +150,60 @@ class Recorder:
             abs_path_parts.append(rel_path_part)
         return pathlib.Path(*abs_path_parts)
 
-    async def clear(self, primary_rel_path: str | None = None) -> None:
+    async def clear(self, primary_rel_path: str | None = None, member_rel_path: str | None = None) -> None:
         async with db.session() as data:
             stmt = sqlmodel.delete(models.CheckResult).where(
                 db.validate_instrumented_attribute(models.CheckResult.release_name) == self.release_name,
                 db.validate_instrumented_attribute(models.CheckResult.checker) == self.checker,
                 db.validate_instrumented_attribute(models.CheckResult.primary_rel_path) == primary_rel_path,
+                db.validate_instrumented_attribute(models.CheckResult.member_rel_path) == member_rel_path,
             )
             await data.execute(stmt)
             await data.commit()
 
-    async def exception(self, message: str, data: Any, primary_rel_path: str | None = None) -> models.CheckResult:
-        return await self._add(models.CheckResultStatus.EXCEPTION, message, data, primary_rel_path=primary_rel_path)
+    async def exception(
+        self, message: str, data: Any, primary_rel_path: str | None = None, member_rel_path: str | None = None
+    ) -> models.CheckResult:
+        return await self._add(
+            models.CheckResultStatus.EXCEPTION,
+            message,
+            data,
+            primary_rel_path=primary_rel_path,
+            member_rel_path=member_rel_path,
+        )
 
-    async def failure(self, message: str, data: Any, primary_rel_path: str | None = None) -> models.CheckResult:
-        return await self._add(models.CheckResultStatus.FAILURE, message, data, primary_rel_path=primary_rel_path)
+    async def failure(
+        self, message: str, data: Any, primary_rel_path: str | None = None, member_rel_path: str | None = None
+    ) -> models.CheckResult:
+        return await self._add(
+            models.CheckResultStatus.FAILURE,
+            message,
+            data,
+            primary_rel_path=primary_rel_path,
+            member_rel_path=member_rel_path,
+        )
 
-    async def success(self, message: str, data: Any, primary_rel_path: str | None = None) -> models.CheckResult:
-        return await self._add(models.CheckResultStatus.SUCCESS, message, data, primary_rel_path=primary_rel_path)
+    async def success(
+        self, message: str, data: Any, primary_rel_path: str | None = None, member_rel_path: str | None = None
+    ) -> models.CheckResult:
+        return await self._add(
+            models.CheckResultStatus.SUCCESS,
+            message,
+            data,
+            primary_rel_path=primary_rel_path,
+            member_rel_path=member_rel_path,
+        )
 
-    async def warning(self, message: str, data: Any, primary_rel_path: str | None = None) -> models.CheckResult:
-        return await self._add(models.CheckResultStatus.WARNING, message, data, primary_rel_path=primary_rel_path)
+    async def warning(
+        self, message: str, data: Any, primary_rel_path: str | None = None, member_rel_path: str | None = None
+    ) -> models.CheckResult:
+        return await self._add(
+            models.CheckResultStatus.WARNING,
+            message,
+            data,
+            primary_rel_path=primary_rel_path,
+            member_rel_path=member_rel_path,
+        )
 
 
 def function_key(func: Callable[..., Any]) -> str:

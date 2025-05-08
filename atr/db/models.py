@@ -460,6 +460,7 @@ class CheckResult(sqlmodel.SQLModel, table=True):
     release: Release = sqlmodel.Relationship(back_populates="check_results")
     checker: str
     primary_rel_path: str | None = sqlmodel.Field(default=None, index=True)
+    member_rel_path: str | None = sqlmodel.Field(default=None, index=True)
     created: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
     status: CheckResultStatus
     message: str
