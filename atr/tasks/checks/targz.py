@@ -25,6 +25,12 @@ import atr.tasks.checks as checks
 _LOGGER: Final = logging.getLogger(__name__)
 
 
+class RootDirectoryError(Exception):
+    """Exception raised when a root directory is not found in an archive."""
+
+    ...
+
+
 async def integrity(args: checks.FunctionArguments) -> str | None:
     """Check the integrity of a .tar.gz file."""
     recorder = await args.recorder()
@@ -57,10 +63,10 @@ def root_directory(tgz_path: str) -> str:
                 if not root:
                     root = parts[0]
                 elif parts[0] != root:
-                    raise ValueError(f"Multiple root directories found: {root}, {parts[0]}")
+                    raise RootDirectoryError(f"Multiple root directories found: {root}, {parts[0]}")
 
     if not root:
-        raise ValueError("No root directory found in archive")
+        raise RootDirectoryError("No root directory found in archive")
 
     return root
 
@@ -91,6 +97,8 @@ async def structure(args: checks.FunctionArguments) -> str | None:
                 f"Root directory '{root}' does not match expected name '{expected_root}'",
                 {"root": root, "expected": expected_root},
             )
+    except RootDirectoryError as e:
+        await recorder.warning("Could not get the root directory of the archive", {"error": str(e)})
     except Exception as e:
         await recorder.failure("Unable to verify archive structure", {"error": str(e)})
     return None

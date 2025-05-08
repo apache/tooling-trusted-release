@@ -145,7 +145,7 @@ def _check_core_logic(
             # Find and validate the root directory
             try:
                 root_dir = targz.root_directory(artifact_path)
-            except ValueError as e:
+            except targz.RootDirectoryError as e:
                 error_msg = str(e)
                 _LOGGER.error(f"Archive root directory issue: {error_msg}")
                 return {

@@ -289,7 +289,7 @@ def _files_check_core_logic(artifact_path: str) -> dict[str, Any]:
     # First find and validate the root directory
     try:
         root_dir = targz.root_directory(artifact_path)
-    except ValueError as e:
+    except targz.RootDirectoryError as e:
         return {
             "files_checked": ["LICENSE", "NOTICE"],
             "files_found": [],
@@ -407,7 +407,7 @@ def _headers_check_core_logic(artifact_path: str) -> dict[str, Any]:
     # First find and validate the root directory
     try:
         root_dir = targz.root_directory(artifact_path)
-    except ValueError as e:
+    except targz.RootDirectoryError as e:
         return {
             "files_checked": 0,
             "files_with_valid_headers": 0,
@@ -463,11 +463,11 @@ def _headers_check_core_logic_process_file(
 ) -> tuple[bool, dict[str, Any]]:
     """Process a single file in an archive for license header verification."""
     if not member.isfile():
-        return False, {}
+        return False, {"skipped": True, "reason": "Not a file"}
 
     # Check if we should verify this file, based on extension
     if not _headers_check_core_logic_should_check(member.name):
-        return False, {}
+        return False, {"skipped": True, "reason": "Not a source file"}
 
     # Get relative path for display purposes only
     display_path = member.name

@@ -169,7 +169,7 @@ async def _generate_cyclonedx_core(artifact_path: str, output_path: str) -> dict
         # Find and validate the root directory
         try:
             root_dir = await asyncio.to_thread(targz.root_directory, artifact_path)
-        except ValueError as e:
+        except targz.RootDirectoryError as e:
             raise SBOMGenerationError(f"Archive root directory issue: {e}", {"artifact_path": artifact_path}) from e
         except Exception as e:
             raise SBOMGenerationError(
