@@ -66,24 +66,31 @@
 
   <h2 id="vote">Vote</h2>
   <p>
-    The <em>Vote</em> page is available to all project participants, and displays the report results from the end of the <em>Compose</em> phase to help participants decide how to cast their votes.
+    The <em>Vote</em> page is available to all project participants, and displays the report results from the end of the <em>Compose</em> phase to help participants decide how to cast their votes [<code>1</code>]. Use the <strong>Download files</strong> button to download the release candidate files to review them before voting [<code>2</code>].
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-vote-01.png') }}"
          alt="Illustration: Anybody can review the reports." />
   </p>
   <p>
-    A link allows review of the voting thread in the mailing list archives [<code>1</code>]. ATR does not yet tally votes; you must do this manually. A form on the page allows you to cast your vote on the mailing list [<code>2</code>].
+    Several methods are available to download files: using the browser, <code>curl</code>, <code>rsync</code>, or <code>wget</code>. You must upload an SSH key before you can use <code>rsync</code>.
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-vote-02.png') }}"
+         alt="Illustration: Download the release candidate files." />
+  </p>
+  <p>
+    A link allows review of the voting thread in the mailing list archives [<code>1</code>]. ATR does not yet tally votes; you must do this manually. A form on the page allows you to cast your vote on the mailing list [<code>2</code>].
+  </p>
+  <p>
+    <img src="{{ url_for('static', filename='png/tutorial-vote-03.png') }}"
          alt="Illustration: Review the voting thread, and case your own vote." />
   </p>
   <p>
     When the voting period concludes and the mandate is clear, record the outcome using the vote resolution form. This action also sends the outcome of the vote to the mailing list. A successful vote promotes the release candidate to the next phase; a failed vote returns it to the <em>Compose</em> phase.
   </p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-vote-03.png') }}"
+    <img src="{{ url_for('static', filename='png/tutorial-vote-04.png') }}"
          alt="Illustration: Use the vote resolution form to progress to the next phase." />
   </p>
 
@@ -115,10 +122,6 @@
     <img src="{{ url_for('static', filename='png/tutorial-releases-01.png') }}"
          alt="Illustration: Finished releases are shown for each individual project." />
   </p>
-  <p>Each entry provides a link to download the artifacts.</p>
-  <p>
-    <img src="{{ url_for('static', filename='png/tutorial-releases-02.png') }}"
-         alt="Illustration: It is possible to browse the files within a finished release." />
-  </p>
+  <p>Each entry provides a link to download the files in the release.</p>
   <p>This completes the ATR workflow, from private draft to finished public release.</p>
 {% endblock content %}
