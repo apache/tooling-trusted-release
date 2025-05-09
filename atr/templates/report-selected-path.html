@@ -62,14 +62,15 @@
 
   <div class="d-flex flex-wrap gap-3 mb-4">
     {% if primary_results and (status_counts.success > 0 or status_counts.failure > 0 or status_counts.warning > 0 or status_counts.exception > 0) %}
+      {% set all_primary_are_success = status_counts.failure == 0 and status_counts.warning == 0 and status_counts.exception == 0 %}
       {% for status, count in status_counts.items() %}
         {% if count > 0 %}
           {% set bs_status = 'danger' if status == 'exception' or status == 'failure' else status %}
           <button id="btn-toggle-primary-{{ status }}"
                   type="button"
-                  class="btn {% if status == 'success' %}btn-outline-success{% else %}btn-{{ bs_status }}{% endif %}"
+                  class="btn {% if status == 'success' and not all_primary_are_success %}btn-outline-success{% elif status == 'success' and all_primary_are_success %}btn-success{% else %}btn-{{ bs_status }}{% endif %}"
                   onclick="toggleStatusVisibility('primary', '{{ status }}')">
-            {% if status == 'success' %}
+            {% if status == 'success' and not all_primary_are_success %}
               Show
             {% else %}
               Hide
@@ -101,7 +102,7 @@
         </thead>
         <tbody>
           {% for primary_result in primary_results %}
-            <tr class="atr-result-primary atr-result-status-{{ primary_result.status.value }} {% if primary_result.status.value == 'success' %}atr-hide{% endif %}">
+            <tr class="atr-result-primary atr-result-status-{{ primary_result.status.value }} {% if primary_result.status.value == 'success' and not all_primary_are_success %}atr-hide{% endif %}">
               <th scope="row" class="align-middle fw-bold">{{ function_name_from_key(primary_result.checker) }}</th>
               <td class="align-middle">
                 {% if primary_result.data is mapping and primary_result.data.keys()|length > 0 %}
@@ -228,15 +229,16 @@
         {% endfor %}
       {% endfor %}
       {% if member_status_counts.success > 0 or member_status_counts.failure > 0 or member_status_counts.warning > 0 or member_status_counts.exception > 0 %}
+        {% set all_member_are_success = member_status_counts.failure == 0 and member_status_counts.warning == 0 and member_status_counts.exception == 0 %}
         <div class="d-flex flex-wrap gap-2 mb-3">
           {% for status, count in member_status_counts.items() %}
             {% if count > 0 %}
               {% set bs_status = 'danger' if status == 'exception' or status == 'failure' else status %}
               <button id="btn-toggle-member-{{ status }}"
                       type="button"
-                      class="btn {% if status == 'success' %}btn-outline-success{% else %}btn-{{ bs_status }}{% endif %}"
+                      class="btn {% if status == 'success' and not all_member_are_success %}btn-outline-success{% elif status == 'success' and all_member_are_success %}btn-success{% else %}btn-{{ bs_status }}{% endif %}"
                       onclick="toggleStatusVisibility('member', '{{ status }}')">
-                {% if status == 'success' %}
+                {% if status == 'success' and not all_member_are_success %}
                   Show
                 {% else %}
                   Hide
@@ -260,7 +262,7 @@
         <tbody>
           {% for member_rel_path, member_results_list in member_results.items() %}
             {% for member_result in member_results_list %}
-              <tr class="atr-result-member atr-result-status-{{ member_result.status.value }} {% if member_result.status.value == 'success' %}atr-hide{% endif %}">
+              <tr class="atr-result-member atr-result-status-{{ member_result.status.value }} {% if member_result.status.value == 'success' and not all_member_are_success %}atr-hide{% endif %}">
                 <td class="align-middle">{{ member_rel_path }}</td>
                 <th scope="row" class="align-middle fw-bold">{{ function_name_from_key(member_result.checker) }}</th>
                 <td class="align-middle">
