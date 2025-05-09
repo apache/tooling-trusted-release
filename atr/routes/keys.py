@@ -463,10 +463,13 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
             declared_uid_str = key.declared_uid or ""
             email_match = re.search(r"<([^>]+)>", declared_uid_str)
             email = email_match.group(1) if email_match else declared_uid_str
-            comment_line = f"# {fingerprint_short} {email} ({apache_uid})"
+            if email == f"{apache_uid}@apache.org":
+                comment_line = f"# {fingerprint_short} {email}"
+            else:
+                comment_line = f"# {fingerprint_short} {email} ({apache_uid})"
             keys_content_list.append(f"{comment_line}\n\n{key.ascii_armored_key}")
 
-        key_blocks_str = "\n\n".join(keys_content_list) + "\n"
+        key_blocks_str = "\n\n\n".join(keys_content_list) + "\n"
 
         project_names_updated: list[str] = []
         write_errors: list[str] = []
@@ -768,7 +771,7 @@ async def _write_keys_file(
 # For details on Apache release signing and verification, see:
 # https://infra.apache.org/release-signing.html
 """
-        + "\n"
+        + "\n\n"
     )
 
     full_keys_file_content = header_content + key_blocks_str
