@@ -389,13 +389,13 @@ async def admin_toggle_view() -> response.Response:
     return quart.redirect(referrer or quart.url_for("admin.admin_data"))
 
 
-@admin.BLUEPRINT.route("/ongoing-tasks/<project_name>/<version_name>/<draft_revision>")
-async def ongoing_tasks(project_name: str, version_name: str, draft_revision: str) -> quart.wrappers.response.Response:
+@admin.BLUEPRINT.route("/ongoing-tasks/<project_name>/<version_name>/<revision>")
+async def ongoing_tasks(project_name: str, version_name: str, revision: str) -> quart.wrappers.response.Response:
     try:
-        ongoing = await db.tasks_ongoing(project_name, version_name, draft_revision)
+        ongoing = await db.tasks_ongoing(project_name, version_name, revision)
         return quart.Response(str(ongoing), mimetype="text/plain")
     except Exception:
-        _LOGGER.exception(f"Error fetching ongoing task count for {project_name} {version_name} rev {draft_revision}:")
+        _LOGGER.exception(f"Error fetching ongoing task count for {project_name} {version_name} rev {revision}:")
         return quart.Response("", mimetype="text/plain")
 
 

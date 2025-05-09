@@ -12,7 +12,8 @@
   {% set phase = release.phase.value %}
   <p class="d-flex justify-content-between align-items-center">
     {% if phase == "release_candidate_draft" %}
-      <a href="{{ as_url(routes.root.index) }}" class="atr-back-link">← Back to Select a release</a>
+      <a href="{{ as_url(routes.compose.selected, project_name=release.project.name, version_name=release.version) }}"
+         class="atr-back-link">← Back to Compose {{ release.project.short_display_name }} {{ release.version }}</a>
     {% else %}
       <a href="{{ as_url(routes.vote.selected, project_name=release.project.name, version_name=release.version) }}"
          class="atr-back-link">← Back to Vote on {{ release.project.short_display_name }} {{ release.version }}</a>
@@ -40,50 +41,55 @@
   <div class="fs-3 bg-light p-3 border rounded mb-4">
     <code>{{ package.filename }}</code>
   </div>
-
+  {% if primary_results %}
+    {% set earliest_checked = primary_results|min(attribute="created") %}
+    {% set latest_checked = primary_results|max(attribute="created") %}
+    <p>
+      <strong>Checked:</strong> {{ earliest_checked.created.strftime("%Y-%m-%d %H:%M:%S UTC") }} to {{ latest_checked.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}
+    </p>
+  {% endif %}
   <p>
     <strong>Note:</strong> Refresh this page to see the latest status of the verification tasks.
   </p>
 
   <h2>Report results</h2>
 
-  {% if check_results %}
-    {# Define status_counts here so it's available globally in this block #}
+  <!-- {% if primary_results %}
     {% set status_counts = {
-          "success": check_results|selectattr("status.value", "equalto", "success")|list|length,
-          "failure": check_results|selectattr("status.value", "equalto", "failure")|list|length,
-          "warning": check_results|selectattr("status.value", "equalto", "warning")|list|length,
-          "exception": check_results|selectattr("status.value", "equalto", "exception")|list|length
+          "success": primary_results|selectattr("status.value", "equalto", "success")|list|length,
+          "failure": primary_results|selectattr("status.value", "equalto", "failure")|list|length,
+          "warning": primary_results|selectattr("status.value", "equalto", "warning")|list|length,
+          "exception": primary_results|selectattr("status.value", "equalto", "exception")|list|length
         } %}
-
     <div class="d-flex align-items-center p-3 mb-3 bg-light border rounded">
       <span class="fw-bold me-3">Status summary:</span>
       <div class="d-flex flex-wrap gap-3">
         {% for status, count in status_counts.items() %}
           {% if count > 0 %}
             <div class="d-flex align-items-center gap-2 px-3 py-2 rounded fw-medium {% if status == "success" %}bg-success-subtle border border-success-subtle {% elif status == "failure" %}bg-danger-subtle border border-danger-subtle {% elif status == "warning" %}bg-warning-subtle border border-warning-subtle {% elif status == "exception" %}bg-danger-subtle border border-danger-subtle {% endif %}">
-              <span class="fs-5">{{ count }}</span>
-              <span>
-                {%- if status == "success" -%}
-                  Passed
-                {%- elif status == "failure" -%}
-                  Issues
-                {%- elif status == "warning" -%}
-                  Warning
-                {%- elif status == "exception" -%}
-                  Error
-                {%- else -%}
-                  {{ status|title }}
-                {%- endif -%}
-              </span>
+              <span>{{ status|title }}</span>
+              <span>(<code>{{ count }}</code>)</span>
             </div>
           {% endif %}
         {% endfor %}
       </div>
     </div>
-  {% endif %}
+  {% endif %} -->
 
-  <div class="d-flex gap-3 mb-3">
+  <div class="d-flex flex-wrap gap-3 mb-3">
+    {% if primary_results and (status_counts.success > 0 or status_counts.failure > 0 or status_counts.warning > 0 or status_counts.exception > 0) %}
+      {% for status, count in status_counts.items() %}
+        {% if count > 0 %}
+          {% set bs_status = 'danger' if status == 'exception' or status == 'failure' else status %}
+          <button id="btn-toggle-primary-{{ status }}"
+                  type="button"
+                  class="btn btn-{{ bs_status }}"
+                  onclick="toggleStatusVisibility('primary', '{{ status }}')">
+            Hide {{ status|title }} (<code>{{ count }}</code>)
+          </button>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
     <button type="button" onclick="toggleAllDetails()" class="btn btn-secondary">Toggle all details</button>
     {% if is_viewing_as_admin_fn(current_user.uid) and (release.phase.value == "release_candidate_draft") %}
       <form method="post"
@@ -95,67 +101,45 @@
   </div>
 
   <div class="mb-3">
-    {% if check_results %}
-      {% for check_result in check_results %}
-        <div class="border border-2 rounded p-3 mb-3">
+    {% if primary_results %}
+      {% for primary_result in primary_results %}
+        <div class="border border-2 rounded p-3 mb-3 atr-result-primary atr-result-status-{{ primary_result.status.value }}">
           <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="fw-bold">{{ function_name_from_key(check_result.checker) }}</span>
-            <span class="badge rounded-pill {% if check_result.status.value == "success" %}bg-success {% elif check_result.status.value == "failure" %}bg-danger {% elif check_result.status.value == "warning" %}bg-warning {% elif check_result.status.value == "exception" %}bg-danger {% else %}bg-secondary{% endif %}">
-              {%- if check_result.status.value == "success" -%}
-                Passed
-              {%- elif check_result.status.value == "failure" -%}
-                {% if status_counts['failure'] == 1 %}
-                  Issue
-                {% else %}
-                  Issues
-                {% endif %}
-              {%- elif check_result.status.value == "warning" -%}
-                {% if status_counts['warning'] == 1 %}
-                  Warning
-                {% else %}
-                  Warnings
-                {% endif %}
-              {%- elif check_result.status.value == "exception" -%}
-                {% if status_counts['exception'] == 1 %}
-                  Exception
-                {% else %}
-                  Exceptions
-                {% endif %}
-              {%- else -%}
-                {{ check_result.status.value|title }}
-              {%- endif -%}
+            <span class="fw-bold">{{ function_name_from_key(primary_result.checker) }}</span>
+            <span class="badge rounded-pill {% if primary_result.status.value == "success" %}bg-success {% elif primary_result.status.value == "failure" %}bg-danger {% elif primary_result.status.value == "warning" %}bg-warning {% elif primary_result.status.value == "exception" %}bg-danger {% else %}bg-secondary{% endif %}">
+              {{ primary_result.status.value|title }}
             </span>
           </div>
           <div class="small">
-            <div>
-              Checked: {{ check_result.created.strftime("%Y-%m-%d %H:%M:%S UTC") if check_result.created else "Not checked" }}
-            </div>
+            <!-- <div>
+              Checked: {{ primary_result.created.strftime("%Y-%m-%d %H:%M:%S UTC") if primary_result.created else "Not checked" }}
+            </div> -->
 
-            {% if check_result.message %}<div class="mt-2">{{ check_result.message }}</div>{% endif %}
+            {% if primary_result.message %}<div class="mt-2">{{ primary_result.message }}</div>{% endif %}
 
-            {% if (check_result.data is mapping) and (check_result.data.keys()|length > 0) %}
+            {% if (primary_result.data is mapping) and (primary_result.data.keys()|length > 0) %}
               <details class="mt-2 p-2 bg-light rounded">
-                {% if check_result.status.value in ["failure", "exception"] %}
+                {% if primary_result.status.value in ["failure", "exception"] %}
                   <summary class="atr-cursor-pointer user-select-none p-2">View details</summary>
-                {% elif check_result.status.value == "warning" %}
+                {% elif primary_result.status.value == "warning" %}
                   <summary class="atr-cursor-pointer user-select-none p-2">View details</summary>
                 {% else %}
                   <summary class="atr-cursor-pointer user-select-none p-2">View details</summary>
                 {% endif %}
 
-                {% if check_result.checker.endswith("rat.check_licenses") %}
+                {% if primary_result.checker.endswith("rat.check_licenses") %}
                   <div class="d-flex gap-3 mb-2">
                     <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle px-2 py-1">
-                      <strong>{{ check_result.data.get('approved_licenses', 0) }}</strong> files with approved licenses
+                      <strong>{{ primary_result.data.get('approved_licenses', 0) }}</strong> files with approved licenses
                     </span>
-                    {% if check_result.data.get("unapproved_licenses", 0) > 0 %}
+                    {% if primary_result.data.get("unapproved_licenses", 0) > 0 %}
                       <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle px-2 py-1">
-                        <strong>{{ check_result.data.get('unapproved_licenses', 0) }}</strong> files with unapproved licenses
+                        <strong>{{ primary_result.data.get('unapproved_licenses', 0) }}</strong> files with unapproved licenses
                       </span>
                     {% endif %}
-                    {% if check_result.data.get("unknown_licenses", 0) > 0 %}
+                    {% if primary_result.data.get("unknown_licenses", 0) > 0 %}
                       <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
-                        <strong>{{ check_result.data.get('unknown_licenses', 0) }}</strong> files with unknown licenses
+                        <strong>{{ primary_result.data.get('unknown_licenses', 0) }}</strong> files with unknown licenses
                       </span>
                     {% endif %}
                   </div>
@@ -163,7 +147,7 @@
 
                 <table class="table table-bordered mt-2">
                   <tbody>
-                    {% for key, value in check_result.data.items() %}
+                    {% for key, value in primary_result.data.items() %}
                       {% if key != "debug_info" %}
                         <tr>
                           <th class="bg-light fw-bold align-top">{{ key|replace('_', ' ') |title }}</th>
@@ -210,8 +194,8 @@
                       {% endif %}
                     {% endfor %}
 
-                    {% if check_result.data.get("debug_info") is mapping %}
-                      {% for debug_key, debug_value in check_result.data.debug_info.items() %}
+                    {% if primary_result.data.get("debug_info") is mapping %}
+                      {% for debug_key, debug_value in primary_result.data.debug_info.items() %}
                         <tr>
                           <th class="bg-light fw-bold align-top">
                             <span class="text-muted">(Debug)</span> {{ debug_key|replace('_', ' ') |title }}
@@ -241,6 +225,50 @@
       <p>No verification tasks found for this file.</p>
     {% endif %}
 
+    {% if member_results %}
+      {% set member_status_counts = {"success": 0, "failure": 0, "warning": 0, "exception": 0} %}
+      {% for path, m_results in member_results.items() %}
+        {% for m_result in m_results %}
+          {% if m_result.status.value in member_status_counts %}
+            {% set _ = member_status_counts.update({m_result.status.value: member_status_counts[m_result.status.value] + 1}) %}
+          {% endif %}
+        {% endfor %}
+      {% endfor %}
+      {% if member_status_counts.success > 0 or member_status_counts.failure > 0 or member_status_counts.warning > 0 or member_status_counts.exception > 0 %}
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          {% for status, count in member_status_counts.items() %}
+            {% if count > 0 %}
+              {% set bs_status = 'danger' if status == 'exception' or status == 'failure' else status %}
+              <button id="btn-toggle-member-{{ status }}"
+                      type="button"
+                      class="btn btn-{{ bs_status }}"
+                      onclick="toggleStatusVisibility('member', '{{ status }}')">
+                Hide {{ status|title }} (<code>{{ count }}</code>)
+              </button>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
+      <h2>Member results</h2>
+      <p>This file is an archive. We have extracted the contents of the archive and checked each file individually.</p>
+      {% for member_rel_path, member_results_list in member_results.items() %}
+        <h3>{{ member_rel_path }}</h3>
+        {% for member_result in member_results_list %}
+          <div class="border border-2 rounded p-3 mb-3 atr-result-member atr-result-status-{{ member_result.status.value }}">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="fw-bold">{{ function_name_from_key(member_result.checker) }}</span>
+              <span class="badge rounded-pill {% if member_result.status.value == "success" %}bg-success {% elif member_result.status.value == "failure" %}bg-danger {% elif member_result.status.value == "warning" %}bg-warning {% elif member_result.status.value == "exception" %}bg-danger {% else %}bg-secondary{% endif %}">
+                {{ member_result.status.value|title }}
+              </span>
+            </div>
+            <div class="small">
+              {% if member_result.message %}<div class="mt-2">{{ member_result.message }}</div>{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      {% endfor %}
+    {% endif %}
+
     <h2>Metadata</h2>
     <div class="p-3 mb-4 bg-light border rounded">
       <p>
@@ -266,6 +294,30 @@
           // If any are closed, open all
           // Otherwise, close all
           details.forEach(detail => detail.open = anyClosed);
+      }
+
+      function toggleStatusVisibility(type, status) {
+          const btn = document.getElementById(`btn-toggle-${type}-${status}`);
+          const targets = document.querySelectorAll(`.atr-result-${type}.atr-result-status-${status}`);
+          if (!targets.length) return;
+          let elementsCurrentlyHidden = targets[0].style.display === "none";
+          targets.forEach(el => el.style.display = elementsCurrentlyHidden ? "" : "none");
+          const bsSt = (status === "failure" || status === "exception") ? "danger" : status;
+          const cntMatch = btn.textContent.match(/\((\d+)\)/);
+          if (!cntMatch) {
+              console.error("Button text regex mismatch for:", btn.textContent);
+              return;
+          }
+          const cnt = cntMatch[0];
+          const newButtonAction = elementsCurrentlyHidden ? "Hide" : "Show";
+          btn.textContent = `${newButtonAction} ${status.charAt(0).toUpperCase()+status.slice(1)} ${cnt}`;
+          if (newButtonAction === "Hide") {
+              btn.classList.remove(`btn-outline-${bsSt}`);
+              btn.classList.add(`btn-${bsSt}`);
+          } else {
+              btn.classList.remove(`btn-${bsSt}`);
+              btn.classList.add(`btn-outline-${bsSt}`);
+          }
       }
   </script>
 {% endblock javascripts %}

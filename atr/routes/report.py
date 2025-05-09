@@ -41,6 +41,8 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
 
     # TODO: When we do more than one thing in a dir, we should use the revision directory directly
     abs_path = util.release_directory(release) / rel_path
+    if release.revision is None:
+        raise base.ASFQuartException("Release has no revision", errorcode=500)
 
     # Check that the file exists
     if not await aiofiles.os.path.exists(abs_path):
@@ -51,20 +53,29 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
 
     # Get all check results for this file
     async with db.session() as data:
-        query = data.check_result(release_name=release.name, primary_rel_path=str(rel_path)).order_by(
+        query = data.check_result(
+            release_name=release.name, revision=release.revision, primary_rel_path=str(rel_path)
+        ).order_by(
             db.validate_instrumented_attribute(models.CheckResult.checker).asc(),
             db.validate_instrumented_attribute(models.CheckResult.created).desc(),
         )
         all_results = await query.all()
 
-    # Filter to get only the most recent result for each checker
-    latest_check_results: dict[str, models.CheckResult] = {}
+    # Filter to separate the primary and member results
+    primary_results_list = []
+    member_results_list: dict[str, list[models.CheckResult]] = {}
     for result in all_results:
-        if result.checker not in latest_check_results:
-            latest_check_results[result.checker] = result
+        if result.member_rel_path is None:
+            primary_results_list.append(result)
+        else:
+            member_results_list.setdefault(result.member_rel_path, []).append(result)
 
-    # Convert to a list for the template
-    check_results_list = list(latest_check_results.values())
+    # Order primary results by checker name
+    primary_results_list.sort(key=lambda r: r.checker)
+
+    # Order member results by relative path and then by checker name
+    for member_rel_path in sorted(member_results_list.keys()):
+        member_results_list[member_rel_path].sort(key=lambda r: r.checker)
 
     file_data = {
         "filename": pathlib.Path(rel_path).name,
@@ -79,6 +90,7 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
         rel_path=rel_path,
         package=file_data,
         release=release,
-        check_results=check_results_list,
+        primary_results=primary_results_list,
+        member_results=member_results_list,
         format_file_size=util.format_file_size,
     )

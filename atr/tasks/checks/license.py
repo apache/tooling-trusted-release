@@ -21,10 +21,12 @@ import logging
 import os
 import re
 import tarfile
+from collections.abc import Iterator
 from typing import Any, Final
 
 import atr.tasks.checks as checks
-import atr.tasks.checks.targz as targz
+from atr import schema
+from atr.db import models
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -169,6 +171,45 @@ INCLUDED_PATTERNS: Final[list[str]] = [
     r"\.(pl|pm|t)$",  # Perl
 ]
 
+# Types
+
+
+class ArtifactResult(schema.Strict):
+    status: models.CheckResultStatus
+    message: str
+    data: Any = schema.Field(default=None)
+
+
+class ArtifactData(schema.Strict):
+    files_checked: int = schema.default(0)
+    files_with_valid_headers: int = schema.default(0)
+    files_with_invalid_headers: int = schema.default(0)
+    files_skipped: int = schema.default(0)
+
+
+# class LicenseCheckResult(schema.Strict):
+#     files_checked: list[str]
+#     files_with_valid_headers: int
+#     errors: list[str]
+#     error_message: str | None
+#     warning_message: str | None
+#     valid: bool
+
+
+class MemberResult(schema.Strict):
+    status: models.CheckResultStatus
+    path: str
+    message: str
+    data: Any = schema.Field(default=None)
+
+
+class MemberSkippedResult(schema.Strict):
+    path: str
+    reason: str
+
+
+Result = ArtifactResult | MemberResult | MemberSkippedResult
+
 # Tasks
 
 
@@ -181,20 +222,18 @@ async def files(args: checks.FunctionArguments) -> str | None:
     _LOGGER.info(f"Checking license files for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
-        result_data = await asyncio.to_thread(_files_check_core_logic, str(artifact_abs_path))
-
-        if result_data.get("warning"):
-            await recorder.warning(result_data["warning"], result_data)
-        elif result_data.get("error"):
-            await recorder.failure(result_data["error"], result_data)
-        elif result_data["license_valid"] and result_data["notice_valid"]:
-            await recorder.success("LICENSE and NOTICE files present and valid", result_data)
-        else:
-            # TODO: Be more specific about the issues
-            await recorder.failure("Issues found with LICENSE or NOTICE files", result_data)
+        for result in await asyncio.to_thread(_files_check_core_logic, str(artifact_abs_path)):
+            match result:
+                case ArtifactResult():
+                    await _record_artifact(recorder, result)
+                case MemberResult():
+                    await _record_member(recorder, result)
+                case MemberSkippedResult():
+                    pass
 
     except Exception as e:
-        await recorder.failure("Error checking license files", {"error": str(e)})
+        _LOGGER.exception("Error during license file check execution:")
+        await recorder.exception("Error during license file check execution", {"error": str(e)})
 
     return None
 
@@ -208,22 +247,17 @@ async def headers(args: checks.FunctionArguments) -> str | None:
     _LOGGER.info(f"Checking license headers for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
-        result_data = await asyncio.to_thread(_headers_check_core_logic, str(artifact_abs_path))
-
-        if result_data.get("warning_message"):
-            await recorder.warning(result_data["warning_message"], result_data)
-        elif result_data.get("error_message"):
-            # Handle errors during the check process itself
-            await recorder.failure(result_data["error_message"], result_data)
-        elif not result_data["valid"]:
-            # Handle validation failures
-            await recorder.failure(result_data["message"], result_data)
-        else:
-            # Handle success
-            await recorder.success(result_data["message"], result_data)
+        for result in await asyncio.to_thread(_headers_check_core_logic, str(artifact_abs_path)):
+            match result:
+                case ArtifactResult():
+                    await _record_artifact(recorder, result)
+                case MemberResult():
+                    await _record_member(recorder, result)
+                case MemberSkippedResult():
+                    pass
 
     except Exception as e:
-        await recorder.failure("Error checking license headers", {"error": str(e)})
+        await recorder.exception("Error during license header check execution", {"error": str(e)})
 
     return None
 
@@ -279,34 +313,38 @@ def strip_comments(content: bytes, file_ext: str) -> bytes:
 # File helpers
 
 
-def _files_check_core_logic(artifact_path: str) -> dict[str, Any]:
+def _files_check_core_logic(artifact_path: str) -> Iterator[Result]:
     """Verify that LICENSE and NOTICE files exist and are placed and formatted correctly."""
     files_found = []
     license_ok = False
     notice_ok = False
     notice_issues: list[str] = []
 
-    # First find and validate the root directory
-    try:
-        root_dir = targz.root_directory(artifact_path)
-    except targz.RootDirectoryError as e:
-        return {
-            "files_checked": ["LICENSE", "NOTICE"],
-            "files_found": [],
-            "license_valid": False,
-            "notice_valid": False,
-            "warning": f"Could not determine root directory: {e!s}",
-        }
+    # # First find and validate the root directory
+    # try:
+    #     root_dir = targz.root_directory(artifact_path)
+    # except targz.RootDirectoryError as e:
+    #     yield ArtifactResult(
+    #         status=models.CheckResultStatus.WARNING,
+    #         message=f"Could not determine root directory: {e!s}",
+    #         data=None,
+    #     )
+    #     # Continue checking files
 
     # Check for license files in the root directory
     with tarfile.open(artifact_path, mode="r|gz") as tf:
         for member in tf:
+            _LOGGER.warning(f"Checking member: {member.name}")
             if member.name and member.name.split("/")[-1].startswith("._"):
                 # Metadata convention
                 continue
 
-            if member.name in [f"{root_dir}/LICENSE", f"{root_dir}/NOTICE"]:
-                filename = os.path.basename(member.name)
+            if member.name.count("/") > 1:
+                # Skip files in subdirectories
+                continue
+
+            filename = os.path.basename(member.name)
+            if filename in {"LICENSE", "NOTICE"}:
                 files_found.append(filename)
                 if filename == "LICENSE":
                     # TODO: Check length, should be 11,358 bytes
@@ -315,16 +353,16 @@ def _files_check_core_logic(artifact_path: str) -> dict[str, Any]:
                     # TODO: Check length doesn't exceed some preset
                     notice_ok, notice_issues = _files_check_core_logic_notice(tf, member)
 
-    messages = _files_messages_build(root_dir, files_found, license_ok, notice_ok, notice_issues)
+    yield from _files_messages_build(files_found, license_ok, notice_ok, notice_issues)
 
-    return {
-        "files_checked": ["LICENSE", "NOTICE"],
-        "files_found": files_found,
-        "license_valid": license_ok,
-        "notice_valid": notice_ok,
-        "notice_issues": notice_issues if notice_issues else None,
-        "message": "; ".join(messages) if messages else "All license files present and valid",
-    }
+    is_valid = license_ok and notice_ok
+    yield ArtifactResult(
+        status=models.CheckResultStatus.SUCCESS if is_valid else models.CheckResultStatus.FAILURE,
+        message="LICENSE and NOTICE files present and valid"
+        if is_valid
+        else "Issues found with LICENSE or NOTICE files",
+        data=None,
+    )
 
 
 def _files_check_core_logic_license(tf: tarfile.TarFile, member: tarfile.TarInfo) -> bool:
@@ -349,40 +387,61 @@ def _files_check_core_logic_notice(tf: tarfile.TarFile, member: tarfile.TarInfo)
     issues = []
 
     if not re.search(r"Apache\s+[\w\-\.]+", content, re.MULTILINE):
-        issues.append("Missing or invalid Apache product header")
+        issues.append("missing or invalid Apache product header")
     if not re.search(r"Copyright\s+(?:\d{4}|\d{4}-\d{4})\s+The Apache Software Foundation", content, re.MULTILINE):
-        issues.append("Missing or invalid copyright statement")
+        issues.append("missing or invalid copyright statement")
     if not re.search(
         r"This product includes software developed at\s*\nThe Apache Software Foundation \(.*?\)", content, re.DOTALL
     ):
-        issues.append("Missing or invalid foundation attribution")
+        issues.append("missing or invalid foundation attribution")
 
     return len(issues) == 0, issues
 
 
 def _files_messages_build(
-    root_dir: str,
     files_found: list[str],
     license_ok: bool,
     notice_ok: bool,
     notice_issues: list[str],
-) -> list[str]:
+) -> Iterator[Result]:
     """Build status messages for license file verification."""
-    messages = []
     if not files_found:
-        messages.append(f"No LICENSE or NOTICE files found in root directory '{root_dir}'")
-    else:
-        if "LICENSE" not in files_found:
-            messages.append(f"LICENSE file not found in root directory '{root_dir}'")
-        elif not license_ok:
-            messages.append("LICENSE file does not match Apache 2.0 license")
+        yield ArtifactResult(
+            status=models.CheckResultStatus.FAILURE,
+            message="No LICENSE or NOTICE files found",
+            data=None,
+        )
+        return
 
-        if "NOTICE" not in files_found:
-            messages.append(f"NOTICE file not found in root directory '{root_dir}'")
-        elif not notice_ok:
-            messages.append("NOTICE file format issues: " + "; ".join(notice_issues))
+    # Check the LICENSE file
+    if "LICENSE" not in files_found:
+        yield ArtifactResult(
+            status=models.CheckResultStatus.FAILURE,
+            message="LICENSE file not found",
+            data=None,
+        )
+    elif not license_ok:
+        yield MemberResult(
+            status=models.CheckResultStatus.FAILURE,
+            path="LICENSE",
+            message="LICENSE file does not match Apache 2.0 license",
+            data=None,
+        )
 
-    return messages
+    # Check the NOTICE file
+    if "NOTICE" not in files_found:
+        yield ArtifactResult(
+            status=models.CheckResultStatus.FAILURE,
+            message="NOTICE file not found",
+            data=None,
+        )
+    elif not notice_ok:
+        yield MemberResult(
+            status=models.CheckResultStatus.FAILURE,
+            path="NOTICE",
+            message="NOTICE file format issues: " + "; ".join(notice_issues),
+            data=None,
+        )
 
 
 # Header helpers
@@ -396,26 +455,22 @@ def _get_file_extension(filename: str) -> str | None:
     return ext[1:].lower()
 
 
-def _headers_check_core_logic(artifact_path: str) -> dict[str, Any]:
+def _headers_check_core_logic(artifact_path: str) -> Iterator[Result]:
     """Verify Apache License headers in source files within an archive."""
     # We could modify @Lucas-C/pre-commit-hooks instead for this
     # But hopefully this will be robust enough, at least for testing
-    files_checked = 0
-    files_with_valid_headers = 0
-    errors = []
-
     # First find and validate the root directory
-    try:
-        root_dir = targz.root_directory(artifact_path)
-    except targz.RootDirectoryError as e:
-        return {
-            "files_checked": 0,
-            "files_with_valid_headers": 0,
-            "errors": [],
-            "error_message": None,
-            "warning_message": f"Could not determine root directory: {e!s}",
-            "valid": False,
-        }
+    artifact_data = ArtifactData()
+
+    # try:
+    #     targz.root_directory(artifact_path)
+    # except targz.RootDirectoryError as e:
+    #     # Tooling believes that this should be a warning, not an error
+    #     yield ArtifactResult(
+    #         status=models.CheckResultStatus.WARNING,
+    #         message=f"Could not determine root directory: {e!s}",
+    #         data=None,
+    #     )
 
     # Check files in the archive
     with tarfile.open(artifact_path, mode="r|gz") as tf:
@@ -424,72 +479,86 @@ def _headers_check_core_logic(artifact_path: str) -> dict[str, Any]:
                 # Metadata convention
                 continue
 
-            processed, result = _headers_check_core_logic_process_file(tf, member, root_dir)
-            if not processed:
-                continue
+            match _headers_check_core_logic_process_file(tf, member):
+                case ArtifactResult() | MemberResult() as result:
+                    artifact_data.files_checked += 1
+                    match result.status:
+                        case models.CheckResultStatus.SUCCESS:
+                            artifact_data.files_with_valid_headers += 1
+                        case models.CheckResultStatus.FAILURE:
+                            artifact_data.files_with_invalid_headers += 1
+                        case models.CheckResultStatus.WARNING:
+                            artifact_data.files_with_invalid_headers += 1
+                        case models.CheckResultStatus.EXCEPTION:
+                            artifact_data.files_with_invalid_headers += 1
+                    yield result
+                case MemberSkippedResult():
+                    artifact_data.files_skipped += 1
 
-            files_checked += 1
-            if result.get("error"):
-                errors.append(result["error"])
-            elif result.get("valid"):
-                files_with_valid_headers += 1
-            else:
-                # Should be impossible
-                raise RuntimeError("Logic error")
-
-    # Prepare result message
-    if files_checked == 0:
-        message = "No source files found to check for license headers"
-        # No files to check is not a failure
-        valid = True
-    else:
-        # Require all files to have valid headers
-        valid = files_checked == files_with_valid_headers
-        message = f"Checked {files_checked} files, found {files_with_valid_headers} with valid headers"
-
-    return {
-        "files_checked": files_checked,
-        "files_with_valid_headers": files_with_valid_headers,
-        "errors": errors,
-        "message": message,
-        "valid": valid,
-    }
+    yield ArtifactResult(
+        status=models.CheckResultStatus.SUCCESS,
+        message=f"Checked {artifact_data.files_checked} files,"
+        f" found {artifact_data.files_with_valid_headers} with valid headers,"
+        f" {artifact_data.files_with_invalid_headers} with invalid headers,"
+        f" and {artifact_data.files_skipped} skipped",
+        data=artifact_data.model_dump_json(),
+    )
 
 
 def _headers_check_core_logic_process_file(
     tf: tarfile.TarFile,
     member: tarfile.TarInfo,
-    root_dir: str,
-) -> tuple[bool, dict[str, Any]]:
+) -> Result:
     """Process a single file in an archive for license header verification."""
     if not member.isfile():
-        return False, {"skipped": True, "reason": "Not a file"}
+        return MemberSkippedResult(
+            path=member.name,
+            reason="Not a file",
+        )
 
     # Check if we should verify this file, based on extension
     if not _headers_check_core_logic_should_check(member.name):
-        return False, {"skipped": True, "reason": "Not a source file"}
-
-    # Get relative path for display purposes only
-    display_path = member.name
-    if display_path.startswith(f"{root_dir}/"):
-        display_path = display_path[len(root_dir) + 1 :]
+        return MemberSkippedResult(
+            path=member.name,
+            reason="Not a source file",
+        )
 
     # Extract and check the file
     try:
         f = tf.extractfile(member)
         if f is None:
-            return True, {"error": f"Could not read file: {display_path}"}
+            return MemberResult(
+                status=models.CheckResultStatus.EXCEPTION,
+                path=member.name,
+                message="Could not read file",
+                data=None,
+            )
 
         # Allow for some extra content at the start of the file
         # That may be shebangs, encoding declarations, etc.
         content = f.read(len(APACHE_LICENSE_HEADER) + 512)
         is_valid, error = _headers_validate(content, member.name)
         if is_valid:
-            return True, {"valid": True}
+            return MemberResult(
+                status=models.CheckResultStatus.SUCCESS,
+                path=member.name,
+                message="Valid license header",
+                data=None,
+            )
         else:
-            return True, {"valid": False, "error": f"{display_path}: {error}"}
+            return MemberResult(
+                status=models.CheckResultStatus.FAILURE,
+                path=member.name,
+                message=f"Invalid license header: {error}",
+                data=None,
+            )
     except Exception as e:
-        return True, {"error": f"Error processing {display_path}: {e!s}"}
+        return MemberResult(
+            status=models.CheckResultStatus.EXCEPTION,
+            path=member.name,
+            message=f"Error processing file: {e!s}",
+            data=None,
+        )
 
 
 def _headers_check_core_logic_should_check(filepath: str) -> bool:
@@ -539,3 +608,27 @@ def _headers_validate(content: bytes, filename: str) -> tuple[bool, str | None]:
         return False, "License header does not match the required Apache License header text"
 
     return True, None
+
+
+async def _record_artifact(recorder: checks.Recorder, result: ArtifactResult) -> None:
+    match result.status:
+        case models.CheckResultStatus.SUCCESS:
+            await recorder.success(result.message, result.data)
+        case models.CheckResultStatus.WARNING:
+            await recorder.warning(result.message, result.data)
+        case models.CheckResultStatus.FAILURE:
+            await recorder.failure(result.message, result.data)
+        case models.CheckResultStatus.EXCEPTION:
+            await recorder.exception(result.message, result.data)
+
+
+async def _record_member(recorder: checks.Recorder, result: MemberResult) -> None:
+    match result.status:
+        case models.CheckResultStatus.SUCCESS:
+            await recorder.success(result.message, result.data, member_rel_path=result.path)
+        case models.CheckResultStatus.WARNING:
+            await recorder.warning(result.message, result.data, member_rel_path=result.path)
+        case models.CheckResultStatus.FAILURE:
+            await recorder.failure(result.message, result.data, member_rel_path=result.path)
+        case models.CheckResultStatus.EXCEPTION:
+            await recorder.exception(result.message, result.data, member_rel_path=result.path)

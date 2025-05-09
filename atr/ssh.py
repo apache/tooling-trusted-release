@@ -485,9 +485,9 @@ async def _step_07b_process_validated_rsync_write(
         # Create the draft revision directory structure
         async with revision.create_and_manage(project_name, version_name, asf_uid) as (
             new_revision_dir,
-            new_draft_revision,
+            new_revision,
         ):
-            _LOGGER.info(f"Created draft revision directory: {new_revision_dir} ({new_draft_revision})")
+            _LOGGER.info(f"Created draft revision directory: {new_revision_dir} ({new_revision})")
             # Update the rsync command path to the new revision directory
             argv[path_index] = str(new_revision_dir)
 
@@ -497,11 +497,11 @@ async def _step_07b_process_validated_rsync_write(
             exit_status = await _step_08_execute_rsync(process, argv)
             if exit_status != 0:
                 _LOGGER.error(
-                    f"rsync upload failed with exit status {exit_status} for revision {new_draft_revision}. "
+                    f"rsync upload failed with exit status {exit_status} for revision {new_revision}. "
                     f"Command: {process.command} (run as {' '.join(argv)})"
                 )
 
-            _LOGGER.info(f"rsync upload successful for revision {new_draft_revision}")
+            _LOGGER.info(f"rsync upload successful for revision {new_revision}")
             # Close the connection unconditionally
             # If we use "if not process.is_closing():" then it fails
             process.exit(exit_status)

@@ -128,8 +128,10 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         self,
         id: Opt[int] = NOT_SET,
         release_name: Opt[str] = NOT_SET,
+        revision: Opt[str] = NOT_SET,
         checker: Opt[str] = NOT_SET,
         primary_rel_path: Opt[str | None] = NOT_SET,
+        member_rel_path: Opt[str | None] = NOT_SET,
         created: Opt[datetime.datetime] = NOT_SET,
         status: Opt[models.CheckResultStatus] = NOT_SET,
         message: Opt[str] = NOT_SET,
@@ -142,10 +144,14 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.CheckResult.id == id)
         if is_defined(release_name):
             query = query.where(models.CheckResult.release_name == release_name)
+        if is_defined(revision):
+            query = query.where(models.CheckResult.revision == revision)
         if is_defined(checker):
             query = query.where(models.CheckResult.checker == checker)
         if is_defined(primary_rel_path):
             query = query.where(models.CheckResult.primary_rel_path == primary_rel_path)
+        if is_defined(member_rel_path):
+            query = query.where(models.CheckResult.member_rel_path == member_rel_path)
         if is_defined(created):
             query = query.where(models.CheckResult.created == created)
         if is_defined(status):
@@ -608,6 +614,8 @@ def is_undefined(v: object | NotSet) -> TypeGuard[NotSet]:
 
 async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathInfo:
     info = PathInfo()
+    if release.revision is None:
+        raise ValueError(f"Release {release.name} has no revision")
     for path in paths:
         # Get template and substitutions
         # elements = {
@@ -633,17 +641,26 @@ async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathI
         async with session() as data:
             info.successes[path] = list(
                 await data.check_result(
-                    release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.SUCCESS
+                    release_name=release.name,
+                    revision=release.revision,
+                    primary_rel_path=str(path),
+                    status=models.CheckResultStatus.SUCCESS,
                 ).all()
             )
             info.warnings[path] = list(
                 await data.check_result(
-                    release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.WARNING
+                    release_name=release.name,
+                    revision=release.revision,
+                    primary_rel_path=str(path),
+                    status=models.CheckResultStatus.WARNING,
                 ).all()
             )
             info.errors[path] = list(
                 await data.check_result(
-                    release_name=release.name, primary_rel_path=str(path), status=models.CheckResultStatus.FAILURE
+                    release_name=release.name,
+                    revision=release.revision,
+                    primary_rel_path=str(path),
+                    status=models.CheckResultStatus.FAILURE,
                 ).all()
             )
     return info
@@ -702,7 +719,7 @@ async def shutdown_database() -> None:
         _LOGGER.info("No database to close")
 
 
-async def tasks_ongoing(project_name: str, version_name: str, draft_revision: str) -> int:
+async def tasks_ongoing(project_name: str, version_name: str, revision: str) -> int:
     release_name = models.release_name(project_name, version_name)
     async with session() as data:
         query = (
@@ -710,7 +727,7 @@ async def tasks_ongoing(project_name: str, version_name: str, draft_revision: st
             .select_from(models.Task)
             .where(
                 models.Task.release_name == release_name,
-                models.Task.draft_revision == draft_revision,
+                models.Task.revision == revision,
                 validate_instrumented_attribute(models.Task.status).in_(
                     [models.TaskStatus.QUEUED, models.TaskStatus.ACTIVE]
                 ),

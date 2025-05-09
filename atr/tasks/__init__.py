@@ -35,7 +35,7 @@ import atr.tasks.vote as vote
 import atr.util as util
 
 
-async def asc_checks(release: models.Release, draft_revision: str, signature_path: str) -> list[models.Task]:
+async def asc_checks(release: models.Release, revision: str, signature_path: str) -> list[models.Task]:
     """Create signature check task for a .asc file."""
     tasks = []
 
@@ -44,7 +44,7 @@ async def asc_checks(release: models.Release, draft_revision: str, signature_pat
             queued(
                 models.TaskType.SIGNATURE_CHECK,
                 release,
-                draft_revision,
+                revision,
                 signature_path,
                 {"committee_name": release.committee.name},
             )
@@ -54,12 +54,12 @@ async def asc_checks(release: models.Release, draft_revision: str, signature_pat
 
 
 async def draft_checks(
-    project_name: str, release_version: str, draft_revision: str, caller_data: db.Session | None = None
+    project_name: str, release_version: str, revision: str, caller_data: db.Session | None = None
 ) -> int:
     """Core logic to analyse a draft revision and queue checks."""
     # Construct path to the specific revision
     # We don't have the release object here, so we can't use util.release_directory
-    revision_path = util.get_unfinished_dir() / project_name / release_version / draft_revision
+    revision_path = util.get_unfinished_dir() / project_name / release_version / revision
     relative_paths = [path async for path in util.paths_recursive(revision_path)]
 
     session_context = db.session() if (caller_data is None) else contextlib.nullcontext(caller_data)
@@ -67,16 +67,19 @@ async def draft_checks(
         release = await data.release(name=models.release_name(project_name, release_version), _committee=True).demand(
             RuntimeError("Release not found")
         )
-        for path in relative_paths:
+        for path_idx, path in enumerate(relative_paths):
             path_str = str(path)
             task_function: Callable[[models.Release, str, str], Awaitable[list[models.Task]]] | None = None
-            for suffix, task_function in TASK_FUNCTIONS.items():
+            for suffix, func in TASK_FUNCTIONS.items():
                 if path.name.endswith(suffix):
-                    for task in await task_function(release, draft_revision, path_str):
-                        task.draft_revision = draft_revision
-                        data.add(task)
+                    task_function = func
+                    break
+            if task_function:
+                for task in await task_function(release, revision, path_str):
+                    task.revision = revision
+                    data.add(task)
 
-        path_check_task = queued(models.TaskType.PATHS_CHECK, release, draft_revision)
+        path_check_task = queued(models.TaskType.PATHS_CHECK, release, revision)
         data.add(path_check_task)
         if caller_data is None:
             await data.commit()
@@ -87,7 +90,7 @@ async def draft_checks(
 def queued(
     task_type: models.TaskType,
     release: models.Release,
-    draft_revision: str,
+    revision: str,
     primary_rel_path: str | None = None,
     extra_args: dict[str, Any] | None = None,
 ) -> models.Task:
@@ -96,7 +99,7 @@ def queued(
         task_type=task_type,
         task_args=extra_args or {},
         release_name=release.name,
-        draft_revision=draft_revision,
+        revision=revision,
         primary_rel_path=primary_rel_path,
     )
 
@@ -141,35 +144,35 @@ def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:
         # Otherwise we lose exhaustiveness checking
 
 
-async def sha_checks(release: models.Release, draft_revision: str, hash_file: str) -> list[models.Task]:
+async def sha_checks(release: models.Release, revision: str, hash_file: str) -> list[models.Task]:
     """Create hash check task for a .sha256 or .sha512 file."""
     tasks = []
 
-    tasks.append(queued(models.TaskType.HASHING_CHECK, release, draft_revision, hash_file))
+    tasks.append(queued(models.TaskType.HASHING_CHECK, release, revision, hash_file))
 
     return tasks
 
 
-async def tar_gz_checks(release: models.Release, draft_revision: str, path: str) -> list[models.Task]:
+async def tar_gz_checks(release: models.Release, revision: str, path: str) -> list[models.Task]:
     """Create check tasks for a .tar.gz or .tgz file."""
     tasks = [
-        queued(models.TaskType.LICENSE_FILES, release, draft_revision, path),
-        queued(models.TaskType.LICENSE_HEADERS, release, draft_revision, path),
-        queued(models.TaskType.RAT_CHECK, release, draft_revision, path),
-        queued(models.TaskType.TARGZ_INTEGRITY, release, draft_revision, path),
-        queued(models.TaskType.TARGZ_STRUCTURE, release, draft_revision, path),
+        queued(models.TaskType.LICENSE_FILES, release, revision, path),
+        queued(models.TaskType.LICENSE_HEADERS, release, revision, path),
+        queued(models.TaskType.RAT_CHECK, release, revision, path),
+        queued(models.TaskType.TARGZ_INTEGRITY, release, revision, path),
+        queued(models.TaskType.TARGZ_STRUCTURE, release, revision, path),
     ]
 
     return tasks
 
 
-async def zip_checks(release: models.Release, draft_revision: str, path: str) -> list[models.Task]:
+async def zip_checks(release: models.Release, revision: str, path: str) -> list[models.Task]:
     """Create check tasks for a .zip file."""
     tasks = [
-        queued(models.TaskType.ZIPFORMAT_INTEGRITY, release, draft_revision, path),
-        queued(models.TaskType.ZIPFORMAT_LICENSE_FILES, release, draft_revision, path),
-        queued(models.TaskType.ZIPFORMAT_LICENSE_HEADERS, release, draft_revision, path),
-        queued(models.TaskType.ZIPFORMAT_STRUCTURE, release, draft_revision, path),
+        queued(models.TaskType.ZIPFORMAT_INTEGRITY, release, revision, path),
+        queued(models.TaskType.ZIPFORMAT_LICENSE_FILES, release, revision, path),
+        queued(models.TaskType.ZIPFORMAT_LICENSE_HEADERS, release, revision, path),
+        queued(models.TaskType.ZIPFORMAT_STRUCTURE, release, revision, path),
     ]
     return tasks
 

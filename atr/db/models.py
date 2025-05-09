@@ -348,7 +348,7 @@ class Task(sqlmodel.SQLModel, table=True):
     # We don't put these in task_args because we want to query them efficiently
     release_name: str | None = sqlmodel.Field(default=None, foreign_key="release.name")
     release: Optional["Release"] = sqlmodel.Relationship(back_populates="tasks")
-    draft_revision: str | None = sqlmodel.Field(default=None, index=True)
+    revision: str | None = sqlmodel.Field(default=None, index=True)
     primary_rel_path: str | None = sqlmodel.Field(default=None, index=True)
 
     # Create an index on status and added for efficient task claiming
@@ -458,6 +458,7 @@ class CheckResult(sqlmodel.SQLModel, table=True):
     id: int = sqlmodel.Field(default=None, primary_key=True)
     release_name: str = sqlmodel.Field(foreign_key="release.name")
     release: Release = sqlmodel.Relationship(back_populates="check_results")
+    revision: str = sqlmodel.Field(default=None, index=True)
     checker: str
     primary_rel_path: str | None = sqlmodel.Field(default=None, index=True)
     member_rel_path: str | None = sqlmodel.Field(default=None, index=True)
@@ -465,17 +466,6 @@ class CheckResult(sqlmodel.SQLModel, table=True):
     status: CheckResultStatus
     message: str
     data: Any = sqlmodel.Field(sa_column=sqlalchemy.Column(sqlalchemy.JSON))
-
-    # Link to the draft revisions that these results are for
-    histories: list["CheckResultHistoryLink"] = sqlmodel.Relationship(back_populates="check_result")
-
-
-class CheckResultHistoryLink(sqlmodel.SQLModel, table=True):
-    # Composite primary key, automatically handled by SQLModel
-    check_result_id: int = sqlmodel.Field(foreign_key="checkresult.id", primary_key=True)
-    draft_revision: str = sqlmodel.Field(index=True, primary_key=True)
-
-    check_result: CheckResult = sqlmodel.Relationship(back_populates="histories")
 
 
 class TextValue(sqlmodel.SQLModel, table=True):

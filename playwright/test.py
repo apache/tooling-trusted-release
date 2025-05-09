@@ -287,12 +287,12 @@ def main() -> None:
     run_tests(args.skip_slow, args.tidy)
 
 
-def poll_for_tasks_completion(page: sync_api.Page, project_name: str, version_name: str, draft_revision: str) -> None:
+def poll_for_tasks_completion(page: sync_api.Page, project_name: str, version_name: str, revision: str) -> None:
     gateway_ip = get_default_gateway_ip()
     if not gateway_ip:
         raise RuntimeError("Cannot proceed without gateway IP")
 
-    rev_path = f"{project_name}/{version_name}/{draft_revision}"
+    rev_path = f"{project_name}/{version_name}/{revision}"
     polling_url = f"https://{gateway_ip}:8080/admin/ongoing-tasks/{rev_path}"
     logging.info(f"Polling URL: {polling_url}")
 
@@ -527,9 +527,9 @@ def test_checks_01_hashing_sha512(page: sync_api.Page, credentials: Credentials)
     sync_api.expect(hashing_check_div_locator).to_be_visible()
     logging.info("Located Hashing Check block")
 
-    passed_badge_locator = hashing_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
-    sync_api.expect(passed_badge_locator).to_be_visible()
-    logging.info("Hashing Check status verified as Passed")
+    success_badge_locator = hashing_check_div_locator.locator("span.badge.bg-success:text-is('Success')")
+    sync_api.expect(success_badge_locator).to_be_visible()
+    logging.info("Hashing Check status verified as Success")
 
 
 def test_checks_02_license_files(page: sync_api.Page, credentials: Credentials) -> None:
@@ -562,7 +562,7 @@ def test_checks_02_license_files(page: sync_api.Page, credentials: Credentials) 
     sync_api.expect(license_check_div_locator).to_be_visible()
     logging.info("Located License Files check block")
 
-    passed_badge_locator = license_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
+    passed_badge_locator = license_check_div_locator.locator("span.badge.bg-success:text-is('Success')")
     sync_api.expect(passed_badge_locator).to_be_visible()
     logging.info("License Files check status verified as Passed")
 
@@ -585,7 +585,7 @@ def test_checks_03_license_headers(page: sync_api.Page, credentials: Credentials
     sync_api.expect(header_check_div_locator).to_be_visible()
     logging.info("Located License Headers check block")
 
-    passed_badge_locator = header_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
+    passed_badge_locator = header_check_div_locator.locator("span.badge.bg-success:text-is('Success')")
     sync_api.expect(passed_badge_locator).to_be_visible()
     logging.info("License Headers check status verified as Passed")
 
@@ -609,7 +609,7 @@ def test_checks_04_paths(page: sync_api.Page, credentials: Credentials) -> None:
     sync_api.expect(paths_check_div_locator).to_be_visible()
     logging.info("Located Paths Check Success block")
 
-    passed_badge_locator = paths_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
+    passed_badge_locator = paths_check_div_locator.locator("span.badge.bg-success:text-is('Success')")
     sync_api.expect(passed_badge_locator).to_be_visible()
     logging.info("Paths Check Success status verified as Passed")
 
@@ -631,7 +631,7 @@ def test_checks_05_signature(page: sync_api.Page, credentials: Credentials) -> N
     sync_api.expect(signature_check_div_locator).to_be_visible()
     logging.info("Located Signature Check block")
 
-    passed_badge_locator = signature_check_div_locator.locator("span.badge.bg-success:text-is('Passed')")
+    passed_badge_locator = signature_check_div_locator.locator("span.badge.bg-success:text-is('Success')")
     sync_api.expect(passed_badge_locator).to_be_visible()
     logging.info("Signature Check status verified as Passed")
 
@@ -652,7 +652,7 @@ def test_checks_06_targz(page: sync_api.Page, credentials: Credentials) -> None:
     integrity_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Targz Integrity'))")
     sync_api.expect(integrity_div_locator).to_be_visible()
     logging.info("Located Targz Integrity block")
-    integrity_passed_badge = integrity_div_locator.locator("span.badge.bg-success:text-is('Passed')")
+    integrity_passed_badge = integrity_div_locator.locator("span.badge.bg-success:text-is('Success')")
     sync_api.expect(integrity_passed_badge).to_be_visible()
     logging.info("Targz Integrity status verified as Passed")
 
@@ -660,7 +660,7 @@ def test_checks_06_targz(page: sync_api.Page, credentials: Credentials) -> None:
     structure_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Targz Structure'))")
     sync_api.expect(structure_div_locator).to_be_visible()
     logging.info("Located Targz Structure block")
-    structure_passed_badge = structure_div_locator.locator("span.badge.bg-success:text-is('Passed')")
+    structure_passed_badge = structure_div_locator.locator("span.badge.bg-success:text-is('Success')")
     sync_api.expect(structure_passed_badge).to_be_visible()
     logging.info("Targz Structure status verified as Passed")
 
@@ -986,11 +986,11 @@ def test_ssh_02_rsync_upload(page: sync_api.Page, credentials: Credentials) -> N
     revision_href = revision_link_locator.get_attribute("href")
     if not revision_href:
         raise RuntimeError("Could not find revision link href")
-    draft_revision = revision_href.split("#", 1)[-1]
-    logging.info(f"Found revision: {draft_revision}")
+    revision = revision_href.split("#", 1)[-1]
+    logging.info(f"Found revision: {revision}")
 
-    logging.info(f"Polling for task completion for revision {draft_revision}")
-    poll_for_tasks_completion(page, project_name, version_name, draft_revision)
+    logging.info(f"Polling for task completion for revision {revision}")
+    poll_for_tasks_completion(page, project_name, version_name, revision)
 
 
 def test_tidy_up(page: sync_api.Page) -> None:

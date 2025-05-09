@@ -76,6 +76,11 @@ def alias_opt(alias_name: str) -> Any:
     return Field(alias=alias_name, default=None)
 
 
+def default(default_value: Any) -> Any:
+    """Helper to create a Pydantic FieldInfo object with only a default value."""
+    return Field(default=default_value)
+
+
 def description(desc_text: str) -> Any:
     """Helper to create a Pydantic FieldInfo object with only a description."""
     return Field(description=desc_text)

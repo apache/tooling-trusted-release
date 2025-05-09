@@ -315,7 +315,7 @@ async def sbomgen(
                     added=datetime.datetime.now(datetime.UTC),
                     status=models.TaskStatus.QUEUED,
                     release_name=release.name,
-                    draft_revision=new_revision_name,
+                    revision=new_revision_name,
                 )
                 data.add(sbom_task)
                 await data.commit()
