@@ -1,6 +1,12 @@
 {
   "lastTimestamp": "20250219115218Z",
   "project_count": 1,
+  "roster_counts": {
+    "tooling": {
+      "members": 3,
+      "owners": 3
+    }
+  },
   "projects": {
     "tooling": {
       "createTimestamp": "20170713020428Z",

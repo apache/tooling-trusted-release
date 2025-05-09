@@ -128,7 +128,7 @@ def _get_dict_to_list_validator(inner_adapter: pydantic.TypeAdapter[dict[Any, An
                 return field.alias if field.alias else field_name
 
             return [
-                {key: k, **{get_alias(f, v.model_fields): getattr(v, f) for f in v.model_fields}}
+                {key: k, **{get_alias(f, type(v).model_fields): getattr(v, f) for f in type(v).model_fields}}
                 for k, v in validated.items()
             ]
 
