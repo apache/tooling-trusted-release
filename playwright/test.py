@@ -329,6 +329,20 @@ def poll_for_tasks_completion(page: sync_api.Page, project_name: str, version_na
     raise TimeoutError(f"Tasks did not complete within {max_wait_seconds} seconds")
 
 
+def ensure_success_results_are_visible(page: sync_api.Page, result_type: str) -> None:
+    button_id = f"#btn-toggle-{result_type}-success"
+    show_success_btn = page.locator(button_id)
+
+    if show_success_btn.is_visible(timeout=500):
+        raw_button_text = show_success_btn.text_content() or ""
+        if "Show Success" in " ".join(raw_button_text.split()):
+            show_success_btn.click()
+            sync_api.expect(show_success_btn).to_contain_text("Hide Success", timeout=2000)
+            first_success_row = page.locator(f".atr-result-{result_type}.atr-result-status-success").first
+            if first_success_row.is_visible(timeout=500):
+                sync_api.expect(first_success_row).not_to_have_class("atr-hide", timeout=1000)
+
+
 def release_remove(page: sync_api.Page, release_name: str) -> None:
     logging.info(f"Checking whether the {release_name} release exists")
     release_checkbox_locator = page.locator(f'input[name="releases_to_delete"][value="{release_name}"]')
@@ -522,6 +536,8 @@ def test_checks_01_hashing_sha512(page: sync_api.Page, credentials: Credentials)
     wait_for_path(page, report_file_path)
     logging.info(f"Successfully navigated to {report_file_path}")
 
+    ensure_success_results_are_visible(page, "primary")
+
     logging.info("Verifying Hashing Check status")
     check_row_locator = page.locator("tr.atr-result-primary:has(th:has-text('Hashing Check'))")
     sync_api.expect(check_row_locator).to_be_visible()
@@ -557,6 +573,8 @@ def test_checks_02_license_files(page: sync_api.Page, credentials: Credentials) 
     wait_for_path(page, report_file_path)
     logging.info(f"Successfully navigated to {report_file_path}")
 
+    ensure_success_results_are_visible(page, "primary")
+
     logging.info("Verifying License Files check status")
     check_row_locator = page.locator("tr.atr-result-primary:has(th:text-is('License Files'))")
     sync_api.expect(check_row_locator).to_be_visible()
@@ -580,6 +598,8 @@ def test_checks_03_license_headers(page: sync_api.Page, credentials: Credentials
     go_to_path(page, report_file_path)
     logging.info(f"Successfully navigated to {report_file_path}")
 
+    ensure_success_results_are_visible(page, "primary")
+
     logging.info("Verifying License Headers check status")
     check_row_locator = page.locator("tr.atr-result-primary:has(th:has-text('License Headers'))")
     sync_api.expect(check_row_locator).to_be_visible()
@@ -601,6 +621,8 @@ def test_checks_04_paths(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info(f"Navigating to report page {report_file_path}")
     go_to_path(page, report_file_path)
     logging.info(f"Successfully navigated to {report_file_path}")
+
+    ensure_success_results_are_visible(page, "primary")
 
     # TODO: It's a bit strange to have the status in the check name
     # But we have to do this because we need separate Recorder objects
@@ -626,6 +648,8 @@ def test_checks_05_signature(page: sync_api.Page, credentials: Credentials) -> N
     go_to_path(page, report_file_path)
     logging.info(f"Successfully navigated to {report_file_path}")
 
+    ensure_success_results_are_visible(page, "primary")
+
     logging.info("Verifying Signature Check status")
     check_row_locator = page.locator("tr.atr-result-primary:has(th:has-text('Signature Check'))")
     sync_api.expect(check_row_locator).to_be_visible()
@@ -647,6 +671,8 @@ def test_checks_06_targz(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info(f"Navigating to report page {report_file_path}")
     go_to_path(page, report_file_path)
     logging.info(f"Successfully navigated to {report_file_path}")
+
+    ensure_success_results_are_visible(page, "primary")
 
     logging.info("Verifying Targz Integrity status")
     integrity_row_locator = page.locator("tr.atr-result-primary:has(th:has-text('Targz Integrity'))")

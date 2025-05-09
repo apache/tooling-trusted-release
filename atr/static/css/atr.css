@@ -476,3 +476,7 @@ aside.sidebar nav a:hover {
 .atr-phase-themed .atr-phase-three {
     color: #cc0033;
 }
+
+.atr-hide {
+    display: none;
+}

@@ -67,9 +67,14 @@
           {% set bs_status = 'danger' if status == 'exception' or status == 'failure' else status %}
           <button id="btn-toggle-primary-{{ status }}"
                   type="button"
-                  class="btn btn-{{ bs_status }}"
+                  class="btn {% if status == 'success' %}btn-outline-success{% else %}btn-{{ bs_status }}{% endif %}"
                   onclick="toggleStatusVisibility('primary', '{{ status }}')">
-            Hide {{ status|title }} (<code>{{ count }}</code>)
+            {% if status == 'success' %}
+              Show
+            {% else %}
+              Hide
+            {% endif %}
+            {{ status|title }} (<code>{{ count }}</code>)
           </button>
         {% endif %}
       {% endfor %}
@@ -87,16 +92,16 @@
   <div class="mb-3">
     {% if primary_results %}
       <table class="table table-bordered table-striped border mb-3">
-        <!-- <thead class="table-light">
-                <tr>
-                    <th scope="col" style="width: 20%;">Check</th>
-                    <th scope="col">Message / Details</th>
-                    <th scope="col" style="width: 10%;">Status</th>
-                </tr>
-            </thead> -->
+        <thead class="table-light">
+          <tr>
+            <th scope="col" class="w-30">Check</th>
+            <th scope="col">Message</th>
+            <th scope="col" class="w-10 text-center">Status</th>
+          </tr>
+        </thead>
         <tbody>
           {% for primary_result in primary_results %}
-            <tr class="atr-result-primary atr-result-status-{{ primary_result.status.value }}">
+            <tr class="atr-result-primary atr-result-status-{{ primary_result.status.value }} {% if primary_result.status.value == 'success' %}atr-hide{% endif %}">
               <th scope="row" class="align-middle fw-bold">{{ function_name_from_key(primary_result.checker) }}</th>
               <td class="align-middle">
                 {% if primary_result.data is mapping and primary_result.data.keys()|length > 0 %}
@@ -211,10 +216,9 @@
       <p>No verification tasks found for this file.</p>
     {% endif %}
 
-    <h2>Member results</h2>
-    <p>This file is an archive. We have extracted the contents of the archive and checked each file individually.</p>
-
     {% if member_results %}
+      <h2>Member results</h2>
+      <p>This file is an archive. We have extracted the contents of the archive and checked each file individually.</p>
       {% set member_status_counts = {"success": 0, "failure": 0, "warning": 0, "exception": 0} %}
       {% for path, m_results in member_results.items() %}
         {% for m_result in m_results %}
@@ -230,31 +234,48 @@
               {% set bs_status = 'danger' if status == 'exception' or status == 'failure' else status %}
               <button id="btn-toggle-member-{{ status }}"
                       type="button"
-                      class="btn btn-{{ bs_status }}"
+                      class="btn {% if status == 'success' %}btn-outline-success{% else %}btn-{{ bs_status }}{% endif %}"
                       onclick="toggleStatusVisibility('member', '{{ status }}')">
-                Hide {{ status|title }} (<code>{{ count }}</code>)
+                {% if status == 'success' %}
+                  Show
+                {% else %}
+                  Hide
+                {% endif %}
+                {{ status|title }} (<code>{{ count }}</code>)
               </button>
             {% endif %}
           {% endfor %}
         </div>
       {% endif %}
 
-      {% for member_rel_path, member_results_list in member_results.items() %}
-        <h3>{{ member_rel_path }}</h3>
-        {% for member_result in member_results_list %}
-          <div class="border border-2 rounded p-3 mb-3 atr-result-member atr-result-status-{{ member_result.status.value }}">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <span class="fw-bold">{{ function_name_from_key(member_result.checker) }}</span>
-              <span class="badge rounded-pill {% if member_result.status.value == "success" %}bg-success {% elif member_result.status.value == "failure" %}bg-danger {% elif member_result.status.value == "warning" %}bg-warning {% elif member_result.status.value == "exception" %}bg-danger {% else %}bg-secondary{% endif %}">
-                {{ member_result.status.value|title }}
-              </span>
-            </div>
-            <div class="small">
-              {% if member_result.message %}<div class="mt-2">{{ member_result.message }}</div>{% endif %}
-            </div>
-          </div>
-        {% endfor %}
-      {% endfor %}
+      <table class="table table-bordered table-striped border mb-3">
+        <thead class="table-light">
+          <tr>
+            <th scope="col" class="w-30">Path</th>
+            <th scope="col" class="w-25">Check</th>
+            <th scope="col">Message</th>
+            <th scope="col" class="text-center w-10">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for member_rel_path, member_results_list in member_results.items() %}
+            {% for member_result in member_results_list %}
+              <tr class="atr-result-member atr-result-status-{{ member_result.status.value }} {% if member_result.status.value == 'success' %}atr-hide{% endif %}">
+                <td class="align-middle">{{ member_rel_path }}</td>
+                <th scope="row" class="align-middle fw-bold">{{ function_name_from_key(member_result.checker) }}</th>
+                <td class="align-middle">
+                  {% if member_result.message %}{{ member_result.message }}{% endif %}
+                </td>
+                <td class="align-middle text-center atr-sans">
+                  <span class="badge rounded-pill {% if member_result.status.value == "success" %}bg-success {% elif member_result.status.value == "failure" %}bg-danger {% elif member_result.status.value == "warning" %}bg-warning {% elif member_result.status.value == "exception" %}bg-danger {% else %}bg-secondary{% endif %}">
+                    {{ member_result.status.value|title }}
+                  </span>
+                </td>
+              </tr>
+            {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
     {% endif %}
 
     <h2>Metadata</h2>
@@ -288,8 +309,14 @@
           const btn = document.getElementById(`btn-toggle-${type}-${status}`);
           const targets = document.querySelectorAll(`.atr-result-${type}.atr-result-status-${status}`);
           if (!targets.length) return;
-          let elementsCurrentlyHidden = targets[0].style.display === "none";
-          targets.forEach(el => el.style.display = elementsCurrentlyHidden ? "" : "none");
+          let elementsCurrentlyHidden = targets[0].classList.contains("atr-hide");
+          targets.forEach(el => {
+              if (elementsCurrentlyHidden) {
+                  el.classList.remove("atr-hide");
+              } else {
+                  el.classList.add("atr-hide");
+              }
+          });
           const bsSt = (status === "failure" || status === "exception") ? "danger" : status;
           const cntMatch = btn.textContent.match(/\((\d+)\)/);
           if (!cntMatch) {
