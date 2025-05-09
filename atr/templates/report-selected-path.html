@@ -42,6 +42,12 @@
     <code>{{ package.filename }}</code>
   </div>
   {% if primary_results %}
+    {% set status_counts = {
+          "success": primary_results|selectattr("status.value", "equalto", "success")|list|length,
+          "failure": primary_results|selectattr("status.value", "equalto", "failure")|list|length,
+          "warning": primary_results|selectattr("status.value", "equalto", "warning")|list|length,
+          "exception": primary_results|selectattr("status.value", "equalto", "exception")|list|length
+        } %}
     {% set earliest_checked = primary_results|min(attribute="created") %}
     {% set latest_checked = primary_results|max(attribute="created") %}
     <p>
@@ -54,29 +60,7 @@
 
   <h2>Report results</h2>
 
-  <!-- {% if primary_results %}
-    {% set status_counts = {
-          "success": primary_results|selectattr("status.value", "equalto", "success")|list|length,
-          "failure": primary_results|selectattr("status.value", "equalto", "failure")|list|length,
-          "warning": primary_results|selectattr("status.value", "equalto", "warning")|list|length,
-          "exception": primary_results|selectattr("status.value", "equalto", "exception")|list|length
-        } %}
-    <div class="d-flex align-items-center p-3 mb-3 bg-light border rounded">
-      <span class="fw-bold me-3">Status summary:</span>
-      <div class="d-flex flex-wrap gap-3">
-        {% for status, count in status_counts.items() %}
-          {% if count > 0 %}
-            <div class="d-flex align-items-center gap-2 px-3 py-2 rounded fw-medium {% if status == "success" %}bg-success-subtle border border-success-subtle {% elif status == "failure" %}bg-danger-subtle border border-danger-subtle {% elif status == "warning" %}bg-warning-subtle border border-warning-subtle {% elif status == "exception" %}bg-danger-subtle border border-danger-subtle {% endif %}">
-              <span>{{ status|title }}</span>
-              <span>(<code>{{ count }}</code>)</span>
-            </div>
-          {% endif %}
-        {% endfor %}
-      </div>
-    </div>
-  {% endif %} -->
-
-  <div class="d-flex flex-wrap gap-3 mb-3">
+  <div class="d-flex flex-wrap gap-3 mb-4">
     {% if primary_results and (status_counts.success > 0 or status_counts.failure > 0 or status_counts.warning > 0 or status_counts.exception > 0) %}
       {% for status, count in status_counts.items() %}
         {% if count > 0 %}
@@ -102,128 +86,133 @@
 
   <div class="mb-3">
     {% if primary_results %}
-      {% for primary_result in primary_results %}
-        <div class="border border-2 rounded p-3 mb-3 atr-result-primary atr-result-status-{{ primary_result.status.value }}">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="fw-bold">{{ function_name_from_key(primary_result.checker) }}</span>
-            <span class="badge rounded-pill {% if primary_result.status.value == "success" %}bg-success {% elif primary_result.status.value == "failure" %}bg-danger {% elif primary_result.status.value == "warning" %}bg-warning {% elif primary_result.status.value == "exception" %}bg-danger {% else %}bg-secondary{% endif %}">
-              {{ primary_result.status.value|title }}
-            </span>
-          </div>
-          <div class="small">
-            <!-- <div>
-              Checked: {{ primary_result.created.strftime("%Y-%m-%d %H:%M:%S UTC") if primary_result.created else "Not checked" }}
-            </div> -->
-
-            {% if primary_result.message %}<div class="mt-2">{{ primary_result.message }}</div>{% endif %}
-
-            {% if (primary_result.data is mapping) and (primary_result.data.keys()|length > 0) %}
-              <details class="mt-2 p-2 bg-light rounded">
-                {% if primary_result.status.value in ["failure", "exception"] %}
-                  <summary class="atr-cursor-pointer user-select-none p-2">View details</summary>
-                {% elif primary_result.status.value == "warning" %}
-                  <summary class="atr-cursor-pointer user-select-none p-2">View details</summary>
-                {% else %}
-                  <summary class="atr-cursor-pointer user-select-none p-2">View details</summary>
-                {% endif %}
-
-                {% if primary_result.checker.endswith("rat.check_licenses") %}
-                  <div class="d-flex gap-3 mb-2">
-                    <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle px-2 py-1">
-                      <strong>{{ primary_result.data.get('approved_licenses', 0) }}</strong> files with approved licenses
-                    </span>
-                    {% if primary_result.data.get("unapproved_licenses", 0) > 0 %}
-                      <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle px-2 py-1">
-                        <strong>{{ primary_result.data.get('unapproved_licenses', 0) }}</strong> files with unapproved licenses
-                      </span>
-                    {% endif %}
-                    {% if primary_result.data.get("unknown_licenses", 0) > 0 %}
-                      <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
-                        <strong>{{ primary_result.data.get('unknown_licenses', 0) }}</strong> files with unknown licenses
-                      </span>
-                    {% endif %}
-                  </div>
-                {% endif %}
-
-                <table class="table table-bordered mt-2">
-                  <tbody>
-                    {% for key, value in primary_result.data.items() %}
-                      {% if key != "debug_info" %}
-                        <tr>
-                          <th class="bg-light fw-bold align-top">{{ key|replace('_', ' ') |title }}</th>
-                          <td>
-                            {% if value is boolean %}
-                              {{ "Yes" if value else "No" }}
-                            {% elif value is mapping %}
-                              <table class="table table-sm mb-0">
-                                {% for k, v in value.items() %}
-                                  <tr>
-                                    <th class="bg-light fw-bold">{{ k|replace('_', ' ') |title }}</th>
-                                    <td>{{ v }}</td>
-                                  </tr>
-                                {% endfor %}
-                              </table>
-                            {% elif key == "unapproved_files" or key == "unknown_license_files" %}
-                              {% if value|length > 0 %}
-                                <table class="table table-sm table-bordered mb-0">
-                                  <thead>
-                                    <tr>
-                                      <th class="bg-light fw-bold">File</th>
-                                      <th class="bg-light fw-bold">License</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {% for file_info in value %}
-                                      <tr>
-                                        <td>{{ file_info.name }}</td>
-                                        <td>{{ file_info.license }}</td>
-                                      </tr>
-                                    {% endfor %}
-                                  </tbody>
-                                </table>
-                              {% else %}
-                                None
-                              {% endif %}
-                            {% elif value is sequence and value is not string %}
-                              {{ value|join(", ") }}
-                            {% else %}
-                              {{ value }}
-                            {% endif %}
-                          </td>
-                        </tr>
+      <table class="table table-bordered table-striped border mb-3">
+        <!-- <thead class="table-light">
+                <tr>
+                    <th scope="col" style="width: 20%;">Check</th>
+                    <th scope="col">Message / Details</th>
+                    <th scope="col" style="width: 10%;">Status</th>
+                </tr>
+            </thead> -->
+        <tbody>
+          {% for primary_result in primary_results %}
+            <tr class="atr-result-primary atr-result-status-{{ primary_result.status.value }}">
+              <th scope="row" class="align-middle fw-bold">{{ function_name_from_key(primary_result.checker) }}</th>
+              <td class="align-middle">
+                {% if primary_result.data is mapping and primary_result.data.keys()|length > 0 %}
+                  <details class="bg-light rounded">
+                    <summary class="atr-cursor-pointer user-select-none p-2">
+                      {{- primary_result.message if primary_result.message else "Details" -}}
+                    </summary>
+                    <div class="p-2">
+                      {% if primary_result.checker.endswith("rat.check_licenses") %}
+                        <div class="d-flex gap-3 mb-2">
+                          <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle px-2 py-1">
+                            <strong>{{ primary_result.data.get('approved_licenses', 0) }}</strong> files with approved licenses
+                          </span>
+                          {% if primary_result.data.get("unapproved_licenses", 0) > 0 %}
+                            <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle px-2 py-1">
+                              <strong>{{ primary_result.data.get('unapproved_licenses', 0) }}</strong> files with unapproved licenses
+                            </span>
+                          {% endif %}
+                          {% if primary_result.data.get("unknown_licenses", 0) > 0 %}
+                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
+                              <strong>{{ primary_result.data.get('unknown_licenses', 0) }}</strong> files with unknown licenses
+                            </span>
+                          {% endif %}
+                        </div>
                       {% endif %}
-                    {% endfor %}
-
-                    {% if primary_result.data.get("debug_info") is mapping %}
-                      {% for debug_key, debug_value in primary_result.data.debug_info.items() %}
-                        <tr>
-                          <th class="bg-light fw-bold align-top">
-                            <span class="text-muted">(Debug)</span> {{ debug_key|replace('_', ' ') |title }}
-                          </th>
-                          <td>
-                            {% if debug_key == 'stderr' %}
-                              <pre class="mb-0 small"><code class="small">{{ debug_value }}</code></pre>
-                            {% elif debug_value is boolean %}
-                              {{ "Yes" if debug_value else "No" }}
-                            {% elif debug_value is none %}
-                              <span class="text-muted">(None)</span>
-                            {% else %}
-                              {{ debug_value }}
+                      <table class="table table-bordered table-sm mb-0">
+                        <tbody>
+                          {% for key, value in primary_result.data.items() %}
+                            {% if key != "debug_info" %}
+                              <tr>
+                                <th class="bg-light fw-bold align-top">{{ key|replace('_', ' ') |title }}</th>
+                                <td>
+                                  {% if value is boolean %}
+                                    {{ "Yes" if value else "No" }}
+                                  {% elif value is mapping %}
+                                    <table class="table table-sm mb-0">
+                                      {% for k, v in value.items() %}
+                                        <tr>
+                                          <th class="bg-light fw-bold">{{ k|replace('_', ' ') |title }}</th>
+                                          <td>{{ v }}</td>
+                                        </tr>
+                                      {% endfor %}
+                                    </table>
+                                  {% elif key == "unapproved_files" or key == "unknown_license_files" %}
+                                    {% if value|length > 0 %}
+                                      <table class="table table-sm table-bordered mb-0">
+                                        <thead>
+                                          <tr>
+                                            <th class="bg-light fw-bold">File</th>
+                                            <th class="bg-light fw-bold">License</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {% for file_info in value %}
+                                            <tr>
+                                              <td>{{ file_info.name }}</td>
+                                              <td>{{ file_info.license }}</td>
+                                            </tr>
+                                          {% endfor %}
+                                        </tbody>
+                                      </table>
+                                    {% else %}
+                                      None
+                                    {% endif %}
+                                  {% elif value is sequence and value is not string %}
+                                    {{ value|join(", ") }}
+                                  {% else %}
+                                    {{ value }}
+                                  {% endif %}
+                                </td>
+                              </tr>
                             {% endif %}
-                          </td>
-                        </tr>
-                      {% endfor %}
-                    {% endif %}
-                  </tbody>
-                </table>
-              </details>
-            {% endif %}
-          </div>
-        </div>
-      {% endfor %}
+                          {% endfor %}
+                          {% if primary_result.data.get("debug_info") is mapping %}
+                            {% for debug_key, debug_value in primary_result.data.debug_info.items() %}
+                              <tr>
+                                <th class="bg-light fw-bold align-top">
+                                  <span class="text-muted">(Debug)</span> {{ debug_key|replace('_', ' ') |title }}
+                                </th>
+                                <td>
+                                  {% if debug_key == 'stderr' %}
+                                    <pre class="mb-0 small"><code class="small">{{ debug_value }}</code></pre>
+                                  {% elif debug_value is boolean %}
+                                    {{ "Yes" if debug_value else "No" }}
+                                  {% elif debug_value is none %}
+                                    <span class="text-muted">(None)</span>
+                                  {% else %}
+                                    {{ debug_value }}
+                                  {% endif %}
+                                </td>
+                              </tr>
+                            {% endfor %}
+                          {% endif %}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                {% elif primary_result.message %}
+                  {{ primary_result.message }}
+                {% endif %}
+              </td>
+              <td class="align-middle text-center atr-sans">
+                <span class="badge rounded-pill {% if primary_result.status.value == "success" %}bg-success {% elif primary_result.status.value == "failure" %}bg-danger {% elif primary_result.status.value == "warning" %}bg-warning {% elif primary_result.status.value == "exception" %}bg-danger {% else %}bg-secondary{% endif %}">
+                  {{ primary_result.status.value|title }}
+                </span>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     {% else %}
       <p>No verification tasks found for this file.</p>
     {% endif %}
+
+    <h2>Member results</h2>
+    <p>This file is an archive. We have extracted the contents of the archive and checked each file individually.</p>
 
     {% if member_results %}
       {% set member_status_counts = {"success": 0, "failure": 0, "warning": 0, "exception": 0} %}
@@ -249,8 +238,7 @@
           {% endfor %}
         </div>
       {% endif %}
-      <h2>Member results</h2>
-      <p>This file is an archive. We have extracted the contents of the archive and checked each file individually.</p>
+
       {% for member_rel_path, member_results_list in member_results.items() %}
         <h3>{{ member_rel_path }}</h3>
         {% for member_result in member_results_list %}
