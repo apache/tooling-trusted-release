@@ -18,7 +18,9 @@
                   aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <p class="text-muted mb-3">Warning: This action will permanently delete this {{ item }} and cannot be undone.</p>
+          <p class="text-muted mb-3 atr-sans">
+            Warning: This action will permanently delete this {{ item }} and cannot be undone.
+          </p>
           <form method="post" action="{{ action }}">
             {{ form.hidden_tag() }}
             {{ form[field_name](value_=id, hidden=True) }}
@@ -44,7 +46,7 @@
 {% endmacro %}
 
 {% macro delete_modal(id, title, item, action, form, field_name) %}
-  {% set element_id = id|slugify %}
+  {% set element_id = id|string|slugify %}
   <div class="modal modal-lg fade"
        id="delete-{{ element_id }}"
        data-bs-backdrop="static"
@@ -62,7 +64,9 @@
                   aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <p class="text-muted mb-3">Warning: This action will permanently delete this {{ item }} and cannot be undone.</p>
+          <p class="text-muted mb-3 atr-sans">
+            Warning: This action will permanently delete this {{ item }} and cannot be undone.
+          </p>
           <form method="post" action="{{ action }}">
             {{ form.hidden_tag() }}
             {{ form[field_name](value_=id, hidden=True) }}

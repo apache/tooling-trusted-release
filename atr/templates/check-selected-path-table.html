@@ -107,7 +107,7 @@
                             data-bs-target="#delete-{{ row_id }}"
                             title="Delete file {{ path }}">Delete</button>
                   </div>
-                  {{ dialog.delete_modal(row_id, "Delete file", "file, and any associated metadata files", as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
+                  {{ dialog.delete_modal(path, "Delete file", "file, and any associated metadata files", as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
                 </div>
               </div>
             </td>
