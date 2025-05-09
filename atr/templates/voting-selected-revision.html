@@ -92,25 +92,48 @@
       <div class="row mb-3 pb-3">
         <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.body.label }}</div>
         <div class="col-md-9">
-          {{ form.body(class_='form-control font-monospace', rows='20') }}
-          {% if form.body.errors %}
-            <div class="invalid-feedback d-block">
-              {% for error in form.body.errors %}{{ error }}{% endfor %}
+          <ul class="nav nav-tabs" id="emailBodyTab" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active"
+                      id="edit-body-tab"
+                      data-bs-toggle="tab"
+                      data-bs-target="#edit-body-pane"
+                      type="button"
+                      role="tab"
+                      aria-controls="edit-body-pane"
+                      aria-selected="true">Edit</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link"
+                      id="text-preview-body-tab"
+                      data-bs-toggle="tab"
+                      data-bs-target="#text-preview-body-pane"
+                      type="button"
+                      role="tab"
+                      aria-controls="text-preview-body-pane"
+                      aria-selected="false">Text preview</button>
+            </li>
+          </ul>
+          <div class="tab-content" id="emailBodyTabContent">
+            <div class="tab-pane fade show active"
+                 id="edit-body-pane"
+                 role="tabpanel"
+                 aria-labelledby="edit-body-tab">
+              {{ form.body(class_='form-control font-monospace mt-2', rows='20') }}
+              {% if form.body.errors %}
+                <div class="invalid-feedback d-block">
+                  {% for error in form.body.errors %}{{ error }}{% endfor %}
+                </div>
+              {% endif %}
+              <small class="form-text text-muted">Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT], [DURATION], [REVIEW_URL], and [YOUR_ASF_ID] will be filled in automatically when the email is sent.</small>
             </div>
-          {% endif %}
-          <small class="form-text text-muted">Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT], [DURATION], [REVIEW_URL], and [YOUR_ASF_ID] will be filled in automatically when the email is sent.</small>
-        </div>
-      </div>
-
-      <div class="row mb-3 pb-3 border-bottom">
-        <div class="col-md-9 offset-md-3">
-          <details>
-            <summary class="text-muted">Show live preview</summary>
-            <pre id="email-body-preview"
-                 data-preview-url="{{ as_url(routes.draft.vote_preview, project_name=release.project.name, version_name=release.version) }}"
-                 data-asf-uid="{{ current_user.uid }}"
-                 class="mt-2 p-3 bg-white border rounded font-monospace overflow-auto"></pre>
-          </details>
+            <div class="tab-pane fade"
+                 id="text-preview-body-pane"
+                 role="tabpanel"
+                 aria-labelledby="text-preview-body-tab">
+              <pre class="mt-2 p-3 bg-light border rounded font-monospace overflow-auto"><code id="text-preview-content">Loading preview...</code></pre>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -133,20 +156,20 @@
 
           const bodyTextarea = document.getElementById("body");
           const voteDurationInput = document.getElementById("vote_duration");
-          const previewPre = document.getElementById("email-body-preview");
+          const textPreviewContent = document.getElementById("text-preview-content");
           const voteForm = document.getElementById("vote-initiate-form");
 
-          if (!bodyTextarea || !previewPre || !voteDurationInput || !voteForm) {
+          if (!bodyTextarea || !voteDurationInput || !textPreviewContent || !voteForm) {
               console.error("Required elements for preview not found.");
               return;
           }
 
-          const previewUrl = previewPre.dataset.previewUrl;
+          const previewUrl = "{{ as_url(routes.draft.vote_preview, project_name=release.project.name, version_name=release.version) }}";
           const csrfTokenInput = voteForm.querySelector('input[name="csrf_token"]');
 
           if (!previewUrl || !csrfTokenInput) {
               console.error("Required data attributes or CSRF token not found.");
-              return
+              return;
           }
           const csrfToken = csrfTokenInput.value;
 
@@ -175,11 +198,11 @@
                       return response.text();
                   })
                   .then(previewText => {
-                      previewPre.textContent = previewText;
+                      textPreviewContent.textContent = previewText;
                   })
                   .catch(error => {
                       console.error("Error fetching email preview:", error);
-                      previewPre.textContent = `Error loading preview:\n${error.message}`;
+                      textPreviewContent.textContent = `Error loading preview:\n${error.message}`;
                   });
           }
 

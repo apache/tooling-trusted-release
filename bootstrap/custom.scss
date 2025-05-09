@@ -152,3 +152,7 @@ small, .text-muted {
   // Set base state - remove underline from shim's a rule
   text-decoration: none;
 }
+
+.nav-link {
+  cursor: pointer;
+}

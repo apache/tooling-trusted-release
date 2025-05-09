@@ -11844,4 +11844,8 @@ small, .small, .text-muted {
   text-decoration: none;
 }
 
+.nav-link {
+  cursor: pointer;
+}
+
 /*# sourceMappingURL=custom.css.map */

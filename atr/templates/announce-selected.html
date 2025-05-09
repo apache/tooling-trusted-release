@@ -111,23 +111,47 @@
       <label for="{{ announce_form.body.id }}"
              class="col-md-3 col-form-label text-md-end">{{ announce_form.body.label.text }}:</label>
       <div class="col-md-9">
-        {{ announce_form.body(class_='form-control font-monospace', rows='12') }}
-        {% if announce_form.body.errors %}
-          <div class="invalid-feedback d-block">
-            {% for error in announce_form.body.errors %}{{ error }}{% endfor %}
+        <ul class="nav nav-tabs" id="announceBodyTab" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active"
+                    id="edit-announce-body-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#edit-announce-body-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="edit-announce-body-pane"
+                    aria-selected="true">Edit</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link"
+                    id="text-preview-announce-body-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#text-preview-announce-body-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="text-preview-announce-body-pane"
+                    aria-selected="false">Text preview</button>
+          </li>
+        </ul>
+        <div class="tab-content" id="announceBodyTabContent">
+          <div class="tab-pane fade show active"
+               id="edit-announce-body-pane"
+               role="tabpanel"
+               aria-labelledby="edit-announce-body-tab">
+            {{ announce_form.body(class_='form-control font-monospace mt-2', rows='12') }}
+            {% if announce_form.body.errors %}
+              <div class="invalid-feedback d-block">
+                {% for error in announce_form.body.errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
           </div>
-        {% endif %}
-      </div>
-    </div>
-    <div class="row mb-3 pb-3 border-bottom">
-      <div class="col-md-9 offset-md-3">
-        <details>
-          <summary class="text-muted">Show live preview</summary>
-          <pre id="announce-email-body-preview"
-               data-preview-url="{{ as_url(routes.preview.announce_preview, project_name=release.project.name, version_name=release.version) }}"
-               data-asf-uid="{{ current_user.uid }}"
-               class="mt-2 p-3 bg-white border rounded font-monospace overflow-auto"></pre>
-        </details>
+          <div class="tab-pane fade"
+               id="text-preview-announce-body-pane"
+               role="tabpanel"
+               aria-labelledby="text-preview-announce-body-tab">
+            <pre class="mt-2 p-3 bg-light border rounded font-monospace overflow-auto"><code id="announce-text-preview-content">Loading preview...</code></pre>
+          </div>
+        </div>
       </div>
     </div>
     <div class="row mb-3">
@@ -155,24 +179,24 @@
           const debounceDelay = 500;
 
           const bodyTextarea = document.getElementById("body");
-          const previewPre = document.getElementById("announce-email-body-preview");
+          const textPreviewContent = document.getElementById("announce-text-preview-content");
           const announceForm = document.getElementById("announce-release-form");
 
-          if (!bodyTextarea || !previewPre || !announceForm) {
-              console.error("Required elements for preview not found.");
+          if (!bodyTextarea || !textPreviewContent || !announceForm) {
+              console.error("Required elements for announce preview not found. Exiting.");
               return;
           }
 
-          const previewUrl = previewPre.dataset.previewUrl;
+          const previewUrl = "{{ as_url(routes.preview.announce_preview, project_name=release.project.name, version_name=release.version) }}";
           const csrfTokenInput = announceForm.querySelector('input[name="csrf_token"]');
 
           if (!previewUrl || !csrfTokenInput) {
-              console.error("Required data attributes or CSRF token not found.");
-              return
+              console.error("Required data attributes or CSRF token not found for announce preview.");
+              return;
           }
           const csrfToken = csrfTokenInput.value;
 
-          function fetchAndUpdatePreview() {
+          function fetchAndUpdateAnnouncePreview() {
               const bodyContent = bodyTextarea.value;
 
               fetch(previewUrl, {
@@ -195,20 +219,20 @@
                       return response.text();
                   })
                   .then(previewText => {
-                      previewPre.textContent = previewText;
+                      textPreviewContent.textContent = previewText;
                   })
                   .catch(error => {
                       console.error("Error fetching email preview:", error);
-                      previewPre.textContent = `Error loading preview:\\n${error.message}`;
+                      textPreviewContent.textContent = `Error loading preview:\n${error.message}`;
                   });
           }
 
           bodyTextarea.addEventListener("input", () => {
               clearTimeout(debounceTimeout);
-              debounceTimeout = setTimeout(fetchAndUpdatePreview, debounceDelay);
+              debounceTimeout = setTimeout(fetchAndUpdateAnnouncePreview, debounceDelay);
           });
 
-          fetchAndUpdatePreview();
+          fetchAndUpdateAnnouncePreview();
       });
   </script>
 {% endblock javascripts %}
