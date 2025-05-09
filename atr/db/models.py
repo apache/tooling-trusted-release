@@ -48,10 +48,10 @@ class UTCDateTime(sqlalchemy.types.TypeDecorator):
     def process_bind_param(self, value, dialect):  # type: ignore
         if value:
             if not isinstance(value, datetime.datetime):
-                raise ValueError(f"unexpected value type {type(value)}")
+                raise ValueError(f"Unexpected value type {type(value)}")
 
             if value.tzinfo is None:
-                raise ValueError("encountered offset-naive datetime")
+                raise ValueError("Unexpected offset-naive datetime")
 
             # store the datetime in UTC in sqlite as it does not support timezones
             return value.astimezone(datetime.UTC)

@@ -10,6 +10,21 @@
           Message-ID: <code class="user-select-all">{{ task_mid }}</code>
         </p>
       {% endif %}
+      {% if vote_task_warnings %}
+        <div class="alert alert-warning mt-2 mb-0 p-2 border-2 rounded-3"
+             role="alert">
+          <p class="mb-1 fw-semibold">
+            <i class="bi bi-exclamation-triangle me-1"></i> WARNING: There were issues sending the vote email:
+          </p>
+          <ul class="mb-0 ps-4">
+            {% for warning in vote_task_warnings %}
+              <li>
+                <small>{{ warning }}</small>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
     {% elif vote_task.status.value == "failed" %}
       <p class="mb-1 text-danger fw-semibold">
         <i class="bi bi-x-circle me-1"></i> Vote thread failed: {{ format_datetime(vote_task.completed) }}

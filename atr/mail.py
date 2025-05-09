@@ -54,7 +54,7 @@ class Message:
     in_reply_to: str | None = None
 
 
-async def send(message: Message) -> str:
+async def send(message: Message) -> tuple[str, list[str]]:
     """Send an email notification about an artifact or a vote."""
     _LOGGER.info(f"Sending email for event: {message}")
     from_addr = message.email_sender
@@ -90,18 +90,17 @@ async def send(message: Message) -> str:
     start = time.perf_counter()
     _LOGGER.info(f"sending message: {msg_text}")
 
-    try:
-        await _send_many(from_addr, [to_addr], msg_text)
-    except Exception as e:
-        _LOGGER.error(f"send error: {e}")
-        raise e
+    errors = await _send_many(from_addr, [to_addr], msg_text)
+
+    if not errors:
+        _LOGGER.info(f"Sent to {to_addr} successfully")
     else:
-        _LOGGER.info(f"sent to {to_addr}")
+        _LOGGER.warning(f"Errors sending to {to_addr}: {errors}")
 
     elapsed = time.perf_counter() - start
-    _LOGGER.info(f" send_many took {elapsed:.3f}s")
+    _LOGGER.info(f"Time taken to _send_many: {elapsed:.3f}s")
 
-    return mid
+    return mid, errors
 
 
 def set_secret_key(key: str) -> None:
@@ -121,11 +120,13 @@ async def set_secret_key_default() -> None:
         _LOGGER.info("DKIM key loaded and set successfully")
 
 
-async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None:
+async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> list[str]:
     """Send an email to multiple recipients with DKIM signing."""
     message_bytes = bytes(msg_text, "utf-8")
 
     if global_secret_key is None:
+        # This is a severe configuration error
+        # It does not count as a send error to only warn about
         raise ValueError("global_secret_key is not set")
 
     # DKIM sign the message
@@ -153,9 +154,7 @@ async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> None
             _LOGGER.exception(f"Failed to send to {addr}:")
             errors.append(f"failed to send to {addr}: {e}")
 
-    if errors:
-        # Raising an exception will ensure that any calling task is marked as failed
-        raise Exception("Failed to send to one or more recipients: " + "; ".join(errors))
+    return errors
 
 
 async def _send_via_relay(from_addr: str, to_addr: str, dkim_msg_bytes: bytes) -> None:

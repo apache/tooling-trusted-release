@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 from typing import TYPE_CHECKING
 
 import quart
@@ -63,6 +64,7 @@ async def check(
     delete_draft_form = await draft.DeleteForm.create_form()
     delete_file_form = await draft.DeleteFileForm.create_form()
     resolve_form = await resolve.ResolveForm.create_form()
+    vote_task_warnings = _warnings_from_vote_result(vote_task)
 
     return await quart.render_template(
         "check-selected.html",
@@ -87,6 +89,7 @@ async def check(
         resolve_form=resolve_form,
         vote_task=vote_task,
         archive_url=archive_url,
+        vote_task_warnings=vote_task_warnings,
     )
 
 
@@ -97,3 +100,38 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
 
     release = await session.release(project_name, version_name, with_committee=True)
     return await check(session, release)
+
+
+def _warnings_from_vote_result(vote_task: models.Task | None) -> list[str]:
+    # TODO: Replace this with a schema.Strict model
+    # But we'd still need to do some of this parsing and validation
+    # We should probably rethink how to send data through tasks
+
+    if not vote_task or (not vote_task.result):
+        return ["No vote task result found."]
+
+    if not isinstance(vote_task.result, list):
+        return ["Vote task result is not a list."]
+
+    if len(vote_task.result) != 1:
+        return ["Vote task result list length invalid."]
+
+    if not (first_task_result := vote_task.result[0]):
+        return ["Vote task result item is empty."]
+
+    if not isinstance(first_task_result, str):
+        return ["Vote task result item is not a string."]
+
+    try:
+        data_after_json_parse = json.loads(first_task_result)
+    except json.JSONDecodeError:
+        return ["Vote task result content not valid JSON."]
+
+    if not isinstance(data_after_json_parse, dict):
+        return ["Vote task result JSON content not a dictionary."]
+
+    existing_warnings_list = data_after_json_parse.get("mail_send_warnings", [])
+    if not isinstance(existing_warnings_list, list):
+        return ["Vote task result mail_send_warnings is not a list."]
+
+    return existing_warnings_list

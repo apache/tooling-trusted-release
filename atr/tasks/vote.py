@@ -18,7 +18,6 @@
 import datetime
 import json
 import logging
-import time
 from typing import Any, Final
 
 import atr.construct as construct
@@ -127,21 +126,21 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     )
 
     # Send the email
-    try:
-        mid = await mail.send(message)
-    except Exception:
-        _LOGGER.exception(f"Failed to send vote email to {args.email_to}:")
-        # This is here for falling through, for debugging
-        mid = f"{int(time.time())}@example.invalid"
-        # Remove this "raise" to fall through
-        raise
-    else:
-        _LOGGER.info(f"Vote email sent successfully to {args.email_to}")
+    mid, mail_errors = await mail.send(message)
 
-    return {
+    # Original success message structure
+    result_data: dict[str, str | list[str]] = {
         "message": "Vote announcement email sent successfully",
         "email_to": args.email_to,
         "vote_end": vote_end_str,
         "subject": subject,
         "mid": mid,
     }
+
+    if mail_errors:
+        _LOGGER.warning(f"Start vote for {args.release_name}: sending to {args.email_to}  gave errors: {mail_errors}")
+        result_data["mail_send_warnings"] = mail_errors
+    else:
+        _LOGGER.info(f"Vote email sent successfully to {args.email_to}")
+
+    return result_data

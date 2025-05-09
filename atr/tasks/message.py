@@ -58,8 +58,15 @@ async def send(args: Send) -> str | None:
     # Send the email
     # TODO: Move this call into send itself?
     await mail.set_secret_key_default()
-    mid = await mail.send(message)
+    mid, mail_errors = await mail.send(message)
+
+    result_data: dict[str, str | list[str]] = {"mid": mid}
+    if mail_errors:
+        _LOGGER.warning(f"Mail sending to {args.email_recipient} for subject '{args.subject}' encountered errors:")
+        for error in mail_errors:
+            _LOGGER.warning(f"- {error}")
+        result_data["mail_send_warnings"] = mail_errors
 
     # TODO: Record the vote in the database?
     # We'd need to sync with manual votes too
-    return json.dumps({"mid": mid})
+    return json.dumps(result_data)
