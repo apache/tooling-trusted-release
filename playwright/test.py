@@ -523,11 +523,11 @@ def test_checks_01_hashing_sha512(page: sync_api.Page, credentials: Credentials)
     logging.info(f"Successfully navigated to {report_file_path}")
 
     logging.info("Verifying Hashing Check status")
-    hashing_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Hashing Check'))")
-    sync_api.expect(hashing_check_div_locator).to_be_visible()
-    logging.info("Located Hashing Check block")
+    check_row_locator = page.locator("tr.atr-result-primary:has(th:has-text('Hashing Check'))")
+    sync_api.expect(check_row_locator).to_be_visible()
+    logging.info("Located Hashing Check row")
 
-    success_badge_locator = hashing_check_div_locator.locator("span.badge.bg-success:text-is('Success')")
+    success_badge_locator = check_row_locator.locator("td span.badge.bg-success:text-is('Success')")
     sync_api.expect(success_badge_locator).to_be_visible()
     logging.info("Hashing Check status verified as Success")
 
@@ -558,13 +558,13 @@ def test_checks_02_license_files(page: sync_api.Page, credentials: Credentials) 
     logging.info(f"Successfully navigated to {report_file_path}")
 
     logging.info("Verifying License Files check status")
-    license_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('License Files'))")
-    sync_api.expect(license_check_div_locator).to_be_visible()
-    logging.info("Located License Files check block")
+    check_row_locator = page.locator("tr.atr-result-primary:has(th:text-is('License Files'))")
+    sync_api.expect(check_row_locator).to_be_visible()
+    logging.info("Located License Files check row")
 
-    passed_badge_locator = license_check_div_locator.locator("span.badge.bg-success:text-is('Success')")
-    sync_api.expect(passed_badge_locator).to_be_visible()
-    logging.info("License Files check status verified as Passed")
+    success_badge_locator = check_row_locator.locator("td span.badge.bg-success:text-is('Success')")
+    sync_api.expect(success_badge_locator).to_be_visible()
+    logging.info("License Files check status verified as Success")
 
 
 def test_checks_03_license_headers(page: sync_api.Page, credentials: Credentials) -> None:
@@ -581,13 +581,13 @@ def test_checks_03_license_headers(page: sync_api.Page, credentials: Credentials
     logging.info(f"Successfully navigated to {report_file_path}")
 
     logging.info("Verifying License Headers check status")
-    header_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('License Headers'))")
-    sync_api.expect(header_check_div_locator).to_be_visible()
-    logging.info("Located License Headers check block")
+    check_row_locator = page.locator("tr.atr-result-primary:has(th:has-text('License Headers'))")
+    sync_api.expect(check_row_locator).to_be_visible()
+    logging.info("Located License Headers check row")
 
-    passed_badge_locator = header_check_div_locator.locator("span.badge.bg-success:text-is('Success')")
-    sync_api.expect(passed_badge_locator).to_be_visible()
-    logging.info("License Headers check status verified as Passed")
+    success_badge_locator = check_row_locator.locator("td span.badge.bg-success:text-is('Success')")
+    sync_api.expect(success_badge_locator).to_be_visible()
+    logging.info("License Headers check status verified as Success")
 
 
 def test_checks_04_paths(page: sync_api.Page, credentials: Credentials) -> None:
@@ -605,13 +605,13 @@ def test_checks_04_paths(page: sync_api.Page, credentials: Credentials) -> None:
     # TODO: It's a bit strange to have the status in the check name
     # But we have to do this because we need separate Recorder objects
     logging.info("Verifying Paths Check Success status")
-    paths_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Paths Check Success'))")
-    sync_api.expect(paths_check_div_locator).to_be_visible()
-    logging.info("Located Paths Check Success block")
+    check_row_locator = page.locator("tr.atr-result-primary:has(th:has-text('Paths Check Success'))")
+    sync_api.expect(check_row_locator).to_be_visible()
+    logging.info("Located Paths Check Success row")
 
-    passed_badge_locator = paths_check_div_locator.locator("span.badge.bg-success:text-is('Success')")
-    sync_api.expect(passed_badge_locator).to_be_visible()
-    logging.info("Paths Check Success status verified as Passed")
+    success_badge_locator = check_row_locator.locator("td span.badge.bg-success:text-is('Success')")
+    sync_api.expect(success_badge_locator).to_be_visible()
+    logging.info("Paths Check Success status verified as Success")
 
 
 def test_checks_05_signature(page: sync_api.Page, credentials: Credentials) -> None:
@@ -627,13 +627,13 @@ def test_checks_05_signature(page: sync_api.Page, credentials: Credentials) -> N
     logging.info(f"Successfully navigated to {report_file_path}")
 
     logging.info("Verifying Signature Check status")
-    signature_check_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Signature Check'))")
-    sync_api.expect(signature_check_div_locator).to_be_visible()
-    logging.info("Located Signature Check block")
+    check_row_locator = page.locator("tr.atr-result-primary:has(th:has-text('Signature Check'))")
+    sync_api.expect(check_row_locator).to_be_visible()
+    logging.info("Located Signature Check row")
 
-    passed_badge_locator = signature_check_div_locator.locator("span.badge.bg-success:text-is('Success')")
-    sync_api.expect(passed_badge_locator).to_be_visible()
-    logging.info("Signature Check status verified as Passed")
+    success_badge_locator = check_row_locator.locator("td span.badge.bg-success:text-is('Success')")
+    sync_api.expect(success_badge_locator).to_be_visible()
+    logging.info("Signature Check status verified as Success")
 
 
 def test_checks_06_targz(page: sync_api.Page, credentials: Credentials) -> None:
@@ -649,20 +649,20 @@ def test_checks_06_targz(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info(f"Successfully navigated to {report_file_path}")
 
     logging.info("Verifying Targz Integrity status")
-    integrity_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Targz Integrity'))")
-    sync_api.expect(integrity_div_locator).to_be_visible()
-    logging.info("Located Targz Integrity block")
-    integrity_passed_badge = integrity_div_locator.locator("span.badge.bg-success:text-is('Success')")
-    sync_api.expect(integrity_passed_badge).to_be_visible()
-    logging.info("Targz Integrity status verified as Passed")
+    integrity_row_locator = page.locator("tr.atr-result-primary:has(th:has-text('Targz Integrity'))")
+    sync_api.expect(integrity_row_locator).to_be_visible()
+    logging.info("Located Targz Integrity row")
+    integrity_success_badge = integrity_row_locator.locator("td span.badge.bg-success:text-is('Success')")
+    sync_api.expect(integrity_success_badge).to_be_visible()
+    logging.info("Targz Integrity status verified as Success")
 
     logging.info("Verifying Targz Structure status")
-    structure_div_locator = page.locator("div.border:has(span.fw-bold:text-is('Targz Structure'))")
-    sync_api.expect(structure_div_locator).to_be_visible()
-    logging.info("Located Targz Structure block")
-    structure_passed_badge = structure_div_locator.locator("span.badge.bg-success:text-is('Success')")
-    sync_api.expect(structure_passed_badge).to_be_visible()
-    logging.info("Targz Structure status verified as Passed")
+    structure_row_locator = page.locator("tr.atr-result-primary:has(th:has-text('Targz Structure'))")
+    sync_api.expect(structure_row_locator).to_be_visible()
+    logging.info("Located Targz Structure row")
+    structure_success_badge = structure_row_locator.locator("td span.badge.bg-success:text-is('Success')")
+    sync_api.expect(structure_success_badge).to_be_visible()
+    logging.info("Targz Structure status verified as Success")
 
 
 def test_gpg_01_upload(page: sync_api.Page, credentials: Credentials) -> None:

@@ -644,6 +644,7 @@ async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathI
                     release_name=release.name,
                     revision=release.revision,
                     primary_rel_path=str(path),
+                    member_rel_path=None,
                     status=models.CheckResultStatus.SUCCESS,
                 ).all()
             )
@@ -652,6 +653,7 @@ async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathI
                     release_name=release.name,
                     revision=release.revision,
                     primary_rel_path=str(path),
+                    member_rel_path=None,
                     status=models.CheckResultStatus.WARNING,
                 ).all()
             )
@@ -660,6 +662,7 @@ async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathI
                     release_name=release.name,
                     revision=release.revision,
                     primary_rel_path=str(path),
+                    member_rel_path=None,
                     status=models.CheckResultStatus.FAILURE,
                 ).all()
             )
