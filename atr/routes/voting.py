@@ -42,10 +42,7 @@ async def selected_revision(
     await session.check_access(project_name)
 
     async with db.session() as data:
-        project = await data.project(name=project_name).demand(routes.FlashError("Project not found"))
-        release = await data.release(project_name=project.name, version=version_name, _committee=True).demand(
-            routes.FlashError("Release candidate not found")
-        )
+        release = await session.release(project_name, version_name, data=data, with_project=True, with_committee=True)
         # Check that the user is on the project committee for the release
         # TODO: Consider relaxing this to all committers
         # Otherwise we must not show the vote form
