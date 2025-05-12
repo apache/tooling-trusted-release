@@ -1,4 +1,3 @@
-
 <form method="post"
       enctype="multipart/form-data"
       class="atr-canary py-4 px-5"
@@ -17,10 +16,7 @@
     <label for="{{ form.mailto_addresses.entries[0].id }}"
            class="col-sm-3 col-form-label text-sm-end">{{ form.mailto_addresses.entries[0].label.text }}:</label>
     <div class="col-sm-8">
-      {{ form.mailto_addresses.entries[0](size=30, class_="form-control" + (" is-invalid" if form.mailto_addresses[0].errors else "")) }}
-      {% if form.mailto_addresses[0].errors %}
-        {% for error in form.mailto_addresses[0].errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-      {% endif %}
+      {{ forms.render_field(form.mailto_addresses.entries[0]) }}
       <span class="form-text text-muted">Note: This field determines where vote and finished release announcement emails are sent. You can set this value to your own mailing list, but ATR will currently only let you send to <code>user-tests@tooling.apache.org</code>.</span>
     </div>
     <!--
@@ -34,9 +30,10 @@
     <label for="{{ form.manual_vote.id }}"
            class="col-sm-3 col-form-label text-sm-end">{{ form.manual_vote.label.text }}</label>
     <div class="col-sm-8">
-      {{ form.manual_vote(class_="form-check-input") }}
-      <label class="form-check-label">Manual</label>
-      <br />
+      <div class="form-check">
+        {{ forms.render_checkbox(form.manual_vote) }}
+        <label class="form-check-label" for="{{ form.manual_vote.id }}">Manual</label>
+      </div>
       <span id="manual_vote-help" class="form-text text-muted">If this is set then the vote will be completely manual and following policy is ignored.</span>
     </div>
   </div>
@@ -45,11 +42,8 @@
     <label for="{{ form.min_hours.id }}"
            class="col-sm-3 col-form-label text-sm-end">{{ form.min_hours.label.text }}</label>
     <div class="col-sm-8">
-      {{ form.min_hours(class_="form-control" + (" is-invalid" if form.min_hours.errors else "") ) }}
+      {{ forms.render_field(form.min_hours) }}
       <span id="min_hours-help" class="form-text text-muted">The minimum time to run the vote, in hours. Must be 0 or between 72 and 144 inclusive. If 0, then wait until 3 +1 votes and more +1 than -1.</span>
-      {% if form.min_hours.errors %}
-        {% for error in form.min_hours.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-      {% endif %}
     </div>
   </div>
 
@@ -57,7 +51,7 @@
     <label for="{{ form.release_checklist.id }}"
            class="col-sm-3 col-form-label text-sm-end">{{ form.release_checklist.label.text }}</label>
     <div class="col-sm-8">
-      {{ form.release_checklist(rows=10, class_="form-control") }}
+      {{ forms.render_field(form.release_checklist) }}
       <span id="release_checklist-help" class="form-text text-muted">Markdown text describing how to test release candidates.</span>
     </div>
   </div>
@@ -66,7 +60,7 @@
     <label for="{{ form.start_vote_template.id }}"
            class="col-sm-3 col-form-label text-sm-end">{{ form.start_vote_template.label.text }}</label>
     <div class="col-sm-8">
-      {{ form.start_vote_template(rows=10, class_="form-control") }}
+      {{ forms.render_field(form.start_vote_template) }}
       <span id="start_vote_template-help" class="form-text text-muted">Email template for messages to start a vote on a release.</span>
     </div>
   </div>
@@ -75,7 +69,7 @@
     <label for="{{ form.announce_release_template.id }}"
            class="col-sm-3 col-form-label text-sm-end">{{ form.announce_release_template.label.text }}</label>
     <div class="col-sm-8">
-      {{ form.announce_release_template(rows=10, class_="form-control") }}
+      {{ forms.render_field(form.announce_release_template) }}
       <span id="announce_release_template-help" class="form-text text-muted">Email template for messages to announce a finished release.</span>
     </div>
   </div>
@@ -84,9 +78,10 @@
     <label for="{{ form.pause_for_rm.id }}"
            class="col-sm-3 col-form-label text-sm-end">{{ form.pause_for_rm.label.text }}</label>
     <div class="col-sm-8">
-      {{ form.pause_for_rm(class_="form-check-input") }}
-      <label class="form-check-label">Enabled</label>
-      <br />
+      <div class="form-check">
+        {{ forms.render_checkbox(form.pause_for_rm) }}
+        <label class="form-check-label" for="{{ form.pause_for_rm.id }}">Enabled</label>
+      </div>
       <span id="pause_for_rm-help" class="form-text text-muted">If enabled, RM can confirm manually if the vote has passed.</span>
     </div>
   </div>

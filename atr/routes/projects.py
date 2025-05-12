@@ -56,6 +56,7 @@ class ReleasePolicyForm(util.QuartFormTyped):
                 wtforms.validators.InputRequired("Please provide a valid email address"),
                 wtforms.validators.Email(),
             ],
+            render_kw={"size": 30},
         ),
         min_entries=1,
     )
@@ -68,9 +69,15 @@ class ReleasePolicyForm(util.QuartFormTyped):
         default=72,
     )
     manual_vote = wtforms.BooleanField("Voting process:")
-    release_checklist = wtforms.StringField("Release checklist:", widget=wtforms.widgets.TextArea())
-    start_vote_template = wtforms.StringField("Start vote template:", widget=wtforms.widgets.TextArea())
-    announce_release_template = wtforms.StringField("Announce release template:", widget=wtforms.widgets.TextArea())
+    release_checklist = wtforms.StringField(
+        "Release checklist:", widget=wtforms.widgets.TextArea(), render_kw={"rows": 10}
+    )
+    start_vote_template = wtforms.StringField(
+        "Start vote template:", widget=wtforms.widgets.TextArea(), render_kw={"rows": 10}
+    )
+    announce_release_template = wtforms.StringField(
+        "Announce release template:", widget=wtforms.widgets.TextArea(), render_kw={"rows": 10}
+    )
     pause_for_rm = wtforms.BooleanField("Pause for RM:")
 
     submit = wtforms.SubmitField("Save")

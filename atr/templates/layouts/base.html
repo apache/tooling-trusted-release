@@ -45,6 +45,7 @@
             {% endif %}
             {% from "macros/flash.html" import render_flash_messages %}
             {{ render_flash_messages() }}
+            {% import 'macros/forms.html' as forms %}
             {% block content %}
             {% endblock content %}
           </main>
