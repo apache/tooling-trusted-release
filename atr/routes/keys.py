@@ -20,20 +20,17 @@
 import asyncio
 import base64
 import binascii
-import contextlib
 import datetime
 import hashlib
 import logging
 import logging.handlers
 import pathlib
-import pprint
 import re
 import textwrap
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import Sequence
 
 import asfquart as asfquart
 import asfquart.base as base
-import gnupg
 import quart
 import sqlmodel
 import werkzeug.datastructures as datastructures
@@ -41,6 +38,7 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.db.models as models
 import atr.routes as routes
 import atr.util as util
@@ -100,7 +98,7 @@ async def add(session: routes.CommitterSession) -> str:
             if invalid_committees:
                 raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
 
-            key_info = await key_user_add(session.uid, public_key_data, selected_committees_data)
+            key_info = await interaction.key_user_add(session.uid, public_key_data, selected_committees_data)
             if key_info:
                 await quart.flash(f"GPG key {key_info.get('fingerprint', '')} added successfully.", "success")
             # Clear form data on success by creating a new empty form instance
@@ -155,13 +153,6 @@ async def delete(session: routes.CommitterSession) -> response.Response:
             return await session.redirect(keys, error="Key not found or not owned by you")
 
 
-@contextlib.asynccontextmanager
-async def ephemeral_gpg_home() -> AsyncGenerator[str]:
-    """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
-    async with util.async_temporary_directory(prefix="gpg-") as temp_dir:
-        yield str(temp_dir)
-
-
 async def key_add_post(
     session: routes.CommitterSession, request: quart.Request, user_committees: Sequence[models.Committee]
 ) -> dict | None:
@@ -184,7 +175,7 @@ async def key_add_post(
     if invalid_committees:
         raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
 
-    return await key_user_add(session.uid, public_key, selected_committees)
+    return await interaction.key_user_add(session.uid, public_key, selected_committees)
 
 
 def key_ssh_fingerprint(ssh_key_string: str) -> str:
@@ -209,135 +200,6 @@ def key_ssh_fingerprint(ssh_key_string: str) -> str:
         return f"SHA256:{fingerprint_b64}"
 
     raise ValueError("Invalid SSH key format")
-
-
-async def key_user_add(asf_uid: str | None, public_key: str, selected_committees: list[str]) -> dict | None:
-    if not public_key:
-        raise routes.FlashError("Public key is required")
-
-    # Validate the key using GPG and get its properties
-    key, _fingerprint = await _key_user_add_validate_key_properties(public_key)
-
-    # Determine ASF UID if not provided
-    if asf_uid is None:
-        for uid in key["uids"]:
-            match = re.search(r"([A-Za-z0-9]+)@apache.org", uid)
-            if match:
-                asf_uid = match.group(1).lower()
-                break
-        else:
-            logging.warning(f"key_user_add called with no ASF UID found in key UIDs: {key.get('uids')}")
-    if asf_uid is None:
-        # We place this here to make it easier on the type checkers
-        raise routes.FlashError("No Apache UID found in the key UIDs")
-
-    # Store key in database
-    async with db.session() as data:
-        return await key_user_session_add(asf_uid, public_key, key, selected_committees, data)
-
-
-async def key_user_session_add(
-    asf_uid: str,
-    public_key: str,
-    key: dict,
-    selected_committees: list[str],
-    data: db.Session,
-) -> dict | None:
-    # TODO: Check if key already exists
-    # psk_statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
-
-    # # If uncommented, this will prevent a user from adding a second key
-    # existing_key = (await db_session.execute(statement)).scalar_one_or_none()
-    # if existing_key:
-    #     return ("You already have a key registered", None)
-
-    fingerprint = key.get("fingerprint")
-    # for subkey in key.get("subkeys", []):
-    #     if subkey[1] == "s":
-    #         # It's a signing key, so use its fingerprint instead
-    #         # TODO: Not sure that we should do this
-    #         # TODO: Check for multiple signing subkeys
-    #         fingerprint = subkey[2]
-    #         break
-    if not isinstance(fingerprint, str):
-        raise routes.FlashError("Invalid key fingerprint")
-    fingerprint = fingerprint.lower()
-    uids = key.get("uids")
-    key_record: models.PublicSigningKey | None = None
-
-    async with data.begin():
-        existing = await data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid).get()
-
-        if existing:
-            logging.info(f"Found existing key {fingerprint}, updating associations")
-            key_record = existing
-        else:
-            # Key doesn't exist, create it
-            logging.info(f"Adding new key {fingerprint}")
-            created = datetime.datetime.fromtimestamp(int(key["date"]), tz=datetime.UTC)
-            expires = (
-                datetime.datetime.fromtimestamp(int(key["expires"]), tz=datetime.UTC) if key.get("expires") else None
-            )
-
-            key_record = models.PublicSigningKey(
-                fingerprint=fingerprint,
-                algorithm=int(key["algo"]),
-                length=int(key.get("length", "0")),
-                created=created,
-                expires=expires,
-                declared_uid=uids[0] if uids else None,
-                apache_uid=asf_uid,
-                ascii_armored_key=public_key,
-            )
-            data.add(key_record)
-            await data.flush()
-            await data.refresh(key_record)
-
-        # Safety check, in case of strange flushes
-        if not key_record:
-            raise RuntimeError(f"Failed to obtain valid key record for fingerprint {fingerprint}")
-
-        # Link key to selected PMCs and track status for each
-        committee_statuses: dict[str, str] = {}
-        for committee_name in selected_committees:
-            committee = await data.committee(name=committee_name).get()
-            if committee and committee.name:
-                # Check whether the link already exists
-                link_exists = await data.execute(
-                    sqlmodel.select(models.KeyLink).where(
-                        models.KeyLink.committee_name == committee.name,
-                        models.KeyLink.key_fingerprint == key_record.fingerprint,
-                    )
-                )
-                if link_exists.scalar_one_or_none() is None:
-                    committee_statuses[committee_name] = "newly_linked"
-                    # Link doesn't exist, create it
-                    logging.debug(f"Linking key {fingerprint} to committee {committee_name}")
-                    link = models.KeyLink(committee_name=committee.name, key_fingerprint=key_record.fingerprint)
-                    data.add(link)
-                else:
-                    committee_statuses[committee_name] = "already_linked"
-                    logging.debug(f"Link already exists for key {fingerprint} and committee {committee_name}")
-            else:
-                logging.warning(f"Could not find committee {committee_name} to link key {fingerprint}")
-                continue
-
-    # Extract email for sorting
-    user_id_str = key_record.declared_uid or ""
-    email_match = re.search(r"<([^>]+)>", user_id_str)
-    email = email_match.group(1) if email_match else user_id_str
-
-    return {
-        "key_id": key_record.fingerprint[:16],
-        "fingerprint": key_record.fingerprint,
-        "user_id": user_id_str,
-        "email": email,
-        "creation_date": key_record.created,
-        "expiration_date": key_record.expires,
-        "data": pprint.pformat(key),
-        "committee_statuses": committee_statuses,
-        "status": "success",
-    }
 
 
 @routes.committer("/keys")
@@ -556,7 +418,9 @@ async def upload(session: routes.CommitterSession) -> str:
 
         # This is a KEYS file of multiple GPG keys
         # We need to parse it and add each key to the user's account
-        key_blocks = await _upload_key_blocks(key_file)
+        keys_content = await asyncio.to_thread(key_file.read)
+        keys_text = keys_content.decode("utf-8", errors="replace")
+        key_blocks = util.parse_key_blocks(keys_text)
         if not key_blocks:
             return await render(error="No valid GPG keys found in the uploaded file")
 
@@ -591,73 +455,6 @@ async def upload(session: routes.CommitterSession) -> str:
     return await render()
 
 
-async def _key_user_add_validate_key_properties(public_key: str) -> tuple[dict, str]:
-    """Validate GPG key string, import it, and return its properties and fingerprint."""
-    async with ephemeral_gpg_home() as gpg_home:
-        gpg = gnupg.GPG(gnupghome=gpg_home)
-        import_result = await asyncio.to_thread(gpg.import_keys, public_key)
-
-        if not import_result.fingerprints:
-            raise routes.FlashError("Invalid public key format or failed import")
-
-        fingerprint = import_result.fingerprints[0]
-        if fingerprint is None:
-            # Should be unreachable given the previous check, but satisfy type checker
-            raise routes.FlashError("Failed to get fingerprint after import")
-        fingerprint_lower = fingerprint.lower()
-
-        # List keys to get details
-        keys = await asyncio.to_thread(gpg.list_keys)
-
-    # Find the specific key details from the list using the fingerprint
-    key_details = None
-    for k in keys:
-        if k.get("fingerprint") is not None and k["fingerprint"].lower() == fingerprint_lower:
-            key_details = k
-            break
-
-    if not key_details:
-        # This might indicate an issue with gpg.list_keys or the environment
-        logging.error(
-            f"Could not find key details for fingerprint {fingerprint_lower}"
-            f" after successful import. Keys listed: {keys}"
-        )
-        raise routes.FlashError("Failed to retrieve key details after import")
-
-    # Validate key algorithm and length
-    # https://infra.apache.org/release-signing.html#note
-    # Says that keys must be at least 2048 bits
-    if (key_details.get("algo") == "1") and (int(key_details.get("length", "0")) < 2048):
-        raise routes.FlashError("RSA Key is not long enough; must be at least 2048 bits")
-
-    return key_details, fingerprint_lower
-
-
-async def _upload_key_blocks(key_file: datastructures.FileStorage) -> list[str]:
-    """Extract GPG key blocks from a KEYS file."""
-    # Read the file content
-    keys_content = await asyncio.to_thread(key_file.read)
-    keys_text = keys_content.decode("utf-8", errors="replace")
-
-    # Extract GPG key blocks
-    key_blocks = []
-    current_block = []
-    in_key_block = False
-
-    for line in keys_text.splitlines():
-        if line.strip() == "-----BEGIN PGP PUBLIC KEY BLOCK-----":
-            in_key_block = True
-            current_block = [line]
-        elif (line.strip() == "-----END PGP PUBLIC KEY BLOCK-----") and in_key_block:
-            current_block.append(line)
-            key_blocks.append("\n".join(current_block))
-            in_key_block = False
-        elif in_key_block:
-            current_block.append(line)
-
-    return key_blocks
-
-
 async def _upload_process_key_blocks(key_blocks: list[str], selected_committees: list[str]) -> list[dict]:
     """Process GPG key blocks and add them to the user's account."""
     results: list[dict] = []
@@ -665,7 +462,7 @@ async def _upload_process_key_blocks(key_blocks: list[str], selected_committees:
     # Process each key block
     for i, key_block in enumerate(key_blocks):
         try:
-            key_info = await key_user_add(None, key_block, selected_committees)
+            key_info = await interaction.key_user_add(None, key_block, selected_committees)
             if key_info:
                 key_info["status"] = key_info.get("status", "success")
                 key_info["email"] = key_info.get("email", "Unknown")

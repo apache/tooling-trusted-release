@@ -17,10 +17,8 @@
 
 from __future__ import annotations
 
-import dataclasses
 import logging
 import os
-import re
 from typing import TYPE_CHECKING, Any, Final, Generic, TypeGuard, TypeVar
 
 import sqlalchemy
@@ -35,13 +33,10 @@ from alembic.config import Config
 
 import atr.config as config
 import atr.db.models as models
-import atr.user as user
 import atr.util as util
-from atr import analysis
 
 if TYPE_CHECKING:
     import datetime
-    import pathlib
     from collections.abc import Sequence
 
     import asfquart.base as base
@@ -80,17 +75,6 @@ class NotSet:
 
 NOT_SET: Final[NotSet] = NotSet()
 type Opt[T] = T | NotSet
-
-
-@dataclasses.dataclass
-class PathInfo:
-    artifacts: set[pathlib.Path] = dataclasses.field(default_factory=set)
-    errors: dict[pathlib.Path, list[models.CheckResult]] = dataclasses.field(default_factory=dict)
-    metadata: set[pathlib.Path] = dataclasses.field(default_factory=set)
-    # substitutions: dict[pathlib.Path, str] = dataclasses.field(default_factory=dict)
-    successes: dict[pathlib.Path, list[models.CheckResult]] = dataclasses.field(default_factory=dict)
-    # templates: dict[pathlib.Path, str] = dataclasses.field(default_factory=dict)
-    warnings: dict[pathlib.Path, list[models.CheckResult]] = dataclasses.field(default_factory=dict)
 
 
 class Query(Generic[T]):
@@ -612,63 +596,6 @@ def is_undefined(v: object | NotSet) -> TypeGuard[NotSet]:
 #     return recent_tasks
 
 
-async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathInfo:
-    info = PathInfo()
-    if release.revision is None:
-        raise ValueError(f"Release {release.name} has no revision")
-    for path in paths:
-        # Get template and substitutions
-        # elements = {
-        #     "core": release.project.name,
-        #     "version": release.version,
-        #     "sub": None,
-        #     "template": None,
-        #     "substitutions": None,
-        # }
-        # template, substitutions = analysis.filename_parse(str(path), elements)
-        # info.templates[path] = template
-        # info.substitutions[path] = analysis.substitutions_format(substitutions) or "none"
-
-        # Get artifacts and metadata
-        search = re.search(analysis.extension_pattern(), str(path))
-        if search:
-            if search.group("artifact"):
-                info.artifacts.add(path)
-            elif search.group("metadata"):
-                info.metadata.add(path)
-
-        # Get successes, warnings, and errors
-        async with session() as data:
-            info.successes[path] = list(
-                await data.check_result(
-                    release_name=release.name,
-                    revision=release.revision,
-                    primary_rel_path=str(path),
-                    member_rel_path=None,
-                    status=models.CheckResultStatus.SUCCESS,
-                ).all()
-            )
-            info.warnings[path] = list(
-                await data.check_result(
-                    release_name=release.name,
-                    revision=release.revision,
-                    primary_rel_path=str(path),
-                    member_rel_path=None,
-                    status=models.CheckResultStatus.WARNING,
-                ).all()
-            )
-            info.errors[path] = list(
-                await data.check_result(
-                    release_name=release.name,
-                    revision=release.revision,
-                    primary_rel_path=str(path),
-                    member_rel_path=None,
-                    status=models.CheckResultStatus.FAILURE,
-                ).all()
-            )
-    return info
-
-
 def select_in_load(*entities: Any) -> orm.strategy_options._AbstractLoad:
     """Eagerly load the given entities from the query."""
     validated_entities = []
@@ -720,54 +647,6 @@ async def shutdown_database() -> None:
         await _global_atr_engine.dispose()
     else:
         _LOGGER.info("No database to close")
-
-
-async def tasks_ongoing(project_name: str, version_name: str, revision: str) -> int:
-    release_name = models.release_name(project_name, version_name)
-    async with session() as data:
-        query = (
-            sqlmodel.select(sqlalchemy.func.count())
-            .select_from(models.Task)
-            .where(
-                models.Task.release_name == release_name,
-                models.Task.revision == revision,
-                validate_instrumented_attribute(models.Task.status).in_(
-                    [models.TaskStatus.QUEUED, models.TaskStatus.ACTIVE]
-                ),
-            )
-        )
-        result = await data.execute(query)
-        return result.scalar_one()
-
-
-async def unfinished_releases(asfuid: str) -> dict[str, list[models.Release]]:
-    releases: dict[str, list[models.Release]] = {}
-    async with session() as data:
-        user_projects = await user.projects(asfuid)
-        user_projects.sort(key=lambda p: p.display_name)
-
-        active_phases = [
-            models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
-            models.ReleasePhase.RELEASE_CANDIDATE,
-            models.ReleasePhase.RELEASE_PREVIEW,
-        ]
-        for project in user_projects:
-            stmt = (
-                sqlmodel.select(models.Release)
-                .where(
-                    models.Release.project_name == project.name,
-                    validate_instrumented_attribute(models.Release.phase).in_(active_phases),
-                )
-                .options(select_in_load(models.Release.project))
-                .order_by(validate_instrumented_attribute(models.Release.created).desc())
-            )
-            result = await data.execute(stmt)
-            active_releases = list(result.scalars().all())
-            if active_releases:
-                active_releases.sort(key=lambda r: r.created, reverse=True)
-                releases[project.short_display_name] = active_releases
-
-    return releases
 
 
 def validate_instrumented_attribute(obj: Any) -> orm.InstrumentedAttribute:

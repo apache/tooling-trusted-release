@@ -38,6 +38,7 @@ import wtforms
 import atr.blueprints.admin as admin
 import atr.datasources.apache as apache
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.db.models as models
 import atr.util as util
 
@@ -392,7 +393,7 @@ async def admin_toggle_view() -> response.Response:
 @admin.BLUEPRINT.route("/ongoing-tasks/<project_name>/<version_name>/<revision>")
 async def ongoing_tasks(project_name: str, version_name: str, revision: str) -> quart.wrappers.response.Response:
     try:
-        ongoing = await db.tasks_ongoing(project_name, version_name, revision)
+        ongoing = await interaction.tasks_ongoing(project_name, version_name, revision)
         return quart.Response(str(ongoing), mimetype="text/plain")
     except Exception:
         _LOGGER.exception(f"Error fetching ongoing task count for {project_name} {version_name} rev {revision}:")

@@ -303,12 +303,12 @@ class TaskStatus(str, enum.Enum):
 
 class TaskType(str, enum.Enum):
     HASHING_CHECK = "hashing_check"
+    # KEYS_IMPORT_FILE = "keys_import_file"
     LICENSE_FILES = "license_files"
     LICENSE_HEADERS = "license_headers"
     MESSAGE_SEND = "message_send"
     PATHS_CHECK = "paths_check"
     RAT_CHECK = "rat_check"
-    # RSYNC_ANALYSE = "rsync_analyse"
     SBOM_GENERATE_CYCLONEDX = "sbom_generate_cyclonedx"
     SIGNATURE_CHECK = "signature_check"
     SVN_IMPORT_FILES = "svn_import_files"

@@ -37,6 +37,7 @@ import atr
 import atr.blueprints as blueprints
 import atr.config as config
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.filters as filters
 import atr.manager as manager
 import atr.preload as preload
@@ -115,7 +116,7 @@ def app_setup_context(app: base.QuartApp) -> None:
             "is_viewing_as_admin_fn": util.is_user_viewing_as_admin,
             "is_committee_member_fn": user.is_committee_member,
             "routes": modules,
-            "unfinished_releases_fn": db.unfinished_releases,
+            "unfinished_releases_fn": interaction.unfinished_releases,
             "release_as_url": mapping.release_as_url,
             "version": metadata.version,
         }

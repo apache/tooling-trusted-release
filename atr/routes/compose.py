@@ -23,6 +23,7 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
@@ -46,7 +47,7 @@ async def check(
 
     paths = [path async for path in util.paths_recursive(base_path)]
     paths.sort()
-    info = await db.path_info(release, paths)
+    info = await interaction.path_info(release, paths)
 
     user_ssh_keys: Sequence[models.SSHKey] = []
     async with db.session() as data:
@@ -59,7 +60,9 @@ async def check(
     # Get the number of ongoing tasks for the current revision
     ongoing_tasks_count = 0
     if revision_name_from_link:
-        ongoing_tasks_count = await db.tasks_ongoing(release.project.name, release.version, revision_name_from_link)
+        ongoing_tasks_count = await interaction.tasks_ongoing(
+            release.project.name, release.version, revision_name_from_link
+        )
 
     delete_draft_form = await draft.DeleteForm.create_form()
     delete_file_form = await draft.DeleteFileForm.create_form()

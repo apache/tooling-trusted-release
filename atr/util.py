@@ -369,6 +369,26 @@ async def number_of_release_files(release: models.Release) -> int:
     return count
 
 
+def parse_key_blocks(keys_text: str) -> list[str]:
+    """Extract GPG key blocks from a KEYS file."""
+    key_blocks = []
+    current_block = []
+    in_key_block = False
+
+    for line in keys_text.splitlines():
+        if line.strip() == "-----BEGIN PGP PUBLIC KEY BLOCK-----":
+            in_key_block = True
+            current_block = [line]
+        elif (line.strip() == "-----END PGP PUBLIC KEY BLOCK-----") and in_key_block:
+            current_block.append(line)
+            key_blocks.append("\n".join(current_block))
+            in_key_block = False
+        elif in_key_block:
+            current_block.append(line)
+
+    return key_blocks
+
+
 async def paths_recursive(base_path: pathlib.Path) -> AsyncGenerator[pathlib.Path]:
     """Yield all file paths recursively within a base path, relative to the base path."""
     try:

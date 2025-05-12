@@ -62,8 +62,7 @@ async def draft_checks(
     revision_path = util.get_unfinished_dir() / project_name / release_version / revision
     relative_paths = [path async for path in util.paths_recursive(revision_path)]
 
-    session_context = db.session() if (caller_data is None) else contextlib.nullcontext(caller_data)
-    async with session_context as data:
+    async with ensure_session(caller_data) as data:
         release = await data.release(name=models.release_name(project_name, release_version), _committee=True).demand(
             RuntimeError("Release not found")
         )
@@ -87,6 +86,12 @@ async def draft_checks(
     return len(relative_paths)
 
 
+def ensure_session(caller_data: db.Session | None) -> db.Session | contextlib.nullcontext[db.Session]:
+    if caller_data is None:
+        return db.session()
+    return contextlib.nullcontext(caller_data)
+
+
 def queued(
     task_type: models.TaskType,
     release: models.Release,
@@ -108,6 +113,8 @@ def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:
     match task_type:
         case models.TaskType.HASHING_CHECK:
             return hashing.check
+        # case models.TaskType.KEYS_IMPORT_FILE:
+        #     return keys.import_file
         case models.TaskType.LICENSE_FILES:
             return license.files
         case models.TaskType.LICENSE_HEADERS:
@@ -118,8 +125,6 @@ def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:
             return paths.check
         case models.TaskType.RAT_CHECK:
             return rat.check
-        # case models.TaskType.RSYNC_ANALYSE:
-        #     return rsync.analyse
         case models.TaskType.SBOM_GENERATE_CYCLONEDX:
             return sbom.generate_cyclonedx
         case models.TaskType.SIGNATURE_CHECK:

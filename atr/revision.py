@@ -34,7 +34,7 @@ _LOGGER: Final = logging.getLogger(__name__)
 
 @contextlib.asynccontextmanager
 async def create_and_manage(
-    project_name: str, version_name: str, asf_uid: str, preview: bool = False, create_directory: bool = True
+    project_name: str, version_name: str, asf_uid: str, create_directory: bool = True
 ) -> AsyncGenerator[tuple[pathlib.Path, str]]:
     """Manage the creation and symlinking of a mutable release revision."""
     base_dir = util.get_unfinished_dir()
@@ -46,17 +46,11 @@ async def create_and_manage(
     await aiofiles.os.makedirs(base_release_dir, exist_ok=True)
 
     # Get the parent revision, if available
-    parent_revision_id: str | None = None
-    parent_revision_dir: pathlib.Path | None = None
     async with db.session() as data:
         release_name = models.release_name(project_name, version_name)
-        namespace = release_name + (" draft" if (preview is False) else " preview")
-        release = await data.release(name=release_name, _project=True).get()
-        if release is not None:
-            parent_revision_id = release.revision
-            if parent_revision_id:
-                parent_revision_dir = base_release_dir / parent_revision_id
-
+        namespace, release, parent_revision_id, parent_revision_dir = await _create_and_manage(
+            data, release_name, base_release_dir
+        )
     try:
         # Create the new revision directory
         if parent_revision_dir:
@@ -76,14 +70,18 @@ async def create_and_manage(
             async with data.begin():
                 if parent_revision_id is not None:
                     _LOGGER.info(f"Storing parent link for {new_revision_name} -> {parent_revision_id}")
-                    data.add(models.TextValue(ns=namespace, key=new_revision_name, value=parent_revision_id))
+                    data.add(
+                        models.TextValue(
+                            ns=f"{namespace}-revision-parent", key=new_revision_name, value=parent_revision_id
+                        )
+                    )
                 else:
                     _LOGGER.info(f"No parent revision for {new_revision_name}")
                 release = await data.release(name=release_name, _project=True).demand(
                     RuntimeError("Release does not exist")
                 )
                 release.revision = new_revision_name
-        if preview is False:
+        if (release is None) or (release.phase is models.ReleasePhase.RELEASE_CANDIDATE_DRAFT):
             # Schedule the checks to be run
             await tasks.draft_checks(project_name, version_name, new_revision_name)
 
@@ -120,6 +118,22 @@ async def latest_info(project_name: str, version_name: str) -> tuple[str | None,
             timestamp = dt_obj.replace(tzinfo=datetime.UTC)
 
     return revision_name, editor, timestamp
+
+
+async def _create_and_manage(
+    data: db.Session, release_name: str, base_release_dir: pathlib.Path
+) -> tuple[str, models.Release | None, str | None, pathlib.Path | None]:
+    parent_revision_id: str | None = None
+    parent_revision_dir: pathlib.Path | None = None
+    release = await data.release(name=release_name, _project=True).get()
+    namespace = "draft"
+    if release is not None:
+        parent_revision_id = release.revision
+        if parent_revision_id:
+            parent_revision_dir = base_release_dir / parent_revision_id
+        if release.phase is models.ReleasePhase.RELEASE_PREVIEW:
+            namespace = "preview"
+    return namespace, release, parent_revision_id, parent_revision_dir
 
 
 def _new_name(asf_uid: str) -> str:
