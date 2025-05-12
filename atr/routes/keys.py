@@ -29,6 +29,7 @@ import re
 import textwrap
 from collections.abc import Sequence
 
+import aiofiles.os
 import asfquart as asfquart
 import asfquart.base as base
 import quart
@@ -42,6 +43,8 @@ import atr.db.interaction as interaction
 import atr.db.models as models
 import atr.routes as routes
 import atr.util as util
+from atr import revision
+from atr.routes import compose
 
 
 class AddSSHKeyForm(util.QuartFormTyped):
@@ -151,6 +154,39 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
             # No key was found
             return await session.redirect(keys, error="Key not found or not owned by you")
+
+
+@routes.committer("/keys/import/<project_name>/<version_name>", methods=["POST"])
+async def import_selected_revision(
+    session: routes.CommitterSession, project_name: str, version_name: str
+) -> response.Response:
+    await session.check_access(project_name)
+
+    release = await session.release(project_name, version_name, with_committee=True)
+    keys_path = util.release_directory(release) / "KEYS"
+    async with aiofiles.open(keys_path, encoding="utf-8") as f:
+        keys_text = await f.read()
+    if release.committee is None:
+        raise routes.FlashError("No committee found for release")
+    selected_committees = [release.committee.name]
+    success_count, error_count, submitted_committees = await _upload_keys(session, keys_text, selected_committees)
+    message = f"Uploaded {success_count} keys,"
+    if error_count > 0:
+        message += f" failed to upload {error_count} keys for {', '.join(submitted_committees)}"
+    # Remove the KEYS file if 100% imported
+    if (success_count > 0) and (error_count == 0):
+        async with revision.create_and_manage(project_name, version_name, session.uid) as (
+            new_revision_dir,
+            _new_revision_name,
+        ):
+            path_in_new_revision = new_revision_dir / "KEYS"
+            await aiofiles.os.remove(path_in_new_revision)
+    return await session.redirect(
+        compose.selected,
+        success=message,
+        project_name=project_name,
+        version_name=version_name,
+    )
 
 
 async def key_add_post(
@@ -416,36 +452,17 @@ async def upload(session: routes.CommitterSession) -> str:
         if not isinstance(key_file, datastructures.FileStorage):
             return await render(error="Invalid file upload")
 
-        # This is a KEYS file of multiple GPG keys
-        # We need to parse it and add each key to the user's account
-        keys_content = await asyncio.to_thread(key_file.read)
-        keys_text = keys_content.decode("utf-8", errors="replace")
-        key_blocks = util.parse_key_blocks(keys_text)
-        if not key_blocks:
-            return await render(error="No valid GPG keys found in the uploaded file")
-
         # Get selected committee list from the form
         selected_committees = form.selected_committees.data
         if not selected_committees:
             return await render(error="You must select at least one committee")
+        # This is a KEYS file of multiple GPG keys
+        # We need to parse it and add each key to the user's account
+        keys_content = await asyncio.to_thread(key_file.read)
+        keys_text = keys_content.decode("utf-8", errors="replace")
 
-        # Ensure that the selected committees are ones of which the user is actually a member
-        invalid_committees = [
-            committee for committee in selected_committees if (committee not in (session.committees + session.projects))
-        ]
-        if invalid_committees:
-            return await render(error=f"Invalid committee selection: {', '.join(invalid_committees)}")
+        success_count, error_count, submitted_committees = await _upload_keys(session, keys_text, selected_committees)
 
-        # TODO: Do we modify this? Store a copy just in case, for the template to use
-        submitted_committees = selected_committees[:]
-
-        # Process each key block
-        results = await _upload_process_key_blocks(key_blocks, selected_committees)
-        if not results:
-            return await render(error="No keys were added")
-
-        success_count = sum(1 for result in results if result["status"] == "success")
-        error_count = len(results) - success_count
         await quart.flash(
             f"Processed {len(results)} keys: {success_count} successful, {error_count} failed",
             "success" if success_count > 0 else "error",
@@ -453,6 +470,34 @@ async def upload(session: routes.CommitterSession) -> str:
         return await render(submitted_committees_list=submitted_committees, all_user_committees=user_committees)
 
     return await render()
+
+
+async def _upload_keys(
+    session: routes.CommitterSession, keys_text: str, selected_committees: list[str]
+) -> tuple[int, int, list[str]]:
+    key_blocks = util.parse_key_blocks(keys_text)
+    if not key_blocks:
+        raise routes.FlashError("No valid GPG keys found in the uploaded file")
+
+    # Ensure that the selected committees are ones of which the user is actually a member
+    invalid_committees = [
+        committee for committee in selected_committees if (committee not in (session.committees + session.projects))
+    ]
+    if invalid_committees:
+        raise routes.FlashError(f"Invalid committee selection: {', '.join(invalid_committees)}")
+
+    # TODO: Do we modify this? Store a copy just in case, for the template to use
+    submitted_committees = selected_committees[:]
+
+    # Process each key block
+    results = await _upload_process_key_blocks(key_blocks, selected_committees)
+    if not results:
+        raise routes.FlashError("No keys were added")
+
+    success_count = sum(1 for result in results if result["status"] == "success")
+    error_count = len(results) - success_count
+
+    return success_count, error_count, submitted_committees
 
 
 async def _upload_process_key_blocks(key_blocks: list[str], selected_committees: list[str]) -> list[dict]:
