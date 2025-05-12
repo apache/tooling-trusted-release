@@ -28,6 +28,7 @@ import atr.tasks.checks.rat as rat
 import atr.tasks.checks.signature as signature
 import atr.tasks.checks.targz as targz
 import atr.tasks.checks.zipformat as zipformat
+import atr.tasks.keys as keys
 import atr.tasks.message as message
 import atr.tasks.sbom as sbom
 import atr.tasks.svn as svn
@@ -92,6 +93,26 @@ def ensure_session(caller_data: db.Session | None) -> db.Session | contextlib.nu
     return contextlib.nullcontext(caller_data)
 
 
+async def keys_import_file(
+    release_name: str, revision: str, abs_keys_path: str, caller_data: db.Session | None = None
+) -> None:
+    """Import a KEYS file from a draft release candidate revision."""
+    async with ensure_session(caller_data) as data:
+        data.add(
+            models.Task(
+                status=models.TaskStatus.QUEUED,
+                task_type=models.TaskType.KEYS_IMPORT_FILE,
+                task_args=keys.ImportFile(
+                    release_name=release_name,
+                    abs_keys_path=abs_keys_path,
+                ).model_dump(),
+                revision=revision,
+                primary_rel_path=None,
+            )
+        )
+        await data.commit()
+
+
 def queued(
     task_type: models.TaskType,
     release: models.Release,
@@ -113,8 +134,8 @@ def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:
     match task_type:
         case models.TaskType.HASHING_CHECK:
             return hashing.check
-        # case models.TaskType.KEYS_IMPORT_FILE:
-        #     return keys.import_file
+        case models.TaskType.KEYS_IMPORT_FILE:
+            return keys.import_file
         case models.TaskType.LICENSE_FILES:
             return license.files
         case models.TaskType.LICENSE_HEADERS:

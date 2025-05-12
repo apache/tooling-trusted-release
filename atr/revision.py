@@ -65,6 +65,11 @@ async def create_and_manage(
         # Yield control to the block within "async with"
         yield new_revision_dir, new_revision_name
 
+        # # Was a KEYS file uploaded in DRAFT phase?
+        # # If so, we need to try to import all of the keys in a task
+        # if (release is None) or (release.phase is models.ReleasePhase.RELEASE_CANDIDATE_DRAFT):
+        #     await tasks.keys.import_file(release_name, str(new_revision_dir / "KEYS"))
+
         # If the "with" block completed without error, store the parent link
         async with db.session() as data:
             async with data.begin():

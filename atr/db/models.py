@@ -303,7 +303,7 @@ class TaskStatus(str, enum.Enum):
 
 class TaskType(str, enum.Enum):
     HASHING_CHECK = "hashing_check"
-    # KEYS_IMPORT_FILE = "keys_import_file"
+    KEYS_IMPORT_FILE = "keys_import_file"
     LICENSE_FILES = "license_files"
     LICENSE_HEADERS = "license_headers"
     MESSAGE_SEND = "message_send"

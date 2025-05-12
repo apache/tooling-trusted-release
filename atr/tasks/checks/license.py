@@ -174,17 +174,17 @@ INCLUDED_PATTERNS: Final[list[str]] = [
 # Types
 
 
-class ArtifactResult(schema.Strict):
-    status: models.CheckResultStatus
-    message: str
-    data: Any = schema.Field(default=None)
-
-
 class ArtifactData(schema.Strict):
     files_checked: int = schema.default(0)
     files_with_valid_headers: int = schema.default(0)
     files_with_invalid_headers: int = schema.default(0)
     files_skipped: int = schema.default(0)
+
+
+class ArtifactResult(schema.Strict):
+    status: models.CheckResultStatus
+    message: str
+    data: Any = schema.Field(default=None)
 
 
 # class LicenseCheckResult(schema.Strict):
