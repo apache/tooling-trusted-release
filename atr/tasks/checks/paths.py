@@ -180,12 +180,10 @@ async def _check_path_process_single(
         if (relative_path.parent == pathlib.Path(".")) and (relative_path.name not in allowed_top_level):
             warnings.append(f"Unknown top level file: {relative_path.name}")
 
-    # Must aggregate errors and aggregate warnings otherwise they will be removed by afresh=True
-    # Alternatively we could call Check.clear() manually
-    if errors:
-        await recorder_errors.failure("; ".join(errors), {"errors": errors}, primary_rel_path=relative_path_str)
-    if warnings:
-        await recorder_warnings.warning("; ".join(warnings), {"warnings": warnings}, primary_rel_path=relative_path_str)
+    for error in errors:
+        await recorder_errors.failure(error, {}, primary_rel_path=relative_path_str)
+    for warning in warnings:
+        await recorder_warnings.warning(warning, {}, primary_rel_path=relative_path_str)
     if not (errors or warnings):
         await recorder_success.success(
             "Path structure and naming conventions conform to policy", {}, primary_rel_path=relative_path_str
