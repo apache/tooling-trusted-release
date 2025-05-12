@@ -37,6 +37,15 @@
     <strong>Note:</strong> This feature is currently in development. The form below only sends email to <a href="https://lists.apache.org/list.html?user-tests@tooling.apache.org">a test mailing list</a> or yourself.
   </div>
 
+  {% if keys_warning %}
+    <div class="p-3 mb-4 bg-warning-subtle border border-warning rounded">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <strong>Warning:</strong>
+      The KEYS file is missing.
+      Please autogenerate one on the <a href="{{ as_url(routes.keys.keys, project_name=release.project.name) }}#committee-{{ release.committee.name|slugify }}">KEYS page</a>.
+    </div>
+  {% endif %}
+
   <form method="post"
         id="vote-initiate-form"
         class="atr-canary py-4 px-5"

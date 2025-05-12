@@ -17,6 +17,7 @@
 
 import datetime
 
+import aiofiles.os
 import asfquart.base as base
 import quart
 import werkzeug.wrappers.response as response
@@ -157,13 +158,24 @@ async def selected_revision(
                 version_name=version,
             )
 
+        keys_warning = await _keys_warning(release)
+
         # For GET requests or failed POST validation
         return await quart.render_template(
             "voting-selected-revision.html",
             release=release,
             form=form,
             revision=revision,
+            keys_warning=keys_warning,
         )
+
+
+async def _keys_warning(
+    release: models.Release,
+) -> bool:
+    """Return a warning about keys if there are any issues."""
+    keys_file_path = util.get_finished_dir() / release.project.name / "KEYS"
+    return not await aiofiles.os.path.isfile(keys_file_path)
 
 
 async def _promote(
