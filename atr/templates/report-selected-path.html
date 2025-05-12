@@ -70,11 +70,13 @@
                   type="button"
                   class="btn {% if status == 'success' and not all_primary_are_success %}btn-outline-success{% elif status == 'success' and all_primary_are_success %}btn-success{% else %}btn-{{ bs_status }}{% endif %}"
                   onclick="toggleStatusVisibility('primary', '{{ status }}')">
-            {% if status == 'success' and not all_primary_are_success %}
-              Show
-            {% else %}
-              Hide
-            {% endif %}
+            <span>
+              {% if status == 'success' and not all_primary_are_success %}
+                Show
+              {% else %}
+                Hide
+              {% endif %}
+            </span>
             {{ status|title }} (<code>{{ count }}</code>)
           </button>
         {% endif %}
@@ -238,11 +240,13 @@
                       type="button"
                       class="btn {% if status == 'success' and not all_member_are_success %}btn-outline-success{% elif status == 'success' and all_member_are_success %}btn-success{% else %}btn-{{ bs_status }}{% endif %}"
                       onclick="toggleStatusVisibility('member', '{{ status }}')">
-                {% if status == 'success' and not all_member_are_success %}
-                  Show
-                {% else %}
-                  Hide
-                {% endif %}
+                <span>
+                  {% if status == 'success' and not all_member_are_success %}
+                    Show
+                  {% else %}
+                    Hide
+                  {% endif %}
+                </span>
                 {{ status|title }} (<code>{{ count }}</code>)
               </button>
             {% endif %}
@@ -327,7 +331,7 @@
           }
           const cnt = cntMatch[0];
           const newButtonAction = elementsCurrentlyHidden ? "Hide" : "Show";
-          btn.textContent = `${newButtonAction} ${status.charAt(0).toUpperCase()+status.slice(1)} ${cnt}`;
+          btn.querySelector("span").textContent = newButtonAction;
           if (newButtonAction === "Hide") {
               btn.classList.remove(`btn-outline-${bsSt}`);
               btn.classList.add(`btn-${bsSt}`);
