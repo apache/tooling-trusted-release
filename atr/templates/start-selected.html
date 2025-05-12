@@ -14,8 +14,6 @@
         action="{{ as_url(routes.start.selected, project_name=project.name) }}"
         enctype="multipart/form-data"
         class="atr-canary py-4 px-5 border rounded">
-
-    {# Includes csrf_token and project_name #}
     {{ form.hidden_tag() }}
 
     <div class="mb-4">

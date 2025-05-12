@@ -84,6 +84,10 @@ class QuartFormTyped(quart_wtf.QuartForm):
         return form
 
 
+class EmptyForm(QuartFormTyped):
+    pass
+
+
 async def archive_listing(file_path: pathlib.Path) -> list[str] | None:
     """Attempt to list contents of supported archive files."""
     if not await aiofiles.os.path.isfile(file_path):
@@ -560,6 +564,12 @@ def validate_as_type(value: Any, t: type[T]) -> T:
     if not isinstance(value, t):
         raise ValueError(f"Expected {t}, got {type(value)}")
     return value
+
+
+async def validate_empty_form() -> None:
+    empty_form = await EmptyForm.create_form(data=await quart.request.form)
+    if not await empty_form.validate_on_submit():
+        raise base.ASFQuartException("Invalid request", 400)
 
 
 def validate_vote_duration(form: wtforms.Form, field: wtforms.IntegerField) -> None:

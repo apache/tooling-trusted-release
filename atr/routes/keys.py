@@ -162,6 +162,7 @@ async def import_selected_revision(
 ) -> response.Response:
     await session.check_access(project_name)
 
+    await util.validate_empty_form()
     release = await session.release(project_name, version_name, with_committee=True)
     keys_path = util.release_directory(release) / "KEYS"
     async with aiofiles.open(keys_path, encoding="utf-8") as f:

@@ -106,6 +106,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         phase_key=phase_key,
         revision_history=list(reversed(revision_history)),
         current_revision_name=current_revision_name,
+        empty_form=await util.EmptyForm.create_form(),
     )
 
 
@@ -114,6 +115,8 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
     """Set a specific revision as the latest for a candidate draft or release preview."""
     await session.check_access(project_name)
 
+    # TODO: This is not truly empty, so make a form object for this
+    await util.validate_empty_form()
     form_data = await quart.request.form
     revision_name = form_data.get("revision_name")
     if not revision_name:

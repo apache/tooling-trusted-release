@@ -32,7 +32,8 @@
   {% endif %}
 
   <form method="post" class="atr-canary">
-    {{ form.csrf_token }}
+    {{ form.hidden_tag() }}
+
     <div class="mb-4">
       <div class="mb-3">
         <label for="key" class="form-label">SSH public key:</label>

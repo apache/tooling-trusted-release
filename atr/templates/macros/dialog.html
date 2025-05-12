@@ -23,6 +23,7 @@
           </p>
           <form method="post" action="{{ action }}">
             {{ form.hidden_tag() }}
+
             {{ form[field_name](value_=id, hidden=True) }}
             <div class="mb-3">
               <label for="confirm_delete_{{ element_id }}" class="form-label">
@@ -69,6 +70,7 @@
           </p>
           <form method="post" action="{{ action }}">
             {{ form.hidden_tag() }}
+
             {{ form[field_name](value_=id, hidden=True) }}
             {{ form.submit(class_="btn btn-danger", id_="delete-button-" + element_id) }}
           </form>

@@ -91,6 +91,8 @@
   <div id="status"></div>
 
   <form action="javascript:submitForm().then(_ => { return false; })">
+    {{ empty_form.hidden_tag() }}
+
     <button type="submit" id="submitButton">Update projects</button>
   </form>
 
@@ -105,9 +107,14 @@
         statusElement.firstChild.remove();
       }
 
+      const csrfToken = document.querySelector("input[name='csrf_token']").value;
+
       try {
           const response = await fetch(window.location.href, {
               method: "POST",
+              headers: {
+                  "X-CSRFToken": csrfToken
+              }
           });
 
           if (!response.ok) {

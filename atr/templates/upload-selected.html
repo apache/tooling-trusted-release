@@ -39,7 +39,8 @@
         enctype="multipart/form-data"
         class="atr-canary py-4 px-5"
         novalidate>
-    {{ form.csrf_token }}
+    {{ form.hidden_tag() }}
+
     <div class="mb-3 pb-3 row border-bottom">
       <label for="{{ form.file_data.id }}"
              class="col-sm-3 col-form-label text-sm-end">{{ form.file_data.label.text }}:</label>
@@ -83,6 +84,7 @@
             novalidate
             class="atr-canary py-4 px-5">
         {{ svn_form.hidden_tag() }}
+
         <div class="mb-3 pb-3 row border-bottom">
           <label for="{{ svn_form.svn_url.id }}"
                  class="col-sm-3 col-form-label text-sm-end">{{ svn_form.svn_url.label.text }}:</label>

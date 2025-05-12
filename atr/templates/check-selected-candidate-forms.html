@@ -13,6 +13,7 @@
       action="{{ as_url(routes.vote.selected_post, project_name=project_name, version_name=version_name) }}"
       class="atr-canary py-4 px-5 mb-4 border rounded">
   {{ form.hidden_tag() }}
+
   <div class="row mb-3 pb-3 border-bottom">
     <label class="col-md-3 col-form-label text-md-end">{{ form.vote_value.label.text }}:</label>
     <div class="col-md-9">
@@ -56,8 +57,9 @@
       action="{{ as_url(routes.resolve.selected_post, project_name=release.project.name, version_name=release.version) }}"
       class="atr-canary py-4 px-5"
       novalidate>
+  {{ resolve_form.hidden_tag() }}
+
   <input type="hidden" name="candidate_name" value="{{ release.name }}" />
-  {{ resolve_form.csrf_token }}
 
   <div class="mb-3 pb-3 row border-bottom">
     <label class="col-sm-3 col-form-label text-sm-end fw-semibold">{{ resolve_form.vote_result.label.text }}:</label>

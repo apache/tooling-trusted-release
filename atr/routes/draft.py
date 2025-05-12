@@ -191,6 +191,7 @@ async def fresh(session: routes.CommitterSession, project_name: str, version_nam
     # Admin only button, but it's okay if users find and use this manually
     await session.check_access(project_name)
 
+    await util.validate_empty_form()
     # Restart checks by creating a new identical draft revision
     # This doesn't make sense unless the checks themselves have been updated
     # Therefore we only show the button for this to admins
@@ -216,7 +217,8 @@ async def hashgen(
     await session.check_access(project_name)
 
     # Get the hash type from the form data
-    # This is just a button, so we don't make a whole form validation schema for it
+    # TODO: This is not truly empty, so make a form object for this
+    await util.validate_empty_form()
     form = await quart.request.form
     hash_type = form.get("hash_type")
     if hash_type not in {"sha256", "sha512"}:
@@ -275,6 +277,7 @@ async def sbomgen(
     """Generate a CycloneDX SBOM file for a candidate draft file, creating a new revision."""
     await session.check_access(project_name)
 
+    await util.validate_empty_form()
     rel_path = pathlib.Path(file_path)
 
     # Check that the file is a .tar.gz archive before creating a revision
@@ -427,6 +430,7 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
         file_data=file_data,
         release=release,
         format_file_size=util.format_file_size,
+        empty_form=await util.EmptyForm.create_form(),
     )
 
 

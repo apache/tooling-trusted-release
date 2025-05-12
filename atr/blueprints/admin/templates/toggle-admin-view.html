@@ -1,0 +1,45 @@
+{% extends "layouts/base-admin.html" %}
+
+{% block title %}Toggle admin view{% endblock title %}
+
+{% block description %}
+  Switch between administrator and regular user views.
+{% endblock description %}
+
+{% block content %}
+  <h1>Toggle admin view</h1>
+
+  <p class="mb-4">
+    Use this page to switch between viewing the site as an administrator or as a regular user.
+    This is helpful for testing permissions and user experience from different perspectives.
+  </p>
+
+  {% if current_user and is_admin_fn(current_user.uid) %}
+    <form action="{{ url_for('admin.admin_toggle_view') }}" method="post" class="mb-4">
+      {{ empty_form.hidden_tag() }}
+      <button type="submit" class="btn btn-primary">
+        {% if not is_viewing_as_admin_fn(current_user.uid) %}
+          <i class="fa-solid fa-user-shield"></i> Switch to admin view
+        {% else %}
+          <i class="fa-solid fa-user-ninja"></i> Switch to user view
+        {% endif %}
+      </button>
+    </form>
+
+    <div class="alert alert-info" role="alert">
+      Current view mode:
+      <strong>
+        {% if is_viewing_as_admin_fn(current_user.uid) %}
+          Administrator
+        {% else %}
+          Regular user
+        {% endif %}
+      </strong>
+    </div>
+
+  {% else %}
+    <div class="alert alert-warning" role="alert">
+      This function is only available to administrators.
+    </div>
+  {% endif %}
+{% endblock content %}

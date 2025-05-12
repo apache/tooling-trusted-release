@@ -261,6 +261,8 @@
               action="{{ as_url(routes.projects.delete) }}"
               class="d-inline-block m-0"
               onsubmit="return confirm('Are you sure you want to delete the project \'{{ project.display_name }}\'? This cannot be undone.');">
+          {{ empty_form.hidden_tag() }}
+
           <input type="hidden" name="project_name" value="{{ project.name }}" />
           <button type="submit"
                   class="btn btn-sm btn-outline-danger"

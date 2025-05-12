@@ -70,6 +70,7 @@
         action="{{ as_url(routes.announce.selected_post, project_name=release.project.name, version_name=release.version) }}"
         class="atr-canary py-4 px-5 mb-4 border rounded">
     {{ announce_form.hidden_tag() }}
+
     <div class="row mb-3 pb-3 border-bottom">
       <div class="col-md-3 text-md-end fw-medium">{{ announce_form.mailing_list.label }}</div>
       <div class="col-md-9">

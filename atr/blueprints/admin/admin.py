@@ -16,12 +16,10 @@
 # under the License.
 
 import collections
-import datetime
 import logging
 import os
 import pathlib
 import statistics
-import uuid
 from collections.abc import Callable, Mapping
 from typing import Any, Final
 
@@ -165,28 +163,6 @@ async def admin_env() -> quart.wrappers.response.Response:
     return quart.Response("\n".join(env_vars), mimetype="text/plain")
 
 
-@admin.BLUEPRINT.route("/keys/delete-all")
-async def admin_keys_delete_all() -> str:
-    """Debug endpoint to delete all of a user's keys."""
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", errorcode=401)
-    uid = util.unwrap(web_session.uid)
-
-    async with db.session() as data:
-        async with data.begin():
-            # Get all keys for the user
-            # TODO: Use session.apache_uid instead of session.uid?
-            keys = await data.public_signing_key(apache_uid=uid).all()
-            count = len(keys)
-
-            # Delete all keys
-            for key in keys:
-                await data.delete(key)
-
-        return f"Deleted {count} keys"
-
-
 @admin.BLUEPRINT.route("/performance")
 async def admin_performance() -> str:
     """Display performance statistics for all routes."""
@@ -291,7 +267,8 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
             }, 200
 
     # For GET requests, show the update form
-    return await quart.render_template("update-projects.html")
+    empty_form = await util.EmptyForm.create_form()
+    return await quart.render_template("update-projects.html", empty_form=empty_form)
 
 
 @admin.BLUEPRINT.route("/releases")
@@ -307,65 +284,17 @@ async def admin_tasks() -> str:
     return await quart.render_template("tasks.html")
 
 
-@admin.BLUEPRINT.route("/test-kv")
-async def admin_test_kv() -> str:
-    """Test route for writing and reading from the TextValue KV store."""
-    test_ns = "kv_test"
-    test_key = str(uuid.uuid4())
-    test_value = f"Test value set at {datetime.datetime.now(datetime.UTC)}"
-    message: str
-
-    try:
-        async with db.session() as data:
-            existing = await data.text_value(ns=test_ns, key=test_key).get()
-            if existing:
-                existing.value = test_value
-                data.add(existing)
-            else:
-                new_entry = models.TextValue(ns=test_ns, key=test_key, value=test_value)
-                data.add(new_entry)
-            await data.commit()
-            _LOGGER.info(f"Text value test: Wrote {test_ns}/{test_key} = {test_value}")
-
-        async with db.session() as data:
-            read_back = await data.text_value(ns=test_ns, key=test_key).get()
-            if read_back and (read_back.value == test_value):
-                message = f"<p class='page-success'>Test SUCCESS: Wrote/read ok (ns='{test_ns}', key='{test_key}')</p>"
-                _LOGGER.info("Text value test SUCCESS")
-            elif read_back:
-                message = (
-                    f"<p class='page-error'>Test FAILED: Read back wrong value!</p>"
-                    f"<p>Expected: '{test_value}'</p>"
-                    f"<p>Got: '{read_back.value}'</p>"
-                )
-                _LOGGER.error(
-                    f"Text value test FAILED: Read back wrong value! Expected='{test_value}', got='{read_back.value}'"
-                )
-            else:
-                message = f"<p class='page-success'>Test SUCCESS: Wrote/read ok (ns='{test_ns}', key='{test_key}')</p>"
-                _LOGGER.info("Text value test SUCCESS")
-
-    except Exception as e:
-        message = f"<p class='page-error'>Test FAILED: Exception occurred - {e!s}</p>"
-        _LOGGER.exception("Text value test exception")
-
-    return f"""<!DOCTYPE html>
-<html>
-<head><title>Text value test result</title></head>
-<style>
-.page-error {{ color: red; }}
-.page-success {{ color: green; }}
-</style>
-<body>
-<h1>Text value test result</h1>
-{message}
-</body>
-</html>
-"""
+@admin.BLUEPRINT.route("/toggle-view", methods=["GET"])
+async def admin_toggle_admin_view_page() -> str:
+    """Display the page with a button to toggle between admin and user views."""
+    empty_form = await util.EmptyForm.create_form()
+    return await quart.render_template("toggle-admin-view.html", empty_form=empty_form)
 
 
 @admin.BLUEPRINT.route("/toggle-admin-view", methods=["POST"])
 async def admin_toggle_view() -> response.Response:
+    await util.validate_empty_form()
+
     web_session = await session.read()
     if web_session is None:
         # For the type checker

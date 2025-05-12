@@ -93,4 +93,5 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
         primary_results=primary_results_list,
         member_results=member_results_list,
         format_file_size=util.format_file_size,
+        empty_form=await util.EmptyForm.create_form(),
     )

@@ -110,6 +110,8 @@
             <div class="mt-3">
               <form method="post"
                     action="{{ as_url(routes.revisions.selected_post, project_name=project_name, version_name=version_name) }}">
+                {{ empty_form.hidden_tag() }}
+
                 <input type="hidden" name="revision_name" value="{{ revision.name }}" />
                 <button type="submit" class="btn btn-sm btn-outline-danger">Set this revision as current</button>
               </form>

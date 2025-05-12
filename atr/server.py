@@ -30,6 +30,7 @@ import asfquart.session
 import blockbuster
 import quart
 import quart_schema
+import quart_wtf
 import rich.logging as rich_logging
 import werkzeug.routing as routing
 
@@ -174,19 +175,16 @@ def app_setup_logging(app: base.QuartApp, config_mode: config.Mode, app_config: 
 
 def create_app(app_config: type[config.AppConfig]) -> base.QuartApp:
     """Create and configure the application."""
+    config_mode = config.get_mode()
     app_dirs_setup(app_config)
-
     app = app_create_base(app_config)
-    app_setup_api_docs(app)
 
+    app_setup_api_docs(app)
+    quart_wtf.CSRFProtect(app)
     db.init_database(app)
     register_routes(app)
     blueprints.register(app)
-
     filters.register_filters(app)
-
-    config_mode = config.get_mode()
-
     app_setup_context(app)
     app_setup_lifecycle(app)
     app_setup_logging(app, config_mode, app_config)

@@ -129,24 +129,13 @@
             <a href="{{ url_for('admin.admin_delete_release') }}"
                {% if request.endpoint == 'admin.admin_delete_release' %}class="active"{% endif %}>Delete release</a>
           </li>
+          <li>
+            <i class="bi bi-person-badge"></i>
+            <a href="{{ url_for('admin.admin_toggle_admin_view_page') }}"
+               {% if request.endpoint == 'admin.admin_toggle_admin_view_page' %}class="active"{% endif %}>Toggle admin view</a>
+          </li>
         </ul>
       {% endif %}
     {% endif %}
-
-    {% if current_user and is_admin_fn(current_user.uid) %}
-      <h3>Admin actions</h3>
-      <form action="{{ url_for('admin.admin_toggle_view') }}"
-            method="post"
-            class="ms-2 mb-4">
-        <button type="submit" class="btn btn-sm btn-outline-secondary">
-          {% if not is_viewing_as_admin_fn(current_user.uid) %}
-            <i class="fa-solid fa-user-shield"></i> View as admin
-          {% else %}
-            <i class="fa-solid fa-user-ninja"></i> View as user
-          {% endif %}
-        </button>
-      </form>
-    {% endif %}
-
   </nav>
 </aside>

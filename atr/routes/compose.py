@@ -67,6 +67,7 @@ async def check(
     delete_draft_form = await draft.DeleteForm.create_form()
     delete_file_form = await draft.DeleteFileForm.create_form()
     resolve_form = await resolve.ResolveForm.create_form()
+    empty_form = await util.EmptyForm.create_form()
     vote_task_warnings = _warnings_from_vote_result(vote_task)
 
     return await quart.render_template(
@@ -93,6 +94,7 @@ async def check(
         vote_task=vote_task,
         archive_url=archive_url,
         vote_task_warnings=vote_task_warnings,
+        empty_form=empty_form,
     )
 
 

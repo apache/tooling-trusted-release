@@ -36,11 +36,15 @@
   <div class="d-flex gap-2 mb-4">
     <form method="post"
           action="{{ as_url(routes.draft.hashgen, project_name=project_name, version_name=version_name, file_path=file_path) }}">
+      {{ empty_form.hidden_tag() }}
+
       <input type="hidden" name="hash_type" value="sha256" />
       <button type="submit" class="btn btn-outline-secondary">Generate SHA256</button>
     </form>
     <form method="post"
           action="{{ as_url(routes.draft.hashgen, project_name=project_name, version_name=version_name, file_path=file_path) }}">
+      {{ empty_form.hidden_tag() }}
+
       <input type="hidden" name="hash_type" value="sha512" />
       <button type="submit" class="btn btn-outline-secondary">Generate SHA512</button>
     </form>
@@ -51,6 +55,8 @@
     <p>Generate a CycloneDX Software Bill of Materials (SBOM) file for this artifact.</p>
     <form method="post"
           action="{{ as_url(routes.draft.sbomgen, project_name=project_name, version_name=version_name, file_path=file_path) }}">
+      {{ empty_form.hidden_tag() }}
+
       <button type="submit" class="btn btn-outline-secondary">Generate CycloneDX SBOM (.cdx.json)</button>
     </form>
   {% endif %}

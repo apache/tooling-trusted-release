@@ -107,6 +107,8 @@ async def add_project(session: routes.CommitterSession, project_name: str) -> re
 @routes.committer("/project/delete", methods=["POST"])
 async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a project created by the user."""
+    # TODO: This is not truly empty, so make a form object for this
+    await util.validate_empty_form()
     form_data = await quart.request.form
     project_name = form_data.get("project_name")
     if not project_name:
@@ -149,7 +151,9 @@ async def projects() -> str:
     """Main project directory page."""
     async with db.session() as data:
         projects = await data.project(_committee=True).order_by(models.Project.full_name).all()
-        return await quart.render_template("projects.html", projects=projects)
+        return await quart.render_template(
+            "projects.html", projects=projects, empty_form=await util.EmptyForm.create_form()
+        )
 
 
 @routes.committer("/projects/<project_name>/release-policy/add", methods=["GET", "POST"])
@@ -261,6 +265,7 @@ async def view(name: str) -> str:
             full_releases=await project.full_releases,
             number_of_release_files=util.number_of_release_files,
             now=datetime.datetime.now(datetime.UTC),
+            empty_form=await util.EmptyForm.create_form(),
         )
 
 

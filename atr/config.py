@@ -17,6 +17,7 @@
 
 import enum
 import os
+import secrets
 from typing import Final
 
 import decouple
@@ -34,6 +35,8 @@ class AppConfig:
     DEBUG = False
     TEMPLATES_AUTO_RELOAD = False
     USE_BLOCKBUSTER = False
+    SECRET_KEY = decouple.config("SECRET_KEY", default=secrets.token_hex(128 // 8))
+    WTF_CSRF_ENABLED = decouple.config("WTF_CSRF_ENABLED", default=True, cast=bool)
     FINISHED_STORAGE_DIR = os.path.join(STATE_DIR, "finished")
     UNFINISHED_STORAGE_DIR = os.path.join(STATE_DIR, "unfinished")
     SQLITE_DB_PATH = decouple.config("SQLITE_DB_PATH", default="atr.db")
