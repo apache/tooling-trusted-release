@@ -59,59 +59,33 @@
       <h3 class="mb-2">Signing keys</h3>
     </div>
     <div class="card-body">
-      <div class="row row-cols-1 g-4">
-        {% for key in project.public_signing_keys %}
-          <div class="col">
-            <div class="card h-100 border">
-              <div class="card-body">
-                <table class="table mb-0">
-                  <tbody>
-                    <tr>
-                      <th class="border-0">Fingerprint</th>
-                      <td class="text-break border-0">{{ key.fingerprint }}</td>
-                    </tr>
-                    <tr>
-                      <th class="border-0">Type</th>
-                      <td class="text-break border-0">{{ algorithms[key.algorithm] }} ({{ key.length }} bits)</td>
-                    </tr>
-                    <tr>
-                      <th class="border-0">Created</th>
-                      <td class="text-break border-0">{{ key.created.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-                    </tr>
-                    <tr>
-                      <th class="border-0">Expires</th>
-                      <td class="text-break border-0">
-                        {% if key.expires %}
-                          {% set days_until_expiry = (key.expires - now).days %}
-                          {% if days_until_expiry < 0 %}
-                            <span class="text-danger fw-bold">
-                              {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
-                              <span class="badge bg-danger text-white ms-2">Expired</span>
-                            </span>
-                          {% elif days_until_expiry <= 30 %}
-                            <span class="text-warning fw-bold">
-                              {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
-                              <span class="badge bg-warning text-dark ms-2">Expires in {{ days_until_expiry }} days</span>
-                            </span>
-                          {% else %}
-                            {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
-                          {% endif %}
-                        {% else %}
-                          Never
-                        {% endif %}
-                      </td>
-                    </tr>
-                    <tr>
-                      <th class="border-0">User ID</th>
-                      <td class="text-break border-0">{{ key.declared_uid or 'Not specified' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        {% endfor %}
-      </div>
+      <!-- Or we could link to the relevant section in the keys review page -->
+      {% if project.committee.public_signing_keys %}
+        <div class="table-responsive mb-2">
+          <table class="table border table-striped table-hover table-sm">
+            <thead>
+              <tr>
+                <th class="px-2" scope="col">Fingerprint</th>
+                <th class="px-2" scope="col">Email</th>
+                <th class="px-2" scope="col">Apache UID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for key in project.committee.public_signing_keys %}
+                <tr>
+                  <td class="text-break font-monospace px-2">
+                    <a href="{{ as_url(routes.keys.show_gpg_key, fingerprint=key.fingerprint) }}">{{ key.fingerprint[:16]|upper }}</a>
+                  </td>
+                  <td class="text-break px-2">{{ key.declared_uid or 'Not specified' }}</td>
+                  <td class="text-break px-2">{{ key.apache_uid }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div>No keys found.</div>
+      {% endif %}
     </div>
   </div>
 
