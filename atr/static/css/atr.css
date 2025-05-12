@@ -51,7 +51,9 @@ footer {
 }
 
 h1 {
-    margin-bottom: 2rem;
+    margin-top: 1rem;
+    margin-bottom: 1.5rem;
+    line-height: 1.35;
 }
 
 h2 {
