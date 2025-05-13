@@ -129,10 +129,10 @@ async def admin_delete_release() -> str | response.Response:
                     _LOGGER.error("Error deleting release %s: %s", release_name, e)
                     fail_count += 1
                     error_messages.append(f"{release_name}: {e}")
-                except Exception:
+                except Exception as e:
                     _LOGGER.exception("Unexpected error deleting release %s:", release_name)
                     fail_count += 1
-                    error_messages.append(f"{release_name}: Unexpected error")
+                    error_messages.append(f"{release_name}: Unexpected error ({e})")
 
             if success_count > 0:
                 await quart.flash(f"Successfully deleted {success_count} release(s).", "success")
