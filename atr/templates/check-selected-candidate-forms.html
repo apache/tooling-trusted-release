@@ -73,7 +73,7 @@
   <div class="row">
     {{ forms.label(resolve_form.resolution_body, col=True, classes="col-sm-3 text-sm-end") }}
     <div class="col-sm-9">
-      {{ forms.widget(resolve_form.resolution_body, rows="3", placeholder=resolve_form.resolution_body.description) }}
+      {{ forms.widget(resolve_form.resolution_body, rows="3") }}
       {{ forms.errors(resolve_form.resolution_body) }}
       {{ forms.description(resolve_form.resolution_body) }}
     </div>

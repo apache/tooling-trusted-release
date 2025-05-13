@@ -1,20 +1,29 @@
-{% macro label(field, classes="form-label", col=False, high=False) %}
+{% macro label(field, classes=None, col=False, high=False, mcol=False) %}
   {% if field.label %}
-    {% set final_classes = classes %}
-    {% if col or high %}
-      {% set base_col_classes = "col-sm-3 text-sm-end" %}
-      {% if col and not high %}
-        {% set base_col_classes = "col-sm-3 col-form-label text-sm-end" %}
-      {% endif %}
-      {% if final_classes and final_classes != "" and final_classes != "form-label" %}
-        {% set final_classes = base_col_classes + " " + final_classes %}
-      {% elif final_classes == "form-label" and base_col_classes != "" %}
-        {% set final_classes = base_col_classes %}
-      {% else %}
-        {% set final_classes = base_col_classes %}
-      {% endif %}
+    {% set base_structural_classes = "" %}
+    {% if col %}
+      {% set base_structural_classes = "col-sm-3 col-form-label text-sm-end" %}
+    {% elif high %}
+      {% set base_structural_classes = "col-sm-3 text-sm-end" %}
+    {% elif mcol %}
+      {% set base_structural_classes = "col-md-2 text-md-end" %}
     {% endif %}
-    {{ field.label(class=final_classes) }}
+    {% set final_class_list = [] %}
+    {% if base_structural_classes %}
+      {% set _ = final_class_list.append(base_structural_classes) %}
+    {% endif %}
+    {% if classes %}
+      {% set _ = final_class_list.append(classes) %}
+    {% endif %}
+    {% if not final_class_list %}
+      {% set _ = final_class_list.append("form-label") %}
+    {% endif %}
+    {% set final_classes_str = final_class_list | join(' ') | trim %}
+    {% if final_classes_str %}
+      {{ field.label(class=final_classes_str) }}
+    {% else %}
+      {{ field.label() }}
+    {% endif %}
   {% endif %}
 {% endmacro %}
 

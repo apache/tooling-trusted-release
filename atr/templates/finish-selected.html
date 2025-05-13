@@ -84,22 +84,14 @@
           {{ form.hidden_tag() }}
 
           <div class="mb-3">
-            {{ form.source_file.label(class="form-label") }}
-            {{ form.source_file(class="form-select form-select-sm font-monospace") }}
-            {% if form.source_file.errors %}
-              <div class="invalid-feedback d-block">
-                {% for error in form.source_file.errors %}{{ error }}{% endfor %}
-              </div>
-            {% endif %}
+            {{ forms.label(form.source_file, classes="pb-2") }}
+            {{ forms.widget(form.source_file, classes="form-select form-select-sm font-monospace") }}
+            {{ forms.errors(form.source_file, classes="invalid-feedback d-block") }}
           </div>
           <div class="mb-3">
-            {{ form.target_directory.label(class="form-label") }}
-            {{ form.target_directory(class="form-select form-select-sm font-monospace") }}
-            {% if form.target_directory.errors %}
-              <div class="invalid-feedback d-block">
-                {% for error in form.target_directory.errors %}{{ error }}{% endfor %}
-              </div>
-            {% endif %}
+            {{ forms.label(form.target_directory, classes="pb-2") }}
+            {{ forms.widget(form.target_directory, classes="form-select form-select-sm font-monospace") }}
+            {{ forms.errors(form.target_directory, classes="invalid-feedback d-block") }}
           </div>
           {{ form.submit(class="btn btn-primary btn-sm") }}
         </form>

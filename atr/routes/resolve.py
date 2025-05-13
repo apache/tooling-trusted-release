@@ -47,9 +47,6 @@ class ResolveForm(util.QuartFormTyped):
         "Resolution email body",
         validators=[wtforms.validators.Optional()],
         description="Enter optional comment for the resolution email (e.g., summary of issues if failed).",
-        render_kw={
-            "placeholder": "Enter optional comment for the resolution email (e.g., summary of issues if failed)."
-        },
     )
     submit = wtforms.SubmitField("Resolve vote")
 

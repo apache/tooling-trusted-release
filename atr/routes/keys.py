@@ -74,7 +74,11 @@ async def add(session: routes.CommitterSession) -> str:
 
     class AddGpgKeyForm(util.QuartFormTyped):
         public_key = wtforms.TextAreaField(
-            "Public GPG key", validators=[wtforms.validators.InputRequired("Public key is required")]
+            "Public GPG key",
+            validators=[wtforms.validators.InputRequired("Public key is required")],
+            render_kw={"placeholder": "Paste your ASCII-armored public GPG key here..."},
+            description="Your public key should be in ASCII-armored format, starting with"
+            ' "-----BEGIN PGP PUBLIC KEY BLOCK-----"',
         )
         selected_committees = wtforms.SelectMultipleField(
             "Associate key with committees",
@@ -83,6 +87,7 @@ async def add(session: routes.CommitterSession) -> str:
             choices=committee_choices,
             option_widget=wtforms.widgets.CheckboxInput(),
             widget=wtforms.widgets.ListWidget(prefix_label=False),
+            description="Select the committees with which to associate your key.",
         )
         submit = wtforms.SubmitField("Add GPG key")
 

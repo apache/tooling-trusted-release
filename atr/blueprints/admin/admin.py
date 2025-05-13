@@ -52,6 +52,7 @@ class DeleteReleaseForm(util.QuartFormTyped):
             wtforms.validators.InputRequired("Confirmation is required"),
             wtforms.validators.Regexp("^DELETE$", message="Please type DELETE to confirm"),
         ],
+        render_kw={"placeholder": "DELETE"},
         description="Please type DELETE exactly to confirm deletion.",
     )
     submit = wtforms.SubmitField("Delete selected releases permanently")
