@@ -41,13 +41,10 @@
     </div>
 
     <div class="mb-3">
-      {{ form.confirm_delete.label(class="form-label") }}
-      {{ form.confirm_delete(class="form-control" + (" is-invalid" if form.confirm_delete.errors else "") , placeholder="DELETE") }}
-      {% if form.confirm_delete.errors %}
-        <div class="invalid-feedback">{{ form.confirm_delete.errors[0] }}</div>
-      {% else %}
-        <div class="form-text">Please type DELETE exactly to confirm deletion.</div>
-      {% endif %}
+      {{ forms.label(form.confirm_delete) }}
+      {{ forms.widget(form.confirm_delete, placeholder="DELETE") }}
+      {{ forms.errors(form.confirm_delete) }}
+      {{ forms.description(form.confirm_delete) }}
     </div>
 
     {{ form.submit(class="btn btn-danger") }}

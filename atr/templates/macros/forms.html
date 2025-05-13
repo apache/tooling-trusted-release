@@ -13,12 +13,16 @@
   {% endif %}
 {% endmacro %}
 
-{% macro widget(field, classes="form-control") %}
+{% macro widget(field, classes="form-control", placeholder=None) %}
   {% set widget_class = classes %}
   {% if field.errors %}
     {% set widget_class = widget_class + ' is-invalid' %}
   {% endif %}
-  {{ field(class_=widget_class) }}
+  {% if placeholder is not none %}
+    {{ field(class_=widget_class, placeholder=placeholder) }}
+  {% else %}
+    {{ field(class_=widget_class) }}
+  {% endif %}
 {% endmacro %}
 
 {% macro errors(field, classes="invalid-feedback", item_separator="<br />") %}
