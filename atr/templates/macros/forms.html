@@ -1,28 +1,38 @@
-{% macro label(field, classes="form-label", col=False) %}
+{% macro label(field, classes="form-label", col=False, high=False) %}
   {% if field.label %}
     {% set final_classes = classes %}
-    {% if col %}
-      {% set col_classes = "col-sm-3 col-form-label text-sm-end" %}
-      {% if final_classes and final_classes != "" %}
-        {% set final_classes = col_classes + " " + final_classes %}
+    {% if col or high %}
+      {% set base_col_classes = "col-sm-3 text-sm-end" %}
+      {% if col and not high %}
+        {% set base_col_classes = "col-sm-3 col-form-label text-sm-end" %}
+      {% endif %}
+      {% if final_classes and final_classes != "" and final_classes != "form-label" %}
+        {% set final_classes = base_col_classes + " " + final_classes %}
+      {% elif final_classes == "form-label" and base_col_classes != "" %}
+        {% set final_classes = base_col_classes %}
       {% else %}
-        {% set final_classes = col_classes %}
+        {% set final_classes = base_col_classes %}
       {% endif %}
     {% endif %}
     {{ field.label(class=final_classes) }}
   {% endif %}
 {% endmacro %}
 
-{% macro widget(field, classes="form-control", placeholder=None) %}
+{% macro widget(field, classes="form-control", placeholder=None, rows=None) %}
   {% set widget_class = classes %}
   {% if field.errors %}
     {% set widget_class = widget_class + ' is-invalid' %}
   {% endif %}
+
+  {% set render_args = {'class_': widget_class} %}
   {% if placeholder is not none %}
-    {{ field(class_=widget_class, placeholder=placeholder) }}
-  {% else %}
-    {{ field(class_=widget_class) }}
+    {% set _ = render_args.update({'placeholder': placeholder}) %}
   {% endif %}
+  {% if rows is not none %}
+    {% set _ = render_args.update({'rows': rows}) %}
+  {% endif %}
+
+  {{ field(**render_args) }}
 {% endmacro %}
 
 {% macro errors(field, classes="invalid-feedback", item_separator="<br />") %}

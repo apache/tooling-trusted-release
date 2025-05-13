@@ -17,6 +17,7 @@
   {% if current_user and is_admin_fn(current_user.uid) %}
     <form action="{{ url_for('admin.admin_toggle_view') }}" method="post" class="mb-4">
       {{ empty_form.hidden_tag() }}
+
       <button type="submit" class="btn btn-primary">
         {% if not is_viewing_as_admin_fn(current_user.uid) %}
           <i class="fa-solid fa-user-shield"></i> Switch to admin view

@@ -27,7 +27,7 @@
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    {{ forms.label(form.manual_vote, col=True) }}
+    {{ forms.label(form.manual_vote, high=True) }}
     <div class="col-sm-8">
       <div class="form-check">
         {{ forms.widget(form.manual_vote, classes="form-check-input") }}
@@ -75,7 +75,7 @@
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    {{ forms.label(form.pause_for_rm, col=True) }}
+    {{ forms.label(form.pause_for_rm, high=True) }}
     <div class="col-sm-8">
       <div class="form-check">
         {{ forms.widget(form.pause_for_rm, classes="form-check-input") }}
