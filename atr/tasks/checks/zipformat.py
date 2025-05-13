@@ -279,12 +279,7 @@ def _license_headers_check_should_check_zip(member_path: str, extension: str) ->
     """Determine whether a file in a zip should be checked for license headers."""
     for pattern in license.INCLUDED_PATTERNS:
         if license.re.match(pattern, f".{extension}"):
-            # Also check whether we have a comment style defined for it
-            if license.COMMENT_STYLES.get(extension):
-                return True
-            else:
-                _LOGGER.warning(f"No comment style defined for included extension '{extension}' in {member_path}")
-                return False
+            return True
     return False
 
 
@@ -295,14 +290,8 @@ def _license_headers_check_single_file_zip(
     member_path = member_info.filename
     try:
         with zf.open(member_path) as file_in_zip:
-            content_bytes = file_in_zip.read(2048)
-            header_bytes = license.strip_comments(content_bytes, extension)
-            expected_header_bytes = license.APACHE_LICENSE_HEADER
-            if header_bytes == expected_header_bytes:
-                return True, None
-            else:
-                # Header mismatch
-                return False, None
+            content_bytes = file_in_zip.read(4096)
+            return license.headers_validate(content_bytes, member_path)
     except Exception as read_error:
         return False, f"{member_path} (Read Error: {read_error})"
 

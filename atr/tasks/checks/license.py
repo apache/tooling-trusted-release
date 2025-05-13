@@ -32,113 +32,19 @@ _LOGGER: Final = logging.getLogger(__name__)
 
 
 # Constant that must be present in the Apache License header
-APACHE_LICENSE_HEADER: Final[bytes] = b"""\
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
+HTTP_APACHE_LICENSE_HEADER: Final[bytes] = (
+    b"Licensed to the Apache Software Foundation ASF under one or mor"
+    b"e contributor license agreements See the NOTICE file distribute"
+    b"d with this work for additional information regarding copyright"
+    b" ownership The ASF licenses this file to you under the Apache L"
+    b"icense Version 2 0 the License you may not use this file except"
+    b" in compliance with the License You may obtain a copy of the Li"
+    b"cense at http www apache org licenses LICENSE 2 0 Unless requir"
+    b"ed by applicable law or agreed to in writing software distribut"
+    b"ed under the License"
+)
 
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License."""
-
-
-# File type comment style definitions
-# Ordered by their popularity in the Stack Overflow Developer Survey 2024
-COMMENT_STYLES: Final[dict[str, dict[str, str]]] = {
-    # JavaScript and variants
-    "js": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "mjs": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "cjs": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "jsx": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # Python
-    "py": {"single": "#", "multi_start": '"""', "multi_end": '"""'},
-    # SQL
-    "sql": {"single": "--", "multi_start": "/*", "multi_end": "*/"},
-    "ddl": {"single": "--", "multi_start": "/*", "multi_end": "*/"},
-    "dml": {"single": "--", "multi_start": "/*", "multi_end": "*/"},
-    # TypeScript and variants
-    "ts": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "tsx": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "mts": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "cts": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # Shell scripts
-    "sh": {"single": "#"},
-    "bash": {"single": "#"},
-    "zsh": {"single": "#"},
-    "ksh": {"single": "#"},
-    # Java
-    "java": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "jav": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # C#
-    "cs": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "csx": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # C++
-    "cpp": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "cxx": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "cc": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "hpp": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # C
-    "c": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "h": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # PHP
-    "php": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "phtml": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # PowerShell
-    "ps1": {"single": "#", "multi_start": "<#", "multi_end": "#>"},
-    "psm1": {"single": "#", "multi_start": "<#", "multi_end": "#>"},
-    "psd1": {"single": "#", "multi_start": "<#", "multi_end": "#>"},
-    # Go
-    "go": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # Rust
-    "rs": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # Kotlin
-    "kt": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "kts": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # Lua
-    "lua": {"single": "--", "multi_start": "--[[", "multi_end": "]]"},
-    # Dart
-    "dart": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # Assembly
-    "asm": {"single": ";"},
-    "s": {"single": "#"},
-    "S": {"single": "#"},
-    # Ruby
-    "rb": {"single": "#", "multi_start": "=begin", "multi_end": "=end"},
-    "rbw": {"single": "#", "multi_start": "=begin", "multi_end": "=end"},
-    # Swift
-    "swift": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # R
-    "r": {"single": "#"},
-    "R": {"single": "#"},
-    # Visual Basic
-    "vb": {"single": "'", "multi_start": "/*", "multi_end": "*/"},
-    "vbs": {"single": "'", "multi_start": "/*", "multi_end": "*/"},
-    # MATLAB
-    "m": {"single": "%", "multi_start": "%{", "multi_end": "%}"},
-    # VBA
-    "vba": {"single": "'"},
-    # Groovy
-    "groovy": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "gvy": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "gy": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "gsh": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # Scala
-    "scala": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    "sc": {"single": "//", "multi_start": "/*", "multi_end": "*/"},
-    # Perl
-    "pl": {"single": "#", "multi_start": "=pod", "multi_end": "=cut"},
-    "pm": {"single": "#", "multi_start": "=pod", "multi_end": "=cut"},
-    "t": {"single": "#", "multi_start": "=pod", "multi_end": "=cut"},
-}
+HTTPS_APACHE_LICENSE_HEADER: Final[bytes] = HTTP_APACHE_LICENSE_HEADER.replace(b" http ", b" https ")
 
 # Patterns for files to include in license header checks
 # Ordered by their popularity in the Stack Overflow Developer Survey 2024
@@ -262,52 +168,24 @@ async def headers(args: checks.FunctionArguments) -> str | None:
     return None
 
 
-def strip_comments(content: bytes, file_ext: str) -> bytes:
-    """Strip comment prefixes from the content based on the file extension."""
-    if file_ext not in COMMENT_STYLES:
-        return content
+def headers_validate(content: bytes, _filename: str) -> tuple[bool, str | None]:
+    """Validate that the content contains the Apache License header."""
+    r_span = re.compile(rb"Licensed to the.*?under the License", re.MULTILINE)
+    r_words = re.compile(rb"[A-Za-z0-9]+")
 
-    comment_style = COMMENT_STYLES[file_ext]
-    lines = content.split(b"\n")
-    cleaned_lines = []
+    # Normalise the content
+    content = re.sub(rb"[ \t\r\n]+", b" ", content)
 
-    # Get comment markers as bytes
-    multi_start = comment_style.get("multi_start", "").encode()
-    multi_end = comment_style.get("multi_end", "").encode()
-    single = comment_style.get("single", "").encode()
-
-    # State tracking
-    in_multiline = False
-    is_c_style = (multi_start == b"/*") and (multi_end == b"*/")
-
-    for line in lines:
-        line = line.strip()
-
-        # Handle start of multi-line comment
-        if not in_multiline and multi_start and multi_start in line:
-            # Get content after multi-start
-            line = line[line.find(multi_start) + len(multi_start) :].strip()
-            in_multiline = True
-
-        # Handle end of multi-line comment
-        elif in_multiline and multi_end and multi_end in line:
-            # Get content before multi-end
-            line = line[: line.find(multi_end)].strip()
-            in_multiline = False
-
-        # Handle single-line comments
-        elif not in_multiline and single and line.startswith(single):
-            line = line[len(single) :].strip()
-
-        # For C style comments, strip leading asterisk if present
-        elif is_c_style and in_multiline and line.startswith(b"*"):
-            line = line[1:].strip()
-
-        # Only add non-empty lines
-        if line:
-            cleaned_lines.append(line)
-
-    return b"\n".join(cleaned_lines)
+    # For each matching heuristic span...
+    for span in r_span.finditer(content):
+        # Get only the words in the span
+        words = r_words.findall(span.group(0))
+        joined = b" ".join(words)
+        if joined == HTTP_APACHE_LICENSE_HEADER:
+            return True, None
+        elif joined == HTTPS_APACHE_LICENSE_HEADER:
+            return True, None
+    return False, "Could not find Apache License header"
 
 
 # File helpers
@@ -355,14 +233,30 @@ def _files_check_core_logic(artifact_path: str) -> Iterator[Result]:
 
     yield from _files_messages_build(files_found, license_ok, notice_ok, notice_issues)
 
-    is_valid = license_ok and notice_ok
-    yield ArtifactResult(
-        status=models.CheckResultStatus.SUCCESS if is_valid else models.CheckResultStatus.FAILURE,
-        message="LICENSE and NOTICE files present and valid"
-        if is_valid
-        else "Issues found with LICENSE or NOTICE files",
-        data=None,
-    )
+    if license_ok and notice_ok:
+        yield ArtifactResult(
+            status=models.CheckResultStatus.SUCCESS,
+            message="LICENSE and NOTICE files present and valid",
+            data=None,
+        )
+    elif license_ok:
+        yield ArtifactResult(
+            status=models.CheckResultStatus.FAILURE,
+            message="LICENSE file present but NOTICE file is not valid",
+            data=None,
+        )
+    elif notice_ok:
+        yield ArtifactResult(
+            status=models.CheckResultStatus.FAILURE,
+            message="NOTICE file present but LICENSE file is not valid",
+            data=None,
+        )
+    else:
+        yield ArtifactResult(
+            status=models.CheckResultStatus.FAILURE,
+            message="LICENSE and NOTICE files are not valid",
+            data=None,
+        )
 
 
 def _files_check_core_logic_license(tf: tarfile.TarFile, member: tarfile.TarInfo) -> bool:
@@ -371,10 +265,15 @@ def _files_check_core_logic_license(tf: tarfile.TarFile, member: tarfile.TarInfo
     if not f:
         return False
 
+    sha3_expected = "5efa4839f385df309ffc022ca5ce9763c4bc709dab862ca77d9a894db6598456"
     sha3 = hashlib.sha3_256()
-    content = f.read()
-    sha3.update(content[:11358])
-    return sha3.hexdigest() == "8a0a8fb6c73ef27e4322391c7b28e5b38639e64e58c40a2c7a51cec6e7915a6a"
+    for line in f:
+        octets = line.strip(b" \t\r\n")
+        if octets:
+            sha3.update(octets)
+        if sha3.hexdigest() == sha3_expected:
+            return True
+    return False
 
 
 def _files_check_core_logic_notice(tf: tarfile.TarFile, member: tarfile.TarInfo) -> tuple[bool, list[str]]:
@@ -536,8 +435,8 @@ def _headers_check_core_logic_process_file(
 
         # Allow for some extra content at the start of the file
         # That may be shebangs, encoding declarations, etc.
-        content = f.read(len(APACHE_LICENSE_HEADER) + 512)
-        is_valid, error = _headers_validate(content, member.name)
+        content = f.read(4096)
+        is_valid, error = headers_validate(content, member.name)
         if is_valid:
             return MemberResult(
                 status=models.CheckResultStatus.SUCCESS,
@@ -567,47 +466,12 @@ def _headers_check_core_logic_should_check(filepath: str) -> bool:
     if ext is None:
         return False
 
-    # First check if we have comment style definitions for this extension
-    if ext not in COMMENT_STYLES:
-        return False
-
     # Then check if the file matches any of our included patterns
     for pattern in INCLUDED_PATTERNS:
         if re.search(pattern, filepath, re.IGNORECASE):
             return True
 
     return False
-
-
-def _headers_validate(content: bytes, filename: str) -> tuple[bool, str | None]:
-    """Validate that the content contains the Apache License header after removing comments."""
-    # Get the file extension from the filename
-    file_ext = _get_file_extension(filename)
-    if not file_ext or file_ext not in COMMENT_STYLES:
-        return False, "Could not determine file type from extension"
-
-    # Strip comments, removing empty lines in the process
-    cleaned_header = strip_comments(content, file_ext)
-
-    # Normalise the expected header in the same way as directly above
-    expected_lines = [line.strip() for line in APACHE_LICENSE_HEADER.split(b"\n")]
-    expected_lines = [line for line in expected_lines if line]
-    expected_header = b"\n".join(expected_lines)
-
-    # Check if the cleaned header contains the expected text
-    if expected_header not in cleaned_header:
-        # # Find the first difference for debugging
-        # cleaned_lines = cleaned_header.split(b"\n")
-        # expected_lines = expected_header.split(b"\n")
-        # for i, (c, e) in enumerate(zip(cleaned_lines, expected_lines)):
-        #     if c != e:
-        #         _LOGGER.debug("\nFirst difference at line %d:", i + 1)
-        #         _LOGGER.debug("Expected: '%s'", e.decode(errors="replace"))
-        #         _LOGGER.debug("Got:      '%s'", c.decode(errors="replace"))
-        #         break
-        return False, "License header does not match the required Apache License header text"
-
-    return True, None
 
 
 async def _record_artifact(recorder: checks.Recorder, result: ArtifactResult) -> None:
