@@ -6,18 +6,18 @@
 
   <input type="hidden" name="form_type" value="single" />
   <div class="mb-3 pb-3 row border-bottom">
-    <label for="project_name_text" class="col-sm-3 col-form-label text-sm-end">Project:</label>
+    <label for="project_name_text" class="col-sm-3 col-form-label text-sm-end">Project</label>
     <div class="col-sm-8">
       <p id="project_name_text" class="form-control-plaintext">{{ project.display_name }}</p>
     </div>
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    <label for="{{ form.mailto_addresses.entries[0].id }}"
-           class="col-sm-3 col-form-label text-sm-end">{{ form.mailto_addresses.entries[0].label.text }}:</label>
+    {{ forms.label(form.mailto_addresses.entries[0], col=True) }}
     <div class="col-sm-8">
-      {{ forms.render_field(form.mailto_addresses.entries[0]) }}
-      <span class="form-text text-muted">Note: This field determines where vote and finished release announcement emails are sent. You can set this value to your own mailing list, but ATR will currently only let you send to <code>user-tests@tooling.apache.org</code>.</span>
+      {{ forms.widget(form.mailto_addresses.entries[0]) }}
+      {{ forms.errors(form.mailto_addresses.entries[0]) }}
+      {{ forms.description(form.mailto_addresses.entries[0]) }}
     </div>
     <!--
     <div class="col-sm-1">
@@ -27,62 +27,62 @@
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    <label for="{{ form.manual_vote.id }}"
-           class="col-sm-3 col-form-label text-sm-end">{{ form.manual_vote.label.text }}</label>
+    {{ forms.label(form.manual_vote, col=True) }}
     <div class="col-sm-8">
       <div class="form-check">
-        {{ forms.render_checkbox(form.manual_vote) }}
+        {{ forms.widget(form.manual_vote, classes="form-check-input") }}
+        {{ forms.errors(form.manual_vote, classes="invalid-feedback d-block") }}
         <label class="form-check-label" for="{{ form.manual_vote.id }}">Manual</label>
       </div>
-      <span id="manual_vote-help" class="form-text text-muted">If this is set then the vote will be completely manual and following policy is ignored.</span>
+      {{ forms.description(form.manual_vote) }}
     </div>
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    <label for="{{ form.min_hours.id }}"
-           class="col-sm-3 col-form-label text-sm-end">{{ form.min_hours.label.text }}</label>
+    {{ forms.label(form.min_hours, col=True) }}
     <div class="col-sm-8">
-      {{ forms.render_field(form.min_hours) }}
-      <span id="min_hours-help" class="form-text text-muted">The minimum time to run the vote, in hours. Must be 0 or between 72 and 144 inclusive. If 0, then wait until 3 +1 votes and more +1 than -1.</span>
+      {{ forms.widget(form.min_hours) }}
+      {{ forms.errors(form.min_hours) }}
+      {{ forms.description(form.min_hours) }}
     </div>
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    <label for="{{ form.release_checklist.id }}"
-           class="col-sm-3 col-form-label text-sm-end">{{ form.release_checklist.label.text }}</label>
+    {{ forms.label(form.release_checklist, col=True) }}
     <div class="col-sm-8">
-      {{ forms.render_field(form.release_checklist) }}
-      <span id="release_checklist-help" class="form-text text-muted">Markdown text describing how to test release candidates.</span>
+      {{ forms.widget(form.release_checklist) }}
+      {{ forms.errors(form.release_checklist) }}
+      {{ forms.description(form.release_checklist) }}
     </div>
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    <label for="{{ form.start_vote_template.id }}"
-           class="col-sm-3 col-form-label text-sm-end">{{ form.start_vote_template.label.text }}</label>
+    {{ forms.label(form.start_vote_template, col=True) }}
     <div class="col-sm-8">
-      {{ forms.render_field(form.start_vote_template) }}
-      <span id="start_vote_template-help" class="form-text text-muted">Email template for messages to start a vote on a release.</span>
+      {{ forms.widget(form.start_vote_template) }}
+      {{ forms.errors(form.start_vote_template) }}
+      {{ forms.description(form.start_vote_template) }}
     </div>
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    <label for="{{ form.announce_release_template.id }}"
-           class="col-sm-3 col-form-label text-sm-end">{{ form.announce_release_template.label.text }}</label>
+    {{ forms.label(form.announce_release_template, col=True) }}
     <div class="col-sm-8">
-      {{ forms.render_field(form.announce_release_template) }}
-      <span id="announce_release_template-help" class="form-text text-muted">Email template for messages to announce a finished release.</span>
+      {{ forms.widget(form.announce_release_template) }}
+      {{ forms.errors(form.announce_release_template) }}
+      {{ forms.description(form.announce_release_template) }}
     </div>
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    <label for="{{ form.pause_for_rm.id }}"
-           class="col-sm-3 col-form-label text-sm-end">{{ form.pause_for_rm.label.text }}</label>
+    {{ forms.label(form.pause_for_rm, col=True) }}
     <div class="col-sm-8">
       <div class="form-check">
-        {{ forms.render_checkbox(form.pause_for_rm) }}
+        {{ forms.widget(form.pause_for_rm, classes="form-check-input") }}
+        {{ forms.errors(form.pause_for_rm, classes="invalid-feedback d-block") }}
         <label class="form-check-label" for="{{ form.pause_for_rm.id }}">Enabled</label>
       </div>
-      <span id="pause_for_rm-help" class="form-text text-muted">If enabled, RM can confirm manually if the vote has passed.</span>
+      {{ forms.description(form.pause_for_rm) }}
     </div>
   </div>
 

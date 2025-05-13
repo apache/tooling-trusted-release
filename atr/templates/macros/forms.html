@@ -1,29 +1,37 @@
-{% macro render_field(field, label=False, class_='form-control') %}
-  {% if label and field.label %}{{ field.label(class="form-label") }}{% endif %}
-  {% set field_class = class_ + (' is-invalid' if field.errors else '') %}
-  {{ field(class_=field_class) }}
-  {% if field.errors %}
-    <div class="invalid-feedback">
-      {% for error in field.errors %}
-        {{ error }}
-        {% if not loop.last %}<br />{% endif %}
-      {% endfor %}
-    </div>
+{% macro label(field, classes="form-label", col=False) %}
+  {% if field.label %}
+    {% set final_classes = classes %}
+    {% if col %}
+      {% set col_classes = "col-sm-3 col-form-label text-sm-end" %}
+      {% if final_classes and final_classes != "" %}
+        {% set final_classes = col_classes + " " + final_classes %}
+      {% else %}
+        {% set final_classes = col_classes %}
+      {% endif %}
+    {% endif %}
+    {{ field.label(class=final_classes) }}
   {% endif %}
-  {% if field.description %}<div class="form-text text-muted">{{ field.description }}</div>{% endif %}
 {% endmacro %}
 
-{% macro render_checkbox(field, label=False, class_='form-check-input') %}
-  {% set field_class = class_ + (' is-invalid' if field.errors else '') %}
-  {{ field(class_=field_class) }}
-  {% if label and field.label %}{{ field.label(class="form-check-label") }}{% endif %}
+{% macro widget(field, classes="form-control") %}
+  {% set widget_class = classes %}
   {% if field.errors %}
-    <div class="invalid-feedback d-block">
-      {% for error in field.errors %}
-        {{ error }}
-        {% if not loop.last %}<br />{% endif %}
-      {% endfor %}
-    </div>
+    {% set widget_class = widget_class + ' is-invalid' %}
   {% endif %}
-  {% if field.description %}<div class="form-text text-muted">{{ field.description }}</div>{% endif %}
+  {{ field(class_=widget_class) }}
+{% endmacro %}
+
+{% macro errors(field, classes="invalid-feedback", item_separator="<br />") %}
+{% if field.errors %}
+  <div class="{{ classes }}">
+    {% for error in field.errors %}
+      {{ error }}
+      {% if not loop.last %}{{ item_separator|safe }}{% endif %}
+    {% endfor %}
+  </div>
+{% endif %}
+{% endmacro %}
+
+{% macro description(field, classes="form-text text-muted") %}
+  {% if field.description %}<div id="{{ field.id }}-help" class="{{ classes }}">{{ field.description }}</div>{% endif %}
 {% endmacro %}

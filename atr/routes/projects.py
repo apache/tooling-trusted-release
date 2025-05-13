@@ -57,28 +57,47 @@ class ReleasePolicyForm(util.QuartFormTyped):
                 wtforms.validators.Email(),
             ],
             render_kw={"size": 30},
+            description="Note: This field determines where vote and finished release announcement emails are sent."
+            " You can set this value to your own mailing list, but ATR will currently only let you send to"
+            " user-tests@tooling.apache.org.",
         ),
         min_entries=1,
     )
     min_hours = wtforms.IntegerField(
-        "Minimum voting period:",
+        "Minimum voting period",
         validators=[
             wtforms.validators.InputRequired("Please provide a minimum voting period"),
             util.validate_vote_duration,
         ],
         default=72,
+        description="The minimum time to run the vote, in hours. Must be 0 or between 72 and 144 inclusive."
+        " If 0, then wait until 3 +1 votes and more +1 than -1.",
     )
-    manual_vote = wtforms.BooleanField("Voting process:")
+    manual_vote = wtforms.BooleanField(
+        "Voting process",
+        description="If this is set then the vote will be completely manual and following policy is ignored.",
+    )
     release_checklist = wtforms.StringField(
-        "Release checklist:", widget=wtforms.widgets.TextArea(), render_kw={"rows": 10}
+        "Release checklist",
+        widget=wtforms.widgets.TextArea(),
+        render_kw={"rows": 10},
+        description="Markdown text describing how to test release candidates.",
     )
     start_vote_template = wtforms.StringField(
-        "Start vote template:", widget=wtforms.widgets.TextArea(), render_kw={"rows": 10}
+        "Start vote template",
+        widget=wtforms.widgets.TextArea(),
+        render_kw={"rows": 10},
+        description="Email template for messages to start a vote on a release.",
     )
     announce_release_template = wtforms.StringField(
-        "Announce release template:", widget=wtforms.widgets.TextArea(), render_kw={"rows": 10}
+        "Announce release template",
+        widget=wtforms.widgets.TextArea(),
+        render_kw={"rows": 10},
+        description="Email template for messages to announce a finished release.",
     )
-    pause_for_rm = wtforms.BooleanField("Pause for RM:")
+    pause_for_rm = wtforms.BooleanField(
+        "Pause for RM", description="If enabled, RM can confirm manually if the vote has passed."
+    )
 
     submit = wtforms.SubmitField("Save")
 
