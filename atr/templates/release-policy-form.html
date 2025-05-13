@@ -13,7 +13,7 @@
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    {{ forms.label(form.mailto_addresses.entries[0], col=True) }}
+    {{ forms.label(form.mailto_addresses.entries[0], col="md3") }}
     <div class="col-sm-8">
       {{ forms.widget(form.mailto_addresses.entries[0]) }}
       {{ forms.errors(form.mailto_addresses.entries[0]) }}
@@ -27,7 +27,7 @@
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    {{ forms.label(form.manual_vote, high=True) }}
+    {{ forms.label(form.manual_vote, col="md3-high") }}
     <div class="col-sm-8">
       <div class="form-check">
         {{ forms.widget(form.manual_vote, classes="form-check-input") }}
@@ -39,7 +39,7 @@
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    {{ forms.label(form.min_hours, col=True) }}
+    {{ forms.label(form.min_hours, col="md3") }}
     <div class="col-sm-8">
       {{ forms.widget(form.min_hours) }}
       {{ forms.errors(form.min_hours) }}
@@ -48,7 +48,7 @@
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    {{ forms.label(form.release_checklist, col=True) }}
+    {{ forms.label(form.release_checklist, col="md3") }}
     <div class="col-sm-8">
       {{ forms.widget(form.release_checklist) }}
       {{ forms.errors(form.release_checklist) }}
@@ -57,7 +57,7 @@
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    {{ forms.label(form.start_vote_template, col=True) }}
+    {{ forms.label(form.start_vote_template, col="md3") }}
     <div class="col-sm-8">
       {{ forms.widget(form.start_vote_template) }}
       {{ forms.errors(form.start_vote_template) }}
@@ -66,7 +66,7 @@
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    {{ forms.label(form.announce_release_template, col=True) }}
+    {{ forms.label(form.announce_release_template, col="md3") }}
     <div class="col-sm-8">
       {{ forms.widget(form.announce_release_template) }}
       {{ forms.errors(form.announce_release_template) }}
@@ -75,7 +75,7 @@
   </div>
 
   <div class="mb-3 pb-3 row border-bottom">
-    {{ forms.label(form.pause_for_rm, high=True) }}
+    {{ forms.label(form.pause_for_rm, col="md3-high") }}
     <div class="col-sm-8">
       <div class="form-check">
         {{ forms.widget(form.pause_for_rm, classes="form-check-input") }}

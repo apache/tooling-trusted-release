@@ -27,7 +27,7 @@
 
       <div class="mb-4">
         <div class="row mb-3 pb-3 border-bottom">
-          {{ forms.label(form.public_key, mcol=True, classes="col-form-label") }}
+          {{ forms.label(form.public_key, col="md3") }}
           <div class="col-md-9">
             {{ forms.widget(form.public_key, classes="form-control font-monospace", rows=10) }}
             {{ forms.description(form.public_key) }}
@@ -36,7 +36,7 @@
         </div>
 
         <div class="row mb-3 pb-3 border-bottom">
-          {{ forms.label(form.selected_committees, mcol=True) }}
+          {{ forms.label(form.selected_committees, col="md3") }}
           <div class="col-md-9">
             <div class="row">
               {% for subfield in form.selected_committees %}
@@ -59,7 +59,7 @@
         </div>
       </div>
 
-      <div class="mt-4 col-md-9 offset-md-2">
+      <div class="mt-4 col-md-9 offset-md-3 px-1">
         {{ form.submit(class_='btn btn-primary') }}
         <a href="{{ as_url(routes.keys.keys) }}"
            class="btn btn-link text-secondary">Cancel</a>

@@ -72,7 +72,7 @@
     {{ announce_form.hidden_tag() }}
 
     <div class="row mb-3 pb-3 border-bottom">
-      {{ forms.label(announce_form.mailing_list, high=True) }}
+      {{ forms.label(announce_form.mailing_list, col="sm3-high") }}
       <div class="col-md-9">
         <div class="d-flex gap-4 mb-3">
           {% for subfield in announce_form.mailing_list %}
@@ -95,14 +95,14 @@
     </div>
 
     <div class="row mb-3 pb-3 border-bottom">
-      {{ forms.label(announce_form.subject, col=True) }}
+      {{ forms.label(announce_form.subject, col="sm3") }}
       <div class="col-md-9">
         {{ forms.widget(announce_form.subject) }}
         {{ forms.errors(announce_form.subject, classes="invalid-feedback d-block") }}
       </div>
     </div>
     <div class="row mb-3 pb-3 border-bottom">
-      {{ forms.label(announce_form.body, col=True) }}
+      {{ forms.label(announce_form.body, col="sm3") }}
       <div class="col-md-9">
         <ul class="nav nav-tabs" id="announceBodyTab" role="tablist">
           <li class="nav-item" role="presentation">

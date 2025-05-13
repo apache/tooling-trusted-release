@@ -429,7 +429,14 @@ async def upload(session: routes.CommitterSession) -> str:
         user_committees = await data.committee(name_in=project_list).all()
 
     class UploadKeyForm(util.QuartFormTyped):
-        key = wtforms.FileField("KEYS file")
+        key = wtforms.FileField(
+            "KEYS file",
+            description=(
+                "Upload a KEYS file containing multiple PGP public keys."
+                " The file should contain keys in ASCII-armored format, starting with"
+                ' "-----BEGIN PGP PUBLIC KEY BLOCK-----".'
+            ),
+        )
         submit = wtforms.SubmitField("Upload KEYS file")
         selected_committees = wtforms.SelectMultipleField(
             "Associate keys with committees",
@@ -438,6 +445,10 @@ async def upload(session: routes.CommitterSession) -> str:
             option_widget=wtforms.widgets.CheckboxInput(),
             widget=wtforms.widgets.ListWidget(prefix_label=False),
             validators=[wtforms.validators.InputRequired("You must select at least one committee")],
+            description=(
+                "Select the committees with which to associate these keys."
+                " You must be a member of the selected committees."
+            ),
         )
 
     form = await UploadKeyForm.create_form()

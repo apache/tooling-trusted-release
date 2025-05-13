@@ -1,12 +1,18 @@
-{% macro label(field, classes=None, col=False, high=False, mcol=False) %}
+{% macro label(field, classes=None, col="") %}
   {% if field.label %}
     {% set base_structural_classes = "" %}
-    {% if col %}
+    {% if col == "sm3" %}
       {% set base_structural_classes = "col-sm-3 col-form-label text-sm-end" %}
-    {% elif high %}
+    {% elif col == "sm3-high" %}
       {% set base_structural_classes = "col-sm-3 text-sm-end" %}
-    {% elif mcol %}
+    {% elif col == "md2" %}
+      {% set base_structural_classes = "col-md-2 col-form-label text-md-end" %}
+    {% elif col == "md2-high" %}
       {% set base_structural_classes = "col-md-2 text-md-end" %}
+    {% elif col == "md3" %}
+      {% set base_structural_classes = "col-md-3 col-form-label text-md-end" %}
+    {% elif col == "md3-high" %}
+      {% set base_structural_classes = "col-md-3 text-md-end" %}
     {% endif %}
     {% set final_class_list = [] %}
     {% if base_structural_classes %}

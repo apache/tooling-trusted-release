@@ -15,7 +15,7 @@
   {{ form.hidden_tag() }}
 
   <div class="row mb-3 pb-3 border-bottom">
-    {{ forms.label(form.vote_value, col=True, classes="col-md-3 text-md-end") }}
+    {{ forms.label(form.vote_value, col="md3") }}
     <div class="col-md-9">
       <div class="btn-group" role="group" aria-label="Vote options">
         {% for subfield in form.vote_value %}
@@ -34,7 +34,7 @@
     </div>
   </div>
   <div class="row mb-3">
-    {{ forms.label(form.vote_comment, col=True, classes="col-md-3 text-md-end") }}
+    {{ forms.label(form.vote_comment, col="md3") }}
     <div class="col-md-9">
       {{ forms.widget(form.vote_comment, rows="3") }}
       {{ forms.errors(form.vote_comment, classes="text-danger small mt-1") }}
@@ -59,7 +59,7 @@
   <input type="hidden" name="candidate_name" value="{{ release.name }}" />
 
   <div class="mb-3 pb-3 row border-bottom">
-    {{ forms.label(resolve_form.vote_result, col=True, classes="col-sm-3 text-sm-end") }}
+    {{ forms.label(resolve_form.vote_result, col="md3") }}
     <div class="col-sm-9 pt-2">
       {% for subfield in resolve_form.vote_result %}
         <div class="form-check form-check-inline">
@@ -71,7 +71,7 @@
     </div>
   </div>
   <div class="row">
-    {{ forms.label(resolve_form.resolution_body, col=True, classes="col-sm-3 text-sm-end") }}
+    {{ forms.label(resolve_form.resolution_body, col="md3") }}
     <div class="col-sm-9">
       {{ forms.widget(resolve_form.resolution_body, rows="3") }}
       {{ forms.errors(resolve_form.resolution_body) }}

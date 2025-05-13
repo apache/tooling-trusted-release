@@ -84,12 +84,12 @@
           {{ form.hidden_tag() }}
 
           <div class="mb-3">
-            {{ forms.label(form.source_file, classes="pb-2") }}
+            {{ forms.label(form.source_file) }}
             {{ forms.widget(form.source_file, classes="form-select form-select-sm font-monospace") }}
             {{ forms.errors(form.source_file, classes="invalid-feedback d-block") }}
           </div>
           <div class="mb-3">
-            {{ forms.label(form.target_directory, classes="pb-2") }}
+            {{ forms.label(form.target_directory) }}
             {{ forms.widget(form.target_directory, classes="form-select form-select-sm font-monospace") }}
             {{ forms.errors(form.target_directory, classes="invalid-feedback d-block") }}
           </div>
