@@ -20,13 +20,13 @@ import hashlib
 import logging
 import os
 import re
-import tarfile
 from collections.abc import Iterator
 from typing import Any, Final
 
+import atr.db.models as models
+import atr.schema as schema
+import atr.tarzip as tarzip
 import atr.tasks.checks as checks
-from atr import schema
-from atr.db import models
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -210,8 +210,8 @@ def _files_check_core_logic(artifact_path: str) -> Iterator[Result]:
     #     # Continue checking files
 
     # Check for license files in the root directory
-    with tarfile.open(artifact_path, mode="r|gz") as tf:
-        for member in tf:
+    with tarzip.open_archive(artifact_path) as archive:
+        for member in archive:
             _LOGGER.warning(f"Checking member: {member.name}")
             if member.name and member.name.split("/")[-1].startswith("._"):
                 # Metadata convention
@@ -226,10 +226,10 @@ def _files_check_core_logic(artifact_path: str) -> Iterator[Result]:
                 files_found.append(filename)
                 if filename == "LICENSE":
                     # TODO: Check length, should be 11,358 bytes
-                    license_ok = _files_check_core_logic_license(tf, member)
+                    license_ok = _files_check_core_logic_license(archive, member)
                 elif filename == "NOTICE":
                     # TODO: Check length doesn't exceed some preset
-                    notice_ok, notice_issues = _files_check_core_logic_notice(tf, member)
+                    notice_ok, notice_issues = _files_check_core_logic_notice(archive, member)
 
     yield from _files_messages_build(files_found, license_ok, notice_ok, notice_issues)
 
@@ -259,9 +259,9 @@ def _files_check_core_logic(artifact_path: str) -> Iterator[Result]:
         )
 
 
-def _files_check_core_logic_license(tf: tarfile.TarFile, member: tarfile.TarInfo) -> bool:
+def _files_check_core_logic_license(archive: tarzip.Archive, member: tarzip.Member) -> bool:
     """Verify that the LICENSE file matches the Apache 2.0 license."""
-    f = tf.extractfile(member)
+    f = archive.extractfile(member)
     if not f:
         return False
 
@@ -276,9 +276,9 @@ def _files_check_core_logic_license(tf: tarfile.TarFile, member: tarfile.TarInfo
     return False
 
 
-def _files_check_core_logic_notice(tf: tarfile.TarFile, member: tarfile.TarInfo) -> tuple[bool, list[str]]:
+def _files_check_core_logic_notice(archive: tarzip.Archive, member: tarzip.Member) -> tuple[bool, list[str]]:
     """Verify that the NOTICE file follows the required format."""
-    f = tf.extractfile(member)
+    f = archive.extractfile(member)
     if not f:
         return False, ["Could not read NOTICE file"]
 
@@ -372,13 +372,13 @@ def _headers_check_core_logic(artifact_path: str) -> Iterator[Result]:
     #     )
 
     # Check files in the archive
-    with tarfile.open(artifact_path, mode="r|gz") as tf:
-        for member in tf:
+    with tarzip.open_archive(artifact_path) as archive:
+        for member in archive:
             if member.name and member.name.split("/")[-1].startswith("._"):
                 # Metadata convention
                 continue
 
-            match _headers_check_core_logic_process_file(tf, member):
+            match _headers_check_core_logic_process_file(archive, member):
                 case ArtifactResult() | MemberResult() as result:
                     artifact_data.files_checked += 1
                     match result.status:
@@ -405,8 +405,8 @@ def _headers_check_core_logic(artifact_path: str) -> Iterator[Result]:
 
 
 def _headers_check_core_logic_process_file(
-    tf: tarfile.TarFile,
-    member: tarfile.TarInfo,
+    archive: tarzip.Archive,
+    member: tarzip.Member,
 ) -> Result:
     """Process a single file in an archive for license header verification."""
     if not member.isfile():
@@ -424,7 +424,7 @@ def _headers_check_core_logic_process_file(
 
     # Extract and check the file
     try:
-        f = tf.extractfile(member)
+        f = archive.extractfile(member)
         if f is None:
             return MemberResult(
                 status=models.CheckResultStatus.EXCEPTION,
