@@ -119,6 +119,7 @@ async def add_project(session: routes.CommitterSession, project_name: str) -> re
                 wtforms.validators.InputRequired("Please provide a derived project name."),
                 wtforms.validators.Length(min=1, max=100),
             ],
+            description="The desired suffix for the full project name.",
         )
         submit = wtforms.SubmitField("Add project")
 

@@ -10,10 +10,13 @@
     Starting a new release creates a <strong>release candidate draft</strong>. You can then add files to this draft before promoting it for voting.
   </p>
 
+  {{ forms.errors_summary(form) }}
+
   <form method="post"
         action="{{ as_url(routes.start.selected, project_name=project.name) }}"
         enctype="multipart/form-data"
-        class="atr-canary py-4 px-5 border rounded">
+        class="atr-canary py-4 px-5 border rounded"
+        novalidate>
     {{ form.hidden_tag() }}
 
     <div class="mb-4">
@@ -24,12 +27,10 @@
     </div>
 
     <div class="mb-3">
-      <label for="{{ form.version_name.id }}" class="form-label">{{ form.version_name.label.text }}:</label>
-      {{ form.version_name(class_="form-control form-control-lg", placeholder="Examples: 1.2.3+rc1 or 2.5") }}
-      {% if form.version_name.errors -%}
-        <div class="invalid-feedback d-block">{{ form.version_name.errors[0] }}</div>
-      {%- endif %}
-      <div id="versionHelp" class="form-text">Enter the version string for this new release.</div>
+      {{ forms.label(form.version_name) }}
+      {{ forms.widget(form.version_name, classes="form-control form-control-lg", id=form.version_name.id) }}
+      {{ forms.errors(form.version_name) }}
+      {{ forms.description(form.version_name) }}
     </div>
 
     <div class="mt-4">

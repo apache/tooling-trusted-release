@@ -14,125 +14,125 @@
   </h1>
   <p>New projects can only be derived from existing projects, by adding a suffix.</p>
 
-  <form method="post" class="atr-canary py-4">
+  {{ forms.errors_summary(form) }}
+
+  <form method="post" class="atr-canary py-4" novalidate>
     {{ form.hidden_tag() }}
 
     <div class="mb-3 pb-3 row border-bottom">
-      <label for="{{ form.derived_project_name.id }}"
-             class="col-sm-3 col-form-label text-sm-end">{{ form.derived_project_name.label.text }}:</label>
+      {{ forms.label(form.derived_project_name, col="sm3") }}
       <div class="col-sm-8">
-        {{ form.derived_project_name(class_="form-control") }}
-        {% if form.derived_project_name.errors -%}
-          <span class="text-danger small">{{ form.derived_project_name.errors[0] }}</span>{%- endif %}
-          <p class="text-muted mt-1">The desired suffix for the full project name.</p>
-          <p id="capitalisation-warning" class="text-danger small mt-1 d-none">
-            <i class="bi bi-exclamation-triangle"></i>
-            Warning: Ensure all words in the derived name start with a capital for proper display.
-          </p>
-        </div>
+        {{ forms.widget(form.derived_project_name, id=form.derived_project_name.id) }}
+        {{ forms.errors(form.derived_project_name, classes="text-danger small") }}
+        {{ forms.description(form.derived_project_name, classes="text-muted mt-1") }}
+        <p id="capitalisation-warning" class="text-danger small mt-1 d-none">
+          <i class="bi bi-exclamation-triangle"></i>
+          Warning: Ensure all words in the derived name start with a capital for proper display.
+        </p>
       </div>
+    </div>
 
-      <div class="mb-3 pb-3 row border-bottom">
-        <label id="new-project-name-label"
-               for="new-project-name-display"
-               class="col-sm-3 col-form-label text-sm-end">Project name preview:</label>
-        <div class="col-sm-8">
-          <code id="new-project-name-display"
-                class="form-control-plaintext bg-light p-2 rounded d-block"></code>
-          <p class="text-muted small mt-1">This will be the full display name for the derived project.</p>
-        </div>
+    <div class="mb-3 pb-3 row border-bottom">
+      <label id="new-project-name-label"
+             for="new-project-name-display"
+             class="col-sm-3 col-form-label text-sm-end">Project name preview</label>
+      <div class="col-sm-8">
+        <code id="new-project-name-display"
+              class="form-control-plaintext bg-light p-2 rounded d-block"></code>
+        <p class="text-muted small mt-1">This will be the full display name for the derived project.</p>
       </div>
+    </div>
 
-      <div class="mb-3 pb-3 row border-bottom">
-        <label id="new-project-label-label"
-               for="new-project-label-display"
-               class="col-sm-3 col-form-label text-sm-end">Project label preview:</label>
-        <div class="col-sm-8">
-          <code id="new-project-label-display"
-                class="form-control-plaintext bg-light p-2 rounded d-block"></code>
-          <p class="text-muted small mt-1">This will be the short label used in URLs and identifiers.</p>
-        </div>
+    <div class="mb-3 pb-3 row border-bottom">
+      <label id="new-project-label-label"
+             for="new-project-label-display"
+             class="col-sm-3 col-form-label text-sm-end">Project label preview</label>
+      <div class="col-sm-8">
+        <code id="new-project-label-display"
+              class="form-control-plaintext bg-light p-2 rounded d-block"></code>
+        <p class="text-muted small mt-1">This will be the short label used in URLs and identifiers.</p>
       </div>
+    </div>
 
-      <div class="row">
-        <div class="col-sm-9 offset-sm-3">{{ form.submit(class_="btn btn-primary mt-3") }}</div>
-      </div>
-    </form>
-  {% endblock content %}
+    <div class="row">
+      <div class="col-sm-9 offset-sm-3">{{ form.submit(class_="btn btn-primary mt-3") }}</div>
+    </div>
+  </form>
+{% endblock content %}
 
-  {% block javascripts %}
-    {{ super() }}
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const projectLabel = document.getElementById("{{ form.project_name.id }}");
-            const projectSelect = "{{ project_name }}";
-            const derivedNameInput = document.getElementById("{{ form.derived_project_name.id }}");
-            const newNameDisplay = document.getElementById("new-project-name-display");
-            const newLabelDisplay = document.getElementById("new-project-label-display");
-            const capitalisationWarning = document.getElementById("capitalisation-warning");
+{% block javascripts %}
+  {{ super() }}
+  <script>
+      document.addEventListener("DOMContentLoaded", () => {
+          const projectLabel = document.getElementById("{{ form.project_name.id }}");
+          const projectSelect = "{{ project_name }}";
+          const derivedNameInput = document.getElementById("{{ form.derived_project_name.id }}");
+          const newNameDisplay = document.getElementById("new-project-name-display");
+          const newLabelDisplay = document.getElementById("new-project-label-display");
+          const capitalisationWarning = document.getElementById("capitalisation-warning");
 
-            if (!projectSelect || !derivedNameInput || !newNameDisplay || !newLabelDisplay || !capitalisationWarning) return;
+          if (!projectSelect || !derivedNameInput || !newNameDisplay || !newLabelDisplay || !capitalisationWarning) return;
 
-            function generateSlug(text) {
-                return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-            }
+          function generateSlug(text) {
+              return text.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+          }
 
-            function updatePreview() {
-                const selectedOption = projectSelect;
-                const baseLabel = projectLabel.value;
-                const baseFullName = selectedOption;
-                const derivedNameValue = derivedNameInput.value.trim();
+          function updatePreview() {
+              const selectedOption = projectSelect;
+              const baseLabel = projectLabel.value;
+              const baseFullName = selectedOption;
+              const derivedNameValue = derivedNameInput.value.trim();
 
-                let hasCapitalisationIssue = false;
-                if (derivedNameValue) {
-                    const words = derivedNameValue.split(/\s+/);
-                    for (const word of words) {
-                        if (word.length > 0 && !/^[A-Z]/.test(word)) {
-                            hasCapitalisationIssue = true;
-                            break;
-                        }
-                    }
-                }
+              let hasCapitalisationIssue = false;
+              if (derivedNameValue) {
+                  const words = derivedNameValue.split(/\s+/);
+                  for (const word of words) {
+                      if (word.length > 0 && !/^[A-Z]/.test(word)) {
+                          hasCapitalisationIssue = true;
+                          break;
+                      }
+                  }
+              }
 
-                if (hasCapitalisationIssue) {
-                    capitalisationWarning.classList.remove("d-none");
-                } else {
-                    capitalisationWarning.classList.add("d-none");
-                }
+              if (hasCapitalisationIssue) {
+                  capitalisationWarning.classList.remove("d-none");
+              } else {
+                  capitalisationWarning.classList.add("d-none");
+              }
 
-                let newFullName = baseFullName;
-                if (derivedNameValue) {
-                    const match = baseFullName.match(/^(.*?)\s*(\(.*\))?$/);
-                    let mainPart = baseFullName.trim();
-                    let suffixPart = null;
+              let newFullName = baseFullName;
+              if (derivedNameValue) {
+                  const match = baseFullName.match(/^(.*?)\s*(\(.*\))?$/);
+                  let mainPart = baseFullName.trim();
+                  let suffixPart = null;
 
-                    if (match) {
-                        mainPart = match[1] ? match[1].trim() : mainPart;
-                        suffixPart = match[2];
-                    }
+                  if (match) {
+                      mainPart = match[1] ? match[1].trim() : mainPart;
+                      suffixPart = match[2];
+                  }
 
-                    if (suffixPart) {
-                        newFullName = `${mainPart} ${derivedNameValue} ${suffixPart}`;
-                    } else {
-                        newFullName = `${mainPart} ${derivedNameValue}`;
-                    }
-                    newFullName = newFullName.replace(/\s{2,}/g, " ").trim();
-                }
-                newNameDisplay.textContent = newFullName || "(Select base project)";
+                  if (suffixPart) {
+                      newFullName = `${mainPart} ${derivedNameValue} ${suffixPart}`;
+                  } else {
+                      newFullName = `${mainPart} ${derivedNameValue}`;
+                  }
+                  newFullName = newFullName.replace(/\s{2,}/g, " ").trim();
+              }
+              newNameDisplay.textContent = newFullName || "(Select base project)";
 
-                let newLabel = baseLabel;
-                if (derivedNameValue) {
-                    const derivedSlug = generateSlug(derivedNameValue);
-                    if (derivedSlug) {
-                        newLabel = `${baseLabel}-${derivedSlug}`;
-                    }
-                }
-                newLabelDisplay.textContent = newLabel || "(Enter derived project name)";
-            }
+              let newLabel = baseLabel;
+              if (derivedNameValue) {
+                  const derivedSlug = generateSlug(derivedNameValue);
+                  if (derivedSlug) {
+                      newLabel = `${baseLabel}-${derivedSlug}`;
+                  }
+              }
+              newLabelDisplay.textContent = newLabel || "(Enter derived project name)";
+          }
 
-            derivedNameInput.addEventListener("input", updatePreview);
+          derivedNameInput.addEventListener("input", updatePreview);
 
-            updatePreview();
-        });
-    </script>
-  {% endblock javascripts %}
+          updatePreview();
+      });
+  </script>
+{% endblock javascripts %}

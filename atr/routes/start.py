@@ -38,6 +38,8 @@ class StartReleaseForm(util.QuartFormTyped):
             wtforms.validators.InputRequired("Version is required"),
             wtforms.validators.Length(min=1, max=100),
         ],
+        render_kw={"placeholder": "Examples: 1.2.3+rc1 or 2.5"},
+        description="Enter the version string for this new release.",
     )
     submit = wtforms.SubmitField("Start new release")
 
