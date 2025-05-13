@@ -42,18 +42,18 @@ class SvnImportForm(util.QuartFormTyped):
             wtforms.validators.InputRequired("SVN URL is required."),
             wtforms.validators.URL(require_tld=False),
         ],
-        description="The URL to the public SVN directory",
+        description="The URL to the public SVN directory.",
     )
     revision = wtforms.StringField(
         "Revision",
         default="HEAD",
         validators=[],
-        description="Specify an SVN revision number or leave as HEAD for the latest",
+        description="Specify an SVN revision number or leave as HEAD for the latest.",
     )
     target_subdirectory = wtforms.StringField(
         "Target subdirectory",
         validators=[],
-        description="Subdirectory to place imported files, defaulting to the root (optional)",
+        description="Optional: Subdirectory to place imported files, defaulting to the root.",
     )
     submit = wtforms.SubmitField("Queue SVN import task")
 
@@ -66,9 +66,15 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     class AddFilesForm(util.QuartFormTyped):
         """Form for adding files to a release candidate."""
 
-        file_name = wtforms.StringField("File name (optional)")
+        file_name = wtforms.StringField(
+            "File name",
+            description="Optional: Enter a file name to use when saving the"
+            " file in the release candidate. Only available when uploading a single file.",
+        )
         file_data = wtforms.MultipleFileField(
-            "Files", validators=[wtforms.validators.InputRequired("At least one file is required")]
+            "Files",
+            validators=[wtforms.validators.InputRequired("At least one file is required")],
+            description="Select the files to upload.",
         )
         submit = wtforms.SubmitField("Add files")
 

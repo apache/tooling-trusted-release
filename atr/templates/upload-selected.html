@@ -35,6 +35,7 @@
   <h2 id="file-upload">File upload</h2>
   <p>Use this form to add files to this candidate draft.</p>
 
+  {{ forms.errors_summary(form) }}
   <form method="post"
         enctype="multipart/form-data"
         class="atr-canary py-4 px-5"
@@ -42,26 +43,20 @@
     {{ form.hidden_tag() }}
 
     <div class="mb-3 pb-3 row border-bottom">
-      <label for="{{ form.file_data.id }}"
-             class="col-sm-3 col-form-label text-sm-end">{{ form.file_data.label.text }}:</label>
+      {{ forms.label(form.file_data, col="sm3") }}
       <div class="col-sm-8">
-        {{ form.file_data(class_="form-control" + (" is-invalid" if form.file_data.errors else "") ) }}
-        <span id="file_data-help" class="form-text text-muted">Select the files to upload</span>
-        {% if form.file_data.errors %}
-          {% for error in form.file_data.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-        {% endif %}
+        {{ forms.widget(form.file_data) }}
+        {{ forms.errors(form.file_data) }}
+        {{ forms.description(form.file_data) }}
       </div>
     </div>
 
     <div class="mb-3 pb-3 row border-bottom">
-      <label for="{{ form.file_name.id }}"
-             class="col-sm-3 col-form-label text-sm-end">{{ form.file_name.label.text }}:</label>
+      {{ forms.label(form.file_name, col="sm3") }}
       <div class="col-sm-8">
-        {{ form.file_name(class_="form-control" + (" is-invalid" if form.file_name.errors else "") ) }}
-        <span id="file_path-help" class="form-text text-muted">Enter a file name to use when saving the file in the release candidate, only available when uploading a single file</span>
-        {% if form.file_name.errors %}
-          {% for error in form.file_name.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-        {% endif %}
+        {{ forms.widget(form.file_name) }}
+        {{ forms.errors(form.file_name) }}
+        {{ forms.description(form.file_name) }}
       </div>
     </div>
 
@@ -77,6 +72,7 @@
     You can monitor progress on the <em>Evaluate files</em> page for this draft once the task is queued.
   </p>
 
+  {{ forms.errors_summary(svn_form) }}
   <div class="row">
     <div class="col-md-8 w-100">
       <form action="{{ as_url(routes.draft.svnload, project_name=project_name, version_name=version_name) }}"
@@ -86,44 +82,29 @@
         {{ svn_form.hidden_tag() }}
 
         <div class="mb-3 pb-3 row border-bottom">
-          <label for="{{ svn_form.svn_url.id }}"
-                 class="col-sm-3 col-form-label text-sm-end">{{ svn_form.svn_url.label.text }}:</label>
+          {{ forms.label(svn_form.svn_url, col="sm3") }}
           <div class="col-sm-9">
-            {{ svn_form.svn_url(class_="form-control") }}
-            {% if svn_form.svn_url.description %}
-              <small class="form-text text-muted">{{ svn_form.svn_url.description }}</small>
-            {% endif %}
-            {% if svn_form.svn_url.errors -%}
-              <div class="invalid-feedback d-block">{{ svn_form.svn_url.errors[0] }}</div>
-            {%- endif %}
+            {{ forms.widget(svn_form.svn_url) }}
+            {{ forms.errors(svn_form.svn_url) }}
+            {{ forms.description(svn_form.svn_url) }}
           </div>
         </div>
 
         <div class="mb-3 pb-3 row border-bottom">
-          <label for="{{ svn_form.revision.id }}"
-                 class="col-sm-3 col-form-label text-sm-end">{{ svn_form.revision.label.text }}:</label>
+          {{ forms.label(svn_form.revision, col="sm3") }}
           <div class="col-sm-9">
-            {{ svn_form.revision(class_="form-control") }}
-            {% if svn_form.revision.description %}
-              <small class="form-text text-muted">{{ svn_form.revision.description }}</small>
-            {% endif %}
-            {% if svn_form.revision.errors -%}
-              <div class="invalid-feedback d-block">{{ svn_form.revision.errors[0] }}</div>
-            {%- endif %}
+            {{ forms.widget(svn_form.revision) }}
+            {{ forms.errors(svn_form.revision) }}
+            {{ forms.description(svn_form.revision) }}
           </div>
         </div>
 
         <div class="mb-3 pb-3 row border-bottom">
-          <label for="{{ svn_form.target_subdirectory.id }}"
-                 class="col-sm-3 col-form-label text-sm-end">{{ svn_form.target_subdirectory.label.text }}:</label>
+          {{ forms.label(svn_form.target_subdirectory, col="sm3") }}
           <div class="col-sm-9">
-            {{ svn_form.target_subdirectory(class_="form-control") }}
-            {% if svn_form.target_subdirectory.description %}
-              <small class="form-text text-muted">{{ svn_form.target_subdirectory.description }}</small>
-            {% endif %}
-            {% if svn_form.target_subdirectory.errors -%}
-              <div class="invalid-feedback d-block">{{ svn_form.target_subdirectory.errors[0] }}</div>
-            {%- endif %}
+            {{ forms.widget(svn_form.target_subdirectory) }}
+            {{ forms.errors(svn_form.target_subdirectory) }}
+            {{ forms.description(svn_form.target_subdirectory) }}
           </div>
         </div>
 
