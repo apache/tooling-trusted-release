@@ -48,7 +48,15 @@ from atr.routes import compose
 
 
 class AddSSHKeyForm(util.QuartFormTyped):
-    key = wtforms.StringField("SSH key", widget=wtforms.widgets.TextArea())
+    key = wtforms.StringField(
+        "SSH public key",
+        widget=wtforms.widgets.TextArea(),
+        render_kw={"placeholder": "Paste your SSH public key here (in the format used in authorized_keys files)"},
+        description=(
+            "Your SSH public key should be in the standard format, starting with a key type"
+            ' (like "ssh-rsa" or "ssh-ed25519") followed by the key data.'
+        ),
+    )
     submit = wtforms.SubmitField("Add SSH key")
 
 
@@ -321,11 +329,18 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
     fingerprint = None
     if await form.validate_on_submit():
         key: str = util.unwrap(form.key.data)
-        fingerprint = await asyncio.to_thread(key_ssh_fingerprint, key)
-        async with db.session() as data:
-            async with data.begin():
-                data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=session.uid))
-        return await session.redirect(keys, success=f"SSH key added successfully: {fingerprint}")
+        try:
+            fingerprint = await asyncio.to_thread(key_ssh_fingerprint, key)
+        except ValueError as e:
+            if isinstance(form.key.errors, list):
+                form.key.errors.append(str(e))
+            else:
+                form.key.errors = [str(e)]
+        else:
+            async with db.session() as data:
+                async with data.begin():
+                    data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=session.uid))
+            return await session.redirect(keys, success=f"SSH key added successfully: {fingerprint}")
 
     return await quart.render_template(
         "keys-ssh-add.html",

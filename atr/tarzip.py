@@ -23,10 +23,13 @@ from typing import IO, Generic, TypeVar
 from typing import Protocol as TypingProtocol
 
 ArchiveT = TypeVar("ArchiveT", tarfile.TarFile, zipfile.ZipFile)
-MemberT = TypeVar("MemberT", tarfile.TarInfo, zipfile.ZipInfo)
+# If you set this covariant=True, then mypy says an "invariant one is expected"
+# But pyright warns, "should be covariant" if you don't
+# We'll use the covariant version and ignore the mypy error
+MemberT = TypeVar("MemberT", tarfile.TarInfo, zipfile.ZipInfo, covariant=True)
 
 
-class AbstractArchiveMember(TypingProtocol, Generic[MemberT]):
+class AbstractArchiveMember(TypingProtocol, Generic[MemberT]):  # type: ignore[misc]
     name: str
     _original_info: MemberT
 

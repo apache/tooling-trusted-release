@@ -64,3 +64,20 @@
 {% macro description(field, classes="form-text text-muted") %}
   {% if field.description %}<div id="{{ field.id }}-help" class="{{ classes }}">{{ field.description }}</div>{% endif %}
 {% endmacro %}
+
+{% macro errors_summary(form, alert_classes='alert alert-danger mt-3 mb-3', heading_text='Please correct the errors below:') %}
+  {% if form.errors and form.errors|length > 0 %}
+    <div class="{{ alert_classes }}" role="alert">
+      <p class="alert-heading">
+        <strong>{{ heading_text }}</strong>
+      </p>
+      <ul class="mb-0">
+        {% for field_name, field_errors in form.errors.items() %}
+          {% for error in field_errors %}
+            <li>{{ form[field_name].label.text if form[field_name] and form[field_name].label else field_name }}: {{ error }}</li>
+          {% endfor %}
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+{% endmacro %}

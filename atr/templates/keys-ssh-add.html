@@ -22,28 +22,18 @@
     </p>
   </div>
 
-  {% if form.errors %}
-    <h2 class="text-danger">Form errors</h2>
-    <div class="mt-3 mb-3">
-      {% for field, errors in form.errors.items() %}
-        {% for error in errors %}<p class="text-danger mb-1">{{ field }}: {{ error }}</p>{% endfor %}
-      {% endfor %}
-    </div>
-  {% endif %}
+  {{ forms.errors_summary(form) }}
 
-  <form method="post" class="atr-canary">
+  <form method="post" class="atr-canary py-4 px-5" novalidate>
     {{ form.hidden_tag() }}
 
     <div class="mb-4">
-      <div class="mb-3">
-        <label for="key" class="form-label">SSH public key:</label>
-      </div>
-      {{ form.key(class="form-control mb-2", rows=4, placeholder="Paste your SSH public key here (in the format used in authorized_keys files)", aria_describedby="key-help") }}
-      <small id="key-help" class="form-text text-muted">
-        Your SSH public key should be in the standard format, starting with a key type (like "ssh-rsa" or "ssh-ed25519") followed by the key data.
-      </small>
+      {{ forms.label(form.key) }}
+      {{ forms.widget(form.key, classes="form-control mb-2", rows=4, id=form.key.id) }}
+      {{ forms.errors(form.key, classes="invalid-feedback d-block") }}
+      {{ forms.description(form.key) }}
     </div>
 
-    {{ form.submit(class="btn btn-primary") }}
+    {{ form.submit(class_="btn btn-primary") }}
   </form>
 {% endblock content %}
