@@ -68,17 +68,25 @@ async def selected_revision(
                 choices=sorted([(recipient, recipient) for recipient in permitted_recipients]),
                 validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
                 default="user-tests@tooling.apache.org",
+                description="NOTE: The limited options above are provided for testing purposes."
+                " In the finished version of ATR, you will be able to send to your own specified mailing lists.",
             )
             vote_duration = wtforms.IntegerField(
-                "Minimum vote duration in hours",
+                "Minimum vote duration",
                 validators=[
                     wtforms.validators.InputRequired("Vote duration is required"),
                     util.validate_vote_duration,
                 ],
                 default=min_hours,
+                description="Minimum number of hours the vote will be open for.",
             )
             subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
-            body = wtforms.TextAreaField("Body", validators=[wtforms.validators.Optional()])
+            body = wtforms.TextAreaField(
+                "Body",
+                validators=[wtforms.validators.Optional()],
+                description="Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT],"
+                " [DURATION], [REVIEW_URL], and [YOUR_ASF_ID] will be filled in automatically when the email is sent.",
+            )
             submit = wtforms.SubmitField("Send vote email")
 
         project = release.project

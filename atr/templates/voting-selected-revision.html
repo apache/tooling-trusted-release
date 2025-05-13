@@ -46,16 +46,18 @@
     </div>
   {% endif %}
 
+  {{ forms.errors_summary(form) }}
   <form method="post"
         id="vote-initiate-form"
         class="atr-canary py-4 px-5"
-        action="{{ as_url(routes.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=release.revision) }}">
+        action="{{ as_url(routes.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=release.revision) }}"
+        novalidate>
     {{ form.hidden_tag() }}
 
     {{ form.release_name }}
     <div class="mb-4">
       <div class="row mb-3 pb-3 border-bottom">
-        <div class="col-md-3 text-md-end fw-medium">{{ form.mailing_list.label }}</div>
+        {{ forms.label(form.mailing_list, col="md3-high") }}
         <div class="col-md-9">
           <div class="d-flex gap-4 mb-2">
             {% for subfield in form.mailing_list %}
@@ -65,41 +67,30 @@
               </div>
             {% endfor %}
           </div>
-          {% if form.mailing_list.errors %}
-            <div class="invalid-feedback d-block">
-              {% for error in form.mailing_list.errors %}{{ error }}{% endfor %}
-            </div>
-          {% endif %}
-          <small class="form-text text-muted">NOTE: The limited options above are provided for testing purposes. In the finished version of ATR, you will be able to send to your own specified mailing lists.</small>
+          {{ forms.errors(form.mailing_list) }}
+          {{ forms.description(form.mailing_list, classes="form-text text-muted") }}
         </div>
       </div>
 
       <div class="row mb-3 pb-3 border-bottom">
-        <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.vote_duration.label }}</div>
+        {{ forms.label(form.vote_duration, col="md3") }}
         <div class="col-md-9">
-          {{ form.vote_duration(class_='form-select w-75') }}
-          {% if form.vote_duration.errors %}
-            <div class="invalid-feedback d-block">
-              {% for error in form.vote_duration.errors %}{{ error }}{% endfor %}
-            </div>
-          {% endif %}
+          {{ forms.widget(form.vote_duration, classes="form-select w-75") }}
+          {{ forms.errors(form.vote_duration) }}
+          {{ forms.description(form.vote_duration, classes="form-text text-muted") }}
         </div>
       </div>
 
       <div class="row mb-3 pb-3 border-bottom">
-        <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.subject.label }}</div>
+        {{ forms.label(form.subject, col="md3") }}
         <div class="col-md-9">
-          {{ form.subject(class_='form-control w-75') }}
-          {% if form.subject.errors %}
-            <div class="invalid-feedback d-block">
-              {% for error in form.subject.errors %}{{ error }}{% endfor %}
-            </div>
-          {% endif %}
+          {{ forms.widget(form.subject, classes="form-control w-75") }}
+          {{ forms.errors(form.subject) }}
         </div>
       </div>
 
       <div class="row mb-3 pb-3">
-        <div class="col-md-3 text-md-end fw-medium pt-2">{{ form.body.label }}</div>
+        {{ forms.label(form.body, col="md3") }}
         <div class="col-md-9">
           <ul class="nav nav-tabs" id="emailBodyTab" role="tablist">
             <li class="nav-item" role="presentation">
@@ -128,13 +119,9 @@
                  id="edit-body-pane"
                  role="tabpanel"
                  aria-labelledby="edit-body-tab">
-              {{ form.body(class_='form-control font-monospace mt-2', rows='20') }}
-              {% if form.body.errors %}
-                <div class="invalid-feedback d-block">
-                  {% for error in form.body.errors %}{{ error }}{% endfor %}
-                </div>
-              {% endif %}
-              <small class="form-text text-muted">Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT], [DURATION], [REVIEW_URL], and [YOUR_ASF_ID] will be filled in automatically when the email is sent.</small>
+              {{ forms.widget(form.body, classes="form-control font-monospace mt-2", rows="20") }}
+              {{ forms.errors(form.body) }}
+              {{ forms.description(form.body, classes="form-text text-muted") }}
             </div>
             <div class="tab-pane fade"
                  id="text-preview-body-pane"
@@ -148,7 +135,7 @@
 
     </div>
 
-    <div class="mt-4 col-md-9 offset-md-3">
+    <div class="mt-4 col-md-9 offset-md-3 px-1">
       {{ form.submit(class_='btn btn-primary') }}
       <a href="{{ as_url(routes.compose.selected, project_name=release.project.name, version_name=release.version) }}"
          class="btn btn-link text-secondary">Cancel</a>
