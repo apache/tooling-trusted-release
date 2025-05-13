@@ -43,7 +43,14 @@ class ResolveForm(util.QuartFormTyped):
         choices=[("passed", "Passed"), ("failed", "Failed")],
         validators=[wtforms.validators.InputRequired("Vote result is required")],
     )
-    resolution_body = wtforms.TextAreaField("Resolution email body", validators=[wtforms.validators.Optional()])
+    resolution_body = wtforms.TextAreaField(
+        "Resolution email body",
+        validators=[wtforms.validators.Optional()],
+        description="Enter optional comment for the resolution email (e.g., summary of issues if failed).",
+        render_kw={
+            "placeholder": "Enter optional comment for the resolution email (e.g., summary of issues if failed)."
+        },
+    )
     submit = wtforms.SubmitField("Resolve vote")
 
 

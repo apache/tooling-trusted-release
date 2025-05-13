@@ -15,7 +15,7 @@
   {{ form.hidden_tag() }}
 
   <div class="row mb-3 pb-3 border-bottom">
-    <label class="col-md-3 col-form-label text-md-end">{{ form.vote_value.label.text }}:</label>
+    {{ forms.label(form.vote_value, col=True, classes="col-md-3 text-md-end") }}
     <div class="col-md-9">
       <div class="btn-group" role="group" aria-label="Vote options">
         {% for subfield in form.vote_value %}
@@ -26,21 +26,18 @@
           {% if subfield.data == "-1" %}
             {% set btn_class = "btn-outline-danger" %}
           {% endif %}
-          {{ subfield(class_="btn-check", autocomplete="off") }}
-          <label class="btn {{ btn_class }}" for="{{ subfield.id }}">{{ subfield.label.text }}</label>
+          {{ forms.widget(subfield, classes="btn-check", autocomplete="off") }}
+          {{ forms.label(subfield, classes="btn " + btn_class) }}
         {% endfor %}
       </div>
-      {% if form.vote_value.errors %}<div class="text-danger small mt-1">{{ form.vote_value.errors[0] }}</div>{% endif %}
+      {{ forms.errors(form.vote_value, classes="text-danger small mt-1") }}
     </div>
   </div>
   <div class="row mb-3">
-    <label for="{{ form.vote_comment.id }}"
-           class="col-md-3 col-form-label text-md-end">{{ form.vote_comment.label.text }}:</label>
+    {{ forms.label(form.vote_comment, col=True, classes="col-md-3 text-md-end") }}
     <div class="col-md-9">
-      {{ form.vote_comment(class_="form-control", rows="3") }}
-      {% if form.vote_comment.errors %}
-        <div class="text-danger small mt-1">{{ form.vote_comment.errors[0] }}</div>
-      {% endif %}
+      {{ forms.widget(form.vote_comment, rows="3") }}
+      {{ forms.errors(form.vote_comment, classes="text-danger small mt-1") }}
     </div>
   </div>
   <div class="row">
@@ -62,22 +59,24 @@
   <input type="hidden" name="candidate_name" value="{{ release.name }}" />
 
   <div class="mb-3 pb-3 row border-bottom">
-    <label class="col-sm-3 col-form-label text-sm-end fw-semibold">{{ resolve_form.vote_result.label.text }}:</label>
+    {{ forms.label(resolve_form.vote_result, col=True, classes="col-sm-3 text-sm-end") }}
     <div class="col-sm-9 pt-2">
       {% for subfield in resolve_form.vote_result %}
         <div class="form-check form-check-inline">
-          {{ subfield(class="form-check-input" + (" is-invalid" if resolve_form.vote_result.errors else "") , id=subfield.id ~ "_" ~ loop.index) }}
-          <label class="form-check-label" for="{{ subfield.id }}_{{ loop.index }}">{{ subfield.label.text }}</label>
+          {{ forms.widget(subfield, classes="form-check-input", id=subfield.id ~ "_" ~ loop.index) }}
+          {{ forms.label(subfield, classes="form-check-label") }}
         </div>
       {% endfor %}
-      {% if resolve_form.vote_result.errors %}
-        <div class="invalid-feedback d-block">{{ resolve_form.vote_result.errors[0] }}</div>
-      {% endif %}
+      {{ forms.errors(resolve_form.vote_result, classes="invalid-feedback d-block") }}
     </div>
   </div>
   <div class="row">
-    <label class="col-sm-3 col-form-label text-sm-end fw-semibold">{{ resolve_form.resolution_body.label.text }}:</label>
-    <div class="col-sm-9 pt-2">{{ resolve_form.resolution_body(class_="form-control", rows="3") }}</div>
+    {{ forms.label(resolve_form.resolution_body, col=True, classes="col-sm-3 text-sm-end") }}
+    <div class="col-sm-9">
+      {{ forms.widget(resolve_form.resolution_body, rows="3", placeholder=resolve_form.resolution_body.description) }}
+      {{ forms.errors(resolve_form.resolution_body) }}
+      {{ forms.description(resolve_form.resolution_body) }}
+    </div>
   </div>
 
   <div class="row">

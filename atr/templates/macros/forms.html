@@ -18,7 +18,7 @@
   {% endif %}
 {% endmacro %}
 
-{% macro widget(field, classes="form-control", placeholder=None, rows=None) %}
+{% macro widget(field, classes="form-control", placeholder=None, rows=None, autocomplete=None, id=None) %}
   {% set widget_class = classes %}
   {% if field.errors %}
     {% set widget_class = widget_class + ' is-invalid' %}
@@ -30,6 +30,12 @@
   {% endif %}
   {% if rows is not none %}
     {% set _ = render_args.update({'rows': rows}) %}
+  {% endif %}
+  {% if autocomplete is not none %}
+    {% set _ = render_args.update({'autocomplete': autocomplete}) %}
+  {% endif %}
+  {% if id is not none %}
+    {% set _ = render_args.update({'id': id}) %}
   {% endif %}
 
   {{ field(**render_args) }}
