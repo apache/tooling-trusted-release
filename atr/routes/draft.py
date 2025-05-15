@@ -140,7 +140,8 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
     metadata_files_deleted = 0
 
     try:
-        async with revision.create_and_manage(project_name, version_name, session.uid) as (
+        description = "File deletion through web interface"
+        async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
             new_revision_dir,
             new_revision_number,
         ):
@@ -195,7 +196,8 @@ async def fresh(session: routes.CommitterSession, project_name: str, version_nam
     # Restart checks by creating a new identical draft revision
     # This doesn't make sense unless the checks themselves have been updated
     # Therefore we only show the button for this to admins
-    async with revision.create_and_manage(project_name, version_name, session.uid) as (
+    description = "Empty revision to restart all checks for the whole release candidate draft"
+    async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
         _new_revision_dir,
         _new_revision_number,
     ):
@@ -227,7 +229,8 @@ async def hashgen(
     rel_path = pathlib.Path(file_path)
 
     try:
-        async with revision.create_and_manage(project_name, version_name, session.uid) as (
+        description = "Hash generation through web interface"
+        async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
             new_revision_dir,
             new_revision_number,
         ):
@@ -285,7 +288,8 @@ async def sbomgen(
         raise base.ASFQuartException("SBOM generation is only supported for .tar.gz files", errorcode=400)
 
     try:
-        async with revision.create_and_manage(project_name, version_name, session.uid) as (
+        description = "SBOM generation through web interface"
+        async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
             new_revision_dir,
             new_revision_number,
         ):

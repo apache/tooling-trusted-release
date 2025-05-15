@@ -62,9 +62,15 @@
           </span>
         </div>
         <div class="card-body">
+          {% if revision.description %}
+            <p class="mb-2">
+              <strong><!-- Description: -->{{ revision.description }}</strong>
+            </p>
+          {% endif %}
           {% if revision.parent %}
             <p class="small text-muted mb-2">
-              Changes from parent revision: <a href="#{{ revision.parent.number }}">{{ revision.parent.number }}</a>
+              Changes from <a href="#{{ revision.parent.number }}"
+    title="Revision {{ revision.parent.number }}">previous revision</a>:
             </p>
           {% else %}
             <p class="small text-muted mb-2">Initial revision</p>

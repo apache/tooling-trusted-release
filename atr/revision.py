@@ -34,7 +34,11 @@ _LOGGER: Final = logging.getLogger(__name__)
 
 @contextlib.asynccontextmanager
 async def create_and_manage(
-    project_name: str, version_name: str, asf_uid: str, create_directory: bool = True
+    project_name: str,
+    version_name: str,
+    asf_uid: str,
+    create_directory: bool = True,
+    description: str | None = None,
 ) -> AsyncGenerator[tuple[pathlib.Path, str]]:
     """Manage the creation and symlinking of a mutable release revision."""
     base_dir = util.get_unfinished_dir()
@@ -62,7 +66,7 @@ async def create_and_manage(
             # parent_name is automatically computed in an event listener
             # parent is automatically computed in an event listener
             child=None,
-            description=None,
+            description=description,
         )
         data.add(new_revision)
         await data.commit()

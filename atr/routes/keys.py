@@ -189,7 +189,8 @@ async def import_selected_revision(
         message += f" failed to upload {error_count} keys for {', '.join(submitted_committees)}"
     # Remove the KEYS file if 100% imported
     if (success_count > 0) and (error_count == 0):
-        async with revision.create_and_manage(project_name, version_name, session.uid) as (
+        description = "Removed KEYS file after successful import through web interface"
+        async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
             new_revision_dir,
             _new_revision_number,
         ):

@@ -483,7 +483,8 @@ async def _step_07b_process_validated_rsync_write(
             return
 
         # Create the draft revision directory structure
-        async with revision.create_and_manage(project_name, version_name, asf_uid) as (
+        description = "File synchronisation through ssh, using rsync"
+        async with revision.create_and_manage(project_name, version_name, asf_uid, description=description) as (
             new_revision_dir,
             new_revision,
         ):

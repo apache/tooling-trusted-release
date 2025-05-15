@@ -115,7 +115,8 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
                 f"Revision {selected_revision_number} is not a preview revision", errorcode=400
             )
 
-    async with revision.create_and_manage(project_name, version_name, session.uid) as (
+    description = f"Copy of revision {selected_revision_number} through web interface"
+    async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
         new_revision_dir,
         new_revision_number,
     ):

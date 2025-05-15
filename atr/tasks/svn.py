@@ -69,7 +69,10 @@ async def _import_files_core(args: SvnImport) -> str:
     # We have to use a temporary directory otherwise SVN thinks it's a pegged revision
     temp_export_dir_name = ".svn-export.tmp"
 
-    async with revision.create_and_manage(args.project_name, args.version_name, args.asf_uid) as (
+    description = "Import of files from subversion"
+    async with revision.create_and_manage(
+        args.project_name, args.version_name, args.asf_uid, description=description
+    ) as (
         new_revision_dir,
         new_revision_number,
     ):
