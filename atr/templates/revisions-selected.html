@@ -48,6 +48,8 @@
           <h2 class="fs-6 my-2 mx-0 p-0 border-0 atr-sans">
             <a href="#{{ revision.number }}"
                class="fw-bold text-decoration-none text-body">{{ revision.number }}</a>
+            {% set revision_phase_key = revision.phase.value.lower().split("_")[-1] %}
+            <span class="badge bg-secondary ms-2">{{ revision_phase_key.upper() }}</span>
             {% if revision.number == latest_revision_number %}<span class="badge bg-primary ms-2">Current</span>{% endif %}
           </h2>
           <span class="fs-6 text-muted">
@@ -105,7 +107,9 @@
             {% endif %}
           {% endif %}
 
-          {% if revision.number != latest_revision_number %}
+          {% set is_draft = phase_key == "draft" %}
+          {% set revision_is_preview = revision.phase.value.lower() == "release_preview" %}
+          {% if (revision.number != latest_revision_number) and (is_draft or revision_is_preview) %}
             <h3 class="fs-6 fw-semibold mt-3 atr-sans">Actions</h3>
             <div class="mt-3">
               <form method="post"

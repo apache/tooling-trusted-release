@@ -306,8 +306,8 @@ class ReleasePhase(str, enum.Enum):
     RELEASE = "release"
 
 
-def revision_name(release_name: str, seq: int) -> str:
-    return f"{release_name} {seq}"
+def revision_name(release_name: str, number: str) -> str:
+    return f"{release_name} {number}"
 
 
 class Revision(sqlmodel.SQLModel, table=True):
@@ -381,7 +381,7 @@ def populate_revision_sequence_and_name(
         # Do NOT set revision.parent directly here
 
     # Recalculate the Revision.name
-    revision.name = revision_name(revision.release_name, revision.seq)
+    revision.name = revision_name(revision.release_name, revision.number)
 
 
 class TaskStatus(str, enum.Enum):

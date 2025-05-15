@@ -58,7 +58,7 @@ async def create_and_manage(
             # number is automatically computed in an event listener
             asfuid=asf_uid,
             created=datetime.datetime.now(datetime.UTC),
-            phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+            phase=release_one.phase,
             # parent_name is automatically computed in an event listener
             # parent is automatically computed in an event listener
             child=None,

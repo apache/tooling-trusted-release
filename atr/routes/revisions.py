@@ -28,10 +28,10 @@ import werkzeug.wrappers.response as response
 
 import atr.db as db
 import atr.db.models as models
+import atr.revision as revision
 import atr.routes as routes
 import atr.schema as schema
 import atr.util as util
-from atr import revision
 
 
 @routes.committer("/revisions/<project_name>/<version_name>")
@@ -104,6 +104,16 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
         selected_revision_dir = util.release_directory_base(release) / selected_revision_number
         if release.phase not in {models.ReleasePhase.RELEASE_CANDIDATE_DRAFT, models.ReleasePhase.RELEASE_PREVIEW}:
             raise base.ASFQuartException("Cannot set revision for non-draft or preview release", errorcode=400)
+
+        selected_revision = await data.revision(release_name=release.name, number=selected_revision_number).demand(
+            base.ASFQuartException(f"Revision {selected_revision_number} not found", errorcode=404)
+        )
+        if (release.phase == models.ReleasePhase.RELEASE_PREVIEW) and (
+            selected_revision.phase != models.ReleasePhase.RELEASE_PREVIEW
+        ):
+            raise base.ASFQuartException(
+                f"Revision {selected_revision_number} is not a preview revision", errorcode=400
+            )
 
     async with revision.create_and_manage(project_name, version_name, session.uid) as (
         new_revision_dir,
