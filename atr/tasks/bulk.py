@@ -29,9 +29,9 @@ import aiohttp
 import sqlalchemy
 import sqlalchemy.ext.asyncio
 
+import atr.config as config
 import atr.db.models as models
 import atr.tasks.task as task
-from atr import config
 
 # Configure detailed logging
 _LOGGER: Final = logging.getLogger(__name__)

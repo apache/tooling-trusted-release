@@ -83,7 +83,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     announce_form = await _create_announce_form_instance(util.permitted_recipients(session.uid))
     # Hidden fields
     announce_form.preview_name.data = release.name
-    announce_form.preview_revision.data = release.unwrap_revision
+    announce_form.preview_revision.data = release.unwrap_revision_number
 
     # Variables used in defaults for subject and body
     project_display_name = release.project.display_name or release.project.name
@@ -112,7 +112,7 @@ async def selected_post(
             error_message = f"{error_message}: {error_details}"
 
         # Render the page again, with errors
-        release = await session.release(
+        release: models.Release = await session.release(
             project_name, version_name, with_committee=True, phase=models.ReleasePhase.RELEASE_PREVIEW
         )
         await quart.flash(error_message, "error")
@@ -128,7 +128,7 @@ async def selected_post(
     async with db.session() as data:
         try:
             release = await session.release(
-                project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW, data=data
+                project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW, with_revisions=True, data=data
             )
 
             test_list = "user-tests"
@@ -166,19 +166,19 @@ async def selected_post(
 
             # Prepare paths for file operations
             source_base = util.release_directory_base(release)
-            source = str(source_base / release.unwrap_revision)
+            source = str(source_base / release.unwrap_revision_number)
 
             # TODO: We should update only if the announcement email was sent
             # That would require moving this, and the filesystem operations, into a task
             release.phase = models.ReleasePhase.RELEASE
-            release.revision = None
+            # Delete all revisions associated with this release
+            for revision in release.revisions:
+                await data.delete(revision)
+            # Essential to set revisions to [], otherwise release.revisions is still populated
+            # And util.release_directory() below checks for it
+            release.revisions = []
             release.released = datetime.datetime.now(datetime.UTC)
             await data.commit()
-
-            # This must come after updating the release object
-            target = str(util.release_directory(release))
-            if await aiofiles.os.path.exists(target):
-                raise routes.FlashError("Release already exists")
 
         except (routes.FlashError, Exception) as e:
             logging.exception("Error during release announcement, database phase:")
@@ -188,6 +188,15 @@ async def selected_post(
                 project_name=project_name,
                 version_name=version_name,
             )
+
+    async with db.session() as data:
+        # This must come after updating the release object
+        # Do not put it in the data block after data.commit()
+        # Otherwise util.release_directory() will not work
+        release = await data.release(name=release.name).demand(RuntimeError("Release does not exist"))
+        target = str(util.release_directory(release))
+        if await aiofiles.os.path.exists(target):
+            raise routes.FlashError("Release already exists")
 
     try:
         await aioshutil.move(source, target)

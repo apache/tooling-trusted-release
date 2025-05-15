@@ -55,19 +55,19 @@ async def asc_checks(release: models.Release, revision: str, signature_path: str
 
 
 async def draft_checks(
-    project_name: str, release_version: str, revision: str, caller_data: db.Session | None = None
+    project_name: str, release_version: str, revision_number: str, caller_data: db.Session | None = None
 ) -> int:
     """Core logic to analyse a draft revision and queue checks."""
     # Construct path to the specific revision
     # We don't have the release object here, so we can't use util.release_directory
-    revision_path = util.get_unfinished_dir() / project_name / release_version / revision
+    revision_path = util.get_unfinished_dir() / project_name / release_version / revision_number
     relative_paths = [path async for path in util.paths_recursive(revision_path)]
 
     async with ensure_session(caller_data) as data:
         release = await data.release(name=models.release_name(project_name, release_version), _committee=True).demand(
             RuntimeError("Release not found")
         )
-        for path_idx, path in enumerate(relative_paths):
+        for path in relative_paths:
             path_str = str(path)
             task_function: Callable[[models.Release, str, str], Awaitable[list[models.Task]]] | None = None
             for suffix, func in TASK_FUNCTIONS.items():
@@ -75,11 +75,11 @@ async def draft_checks(
                     task_function = func
                     break
             if task_function:
-                for task in await task_function(release, revision, path_str):
-                    task.revision = revision
+                for task in await task_function(release, revision_number, path_str):
+                    task.revision_number = revision_number
                     data.add(task)
 
-        path_check_task = queued(models.TaskType.PATHS_CHECK, release, revision)
+        path_check_task = queued(models.TaskType.PATHS_CHECK, release, revision_number)
         data.add(path_check_task)
         if caller_data is None:
             await data.commit()
@@ -94,7 +94,7 @@ def ensure_session(caller_data: db.Session | None) -> db.Session | contextlib.nu
 
 
 async def keys_import_file(
-    release_name: str, revision: str, abs_keys_path: str, caller_data: db.Session | None = None
+    release_name: str, revision_number: str, abs_keys_path: str, caller_data: db.Session | None = None
 ) -> None:
     """Import a KEYS file from a draft release candidate revision."""
     async with ensure_session(caller_data) as data:
@@ -106,7 +106,7 @@ async def keys_import_file(
                     release_name=release_name,
                     abs_keys_path=abs_keys_path,
                 ).model_dump(),
-                revision=revision,
+                revision_number=revision_number,
                 primary_rel_path=None,
             )
         )
@@ -116,7 +116,7 @@ async def keys_import_file(
 def queued(
     task_type: models.TaskType,
     release: models.Release,
-    revision: str,
+    revision_number: str,
     primary_rel_path: str | None = None,
     extra_args: dict[str, Any] | None = None,
 ) -> models.Task:
@@ -125,7 +125,7 @@ def queued(
         task_type=task_type,
         task_args=extra_args or {},
         release_name=release.name,
-        revision=revision,
+        revision_number=revision_number,
         primary_rel_path=primary_rel_path,
     )
 

@@ -1,8 +1,8 @@
 """Use the existing ATR schema
 
-Revision ID: 0001_2025.05.06_38b0d2de
+Revision ID: 0001_2025.05.15_32c59be6
 Revises:
-Create Date: 2025-05-06 14:44:00.401362+00:00
+Create Date: 2025-05-15 15:44:04.208248+00:00
 """
 
 from collections.abc import Sequence
@@ -13,7 +13,7 @@ from alembic import op
 import atr.db.models
 
 # Revision identifiers, used by Alembic
-revision: str = "0001_2025.05.06_38b0d2de"
+revision: str = "0001_2025.05.15_32c59be6"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -30,11 +30,10 @@ def upgrade() -> None:
         sa.Column("committers", sa.JSON(), nullable=True),
         sa.Column("release_managers", sa.JSON(), nullable=True),
         sa.ForeignKeyConstraint(
-            ["parent_committee_name"],
-            ["committee.name"],
+            ["parent_committee_name"], ["committee.name"], name=op.f("fk_committee_parent_committee_name_committee")
         ),
-        sa.PrimaryKeyConstraint("name"),
-        sa.UniqueConstraint("name"),
+        sa.PrimaryKeyConstraint("name", name=op.f("pk_committee")),
+        sa.UniqueConstraint("name", name=op.f("uq_committee_name")),
     )
     op.create_table(
         "publicsigningkey",
@@ -46,8 +45,8 @@ def upgrade() -> None:
         sa.Column("declared_uid", sa.String(), nullable=True),
         sa.Column("apache_uid", sa.String(), nullable=False),
         sa.Column("ascii_armored_key", sa.String(), nullable=False),
-        sa.PrimaryKeyConstraint("fingerprint"),
-        sa.UniqueConstraint("fingerprint"),
+        sa.PrimaryKeyConstraint("fingerprint", name=op.f("pk_publicsigningkey")),
+        sa.UniqueConstraint("fingerprint", name=op.f("uq_publicsigningkey_fingerprint")),
     )
     op.create_table(
         "releasepolicy",
@@ -59,21 +58,21 @@ def upgrade() -> None:
         sa.Column("pause_for_rm", sa.Boolean(), nullable=False),
         sa.Column("start_vote_template", sa.String(), nullable=False),
         sa.Column("announce_release_template", sa.String(), nullable=False),
-        sa.PrimaryKeyConstraint("id"),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_releasepolicy")),
     )
     op.create_table(
         "sshkey",
         sa.Column("fingerprint", sa.String(), nullable=False),
         sa.Column("key", sa.String(), nullable=False),
         sa.Column("asf_uid", sa.String(), nullable=False),
-        sa.PrimaryKeyConstraint("fingerprint"),
+        sa.PrimaryKeyConstraint("fingerprint", name=op.f("pk_sshkey")),
     )
     op.create_table(
         "textvalue",
         sa.Column("ns", sa.String(), nullable=False),
         sa.Column("key", sa.String(), nullable=False),
         sa.Column("value", sa.String(), nullable=False),
-        sa.PrimaryKeyConstraint("ns", "key"),
+        sa.PrimaryKeyConstraint("ns", "key", name=op.f("pk_textvalue")),
     )
     op.create_index(op.f("ix_textvalue_key"), "textvalue", ["key"], unique=False)
     op.create_index(op.f("ix_textvalue_ns"), "textvalue", ["ns"], unique=False)
@@ -82,14 +81,14 @@ def upgrade() -> None:
         sa.Column("committee_name", sa.String(), nullable=False),
         sa.Column("key_fingerprint", sa.String(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["committee_name"],
-            ["committee.name"],
+            ["committee_name"], ["committee.name"], name=op.f("fk_keylink_committee_name_committee")
         ),
         sa.ForeignKeyConstraint(
             ["key_fingerprint"],
             ["publicsigningkey.fingerprint"],
+            name=op.f("fk_keylink_key_fingerprint_publicsigningkey"),
         ),
-        sa.PrimaryKeyConstraint("committee_name", "key_fingerprint"),
+        sa.PrimaryKeyConstraint("committee_name", "key_fingerprint", name=op.f("pk_keylink")),
     )
     op.create_table(
         "project",
@@ -106,16 +105,19 @@ def upgrade() -> None:
         sa.Column("created", atr.db.models.UTCDateTime(timezone=True), nullable=True),
         sa.Column("created_by", sa.String(), nullable=True),
         sa.ForeignKeyConstraint(
-            ["committee_name"],
-            ["committee.name"],
+            ["committee_name"], ["committee.name"], name=op.f("fk_project_committee_name_committee")
         ),
-        sa.ForeignKeyConstraint(["release_policy_id"], ["releasepolicy.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(
-            ["super_project_name"],
-            ["project.name"],
+            ["release_policy_id"],
+            ["releasepolicy.id"],
+            name=op.f("fk_project_release_policy_id_releasepolicy"),
+            ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("name"),
-        sa.UniqueConstraint("name"),
+        sa.ForeignKeyConstraint(
+            ["super_project_name"], ["project.name"], name=op.f("fk_project_super_project_name_project")
+        ),
+        sa.PrimaryKeyConstraint("name", name=op.f("pk_project")),
+        sa.UniqueConstraint("name", name=op.f("uq_project_name")),
     )
     op.create_table(
         "distributionchannel",
@@ -127,10 +129,9 @@ def upgrade() -> None:
         sa.Column("automation_endpoint", sa.String(), nullable=False),
         sa.Column("project_name", sa.String(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["project_name"],
-            ["project.name"],
+            ["project_name"], ["project.name"], name=op.f("fk_distributionchannel_project_name_project")
         ),
-        sa.PrimaryKeyConstraint("id"),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_distributionchannel")),
     )
     op.create_index(op.f("ix_distributionchannel_name"), "distributionchannel", ["name"], unique=True)
     op.create_table(
@@ -149,44 +150,59 @@ def upgrade() -> None:
         sa.Column("project_name", sa.String(), nullable=False),
         sa.Column("package_managers", sa.JSON(), nullable=True),
         sa.Column("version", sa.String(), nullable=False),
-        sa.Column("revision", sa.String(), nullable=True),
         sa.Column("sboms", sa.JSON(), nullable=True),
         sa.Column("release_policy_id", sa.Integer(), nullable=True),
         sa.Column("votes", sa.JSON(), nullable=True),
         sa.Column("vote_started", atr.db.models.UTCDateTime(timezone=True), nullable=True),
         sa.Column("vote_resolved", atr.db.models.UTCDateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(["project_name"], ["project.name"], name=op.f("fk_release_project_name_project")),
         sa.ForeignKeyConstraint(
-            ["project_name"],
-            ["project.name"],
+            ["release_policy_id"], ["releasepolicy.id"], name=op.f("fk_release_release_policy_id_releasepolicy")
         ),
-        sa.ForeignKeyConstraint(
-            ["release_policy_id"],
-            ["releasepolicy.id"],
-        ),
-        sa.PrimaryKeyConstraint("name"),
-        sa.UniqueConstraint("name"),
+        sa.PrimaryKeyConstraint("name", name=op.f("pk_release")),
+        sa.UniqueConstraint("name", name=op.f("uq_release_name")),
         sa.UniqueConstraint("project_name", "version", name="unique_project_version"),
     )
-    op.create_index(op.f("ix_release_revision"), "release", ["revision"], unique=False)
     op.create_table(
         "checkresult",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("release_name", sa.String(), nullable=False),
+        sa.Column("revision_number", sa.String(), nullable=True),
         sa.Column("checker", sa.String(), nullable=False),
         sa.Column("primary_rel_path", sa.String(), nullable=True),
+        sa.Column("member_rel_path", sa.String(), nullable=True),
         sa.Column("created", atr.db.models.UTCDateTime(timezone=True), nullable=True),
         sa.Column(
             "status", sa.Enum("EXCEPTION", "FAILURE", "SUCCESS", "WARNING", name="checkresultstatus"), nullable=False
         ),
         sa.Column("message", sa.String(), nullable=False),
         sa.Column("data", sa.JSON(), nullable=True),
-        sa.ForeignKeyConstraint(
-            ["release_name"],
-            ["release.name"],
-        ),
-        sa.PrimaryKeyConstraint("id"),
+        sa.ForeignKeyConstraint(["release_name"], ["release.name"], name=op.f("fk_checkresult_release_name_release")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_checkresult")),
     )
+    op.create_index(op.f("ix_checkresult_member_rel_path"), "checkresult", ["member_rel_path"], unique=False)
     op.create_index(op.f("ix_checkresult_primary_rel_path"), "checkresult", ["primary_rel_path"], unique=False)
+    op.create_index(op.f("ix_checkresult_revision_number"), "checkresult", ["revision_number"], unique=False)
+    op.create_table(
+        "revision",
+        sa.Column("name", sa.String(), nullable=False),
+        sa.Column("release_name", sa.String(), nullable=True),
+        sa.Column("seq", sa.Integer(), nullable=False),
+        sa.Column("number", sa.String(), nullable=False),
+        sa.Column("asfuid", sa.String(), nullable=False),
+        sa.Column("created", atr.db.models.UTCDateTime(timezone=True), nullable=True),
+        sa.Column(
+            "phase",
+            sa.Enum("RELEASE_CANDIDATE_DRAFT", "RELEASE_CANDIDATE", "RELEASE_PREVIEW", "RELEASE", name="releasephase"),
+            nullable=False,
+        ),
+        sa.Column("parent_name", sa.String(), nullable=True),
+        sa.Column("description", sa.String(), nullable=True),
+        sa.ForeignKeyConstraint(["parent_name"], ["revision.name"], name=op.f("fk_revision_parent_name_revision")),
+        sa.ForeignKeyConstraint(["release_name"], ["release.name"], name=op.f("fk_revision_release_name_release")),
+        sa.PrimaryKeyConstraint("name", name=op.f("pk_revision")),
+        sa.UniqueConstraint("name", name=op.f("uq_revision_name")),
+    )
     op.create_table(
         "task",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -195,6 +211,7 @@ def upgrade() -> None:
             "task_type",
             sa.Enum(
                 "HASHING_CHECK",
+                "KEYS_IMPORT_FILE",
                 "LICENSE_FILES",
                 "LICENSE_HEADERS",
                 "MESSAGE_SEND",
@@ -207,8 +224,6 @@ def upgrade() -> None:
                 "TARGZ_STRUCTURE",
                 "VOTE_INITIATE",
                 "ZIPFORMAT_INTEGRITY",
-                "ZIPFORMAT_LICENSE_FILES",
-                "ZIPFORMAT_LICENSE_HEADERS",
                 "ZIPFORMAT_STRUCTURE",
                 name="tasktype",
             ),
@@ -222,7 +237,7 @@ def upgrade() -> None:
         sa.Column("result", sa.JSON(), nullable=True),
         sa.Column("error", sa.String(), nullable=True),
         sa.Column("release_name", sa.String(), nullable=True),
-        sa.Column("draft_revision", sa.String(), nullable=True),
+        sa.Column("revision_number", sa.String(), nullable=True),
         sa.Column("primary_rel_path", sa.String(), nullable=True),
         sa.CheckConstraint(
             """
@@ -237,46 +252,30 @@ def upgrade() -> None:
                 OR (status = 'FAILED' AND completed IS NOT NULL AND error IS NOT NULL)
             )
             """,
-            name="valid_task_status_transitions",
+            name=op.f("ck_task_valid_task_status_transitions"),
         ),
-        sa.ForeignKeyConstraint(
-            ["release_name"],
-            ["release.name"],
-        ),
-        sa.PrimaryKeyConstraint("id"),
+        sa.ForeignKeyConstraint(["release_name"], ["release.name"], name=op.f("fk_task_release_name_release")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_task")),
     )
     op.create_index(op.f("ix_task_added"), "task", ["added"], unique=False)
-    op.create_index(op.f("ix_task_draft_revision"), "task", ["draft_revision"], unique=False)
     op.create_index(op.f("ix_task_primary_rel_path"), "task", ["primary_rel_path"], unique=False)
+    op.create_index(op.f("ix_task_revision_number"), "task", ["revision_number"], unique=False)
     op.create_index(op.f("ix_task_status"), "task", ["status"], unique=False)
     op.create_index("ix_task_status_added", "task", ["status", "added"], unique=False)
-    op.create_table(
-        "checkresulthistorylink",
-        sa.Column("check_result_id", sa.Integer(), nullable=False),
-        sa.Column("draft_revision", sa.String(), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["check_result_id"],
-            ["checkresult.id"],
-        ),
-        sa.PrimaryKeyConstraint("check_result_id", "draft_revision"),
-    )
-    op.create_index(
-        op.f("ix_checkresulthistorylink_draft_revision"), "checkresulthistorylink", ["draft_revision"], unique=False
-    )
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_checkresulthistorylink_draft_revision"), table_name="checkresulthistorylink")
-    op.drop_table("checkresulthistorylink")
     op.drop_index("ix_task_status_added", table_name="task")
     op.drop_index(op.f("ix_task_status"), table_name="task")
+    op.drop_index(op.f("ix_task_revision_number"), table_name="task")
     op.drop_index(op.f("ix_task_primary_rel_path"), table_name="task")
-    op.drop_index(op.f("ix_task_draft_revision"), table_name="task")
     op.drop_index(op.f("ix_task_added"), table_name="task")
     op.drop_table("task")
+    op.drop_table("revision")
+    op.drop_index(op.f("ix_checkresult_revision_number"), table_name="checkresult")
     op.drop_index(op.f("ix_checkresult_primary_rel_path"), table_name="checkresult")
+    op.drop_index(op.f("ix_checkresult_member_rel_path"), table_name="checkresult")
     op.drop_table("checkresult")
-    op.drop_index(op.f("ix_release_revision"), table_name="release")
     op.drop_table("release")
     op.drop_index(op.f("ix_distributionchannel_name"), table_name="distributionchannel")
     op.drop_table("distributionchannel")

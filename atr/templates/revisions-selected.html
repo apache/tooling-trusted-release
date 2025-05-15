@@ -42,77 +42,77 @@
   </h1>
 
   {% if revision_history %}
-    {% for revision in revision_history %}
-      <div id="{{ revision.name }}" class="card mb-3">
+    {% for revision, files_diff in revision_history %}
+      <div id="{{ revision.number }}" class="card mb-3">
         <div class="card-header d-flex justify-content-between align-items-center">
           <h2 class="fs-6 my-2 mx-0 p-0 border-0 atr-sans">
-            <a href="#{{ revision.name }}"
-               class="fw-bold text-decoration-none text-body">{{ revision.name }}</a>
-            {% if revision.name == current_revision_name %}<span class="badge bg-primary ms-2">Current</span>{% endif %}
+            <a href="#{{ revision.number }}"
+               class="fw-bold text-decoration-none text-body">{{ revision.number }}</a>
+            {% if revision.number == latest_revision_number %}<span class="badge bg-primary ms-2">Current</span>{% endif %}
           </h2>
           <span class="fs-6 text-muted">
-            {% if revision.timestamp %}
-              {{ revision.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC") }}
+            {% if revision.created %}
+              {{ revision.created.strftime("%Y-%m-%d %H:%M:%S UTC") }}
             {% else %}
               Invalid timestamp
             {% endif %}
-            by {{ revision.editor }}
+            by {{ revision.asfuid }}
           </span>
         </div>
         <div class="card-body">
           {% if revision.parent %}
             <p class="small text-muted mb-2">
-              Changes from parent revision: <a href="#{{ revision.parent }}">{{ revision.parent }}</a>
+              Changes from parent revision: <a href="#{{ revision.parent.number }}">{{ revision.parent.number }}</a>
             </p>
           {% else %}
             <p class="small text-muted mb-2">Initial revision</p>
           {% endif %}
 
-          {% if not revision.added and not revision.removed and not revision.modified %}
+          {% if (not files_diff.added) and (not files_diff.removed) and (not files_diff.modified) %}
             <p class="fst-italic text-muted">No file changes detected in this revision.</p>
           {% else %}
-            {% if revision.added %}
+            {% if files_diff.added %}
               <h3 class="fs-6 fw-semibold mt-3 atr-sans">
-                Added files <span class="font-monospace fw-normal">({{ revision.added|length }})</span>
+                Added files <span class="font-monospace fw-normal">({{ files_diff.added|length }})</span>
               </h3>
               <ul class="list-group list-group-flush mb-2">
-                {% for file in revision.added %}
+                {% for file in files_diff.added %}
                   <li class="list-group-item list-group-item-success py-1 px-3 small rounded-2">{{ file }}</li>
                 {% endfor %}
               </ul>
             {% endif %}
 
-            {% if revision.removed %}
+            {% if files_diff.removed %}
               <h3 class="fs-6 fw-semibold mt-3 atr-sans">
-                Removed files <span class="font-monospace fw-normal">({{ revision.removed|length }})</span>
+                Removed files <span class="font-monospace fw-normal">({{ files_diff.removed|length }})</span>
               </h3>
               <ul class="list-group list-group-flush mb-2">
-                {% for file in revision.removed %}
+                {% for file in files_diff.removed %}
                   <li class="list-group-item list-group-item-danger py-1 px-3 small rounded-2">{{ file }}</li>
                 {% endfor %}
               </ul>
             {% endif %}
 
-            {% if revision.modified %}
+            {% if files_diff.modified %}
               <h3 class="fs-6 fw-semibold mt-3 atr-sans">
-                Modified files <span class="font-monospace fw-normal">({{ revision.modified|length }})</span>
+                Modified files <span class="font-monospace fw-normal">({{ files_diff.modified|length }})</span>
               </h3>
               <ul class="list-group list-group-flush mb-2">
-                {% for file in revision.modified %}
+                {% for file in files_diff.modified %}
                   <li class="list-group-item list-group-item-warning py-1 px-3 small rounded-2">{{ file }}</li>
                 {% endfor %}
               </ul>
             {% endif %}
           {% endif %}
 
-          {% if revision.name != current_revision_name %}
+          {% if revision.number != latest_revision_number %}
             <h3 class="fs-6 fw-semibold mt-3 atr-sans">Actions</h3>
             <div class="mt-3">
               <form method="post"
                     action="{{ as_url(routes.revisions.selected_post, project_name=project_name, version_name=version_name) }}">
                 {{ empty_form.hidden_tag() }}
 
-                <input type="hidden" name="revision_name" value="{{ revision.name }}" />
+                <input type="hidden" name="revision_number" value="{{ revision.number }}" />
                 <button type="submit" class="btn btn-sm btn-outline-danger">Set this revision as current</button>
               </form>
             </div>

@@ -21,6 +21,8 @@ import logging
 import os
 from typing import TYPE_CHECKING, Any, Final, Generic, TypeGuard, TypeVar
 
+import alembic.command as command
+import alembic.config as alembic_config
 import sqlalchemy
 import sqlalchemy.dialects.sqlite
 import sqlalchemy.ext.asyncio
@@ -28,8 +30,6 @@ import sqlalchemy.orm as orm
 import sqlalchemy.sql as sql
 import sqlmodel
 import sqlmodel.sql.expression as expression
-from alembic import command
-from alembic.config import Config
 
 import atr.config as config
 import atr.db.models as models
@@ -112,7 +112,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         self,
         id: Opt[int] = NOT_SET,
         release_name: Opt[str] = NOT_SET,
-        revision: Opt[str] = NOT_SET,
+        revision_number: Opt[str] = NOT_SET,
         checker: Opt[str] = NOT_SET,
         primary_rel_path: Opt[str | None] = NOT_SET,
         member_rel_path: Opt[str | None] = NOT_SET,
@@ -128,8 +128,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.CheckResult.id == id)
         if is_defined(release_name):
             query = query.where(models.CheckResult.release_name == release_name)
-        if is_defined(revision):
-            query = query.where(models.CheckResult.revision == revision)
+        if is_defined(revision_number):
+            query = query.where(models.CheckResult.revision_number == revision_number)
         if is_defined(checker):
             query = query.where(models.CheckResult.checker == checker)
         if is_defined(primary_rel_path):
@@ -181,7 +181,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Committee.release_managers == release_managers)
 
         if is_defined(name_in):
-            models_committee_name = validate_instrumented_attribute(models.Committee.name)
+            models_committee_name = models.validate_instrumented_attribute(models.Committee.name)
             query = query.where(models_committee_name.in_(name_in))
 
         if _projects:
@@ -193,8 +193,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     async def ns_text_del(self, ns: str, key: str, commit: bool = True) -> None:
         stmt = sql.delete(models.TextValue).where(
-            validate_instrumented_attribute(models.TextValue.ns) == ns,
-            validate_instrumented_attribute(models.TextValue.key) == key,
+            models.validate_instrumented_attribute(models.TextValue.ns) == ns,
+            models.validate_instrumented_attribute(models.TextValue.key) == key,
         )
         await self.execute(stmt)
         if commit is True:
@@ -202,7 +202,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     async def ns_text_del_all(self, ns: str, commit: bool = True) -> None:
         stmt = sql.delete(models.TextValue).where(
-            validate_instrumented_attribute(models.TextValue.ns) == ns,
+            models.validate_instrumented_attribute(models.TextValue.ns) == ns,
         )
         await self.execute(stmt)
         if commit is True:
@@ -210,8 +210,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     async def ns_text_get(self, ns: str, key: str) -> str | None:
         stmt = sql.select(models.TextValue).where(
-            validate_instrumented_attribute(models.TextValue.ns) == ns,
-            validate_instrumented_attribute(models.TextValue.key) == key,
+            models.validate_instrumented_attribute(models.TextValue.ns) == ns,
+            models.validate_instrumented_attribute(models.TextValue.key) == key,
         )
         result = await self.execute(stmt)
         match result.scalar_one_or_none():
@@ -317,7 +317,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         project_name: Opt[str] = NOT_SET,
         package_managers: Opt[list[str]] = NOT_SET,
         version: Opt[str] = NOT_SET,
-        revision: Opt[str] = NOT_SET,
         sboms: Opt[list[str]] = NOT_SET,
         release_policy_id: Opt[int] = NOT_SET,
         votes: Opt[list[models.VoteEntry]] = NOT_SET,
@@ -325,6 +324,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         _release_policy: bool = False,
         _committee: bool = False,
         _tasks: bool = False,
+        _revisions: bool = False,
     ) -> Query[models.Release]:
         query = sqlmodel.select(models.Release)
 
@@ -342,8 +342,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Release.package_managers == package_managers)
         if is_defined(version):
             query = query.where(models.Release.version == version)
-        if is_defined(revision):
-            query = query.where(models.Release.revision == revision)
         if is_defined(sboms):
             query = query.where(models.Release.sboms == sboms)
         if is_defined(release_policy_id):
@@ -359,6 +357,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.options(select_in_load_nested(models.Release.project, models.Project.committee))
         if _tasks:
             query = query.options(select_in_load(models.Release.tasks))
+        if _revisions:
+            query = query.options(select_in_load(models.Release.revisions))
 
         return Query(self, query)
 
@@ -389,6 +389,51 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
         if _project:
             query = query.options(select_in_load(models.ReleasePolicy.project))
+
+        return Query(self, query)
+
+    def revision(
+        self,
+        name: Opt[str] = NOT_SET,
+        release_name: Opt[str] = NOT_SET,
+        seq: Opt[int] = NOT_SET,
+        number: Opt[str] = NOT_SET,
+        asfuid: Opt[str] = NOT_SET,
+        created: Opt[datetime.datetime] = NOT_SET,
+        phase: Opt[models.ReleasePhase] = NOT_SET,
+        parent_name: Opt[str | None] = NOT_SET,
+        description: Opt[str | None] = NOT_SET,
+        _release: bool = False,
+        _parent: bool = False,
+        _child: bool = False,
+    ) -> Query[models.Revision]:
+        query = sqlmodel.select(models.Revision)
+
+        if is_defined(name):
+            query = query.where(models.Revision.name == name)
+        if is_defined(release_name):
+            query = query.where(models.Revision.release_name == release_name)
+        if is_defined(seq):
+            query = query.where(models.Revision.seq == seq)
+        if is_defined(number):
+            query = query.where(models.Revision.number == number)
+        if is_defined(asfuid):
+            query = query.where(models.Revision.asfuid == asfuid)
+        if is_defined(created):
+            query = query.where(models.Revision.created == created)
+        if is_defined(phase):
+            query = query.where(models.Revision.phase == phase)
+        if is_defined(parent_name):
+            query = query.where(models.Revision.parent_name == parent_name)
+        if is_defined(description):
+            query = query.where(models.Revision.description == description)
+
+        if _release:
+            query = query.options(select_in_load(models.Revision.release))
+        if _parent:
+            query = query.options(select_in_load(models.Revision.parent))
+        if _child:
+            query = query.options(select_in_load(models.Revision.child))
 
         return Query(self, query)
 
@@ -528,7 +573,7 @@ def init_database(app: base.QuartApp) -> None:
         # Run any pending migrations on startup
         _LOGGER.info("Applying database migrations via init_database...")
         alembic_ini_path = os.path.join(app_config.PROJECT_ROOT, "alembic.ini")
-        alembic_cfg = Config(alembic_ini_path)
+        alembic_cfg = alembic_config.Config(alembic_ini_path)
 
         # Construct synchronous URLs
         absolute_db_path = os.path.join(app_config.STATE_DIR, app_config.SQLITE_DB_PATH)
@@ -647,10 +692,3 @@ async def shutdown_database() -> None:
         await _global_atr_engine.dispose()
     else:
         _LOGGER.info("No database to close")
-
-
-def validate_instrumented_attribute(obj: Any) -> orm.InstrumentedAttribute:
-    """Check if the given object is an InstrumentedAttribute."""
-    if not isinstance(obj, orm.InstrumentedAttribute):
-        raise ValueError(f"Object must be an orm.InstrumentedAttribute, got: {type(obj)}")
-    return obj

@@ -24,7 +24,6 @@ import hashlib
 import logging
 import pathlib
 import re
-import shutil
 import tarfile
 import tempfile
 import uuid
@@ -33,6 +32,7 @@ from collections.abc import AsyncGenerator, Callable, Sequence
 from typing import Any, Final, TypeVar
 
 import aiofiles.os
+import aioshutil
 import asfquart
 import asfquart.base as base
 import asfquart.session as session
@@ -140,7 +140,10 @@ async def async_temporary_directory(
     try:
         yield pathlib.Path(temp_dir_path)
     finally:
-        await asyncio.to_thread(shutil.rmtree, temp_dir_path, ignore_errors=True)
+        try:
+            await aioshutil.rmtree(temp_dir_path)  # type: ignore[call-arg]
+        except Exception:
+            pass
 
 
 def compute_sha3_256(file_data: bytes) -> str:
@@ -355,7 +358,7 @@ async def number_of_release_files(release: models.Release) -> int:
     """Return the number of files in a release."""
     path_project = release.project.name
     path_version = release.version
-    path_revision = release.revision or "force-error"
+    path_revision = release.unwrap_revision_number
     match release.phase:
         case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
             path = get_unfinished_dir() / path_project / path_version / path_revision
@@ -464,9 +467,10 @@ async def read_file_for_viewer(full_path: pathlib.Path, max_size: int) -> tuple[
 
 def release_directory(release: models.Release) -> pathlib.Path:
     """Return the absolute path to the directory containing the active files for a given release phase."""
-    if release.revision is None:
+    latest_revision_number = release.latest_revision_number
+    if latest_revision_number is None:
         return release_directory_base(release)
-    return release_directory_base(release) / release.revision
+    return release_directory_base(release) / latest_revision_number
 
 
 def release_directory_base(release: models.Release) -> pathlib.Path:

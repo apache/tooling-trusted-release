@@ -41,10 +41,10 @@ import wtforms
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.db.models as models
+import atr.revision as revision
 import atr.routes as routes
+import atr.routes.compose as compose
 import atr.util as util
-from atr import revision
-from atr.routes import compose
 
 
 class AddSSHKeyForm(util.QuartFormTyped):
@@ -191,7 +191,7 @@ async def import_selected_revision(
     if (success_count > 0) and (error_count == 0):
         async with revision.create_and_manage(project_name, version_name, session.uid) as (
             new_revision_dir,
-            _new_revision_name,
+            _new_revision_number,
         ):
             path_in_new_revision = new_revision_dir / "KEYS"
             await aiofiles.os.remove(path_in_new_revision)

@@ -182,10 +182,11 @@ async def key_user_session_add(
     }
 
 
-async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathInfo:
+async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathInfo | None:
     info = PathInfo()
-    if release.revision is None:
-        raise ValueError(f"Release {release.name} has no revision")
+    latest_revision_number = release.latest_revision_number
+    if latest_revision_number is None:
+        return None
     for path in paths:
         # Get template and substitutions
         # elements = {
@@ -212,7 +213,7 @@ async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathI
             info.successes[path] = list(
                 await data.check_result(
                     release_name=release.name,
-                    revision=release.revision,
+                    revision_number=latest_revision_number,
                     primary_rel_path=str(path),
                     member_rel_path=None,
                     status=models.CheckResultStatus.SUCCESS,
@@ -221,7 +222,7 @@ async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathI
             info.warnings[path] = list(
                 await data.check_result(
                     release_name=release.name,
-                    revision=release.revision,
+                    revision_number=latest_revision_number,
                     primary_rel_path=str(path),
                     member_rel_path=None,
                     status=models.CheckResultStatus.WARNING,
@@ -230,7 +231,7 @@ async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathI
             info.errors[path] = list(
                 await data.check_result(
                     release_name=release.name,
-                    revision=release.revision,
+                    revision_number=latest_revision_number,
                     primary_rel_path=str(path),
                     member_rel_path=None,
                     status=models.CheckResultStatus.FAILURE,
@@ -239,7 +240,7 @@ async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathI
     return info
 
 
-async def tasks_ongoing(project_name: str, version_name: str, revision: str) -> int:
+async def tasks_ongoing(project_name: str, version_name: str, revision_number: str) -> int:
     release_name = models.release_name(project_name, version_name)
     async with db.session() as data:
         query = (
@@ -247,8 +248,8 @@ async def tasks_ongoing(project_name: str, version_name: str, revision: str) -> 
             .select_from(models.Task)
             .where(
                 models.Task.release_name == release_name,
-                models.Task.revision == revision,
-                db.validate_instrumented_attribute(models.Task.status).in_(
+                models.Task.revision_number == revision_number,
+                models.validate_instrumented_attribute(models.Task.status).in_(
                     [models.TaskStatus.QUEUED, models.TaskStatus.ACTIVE]
                 ),
             )
@@ -273,10 +274,10 @@ async def unfinished_releases(asfuid: str) -> dict[str, list[models.Release]]:
                 sqlmodel.select(models.Release)
                 .where(
                     models.Release.project_name == project.name,
-                    db.validate_instrumented_attribute(models.Release.phase).in_(active_phases),
+                    models.validate_instrumented_attribute(models.Release.phase).in_(active_phases),
                 )
                 .options(db.select_in_load(models.Release.project))
-                .order_by(db.validate_instrumented_attribute(models.Release.created).desc())
+                .order_by(models.validate_instrumented_attribute(models.Release.created).desc())
             )
             result = await data.execute(stmt)
             active_releases = list(result.scalars().all())

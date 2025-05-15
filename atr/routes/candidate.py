@@ -54,7 +54,9 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     # Convert async generator to list
     file_stats = [
         stat
-        async for stat in util.content_list(util.get_unfinished_dir(), project_name, version_name, release.revision)
+        async for stat in util.content_list(
+            util.get_unfinished_dir(), project_name, version_name, release.unwrap_revision_number
+        )
     ]
     logging.debug(f"File stats: {file_stats}")
 

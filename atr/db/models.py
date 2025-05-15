@@ -24,12 +24,23 @@ import datetime
 import enum
 from typing import Any, Optional
 
+import pydantic
 import sqlalchemy
 import sqlalchemy.event as event
+import sqlalchemy.orm as orm
 import sqlmodel
 
-import atr.db as db
 import atr.schema as schema
+
+sqlmodel.SQLModel.metadata = sqlalchemy.MetaData(
+    naming_convention={
+        "ix": "ix_%(table_name)s_%(column_0_N_name)s",
+        "uq": "uq_%(table_name)s_%(column_0_N_name)s",
+        "ck": "ck_%(table_name)s_%(constraint_name)s",
+        "fk": "fk_%(table_name)s_%(column_0_N_name)s_%(referred_table_name)s",
+        "pk": "pk_%(table_name)s",
+    }
+)
 
 
 class UTCDateTime(sqlalchemy.types.TypeDecorator):
@@ -200,16 +211,19 @@ class Project(sqlmodel.SQLModel, table=True):
 
     async def releases_by_phase(self, phase: "ReleasePhase") -> list["Release"]:
         """Get the releases for the project by phase."""
+        import atr.db as db
+
         query = (
             sqlmodel.select(Release)
             .where(
                 Release.project_name == self.name,
                 Release.phase == phase,
             )
-            .order_by(db.validate_instrumented_attribute(Release.created).desc())
+            .order_by(validate_instrumented_attribute(Release.created).desc())
         )
 
         results = []
+        # TODO: Use inspect(self).session, if available
         async with db.session() as data:
             for result in (await data.execute(query)).all():
                 release = result[0]
@@ -292,6 +306,84 @@ class ReleasePhase(str, enum.Enum):
     RELEASE = "release"
 
 
+def revision_name(release_name: str, seq: int) -> str:
+    return f"{release_name} {seq}"
+
+
+class Revision(sqlmodel.SQLModel, table=True):
+    name: str = sqlmodel.Field(default="", primary_key=True, unique=True)
+    release_name: str | None = sqlmodel.Field(default=None, foreign_key="release.name")
+    release: "Release" = sqlmodel.Relationship(
+        back_populates="revisions",
+        sa_relationship_kwargs={
+            "foreign_keys": "[Revision.release_name]",
+        },
+    )
+    seq: int = sqlmodel.Field(default=0)
+    # This was designed as a property, but it's better for it to be a column
+    # That way, we can do dynamic Release.latest_revision_number construction easier
+    number: str = sqlmodel.Field(default="")
+    asfuid: str
+    created: datetime.datetime = sqlmodel.Field(
+        default_factory=lambda: datetime.datetime.now(datetime.UTC), sa_column=sqlalchemy.Column(UTCDateTime)
+    )
+    phase: ReleasePhase
+
+    parent_name: str | None = sqlmodel.Field(default=None, foreign_key="revision.name")
+    parent: Optional["Revision"] = sqlmodel.Relationship(
+        sa_relationship_kwargs=dict(
+            remote_side=lambda: Revision.name,
+            uselist=False,
+            primaryjoin=lambda: Revision.parent_name == Revision.name,
+            back_populates="child",
+        )
+    )
+    child: Optional["Revision"] = sqlmodel.Relationship(back_populates="parent")
+
+    description: str | None = sqlmodel.Field(default=None)
+
+
+@event.listens_for(Revision, "before_insert")
+def populate_revision_sequence_and_name(
+    mapper: sqlalchemy.orm.Mapper, connection: sqlalchemy.engine.Connection, revision: Revision
+) -> None:
+    # We require Revision.release_name to have been set
+    if not revision.release_name:
+        # Raise an exception
+        # Otherwise, Revision.name would be "", Revision.seq 0, and Revision.number ""
+        raise RuntimeError("Cannot populate revision sequence and name without release_name")
+
+    # Get the Revision with the maximum existing Revision.seq and the same Revision.release_name
+    stmt = (
+        sqlmodel.select(Revision.seq, Revision.name)
+        .where(Revision.release_name == revision.release_name)
+        .order_by(sqlalchemy.desc(validate_instrumented_attribute(Revision.seq)))
+        .limit(1)
+    )
+    parent_row = connection.execute(stmt).fetchone()
+
+    # We cannot happy path this, because we must recalculate the Revision.name afterwards
+    if parent_row is None:
+        # This is the first Revision for this Revision.release_name
+        # Revision.seq is 0, but we use a 1-based system
+        revision.seq = 1
+        revision.number = str(revision.seq).zfill(5)
+    else:
+        # We don't have the ORM available in this event listener
+        # Therefore we must construct a new Revision object from the database row
+        parent_row_seq = parent_row.seq
+        parent_row_name = parent_row.name
+        # Compute the next sequence number
+        revision.seq = parent_row_seq + 1
+        revision.number = str(revision.seq).zfill(5)
+        # Set the parent_name foreign key. SQLAlchemy will handle the relationship.
+        revision.parent_name = parent_row_name
+        # Do NOT set revision.parent directly here
+
+    # Recalculate the Revision.name
+    revision.name = revision_name(revision.release_name, revision.seq)
+
+
 class TaskStatus(str, enum.Enum):
     """Status of a task in the task queue."""
 
@@ -346,7 +438,7 @@ class Task(sqlmodel.SQLModel, table=True):
     # We don't put these in task_args because we want to query them efficiently
     release_name: str | None = sqlmodel.Field(default=None, foreign_key="release.name")
     release: Optional["Release"] = sqlmodel.Relationship(back_populates="tasks")
-    revision: str | None = sqlmodel.Field(default=None, index=True)
+    revision_number: str | None = sqlmodel.Field(default=None, index=True)
     primary_rel_path: str | None = sqlmodel.Field(default=None, index=True)
 
     # Create an index on status and added for efficient task claiming
@@ -374,7 +466,16 @@ class Task(sqlmodel.SQLModel, table=True):
     )
 
 
+def validate_instrumented_attribute(obj: Any) -> orm.InstrumentedAttribute:
+    """Check if the given object is an InstrumentedAttribute."""
+    if not isinstance(obj, orm.InstrumentedAttribute):
+        raise ValueError(f"Object must be an orm.InstrumentedAttribute, got: {type(obj)}")
+    return obj
+
+
 class Release(sqlmodel.SQLModel, table=True):
+    # model_config = compat.SQLModelConfig(extra="forbid", from_attributes=True)
+
     # We guarantee that "{project.name}-{version}" is unique
     # Therefore we can use that for the name
     name: str = sqlmodel.Field(default="", primary_key=True, unique=True)
@@ -393,7 +494,6 @@ class Release(sqlmodel.SQLModel, table=True):
     # For example, Apache Airflow Providers do not have an overall version
     # They have one version per package, i.e. per provider
     version: str
-    revision: str | None = sqlmodel.Field(default=None, index=True)
     sboms: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
 
     # Many-to-one: A release can have one release policy, a release policy can be used by multiple releases
@@ -407,6 +507,15 @@ class Release(sqlmodel.SQLModel, table=True):
     vote_started: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
     vote_resolved: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
 
+    revisions: list["Revision"] = sqlmodel.Relationship(
+        back_populates="release",
+        sa_relationship_kwargs={
+            "order_by": "Revision.seq",
+            "foreign_keys": "[Revision.release_name]",
+            "cascade": "all, delete-orphan",
+        },
+    )
+
     # One-to-many: A release can have multiple tasks
     tasks: list["Task"] = sqlmodel.Relationship(
         back_populates="release", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
@@ -416,7 +525,7 @@ class Release(sqlmodel.SQLModel, table=True):
     check_results: list["CheckResult"] = sqlmodel.Relationship(back_populates="release")
 
     # The combination of project_name and version must be unique
-    __table_args__ = (sqlalchemy.UniqueConstraint("project_name", "version", name="unique_project_version"),)
+    __table_args__ = (sqlmodel.UniqueConstraint("project_name", "version", name="unique_project_version"),)
 
     @property
     def committee(self) -> Committee | None:
@@ -432,11 +541,33 @@ class Release(sqlmodel.SQLModel, table=True):
         return f"{self.project.short_display_name} {self.version}"
 
     @property
-    def unwrap_revision(self) -> str:
-        """Get the revision for the release."""
-        if self.revision is None:
-            raise ValueError("Release has no revision")
-        return self.revision
+    def unwrap_revision_number(self) -> str:
+        """Get the revision number for the release, or raise an exception."""
+        number = self.latest_revision_number
+        if number is None:
+            raise ValueError("Release has no revisions")
+        return number
+
+    @pydantic.computed_field  # type: ignore[prop-decorator]
+    @property
+    def latest_revision_number(self) -> str | None:
+        """Get the latest revision number for the release."""
+        # The session must still be active for this to work
+        number = getattr(self, "_latest_revision_number", None)
+        if not (isinstance(number, str) or (number is None)):
+            raise ValueError("Latest revision number is not a str or None")
+        return number
+
+
+# https://github.com/fastapi/sqlmodel/issues/240#issuecomment-2074161775
+Release._latest_revision_number = orm.column_property(
+    sqlalchemy.select(validate_instrumented_attribute(Revision.number))
+    .where(validate_instrumented_attribute(Revision.release_name) == Release.name)
+    .order_by(validate_instrumented_attribute(Revision.seq).desc())
+    .limit(1)
+    .correlate_except(Revision)
+    .scalar_subquery(),
+)
 
 
 class SSHKey(sqlmodel.SQLModel, table=True):
@@ -456,7 +587,8 @@ class CheckResult(sqlmodel.SQLModel, table=True):
     id: int = sqlmodel.Field(default=None, primary_key=True)
     release_name: str = sqlmodel.Field(foreign_key="release.name")
     release: Release = sqlmodel.Relationship(back_populates="check_results")
-    revision: str = sqlmodel.Field(default=None, index=True)
+    # We don't call this latest_revision_number, because it might not be the latest
+    revision_number: str | None = sqlmodel.Field(default=None, index=True)
     checker: str
     primary_rel_path: str | None = sqlmodel.Field(default=None, index=True)
     member_rel_path: str | None = sqlmodel.Field(default=None, index=True)
@@ -476,7 +608,9 @@ class TextValue(sqlmodel.SQLModel, table=True):
 @event.listens_for(Release, "before_insert")
 def check_release_name(_mapper: sqlalchemy.orm.Mapper, _connection: sqlalchemy.Connection, release: Release) -> None:
     if release.name == "":
-        release.name = release_name(release.project.name, release.version)
+        if (release.project_name is None) or (release.version is None):
+            raise ValueError("Cannot generate release name without project_name and version")
+        release.name = release_name(release.project_name, release.version)
 
 
 def project_version(release_name: str) -> tuple[str, str]:

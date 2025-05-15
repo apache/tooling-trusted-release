@@ -25,7 +25,7 @@ import atr.db.interaction as interaction
 import atr.db.models as models
 import atr.schema as schema
 import atr.tasks.checks as checks
-from atr import util
+import atr.util as util
 
 _LOGGER: Final = logging.getLogger(__name__)
 

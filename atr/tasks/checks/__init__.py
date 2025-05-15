@@ -41,7 +41,7 @@ import atr.util as util
 class FunctionArguments:
     recorder: Callable[[], Awaitable[Recorder]]
     release_name: str
-    revision: str
+    revision_number: str
     primary_rel_path: str | None
     extra_args: dict[str, Any]
 
@@ -60,14 +60,14 @@ class Recorder:
         self,
         checker: str | Callable[..., Any],
         release_name: str,
-        revision: str,
+        revision_number: str,
         primary_rel_path: str | None = None,
         member_rel_path: str | None = None,
         afresh: bool = True,
     ) -> None:
         self.checker = function_key(checker) if callable(checker) else checker
         self.release_name = release_name
-        self.revision = revision
+        self.revision_number = revision_number
         self.primary_rel_path = primary_rel_path
         self.member_rel_path = member_rel_path
         self.afresh = afresh
@@ -82,12 +82,12 @@ class Recorder:
         cls,
         checker: str | Callable[..., Any],
         release_name: str,
-        revision: str,
+        revision_number: str,
         primary_rel_path: str | None = None,
         member_rel_path: str | None = None,
         afresh: bool = True,
     ) -> Recorder:
-        recorder = cls(checker, release_name, revision, primary_rel_path, member_rel_path, afresh)
+        recorder = cls(checker, release_name, revision_number, primary_rel_path, member_rel_path, afresh)
         if afresh is True:
             # Clear outer path whether it's specified or not
             await recorder.clear(primary_rel_path=primary_rel_path, member_rel_path=member_rel_path)
@@ -113,7 +113,7 @@ class Recorder:
 
         result = models.CheckResult(
             release_name=self.release_name,
-            revision=self.revision,
+            revision_number=self.revision_number,
             checker=self.checker,
             primary_rel_path=primary_rel_path or self.primary_rel_path,
             member_rel_path=member_rel_path,
@@ -136,7 +136,7 @@ class Recorder:
         base_dir = util.get_unfinished_dir()
         project_part = self.project_name
         version_part = self.version_name
-        revision_part = self.revision
+        revision_part = self.revision_number
 
         # Determine the relative path part
         rel_path_part: str | None = None
@@ -154,11 +154,11 @@ class Recorder:
     async def clear(self, primary_rel_path: str | None = None, member_rel_path: str | None = None) -> None:
         async with db.session() as data:
             stmt = sqlmodel.delete(models.CheckResult).where(
-                db.validate_instrumented_attribute(models.CheckResult.release_name) == self.release_name,
-                db.validate_instrumented_attribute(models.CheckResult.revision) == self.revision,
-                db.validate_instrumented_attribute(models.CheckResult.checker) == self.checker,
-                db.validate_instrumented_attribute(models.CheckResult.primary_rel_path) == primary_rel_path,
-                db.validate_instrumented_attribute(models.CheckResult.member_rel_path) == member_rel_path,
+                models.validate_instrumented_attribute(models.CheckResult.release_name) == self.release_name,
+                models.validate_instrumented_attribute(models.CheckResult.revision_number) == self.revision_number,
+                models.validate_instrumented_attribute(models.CheckResult.checker) == self.checker,
+                models.validate_instrumented_attribute(models.CheckResult.primary_rel_path) == primary_rel_path,
+                models.validate_instrumented_attribute(models.CheckResult.member_rel_path) == member_rel_path,
             )
             await data.execute(stmt)
             await data.commit()

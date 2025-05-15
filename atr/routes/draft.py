@@ -142,7 +142,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
     try:
         async with revision.create_and_manage(project_name, version_name, session.uid) as (
             new_revision_dir,
-            new_revision_name,
+            new_revision_number,
         ):
             # Path to delete within the new revision directory
             path_in_new_revision = new_revision_dir / rel_path_to_delete
@@ -152,7 +152,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
                 # This indicates a potential severe issue with hard linking or logic
                 logging.error(
                     f"SEVERE ERROR! File {rel_path_to_delete} not found in new revision"
-                    f" {new_revision_name} before deletion"
+                    f" {new_revision_number} before deletion"
                 )
                 raise routes.FlashError("File to delete was not found in the new revision")
 
@@ -197,7 +197,7 @@ async def fresh(session: routes.CommitterSession, project_name: str, version_nam
     # Therefore we only show the button for this to admins
     async with revision.create_and_manage(project_name, version_name, session.uid) as (
         _new_revision_dir,
-        _new_revision_name,
+        _new_revision_number,
     ):
         ...
 
@@ -229,7 +229,7 @@ async def hashgen(
     try:
         async with revision.create_and_manage(project_name, version_name, session.uid) as (
             new_revision_dir,
-            new_revision_name,
+            new_revision_number,
         ):
             path_in_new_revision = new_revision_dir / rel_path
             hash_path_rel = rel_path.name + f".{hash_type}"
@@ -238,7 +238,7 @@ async def hashgen(
             # Check that the source file exists in the new revision
             if not await aiofiles.os.path.exists(path_in_new_revision):
                 logging.error(
-                    f"Source file {rel_path} not found in new revision {new_revision_name} for hash generation."
+                    f"Source file {rel_path} not found in new revision {new_revision_number} for hash generation."
                 )
                 raise routes.FlashError("Source file not found in the new revision.")
 
@@ -287,7 +287,7 @@ async def sbomgen(
     try:
         async with revision.create_and_manage(project_name, version_name, session.uid) as (
             new_revision_dir,
-            new_revision_name,
+            new_revision_number,
         ):
             path_in_new_revision = new_revision_dir / rel_path
             sbom_path_rel = rel_path.with_suffix(rel_path.suffix + ".cdx.json").name
@@ -296,7 +296,7 @@ async def sbomgen(
             # Check that the source file exists in the new revision
             if not await aiofiles.os.path.exists(path_in_new_revision):
                 logging.error(
-                    f"Source file {rel_path} not found in new revision {new_revision_name} for SBOM generation."
+                    f"Source file {rel_path} not found in new revision {new_revision_number} for SBOM generation."
                 )
                 raise routes.FlashError("Source artifact file not found in the new revision.")
 
@@ -318,7 +318,7 @@ async def sbomgen(
                     added=datetime.datetime.now(datetime.UTC),
                     status=models.TaskStatus.QUEUED,
                     release_name=release.name,
-                    revision=new_revision_name,
+                    revision_number=new_revision_number,
                 )
                 data.add(sbom_task)
                 await data.commit()
@@ -446,7 +446,9 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     # Convert async generator to list
     file_stats = [
         stat
-        async for stat in util.content_list(util.get_unfinished_dir(), project_name, version_name, release.revision)
+        async for stat in util.content_list(
+            util.get_unfinished_dir(), project_name, version_name, release.unwrap_revision_number
+        )
     ]
 
     return await quart.render_template(

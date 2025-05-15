@@ -31,11 +31,11 @@ import asfquart.base as base
 import asfquart.session as session
 import quart
 
+import atr.config as config
 import atr.db as db
 import atr.db.models as models
 import atr.user as user
 import atr.util as util
-from atr import config
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Coroutine, Sequence
@@ -213,9 +213,9 @@ class CommitterSession:
         phase: models.ReleasePhase | db.NotSet | None = db.NOT_SET,
         data: db.Session | None = None,
         with_committee: bool = False,
-        with_packages: bool = False,
         with_project: bool = True,
         with_tasks: bool = False,
+        with_revisions: bool = False,
     ) -> models.Release:
         # We reuse db.NOT_SET as an entirely different sentinel
         # TODO: We probably shouldn't do that, or should make it clearer
@@ -234,6 +234,7 @@ class CommitterSession:
                     _committee=with_committee,
                     _project=with_project,
                     _tasks=with_tasks,
+                    _revisions=with_revisions,
                 ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
         else:
             release = await data.release(
@@ -242,6 +243,7 @@ class CommitterSession:
                 _committee=with_committee,
                 _project=with_project,
                 _tasks=with_tasks,
+                _revisions=with_revisions,
             ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
         return release
 

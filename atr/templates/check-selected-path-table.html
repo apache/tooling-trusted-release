@@ -3,8 +3,8 @@
   <table class="table table-hover align-middle table-sm mb-0 border">
     <tbody>
       {% for path in paths %}
-        {% set has_errors = info.errors[path]|length > 0 %}
-        {% set has_warnings = info.warnings[path]|length > 0 %}
+        {% set has_errors = info and (info.errors[path]|length > 0) %}
+        {% set has_warnings = info and (info.warnings[path]|length > 0) %}
         {% set row_id = path|string|slugify %}
 
         {# Manual striping for pairs of rows #}
@@ -29,11 +29,11 @@
               {% set icon_class = "text-warning" %}
             {% endif %}
 
-            {% if path in info.artifacts %}
+            {% if info and (path in info.artifacts) %}
               <i class="bi bi-archive {{ icon_class }}"
                  title="Artifact"
                  aria-label="Artifact"></i>
-            {% elif path in info.metadata %}
+            {% elif info and (path in info.metadata) %}
               <i class="bi bi-file-earmark-text {{ icon_class }}"
                  title="Metadata"
                  aria-label="Metadata"></i>
@@ -71,7 +71,7 @@
               {% elif has_warnings %}
                 <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                    class="btn btn-sm btn-outline-warning">Show {{ info.warnings[path]|length }} {{ "warning" if info.warnings[path]|length == 1 else "warnings" }}</a>
-              {% elif info.successes[path] %}
+              {% elif info and (path in info.successes) %}
                 <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                    class="btn btn-sm btn-outline-success"
                    title="Show report for {{ path }}">Show report</a>

@@ -41,7 +41,7 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
 
     # TODO: When we do more than one thing in a dir, we should use the revision directory directly
     abs_path = util.release_directory(release) / rel_path
-    if release.revision is None:
+    if release.latest_revision_number is None:
         raise base.ASFQuartException("Release has no revision", errorcode=500)
 
     # Check that the file exists
@@ -54,10 +54,12 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
     # Get all check results for this file
     async with db.session() as data:
         query = data.check_result(
-            release_name=release.name, revision=release.revision, primary_rel_path=str(rel_path)
+            release_name=release.name,
+            revision_number=release.latest_revision_number,
+            primary_rel_path=str(rel_path),
         ).order_by(
-            db.validate_instrumented_attribute(models.CheckResult.checker).asc(),
-            db.validate_instrumented_attribute(models.CheckResult.created).desc(),
+            models.validate_instrumented_attribute(models.CheckResult.checker).asc(),
+            models.validate_instrumented_attribute(models.CheckResult.created).desc(),
         )
         all_results = await query.all()
 

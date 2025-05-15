@@ -145,7 +145,7 @@ async def _task_next_claim() -> tuple[int, str, list[str] | dict[str, Any]] | No
             oldest_queued_task = (
                 sqlmodel.select(models.Task.id)
                 .where(models.Task.status == task.QUEUED)
-                .order_by(db.validate_instrumented_attribute(models.Task.added).asc())
+                .order_by(models.validate_instrumented_attribute(models.Task.added).asc())
                 .limit(1)
             )
 
@@ -157,9 +157,9 @@ async def _task_next_claim() -> tuple[int, str, list[str] | dict[str, Any]] | No
                 .where(sqlmodel.and_(models.Task.id == oldest_queued_task, models.Task.status == task.QUEUED))
                 .values(status=task.ACTIVE, started=now, pid=os.getpid())
                 .returning(
-                    db.validate_instrumented_attribute(models.Task.id),
-                    db.validate_instrumented_attribute(models.Task.task_type),
-                    db.validate_instrumented_attribute(models.Task.task_args),
+                    models.validate_instrumented_attribute(models.Task.id),
+                    models.validate_instrumented_attribute(models.Task.task_type),
+                    models.validate_instrumented_attribute(models.Task.task_args),
                 )
             )
 
@@ -201,8 +201,8 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
             # Validate required fields from the Task object itself
             if task_obj.release_name is None:
                 raise ValueError(f"Task {task_id} is missing required release_name")
-            if task_obj.revision is None:
-                raise ValueError(f"Task {task_id} is missing required revision")
+            if task_obj.revision_number is None:
+                raise ValueError(f"Task {task_id} is missing required revision_number")
 
             if not isinstance(task_args, dict):
                 raise TypeError(
@@ -214,14 +214,14 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
                 return await checks.Recorder.create(
                     checker=handler,
                     release_name=task_obj.release_name or "",
-                    revision=task_obj.revision or "",
+                    revision_number=task_obj.revision_number or "",
                     primary_rel_path=task_obj.primary_rel_path,
                 )
 
             function_arguments = checks.FunctionArguments(
                 recorder=recorder_factory,
                 release_name=task_obj.release_name,
-                revision=task_obj.revision,
+                revision_number=task_obj.revision_number,
                 primary_rel_path=task_obj.primary_rel_path,
                 extra_args=task_args,
             )

@@ -59,10 +59,10 @@ async def index() -> response.Response | str:
                     sqlmodel.select(models.Release)
                     .where(
                         models.Release.project_name == project.name,
-                        db.validate_instrumented_attribute(models.Release.phase).in_(active_phases),
+                        models.validate_instrumented_attribute(models.Release.phase).in_(active_phases),
                     )
-                    .options(orm.selectinload(db.validate_instrumented_attribute(models.Release.project)))
-                    .order_by(db.validate_instrumented_attribute(models.Release.created).desc())
+                    .options(orm.selectinload(models.validate_instrumented_attribute(models.Release.project)))
+                    .order_by(models.validate_instrumented_attribute(models.Release.created).desc())
                 )
                 result = await data.execute(stmt)
                 active_releases = result.scalars().all()

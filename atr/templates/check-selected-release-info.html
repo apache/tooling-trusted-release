@@ -17,10 +17,10 @@
         <p>
           <strong>Created:</strong> {{ format_datetime(release.created) }}
         </p>
-        {% if revision_time %}
+        {% if (phase == "release_candidate_draft") and revision_time %}
           <p>
             <strong>Revision:</strong>
-            <a href="{{ as_url(routes.revisions.selected, project_name=project_name, version_name=version_name) }}#{{ revision_name_from_link }}">
+            <a href="{{ as_url(routes.revisions.selected, project_name=project_name, version_name=version_name) }}#{{ revision_number }}">
               {{ format_datetime(revision_time) }}
             </a>
             {% if revision_editor %}by {{ revision_editor }}{% endif %}
@@ -39,7 +39,7 @@
         <a href="{{ as_url(routes.revisions.selected, project_name=release.project.name, version_name=release.version) }}"
            title="View revision history"
            class="btn btn-secondary"><i class="bi bi-clock-history me-1"></i> Revisions</a>
-        <a href="{{ as_url(routes.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=release.revision) }}"
+        <a href="{{ as_url(routes.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=release.latest_revision_number) }}"
            title="Start a vote on this draft"
            class="btn btn-success"><i class="bi bi-check-circle me-1"></i> Start voting</a>
         <button class="btn btn-danger"

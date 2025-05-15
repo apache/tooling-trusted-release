@@ -28,8 +28,8 @@ import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.finish as finish
 import atr.routes.vote as vote
+import atr.tasks.message as message
 import atr.util as util
-from atr.tasks import message
 
 
 class ResolveForm(util.QuartFormTyped):

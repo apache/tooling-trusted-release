@@ -137,7 +137,7 @@ async def _upload_files(
     """Process and save the uploaded files into a new draft revision."""
     async with revision.create_and_manage(project_name, version_name, asf_uid) as (
         new_revision_dir,
-        _new_revision_name,
+        _new_revision_number,
     ):
 
         def get_target_path(file: datastructures.FileStorage) -> pathlib.Path:

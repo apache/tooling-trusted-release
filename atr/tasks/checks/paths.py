@@ -38,21 +38,21 @@ async def check(args: checks.FunctionArguments) -> None:
     recorder_errors = await checks.Recorder.create(
         checker=checks.function_key(check) + "_errors",
         release_name=args.release_name,
-        revision=args.revision,
+        revision_number=args.revision_number,
         primary_rel_path=None,
         afresh=True,
     )
     recorder_warnings = await checks.Recorder.create(
         checker=checks.function_key(check) + "_warnings",
         release_name=args.release_name,
-        revision=args.revision,
+        revision_number=args.revision_number,
         primary_rel_path=None,
         afresh=True,
     )
     recorder_success = await checks.Recorder.create(
         checker=checks.function_key(check) + "_success",
         release_name=args.release_name,
-        revision=args.revision,
+        revision_number=args.revision_number,
         primary_rel_path=None,
         afresh=True,
     )

@@ -72,6 +72,7 @@ async def admin_data(model: str = "Committee") -> str:
             "PublicSigningKey": data.public_signing_key,
             "Release": data.release,
             "ReleasePolicy": data.release_policy,
+            "Revision": data.revision,
             "SSHKey": data.ssh_key,
             "Task": data.task,
             "TextValue": data.text_value,

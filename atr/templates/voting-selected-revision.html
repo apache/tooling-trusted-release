@@ -50,7 +50,7 @@
   <form method="post"
         id="vote-initiate-form"
         class="atr-canary py-4 px-5"
-        action="{{ as_url(routes.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=release.revision) }}"
+        action="{{ as_url(routes.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=release.unwrap_revision_number) }}"
         novalidate>
     {{ form.hidden_tag() }}
 

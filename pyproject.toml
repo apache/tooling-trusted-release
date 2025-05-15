@@ -123,6 +123,7 @@ select = [
 [tool.mypy]
 python_version = "3.13"
 exclude = ["tests"]
+plugins = ["pydantic.mypy"]
 mypy_path = "typestubs"
 check_untyped_defs = false
 disallow_incomplete_defs = true
@@ -135,6 +136,11 @@ warn_redundant_casts = true
 warn_return_any = true
 # warn_unreachable = true
 warn_unused_ignores = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
 
 [[tool.mypy.overrides]]
 module = "asfquart.*"

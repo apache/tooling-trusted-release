@@ -301,7 +301,7 @@ class WorkerManager:
                         sqlmodel.update(models.Task)
                         .where(
                             sqlmodel.and_(
-                                db.validate_instrumented_attribute(models.Task.pid).notin_(active_worker_pids),
+                                models.validate_instrumented_attribute(models.Task.pid).notin_(active_worker_pids),
                                 models.Task.status == models.TaskStatus.ACTIVE,
                             )
                         )

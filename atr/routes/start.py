@@ -63,39 +63,41 @@ async def create_release_draft(project_name: str, version: str, asf_uid: str) ->
                     errorcode=403,
                 )
 
+    # TODO: Consider using Release.revision instead of ./latest
+    async with db.session() as data:
+        async with data.begin():
+            # Check whether the release already exists
+            if release := await data.release(project_name=project.name, version=version).get():
+                if release.phase == models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+                    raise routes.FlashError(f"A draft for {project_name} {version} already exists.")
+                else:
+                    raise routes.FlashError(
+                        f"A release ({release.phase.value}) for {project_name} {version} already exists."
+                    )
+
+            # Validate the version name
+            # TODO: We should check that it's bigger than the current version
+            if version_name_error := util.version_name_error(version):
+                raise routes.FlashError(f'Invalid version name "{version}": {version_name_error}')
+
+            release = models.Release(
+                stage=models.ReleaseStage.RELEASE_CANDIDATE,
+                phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+                project_name=project.name,
+                project=project,
+                version=version,
+                created=datetime.datetime.now(datetime.UTC),
+            )
+            data.add(release)
+
+        await data.refresh(release)
+
     async with revision.create_and_manage(project_name, version, asf_uid) as (
         _new_revision_dir,
-        _new_revision_name,
+        _new_revision_number,
     ):
-        # TODO: Consider using Release.revision instead of ./latest
-        async with db.session() as data:
-            async with data.begin():
-                # Check whether the release already exists
-                if release := await data.release(project_name=project.name, version=version).get():
-                    if release.phase == models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-                        raise routes.FlashError(f"A draft for {project_name} {version} already exists.")
-                    else:
-                        raise routes.FlashError(
-                            f"A release ({release.phase.value}) for {project_name} {version} already exists."
-                        )
-
-                # Validate the version name
-                # TODO: We should check that it's bigger than the current version
-                if version_name_error := util.version_name_error(version):
-                    raise routes.FlashError(f'Invalid version name "{version}": {version_name_error}')
-
-                release = models.Release(
-                    stage=models.ReleaseStage.RELEASE_CANDIDATE,
-                    phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
-                    project_name=project.name,
-                    project=project,
-                    version=version,
-                    created=datetime.datetime.now(datetime.UTC),
-                )
-                data.add(release)
-
-            await data.refresh(release)
-            return release, project
+        pass
+    return release, project
 
 
 @routes.committer("/start/<project_name>", methods=["GET", "POST"])

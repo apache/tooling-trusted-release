@@ -63,12 +63,12 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         )
         user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
 
-    current_revision_dir = util.release_directory(release)
+    latest_revision_dir = util.release_directory(release)
     file_paths_rel: list[pathlib.Path] = []
     unique_dirs: set[pathlib.Path] = {pathlib.Path(".")}
 
     try:
-        async for path in util.paths_recursive(current_revision_dir):
+        async for path in util.paths_recursive(latest_revision_dir):
             file_paths_rel.append(path)
             unique_dirs.add(path.parent)
     except FileNotFoundError:
@@ -111,7 +111,7 @@ async def _move_file(
         try:
             async with revision.create_and_manage(project_name, version_name, session.uid) as (
                 new_revision_dir,
-                new_revision_name,
+                new_revision_number,
             ):
                 source_path_in_new = new_revision_dir / source_file_rel
                 target_path_in_new = new_revision_dir / target_dir_rel / source_file_rel.name
@@ -123,7 +123,9 @@ async def _move_file(
                     )
                     return await session.redirect(selected, project_name=project_name, version_name=version_name)
 
-                _LOGGER.info(f"Moving {source_path_in_new} to {target_path_in_new} in new revision {new_revision_name}")
+                _LOGGER.info(
+                    f"Moving {source_path_in_new} to {target_path_in_new} in new revision {new_revision_number}"
+                )
                 await aiofiles.os.rename(source_path_in_new, target_path_in_new)
 
             await quart.flash(

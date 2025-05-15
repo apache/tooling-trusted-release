@@ -82,7 +82,7 @@ async def _check_core_logic(committee_name: str, artifact_path: str, signature_p
             sqlmodel.select(models.PublicSigningKey)
             .join(models.KeyLink)
             .join(models.Committee)
-            .where(db.validate_instrumented_attribute(models.Committee.name) == committee_name)
+            .where(models.validate_instrumented_attribute(models.Committee.name) == committee_name)
         )
         result = await session.execute(statement)
         public_keys = [key.ascii_armored_key for key in result.scalars().all()]

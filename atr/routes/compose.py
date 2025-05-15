@@ -53,16 +53,19 @@ async def check(
     async with db.session() as data:
         user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
 
-    revision_name_from_link, revision_editor, revision_time = await revision.latest_info(
-        release.project.name, release.version
-    )
-
     # Get the number of ongoing tasks for the current revision
     ongoing_tasks_count = 0
-    if revision_name_from_link:
-        ongoing_tasks_count = await interaction.tasks_ongoing(
-            release.project.name, release.version, revision_name_from_link
-        )
+    match await revision.latest_info(release.project.name, release.version):
+        case (revision_number, revision_editor, revision_timestamp):
+            ongoing_tasks_count = await interaction.tasks_ongoing(
+                release.project.name,
+                release.version,
+                revision_number,  # type: ignore[arg-type]
+            )
+        case None:
+            revision_number = None  # type: ignore[assignment]
+            revision_editor = None  # type: ignore[assignment]
+            revision_timestamp = None  # type: ignore[assignment]
 
     delete_draft_form = await draft.DeleteForm.create_form()
     delete_file_form = await draft.DeleteFileForm.create_form()
@@ -78,8 +81,8 @@ async def check(
         paths=paths,
         info=info,
         revision_editor=revision_editor,
-        revision_time=revision_time,
-        revision_name_from_link=revision_name_from_link,
+        revision_time=revision_timestamp,
+        revision_number=revision_number,
         ongoing_tasks_count=ongoing_tasks_count,
         delete_form=delete_draft_form,
         delete_file_form=delete_file_form,

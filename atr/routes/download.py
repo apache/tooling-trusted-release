@@ -27,13 +27,13 @@ import quart
 import werkzeug.wrappers.response as response
 import zipstream
 
+import atr.config as config
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.routes.mapping as mapping
 import atr.routes.root as root
 import atr.util as util
-from atr import config
 
 
 @routes.committer("/download/all/<project_name>/<version_name>")

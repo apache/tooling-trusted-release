@@ -71,7 +71,7 @@ async def _import_files_core(args: SvnImport) -> str:
 
     async with revision.create_and_manage(args.project_name, args.version_name, args.asf_uid) as (
         new_revision_dir,
-        new_revision_name,
+        new_revision_number,
     ):
         _LOGGER.debug(f"Created revision directory: {new_revision_dir}")
 
@@ -117,7 +117,7 @@ async def _import_files_core(args: SvnImport) -> str:
         await aiofiles.os.rmdir(temp_export_path)
         _LOGGER.info(f"Removed temporary export directory: {temp_export_path}")
 
-    return f"Successfully imported files from SVN into revision {new_revision_name}"
+    return f"Successfully imported files from SVN into revision {new_revision_number}"
 
 
 async def _import_files_core_run_svn_export(svn_command: list[str], temp_export_path: pathlib.Path) -> None:
