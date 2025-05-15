@@ -136,7 +136,7 @@ class Committee(sqlmodel.SQLModel, table=True):
     # One-to-many: A committee can have multiple child committees, each child committee belongs to one parent committee
     child_committees: list["Committee"] = sqlmodel.Relationship(
         sa_relationship_kwargs=dict(
-            backref=sqlalchemy.orm.backref("parent_committee", remote_side="Committee.name"),
+            backref=orm.backref("parent_committee", remote_side="Committee.name"),
         ),
     )
     parent_committee_name: str | None = sqlmodel.Field(default=None, foreign_key="committee.name")
@@ -345,7 +345,7 @@ class Revision(sqlmodel.SQLModel, table=True):
 
 @event.listens_for(Revision, "before_insert")
 def populate_revision_sequence_and_name(
-    mapper: sqlalchemy.orm.Mapper, connection: sqlalchemy.engine.Connection, revision: Revision
+    mapper: orm.Mapper, connection: sqlalchemy.engine.Connection, revision: Revision
 ) -> None:
     # We require Revision.release_name to have been set
     if not revision.release_name:
@@ -606,7 +606,7 @@ class TextValue(sqlmodel.SQLModel, table=True):
 
 
 @event.listens_for(Release, "before_insert")
-def check_release_name(_mapper: sqlalchemy.orm.Mapper, _connection: sqlalchemy.Connection, release: Release) -> None:
+def check_release_name(_mapper: orm.Mapper, _connection: sqlalchemy.Connection, release: Release) -> None:
     if release.name == "":
         if (release.project_name is None) or (release.version is None):
             raise ValueError("Cannot generate release name without project_name and version")

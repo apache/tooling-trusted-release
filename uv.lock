@@ -95,6 +95,15 @@ wheels = [
 ]
 
 [[package]]
+name = "aiozipstream"
+version = "0.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0f/1b/97b8d72faeb6cd6b44c23fdc45d054b00366ce153896e76e375e63f80a68/aiozipstream-0.4.tar.gz", hash = "sha256:ccc5cec35c2580b8a13185c916b1581bfcb4278ddf6ea3f7f834b6c9c47d6c61", size = 7826 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/43/32/942919e4bc56894416ad78e65d4d06434f388e28ef2740d2176e5db5e010/aiozipstream-0.4-py2.py3-none-any.whl", hash = "sha256:a58bad8c75aba319c07bd3d817da7caec7417c1eb4f4c692e00b173fb9ded9c6", size = 8601 },
+]
+
+[[package]]
 name = "alembic"
 version = "1.15.2"
 source = { registry = "https://pypi.org/simple" }
@@ -273,7 +282,7 @@ name = "click"
 version = "8.1.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593 }
 wheels = [
@@ -1326,6 +1335,7 @@ dependencies = [
     { name = "aioshutil" },
     { name = "aiosmtplib" },
     { name = "aiosqlite" },
+    { name = "aiozipstream" },
     { name = "alembic" },
     { name = "asfquart" },
     { name = "asyncssh" },
@@ -1370,6 +1380,7 @@ requires-dist = [
     { name = "aioshutil", specifier = ">=1.5,<2.0" },
     { name = "aiosmtplib", specifier = ">=4.0.0,<5.0.0" },
     { name = "aiosqlite", specifier = ">=0.21.0,<0.22.0" },
+    { name = "aiozipstream", specifier = ">=0.4,<0.5" },
     { name = "alembic", specifier = "~=1.14" },
     { name = "asfquart", git = "https://github.com/apache/infrastructure-asfquart.git?rev=main" },
     { name = "asyncssh", specifier = ">=2.20.0,<3.0.0" },
@@ -1412,7 +1423,7 @@ name = "tqdm"
 version = "4.67.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a8/4b/29b4ef32e036bb34e4ab51796dd745cdba7ed47ad142a9f4a1eb8e0c744d/tqdm-4.67.1.tar.gz", hash = "sha256:f8aef9c52c08c13a65f30ea34f4e5aac3fd1a34959879d7e59e63027286627f2", size = 169737 }
 wheels = [
