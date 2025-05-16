@@ -28,6 +28,7 @@ import pydantic
 import sqlalchemy
 import sqlalchemy.event as event
 import sqlalchemy.orm as orm
+import sqlalchemy.sql.expression as expression
 import sqlmodel
 
 import atr.schema as schema
@@ -342,6 +343,11 @@ class Revision(sqlmodel.SQLModel, table=True):
 
     description: str | None = sqlmodel.Field(default=None)
 
+    __table_args__ = (
+        sqlmodel.UniqueConstraint("release_name", "seq", name="uq_revision_release_seq"),
+        sqlmodel.UniqueConstraint("release_name", "number", name="uq_revision_release_number"),
+    )
+
 
 @event.listens_for(Revision, "before_insert")
 def populate_revision_sequence_and_name(
@@ -381,6 +387,7 @@ def populate_revision_sequence_and_name(
         # Do NOT set revision.parent directly here
 
     # Recalculate the Revision.name
+    # This field has a unique constraint, which eliminates the potential for race conditions
     revision.name = revision_name(revision.release_name, revision.number)
 
 
@@ -558,6 +565,19 @@ class Release(sqlmodel.SQLModel, table=True):
             raise ValueError("Latest revision number is not a str or None")
         return number
 
+    # NOTE: This does not work
+    # But it we set it with Release.latest_revision_number_query = ..., it might work
+    # Not clear that we'd want to do that, though
+    # @property
+    # def latest_revision_number_query(self) -> expression.ScalarSelect[str]:
+    #     return (
+    #         sqlmodel.select(validate_instrumented_attribute(Revision.number))
+    #         .where(validate_instrumented_attribute(Revision.release_name) == Release.name)
+    #         .order_by(validate_instrumented_attribute(Revision.seq).desc())
+    #         .limit(1)
+    #         .scalar_subquery()
+    #     )
+
 
 # https://github.com/fastapi/sqlmodel/issues/240#issuecomment-2074161775
 Release._latest_revision_number = orm.column_property(
@@ -568,6 +588,20 @@ Release._latest_revision_number = orm.column_property(
     .correlate_except(Revision)
     .scalar_subquery(),
 )
+
+
+def latest_revision_number_query(release_name: str | None = None) -> expression.ScalarSelect[str]:
+    if release_name is None:
+        query_release_name = Release.name
+    else:
+        query_release_name = release_name
+    return (
+        sqlmodel.select(validate_instrumented_attribute(Revision.number))
+        .where(validate_instrumented_attribute(Revision.release_name) == query_release_name)
+        .order_by(validate_instrumented_attribute(Revision.seq).desc())
+        .limit(1)
+        .scalar_subquery()
+    )
 
 
 class SSHKey(sqlmodel.SQLModel, table=True):

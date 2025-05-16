@@ -211,6 +211,7 @@ class CommitterSession:
         project_name: str,
         version_name: str,
         phase: models.ReleasePhase | db.NotSet | None = db.NOT_SET,
+        latest_revision_number: str | db.NotSet | None = db.NOT_SET,
         data: db.Session | None = None,
         with_committee: bool = False,
         with_project: bool = True,
@@ -231,6 +232,7 @@ class CommitterSession:
                 release = await data.release(
                     name=release_name,
                     phase=phase_value,
+                    latest_revision_number=latest_revision_number,
                     _committee=with_committee,
                     _project=with_project,
                     _tasks=with_tasks,
@@ -240,6 +242,7 @@ class CommitterSession:
             release = await data.release(
                 name=release_name,
                 phase=phase_value,
+                latest_revision_number=latest_revision_number,
                 _committee=with_committee,
                 _project=with_project,
                 _tasks=with_tasks,

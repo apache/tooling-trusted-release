@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 from typing import TYPE_CHECKING, Any, Final, Generic, TypeGuard, TypeVar
@@ -37,12 +38,13 @@ import atr.util as util
 
 if TYPE_CHECKING:
     import datetime
-    from collections.abc import Sequence
+    from collections.abc import Iterator, Sequence
 
     import asfquart.base as base
 
 _LOGGER: Final = logging.getLogger(__name__)
 
+global_log_query: bool = False
 _global_atr_engine: sqlalchemy.ext.asyncio.AsyncEngine | None = None
 _global_atr_sessionmaker: sqlalchemy.ext.asyncio.async_sessionmaker | None = None
 
@@ -86,18 +88,30 @@ class Query(Generic[T]):
         self.query = self.query.order_by(*args, **kwargs)
         return self
 
-    async def get(self) -> T | None:
+    def log_query(self, method_name: str, log_query: bool) -> None:
+        if not (self.session.log_queries or global_log_query or log_query):
+            return
+        try:
+            compiled_query = self.query.compile(self.session.bind, compile_kwargs={"literal_binds": True})
+            _LOGGER.info(f"Executing query ({method_name}): {compiled_query}")
+        except Exception as e:
+            _LOGGER.error(f"Error compiling query for logging ({method_name}): {e}")
+
+    async def get(self, log_query: bool = False) -> T | None:
+        self.log_query("get", log_query)
         result = await self.session.execute(self.query)
         return result.scalar_one_or_none()
 
-    async def demand(self, error: Exception) -> T:
+    async def demand(self, error: Exception, log_query: bool = False) -> T:
+        self.log_query("demand", log_query)
         result = await self.session.execute(self.query)
         item = result.scalar_one_or_none()
         if item is None:
             raise error
         return item
 
-    async def all(self) -> Sequence[T]:
+    async def all(self, log_query: bool = False) -> Sequence[T]:
+        self.log_query("all", log_query)
         result = await self.session.execute(self.query)
         return result.scalars().all()
 
@@ -106,6 +120,14 @@ class Query(Generic[T]):
 
 
 class Session(sqlalchemy.ext.asyncio.AsyncSession):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        explicit_value_passed_by_sessionmaker = kwargs.pop("log_queries", None)
+        super().__init__(*args, **kwargs)
+
+        self.log_queries: bool = global_log_query
+        if explicit_value_passed_by_sessionmaker is not None:
+            self.log_queries = explicit_value_passed_by_sessionmaker
+
     # TODO: Need to type all of these arguments correctly
 
     def check_result(
@@ -190,6 +212,17 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.options(select_in_load(models.Committee.public_signing_keys))
 
         return Query(self, query)
+
+    async def execute_query(self, query: sqlalchemy.sql.expression.Executable) -> sqlalchemy.engine.Result:
+        if (self.log_queries or global_log_query) and isinstance(query, sqlalchemy.sql.expression.Select):
+            try:
+                dialect = self.bind.dialect if self.bind else sqlalchemy.dialects.sqlite.dialect()
+                compiled_query = query.compile(dialect=dialect, compile_kwargs={"literal_binds": True})
+                _LOGGER.info(f"Executing query (execute_query): {compiled_query}")
+            except Exception as e:
+                _LOGGER.error(f"Error compiling query for logging: {e}")
+        execution_result: sqlalchemy.engine.Result = await self.execute(query)
+        return execution_result
 
     async def ns_text_del(self, ns: str, key: str, commit: bool = True) -> None:
         stmt = sql.delete(models.TextValue).where(
@@ -320,6 +353,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         sboms: Opt[list[str]] = NOT_SET,
         release_policy_id: Opt[int] = NOT_SET,
         votes: Opt[list[models.VoteEntry]] = NOT_SET,
+        latest_revision_number: Opt[str | None] = NOT_SET,
         _project: bool = False,
         _release_policy: bool = False,
         _committee: bool = False,
@@ -348,6 +382,11 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Release.release_policy_id == release_policy_id)
         if is_defined(votes):
             query = query.where(models.Release.votes == votes)
+        if is_defined(latest_revision_number):
+            # Must define the subquery explicitly, mirroring the column_property
+            # In other words, this doesn't work:
+            # query = query.where(models.Release.latest_revision_number == latest_revision_number)
+            query = query.where(models.latest_revision_number_query() == latest_revision_number)
 
         if _project:
             query = query.options(select_in_load(models.Release.project))
@@ -538,6 +577,7 @@ async def create_async_engine(app_config: type[config.AppConfig]) -> sqlalchemy.
         await conn.execute(sql.text("PRAGMA cache_size=-64000"))
         await conn.execute(sql.text("PRAGMA foreign_keys=ON"))
         await conn.execute(sql.text("PRAGMA busy_timeout=5000"))
+        await conn.execute(sql.text("PRAGMA strict=ON"))
 
     return engine
 
@@ -622,6 +662,18 @@ def is_undefined(v: object | NotSet) -> TypeGuard[NotSet]:
     return isinstance(v, NotSet)
 
 
+@contextlib.contextmanager
+def log_queries() -> Iterator[None]:
+    """A context manager to temporarily enable global query logging."""
+    global global_log_query
+    original_global_log_query_state = global_log_query
+    global_log_query = True
+    try:
+        yield
+    finally:
+        global_log_query = original_global_log_query_state
+
+
 # async def recent_tasks(data: Session, release_name: str, file_path: str, modified: int) -> dict[str, models.Task]:
 #     """Get the most recent task for each task type for a specific file."""
 #     tasks = await data.task(
@@ -664,9 +716,8 @@ def select_in_load_nested(parent: Any, *descendants: Any) -> orm.strategy_option
     return result
 
 
-def session() -> Session:
+def session(log_queries: bool | None = None) -> Session:
     """Create a new asynchronous database session."""
-
     # FIXME: occasionally you see this in the console output
     # <sys>:0: SAWarning: The garbage collector is trying to clean up non-checked-in connection <AdaptedConnection
     # <Connection(Thread-291, started daemon 138838634661440)>>, which will be dropped, as it cannot be safely
@@ -680,10 +731,15 @@ def session() -> Session:
 
     # from FastAPI documentation: https://fastapi-users.github.io/fastapi-users/latest/configuration/databases/sqlalchemy/
 
+    global _global_atr_sessionmaker
     if _global_atr_sessionmaker is None:
-        raise RuntimeError("database not initialized")
+        raise RuntimeError("Call db.init_database or db.init_database_for_worker first, before calling db.session")
+
+    if log_queries is not None:
+        session_instance = util.validate_as_type(_global_atr_sessionmaker(log_queries=log_queries), Session)
     else:
-        return util.validate_as_type(_global_atr_sessionmaker(), Session)
+        session_instance = util.validate_as_type(_global_atr_sessionmaker(), Session)
+    return session_instance
 
 
 async def shutdown_database() -> None:

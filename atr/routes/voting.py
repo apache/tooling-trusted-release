@@ -20,6 +20,7 @@ import datetime
 import aiofiles.os
 import asfquart.base as base
 import quart
+import sqlmodel
 import werkzeug.wrappers.response as response
 import wtforms
 
@@ -53,6 +54,10 @@ async def selected_revision(
             )
         committee = util.unwrap(release.committee)
         permitted_recipients = util.permitted_recipients(session.uid)
+
+        selected_revision_number = release.latest_revision_number
+        if selected_revision_number is None:
+            return await session.redirect(compose.selected, error="No revision found for this release")
 
         if release.release_policy:
             min_hours = release.release_policy.min_hours
@@ -121,7 +126,7 @@ async def selected_revision(
                 raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
 
             # This sets the phase to RELEASE_CANDIDATE
-            error = await _promote(data, release.name)
+            error = await _promote(data, release.name, selected_revision_number)
             if error:
                 return await session.redirect(root.index, error=error)
 
@@ -150,10 +155,7 @@ async def selected_revision(
                 ).model_dump(),
                 release_name=release.name,
             )
-
             data.add(task)
-            # Flush to get the task ID
-            await data.flush()
             await data.commit()
 
             # TODO: We should log all outgoing email and the session so that users can confirm
@@ -189,30 +191,45 @@ async def _keys_warning(
 async def _promote(
     data: db.Session,
     release_name: str,
+    selected_revision_number: str,
 ) -> str | None:
     """Promote a release candidate draft to a new phase."""
-    # Get the release
     # TODO: Use session.release here
-    release = await data.release(name=release_name, _project=True).demand(
+    release_for_pre_checks = await data.release(name=release_name, _project=True).demand(
         routes.FlashError("Release candidate draft not found")
     )
 
     # Verify that it's in the correct phase
-    if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+    # The atomic update below will also check this
+    if release_for_pre_checks.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
         return "This release is not in the candidate draft phase"
 
-    # Count how many files are in the source directory
-    file_count = await util.number_of_release_files(release)
+    # Check that there is at least one file in the draft
+    # This is why we require _project=True above
+    file_count = await util.number_of_release_files(release_for_pre_checks)
     if file_count == 0:
         return "This candidate draft is empty, containing no files"
 
-    # Promote it to the target phase
-    # TODO: Obtain a lock for this
-    # NOTE: The functionality for skipping phases has been removed
-    release.stage = models.ReleaseStage.RELEASE_CANDIDATE
-    release.phase = models.ReleasePhase.RELEASE_CANDIDATE
+    # Promote it to RELEASE_CANDIDATE
+    # NOTE: We previously allowed skipping phases, but removed that functionality
+    # We don't need a lock here because we use an atomic update
+    via = models.validate_instrumented_attribute
+    stmt = (
+        sqlmodel.update(models.Release)
+        .where(
+            via(models.Release.name) == release_name,
+            via(models.Release.phase) == models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+            models.latest_revision_number_query() == selected_revision_number,
+        )
+        .values(
+            stage=models.ReleaseStage.RELEASE_CANDIDATE,
+            phase=models.ReleasePhase.RELEASE_CANDIDATE,
+        )
+    )
 
-    # We updated the release
+    result = await data.execute(stmt)
+    if result.rowcount != 1:
+        await data.rollback()
+        return "A newer revision appeared, please refresh and try again."
     await data.commit()
-
     return None

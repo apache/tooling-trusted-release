@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 import aiofiles.os
 import aioshutil
 import quart
+import sqlmodel
 import werkzeug.wrappers.response as response
 import wtforms
 
@@ -120,15 +121,21 @@ async def selected_post(
 
     subject = str(announce_form.subject.data)
     body = str(announce_form.body.data)
+    preview_revision_number = str(announce_form.preview_revision.data)
 
     source: str = ""
     target: str = ""
     source_base: pathlib.Path | None = None
 
-    async with db.session() as data:
+    async with db.session(log_queries=True) as data:
         try:
             release = await session.release(
-                project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW, with_revisions=True, data=data
+                project_name,
+                version_name,
+                phase=models.ReleasePhase.RELEASE_PREVIEW,
+                latest_revision_number=preview_revision_number,
+                with_revisions=True,
+                data=data,
             )
 
             test_list = "user-tests"
@@ -168,16 +175,7 @@ async def selected_post(
             source_base = util.release_directory_base(release)
             source = str(source_base / release.unwrap_revision_number)
 
-            # TODO: We should update only if the announcement email was sent
-            # That would require moving this, and the filesystem operations, into a task
-            release.phase = models.ReleasePhase.RELEASE
-            # Delete all revisions associated with this release
-            for revision in release.revisions:
-                await data.delete(revision)
-            # Essential to set revisions to [], otherwise release.revisions is still populated
-            # And util.release_directory() below checks for it
-            release.revisions = []
-            release.released = datetime.datetime.now(datetime.UTC)
+            await _promote(release, data, preview_revision_number)
             await data.commit()
 
         except (routes.FlashError, Exception) as e:
@@ -193,7 +191,7 @@ async def selected_post(
         # This must come after updating the release object
         # Do not put it in the data block after data.commit()
         # Otherwise util.release_directory() will not work
-        release = await data.release(name=release.name).demand(RuntimeError("Release does not exist"))
+        release = await data.release(name=release.name).demand(RuntimeError(f"Release {release.name} does not exist"))
         target = str(util.release_directory(release))
         if await aiofiles.os.path.exists(target):
             raise routes.FlashError("Release already exists")
@@ -245,3 +243,31 @@ async def _create_announce_form_instance(
 
     form_instance = await AnnounceForm.create_form(data=data)
     return form_instance
+
+
+async def _promote(release: models.Release, data: db.Session, preview_revision_number: str) -> None:
+    """Promote a release preview to a release and delete its old revisions."""
+    via = models.validate_instrumented_attribute
+
+    update_stmt = (
+        sqlmodel.update(models.Release)
+        .where(
+            via(models.Release.name) == release.name,
+            via(models.Release.phase) == models.ReleasePhase.RELEASE_PREVIEW,
+            models.latest_revision_number_query() == preview_revision_number,
+        )
+        .values(
+            stage=models.ReleaseStage.RELEASE,
+            phase=models.ReleasePhase.RELEASE,
+            released=datetime.datetime.now(datetime.UTC),
+        )
+    )
+    update_result = await data.execute_query(update_stmt)
+    # Avoid a type error with update_result.rowcount
+    # Could not find another way to do it, other than using a Protocol
+    rowcount: int = getattr(update_result, "rowcount", 0)
+    if rowcount != 1:
+        raise RuntimeError("A newer revision appeared, please refresh and try again.")
+
+    delete_revisions_stmt = sqlmodel.delete(models.Revision).where(via(models.Revision.release_name) == release.name)
+    await data.execute_query(delete_revisions_stmt)

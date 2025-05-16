@@ -1,8 +1,8 @@
 """Use the existing ATR schema
 
-Revision ID: 0001_2025.05.15_32c59be6
+Revision ID: 0001_2025.05.15_1d3ee5a0
 Revises:
-Create Date: 2025-05-15 15:44:04.208248+00:00
+Create Date: 2025-05-15 19:39:20.865550+00:00
 """
 
 from collections.abc import Sequence
@@ -13,7 +13,7 @@ from alembic import op
 import atr.db.models
 
 # Revision identifiers, used by Alembic
-revision: str = "0001_2025.05.15_32c59be6"
+revision: str = "0001_2025.05.15_1d3ee5a0"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -202,6 +202,8 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["release_name"], ["release.name"], name=op.f("fk_revision_release_name_release")),
         sa.PrimaryKeyConstraint("name", name=op.f("pk_revision")),
         sa.UniqueConstraint("name", name=op.f("uq_revision_name")),
+        sa.UniqueConstraint("release_name", "number", name="uq_revision_release_number"),
+        sa.UniqueConstraint("release_name", "seq", name="uq_revision_release_seq"),
     )
     op.create_table(
         "task",

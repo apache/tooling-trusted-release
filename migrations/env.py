@@ -1,5 +1,4 @@
 import datetime
-import logging.config
 import os
 import re
 import subprocess
@@ -34,8 +33,8 @@ alembic_config = alembic.context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-if alembic_config.config_file_name is not None:
-    logging.config.fileConfig(alembic_config.config_file_name)
+# if alembic_config.config_file_name is not None:
+#     logging.config.fileConfig(alembic_config.config_file_name)
 
 # The SQLModel.metadata object as populated by the ATR models
 target_metadata = sqlmodel.SQLModel.metadata
