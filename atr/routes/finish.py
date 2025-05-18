@@ -64,13 +64,24 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
 
     latest_revision_dir = util.release_directory(release)
-    file_paths_rel: list[pathlib.Path] = []
-    unique_dirs: set[pathlib.Path] = {pathlib.Path(".")}
+    source_files_rel: list[pathlib.Path] = []
+    target_dirs: set[pathlib.Path] = {pathlib.Path(".")}
 
     try:
-        async for path in util.paths_recursive(latest_revision_dir):
-            file_paths_rel.append(path)
-            unique_dirs.add(path.parent)
+        async for item_rel_path in util.paths_recursive_all(latest_revision_dir):
+            current_parent = item_rel_path.parent
+            while True:
+                target_dirs.add(current_parent)
+                if current_parent == pathlib.Path("."):
+                    break
+                current_parent = current_parent.parent
+
+            item_abs_path = latest_revision_dir / item_rel_path
+            if await aiofiles.os.path.isfile(item_abs_path):
+                source_files_rel.append(item_rel_path)
+            elif await aiofiles.os.path.isdir(item_abs_path):
+                target_dirs.add(item_rel_path)
+
     except FileNotFoundError:
         await quart.flash("Preview revision directory not found.", "error")
         return await session.redirect(root.index)
@@ -78,9 +89,9 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     form = await MoveFileForm.create_form(data=await quart.request.form if (quart.request.method == "POST") else None)
 
     # Populate choices dynamically for both GET and POST
-    form.source_file.choices = sorted([(str(p), str(p)) for p in file_paths_rel])
-    form.target_directory.choices = sorted([(str(d), str(d)) for d in unique_dirs])
-    can_move = len(unique_dirs) > 1
+    form.source_file.choices = sorted([(str(p), str(p)) for p in source_files_rel])
+    form.target_directory.choices = sorted([(str(d), str(d)) for d in target_dirs])
+    can_move = (len(target_dirs) > 1) and (len(source_files_rel) > 0)
 
     if (quart.request.method == "POST") and can_move:
         match r := await _move_file(form, session, project_name, version_name):
@@ -89,15 +100,21 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
             case response.Response():
                 return r
 
+    # resp = await quart.current_app.make_response(template_rendered)
+    # resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    # resp.headers["Pragma"] = "no-cache"
+    # resp.headers["Expires"] = "0"
+    # return resp
     return await quart.render_template(
         "finish-selected.html",
         asf_id=session.uid,
         server_domain=session.app_host,
         release=release,
-        file_paths=sorted(file_paths_rel),
+        source_files=sorted(source_files_rel),
         form=form,
         can_move=can_move,
         user_ssh_keys=user_ssh_keys,
+        target_dirs=sorted(list(target_dirs)),
     )
 
 

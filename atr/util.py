@@ -334,6 +334,16 @@ def get_unfinished_dir() -> pathlib.Path:
     return pathlib.Path(config.get().UNFINISHED_STORAGE_DIR)
 
 
+async def is_dir_resolve(path: pathlib.Path) -> pathlib.Path | None:
+    try:
+        resolved_path = await asyncio.to_thread(path.resolve)
+        if not await aiofiles.os.path.isdir(resolved_path):
+            return None
+    except (FileNotFoundError, OSError):
+        return None
+    return resolved_path
+
+
 def is_user_viewing_as_admin(uid: str | None) -> bool:
     """Check whether a user is currently viewing the site with active admin privileges."""
     if not user.is_admin(uid):
@@ -398,18 +408,37 @@ def parse_key_blocks(keys_text: str) -> list[str]:
 
 async def paths_recursive(base_path: pathlib.Path) -> AsyncGenerator[pathlib.Path]:
     """Yield all file paths recursively within a base path, relative to the base path."""
-    try:
-        abs_base_path = await asyncio.to_thread(base_path.resolve)
-        for entry in await aiofiles.os.scandir(abs_base_path):
-            entry_path = pathlib.Path(entry.path)
-            relative_path = entry_path.relative_to(abs_base_path)
-            if entry.is_file():
-                yield relative_path
-            elif entry.is_dir():
-                async for sub_path in paths_recursive(entry_path):
-                    yield relative_path / sub_path
-    except FileNotFoundError:
+    if (resolved_base_path := await is_dir_resolve(base_path)) is None:
         return
+    async for rel_path in paths_recursive_all(base_path):
+        abs_path_to_check = resolved_base_path / rel_path
+        with contextlib.suppress(FileNotFoundError, OSError):
+            if await aiofiles.os.path.isfile(abs_path_to_check):
+                yield rel_path
+
+
+async def paths_recursive_all(base_path: pathlib.Path) -> AsyncGenerator[pathlib.Path]:
+    """Yield all file and directory paths recursively within a base path, relative to the base path."""
+    if (resolved_base_path := await is_dir_resolve(base_path)) is None:
+        return
+    queue: list[pathlib.Path] = [resolved_base_path]
+    visited_abs_paths: set[pathlib.Path] = set()
+    while queue:
+        current_abs_item = queue.pop(0)
+        try:
+            resolved_current_abs_item = await asyncio.to_thread(current_abs_item.resolve)
+        except (FileNotFoundError, OSError):
+            continue
+        if resolved_current_abs_item in visited_abs_paths:
+            continue
+        visited_abs_paths.add(resolved_current_abs_item)
+        with contextlib.suppress(FileNotFoundError, OSError):
+            for entry in await aiofiles.os.scandir(current_abs_item):
+                entry_abs_path = pathlib.Path(entry.path)
+                relative_path = entry_abs_path.relative_to(resolved_base_path)
+                yield relative_path
+                if entry.is_dir():
+                    queue.append(entry_abs_path)
 
 
 def permitted_recipients(asf_uid: str) -> list[str]:
