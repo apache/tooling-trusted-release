@@ -264,10 +264,6 @@ class CommitterSession:
             self._projects = await user.projects(self.uid)
         return self._projects
 
-    @property
-    async def user_releases(self) -> list[models.Release]:
-        return await user.releases(self.uid)
-
 
 class FlashError(RuntimeError): ...
 

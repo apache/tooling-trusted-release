@@ -257,7 +257,6 @@ async def _promote(release: models.Release, data: db.Session, preview_revision_n
             models.latest_revision_number_query() == preview_revision_number,
         )
         .values(
-            stage=models.ReleaseStage.RELEASE,
             phase=models.ReleasePhase.RELEASE,
             released=datetime.datetime.now(datetime.UTC),
         )

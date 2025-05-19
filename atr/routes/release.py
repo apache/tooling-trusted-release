@@ -101,7 +101,6 @@ async def releases() -> str:
     # Releases are public, so we don't need to filter by user
     async with db.session() as data:
         releases = await data.release(
-            stage=models.ReleaseStage.RELEASE,
             phase=models.ReleasePhase.RELEASE,
             _committee=True,
             _project=True,

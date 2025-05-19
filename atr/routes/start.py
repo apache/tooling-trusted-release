@@ -81,7 +81,6 @@ async def create_release_draft(project_name: str, version: str, asf_uid: str) ->
                 raise routes.FlashError(f'Invalid version name "{version}": {version_name_error}')
 
             release = models.Release(
-                stage=models.ReleaseStage.RELEASE_CANDIDATE,
                 phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
                 project_name=project.name,
                 project=project,

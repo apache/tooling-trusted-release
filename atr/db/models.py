@@ -285,17 +285,6 @@ class VoteEntry(schema.Strict):
     end: datetime.datetime
 
 
-class ReleaseStage(str, enum.Enum):
-    # A release candidate is being prepared
-    RELEASE_CANDIDATE = "release_candidate"
-    # A release is being prepared
-    RELEASE = "release"
-    # An existing release is being imported from ASF SVN dist
-    MIGRATION = "migration"
-    # A release candidate has failed at any CANDIDATE stage
-    FAILED = "failed"
-
-
 class ReleasePhase(str, enum.Enum):
     # Step 1: The candidate files are added from external sources and checked by ATR
     RELEASE_CANDIDATE_DRAFT = "release_candidate_draft"
@@ -486,7 +475,6 @@ class Release(sqlmodel.SQLModel, table=True):
     # We guarantee that "{project.name}-{version}" is unique
     # Therefore we can use that for the name
     name: str = sqlmodel.Field(default="", primary_key=True, unique=True)
-    stage: ReleaseStage
     phase: ReleasePhase
     created: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
     released: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))

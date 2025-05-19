@@ -344,7 +344,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
     def release(
         self,
         name: Opt[str] = NOT_SET,
-        stage: Opt[models.ReleaseStage] = NOT_SET,
         phase: Opt[models.ReleasePhase] = NOT_SET,
         created: Opt[datetime.datetime] = NOT_SET,
         project_name: Opt[str] = NOT_SET,
@@ -364,8 +363,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
         if is_defined(name):
             query = query.where(models.Release.name == name)
-        if is_defined(stage):
-            query = query.where(models.Release.stage == stage)
         if is_defined(phase):
             query = query.where(models.Release.phase == phase)
         if is_defined(created):

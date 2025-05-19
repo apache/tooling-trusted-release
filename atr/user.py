@@ -22,7 +22,6 @@ import functools
 import atr.config as config
 import atr.db as db
 import atr.db.models as models
-import atr.util as util
 
 
 async def candidate_drafts(uid: str, user_projects: list[models.Project] | None = None) -> list[models.Release]:
@@ -74,13 +73,3 @@ async def projects(uid: str, committee_only: bool = False, super_project: bool =
                 if (uid in p.committee.committee_members) or (uid in p.committee.committers):
                     user_projects.append(p)
     return user_projects
-
-
-async def releases(uid: str) -> list[models.Release]:
-    user_releases: list[models.Release] = []
-    async with db.session() as data:
-        # TODO: We're limiting this to candidates
-        # We should either call this user_candidate_releases, or change the query
-        releases = await data.release(stage=models.ReleaseStage.RELEASE_CANDIDATE, _project=True, _committee=True).all()
-        user_releases = util.user_releases(uid, releases)
-    return user_releases

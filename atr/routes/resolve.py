@@ -115,7 +115,6 @@ async def selected_post(
 
             # Update the release phase based on vote result
             if vote_result == "passed":
-                release.stage = models.ReleaseStage.RELEASE
                 release.phase = models.ReleasePhase.RELEASE_PREVIEW
                 success_message = "Vote marked as passed"
                 destination = finish.selected

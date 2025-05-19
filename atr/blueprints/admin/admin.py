@@ -276,7 +276,7 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
 
 @admin.BLUEPRINT.route("/releases")
 async def admin_releases() -> str:
-    """Display a list of all releases across all stages and phases."""
+    """Display a list of all releases across all phases."""
     async with db.session() as data:
         releases = await data.release(_project=True, _committee=True).order_by(models.Release.name).all()
     return await quart.render_template("releases.html", releases=releases)

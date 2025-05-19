@@ -537,7 +537,6 @@ async def _step_07c_ensure_release_object_for_write(
                         project_name=project.name,
                         project=project,
                         version=version_name,
-                        stage=models.ReleaseStage.RELEASE_CANDIDATE,
                         phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
                         created=datetime.datetime.now(datetime.UTC),
                     )

@@ -222,7 +222,6 @@ async def _promote(
             models.latest_revision_number_query() == selected_revision_number,
         )
         .values(
-            stage=models.ReleaseStage.RELEASE_CANDIDATE,
             phase=models.ReleasePhase.RELEASE_CANDIDATE,
         )
     )
