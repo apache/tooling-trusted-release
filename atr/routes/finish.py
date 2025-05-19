@@ -109,18 +109,6 @@ async def selected(
     )
 
 
-def _related_files(path: pathlib.Path) -> list[pathlib.Path]:
-    base_path = path.with_suffix("") if (path.suffix in SPECIAL_SUFFIXES) else path
-    parent_dir = base_path.parent
-    name_without_ext = base_path.name
-    return [
-        parent_dir / name_without_ext,
-        parent_dir / f"{name_without_ext}.asc",
-        parent_dir / f"{name_without_ext}.sha256",
-        parent_dir / f"{name_without_ext}.sha512",
-    ]
-
-
 async def _move_file(
     form: MoveFileForm, session: routes.CommitterSession, project_name: str, version_name: str
 ) -> tuple[quart_response.Response, int] | response.Response | None:
@@ -203,6 +191,18 @@ async def _move_file_to_revision(
         await quart.flash(msg, "error")
 
     return await session.redirect(selected, project_name=project_name, version_name=version_name)
+
+
+def _related_files(path: pathlib.Path) -> list[pathlib.Path]:
+    base_path = path.with_suffix("") if (path.suffix in SPECIAL_SUFFIXES) else path
+    parent_dir = base_path.parent
+    name_without_ext = base_path.name
+    return [
+        parent_dir / name_without_ext,
+        parent_dir / f"{name_without_ext}.asc",
+        parent_dir / f"{name_without_ext}.sha256",
+        parent_dir / f"{name_without_ext}.sha512",
+    ]
 
 
 async def _sources_and_targets(latest_revision_dir: pathlib.Path) -> tuple[list[pathlib.Path], set[pathlib.Path]]:
