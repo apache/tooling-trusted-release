@@ -145,6 +145,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
             new_revision_dir,
             new_revision_number,
         ):
+            # Uses new_revision_number for logging only
             # Path to delete within the new revision directory
             path_in_new_revision = new_revision_dir / rel_path_to_delete
 
@@ -234,6 +235,7 @@ async def hashgen(
             new_revision_dir,
             new_revision_number,
         ):
+            # Uses new_revision_number for logging only
             path_in_new_revision = new_revision_dir / rel_path
             hash_path_rel = rel_path.name + f".{hash_type}"
             hash_path_in_new_revision = new_revision_dir / rel_path.parent / hash_path_rel
@@ -293,6 +295,7 @@ async def sbomgen(
             new_revision_dir,
             new_revision_number,
         ):
+            # Uses new_revision_number in a functional way
             path_in_new_revision = new_revision_dir / rel_path
             sbom_path_rel = rel_path.with_suffix(rel_path.suffix + ".cdx.json").name
             sbom_path_in_new_revision = new_revision_dir / rel_path.parent / sbom_path_rel

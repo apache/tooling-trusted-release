@@ -76,6 +76,7 @@ async def _import_files_core(args: SvnImport) -> str:
         new_revision_dir,
         new_revision_number,
     ):
+        # Uses new_revision_number after this block
         _LOGGER.debug(f"Created revision directory: {new_revision_dir}")
 
         final_target_path = new_revision_dir

@@ -120,6 +120,7 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
         new_revision_dir,
         new_revision_number,
     ):
+        # Uses new_revision_number after this block
         # TODO: Stop create_and_manage from hard linking the parent first
         await aioshutil.rmtree(new_revision_dir)  # type: ignore[call-arg]
         await util.create_hard_link_clone(selected_revision_dir, new_revision_dir)
