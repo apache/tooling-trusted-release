@@ -183,7 +183,9 @@ async def import_selected_revision(
     if release.committee is None:
         raise routes.FlashError("No committee found for release")
     selected_committees = [release.committee.name]
-    success_count, error_count, submitted_committees = await _upload_keys(session, keys_text, selected_committees)
+    _upload_results, success_count, error_count, submitted_committees = await _upload_keys(
+        session, keys_text, selected_committees
+    )
     message = f"Uploaded {success_count} keys,"
     if error_count > 0:
         message += f" failed to upload {error_count} keys for {', '.join(submitted_committees)}"
@@ -494,20 +496,28 @@ async def upload(session: routes.CommitterSession) -> str:
         keys_content = await asyncio.to_thread(key_file.read)
         keys_text = keys_content.decode("utf-8", errors="replace")
 
-        success_count, error_count, submitted_committees = await _upload_keys(session, keys_text, selected_committees)
+        upload_results, success_count, error_count, submitted_committees = await _upload_keys(
+            session, keys_text, selected_committees
+        )
+        # We use results in a closure
+        # So we have to mutate it, not replace it
+        results[:] = upload_results
 
         await quart.flash(
             f"Processed {len(results)} keys: {success_count} successful, {error_count} failed",
             "success" if success_count > 0 else "error",
         )
-        return await render(submitted_committees_list=submitted_committees, all_user_committees=user_committees)
+        return await render(
+            submitted_committees_list=submitted_committees,
+            all_user_committees=user_committees,
+        )
 
     return await render()
 
 
 async def _upload_keys(
     session: routes.CommitterSession, keys_text: str, selected_committees: list[str]
-) -> tuple[int, int, list[str]]:
+) -> tuple[list[dict], int, int, list[str]]:
     key_blocks = util.parse_key_blocks(keys_text)
     if not key_blocks:
         raise routes.FlashError("No valid GPG keys found in the uploaded file")
@@ -530,7 +540,7 @@ async def _upload_keys(
     success_count = sum(1 for result in results if result["status"] == "success")
     error_count = len(results) - success_count
 
-    return success_count, error_count, submitted_committees
+    return results, success_count, error_count, submitted_committees
 
 
 async def _upload_process_key_blocks(key_blocks: list[str], selected_committees: list[str]) -> list[dict]:
