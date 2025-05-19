@@ -244,13 +244,13 @@
               }
 
               if ((!currentlySelectedFilePath) && currentlyChosenDirectoryPath) {
-                  currentMoveSelectionInfoElement.textContent = `Selected destination: ${currentlyChosenDirectoryPath}. Please select a file to move.`;
+                  currentMoveSelectionInfoElement.innerHTML = `Selected destination: <strong>${currentlyChosenDirectoryPath}</strong>. Please select a file to move.`;
                   confirmMoveButton.disabled = true;
               } else if (currentlySelectedFilePath && (!currentlyChosenDirectoryPath)) {
-                  currentMoveSelectionInfoElement.textContent = `Moving: ${currentlySelectedFilePath} to (select destination).`;
+                  currentMoveSelectionInfoElement.innerHTML = `Moving <strong>${currentlySelectedFilePath}</strong> to (select destination).`;
                   confirmMoveButton.disabled = true;
               } else if (currentlySelectedFilePath && currentlyChosenDirectoryPath) {
-                  currentMoveSelectionInfoElement.textContent = `Move: ${currentlySelectedFilePath} to ${currentlyChosenDirectoryPath}`;
+                  currentMoveSelectionInfoElement.innerHTML = `Move <strong>${currentlySelectedFilePath}</strong> to <strong>${currentlyChosenDirectoryPath}</strong>`;
                   confirmMoveButton.disabled = false;
               } else {
                   currentMoveSelectionInfoElement.textContent = "Please select a file and a destination.";
