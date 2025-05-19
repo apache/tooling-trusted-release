@@ -1,5 +1,5 @@
-.PHONY: build build-alpine build-playwright build-ubuntu certs check \
-  docs generate-version obvfix report run run-dev run-playwright \
+.PHONY: build build-alpine build-playwright build-ts build-ubuntu certs \
+  check docs generate-version obvfix report run run-dev run-playwright \
   run-playwright-slow run-staging stop serve serve-local sync sync-dev
 
 BIND ?= 127.0.0.1:8080
@@ -16,6 +16,15 @@ build-alpine:
 
 build-playwright:
 	docker build -t atr-playwright -f tests/Dockerfile.playwright playwright
+
+build-ts:
+	for ts_file in atr/static/ts/*.ts; \
+	do \
+	  if [ -e "$$ts_file" ]; \
+	  then \
+	    tsc "$$ts_file" --outDir atr/static/js --lib es2015,dom --target es2015 --module none; \
+	  fi; \
+	done
 
 build-ubuntu:
 	$(SCRIPTS)/build Dockerfile.ubuntu $(IMAGE)
