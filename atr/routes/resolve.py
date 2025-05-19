@@ -24,6 +24,7 @@ import wtforms
 
 import atr.db as db
 import atr.db.models as models
+import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.finish as finish
@@ -122,6 +123,13 @@ async def selected_post(
                 release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
                 success_message = "Vote marked as failed"
                 destination = compose.selected
+
+    description = "Create a preview revision from the last candidate draft"
+    async with revision.create_and_manage(project_name, release.version, session.uid, description=description) as (
+        _new_revision_dir,
+        _new_revision_number,
+    ):
+        pass
 
     error_message = await _send_resolution(session, release, vote_result, resolution_body)
     if error_message is not None:
