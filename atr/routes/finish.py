@@ -21,6 +21,7 @@ from typing import Final
 
 import aiofiles.os
 import quart
+import quart.wrappers.response as quart_response
 import werkzeug.wrappers.response as response
 import wtforms
 
@@ -30,6 +31,8 @@ import atr.revision as revision
 import atr.routes as routes
 import atr.routes.root as root
 import atr.util as util
+
+SPECIAL_SUFFIXES: Final[frozenset[str]] = frozenset({".asc", ".sha256", ".sha512"})
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -53,7 +56,9 @@ class MoveFileForm(util.QuartFormTyped):
 
 
 @routes.committer("/finish/<project_name>/<version_name>", methods=["GET", "POST"])
-async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+async def selected(
+    session: routes.CommitterSession, project_name: str, version_name: str
+) -> tuple[quart_response.Response, int] | response.Response | str:
     """Finish a release preview."""
     await session.check_access(project_name)
 
@@ -64,24 +69,8 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
 
     latest_revision_dir = util.release_directory(release)
-    source_files_rel: list[pathlib.Path] = []
-    target_dirs: set[pathlib.Path] = {pathlib.Path(".")}
-
     try:
-        async for item_rel_path in util.paths_recursive_all(latest_revision_dir):
-            current_parent = item_rel_path.parent
-            while True:
-                target_dirs.add(current_parent)
-                if current_parent == pathlib.Path("."):
-                    break
-                current_parent = current_parent.parent
-
-            item_abs_path = latest_revision_dir / item_rel_path
-            if await aiofiles.os.path.isfile(item_abs_path):
-                source_files_rel.append(item_rel_path)
-            elif await aiofiles.os.path.isdir(item_abs_path):
-                target_dirs.add(item_rel_path)
-
+        source_files_rel, target_dirs = await _sources_and_targets(latest_revision_dir)
     except FileNotFoundError:
         await quart.flash("Preview revision directory not found.", "error")
         return await session.redirect(root.index)
@@ -94,11 +83,13 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     can_move = (len(target_dirs) > 1) and (len(source_files_rel) > 0)
 
     if (quart.request.method == "POST") and can_move:
-        match r := await _move_file(form, session, project_name, version_name):
+        match await _move_file(form, session, project_name, version_name):
             case None:
                 pass
-            case response.Response():
-                return r
+            case tuple() as resp_tuple:
+                return resp_tuple
+            case resp_obj if isinstance(resp_obj, response.Response):
+                return resp_obj
 
     # resp = await quart.current_app.make_response(template_rendered)
     # resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -118,53 +109,118 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     )
 
 
+def _related_files(path: pathlib.Path) -> list[pathlib.Path]:
+    base_path = path.with_suffix("") if (path.suffix in SPECIAL_SUFFIXES) else path
+    parent_dir = base_path.parent
+    name_without_ext = base_path.name
+    return [
+        parent_dir / name_without_ext,
+        parent_dir / f"{name_without_ext}.asc",
+        parent_dir / f"{name_without_ext}.sha256",
+        parent_dir / f"{name_without_ext}.sha512",
+    ]
+
+
 async def _move_file(
     form: MoveFileForm, session: routes.CommitterSession, project_name: str, version_name: str
-) -> response.Response | None:
+) -> tuple[quart_response.Response, int] | response.Response | None:
+    wants_json = "application/json" in quart.request.headers.get("Accept", "")
     if await form.validate_on_submit():
         source_file_rel = pathlib.Path(form.source_file.data)
         target_dir_rel = pathlib.Path(form.target_directory.data)
-
-        try:
-            description = "File move through web interface"
-            async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
-                new_revision_dir,
-                new_revision_number,
-            ):
-                source_path_in_new = new_revision_dir / source_file_rel
-                target_path_in_new = new_revision_dir / target_dir_rel / source_file_rel.name
-
-                if await aiofiles.os.path.exists(target_path_in_new):
-                    await quart.flash(
-                        f"File '{source_file_rel.name}' already exists in '{target_dir_rel}' in new revision.",
-                        "error",
-                    )
-                    return await session.redirect(selected, project_name=project_name, version_name=version_name)
-
-                _LOGGER.info(
-                    f"Moving {source_path_in_new} to {target_path_in_new} in new revision {new_revision_number}"
-                )
-                await aiofiles.os.rename(source_path_in_new, target_path_in_new)
-
-            await quart.flash(
-                f"File '{source_file_rel.name}' moved successfully to '{target_dir_rel}' in new revision.", "success"
-            )
-            return await session.redirect(selected, project_name=project_name, version_name=version_name)
-
-        except FileNotFoundError:
-            _LOGGER.exception("File not found during move operation in new revision")
-            await quart.flash("Error: Source file not found during move operation.", "error")
-        except OSError as e:
-            _LOGGER.exception("Error moving file in new revision")
-            await quart.flash(f"Error moving file: {e}", "error")
-        except Exception as e:
-            _LOGGER.exception("Unexpected error during file move")
-            await quart.flash(f"An unexpected error occurred: {e!s}", "error")
-            return await session.redirect(selected, project_name=project_name, version_name=version_name)
+        return await _move_file_to_revision(
+            source_file_rel, target_dir_rel, session, project_name, version_name, wants_json
+        )
     else:
-        for field, errors in form.errors.items():
-            field_label = getattr(getattr(form, field, None), "label", None)
-            label_text = field_label.text if field_label else field.replace("_", " ").title()
-            for error in errors:
-                await quart.flash(f"{label_text}: {error}", "warning")
+        if wants_json:
+            error_messages = []
+            for field_name, field_errors in form.errors.items():
+                field_object = getattr(form, field_name, None)
+                label_object = getattr(field_object, "label", None)
+                label_text = label_object.text if label_object else field_name.replace("_", " ").title()
+                error_messages.append(f"{label_text}: {', '.join(field_errors)}")
+            error_string = "; ".join(error_messages)
+            return quart.jsonify(error=error_string), 400
+        else:
+            for field_name, field_errors in form.errors.items():
+                field_object = getattr(form, field_name, None)
+                label_object = getattr(field_object, "label", None)
+                label_text = label_object.text if label_object else field_name.replace("_", " ").title()
+                for error_message_text in field_errors:
+                    await quart.flash(f"{label_text}: {error_message_text}", "warning")
     return None
+
+
+async def _move_file_to_revision(
+    source_file_rel: pathlib.Path,
+    target_dir_rel: pathlib.Path,
+    session: routes.CommitterSession,
+    project_name: str,
+    version_name: str,
+    wants_json: bool,
+) -> tuple[quart_response.Response, int] | response.Response | None:
+    try:
+        description = "File move through web interface"
+        async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
+            new_revision_dir,
+            _new_revision_number,
+        ):
+            related_files = _related_files(source_file_rel)
+            bundle = [f for f in related_files if await aiofiles.os.path.exists(new_revision_dir / f)]
+            collisions = [
+                f.name for f in bundle if await aiofiles.os.path.exists(new_revision_dir / target_dir_rel / f.name)
+            ]
+            if collisions:
+                msg = f"Files already exist in '{target_dir_rel}': {', '.join(collisions)}"
+                if wants_json:
+                    return quart.jsonify(error=msg), 400
+                await quart.flash(msg, "error")
+                return await session.redirect(selected, project_name=project_name, version_name=version_name)
+
+            for f in bundle:
+                await aiofiles.os.rename(new_revision_dir / f, new_revision_dir / target_dir_rel / f.name)
+
+        await quart.flash(f"Moved {', '.join(f.name for f in bundle)}", "success")
+        return await session.redirect(selected, project_name=project_name, version_name=version_name)
+
+    except FileNotFoundError:
+        _LOGGER.exception("File not found during move operation in new revision")
+        msg = "Error: Source file not found during move operation."
+        if wants_json:
+            return quart.jsonify(error=msg), 400
+        await quart.flash(msg, "error")
+    except OSError as e:
+        _LOGGER.exception("Error moving file in new revision")
+        msg = f"Error moving file: {e}"
+        if wants_json:
+            return quart.jsonify(error=msg), 500
+        await quart.flash(msg, "error")
+    except Exception as e:
+        _LOGGER.exception("Unexpected error during file move")
+        msg = f"An unexpected error occurred: {e!s}"
+        if wants_json:
+            return quart.jsonify(error=msg), 500
+        await quart.flash(msg, "error")
+
+    return await session.redirect(selected, project_name=project_name, version_name=version_name)
+
+
+async def _sources_and_targets(latest_revision_dir: pathlib.Path) -> tuple[list[pathlib.Path], set[pathlib.Path]]:
+    source_files_rel: list[pathlib.Path] = []
+    target_dirs: set[pathlib.Path] = {pathlib.Path(".")}
+
+    async for item_rel_path in util.paths_recursive_all(latest_revision_dir):
+        current_parent = item_rel_path.parent
+        while True:
+            target_dirs.add(current_parent)
+            if current_parent == pathlib.Path("."):
+                break
+            current_parent = current_parent.parent
+
+        item_abs_path = latest_revision_dir / item_rel_path
+        if await aiofiles.os.path.isfile(item_abs_path):
+            source_files_rel.append(item_rel_path)
+        elif await aiofiles.os.path.isdir(item_abs_path):
+            target_dirs.add(item_rel_path)
+
+    return source_files_rel, target_dirs

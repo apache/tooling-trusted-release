@@ -19,6 +19,7 @@ const DIR_DATA_ID = "dir-data";
 const DIR_FILTER_INPUT_ID = "dir-filter-input";
 const DIR_LIST_MORE_INFO_ID = "dir-list-more-info";
 const DIR_LIST_TABLE_BODY_ID = "dir-list-table-body";
+const ERROR_ALERT_ID = "move-error-alert";
 const FILE_DATA_ID = "file-data";
 const FILE_FILTER_ID = "file-filter";
 const FILE_LIST_MORE_INFO_ID = "file-list-more-info";
@@ -39,6 +40,7 @@ let dirFilterInput;
 let dirListTableBody;
 let confirmMoveButton;
 let currentMoveSelectionInfoElement;
+let errorAlert;
 let uiState;
 function getParentPath(filePathString) {
     if (!filePathString || typeof filePathString !== "string")
@@ -170,16 +172,10 @@ function handleFileSelection(filePath) {
     }
     uiState.currentlySelectedFilePath = filePath;
     renderAllLists();
-    if (!confirmMoveButton.disabled) {
-        confirmMoveButton.focus();
-    }
 }
 function handleDirSelection(dirPath) {
     uiState.currentlyChosenDirectoryPath = dirPath;
     renderAllLists();
-    if (!confirmMoveButton.disabled) {
-        confirmMoveButton.focus();
-    }
 }
 function onFileListClick(event) {
     const targetElement = event.target;
@@ -217,6 +213,7 @@ function onMaxFilesChange(event) {
 }
 function onConfirmMoveClick() {
     return __awaiter(this, void 0, void 0, function* () {
+        errorAlert.classList.add("d-none");
         if (uiState.currentlySelectedFilePath && uiState.currentlyChosenDirectoryPath && uiState.csrfToken) {
             const formData = new FormData();
             formData.append("csrf_token", uiState.csrfToken);
@@ -236,29 +233,30 @@ function onConfirmMoveClick() {
                 }
                 else {
                     let errorMsg = `An error occurred while moving the file (Status: ${response.status})`;
-                    if (response.status === 403) {
+                    if (response.status === 403)
                         errorMsg = "Permission denied to move the file.";
-                    }
-                    else if (response.status === 400) {
-                        errorMsg = "Invalid request to move the file (e.g. source or target invalid).";
-                    }
+                    if (response.status === 400)
+                        errorMsg = "Invalid request to move the file.";
                     try {
                         const errorData = yield response.json();
-                        if (errorData && errorData.error) {
+                        if (errorData && typeof errorData.error === "string")
                             errorMsg = errorData.error;
-                        }
                     }
-                    catch (e) { }
-                    alert(errorMsg);
+                    catch (_) { }
+                    errorAlert.textContent = errorMsg;
+                    errorAlert.classList.remove("d-none");
+                    return;
                 }
             }
             catch (error) {
                 console.error("Network or fetch error:", error);
-                alert("A network error occurred. Please check your connection and try again.");
+                errorAlert.textContent = "A network error occurred. Please check your connection and try again.";
+                errorAlert.classList.remove("d-none");
             }
         }
         else {
-            alert("Please select both a file to move and a destination directory.");
+            errorAlert.textContent = "Please select both a file to move and a destination directory.";
+            errorAlert.classList.remove("d-none");
         }
     });
 }
@@ -272,6 +270,7 @@ document.addEventListener("DOMContentLoaded", function () {
     confirmMoveButton = assertElementPresent(document.querySelector(`#${CONFIRM_MOVE_BUTTON_ID}`), CONFIRM_MOVE_BUTTON_ID);
     currentMoveSelectionInfoElement = assertElementPresent(document.getElementById(CURRENT_MOVE_SELECTION_INFO_ID), CURRENT_MOVE_SELECTION_INFO_ID);
     currentMoveSelectionInfoElement.setAttribute("aria-live", "polite");
+    errorAlert = assertElementPresent(document.getElementById(ERROR_ALERT_ID), ERROR_ALERT_ID);
     let initialFilePaths = [];
     let initialTargetDirs = [];
     try {

@@ -101,6 +101,10 @@
 
   {% if can_move %}
     <h2>Move a file to a different directory</h2>
+    <div id="move-error-alert"
+         class="alert alert-danger d-none"
+         role="alert"
+         aria-live="assertive"></div>
     <form class="atr-canary">
       <div class="row">
         <div class="col-lg-6">
