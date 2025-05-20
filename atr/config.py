@@ -26,12 +26,25 @@ _MB: Final = 1024 * 1024
 _GB: Final = 1024 * _MB
 
 
+def _config_secrets(key: str, state_dir: str, default: str | None = None, cast: type = str) -> str | None:
+    secrets_path = os.path.join(state_dir, "secrets.ini")
+    try:
+        repo_ini = decouple.RepositoryIni(secrets_path)
+        config_obj = decouple.Config(repo_ini)
+        return config_obj.get(key, default=default, cast=cast)
+    except FileNotFoundError:
+        return decouple.config(key, default=default, cast=cast)
+
+
 class AppConfig:
     APP_HOST = decouple.config("APP_HOST", default="localhost")
     SSH_HOST = decouple.config("SSH_HOST", default="0.0.0.0")
     SSH_PORT = decouple.config("SSH_PORT", default=2222, cast=int)
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     STATE_DIR = decouple.config("STATE_DIR", default=os.path.join(PROJECT_ROOT, "state"))
+    LDAP_BIND_DN = _config_secrets("LDAP_BIND_DN", STATE_DIR, default=None, cast=str)
+    LDAP_BIND_PASSWORD = _config_secrets("LDAP_BIND_PASSWORD", STATE_DIR, default=None, cast=str)
+
     DEBUG = False
     TEMPLATES_AUTO_RELOAD = False
     USE_BLOCKBUSTER = False

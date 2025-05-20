@@ -27,8 +27,10 @@ import aiofiles.os
 import aioshutil
 import asfquart
 import asfquart.base as base
-import asfquart.session as session
+import asfquart.session
 import httpx
+import ldap3
+import ldap3.utils.conv as conv
 import quart
 import werkzeug.wrappers.response as response
 import wtforms
@@ -41,6 +43,10 @@ import atr.db.models as models
 import atr.util as util
 
 _LOGGER: Final = logging.getLogger(__name__)
+
+LDAP_ATTRIBUTES: Final[list[str]] = ["uid", "cn", "mail", "asf-altEmail", "displayName"]
+LDAP_SEARCH_BASE: Final[str] = "ou=people,dc=apache,dc=org"
+LDAP_SERVER_HOST: Final[str] = "ldap-eu.apache.org"
 
 
 class DeleteReleaseForm(util.QuartFormTyped):
@@ -56,6 +62,18 @@ class DeleteReleaseForm(util.QuartFormTyped):
         description="Please type DELETE exactly to confirm deletion.",
     )
     submit = wtforms.SubmitField("Delete selected releases permanently")
+
+
+class LdapLookupForm(util.QuartFormTyped):
+    uid = wtforms.StringField(
+        "ASF UID (optional)",
+        render_kw={"placeholder": "Enter ASF UID, e.g. johnsmith"},
+    )
+    email = wtforms.StringField(
+        "Email address (optional)",
+        render_kw={"placeholder": "Enter email address, e.g. user@example.org"},
+    )
+    submit = wtforms.SubmitField("Lookup")
 
 
 @admin.BLUEPRINT.route("/data")
@@ -298,7 +316,7 @@ async def admin_toggle_admin_view_page() -> str:
 async def admin_toggle_view() -> response.Response:
     await util.validate_empty_form()
 
-    web_session = await session.read()
+    web_session = await asfquart.session.read()
     if web_session is None:
         # For the type checker
         # We should pass this as an argument, then it's guaranteed
@@ -320,6 +338,107 @@ async def admin_toggle_view() -> response.Response:
     await quart.flash(message, "success")
     referrer = quart.request.referrer
     return quart.redirect(referrer or quart.url_for("admin.admin_data"))
+
+
+@admin.BLUEPRINT.route("/ldap/", methods=["GET"])
+async def ldap() -> str:
+    form = await LdapLookupForm.create_form(data=quart.request.args)
+    results: list[dict[str, str | list[str]]] = []
+    error_message: str | None = None
+    server_info_for_debug: str | None = None
+    detailed_error_info: str | None = None
+    asf_id_for_template: str | None = None
+
+    web_session = await asfquart.session.read()
+    if web_session and web_session.uid:
+        asf_id_for_template = web_session.uid
+
+    uid_query = form.uid.data
+    email_query = form.email.data
+
+    ldap_querying: bool = bool((quart.request.method == "GET") and (uid_query or email_query))
+    if ldap_querying:
+        bind_dn = quart.current_app.config.get("LDAP_BIND_DN")
+        bind_password = quart.current_app.config.get("LDAP_BIND_PASSWORD")
+
+        results, error_message, server_info_for_debug, detailed_error_info = await _ldap_lookup_perform_search(
+            uid_query, email_query, bind_dn, bind_password
+        )
+
+    return await quart.render_template(
+        "ldap-lookup.html",
+        form=form,
+        results=results,
+        error_message=error_message,
+        asf_id=asf_id_for_template,
+        ldap_query_performed=ldap_querying,
+        server_info_for_debug=server_info_for_debug,
+        detailed_error_info=detailed_error_info,
+    )
+
+
+async def _ldap_lookup_perform_search(
+    uid_query: str | None,
+    email_query: str | None,
+    bind_dn_from_config: str | None,
+    bind_password_from_config: str | None,
+) -> tuple[list[dict[str, str | list[str]]], str | None, str | None, str | None]:
+    results_list: list[dict[str, str | list[str]]] = []
+    err_msg: str | None = None
+    srv_info: str | None = None
+    detail_err: str | None = None
+
+    try:
+        server = ldap3.Server(LDAP_SERVER_HOST, use_ssl=True, get_info=ldap3.ALL)
+        srv_info = repr(server)
+
+        if bind_dn_from_config and bind_password_from_config:
+            conn = ldap3.Connection(
+                server, user=bind_dn_from_config, password=bind_password_from_config, auto_bind=True
+            )
+        else:
+            conn = ldap3.Connection(server, auto_bind=True)
+
+        filters: list[str] = []
+        if uid_query:
+            filters.append(f"(uid={conv.escape_filter_chars(uid_query)})")
+
+        if email_query:
+            escaped_email = conv.escape_filter_chars(email_query)
+            if email_query.endswith("@apache.org"):
+                filters.append(f"(mail={escaped_email})")
+            else:
+                filters.append(f"(asf-altEmail={escaped_email})")
+
+        if not filters:
+            err_msg = "Please provide a UID or an email address to search."
+        else:
+            search_filter = f"(&{''.join(filters)})" if (len(filters) > 1) else filters[0]
+            conn.search(
+                search_base=LDAP_SEARCH_BASE,
+                search_filter=search_filter,
+                attributes=LDAP_ATTRIBUTES,
+            )
+            for entry in conn.entries:
+                result_item: dict[str, str | list[str]] = {"dn": entry.entry_dn}
+                result_item.update(entry.entry_attributes_as_dict)
+                results_list.append(result_item)
+
+            if (not results_list) and (not err_msg):
+                err_msg = "No results found for the given criteria."
+        if conn.bound:
+            conn.unbind()
+    # except exceptions.LDAPSocketOpenError as e:
+    #     err_msg = f"LDAP Socket Open Error: {e!s}"
+    #     detail_err = f"Details: {e.args}"
+    # except exceptions.LDAPException as e:
+    #     err_msg = f"LDAP Error: {e!s}"
+    #     detail_err = f"Details: {e.args}"
+    except Exception as e:
+        err_msg = f"An unexpected error occurred: {e!s}"
+        detail_err = f"Details: {e.args}"
+
+    return results_list, err_msg, srv_info, detail_err
 
 
 @admin.BLUEPRINT.route("/ongoing-tasks/<project_name>/<version_name>/<revision>")
