@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "outDir": "./atr/static/js",
+    "rootDir": "./atr/static/ts",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "./atr/static/ts/**/*.ts"
+  ],
+  "exclude": [
+    "./atr/static/js"
+  ]
+}

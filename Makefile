@@ -18,13 +18,7 @@ build-playwright:
 	docker build -t atr-playwright -f tests/Dockerfile.playwright playwright
 
 build-ts:
-	for ts_file in atr/static/ts/*.ts; \
-	do \
-	  if [ -e "$$ts_file" ]; \
-	  then \
-	    tsc "$$ts_file" --outDir atr/static/js --lib es2015,dom --target es2015 --module none; \
-	  fi; \
-	done
+	tsc -p tsconfig.json
 
 build-ubuntu:
 	$(SCRIPTS)/build Dockerfile.ubuntu $(IMAGE)
