@@ -130,7 +130,7 @@ function renderListItems(
     itemsToShow.forEach(item => {
         const itemPathString = config.itemType === ItemType.Dir && !item ? "." : String(item || "");
         const row = document.createElement("tr");
-        row.className = "atr-table-row-interactive";
+        row.className = "page-table-row-interactive";
 
         const buttonCell = row.insertCell();
         buttonCell.className = "page-table-button-cell text-end";
@@ -140,6 +140,20 @@ function renderListItems(
         const span = document.createElement("span");
         span.className = "page-file-select-text";
         span.textContent = itemPathString;
+
+        let isIncompatible = false;
+        if (config.itemType === ItemType.File) {
+            if (uiState.currentlyChosenDirectoryPath && getParentPath(itemPathString) === uiState.currentlyChosenDirectoryPath) {
+                isIncompatible = true;
+            }
+        } else {
+            if (uiState.currentlySelectedFilePath && getParentPath(uiState.currentlySelectedFilePath) === itemPathString) {
+                isIncompatible = true;
+            }
+        }
+        if (isIncompatible) {
+            span.classList.add("page-extra-muted");
+        }
 
         if (itemPathString === config.selectedItem) {
             row.classList.add("page-item-selected");
