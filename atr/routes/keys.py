@@ -584,14 +584,18 @@ async def _upload_process_key_blocks(key_blocks: list[str], selected_committees:
             )
         except Exception as e:
             logging.exception(f"Exception processing key #{i + 1}:")
+            fingerprint, user_id = "Unknown", "None"
+            if isinstance(e, interaction.ApacheUserMissingError):
+                fingerprint = e.fingerprint or "Unknown"
+                user_id = e.primary_uid or "None"
             results.append(
                 {
                     "status": "error",
                     "message": f"Internal Exception: {e}",
                     "key_id": f"Key #{i + 1}",
-                    "fingerprint": "Error",
-                    "user_id": "Unknown",
-                    "email": "Unknown",
+                    "fingerprint": fingerprint,
+                    "user_id": user_id,
+                    "email": user_id,
                     "committee_statuses": {},
                 }
             )

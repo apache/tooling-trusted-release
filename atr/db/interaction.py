@@ -39,6 +39,13 @@ import atr.util as util
 _LOGGER: Final = logging.getLogger(__name__)
 
 
+class ApacheUserMissingError(RuntimeError):
+    def __init__(self, message: str, fingerprint: str | None, primary_uid: str | None) -> None:
+        super().__init__(message)
+        self.fingerprint = fingerprint
+        self.primary_uid = primary_uid
+
+
 class PathInfo(schema.Strict):
     artifacts: set[pathlib.Path] = schema.factory(set)
     errors: dict[pathlib.Path, list[models.CheckResult]] = schema.factory(dict)
@@ -74,7 +81,13 @@ async def key_user_add(asf_uid: str | None, public_key: str, selected_committees
                     break
     if asf_uid is None:
         # We place this here to make it easier on the type checkers
-        raise RuntimeError("No Apache UID found in the key UIDs")
+        non_asf_uids = key.get("uids", [])
+        first_non_asf_uid = non_asf_uids[0] if non_asf_uids else "None"
+        raise ApacheUserMissingError(
+            f"No Apache UID found. Fingerprint: {key.get('fingerprint', 'Unknown')}. Primary UID: {first_non_asf_uid}",
+            fingerprint=key.get("fingerprint"),
+            primary_uid=first_non_asf_uid,
+        )
 
     # Store key in database
     async with db.session() as data:
