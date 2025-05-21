@@ -38,6 +38,7 @@ class Creating:
     old: models.Revision | None
     interim_path: pathlib.Path
     new: models.Revision | None
+    failed: bool = False
 
 
 # NOTE: The create_directory parameter is not used anymore
@@ -68,11 +69,15 @@ async def create_and_manage(
             old_release_dir = util.release_directory(release)
             await util.create_hard_link_clone(old_release_dir, temp_dir_path, do_not_create_dest_dir=True)
         # The directory is either empty or its files are hard linked to the previous revision
-        creating = Creating(old=old_revision, interim_path=temp_dir_path, new=None)
+        creating = Creating(old=old_revision, interim_path=temp_dir_path, new=None, failed=False)
         yield creating
     except Exception:
         await aioshutil.rmtree(temp_dir)  # type: ignore[call-arg]
         raise
+
+    if creating.failed:
+        await aioshutil.rmtree(temp_dir)  # type: ignore[call-arg]
+        return
 
     # Create a revision row, but hold the write lock
     async with db.session() as data, data.begin():

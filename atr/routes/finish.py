@@ -158,6 +158,9 @@ async def _move_file_to_revision(
                 f.name for f in bundle if await aiofiles.os.path.exists(creating.interim_path / target_dir_rel / f.name)
             ]
             if collisions:
+                # Remove the temporary directory, and do not create or commit a new revision
+                # (But also do not raise an exception)
+                creating.failed = True
                 msg = f"Files already exist in '{target_dir_rel}': {', '.join(collisions)}"
                 if wants_json:
                     return quart.jsonify(error=msg), 400
