@@ -90,32 +90,35 @@ function renderListItems(tbodyElement, items, config) {
     itemsToShow.forEach(item => {
         const itemPathString = config.itemType === ItemType.Dir && !item ? "." : String(item || "");
         const row = document.createElement("tr");
+        row.className = "atr-table-row-interactive";
         const buttonCell = row.insertCell();
-        buttonCell.className = "page-table-button-cell";
+        buttonCell.className = "page-table-button-cell text-end";
         const pathCell = row.insertCell();
         pathCell.className = "page-table-path-cell";
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = `btn btn-sm m-1 ${config.buttonClassBase} ${config.buttonClassOutline}`;
-        button.dataset[config.itemType === ItemType.File ? "filePath" : "dirPath"] = itemPathString;
-        if (itemPathString === config.selectedItem) {
-            row.classList.add("page-item-selected");
-            row.setAttribute("aria-selected", "true");
-            button.textContent = config.buttonTextSelected;
-            button.classList.remove(config.buttonClassOutline);
-            button.classList.add(config.buttonClassActive);
-        }
-        else {
-            row.setAttribute("aria-selected", "false");
-            button.textContent = config.buttonTextDefault;
-        }
-        if (config.disableCondition(itemPathString, uiState.currentlySelectedFilePath, uiState.currentlyChosenDirectoryPath, getParentPath)) {
-            button.disabled = true;
-        }
         const span = document.createElement("span");
         span.className = "page-file-select-text";
         span.textContent = itemPathString;
-        buttonCell.appendChild(button);
+        if (itemPathString === config.selectedItem) {
+            row.classList.add("page-item-selected");
+            row.setAttribute("aria-selected", "true");
+            span.classList.add("fw-bold");
+            const arrowSpan = document.createElement("span");
+            arrowSpan.className = "text-success fs-3";
+            arrowSpan.textContent = "→";
+            buttonCell.appendChild(arrowSpan);
+        }
+        else {
+            row.setAttribute("aria-selected", "false");
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = `btn btn-sm ${config.buttonClassBase} ${config.buttonClassOutline}`;
+            button.dataset[config.itemType === ItemType.File ? "filePath" : "dirPath"] = itemPathString;
+            button.textContent = config.buttonTextDefault;
+            if (config.disableCondition(itemPathString, uiState.currentlySelectedFilePath, uiState.currentlyChosenDirectoryPath, getParentPath)) {
+                button.disabled = true;
+            }
+            buttonCell.appendChild(button);
+        }
         pathCell.appendChild(span);
         fragment.appendChild(row);
     });
