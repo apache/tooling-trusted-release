@@ -120,7 +120,7 @@ async def key_user_session_add(
     if not isinstance(fingerprint, str):
         raise RuntimeError("Invalid key fingerprint")
     fingerprint = fingerprint.lower()
-    uids = key.get("uids")
+    uids = key.get("uids", [])
     key_record: models.PublicSigningKey | None = None
 
     async with data.begin():
@@ -143,7 +143,8 @@ async def key_user_session_add(
                 length=int(key.get("length", "0")),
                 created=created,
                 expires=expires,
-                declared_uid=uids[0] if uids else None,
+                primary_declared_uid=uids[0] if uids else None,
+                secondary_declared_uids=uids[1:],
                 apache_uid=asf_uid,
                 ascii_armored_key=public_key,
             )
@@ -181,7 +182,7 @@ async def key_user_session_add(
                 continue
 
     # Extract email for sorting
-    user_id_str = key_record.declared_uid or ""
+    user_id_str = key_record.primary_declared_uid or ""
     email_match = re.search(r"<([^>]+)>", user_id_str)
     email = email_match.group(1) if email_match else user_id_str
 

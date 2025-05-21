@@ -102,8 +102,12 @@ class PublicSigningKey(sqlmodel.SQLModel, table=True):
     created: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
     # Expiration date
     expires: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
-    # The UID declared in the key
-    declared_uid: str | None
+    # The primary UID declared in the key
+    primary_declared_uid: str | None
+    # The secondary UIDs declared in the key
+    secondary_declared_uids: list[str] = sqlmodel.Field(
+        default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON)
+    )
     # The UID used by Apache
     apache_uid: str
     # The ASCII armored key

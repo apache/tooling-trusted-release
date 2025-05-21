@@ -382,9 +382,9 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
         for key in sorted_keys:
             fingerprint_short = key.fingerprint[:16].upper()
             apache_uid = key.apache_uid
-            declared_uid_str = key.declared_uid or ""
-            email_match = re.search(r"<([^>]+)>", declared_uid_str)
-            email = email_match.group(1) if email_match else declared_uid_str
+            primary_declared_uid_str = key.primary_declared_uid or ""
+            email_match = re.search(r"<([^>]+)>", primary_declared_uid_str)
+            email = email_match.group(1) if email_match else primary_declared_uid_str
             if email == f"{apache_uid}@apache.org":
                 comment_line = f"# {fingerprint_short} {email}"
             else:

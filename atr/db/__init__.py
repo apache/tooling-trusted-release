@@ -312,7 +312,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         length: Opt[int] = NOT_SET,
         created: Opt[datetime.datetime] = NOT_SET,
         expires: Opt[datetime.datetime | None] = NOT_SET,
-        declared_uid: Opt[str | None] = NOT_SET,
+        primary_declared_uid: Opt[str | None] = NOT_SET,
+        secondary_declared_uids: Opt[list[str]] = NOT_SET,
         apache_uid: Opt[str] = NOT_SET,
         ascii_armored_key: Opt[str] = NOT_SET,
         _committees: bool = False,
@@ -329,8 +330,10 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.PublicSigningKey.created == created)
         if is_defined(expires):
             query = query.where(models.PublicSigningKey.expires == expires)
-        if is_defined(declared_uid):
-            query = query.where(models.PublicSigningKey.declared_uid == declared_uid)
+        if is_defined(primary_declared_uid):
+            query = query.where(models.PublicSigningKey.primary_declared_uid == primary_declared_uid)
+        if is_defined(secondary_declared_uids):
+            query = query.where(models.PublicSigningKey.secondary_declared_uids == secondary_declared_uids)
         if is_defined(apache_uid):
             query = query.where(models.PublicSigningKey.apache_uid == apache_uid)
         if is_defined(ascii_armored_key):
