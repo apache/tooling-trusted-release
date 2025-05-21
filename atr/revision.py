@@ -79,8 +79,12 @@ async def create_and_manage(
         await aioshutil.rmtree(temp_dir)  # type: ignore[call-arg]
         return
 
-    # Create a revision row, but hold the write lock
-    async with db.session() as data, data.begin():
+    # Create a revision row, holding the write lock
+    async with db.session() as data:
+        # This is the only place where models.Revision is constructed
+        # That makes models.populate_revision_sequence_and_name safe against races
+        # Because that event is called when data.add is called below
+        # And we have a write lock at that point through the use of data.begin_immediate
         new_revision = models.Revision(
             release_name=release_name,
             release=release,
@@ -89,27 +93,41 @@ async def create_and_manage(
             phase=release.phase,
             description=description,
         )
+
+        # Acquire the write lock and add the row
+        # We need this write lock for moving the directory below atomically
+        # But it also helps to make models.populate_revision_sequence_and_name safe against races
+        await data.begin_immediate()
         data.add(new_revision)
+
         # Flush but do not commit the row to get its name and number
+        # The row will still be invisible to other sessions after flushing
         await data.flush()
-        # The row is still invisible to other sessions
+        # Give the caller details about the new revision
         creating.new = new_revision
-        # The caller will now have the details about the new revision
 
         # Rename the directory to the new revision number
         await data.refresh(release)
         new_revision_dir = util.release_directory(release)
+
         # Ensure that the parent directory exists
         await aiofiles.os.makedirs(new_revision_dir.parent, exist_ok=True)
+
         # Rename the temporary interim directory to the new revision number
         await aiofiles.os.rename(temp_dir, new_revision_dir)
-        # creating.interim_path = None
 
-        # Run checks if in DRAFT phase
-        if release.phase == models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-            # Must use caller_data here because we acquired the write lock
-            await tasks.draft_checks(project_name, version_name, new_revision.number, caller_data=data)
-        # Commit by leaving the data.begin() context manager
+        # Commit to end the transaction started by data.begin_immediate
+        # We must commit the revision before starting the checks
+        await data.commit()
+
+        async with data.begin():
+            # Run checks if in DRAFT phase
+            # We could also run this outside the data Session
+            # But then it would create its own new Session
+            # It does, however, need a transaction to be created using data.begin()
+            if release.phase == models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+                # Must use caller_data here because we acquired the write lock
+                await tasks.draft_checks(project_name, version_name, new_revision.number, caller_data=data)
 
 
 async def latest_info(project_name: str, version_name: str) -> tuple[str, str, datetime.datetime] | None:

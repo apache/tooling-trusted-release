@@ -130,6 +130,9 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
     # TODO: Need to type all of these arguments correctly
 
+    async def begin_immediate(self) -> None:
+        await self.execute(sql.text("BEGIN IMMEDIATE"))
+
     def check_result(
         self,
         id: Opt[int] = NOT_SET,
