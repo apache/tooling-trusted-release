@@ -40,19 +40,19 @@
         <h5 class="mb-0">Lookup results</h5>
       </div>
       <div class="card-body">
-        {% if error_message %}
+        {% if ldap_params and ldap_params.err_msg %}
           <div class="alert alert-danger" role="alert">
-            <p class="fw-bold">{{ error_message }}</p>
-            {% if server_info_for_debug %}
+            <p class="fw-bold">{{ ldap_params.err_msg }}</p>
+            {% if ldap_params.srv_info %}
               <p class="mb-1">Attempted server configuration:</p>
-              <pre class="small bg-light p-2 rounded"><code>{{ server_info_for_debug }}</code></pre>
+              <pre class="small bg-light p-2 rounded"><code>{{ ldap_params.srv_info }}</code></pre>
             {% endif %}
-            {% if detailed_error_info %}
+            {% if ldap_params.detail_err %}
               <p class="mb-1 mt-2">Detailed error information:</p>
-              <pre class="small bg-light p-2 rounded"><code>{{ detailed_error_info }}</code></pre>
+              <pre class="small bg-light p-2 rounded"><code>{{ ldap_params.detail_err }}</code></pre>
             {% endif %}
           </div>
-        {% elif results %}
+        {% elif ldap_params and ldap_params.results_list %}
           <table class="table table-striped table-hover">
             <thead>
               <tr>
@@ -65,7 +65,7 @@
               </tr>
             </thead>
             <tbody>
-              {% for result in results %}
+              {% for result in ldap_params.results_list %}
                 <tr>
                   <td>{{ result.get('dn', 'N/A') }}</td>
                   <td>{{ result.get('uid', ['N/A'])[0] }}</td>
