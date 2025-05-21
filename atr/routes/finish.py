@@ -149,14 +149,13 @@ async def _move_file_to_revision(
 ) -> tuple[quart_response.Response, int] | response.Response | None:
     try:
         description = "File move through web interface"
-        async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
-            new_revision_dir,
-            _new_revision_number,
-        ):
+        async with revision.create_and_manage(
+            project_name, version_name, session.uid, description=description
+        ) as creating:
             related_files = _related_files(source_file_rel)
-            bundle = [f for f in related_files if await aiofiles.os.path.exists(new_revision_dir / f)]
+            bundle = [f for f in related_files if await aiofiles.os.path.exists(creating.interim_path / f)]
             collisions = [
-                f.name for f in bundle if await aiofiles.os.path.exists(new_revision_dir / target_dir_rel / f.name)
+                f.name for f in bundle if await aiofiles.os.path.exists(creating.interim_path / target_dir_rel / f.name)
             ]
             if collisions:
                 msg = f"Files already exist in '{target_dir_rel}': {', '.join(collisions)}"
@@ -166,7 +165,7 @@ async def _move_file_to_revision(
                 return await session.redirect(selected, project_name=project_name, version_name=version_name)
 
             for f in bundle:
-                await aiofiles.os.rename(new_revision_dir / f, new_revision_dir / target_dir_rel / f.name)
+                await aiofiles.os.rename(creating.interim_path / f, creating.interim_path / target_dir_rel / f.name)
 
         await quart.flash(f"Moved {', '.join(f.name for f in bundle)}", "success")
         return await session.redirect(selected, project_name=project_name, version_name=version_name)

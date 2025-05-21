@@ -116,18 +116,16 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
             )
 
     description = f"Copy of revision {selected_revision_number} through web interface"
-    async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
-        new_revision_dir,
-        new_revision_number,
-    ):
-        # Uses new_revision_number after this block
+    async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as creating:
         # TODO: Stop create_and_manage from hard linking the parent first
-        await aioshutil.rmtree(new_revision_dir)  # type: ignore[call-arg]
-        await util.create_hard_link_clone(selected_revision_dir, new_revision_dir)
+        await aioshutil.rmtree(creating.interim_path)  # type: ignore[call-arg]
+        await util.create_hard_link_clone(selected_revision_dir, creating.interim_path)
 
+    if creating.new is None:
+        raise base.ASFQuartException("Internal error: New revision not found", errorcode=500)
     return await session.redirect(
         selected,
-        success=f"Copied revision {selected_revision_number} to new latest revision, {new_revision_number}",
+        success=f"Copied revision {selected_revision_number} to new latest revision, {creating.new.number}",
         project_name=project_name,
         version_name=version_name,
     )

@@ -124,10 +124,9 @@ async def selected_post(
                 destination = compose.selected
 
     description = "Create a preview revision from the last candidate draft"
-    async with revision.create_and_manage(project_name, release.version, session.uid, description=description) as (
-        _new_revision_dir,
-        _new_revision_number,
-    ):
+    async with revision.create_and_manage(
+        project_name, release.version, session.uid, description=description
+    ) as _creating:
         pass
 
     error_message = await _send_resolution(session, release, vote_result, resolution_body)

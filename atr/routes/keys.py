@@ -192,11 +192,10 @@ async def import_selected_revision(
     # Remove the KEYS file if 100% imported
     if (success_count > 0) and (error_count == 0):
         description = "Removed KEYS file after successful import through web interface"
-        async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
-            new_revision_dir,
-            _new_revision_number,
-        ):
-            path_in_new_revision = new_revision_dir / "KEYS"
+        async with revision.create_and_manage(
+            project_name, version_name, session.uid, description=description
+        ) as creating:
+            path_in_new_revision = creating.interim_path / "KEYS"
             await aiofiles.os.remove(path_in_new_revision)
     return await session.redirect(
         compose.selected,

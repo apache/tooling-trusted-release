@@ -199,6 +199,13 @@ async def key_user_session_add(
     }
 
 
+async def latest_revision(release: models.Release) -> models.Revision | None:
+    if release.latest_revision_number is None:
+        return None
+    async with db.session() as data:
+        return await data.revision(release_name=release.name, number=release.latest_revision_number).get()
+
+
 async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathInfo | None:
     info = PathInfo()
     latest_revision_number = release.latest_revision_number

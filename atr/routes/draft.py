@@ -24,7 +24,7 @@ import datetime
 import hashlib
 import logging
 import pathlib
-from typing import TYPE_CHECKING, Protocol, TypeVar
+from typing import TYPE_CHECKING, Final, Protocol, TypeVar
 
 import aiofiles.os
 import aioshutil
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     import werkzeug.wrappers.response as response
 
 # _CONFIG: Final = config.get()
-# _LOGGER: Final = logging.getLogger(__name__)
+_LOGGER: Final = logging.getLogger(__name__)
 
 
 T = TypeVar("T")
@@ -141,21 +141,17 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
 
     try:
         description = "File deletion through web interface"
-        async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
-            new_revision_dir,
-            new_revision_number,
-        ):
+        async with revision.create_and_manage(
+            project_name, version_name, session.uid, description=description
+        ) as creating:
             # Uses new_revision_number for logging only
             # Path to delete within the new revision directory
-            path_in_new_revision = new_revision_dir / rel_path_to_delete
+            path_in_new_revision = creating.interim_path / rel_path_to_delete
 
             # Check that the file exists in the new revision
             if not await aiofiles.os.path.exists(path_in_new_revision):
                 # This indicates a potential severe issue with hard linking or logic
-                logging.error(
-                    f"SEVERE ERROR! File {rel_path_to_delete} not found in new revision"
-                    f" {new_revision_number} before deletion"
-                )
+                logging.error(f"SEVERE ERROR! File {rel_path_to_delete} not found in new revision before deletion")
                 raise routes.FlashError("File to delete was not found in the new revision")
 
             # Check whether the file is an artifact
@@ -163,7 +159,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
                 # If so, delete all associated metadata files in the new revision
                 async for p in util.paths_recursive(path_in_new_revision.parent):
                     # Construct full path within the new revision
-                    metadata_path_obj = new_revision_dir / p
+                    metadata_path_obj = creating.interim_path / p
                     if p.name.startswith(rel_path_to_delete.name + "."):
                         await aiofiles.os.remove(metadata_path_obj)
                         metadata_files_deleted += 1
@@ -198,11 +194,10 @@ async def fresh(session: routes.CommitterSession, project_name: str, version_nam
     # This doesn't make sense unless the checks themselves have been updated
     # Therefore we only show the button for this to admins
     description = "Empty revision to restart all checks for the whole release candidate draft"
-    async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
-        _new_revision_dir,
-        _new_revision_number,
-    ):
-        ...
+    async with revision.create_and_manage(
+        project_name, version_name, session.uid, description=description
+    ) as _creating:
+        pass
 
     return await session.redirect(
         compose.selected,
@@ -231,20 +226,17 @@ async def hashgen(
 
     try:
         description = "Hash generation through web interface"
-        async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
-            new_revision_dir,
-            new_revision_number,
-        ):
+        async with revision.create_and_manage(
+            project_name, version_name, session.uid, description=description
+        ) as creating:
             # Uses new_revision_number for logging only
-            path_in_new_revision = new_revision_dir / rel_path
+            path_in_new_revision = creating.interim_path / rel_path
             hash_path_rel = rel_path.name + f".{hash_type}"
-            hash_path_in_new_revision = new_revision_dir / rel_path.parent / hash_path_rel
+            hash_path_in_new_revision = creating.interim_path / rel_path.parent / hash_path_rel
 
             # Check that the source file exists in the new revision
             if not await aiofiles.os.path.exists(path_in_new_revision):
-                logging.error(
-                    f"Source file {rel_path} not found in new revision {new_revision_number} for hash generation."
-                )
+                logging.error(f"Source file {rel_path} not found in new revision for hash generation.")
                 raise routes.FlashError("Source file not found in the new revision.")
 
             # Check that the hash file does not already exist in the new revision
@@ -291,53 +283,53 @@ async def sbomgen(
 
     try:
         description = "SBOM generation through web interface"
-        async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as (
-            new_revision_dir,
-            new_revision_number,
-        ):
+        async with revision.create_and_manage(
+            project_name, version_name, session.uid, description=description
+        ) as creating:
             # Uses new_revision_number in a functional way
-            path_in_new_revision = new_revision_dir / rel_path
+            path_in_new_revision = creating.interim_path / rel_path
             sbom_path_rel = rel_path.with_suffix(rel_path.suffix + ".cdx.json").name
-            sbom_path_in_new_revision = new_revision_dir / rel_path.parent / sbom_path_rel
+            sbom_path_in_new_revision = creating.interim_path / rel_path.parent / sbom_path_rel
 
             # Check that the source file exists in the new revision
             if not await aiofiles.os.path.exists(path_in_new_revision):
-                logging.error(
-                    f"Source file {rel_path} not found in new revision {new_revision_number} for SBOM generation."
-                )
+                logging.error(f"Source file {rel_path} not found in new revision for SBOM generation.")
                 raise routes.FlashError("Source artifact file not found in the new revision.")
 
             # Check that the SBOM file does not already exist in the new revision
             if await aiofiles.os.path.exists(sbom_path_in_new_revision):
                 raise base.ASFQuartException("SBOM file already exists", errorcode=400)
 
-            # Create and queue the task, using paths within the new revision
-            async with db.session() as data:
-                # We still need release.name for the task metadata
-                release = await session.release(project_name, version_name, data=data)
+        if creating.new is None:
+            raise routes.FlashError("Internal error: New revision not found")
 
-                sbom_task = models.Task(
-                    task_type=models.TaskType.SBOM_GENERATE_CYCLONEDX,
-                    task_args=sbom.GenerateCycloneDX(
-                        artifact_path=str(path_in_new_revision.resolve()),
-                        output_path=str(sbom_path_in_new_revision.resolve()),
-                    ).model_dump(),
-                    added=datetime.datetime.now(datetime.UTC),
-                    status=models.TaskStatus.QUEUED,
-                    release_name=release.name,
-                    revision_number=new_revision_number,
-                )
-                data.add(sbom_task)
-                await data.commit()
+        # Create and queue the task, using paths within the new revision
+        async with db.session() as data:
+            # We still need release.name for the task metadata
+            release = await session.release(project_name, version_name, data=data)
 
-                # We must wait until the sbom_task is complete before we can queue checks
-                # Maximum wait time is 60 * 100ms = 6000ms
-                for _attempt in range(60):
-                    await data.refresh(sbom_task)
-                    if sbom_task.status != models.TaskStatus.QUEUED:
-                        break
-                    # Wait 100ms before checking again
-                    await asyncio.sleep(0.1)
+            sbom_task = models.Task(
+                task_type=models.TaskType.SBOM_GENERATE_CYCLONEDX,
+                task_args=sbom.GenerateCycloneDX(
+                    artifact_path=str(path_in_new_revision.resolve()),
+                    output_path=str(sbom_path_in_new_revision.resolve()),
+                ).model_dump(),
+                added=datetime.datetime.now(datetime.UTC),
+                status=models.TaskStatus.QUEUED,
+                release_name=release.name,
+                revision_number=creating.new.number,
+            )
+            data.add(sbom_task)
+            await data.commit()
+
+            # We must wait until the sbom_task is complete before we can queue checks
+            # Maximum wait time is 60 * 100ms = 6000ms
+            for _attempt in range(60):
+                await data.refresh(sbom_task)
+                if sbom_task.status != models.TaskStatus.QUEUED:
+                    break
+                # Wait 100ms before checking again
+                await asyncio.sleep(0.1)
 
     except Exception as e:
         logging.exception("Error generating SBOM:")

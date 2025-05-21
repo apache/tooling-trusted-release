@@ -182,7 +182,9 @@ async def content_list(
         )
 
 
-async def create_hard_link_clone(source_dir: pathlib.Path, dest_dir: pathlib.Path) -> None:
+async def create_hard_link_clone(
+    source_dir: pathlib.Path, dest_dir: pathlib.Path, do_not_create_dest_dir: bool = False
+) -> None:
     """Recursively create a clone of source_dir in dest_dir using hard links for files."""
     # TODO: We're currently using cp -al instead
     # Ensure source exists and is a directory
@@ -190,7 +192,8 @@ async def create_hard_link_clone(source_dir: pathlib.Path, dest_dir: pathlib.Pat
         raise ValueError(f"Source path is not a directory or does not exist: {source_dir}")
 
     # Create destination directory
-    await aiofiles.os.makedirs(dest_dir, exist_ok=False)
+    if do_not_create_dest_dir is False:
+        await aiofiles.os.makedirs(dest_dir, exist_ok=False)
 
     async def _clone_recursive(current_source: pathlib.Path, current_dest: pathlib.Path) -> None:
         for entry in await aiofiles.os.scandir(current_source):

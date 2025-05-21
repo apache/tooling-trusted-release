@@ -72,24 +72,21 @@ async def _import_files_core(args: SvnImport) -> str:
     description = "Import of files from subversion"
     async with revision.create_and_manage(
         args.project_name, args.version_name, args.asf_uid, description=description
-    ) as (
-        new_revision_dir,
-        new_revision_number,
-    ):
-        # Uses new_revision_number after this block
-        _LOGGER.debug(f"Created revision directory: {new_revision_dir}")
+    ) as creating:
+        # Uses creating.new after this block
+        _LOGGER.debug(f"Created revision directory: {creating.interim_path}")
 
-        final_target_path = new_revision_dir
+        final_target_path = creating.interim_path
         if args.target_subdirectory:
-            final_target_path = new_revision_dir / args.target_subdirectory
+            final_target_path = creating.interim_path / args.target_subdirectory
             # Validate that final_target_path is a subdirectory of new_revision_dir
-            if not final_target_path.is_relative_to(new_revision_dir):
+            if not final_target_path.is_relative_to(creating.interim_path):
                 raise SvnImportError(
-                    f"Target subdirectory {args.target_subdirectory} is not a subdirectory of {new_revision_dir}"
+                    f"Target subdirectory {args.target_subdirectory} is not a subdirectory of {creating.interim_path}"
                 )
             await aiofiles.os.makedirs(final_target_path, exist_ok=True)
 
-        temp_export_path = new_revision_dir / temp_export_dir_name
+        temp_export_path = creating.interim_path / temp_export_dir_name
 
         svn_command = [
             "svn",
@@ -121,7 +118,9 @@ async def _import_files_core(args: SvnImport) -> str:
         await aiofiles.os.rmdir(temp_export_path)
         _LOGGER.info(f"Removed temporary export directory: {temp_export_path}")
 
-    return f"Successfully imported files from SVN into revision {new_revision_number}"
+    if creating.new is None:
+        raise SvnImportError("Internal error: New revision not found")
+    return f"Successfully imported files from SVN into revision {creating.new.number}"
 
 
 async def _import_files_core_run_svn_export(svn_command: list[str], temp_export_path: pathlib.Path) -> None:

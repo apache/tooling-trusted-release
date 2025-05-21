@@ -92,10 +92,7 @@ async def create_release_draft(project_name: str, version: str, asf_uid: str) ->
         await data.refresh(release)
 
     description = "Creation of empty release candidate draft through web interface"
-    async with revision.create_and_manage(project_name, version, asf_uid, description=description) as (
-        _new_revision_dir,
-        _new_revision_number,
-    ):
+    async with revision.create_and_manage(project_name, version, asf_uid, description=description) as _creating:
         pass
     return release, project
 

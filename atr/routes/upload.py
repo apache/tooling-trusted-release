@@ -137,10 +137,7 @@ async def _upload_files(
     """Process and save the uploaded files into a new draft revision."""
     number_of_files = len(files)
     description = f"Upload of {number_of_files} file{'' if number_of_files == 1 else 's'} through web interface"
-    async with revision.create_and_manage(project_name, version_name, asf_uid, description=description) as (
-        new_revision_dir,
-        _new_revision_number,
-    ):
+    async with revision.create_and_manage(project_name, version_name, asf_uid, description=description) as creating:
 
         def get_target_path(file: datastructures.FileStorage) -> pathlib.Path:
             # Determine the target path within the new revision directory
@@ -156,7 +153,7 @@ async def _upload_files(
                 relative_file_path = file_name.relative_to(file_name.anchor)
 
             # Construct path inside the new revision directory
-            target_path = new_revision_dir / relative_file_path
+            target_path = creating.interim_path / relative_file_path
             return target_path
 
         # Save each uploaded file to the new revision directory

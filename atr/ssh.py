@@ -484,29 +484,33 @@ async def _step_07b_process_validated_rsync_write(
 
         # Create the draft revision directory structure
         description = "File synchronisation through ssh, using rsync"
-        async with revision.create_and_manage(project_name, version_name, asf_uid, description=description) as (
-            new_revision_dir,
-            new_revision_number,
-        ):
+        async with revision.create_and_manage(project_name, version_name, asf_uid, description=description) as creating:
             # Uses new_revision_number for logging only
-            _LOGGER.info(f"Created draft revision directory: {new_revision_dir} ({new_revision_number})")
+            if creating.old is not None:
+                _LOGGER.info(f"Using old revision {creating.old.number} and interim path {creating.interim_path}")
             # Update the rsync command path to the new revision directory
-            argv[path_index] = str(new_revision_dir)
+            argv[path_index] = str(creating.interim_path)
 
             ###################################################
             ### Calls _step_08_execute_rsync_upload_command ###
             ###################################################
             exit_status = await _step_08_execute_rsync(process, argv)
             if exit_status != 0:
+                if creating.old is not None:
+                    for_revision = f"successor of revision {creating.old.number}"
+                else:
+                    for_revision = f"initial revision for release {project_name}-{version_name}"
                 _LOGGER.error(
-                    f"rsync upload failed with exit status {exit_status} for revision {new_revision_number}. "
+                    f"rsync upload failed with exit status {exit_status} for {for_revision}. "
                     f"Command: {process.command} (run as {' '.join(argv)})"
                 )
-
-            _LOGGER.info(f"rsync upload successful for revision {new_revision_number}")
-            # Close the connection unconditionally
-            # If we use "if not process.is_closing():" then it fails
-            process.exit(exit_status)
+        if creating.new is not None:
+            _LOGGER.info(f"rsync upload successful for revision {creating.new.number}")
+        else:
+            _LOGGER.info(f"rsync upload successful for release {project_name}-{version_name}")
+        # Close the connection unconditionally
+        # If we use "if not process.is_closing():" then it fails
+        process.exit(exit_status)
 
     except Exception as e:
         _LOGGER.exception(f"Error during draft revision processing for {project_name}-{version_name}")
