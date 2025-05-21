@@ -114,9 +114,6 @@ function renderListItems(tbodyElement, items, config) {
             button.className = `btn btn-sm ${config.buttonClassBase} ${config.buttonClassOutline}`;
             button.dataset[config.itemType === ItemType.File ? "filePath" : "dirPath"] = itemPathString;
             button.textContent = config.buttonTextDefault;
-            if (config.disableCondition(itemPathString, uiState.currentlySelectedFilePath, uiState.currentlyChosenDirectoryPath, getParentPath)) {
-                button.disabled = true;
-            }
             buttonCell.appendChild(button);
         }
         pathCell.appendChild(span);
@@ -146,8 +143,7 @@ function renderAllLists() {
         buttonClassActive: "btn-primary",
         buttonTextSelected: TXT_SELECTED,
         buttonTextDefault: TXT_SELECT,
-        moreInfoId: FILE_LIST_MORE_INFO_ID,
-        disableCondition: (itemPath, _selectedFile, chosenDir, getParent) => !!chosenDir && (getParent(itemPath) === chosenDir),
+        moreInfoId: FILE_LIST_MORE_INFO_ID
     };
     renderListItems(fileListTableBody, filteredFilePaths, filesConfig);
     const lowerDirFilter = toLower(uiState.dirFilter);
@@ -160,8 +156,7 @@ function renderAllLists() {
         buttonClassActive: "btn-secondary",
         buttonTextSelected: TXT_CHOSEN,
         buttonTextDefault: TXT_CHOOSE,
-        moreInfoId: DIR_LIST_MORE_INFO_ID,
-        disableCondition: (itemPath, selectedFile, _chosenDir, getParent) => !!selectedFile && (getParent(selectedFile) === itemPath),
+        moreInfoId: DIR_LIST_MORE_INFO_ID
     };
     renderListItems(dirListTableBody, filteredDirs, dirsConfig);
     updateMoveSelectionInfo();
@@ -177,6 +172,8 @@ function handleFileSelection(filePath) {
     renderAllLists();
 }
 function handleDirSelection(dirPath) {
+    if (dirPath && uiState.currentlySelectedFilePath && getParentPath(uiState.currentlySelectedFilePath) === dirPath)
+        uiState.currentlySelectedFilePath = null;
     uiState.currentlyChosenDirectoryPath = dirPath;
     renderAllLists();
 }

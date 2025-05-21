@@ -60,12 +60,6 @@ interface RenderListDisplayConfig {
     buttonTextSelected: string;
     buttonTextDefault: string;
     moreInfoId: string;
-    disableCondition: (
-        itemPath: string,
-        selectedFile: string | null,
-        chosenDir: string | null,
-        getParent: (filePath: string) => string
-    ) => boolean;
 }
 
 let fileFilterInput: HTMLInputElement;
@@ -165,9 +159,6 @@ function renderListItems(
             button.dataset[config.itemType === ItemType.File ? "filePath" : "dirPath"] = itemPathString;
             button.textContent = config.buttonTextDefault;
 
-            if (config.disableCondition(itemPathString, uiState.currentlySelectedFilePath, uiState.currentlyChosenDirectoryPath, getParentPath)) {
-                button.disabled = true;
-            }
             buttonCell.appendChild(button);
         }
 
@@ -202,9 +193,7 @@ function renderAllLists(): void {
         buttonClassActive: "btn-primary",
         buttonTextSelected: TXT_SELECTED,
         buttonTextDefault: TXT_SELECT,
-        moreInfoId: FILE_LIST_MORE_INFO_ID,
-        disableCondition: (itemPath, _selectedFile, chosenDir, getParent) =>
-            !!chosenDir && (getParent(itemPath) === chosenDir),
+        moreInfoId: FILE_LIST_MORE_INFO_ID
     };
     renderListItems(fileListTableBody, filteredFilePaths, filesConfig);
 
@@ -220,9 +209,7 @@ function renderAllLists(): void {
         buttonClassActive: "btn-secondary",
         buttonTextSelected: TXT_CHOSEN,
         buttonTextDefault: TXT_CHOOSE,
-        moreInfoId: DIR_LIST_MORE_INFO_ID,
-        disableCondition: (itemPath, selectedFile, _chosenDir, getParent) =>
-            !!selectedFile && (getParent(selectedFile) === itemPath),
+        moreInfoId: DIR_LIST_MORE_INFO_ID
     };
     renderListItems(dirListTableBody, filteredDirs, dirsConfig);
 
@@ -241,6 +228,7 @@ function handleFileSelection(filePath: string | null): void {
 }
 
 function handleDirSelection(dirPath: string | null): void {
+    if (dirPath && uiState.currentlySelectedFilePath && getParentPath(uiState.currentlySelectedFilePath) === dirPath) uiState.currentlySelectedFilePath = null;
     uiState.currentlyChosenDirectoryPath = dirPath;
     renderAllLists();
 }
