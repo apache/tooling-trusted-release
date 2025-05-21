@@ -103,7 +103,7 @@ function renderListItems(tbodyElement, items, config) {
             row.setAttribute("aria-selected", "true");
             span.classList.add("fw-bold");
             const arrowSpan = document.createElement("span");
-            arrowSpan.className = "text-success fs-3";
+            arrowSpan.className = "text-success fs-1";
             arrowSpan.textContent = "→";
             buttonCell.appendChild(arrowSpan);
         }
