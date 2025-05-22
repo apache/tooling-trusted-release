@@ -453,7 +453,8 @@ async def _step_07a_process_validated_rsync_read(
                 f"Command: {process.command} (run as {' '.join(argv)})"
             )
 
-        process.exit(exit_status)
+        if not process.is_closing():
+            process.exit(exit_status)
 
     except Exception as e:
         _LOGGER.exception(f"Error during rsync read processing for {release.name}")
@@ -507,16 +508,22 @@ async def _step_07b_process_validated_rsync_write(
                 creating.failed = True
         if creating.new is not None:
             _LOGGER.info(f"rsync upload successful for revision {creating.new.number}")
+            host = config.get().APP_HOST
+            message = f"\nATR: Created revision {creating.new.number} of {project_name} {version_name}\n"
+            message += f"ATR: https://{host}/compose/{project_name}/{version_name}\n"
+            if not process.stderr.is_closing():
+                process.stderr.write(message.encode())
+                await process.stderr.drain()
         else:
             _LOGGER.info(f"rsync upload successful for release {project_name}-{version_name}")
-        # Close the connection unconditionally
-        # If we use "if not process.is_closing():" then it fails
-        process.exit(exit_status)
+        if not process.is_closing():
+            process.exit(exit_status)
 
     except Exception as e:
         _LOGGER.exception(f"Error during draft revision processing for {project_name}-{version_name}")
         _fail(process, f"Internal error processing upload revision: {e}", None)
-        process.exit(1)
+        if not process.is_closing():
+            process.exit(1)
 
 
 async def _step_07c_ensure_release_object_for_write(
@@ -569,7 +576,8 @@ async def _step_08_execute_rsync(process: asyncssh.SSHServerProcess, argv: list[
         stderr=asyncio.subprocess.PIPE,
     )
     # Redirect the client's streams to the rsync process
-    await process.redirect(stdin=proc.stdin, stdout=proc.stdout, stderr=proc.stderr)
+    # TODO: Do we instead need send_eof=False on stderr only?
+    await process.redirect(stdin=proc.stdin, stdout=proc.stdout, stderr=proc.stderr, send_eof=False)
     # Wait for rsync to finish and get its exit status
     exit_status = await proc.wait()
     _LOGGER.info(f"Rsync finished with exit status {exit_status}")
