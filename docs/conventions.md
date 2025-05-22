@@ -185,6 +185,21 @@ While this approach can lead to slightly longer function names, the benefits of 
 
 Classes should always be placed before functions. Private, underscored, classes should be placed after all public classes, and likewise for functions.
 
+### Use numbers in function names with long, linear flow
+
+In some cases, such as testing, computation proceeds through a predictable, linear path and is implemented across many functions. In such cases, use numbers in the function names to make the order clear. One disadvantage to this style is the requirement to renumber all subsequent functions when inserting a new function in the middle.
+
+**Example:**
+
+```python
+def example_01_start():
+def example_02_prepare():
+def example_03_query():
+def example_04_filter():
+def example_05_process()):
+def example_06_clean_up():
+```
+
 ### Give helper functions the same prefix as their parent function
 
 This makes it easier to find all the functions related to a specific task.

@@ -119,6 +119,16 @@ def license_files_verify():         # sorted alphabetically
 <p>Note how verbs tend to come last, so that function names now read in an object oriented style, like a module, object, and action.</p>
 <p>While this approach can lead to slightly longer function names, the benefits of improved code organisation and discoverability outweigh the verbosity.</p>
 <p>Classes should always be placed before functions. Private, underscored, classes should be placed after all public classes, and likewise for functions.</p>
+<h3>Use numbers in function names with long, linear flow</h3>
+<p>In some cases, such as testing, computation proceeds through a predictable, linear path and is implemented across many functions. In such cases, use numbers in the function names to make the order clear. One disadvantage to this style is the requirement to renumber all subsequent functions when inserting a new function in the middle.</p>
+<p><strong>Example:</strong></p>
+<pre><code class="language-python">def example_01_start():
+def example_02_prepare():
+def example_03_query():
+def example_04_filter():
+def example_05_process()):
+def example_06_clean_up():
+</code></pre>
 <h3>Give helper functions the same prefix as their parent function</h3>
 <p>This makes it easier to find all the functions related to a specific task.</p>
 <p><strong>Example</strong>:</p>
