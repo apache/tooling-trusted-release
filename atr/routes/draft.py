@@ -449,6 +449,8 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
             util.get_unfinished_dir(), project_name, version_name, release.unwrap_revision_number
         )
     ]
+    # Sort the files by FileStat.path
+    file_stats.sort(key=lambda fs: fs.path)
 
     return await quart.render_template(
         # TODO: Move to somewhere appropriate
