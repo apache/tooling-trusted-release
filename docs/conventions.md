@@ -196,7 +196,7 @@ def example_01_start():
 def example_02_prepare():
 def example_03_query():
 def example_04_filter():
-def example_05_process()):
+def example_05_process():
 def example_06_clean_up():
 ```
 

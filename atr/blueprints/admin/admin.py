@@ -40,6 +40,7 @@ import atr.db as db
 import atr.db.interaction as interaction
 import atr.db.models as models
 import atr.ldap as ldap
+import atr.routes.mapping as mapping
 import atr.util as util
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -288,12 +289,12 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
     return await quart.render_template("update-projects.html", empty_form=empty_form)
 
 
-@admin.BLUEPRINT.route("/releases")
-async def admin_releases() -> str:
+@admin.BLUEPRINT.route("/all-releases")
+async def admin_all_releases() -> str:
     """Display a list of all releases across all phases."""
     async with db.session() as data:
         releases = await data.release(_project=True, _committee=True).order_by(models.Release.name).all()
-    return await quart.render_template("releases.html", releases=releases)
+    return await quart.render_template("all-releases.html", releases=releases, release_as_url=mapping.release_as_url)
 
 
 @admin.BLUEPRINT.route("/tasks")
