@@ -37,6 +37,7 @@ import playwright.sync_api as sync_api
 
 _SSH_KEY_COMMENT: Final[str] = "atr-playwright-test@127.0.0.1"
 _SSH_KEY_PATH: Final[str] = "/root/.ssh/id_ed25519"
+_GPG_TEST_UID: Final[str] = "<apache-tooling@example.invalid>"
 
 
 @dataclasses.dataclass
@@ -1033,30 +1034,70 @@ def test_tidy_up_gpg_keys(page: sync_api.Page) -> None:
     go_to_path(page, "/keys")
     logging.info("Navigated to /keys page for GPG key cleanup")
 
-    gpg_key_section_locator = page.locator("h2:has-text('GPG keys')")
-    # Find cards within the GPG section by looking for the fingerprint
-    key_cards_locator = gpg_key_section_locator.locator(
-        "xpath=following-sibling::div//div[contains(@class, 'card') and .//td[contains(text(), '@')]]"
+    gpg_key_section_locator = page.locator("h3:has-text('GPG keys')")
+    key_cards_container_locator = gpg_key_section_locator.locator(
+        "xpath=following-sibling::div[contains(@class, 'mb-5')]//div[contains(@class, 'd-grid')]"
     )
+    key_cards_locator = key_cards_container_locator.locator("> div.card")
 
     key_cards = key_cards_locator.all()
     logging.info(f"Found {len(key_cards)} potential GPG key cards to check")
 
     fingerprints_to_delete = []
-    test_uid_substring = "<apache-tooling@example.invalid>"
 
-    # Identify keys with the test UID
     for card in key_cards:
-        user_id_locator = card.locator(f'td:has-text("{test_uid_substring}")')
-        if user_id_locator.is_visible():
-            fingerprint_locator = card.locator('tr:has(th:has-text("Fingerprint")) > td')
-            fingerprint = fingerprint_locator.inner_text()
+        details_element = card.locator("details").first
+        summary_element = details_element.locator("summary").first
+
+        if not details_element.is_visible(timeout=500):
+            logging.warning("GPG key card: <details> element not found or not visible, skipping")
+            continue
+        if not summary_element.is_visible(timeout=500):
+            logging.warning("GPG key card: <summary> element not found or not visible, skipping")
+            continue
+
+        is_already_open = details_element.evaluate("el => el.hasAttribute('open')")
+
+        if not is_already_open:
+            logging.info("GPG key card: details is not open, clicking summary to open")
+            summary_element.click()
+            try:
+                sync_api.expect(details_element).to_have_attribute("open", "", timeout=2000)
+                logging.info("GPG key card: details successfully opened")
+            except Exception as e:
+                logging.warning(
+                    f"GPG key card: failed to confirm details opened after clicking summary: {e}, skipping card"
+                )
+                continue
+        else:
+            logging.info("GPG key card: Details already open.")
+
+        details_pre_locator = details_element.locator("pre").first
+        try:
+            sync_api.expect(details_pre_locator).to_be_visible(timeout=1000)
+        except Exception as e:
+            logging.warning(
+                f"GPG key card: <pre> tag not visible even after attempting to open details: {e}, skipping card"
+            )
+            continue
+
+        key_content = details_pre_locator.inner_text()
+        if _GPG_TEST_UID in key_content:
+            fingerprint_locator = card.locator('tr:has(th:has-text("Fingerprint")) > td').first
+            fingerprint = fingerprint_locator.inner_text().strip()
             if fingerprint:
                 logging.info(f"Found test GPG key with fingerprint {fingerprint} for deletion")
                 fingerprints_to_delete.append(fingerprint)
             else:
                 logging.warning("Found test GPG key card but could not extract fingerprint")
+        else:
+            logging.debug(f"GPG key card: test UID '{_GPG_TEST_UID}' not found in key content")
 
+    # For the complexity linter only
+    test_tidy_up_gpg_keys_continued(page, fingerprints_to_delete)
+
+
+def test_tidy_up_gpg_keys_continued(page: sync_api.Page, fingerprints_to_delete: list[str]) -> None:
     if not fingerprints_to_delete:
         logging.info("No test GPG keys found to delete")
         return
@@ -1137,45 +1178,73 @@ def test_tidy_up_ssh_keys(page: sync_api.Page) -> None:
     go_to_path(page, "/keys")
     logging.info("Navigated to /keys page for SSH key cleanup")
 
-    ssh_key_section_locator = page.locator("h2:has-text('SSH keys')")
-    key_cards_locator = ssh_key_section_locator.locator("xpath=following-sibling::div//div[contains(@class, 'card')]")
+    ssh_key_section_locator = page.locator("h3:has-text('SSH keys')")
+    key_cards_container_locator = ssh_key_section_locator.locator(
+        "xpath=following-sibling::div[contains(@class, 'mb-5')]//div[contains(@class, 'd-grid')]"
+    )
+    key_cards_locator = key_cards_container_locator.locator("> div.card")
 
     key_cards = key_cards_locator.all()
     logging.info(f"Found {len(key_cards)} potential SSH key cards to check")
 
     fingerprints_to_delete = []
 
-    # Identify keys with the test comment
     for card in key_cards:
-        # Ensure that the details section is open by clicking the summary
-        # TODO: We should consider always displaying the key content instead
-        summary_locator = card.locator("details > summary")
-        # Check that summary exists before clicking
-        if summary_locator.is_visible():
-            # Open the details
-            summary_locator.click()
-        else:
-            logging.warning("Could not find summary element in key card, skipping")
+        details_element = card.locator("details").first
+        summary_element = details_element.locator("summary").first
+
+        if not details_element.is_visible(timeout=500):
+            logging.warning("SSH key card: <details> element not found or not visible, skipping")
+            continue
+        if not summary_element.is_visible(timeout=500):
+            logging.warning("SSH key card: <summary> element not found or not visible, skipping")
             continue
 
-        # Check the content of the pre element
-        details_locator = card.locator("details > pre")
-        # Even after clicking summary, wait for visibility just in case
-        sync_api.expect(details_locator).to_be_visible(timeout=1000)
+        is_already_open = details_element.evaluate("el => el.hasAttribute('open')")
 
-        if details_locator.is_visible():
-            key_content = details_locator.inner_text()
-            if _SSH_KEY_COMMENT in key_content:
-                fingerprint_locator = card.locator('td:has-text("SHA256:")')
-                fingerprint = fingerprint_locator.inner_text()
+        if not is_already_open:
+            logging.info("SSH key card: details is not open, clicking summary to open")
+            summary_element.click()
+            try:
+                sync_api.expect(details_element).to_have_attribute("open", "", timeout=2000)
+                logging.info("SSH key card: details successfully opened")
+            except Exception as e:
+                logging.warning(
+                    f"SSH key card: failed to confirm details opened after clicking summary: {e}, skipping card"
+                )
+                continue
+        else:
+            logging.info("SSH key card: details already open")
+
+        details_pre_locator = details_element.locator("pre").first
+        try:
+            sync_api.expect(details_pre_locator).to_be_visible(timeout=1000)
+        except Exception as e:
+            logging.warning(
+                f"SSH key card: <pre> tag not visible even after attempting to open details: {e}, skipping card"
+            )
+            continue
+
+        key_content = details_pre_locator.inner_text()
+        if _SSH_KEY_COMMENT in key_content:
+            fingerprint_td_locator = card.locator('td:has-text("SHA256:")')
+            if fingerprint_td_locator.is_visible(timeout=500):
+                fingerprint = fingerprint_td_locator.inner_text().strip()
                 if fingerprint:
                     logging.info(f"Found test SSH key with fingerprint {fingerprint} for deletion")
                     fingerprints_to_delete.append(fingerprint)
                 else:
-                    logging.warning("Found test key card but could not extract fingerprint")
+                    logging.warning("Found test SSH key card but could not extract fingerprint text from td")
+            else:
+                logging.warning("Could not locate fingerprint td for a test key card")
         else:
-            logging.warning("Key details <pre> not visible even after clicking summary")
+            logging.debug(f"SSH key card: test comment '{_SSH_KEY_COMMENT}' not found in key content")
 
+    # For the complexity linter only
+    test_tidy_up_ssh_keys_continued(page, fingerprints_to_delete)
+
+
+def test_tidy_up_ssh_keys_continued(page: sync_api.Page, fingerprints_to_delete: list[str]) -> None:
     if not fingerprints_to_delete:
         logging.info("No test SSH keys found to delete")
         return
