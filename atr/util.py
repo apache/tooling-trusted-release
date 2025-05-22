@@ -371,7 +371,9 @@ async def number_of_release_files(release: models.Release) -> int:
     """Return the number of files in a release."""
     path_project = release.project.name
     path_version = release.version
-    path_revision = release.unwrap_revision_number
+    path_revision = release.latest_revision_number
+    if path_revision is None:
+        return 0
     match release.phase:
         case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
             path = get_unfinished_dir() / path_project / path_version / path_revision
