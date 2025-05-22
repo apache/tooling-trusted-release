@@ -37,6 +37,23 @@ SPECIAL_SUFFIXES: Final[frozenset[str]] = frozenset({".asc", ".sha256", ".sha512
 _LOGGER: Final = logging.getLogger(__name__)
 
 
+class CreateDirectoryForm(util.QuartFormTyped):
+    """Form for creating a new directory within a preview revision."""
+
+    new_directory_name = wtforms.StringField(
+        "New directory name",
+        validators=[
+            wtforms.validators.InputRequired(),
+            wtforms.validators.Regexp(
+                r"^(?!.*\.\.)(?!^\.$)(?!^/)(?!.*/$)[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*$",
+                message="Invalid characters or structure. Use a-z, 0-9, _, -."
+                " No leading or trailing slashes, and no dots. No '..' segments.",
+            ),
+        ],
+    )
+    submit = wtforms.SubmitField("Create directory")
+
+
 class MoveFileForm(util.QuartFormTyped):
     """Form for moving a file within a preview revision."""
 
@@ -75,21 +92,40 @@ async def selected(
         await quart.flash("Preview revision directory not found.", "error")
         return await session.redirect(root.index)
 
-    form = await MoveFileForm.create_form(data=await quart.request.form if (quart.request.method == "POST") else None)
+    formdata = None
+    if quart.request.method == "POST":
+        formdata = await quart.request.form
+
+    move_form = await MoveFileForm.create_form(
+        data=formdata if (formdata and formdata.get("form_action") != "create_dir") else None
+    )
+    create_dir_form = await CreateDirectoryForm.create_form(
+        data=formdata if (formdata and formdata.get("form_action") == "create_dir") else None
+    )
 
     # Populate choices dynamically for both GET and POST
-    form.source_file.choices = sorted([(str(p), str(p)) for p in source_files_rel])
-    form.target_directory.choices = sorted([(str(d), str(d)) for d in target_dirs])
+    move_form.source_file.choices = sorted([(str(p), str(p)) for p in source_files_rel])
+    move_form.target_directory.choices = sorted([(str(d), str(d)) for d in target_dirs])
     can_move = (len(target_dirs) > 1) and (len(source_files_rel) > 0)
 
-    if (quart.request.method == "POST") and can_move:
-        match await _move_file(form, session, project_name, version_name):
-            case None:
-                pass
-            case tuple() as resp_tuple:
-                return resp_tuple
-            case resp_obj if isinstance(resp_obj, response.Response):
-                return resp_obj
+    if formdata:
+        form_action = formdata.get("form_action")
+        if form_action == "create_dir":
+            if await create_dir_form.validate_on_submit():
+                new_dir_name = create_dir_form.new_directory_name.data
+                if new_dir_name:
+                    return await _create_directory_in_revision(
+                        pathlib.Path(new_dir_name),
+                        session,
+                        project_name,
+                        version_name,
+                        quart.request.accept_mimetypes.best_match(["application/json", "text/html"])
+                        == "application/json",
+                    )
+        elif (form_action != "create_dir") and can_move:
+            move_result = await _move_file(move_form, session, project_name, version_name)
+            if move_result is not None:
+                return move_result
 
     # resp = await quart.current_app.make_response(template_rendered)
     # resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -102,11 +138,84 @@ async def selected(
         server_domain=session.app_host,
         release=release,
         source_files=sorted(source_files_rel),
-        form=form,
+        form=move_form,
+        create_dir_form=create_dir_form,
         can_move=can_move,
         user_ssh_keys=user_ssh_keys,
         target_dirs=sorted(list(target_dirs)),
     )
+
+
+async def _respond(
+    session: routes.CommitterSession,
+    project_name: str,
+    version_name: str,
+    wants_json: bool,
+    ok: bool,
+    msg: str,
+    http_status: int = 200,
+) -> tuple[quart_response.Response, int] | response.Response:
+    """Helper to respond with JSON or flash message and redirect."""
+    if wants_json:
+        return quart.jsonify(ok=ok, message=msg), http_status
+    await quart.flash(msg, "success" if ok else "error")
+    return await session.redirect(selected, project_name=project_name, version_name=version_name)
+
+
+async def _create_directory_in_revision(
+    new_dir_rel: pathlib.Path,
+    session: routes.CommitterSession,
+    project_name: str,
+    version_name: str,
+    wants_json: bool,
+) -> tuple[quart_response.Response, int] | response.Response:
+    try:
+        description = "Directory creation through web interface"
+        async with revision.create_and_manage(
+            project_name, version_name, session.uid, description=description
+        ) as creating:
+            target_path = creating.interim_path / new_dir_rel
+            # Path traversal check
+            try:
+                resolved_target_path = target_path.resolve()
+                resolved_target_path.relative_to(creating.interim_path.resolve())
+                await aiofiles.os.makedirs(target_path, exist_ok=False)
+            except ValueError:
+                creating.failed = True
+                # Path traversal attempt detected
+                return await _respond(
+                    session, project_name, version_name, wants_json, False, "Invalid directory path.", 400
+                )
+            except FileExistsError:
+                creating.failed = True
+                return await _respond(
+                    session,
+                    project_name,
+                    version_name,
+                    wants_json,
+                    False,
+                    f"Directory or file '{new_dir_rel}' already exists.",
+                    400,
+                )
+        return await _respond(
+            session,
+            project_name,
+            version_name,
+            wants_json,
+            True,
+            f"Created directory '{new_dir_rel}'.",
+            201 if wants_json else 200,
+        )
+    except OSError as e:
+        _LOGGER.exception("Error creating directory in new revision")
+        return await _respond(
+            session, project_name, version_name, wants_json, False, f"Error creating directory: {e}", 500
+        )
+    except Exception as e:
+        _LOGGER.exception("Unexpected error during directory creation")
+        return await _respond(
+            session, project_name, version_name, wants_json, False, f"An unexpected error occurred: {e!s}", 500
+        )
 
 
 async def _move_file(
@@ -128,7 +237,7 @@ async def _move_file(
                 label_text = label_object.text if label_object else field_name.replace("_", " ").title()
                 error_messages.append(f"{label_text}: {', '.join(field_errors)}")
             error_string = "; ".join(error_messages)
-            return quart.jsonify(error=error_string), 400
+            return await _respond(session, project_name, version_name, True, False, error_string, 400)
         else:
             for field_name, field_errors in form.errors.items():
                 field_object = getattr(form, field_name, None)
@@ -136,7 +245,7 @@ async def _move_file(
                 label_text = label_object.text if label_object else field_name.replace("_", " ").title()
                 for error_message_text in field_errors:
                     await quart.flash(f"{label_text}: {error_message_text}", "warning")
-    return None
+            return None
 
 
 async def _move_file_to_revision(
@@ -146,7 +255,7 @@ async def _move_file_to_revision(
     project_name: str,
     version_name: str,
     wants_json: bool,
-) -> tuple[quart_response.Response, int] | response.Response | None:
+) -> tuple[quart_response.Response, int] | response.Response:
     try:
         description = "File move through web interface"
         async with revision.create_and_manage(
@@ -162,37 +271,34 @@ async def _move_file_to_revision(
                 # (But also do not raise an exception)
                 creating.failed = True
                 msg = f"Files already exist in '{target_dir_rel}': {', '.join(collisions)}"
-                if wants_json:
-                    return quart.jsonify(error=msg), 400
-                await quart.flash(msg, "error")
-                return await session.redirect(selected, project_name=project_name, version_name=version_name)
+                return await _respond(session, project_name, version_name, wants_json, False, msg, 400)
 
             for f in bundle:
                 await aiofiles.os.rename(creating.interim_path / f, creating.interim_path / target_dir_rel / f.name)
 
-        await quart.flash(f"Moved {', '.join(f.name for f in bundle)}", "success")
-        return await session.redirect(selected, project_name=project_name, version_name=version_name)
+        return await _respond(
+            session, project_name, version_name, wants_json, True, f"Moved {', '.join(f.name for f in bundle)}", 200
+        )
 
     except FileNotFoundError:
         _LOGGER.exception("File not found during move operation in new revision")
-        msg = "Error: Source file not found during move operation."
-        if wants_json:
-            return quart.jsonify(error=msg), 400
-        await quart.flash(msg, "error")
+        return await _respond(
+            session,
+            project_name,
+            version_name,
+            wants_json,
+            False,
+            "Error: Source file not found during move operation.",
+            400,
+        )
     except OSError as e:
         _LOGGER.exception("Error moving file in new revision")
-        msg = f"Error moving file: {e}"
-        if wants_json:
-            return quart.jsonify(error=msg), 500
-        await quart.flash(msg, "error")
+        return await _respond(session, project_name, version_name, wants_json, False, f"Error moving file: {e}", 500)
     except Exception as e:
         _LOGGER.exception("Unexpected error during file move")
-        msg = f"An unexpected error occurred: {e!s}"
-        if wants_json:
-            return quart.jsonify(error=msg), 500
-        await quart.flash(msg, "error")
-
-    return await session.redirect(selected, project_name=project_name, version_name=version_name)
+        return await _respond(
+            session, project_name, version_name, wants_json, False, f"An unexpected error occurred: {e!s}", 500
+        )
 
 
 def _related_files(path: pathlib.Path) -> list[pathlib.Path]:
