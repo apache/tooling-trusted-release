@@ -21,3 +21,6 @@ cp ../custom.scss scss/custom.scss
 cp ../reboot-shim.scss scss/reboot-shim.scss
 sass -q scss/custom.scss css/custom.css
 cp css/custom.css ../../atr/static/css/bootstrap.custom.css
+cp css/custom.css.map ../../atr/static/css/bootstrap.custom.css.map
+cp node_modules/bootstrap/dist/js/bootstrap.bundle.min.js ../../atr/static/js/bootstrap.bundle.min.js
+cp node_modules/bootstrap/dist/js/bootstrap.bundle.min.js.map ../../atr/static/js/bootstrap.bundle.min.js.map
