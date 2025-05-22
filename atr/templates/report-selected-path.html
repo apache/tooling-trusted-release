@@ -8,6 +8,19 @@
   Show the report for the {{ release.short_display_name }} {{ package.filename }} candidate draft file.
 {% endblock description %}
 
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .page-member-path-hide {
+          display: none !important;
+      }
+
+      .page-member-visible-odd {
+          background-color: rgba(0, 0, 0, 0.05);
+      }
+  </style>
+{% endblock stylesheets %}
+
 {% block content %}
   {% set phase = release.phase.value %}
   <p class="d-flex justify-content-between align-items-center">
@@ -108,7 +121,7 @@
           {% for primary_result in primary_results %}
             <tr class="atr-result-primary atr-result-status-{{ primary_result.status.value }} {% if primary_result.status.value == 'success' and not all_primary_are_success %}atr-hide{% endif %}">
               <th scope="row" class="align-middle fw-bold">{{ function_name_from_key(primary_result.checker) }}</th>
-              <td class="align-middle">
+              <td class="align-middle text-break">
                 {% if primary_result.data is mapping and primary_result.data.keys()|length > 0 %}
                   <details class="bg-light rounded">
                     <summary class="atr-cursor-pointer user-select-none p-2">
@@ -234,7 +247,7 @@
       {% endfor %}
       {% if member_status_counts.success > 0 or member_status_counts.failure > 0 or member_status_counts.warning > 0 or member_status_counts.exception > 0 %}
         {% set all_member_are_success = member_status_counts.failure == 0 and member_status_counts.warning == 0 and member_status_counts.exception == 0 %}
-        <div class="d-flex flex-wrap gap-2 mb-3">
+        <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
           {% for status, count in member_status_counts.items() %}
             {% if count > 0 %}
               {% set bs_status = 'danger' if status == 'exception' or status == 'failure' else status %}
@@ -253,10 +266,15 @@
               </button>
             {% endif %}
           {% endfor %}
+          <input type="text"
+                 id="member-path-filter"
+                 class="form-control form-control-sm ms-auto w-20"
+                 placeholder="Filter paths..."
+                 aria-label="Filter member paths" />
         </div>
       {% endif %}
 
-      <table class="table table-bordered table-striped border mb-3">
+      <table class="table table-bordered border mb-3">
         <thead class="table-light">
           <tr>
             <th scope="col" class="w-30">Path</th>
@@ -268,10 +286,12 @@
         <tbody>
           {% for member_rel_path, member_results_list in member_results.items() %}
             {% for member_result in member_results_list %}
-              <tr class="atr-result-member atr-result-status-{{ member_result.status.value }} {% if member_result.status.value == 'success' and not all_member_are_success %}atr-hide{% endif %}">
+              {# The striping class here is now technically redundant because of the JS striping #}
+              {# But we leave it here for clean initial page rendering #}
+              <tr class="atr-result-member atr-result-status-{{ member_result.status.value }} {% if member_result.status.value == 'success' and not all_member_are_success %}atr-hide{% endif %} {% if loop.index is odd %}page-member-visible-odd{% endif %} ">
                 <td class="align-middle">{{ member_rel_path }}</td>
                 <th scope="row" class="align-middle fw-bold">{{ function_name_from_key(member_result.checker) }}</th>
-                <td class="align-middle">
+                <td class="align-middle text-break">
                   {% if member_result.message %}{{ member_result.message }}{% endif %}
                 </td>
                 <td class="align-middle text-center atr-sans">
@@ -341,7 +361,40 @@
               btn.classList.remove(`btn-${bsSt}`);
               btn.classList.add(`btn-outline-${bsSt}`);
           }
+          if (type === "member") {
+              updateMemberStriping();
+          }
       }
+
+      function updateMemberStriping() {
+          let visibleIdx = 0;
+          document.querySelectorAll(".atr-result-member").forEach(r => {
+              r.classList.remove("page-member-visible-odd");
+              if (!r.classList.contains("atr-hide") && !r.classList.contains("page-member-path-hide")) {
+                  if (visibleIdx % 2 === 0) r.classList.add("page-member-visible-odd");
+                  visibleIdx++;
+              }
+          });
+      }
+
+      const mpfInput = document.getElementById("member-path-filter");
+      if (mpfInput) {
+          mpfInput.addEventListener("input", function() {
+              const filterText = this.value.toLowerCase();
+              document.querySelectorAll(".atr-result-member").forEach(row => {
+                  const pathCell = row.cells[0];
+                  let hide = false;
+                  if (filterText) {
+                      if (!pathCell.textContent.toLowerCase().includes(filterText)) {
+                          hide = true;
+                      }
+                  }
+                  row.classList.toggle("page-member-path-hide", hide);
+              });
+              updateMemberStriping();
+          });
+      }
+      updateMemberStriping();
   </script>
 {% endblock javascripts %}
 
