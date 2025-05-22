@@ -327,3 +327,4 @@ document.addEventListener("DOMContentLoaded", function () {
     confirmMoveButton.addEventListener("click", onConfirmMoveClick);
     renderAllLists();
 });
+//# sourceMappingURL=finish-selected-move.js.map
