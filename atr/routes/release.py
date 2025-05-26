@@ -23,13 +23,13 @@ import logging.handlers
 
 import asfquart
 import asfquart.base as base
-import quart
 import werkzeug.wrappers.response as response
 
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.routes.root as root
+import atr.template as template
 import atr.util as util
 
 if asfquart.APP is ...:
@@ -68,7 +68,7 @@ async def bulk_status(session: routes.CommitterSession, task_id: int) -> str | r
                 ):
                     return await session.redirect(root.index, error="You don't have permission to view this task.")
 
-    return await quart.render_template("release-bulk.html", task=task, release=release, TaskStatus=models.TaskStatus)
+    return await template.render("release-bulk.html", task=task, release=release, TaskStatus=models.TaskStatus)
 
 
 @routes.public("/releases/finished/<project_name>")
@@ -90,7 +90,7 @@ async def finished(project_name: str) -> str:
 
     releases = sorted(releases, key=sort_releases, reverse=True)
 
-    return await quart.render_template(
+    return await template.render(
         "releases-finished.html", project=project, releases=releases, format_datetime=util.format_datetime
     )
 
@@ -113,7 +113,7 @@ async def releases() -> str:
         else:
             projects[release.project.display_name] = (release.project, projects[release.project.display_name][1] + 1)
 
-    return await quart.render_template(
+    return await template.render(
         "releases.html",
         projects=projects,
         releases=releases,
@@ -130,7 +130,7 @@ async def select(session: routes.CommitterSession, project_name: str) -> str:
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
         )
         releases = await project.releases_in_progress
-        return await quart.render_template(
+        return await template.render(
             "release-select.html", project=project, releases=releases, format_datetime=util.format_datetime
         )
 
@@ -149,7 +149,7 @@ async def view(project_name: str, version_name: str) -> response.Response | str:
     # Sort the files by FileStat.path
     file_stats.sort(key=lambda fs: fs.path)
 
-    return await quart.render_template(
+    return await template.render(
         # TODO: Move to somewhere appropriate
         "phase-view.html",
         file_stats=file_stats,
@@ -174,7 +174,7 @@ async def view_path(project_name: str, version_name: str, file_path: str) -> res
     full_path = util.release_directory(release) / file_path
     content_listing = await util.archive_listing(full_path)
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
-    return await quart.render_template(
+    return await template.render(
         "file-selected-path.html",
         release=release,
         project_name=project_name,

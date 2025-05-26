@@ -21,13 +21,13 @@ import logging
 
 import asfquart
 import asfquart.base as base
-import quart
 import werkzeug.wrappers.response as response
 
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.routes.root as root
+import atr.template as template
 import atr.util as util
 
 if asfquart.APP is ...:
@@ -62,7 +62,7 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     file_stats.sort(key=lambda fs: fs.path)
     logging.debug(f"File stats: {file_stats}")
 
-    return await quart.render_template(
+    return await template.render(
         # TODO: Move to somewhere appropriate
         "phase-view.html",
         file_stats=file_stats,
@@ -87,7 +87,7 @@ async def view_path(
     full_path = util.release_directory(release) / file_path
     content_listing = await util.archive_listing(full_path)
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
-    return await quart.render_template(
+    return await template.render(
         "file-selected-path.html",
         release=release,
         project_name=project_name,

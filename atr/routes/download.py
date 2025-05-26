@@ -33,6 +33,7 @@ import atr.db.models as models
 import atr.routes as routes
 import atr.routes.mapping as mapping
 import atr.routes.root as root
+import atr.template as template
 import atr.util as util
 
 
@@ -49,7 +50,7 @@ async def all_selected(
 
     back_url = mapping.release_as_url(release)
 
-    return await quart.render_template(
+    return await template.render(
         "download-all.html",
         project_name=project_name,
         version_name=version_name,

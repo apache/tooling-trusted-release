@@ -34,6 +34,7 @@ import atr.routes as routes
 # TODO: Improve upon the routes_release pattern
 import atr.routes.release as routes_release
 import atr.tasks.message as message
+import atr.template as template
 import atr.util as util
 
 if TYPE_CHECKING:
@@ -93,7 +94,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     announce_form.subject.data = f"[ANNOUNCE] {project_display_name} {version_name} released"
     # The body can be changed, either from VoteTemplate or from the form
     announce_form.body.data = await construct.announce_release_default(project_name)
-    return await quart.render_template("announce-selected.html", release=release, announce_form=announce_form)
+    return await template.render("announce-selected.html", release=release, announce_form=announce_form)
 
 
 @routes.committer("/announce/<project_name>/<version_name>", methods=["POST"])
@@ -117,7 +118,7 @@ async def selected_post(
             project_name, version_name, with_committee=True, phase=models.ReleasePhase.RELEASE_PREVIEW
         )
         await quart.flash(error_message, "error")
-        return await quart.render_template("announce-selected.html", release=release, announce_form=announce_form)
+        return await template.render("announce-selected.html", release=release, announce_form=announce_form)
 
     subject = str(announce_form.subject.data)
     body = str(announce_form.body.data)

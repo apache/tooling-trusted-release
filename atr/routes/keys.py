@@ -44,6 +44,7 @@ import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
+import atr.template as template
 import atr.util as util
 
 
@@ -127,7 +128,7 @@ async def add(session: routes.CommitterSession) -> str:
             logging.exception("Exception adding GPG key:")
             await quart.flash(f"An unexpected error occurred: {e!s}", "error")
 
-    return await quart.render_template(
+    return await template.render(
         "keys-add.html",
         asf_id=session.uid,
         user_committees=user_committees,
@@ -270,7 +271,7 @@ async def keys(session: routes.CommitterSession) -> str:
     status_message = quart.request.args.get("status_message")
     status_type = quart.request.args.get("status_type")
 
-    return await quart.render_template(
+    return await template.render(
         "keys-review.html",
         asf_id=session.uid,
         user_keys=user_keys,
@@ -310,7 +311,7 @@ async def show_gpg_key(session: routes.CommitterSession, fingerprint: str) -> st
     if not authorised:
         quart.abort(403, description="You are not authorised to view this key")
 
-    return await quart.render_template(
+    return await template.render(
         "keys-show-gpg.html",
         key=key,
         algorithms=routes.algorithms,
@@ -344,7 +345,7 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
                     data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=session.uid))
             return await session.redirect(keys, success=f"SSH key added successfully: {fingerprint}")
 
-    return await quart.render_template(
+    return await template.render(
         "keys-ssh-add.html",
         asf_id=session.uid,
         form=form,
@@ -470,7 +471,7 @@ async def upload(session: routes.CommitterSession) -> str:
         current_committees = all_user_committees if (all_user_committees is not None) else user_committees
         committee_map = {c.name: c.display_name for c in current_committees}
 
-        return await quart.render_template(
+        return await template.render(
             "keys-upload.html",
             asf_id=session.uid,
             user_committees=current_committees,

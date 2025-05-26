@@ -20,11 +20,11 @@ import pathlib
 
 import aiofiles.os
 import asfquart.base as base
-import quart
 
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
+import atr.template as template
 import atr.util as util
 
 
@@ -85,7 +85,7 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
         "uploaded": datetime.datetime.fromtimestamp(modified, tz=datetime.UTC),
     }
 
-    return await quart.render_template(
+    return await template.render(
         "report-selected-path.html",
         project_name=project_name,
         version_name=version_name,

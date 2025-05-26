@@ -30,6 +30,7 @@ import atr.db as db
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
+import atr.template as template
 import atr.util as util
 
 
@@ -108,7 +109,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         release = await session.release(project_name, version_name, data=data)
         user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
 
-    return await quart.render_template(
+    return await template.render(
         "upload-selected.html",
         asf_id=session.uid,
         server_domain=session.app_host,

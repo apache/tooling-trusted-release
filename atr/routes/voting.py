@@ -32,6 +32,7 @@ import atr.routes.compose as compose
 import atr.routes.root as root
 import atr.routes.vote as vote
 import atr.tasks.vote as tasks_vote
+import atr.template as template
 import atr.user as user
 import atr.util as util
 
@@ -171,7 +172,7 @@ async def selected_revision(
         keys_warning = await _keys_warning(release)
 
         # For GET requests or failed POST validation
-        return await quart.render_template(
+        return await template.render(
             "voting-selected-revision.html",
             release=release,
             form=form,

@@ -18,7 +18,6 @@
 import json
 from typing import TYPE_CHECKING
 
-import quart
 import werkzeug.wrappers.response as response
 import wtforms
 
@@ -29,6 +28,7 @@ import atr.revision as revision
 import atr.routes as routes
 import atr.routes.draft as draft
 import atr.routes.resolve as resolve
+import atr.template as template
 import atr.util as util
 
 if TYPE_CHECKING:
@@ -73,7 +73,7 @@ async def check(
     empty_form = await util.EmptyForm.create_form()
     vote_task_warnings = _warnings_from_vote_result(vote_task)
 
-    return await quart.render_template(
+    return await template.render(
         "check-selected.html",
         project_name=release.project.name,
         version_name=release.version,

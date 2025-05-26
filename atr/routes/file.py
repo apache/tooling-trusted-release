@@ -15,10 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import quart
 import werkzeug.wrappers.response as response
 
 import atr.routes as routes
+import atr.template as template
 import atr.util as util
 
 
@@ -41,7 +41,7 @@ async def selected_path(
     content_listing = await util.archive_listing(full_path)
 
     content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
-    return await quart.render_template(
+    return await template.render(
         "file-selected-path.html",
         release=release,
         project_name=project_name,

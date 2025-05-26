@@ -27,6 +27,7 @@ import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
+import atr.template as template
 import atr.util as util
 
 
@@ -132,4 +133,4 @@ async def selected(session: routes.CommitterSession, project_name: str) -> respo
             await quart.flash(str(e), "error")
 
     # Render the template for GET requests or POST requests with validation errors
-    return await quart.render_template("start-selected.html", project=project, form=form, routes=routes)
+    return await template.render("start-selected.html", project=project, form=form, routes=routes)

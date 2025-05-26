@@ -42,6 +42,7 @@ import atr.routes.compose as compose
 import atr.routes.root as root
 import atr.routes.upload as upload
 import atr.tasks.sbom as sbom
+import atr.template as template
 import atr.util as util
 
 if TYPE_CHECKING:
@@ -420,7 +421,7 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
         "uploaded": datetime.datetime.fromtimestamp(modified, tz=datetime.UTC),
     }
 
-    return await quart.render_template(
+    return await template.render(
         "draft-tools.html",
         asf_id=session.uid,
         project_name=project_name,
@@ -452,7 +453,7 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     # Sort the files by FileStat.path
     file_stats.sort(key=lambda fs: fs.path)
 
-    return await quart.render_template(
+    return await template.render(
         # TODO: Move to somewhere appropriate
         "phase-view.html",
         file_stats=file_stats,

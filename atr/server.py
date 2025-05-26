@@ -28,7 +28,6 @@ import asfquart.base as base
 import asfquart.generics
 import asfquart.session
 import blockbuster
-import quart
 import quart_schema
 import quart_wtf
 import rich.logging as rich_logging
@@ -43,6 +42,7 @@ import atr.filters as filters
 import atr.manager as manager
 import atr.preload as preload
 import atr.ssh as ssh
+import atr.template as template
 import atr.user as user
 import atr.util as util
 
@@ -234,7 +234,7 @@ def register_routes(app: base.QuartApp) -> ModuleType:
         # Required to give to the error.html template
         tb = traceback.format_exc()
         app.logger.exception("Unhandled exception")
-        return await quart.render_template("error.html", error=str(error), traceback=tb, status_code=500), 500
+        return await template.render("error.html", error=str(error), traceback=tb, status_code=500), 500
 
     @app.errorhandler(base.ASFQuartException)
     async def handle_asfquart_exception(error: base.ASFQuartException) -> Any:
@@ -243,12 +243,12 @@ def register_routes(app: base.QuartApp) -> ModuleType:
             errorcode = 500
         else:
             errorcode = getattr(error, "errorcode")
-        return await quart.render_template("error.html", error=str(error), status_code=errorcode), errorcode
+        return await template.render("error.html", error=str(error), status_code=errorcode), errorcode
 
     # Add a global error handler in case a page does not exist.
     @app.errorhandler(404)
     async def handle_not_found(error: Exception) -> Any:
-        return await quart.render_template("notfound.html", error="404 Not Found", traceback="", status_code=404), 404
+        return await template.render("notfound.html", error="404 Not Found", traceback="", status_code=404), 404
 
     return modules
 

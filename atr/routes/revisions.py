@@ -31,6 +31,7 @@ import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
 import atr.schema as schema
+import atr.template as template
 import atr.util as util
 
 
@@ -75,7 +76,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         loop_prev_revision_files = current_files_for_diff
         loop_prev_revision_number = current_db_revision.number
 
-    return await quart.render_template(
+    return await template.render(
         "revisions-selected.html",
         project_name=project_name,
         version_name=version_name,

@@ -18,7 +18,6 @@
 """root.py"""
 
 import asfquart.session
-import quart
 import sqlalchemy.orm as orm
 import sqlmodel
 import werkzeug.wrappers.response as response
@@ -26,6 +25,7 @@ import werkzeug.wrappers.response as response
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
+import atr.template as template
 import atr.user as user
 import atr.util as util
 
@@ -37,7 +37,7 @@ async def index() -> response.Response | str:
     if session_data:
         uid = session_data.get("uid")
         if not uid:
-            return await quart.render_template("index-public.html")
+            return await template.render("index-public.html")
 
         phase_sequence = ["Compose", "Vote", "Finish"]
         phase_index_map = {
@@ -93,7 +93,7 @@ async def index() -> response.Response | str:
 
         all_projects.sort(key=sort_key)
 
-        return await quart.render_template(
+        return await template.render(
             "index-committer.html",
             all_projects=all_projects,
             phase_sequence=phase_sequence,
@@ -102,10 +102,10 @@ async def index() -> response.Response | str:
         )
 
     # Public view
-    return await quart.render_template("index-public.html")
+    return await template.render("index-public.html")
 
 
 @routes.committer("/tutorial")
 async def tutorial(session: routes.CommitterSession) -> str:
     """Tutorial page."""
-    return await quart.render_template("tutorial.html")
+    return await template.render("tutorial.html")

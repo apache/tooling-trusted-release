@@ -30,6 +30,7 @@ import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.root as root
+import atr.template as template
 import atr.util as util
 
 SPECIAL_SUFFIXES: Final[frozenset[str]] = frozenset({".asc", ".sha256", ".sha512"})
@@ -132,7 +133,7 @@ async def selected(
     # resp.headers["Pragma"] = "no-cache"
     # resp.headers["Expires"] = "0"
     # return resp
-    return await quart.render_template(
+    return await template.render(
         "finish-selected.html",
         asf_id=session.uid,
         server_domain=session.app_host,

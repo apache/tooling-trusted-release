@@ -30,6 +30,7 @@ import wtforms
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
+import atr.template as template
 import atr.user as user
 import atr.util as util
 
@@ -128,7 +129,7 @@ async def add_project(session: routes.CommitterSession, project_name: str) -> re
     if await form.validate_on_submit():
         return await _add_project(form, session.uid)
 
-    return await quart.render_template("project-add-project.html", form=form, project_name=project.display_name)
+    return await template.render("project-add-project.html", form=form, project_name=project.display_name)
 
 
 @routes.committer("/project/delete", methods=["POST"])
@@ -178,9 +179,7 @@ async def projects() -> str:
     """Main project directory page."""
     async with db.session() as data:
         projects = await data.project(_committee=True).order_by(models.Project.full_name).all()
-        return await quart.render_template(
-            "projects.html", projects=projects, empty_form=await util.EmptyForm.create_form()
-        )
+        return await template.render("projects.html", projects=projects, empty_form=await util.EmptyForm.create_form())
 
 
 @routes.committer("/projects/<project_name>/release-policy/add", methods=["GET", "POST"])
@@ -207,7 +206,7 @@ async def release_policy_add(session: routes.CommitterSession, project_name: str
         if await form.validate_on_submit():
             return await _add_release_policy(project, form, data)
 
-    return await quart.render_template(
+    return await template.render(
         "release-policy-add.html",
         asf_id=uid,
         project=project,
@@ -245,7 +244,7 @@ async def release_policy_edit(session: routes.CommitterSession, project_name: st
             return await _edit_release_policy(util.unwrap(project.release_policy), form, data)
 
     # For GET requests, show the form
-    return await quart.render_template(
+    return await template.render(
         "release-policy-edit.html",
         asf_id=uid,
         project=project,
@@ -273,7 +272,7 @@ async def select(session: routes.CommitterSession) -> str:
             ]
             user_projects.sort(key=lambda p: p.display_name)
 
-    return await quart.render_template("project-select.html", user_projects=user_projects)
+    return await template.render("project-select.html", user_projects=user_projects)
 
 
 @routes.public("/projects/<name>")
@@ -282,7 +281,7 @@ async def view(name: str) -> str:
         project = await data.project(name=name, _committee_public_signing_keys=True, _release_policy=True).demand(
             http.client.HTTPException(404)
         )
-        return await quart.render_template(
+        return await template.render(
             "project-view.html",
             project=project,
             algorithms=routes.algorithms,

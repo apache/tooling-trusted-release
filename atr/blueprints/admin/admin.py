@@ -41,6 +41,7 @@ import atr.db.interaction as interaction
 import atr.db.models as models
 import atr.ldap as ldap
 import atr.routes.mapping as mapping
+import atr.template as template
 import atr.util as util
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -116,7 +117,7 @@ async def admin_data(model: str = "Committee") -> str:
                         record_dict[key] = getattr(record, key)
             records_dict.append(record_dict)
 
-        return await quart.render_template(
+        return await template.render(
             "data-browser.html", models=list(model_methods.keys()), model=model, records=records_dict
         )
 
@@ -169,7 +170,7 @@ async def admin_delete_release() -> str | response.Response:
     # For GET request or failed form validation
     async with db.session() as data:
         releases = await data.release(_project=True).order_by(models.Release.name).all()
-    return await quart.render_template("delete-release.html", form=form, releases=releases, stats=None)
+    return await template.render("delete-release.html", form=form, releases=releases, stats=None)
 
 
 @admin.BLUEPRINT.route("/env")
@@ -199,7 +200,7 @@ async def admin_performance() -> str:
     # await asyncio.to_thread(APP.logger.info, "Files in current directory: %s", files)
     if not await aiofiles.os.path.exists(log_path):
         await quart.flash("No performance data currently available", "error")
-        return await quart.render_template("performance.html", stats=None)
+        return await template.render("performance.html", stats=None)
 
     # Parse the log file and collect statistics
     stats = collections.defaultdict(list)
@@ -259,7 +260,7 @@ async def admin_performance() -> str:
         return x[1]["total"]["mean"]
 
     sorted_summary = dict(sorted(summary.items(), key=one_total_mean, reverse=True))
-    return await quart.render_template("performance.html", stats=sorted_summary)
+    return await template.render("performance.html", stats=sorted_summary)
 
 
 @admin.BLUEPRINT.route("/projects/update", methods=["GET", "POST"])
@@ -286,7 +287,7 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
 
     # For GET requests, show the update form
     empty_form = await util.EmptyForm.create_form()
-    return await quart.render_template("update-projects.html", empty_form=empty_form)
+    return await template.render("update-projects.html", empty_form=empty_form)
 
 
 @admin.BLUEPRINT.route("/all-releases")
@@ -294,19 +295,19 @@ async def admin_all_releases() -> str:
     """Display a list of all releases across all phases."""
     async with db.session() as data:
         releases = await data.release(_project=True, _committee=True).order_by(models.Release.name).all()
-    return await quart.render_template("all-releases.html", releases=releases, release_as_url=mapping.release_as_url)
+    return await template.render("all-releases.html", releases=releases, release_as_url=mapping.release_as_url)
 
 
 @admin.BLUEPRINT.route("/tasks")
 async def admin_tasks() -> str:
-    return await quart.render_template("tasks.html")
+    return await template.render("tasks.html")
 
 
 @admin.BLUEPRINT.route("/toggle-view", methods=["GET"])
 async def admin_toggle_admin_view_page() -> str:
     """Display the page with a button to toggle between admin and user views."""
     empty_form = await util.EmptyForm.create_form()
-    return await quart.render_template("toggle-admin-view.html", empty_form=empty_form)
+    return await template.render("toggle-admin-view.html", empty_form=empty_form)
 
 
 @admin.BLUEPRINT.route("/toggle-admin-view", methods=["POST"])
@@ -362,7 +363,7 @@ async def ldap_search() -> str:
         )
         await asyncio.to_thread(ldap.search, ldap_params)
 
-    return await quart.render_template(
+    return await template.render(
         "ldap-lookup.html",
         form=form,
         ldap_params=ldap_params,

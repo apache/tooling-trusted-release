@@ -20,11 +20,10 @@
 import datetime
 import http.client
 
-import quart
-
 import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
+import atr.template as template
 
 
 @routes.public("/committees")
@@ -32,7 +31,7 @@ async def directory() -> str:
     """Main committee directory page."""
     async with db.session() as data:
         committees = await data.committee(_projects=True).order_by(models.Committee.name).all()
-        return await quart.render_template("committee-directory.html", committees=committees)
+        return await template.render("committee-directory.html", committees=committees)
 
 
 @routes.public("/committees/<name>")
@@ -41,7 +40,7 @@ async def view(name: str) -> str:
         committee = await data.committee(name=name, _projects=True, _public_signing_keys=True).demand(
             http.client.HTTPException(404)
         )
-        return await quart.render_template(
+        return await template.render(
             "committee-view.html",
             committee=committee,
             algorithms=routes.algorithms,
