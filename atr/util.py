@@ -333,6 +333,11 @@ async def get_release_stats(release: models.Release) -> tuple[int, int, str]:
     return count, total_bytes, formatted_size
 
 
+def get_tmp_dir() -> pathlib.Path:
+    # This must be on the same filesystem as the other state subdirectories
+    return pathlib.Path(config.get().STATE_DIR) / "tmp"
+
+
 def get_unfinished_dir() -> pathlib.Path:
     return pathlib.Path(config.get().UNFINISHED_STORAGE_DIR)
 

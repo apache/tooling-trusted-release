@@ -58,9 +58,11 @@ async def create_and_manage(
             RuntimeError("Release does not exist for new revision creation")
         )
         old_revision = await interaction.latest_revision(release)
+
     # Create a temporary directory
-    # Ensure that it's removed on any exception
-    temp_dir: str = await asyncio.to_thread(tempfile.mkdtemp)
+    # We ensure, below, that it's removed on any exception
+    # Use the tmp subdirectory of state, to ensure that it is on the same filesystem
+    temp_dir: str = await asyncio.to_thread(tempfile.mkdtemp, dir=util.get_tmp_dir())
     temp_dir_path = pathlib.Path(temp_dir)
     try:
         # The directory was created by mkdtemp, but it's empty

@@ -79,6 +79,7 @@ def app_dirs_setup(app_config: type[config.AppConfig]) -> None:
     print(f"Working directory changed to: {os.getcwd()}")
     util.get_unfinished_dir().mkdir(parents=True, exist_ok=True)
     util.get_finished_dir().mkdir(parents=True, exist_ok=True)
+    util.get_tmp_dir().mkdir(parents=True, exist_ok=True)
 
 
 def app_setup_api_docs(app: base.QuartApp) -> None:
