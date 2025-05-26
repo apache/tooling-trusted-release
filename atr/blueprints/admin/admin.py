@@ -31,6 +31,7 @@ import asfquart.base as base
 import asfquart.session
 import httpx
 import quart
+import sqlalchemy.orm as orm
 import werkzeug.wrappers.response as response
 import wtforms
 
@@ -45,6 +46,16 @@ import atr.template as template
 import atr.util as util
 
 _LOGGER: Final = logging.getLogger(__name__)
+
+
+class DeleteCommitteeKeysForm(util.QuartFormTyped):
+    committee_name = wtforms.SelectField("Committee", validators=[wtforms.validators.InputRequired()])
+    confirm_delete = wtforms.StringField(
+        "Confirmation",
+        validators=[wtforms.validators.InputRequired(), wtforms.validators.Regexp("^DELETE KEYS$")],
+        render_kw={"placeholder": "DELETE KEYS"},
+    )
+    submit = wtforms.SubmitField("Delete all keys for selected committee")
 
 
 class DeleteReleaseForm(util.QuartFormTyped):
@@ -120,6 +131,58 @@ async def admin_data(model: str = "Committee") -> str:
         return await template.render(
             "data-browser.html", models=list(model_methods.keys()), model=model, records=records_dict
         )
+
+
+@admin.BLUEPRINT.route("/delete-committee-keys", methods=["GET", "POST"])
+async def admin_delete_committee_keys() -> str | response.Response:
+    form = await DeleteCommitteeKeysForm.create_form()
+    async with db.session() as data:
+        all_committees = await data.committee(_public_signing_keys=True).order_by(models.Committee.name).all()
+        committees_with_keys = [c for c in all_committees if c.public_signing_keys]
+    form.committee_name.choices = [(c.name, c.display_name) for c in committees_with_keys]
+
+    if await form.validate_on_submit():
+        committee_name = form.committee_name.data
+        async with db.session() as data:
+            committee_query = data.committee(name=committee_name)
+            via = models.validate_instrumented_attribute
+            committee_query.query = committee_query.query.options(
+                orm.selectinload(via(models.Committee.public_signing_keys)).selectinload(
+                    via(models.PublicSigningKey.committees)
+                )
+            )
+            committee = await committee_query.get()
+
+            if not committee:
+                await quart.flash(f"Committee '{committee_name}' not found.", "error")
+                return quart.redirect(quart.url_for("admin.admin_delete_committee_keys"))
+
+            keys_to_check = list(committee.public_signing_keys)
+            if not keys_to_check:
+                await quart.flash(f"Committee '{committee_name}' has no keys.", "info")
+                return quart.redirect(quart.url_for("admin.admin_delete_committee_keys"))
+
+            num_removed = len(committee.public_signing_keys)
+            committee.public_signing_keys.clear()
+            await data.flush()
+
+            unused_deleted = 0
+            for key_obj in keys_to_check:
+                if not key_obj.committees:
+                    await data.delete(key_obj)
+                    unused_deleted += 1
+
+            await data.commit()
+            await quart.flash(
+                f"Removed {num_removed} key links for '{committee_name}'. Deleted {unused_deleted} unused keys.",
+                "success",
+            )
+        return quart.redirect(quart.url_for("admin.admin_delete_committee_keys"))
+
+    elif quart.request.method == "POST":
+        await quart.flash("Form validation failed. Select committee and type DELETE KEYS.", "warning")
+
+    return await template.render("delete-committee-keys.html", form=form)
 
 
 @admin.BLUEPRINT.route("/delete-release", methods=["GET", "POST"])
