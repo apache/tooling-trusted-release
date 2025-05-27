@@ -247,7 +247,13 @@ async def _move_file_to_revision(
 
         if creating.failed:
             return await _respond(
-                session, project_name, version_name, wants_json, False, "Move operation failed due to pre-check.", 409
+                session,
+                project_name,
+                version_name,
+                wants_json,
+                False,
+                "Directory names must not start with '.' or be '..'.",
+                409,
             )
 
         response_messages = []
@@ -332,6 +338,11 @@ async def _setup_revision(
         return
 
     if not await aiofiles.os.path.exists(target_path):
+        for part in target_path.parts:
+            if (part == "..") or part.startswith("."):
+                creating.failed = True
+                return
+
         try:
             await aiofiles.os.makedirs(target_path)
         except OSError:
@@ -342,21 +353,34 @@ async def _setup_revision(
         return
 
     for source_file_rel in source_files_rel:
-        if source_file_rel.parent == target_dir_rel:
-            skipped_files_names.append(source_file_rel.name)
-            continue
+        await _setup_revision_file(
+            source_file_rel, target_dir_rel, creating, moved_files_names, skipped_files_names, target_path
+        )
 
-        related_files = _related_files(source_file_rel)
-        bundle = [f for f in related_files if await aiofiles.os.path.exists(creating.interim_path / f)]
-        collisions = [f.name for f in bundle if await aiofiles.os.path.exists(target_path / f.name)]
-        if collisions:
-            creating.failed = True
-            return
 
-        for f in bundle:
-            await aiofiles.os.rename(creating.interim_path / f, target_path / f.name)
-            if f == source_file_rel:
-                moved_files_names.append(f.name)
+async def _setup_revision_file(
+    source_file_rel: pathlib.Path,
+    target_dir_rel: pathlib.Path,
+    creating: revision.Creating,
+    moved_files_names: list[str],
+    skipped_files_names: list[str],
+    target_path: pathlib.Path,
+) -> None:
+    if source_file_rel.parent == target_dir_rel:
+        skipped_files_names.append(source_file_rel.name)
+        return
+
+    related_files = _related_files(source_file_rel)
+    bundle = [f for f in related_files if await aiofiles.os.path.exists(creating.interim_path / f)]
+    collisions = [f.name for f in bundle if await aiofiles.os.path.exists(target_path / f.name)]
+    if collisions:
+        creating.failed = True
+        return
+
+    for f in bundle:
+        await aiofiles.os.rename(creating.interim_path / f, target_path / f.name)
+        if f == source_file_rel:
+            moved_files_names.append(f.name)
 
 
 async def _sources_and_targets(latest_revision_dir: pathlib.Path) -> tuple[list[pathlib.Path], set[pathlib.Path]]:
