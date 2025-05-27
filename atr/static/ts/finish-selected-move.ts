@@ -70,6 +70,10 @@ function includesCaseInsensitive(haystack: string | null | undefined, needle: st
     return toLower(haystack).includes(toLower(needle));
 }
 
+function isValidNewDirName(d: string): boolean {
+  return d.length > 0 && !d.includes("..") && !d.startsWith("/") && !d.endsWith("/");
+}
+
 function getParentPath(filePathString: string | null | undefined): string {
     if (!filePathString || typeof filePathString !== "string") return ".";
     const lastSlash = filePathString.lastIndexOf("/");
@@ -126,6 +130,12 @@ function updateMoveSelectionInfo(): void {
         const strongDest = document.createElement("strong");
         strongDest.textContent = destinationDir;
         currentMoveSelectionInfoElement.appendChild(strongDest);
+        if (destinationDir && uiState.allTargetDirs.indexOf(destinationDir) === -1 && isValidNewDirName(destinationDir)) {
+            const newDirSpan = document.createElement("span");
+            newDirSpan.textContent = " (will be created)";
+            newDirSpan.className = "text-muted small";
+            currentMoveSelectionInfoElement.appendChild(newDirSpan);
+        }
         message = "";
         disableConfirmButton = false;
     }
@@ -191,6 +201,12 @@ function renderListItems(
                 } else {
                     row.setAttribute("aria-selected", "false");
                 }
+                if (itemPathString === uiState.filters.dir.trim() && uiState.allTargetDirs.indexOf(itemPathString) === -1 && isValidNewDirName(itemPathString)){
+                    const newDirSpan = document.createElement("span");
+                    newDirSpan.textContent = " (new directory)";
+                    newDirSpan.className = "text-muted small";
+                    span.appendChild(newDirSpan);
+                }
                 controlCell.appendChild(radio);
                 break;
             }
@@ -225,7 +241,14 @@ function renderAllLists(): void {
     };
     renderListItems(fileListTableBody, filteredFilePaths, filesConfig);
 
-    const filteredDirs = uiState.allTargetDirs.filter(dirP =>
+    const displayDirs = [...uiState.allTargetDirs];
+    const trimmedDirFilter = uiState.filters.dir.trim();
+    if (isValidNewDirName(trimmedDirFilter) && uiState.allTargetDirs.indexOf(trimmedDirFilter) === -1) {
+        displayDirs.push(trimmedDirFilter);
+        displayDirs.sort();
+    }
+
+    const filteredDirs = displayDirs.filter(dirP =>
         includesCaseInsensitive(dirP, uiState.filters.dir)
     );
     const dirsConfig: RenderListDisplayConfig = {

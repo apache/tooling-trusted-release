@@ -66,7 +66,7 @@ class MoveFileForm(util.QuartFormTyped):
         validators=[wtforms.validators.DataRequired(message="Please select at least one file to move.")],
     )
     target_directory = wtforms.SelectField(
-        "Target directory", choices=[], validators=[wtforms.validators.DataRequired()]
+        "Target directory", choices=[], validators=[wtforms.validators.DataRequired()], validate_choice=False
     )
     submit = wtforms.SubmitField("Move file")
 
@@ -415,6 +415,24 @@ async def _setup_revision(
     moved_files_names: list[str],
     skipped_files_names: list[str],
 ) -> None:
+    target_path = creating.interim_path / target_dir_rel
+    try:
+        target_path.resolve().relative_to(creating.interim_path.resolve())
+    except ValueError:
+        # Path traversal detected
+        creating.failed = True
+        return
+
+    if not await aiofiles.os.path.exists(target_path):
+        try:
+            await aiofiles.os.makedirs(target_path)
+        except OSError:
+            creating.failed = True
+            return
+    elif not await aiofiles.os.path.isdir(target_path):
+        creating.failed = True
+        return
+
     for source_file_rel in source_files_rel:
         if source_file_rel.parent == target_dir_rel:
             skipped_files_names.append(source_file_rel.name)
@@ -422,15 +440,13 @@ async def _setup_revision(
 
         related_files = _related_files(source_file_rel)
         bundle = [f for f in related_files if await aiofiles.os.path.exists(creating.interim_path / f)]
-        collisions = [
-            f.name for f in bundle if await aiofiles.os.path.exists(creating.interim_path / target_dir_rel / f.name)
-        ]
+        collisions = [f.name for f in bundle if await aiofiles.os.path.exists(target_path / f.name)]
         if collisions:
             creating.failed = True
             return
 
         for f in bundle:
-            await aiofiles.os.rename(creating.interim_path / f, creating.interim_path / target_dir_rel / f.name)
+            await aiofiles.os.rename(creating.interim_path / f, target_path / f.name)
             if f == source_file_rel:
                 moved_files_names.append(f.name)
 
