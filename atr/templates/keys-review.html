@@ -183,8 +183,8 @@
                 <td class="text-break font-monospace px-2">
                   <a href="{{ as_url(routes.keys.show_gpg_key, fingerprint=key.fingerprint) }}">{{ key.fingerprint[:16]|upper }}</a>
                 </td>
-                <td class="text-break px-2">{{ key.declared_uid or 'Not specified' }}</td>
-                <td class="text-break px-2">{{ key.apache_uid }}</td>
+                <td class="text-break px-2">{{ email_from_key(key.primary_declared_uid) or 'Not specified' }}</td>
+                <td class="text-break px-2">{{ key.apache_uid or "-" }}</td>
               </tr>
             {% endfor %}
           </tbody>

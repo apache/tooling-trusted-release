@@ -290,12 +290,43 @@ class WorkerManager:
                 await self.spawn_worker()
             _LOGGER.info(f"Worker pool restored to {len(self.workers)} workers")
 
+    async def _log_tasks_held_by_unmanaged_pids(self, data: db.Session, active_worker_pids: list[int]) -> None:
+        """Log tasks that are active and held by PIDs not managed by this worker manager."""
+        foreign_tasks_stmt = sqlmodel.select(models.Task.pid, models.Task.id).where(
+            sqlmodel.and_(
+                models.validate_instrumented_attribute(models.Task.pid).notin_(active_worker_pids),
+                models.Task.status == models.TaskStatus.ACTIVE,
+                models.validate_instrumented_attribute(models.Task.pid).isnot(None),
+            )
+        )
+        foreign_tasks_result = await data.execute(foreign_tasks_stmt)
+        foreign_pids_with_tasks: dict[int, int] = {
+            row.pid: row.id for row in foreign_tasks_result if row.pid is not None
+        }
+
+        if not foreign_pids_with_tasks:
+            return
+
+        _LOGGER.debug(f"Found tasks potentially claimed by non-managed PIDs: {foreign_pids_with_tasks}")
+        for foreign_pid, task_id_held in foreign_pids_with_tasks.items():
+            try:
+                os.kill(foreign_pid, 0)
+                _LOGGER.warning(f"Task {task_id_held} is held by an active, unmanaged process (PID: {foreign_pid})")
+            except ProcessLookupError:
+                _LOGGER.info(f"Task {task_id_held} was held by PID {foreign_pid}, which is no longer running")
+            except Exception as e:
+                _LOGGER.error(f"Unexpected error: {foreign_pid} holding task {task_id_held}: {e}")
+
     async def reset_broken_tasks(self) -> None:
-        """Reset any tasks that were being processed by exited workers."""
+        """Reset any tasks that were being processed by exited or unmanaged workers."""
         try:
             async with db.session() as data:
                 async with data.begin():
                     active_worker_pids = list(self.workers)
+                    try:
+                        await self._log_tasks_held_by_unmanaged_pids(data, active_worker_pids)
+                    except Exception:
+                        ...
 
                     update_stmt = (
                         sqlmodel.update(models.Task)
@@ -310,7 +341,7 @@ class WorkerManager:
 
                     result = await data.execute(update_stmt)
                     if result.rowcount > 0:
-                        _LOGGER.info(f"Reset {result.rowcount} tasks to state 'QUEUED' as their worker died")
+                        _LOGGER.info(f"Reset {result.rowcount} tasks to state 'QUEUED' due to worker issues")
 
         except Exception as e:
             _LOGGER.error(f"Error resetting broken tasks: {e}")

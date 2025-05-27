@@ -108,8 +108,8 @@ class PublicSigningKey(sqlmodel.SQLModel, table=True):
     secondary_declared_uids: list[str] = sqlmodel.Field(
         default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON)
     )
-    # The UID used by Apache
-    apache_uid: str
+    # The UID used by Apache, if available
+    apache_uid: str | None
     # The ASCII armored key
     ascii_armored_key: str
     # The committees that use this key

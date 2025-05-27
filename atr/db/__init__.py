@@ -317,7 +317,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         expires: Opt[datetime.datetime | None] = NOT_SET,
         primary_declared_uid: Opt[str | None] = NOT_SET,
         secondary_declared_uids: Opt[list[str]] = NOT_SET,
-        apache_uid: Opt[str] = NOT_SET,
+        apache_uid: Opt[str | None] = NOT_SET,
         ascii_armored_key: Opt[str] = NOT_SET,
         _committees: bool = False,
     ) -> Query[models.PublicSigningKey]:

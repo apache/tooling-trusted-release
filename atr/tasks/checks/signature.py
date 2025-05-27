@@ -85,19 +85,22 @@ async def _check_core_logic(committee_name: str, artifact_path: str, signature_p
             .where(models.validate_instrumented_attribute(models.Committee.name) == committee_name)
         )
         result = await session.execute(statement)
-        public_keys = [key.ascii_armored_key for key in result.scalars().all()]
-    _LOGGER.info(f"Found {len(public_keys)} public keys for committee_name: '{committee_name}'")
+        db_public_keys = result.scalars().all()
+    _LOGGER.info(f"Found {len(db_public_keys)} public keys for committee_name: '{committee_name}'")
+    apache_uid_map = {key.fingerprint.lower(): bool(key.apache_uid) for key in db_public_keys if key.fingerprint}
+    public_keys = [key.ascii_armored_key for key in db_public_keys]
 
     return await asyncio.to_thread(
         _check_core_logic_verify_signature,
         signature_path=signature_path,
         artifact_path=artifact_path,
         ascii_armored_keys=public_keys,
+        apache_uid_map=apache_uid_map,
     )
 
 
 def _check_core_logic_verify_signature(
-    signature_path: str, artifact_path: str, ascii_armored_keys: list[str]
+    signature_path: str, artifact_path: str, ascii_armored_keys: list[str], apache_uid_map: dict[str, bool]
 ) -> dict[str, Any]:
     """Verify a GPG signature for a file."""
     with tempfile.TemporaryDirectory(prefix="gpg-") as gpg_dir, open(signature_path, "rb") as sig_file:
@@ -111,10 +114,13 @@ def _check_core_logic_verify_signature(
                 continue
         verified = gpg.verify_file(sig_file, str(artifact_path))
 
+    key_fp = verified.pubkey_fingerprint.lower() if verified.pubkey_fingerprint else None
+    apache_uid_ok = (key_fp is not None) and apache_uid_map.get(key_fp, False)
+
     # Collect all available information for debugging
     debug_info = {
         "key_id": verified.key_id or "Not available",
-        "fingerprint": verified.fingerprint.lower() if verified.fingerprint else "Not available",
+        "fingerprint": key_fp or "Not available",
         "pubkey_fingerprint": verified.pubkey_fingerprint.lower() if verified.pubkey_fingerprint else "Not available",
         "creation_date": verified.creation_date or "Not available",
         "timestamp": verified.timestamp or "Not available",
@@ -125,12 +131,17 @@ def _check_core_logic_verify_signature(
         "trust_text": verified.trust_text if hasattr(verified, "trust_text") else "Not available",
         "stderr": verified.stderr if hasattr(verified, "stderr") else "Not available",
         "num_committee_keys": len(ascii_armored_keys),
+        "key_has_apache_uid": apache_uid_ok,
     }
 
-    if not verified:
+    if (not verified) or (not apache_uid_ok):
+        error_msg = "No valid signature found"
+        if verified and (not apache_uid_ok):
+            error_msg = "Verifying key lacks an ASF UID"
+            debug_info["status"] = "Invalid: Key lacks ASF UID"
         return {
             "verified": False,
-            "error": "No valid signature found",
+            "error": error_msg,
             "debug_info": debug_info,
         }
 
@@ -139,7 +150,7 @@ def _check_core_logic_verify_signature(
         "key_id": verified.key_id,
         "timestamp": verified.timestamp,
         "username": verified.username or "Unknown",
-        "fingerprint": verified.pubkey_fingerprint.lower() or "Unknown",
+        "fingerprint": key_fp or "Unknown",
         "status": "Valid signature",
         "debug_info": debug_info,
     }

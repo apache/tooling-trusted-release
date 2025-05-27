@@ -126,6 +126,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         render_item=render_item_override,
         process_revision_directives=process_revision_directives_custom_naming,
+        render_as_batch=True,
     )
 
     with alembic.context.begin_transaction():
@@ -149,6 +150,7 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             render_item=render_item_override,
             process_revision_directives=process_revision_directives_custom_naming,
+            render_as_batch=True,
         )
 
         with alembic.context.begin_transaction():

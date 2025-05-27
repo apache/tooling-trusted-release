@@ -79,15 +79,16 @@ async def key_user_add(asf_uid: str | None, public_key: str, selected_committees
             for uid_str in key.get("uids", []):
                 if asf_uid := await asyncio.to_thread(_asf_uid_from_uid_str, uid_str):
                     break
-    if asf_uid is None:
-        # We place this here to make it easier on the type checkers
-        non_asf_uids = key.get("uids", [])
-        first_non_asf_uid = non_asf_uids[0] if non_asf_uids else "None"
-        raise ApacheUserMissingError(
-            f"No Apache UID found. Fingerprint: {key.get('fingerprint', 'Unknown')}. Primary UID: {first_non_asf_uid}",
-            fingerprint=key.get("fingerprint"),
-            primary_uid=first_non_asf_uid,
-        )
+    # if asf_uid is None:
+    #     # We place this here to make it easier on the type checkers
+    #     non_asf_uids = key.get("uids", [])
+    #     first_non_asf_uid = non_asf_uids[0] if non_asf_uids else "None"
+    #     raise ApacheUserMissingError(
+    #         f"No Apache UID found. Fingerprint: {key.get('fingerprint', 'Unknown')}.
+    #         f" Primary UID: {first_non_asf_uid}",
+    #         fingerprint=key.get("fingerprint"),
+    #         primary_uid=first_non_asf_uid,
+    #     )
 
     # Store key in database
     async with db.session() as data:
@@ -95,7 +96,7 @@ async def key_user_add(asf_uid: str | None, public_key: str, selected_committees
 
 
 async def key_user_session_add(
-    asf_uid: str,
+    asf_uid: str | None,
     public_key: str,
     key: dict,
     selected_committees: list[str],
@@ -126,6 +127,7 @@ async def key_user_session_add(
     async with data.begin():
         existing = await data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid).get()
 
+        # TODO: This can race
         if existing:
             logging.info(f"Found existing key {fingerprint}, updating associations")
             key_record = existing
@@ -181,10 +183,9 @@ async def key_user_session_add(
                 logging.warning(f"Could not find committee {committee_name} to link key {fingerprint}")
                 continue
 
-    # Extract email for sorting
+    # TODO: What if there is no email?
     user_id_str = key_record.primary_declared_uid or ""
-    email_match = re.search(r"<([^>]+)>", user_id_str)
-    email = email_match.group(1) if email_match else user_id_str
+    email = util.email_from_uid(user_id_str) or ""
 
     return {
         "key_id": key_record.fingerprint[:16],

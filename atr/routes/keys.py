@@ -25,7 +25,6 @@ import hashlib
 import logging
 import logging.handlers
 import pathlib
-import re
 import textwrap
 from collections.abc import Sequence
 
@@ -283,6 +282,7 @@ async def keys(session: routes.CommitterSession) -> str:
         now=datetime.datetime.now(datetime.UTC),
         delete_form=delete_form,
         update_committee_keys_form=update_committee_keys_form,
+        email_from_key=util.email_from_uid,
     )
 
 
@@ -382,9 +382,8 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
         for key in sorted_keys:
             fingerprint_short = key.fingerprint[:16].upper()
             apache_uid = key.apache_uid
-            primary_declared_uid_str = key.primary_declared_uid or ""
-            email_match = re.search(r"<([^>]+)>", primary_declared_uid_str)
-            email = email_match.group(1) if email_match else primary_declared_uid_str
+            # TODO: What if there is no email?
+            email = util.email_from_uid(key.primary_declared_uid or "") or ""
             if email == f"{apache_uid}@apache.org":
                 comment_line = f"# {fingerprint_short} {email}"
             else:

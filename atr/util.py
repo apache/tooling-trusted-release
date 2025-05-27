@@ -214,6 +214,12 @@ async def create_hard_link_clone(
     await _clone_recursive(source_dir, dest_dir)
 
 
+def email_from_uid(uid: str) -> str | None:
+    if m := re.search(r"<([^>]+)>", uid):
+        return m.group(1)
+    return None
+
+
 async def file_sha3(path: str) -> str:
     """Compute SHA3-256 hash of a file."""
     sha3 = hashlib.sha3_256()
