@@ -40,23 +40,6 @@ SPECIAL_SUFFIXES: Final[frozenset[str]] = frozenset({".asc", ".sha256", ".sha512
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-class CreateDirectoryForm(util.QuartFormTyped):
-    """Form for creating a new directory within a preview revision."""
-
-    new_directory_name = wtforms.StringField(
-        "New directory name",
-        validators=[
-            wtforms.validators.InputRequired(),
-            wtforms.validators.Regexp(
-                r"^(?!.*\.\.)(?!^\.$)(?!^/)(?!.*/$)[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*$",
-                message="Invalid characters or structure. Use a-z, 0-9, _, -."
-                " No leading or trailing slashes, and no dots. No '..' segments.",
-            ),
-        ],
-    )
-    submit = wtforms.SubmitField("Create directory")
-
-
 class MoveFileForm(util.QuartFormTyped):
     """Form for moving one or more files within a preview revision."""
 
@@ -113,9 +96,6 @@ async def selected(
     move_form = await MoveFileForm.create_form(
         data=formdata if (formdata and formdata.get("form_action") != "create_dir") else None
     )
-    create_dir_form = await CreateDirectoryForm.create_form(
-        data=formdata if (formdata and formdata.get("form_action") == "create_dir") else None
-    )
 
     # Populate choices dynamically for both GET and POST
     move_form.source_files.choices = sorted([(str(p), str(p)) for p in source_files_rel])
@@ -123,9 +103,7 @@ async def selected(
     can_move = (len(target_dirs) > 1) and (len(source_files_rel) > 0)
 
     if formdata:
-        result = await _process_formdata(
-            formdata, session, project_name, version_name, create_dir_form, move_form, can_move
-        )
+        result = await _process_formdata(formdata, session, project_name, version_name, move_form, can_move)
         if result is not None:
             return result
 
@@ -141,67 +119,10 @@ async def selected(
         release=release,
         source_files=sorted(source_files_rel),
         form=move_form,
-        create_dir_form=create_dir_form,
         can_move=can_move,
         user_ssh_keys=user_ssh_keys,
         target_dirs=sorted(list(target_dirs)),
     )
-
-
-async def _create_directory_in_revision(
-    new_dir_rel: pathlib.Path,
-    session: routes.CommitterSession,
-    project_name: str,
-    version_name: str,
-    wants_json: bool,
-) -> tuple[quart_response.Response, int] | response.Response:
-    try:
-        description = "Directory creation through web interface"
-        async with revision.create_and_manage(
-            project_name, version_name, session.uid, description=description
-        ) as creating:
-            target_path = creating.interim_path / new_dir_rel
-            # Path traversal check
-            try:
-                resolved_target_path = target_path.resolve()
-                resolved_target_path.relative_to(creating.interim_path.resolve())
-                await aiofiles.os.makedirs(target_path, exist_ok=False)
-            except ValueError:
-                creating.failed = True
-                # Path traversal attempt detected
-                return await _respond(
-                    session, project_name, version_name, wants_json, False, "Invalid directory path.", 400
-                )
-            except FileExistsError:
-                creating.failed = True
-                return await _respond(
-                    session,
-                    project_name,
-                    version_name,
-                    wants_json,
-                    False,
-                    f"Directory or file '{new_dir_rel}' already exists.",
-                    400,
-                )
-        return await _respond(
-            session,
-            project_name,
-            version_name,
-            wants_json,
-            True,
-            f"Created directory '{new_dir_rel}'.",
-            201 if wants_json else 200,
-        )
-    except OSError as e:
-        _LOGGER.exception("Error creating directory in new revision")
-        return await _respond(
-            session, project_name, version_name, wants_json, False, f"Error creating directory: {e}", 500
-        )
-    except Exception as e:
-        _LOGGER.exception("Unexpected error during directory creation")
-        return await _respond(
-            session, project_name, version_name, wants_json, False, f"An unexpected error occurred: {e!s}", 500
-        )
 
 
 async def _process_formdata(
@@ -209,7 +130,6 @@ async def _process_formdata(
     session: routes.CommitterSession,
     project_name: str,
     version_name: str,
-    create_dir_form: CreateDirectoryForm,
     move_form: MoveFileForm,
     can_move: bool,
 ) -> tuple[quart_response.Response, int] | response.Response | str | None:
@@ -246,18 +166,6 @@ async def _process_formdata(
         return await _move_file_to_revision(
             source_files_rel, target_dir_rel, session, project_name, version_name, wants_json
         )
-
-    elif form_action == "create_dir":
-        if await create_dir_form.validate_on_submit():
-            new_dir_name = create_dir_form.new_directory_name.data
-            if new_dir_name:
-                return await _create_directory_in_revision(
-                    pathlib.Path(new_dir_name),
-                    session,
-                    project_name,
-                    version_name,
-                    quart.request.accept_mimetypes.best_match(["application/json", "text/html"]) == "application/json",
-                )
 
     elif ((form_action != "create_dir") or (form_action is None)) and can_move:
         return await _move_file(move_form, session, project_name, version_name)

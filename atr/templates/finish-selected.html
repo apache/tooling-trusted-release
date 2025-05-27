@@ -176,21 +176,6 @@
       File moving is disabled as all files are currently in the same directory or the revision is empty.
     </div>
   {% endif %}
-
-  <h2>Manage directories</h2>
-  <h3>Create a new directory</h3>
-  <form method="post">
-    {{ create_dir_form.hidden_tag() }}
-    <div class="d-flex">
-      {{ create_dir_form.new_directory_name(class="form-control", placeholder="New directory name") }}
-      <button type="submit"
-              class="btn btn-primary ms-2 text-nowrap"
-              name="form_action"
-              value="create_dir">Create directory</button>
-    </div>
-    {{ forms.errors(create_dir_form.new_directory_name, classes="text-danger small mt-1") }}
-  </form>
-
   <!--
   TODO: Add a form to delete a directory.
   <h3>Delete a directory</h3>
