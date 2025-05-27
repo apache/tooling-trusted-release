@@ -3,10 +3,15 @@ repos:
   rev: v5.0.0
   hooks:
     - id: check-toml
+      exclude: ^node_modules/
     - id: check-yaml
+      exclude: ^node_modules/
     - id: end-of-file-fixer
+      exclude: ^node_modules/
     - id: mixed-line-ending
+      exclude: ^node_modules/
     - id: trailing-whitespace
+      exclude: ^node_modules/
 - repo: https://github.com/Lucas-C/pre-commit-hooks
   rev: v1.5.5
   hooks:
@@ -62,18 +67,21 @@ repos:
       entry: ruff check --fix
       language: system
       types: [python]
+      exclude: ^node_modules/
     - id: ruff-format
       name: Ruff Formatter
       entry: ruff format --force-exclude
       language: system
       types: [python]
+      exclude: ^node_modules/
     - id: mypy
       name: Mypy Type Check
       entry: mypy
       language: system
       require_serial: true
       types: [python]
-      exclude: "tests" # see https://github.com/pre-commit/pre-commit/issues/2967
+      # See https://github.com/pre-commit/pre-commit/issues/2967
+      exclude: ^(node_modules|tests)/
       args:
         - --config-file=pyproject.toml
         - --scripts-are-modules
@@ -83,7 +91,7 @@ repos:
       language: system
       require_serial: true
       types: [python]
-      exclude: "tests"
+      exclude: ^tests/
     - id: jinja-route-check
       name: Jinja Route Checker
       description: Check whether routes used in Jinja2 templates actually exist

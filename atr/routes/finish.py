@@ -22,8 +22,10 @@ from typing import Final
 import aiofiles.os
 import quart
 import quart.wrappers.response as quart_response
+import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
 import wtforms
+import wtforms.fields as fields
 
 import atr.db as db
 import atr.db.models as models
@@ -56,21 +58,32 @@ class CreateDirectoryForm(util.QuartFormTyped):
 
 
 class MoveFileForm(util.QuartFormTyped):
-    """Form for moving a file within a preview revision."""
+    """Form for moving one or more files within a preview revision."""
 
-    source_file = wtforms.SelectField("File to move", choices=[], validators=[wtforms.validators.InputRequired()])
+    source_files = wtforms.SelectMultipleField(
+        "Files to move",
+        choices=[],
+        validators=[wtforms.validators.DataRequired(message="Please select at least one file to move.")],
+    )
     target_directory = wtforms.SelectField(
-        "Target directory", choices=[], validators=[wtforms.validators.InputRequired()]
+        "Target directory", choices=[], validators=[wtforms.validators.DataRequired()]
     )
     submit = wtforms.SubmitField("Move file")
 
+    def validate_source_files(self, field: fields.SelectMultipleField) -> None:
+        if not field.data or len(field.data) == 0:
+            raise wtforms.validators.ValidationError("Please select at least one file to move.")
+
     def validate_target_directory(self, field: wtforms.Field) -> None:
         # This validation runs only if both fields have data
-        if self.source_file.data and field.data:
-            source_path = pathlib.Path(self.source_file.data)
+        if self.source_files.data and field.data:
+            source_paths = [pathlib.Path(sf) for sf in self.source_files.data]
             target_dir = pathlib.Path(field.data)
-            if source_path.parent == target_dir:
-                raise wtforms.validators.ValidationError("Target directory cannot be the same as the source directory.")
+            for source_path in source_paths:
+                if source_path.parent == target_dir:
+                    raise wtforms.validators.ValidationError(
+                        f"Target directory cannot be the same as the source directory for {source_path.name}."
+                    )
 
 
 @routes.committer("/finish/<project_name>/<version_name>", methods=["GET", "POST"])
@@ -105,28 +118,16 @@ async def selected(
     )
 
     # Populate choices dynamically for both GET and POST
-    move_form.source_file.choices = sorted([(str(p), str(p)) for p in source_files_rel])
+    move_form.source_files.choices = sorted([(str(p), str(p)) for p in source_files_rel])
     move_form.target_directory.choices = sorted([(str(d), str(d)) for d in target_dirs])
     can_move = (len(target_dirs) > 1) and (len(source_files_rel) > 0)
 
     if formdata:
-        form_action = formdata.get("form_action")
-        if form_action == "create_dir":
-            if await create_dir_form.validate_on_submit():
-                new_dir_name = create_dir_form.new_directory_name.data
-                if new_dir_name:
-                    return await _create_directory_in_revision(
-                        pathlib.Path(new_dir_name),
-                        session,
-                        project_name,
-                        version_name,
-                        quart.request.accept_mimetypes.best_match(["application/json", "text/html"])
-                        == "application/json",
-                    )
-        elif (form_action != "create_dir") and can_move:
-            move_result = await _move_file(move_form, session, project_name, version_name)
-            if move_result is not None:
-                return move_result
+        result = await _process_formdata(
+            formdata, session, project_name, version_name, create_dir_form, move_form, can_move
+        )
+        if result is not None:
+            return result
 
     # resp = await quart.current_app.make_response(template_rendered)
     # resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -145,22 +146,6 @@ async def selected(
         user_ssh_keys=user_ssh_keys,
         target_dirs=sorted(list(target_dirs)),
     )
-
-
-async def _respond(
-    session: routes.CommitterSession,
-    project_name: str,
-    version_name: str,
-    wants_json: bool,
-    ok: bool,
-    msg: str,
-    http_status: int = 200,
-) -> tuple[quart_response.Response, int] | response.Response:
-    """Helper to respond with JSON or flash message and redirect."""
-    if wants_json:
-        return quart.jsonify(ok=ok, message=msg), http_status
-    await quart.flash(msg, "success" if ok else "error")
-    return await session.redirect(selected, project_name=project_name, version_name=version_name)
 
 
 async def _create_directory_in_revision(
@@ -219,38 +204,117 @@ async def _create_directory_in_revision(
         )
 
 
+async def _process_formdata(
+    formdata: datastructures.MultiDict,
+    session: routes.CommitterSession,
+    project_name: str,
+    version_name: str,
+    create_dir_form: CreateDirectoryForm,
+    move_form: MoveFileForm,
+    can_move: bool,
+) -> tuple[quart_response.Response, int] | response.Response | str | None:
+    form_action = formdata.get("form_action")
+
+    if (
+        (quart.request.method == "POST")
+        and ("source_files" in formdata)
+        and ("target_directory" in formdata)
+        and (not form_action)
+    ):
+        source_files_data = formdata.getlist("source_files")
+        target_dir_data = formdata.get("target_directory")
+        wants_json = quart.request.accept_mimetypes.best_match(["application/json", "text/html"]) == "application/json"
+
+        if not source_files_data or not target_dir_data:
+            return await _respond(
+                session,
+                project_name,
+                version_name,
+                wants_json,
+                False,
+                "Missing source file(s) or target directory.",
+                400,
+            )
+
+        source_files_rel = [pathlib.Path(sf) for sf in source_files_data]
+        target_dir_rel = pathlib.Path(target_dir_data)
+
+        if not source_files_rel:
+            return await _respond(
+                session, project_name, version_name, wants_json, False, "No source files selected.", 400
+            )
+        return await _move_file_to_revision(
+            source_files_rel, target_dir_rel, session, project_name, version_name, wants_json
+        )
+
+    elif form_action == "create_dir":
+        if await create_dir_form.validate_on_submit():
+            new_dir_name = create_dir_form.new_directory_name.data
+            if new_dir_name:
+                return await _create_directory_in_revision(
+                    pathlib.Path(new_dir_name),
+                    session,
+                    project_name,
+                    version_name,
+                    quart.request.accept_mimetypes.best_match(["application/json", "text/html"]) == "application/json",
+                )
+
+    elif ((form_action != "create_dir") or (form_action is None)) and can_move:
+        return await _move_file(move_form, session, project_name, version_name)
+    return None
+
+
 async def _move_file(
-    form: MoveFileForm, session: routes.CommitterSession, project_name: str, version_name: str
+    form: MoveFileForm,
+    session: routes.CommitterSession,
+    project_name: str,
+    version_name: str,
 ) -> tuple[quart_response.Response, int] | response.Response | None:
     wants_json = "application/json" in quart.request.headers.get("Accept", "")
+
     if await form.validate_on_submit():
-        source_file_rel = pathlib.Path(form.source_file.data)
-        target_dir_rel = pathlib.Path(form.target_directory.data)
+        source_files_rel_str_list = form.source_files.data
+        target_dir_rel_str = form.target_directory.data
+        if not source_files_rel_str_list or not target_dir_rel_str:
+            return await _respond(
+                session,
+                project_name,
+                version_name,
+                wants_json,
+                False,
+                "Source file(s) or target directory missing.",
+                400,
+            )
+
+        source_files_rel = [pathlib.Path(sf_str) for sf_str in source_files_rel_str_list]
+        target_dir_rel = pathlib.Path(target_dir_rel_str)
         return await _move_file_to_revision(
-            source_file_rel, target_dir_rel, session, project_name, version_name, wants_json
+            source_files_rel, target_dir_rel, session, project_name, version_name, wants_json
         )
     else:
         if wants_json:
             error_messages = []
             for field_name, field_errors in form.errors.items():
                 field_object = getattr(form, field_name, None)
-                label_object = getattr(field_object, "label", None)
-                label_text = label_object.text if label_object else field_name.replace("_", " ").title()
+                label_text = field_name.replace("_", " ").title()
+                if field_object and hasattr(field_object, "label") and field_object.label:
+                    label_text = field_object.label.text
                 error_messages.append(f"{label_text}: {', '.join(field_errors)}")
             error_string = "; ".join(error_messages)
             return await _respond(session, project_name, version_name, True, False, error_string, 400)
         else:
             for field_name, field_errors in form.errors.items():
                 field_object = getattr(form, field_name, None)
-                label_object = getattr(field_object, "label", None)
-                label_text = label_object.text if label_object else field_name.replace("_", " ").title()
+                label_text = field_name.replace("_", " ").title()
+                if field_object and hasattr(field_object, "label") and field_object.label:
+                    label_text = field_object.label.text
                 for error_message_text in field_errors:
                     await quart.flash(f"{label_text}: {error_message_text}", "warning")
             return None
 
 
 async def _move_file_to_revision(
-    source_file_rel: pathlib.Path,
+    source_files_rel: list[pathlib.Path],
     target_dir_rel: pathlib.Path,
     session: routes.CommitterSession,
     project_name: str,
@@ -259,27 +323,41 @@ async def _move_file_to_revision(
 ) -> tuple[quart_response.Response, int] | response.Response:
     try:
         description = "File move through web interface"
+        moved_files_names: list[str] = []
+        skipped_files_names: list[str] = []
+
         async with revision.create_and_manage(
             project_name, version_name, session.uid, description=description
         ) as creating:
-            related_files = _related_files(source_file_rel)
-            bundle = [f for f in related_files if await aiofiles.os.path.exists(creating.interim_path / f)]
-            collisions = [
-                f.name for f in bundle if await aiofiles.os.path.exists(creating.interim_path / target_dir_rel / f.name)
-            ]
-            if collisions:
-                # Remove the temporary directory, and do not create or commit a new revision
-                # (But also do not raise an exception)
-                creating.failed = True
-                msg = f"Files already exist in '{target_dir_rel}': {', '.join(collisions)}"
-                return await _respond(session, project_name, version_name, wants_json, False, msg, 400)
+            await _setup_revision(
+                source_files_rel,
+                target_dir_rel,
+                creating,
+                moved_files_names,
+                skipped_files_names,
+            )
 
-            for f in bundle:
-                await aiofiles.os.rename(creating.interim_path / f, creating.interim_path / target_dir_rel / f.name)
+        if creating.failed:
+            return await _respond(
+                session, project_name, version_name, wants_json, False, "Move operation failed due to pre-check.", 409
+            )
 
-        return await _respond(
-            session, project_name, version_name, wants_json, True, f"Moved {', '.join(f.name for f in bundle)}", 200
-        )
+        response_messages = []
+        if moved_files_names:
+            response_messages.append(f"Moved {', '.join(moved_files_names)}")
+        if skipped_files_names:
+            response_messages.append(f"Skipped {', '.join(skipped_files_names)} (already in target directory)")
+
+        if not response_messages:
+            if not source_files_rel:
+                return await _respond(
+                    session, project_name, version_name, wants_json, False, "No source files specified for move.", 400
+                )
+            msg = f"No files were moved. {', '.join(skipped_files_names)} already in '{target_dir_rel}'."
+            return await _respond(session, project_name, version_name, wants_json, True, msg, 200)
+
+        final_msg = ". ".join(response_messages) + "."
+        return await _respond(session, project_name, version_name, wants_json, True, final_msg, 200)
 
     except FileNotFoundError:
         _LOGGER.exception("File not found during move operation in new revision")
@@ -312,6 +390,49 @@ def _related_files(path: pathlib.Path) -> list[pathlib.Path]:
         parent_dir / f"{name_without_ext}.sha256",
         parent_dir / f"{name_without_ext}.sha512",
     ]
+
+
+async def _respond(
+    session: routes.CommitterSession,
+    project_name: str,
+    version_name: str,
+    wants_json: bool,
+    ok: bool,
+    msg: str,
+    http_status: int = 200,
+) -> tuple[quart_response.Response, int] | response.Response:
+    """Helper to respond with JSON or flash message and redirect."""
+    if wants_json:
+        return quart.jsonify(ok=ok, message=msg), http_status
+    await quart.flash(msg, "success" if ok else "error")
+    return await session.redirect(selected, project_name=project_name, version_name=version_name)
+
+
+async def _setup_revision(
+    source_files_rel: list[pathlib.Path],
+    target_dir_rel: pathlib.Path,
+    creating: revision.Creating,
+    moved_files_names: list[str],
+    skipped_files_names: list[str],
+) -> None:
+    for source_file_rel in source_files_rel:
+        if source_file_rel.parent == target_dir_rel:
+            skipped_files_names.append(source_file_rel.name)
+            continue
+
+        related_files = _related_files(source_file_rel)
+        bundle = [f for f in related_files if await aiofiles.os.path.exists(creating.interim_path / f)]
+        collisions = [
+            f.name for f in bundle if await aiofiles.os.path.exists(creating.interim_path / target_dir_rel / f.name)
+        ]
+        if collisions:
+            creating.failed = True
+            return
+
+        for f in bundle:
+            await aiofiles.os.rename(creating.interim_path / f, creating.interim_path / target_dir_rel / f.name)
+            if f == source_file_rel:
+                moved_files_names.append(f.name)
 
 
 async def _sources_and_targets(latest_revision_dir: pathlib.Path) -> tuple[list[pathlib.Path], set[pathlib.Path]]:

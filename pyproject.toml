@@ -98,6 +98,9 @@ executionEnvironments = [
 
 [tool.ruff]
 line-length = 120
+extend-exclude = [
+    "node_modules",
+]
 
 [tool.ruff.lint]
 ignore = []
@@ -123,7 +126,7 @@ select = [
 
 [tool.mypy]
 python_version = "3.13"
-exclude = ["tests"]
+exclude = ["node_modules", "tests"]
 plugins = ["pydantic.mypy"]
 mypy_path = "typestubs"
 check_untyped_defs = false

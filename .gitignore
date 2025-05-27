@@ -10,5 +10,7 @@
 __pycache__/
 apptoken.txt
 bootstrap/build/
+node_modules/
+package-lock.json
 state/
 atr/_version.py
