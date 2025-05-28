@@ -145,7 +145,6 @@ async def selected(
         source_files=sorted(source_files_rel),
         form=move_form,
         delete_dir_form=delete_dir_form,
-        can_move=can_move,
         user_ssh_keys=user_ssh_keys,
         target_dirs=sorted(list(target_dirs)),
         max_files_to_show=10,

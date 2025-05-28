@@ -22,6 +22,7 @@ import dataclasses
 import datetime
 import hashlib
 import logging
+import os
 import pathlib
 import re
 import tarfile
@@ -158,6 +159,13 @@ async def compute_sha512(file_path: pathlib.Path) -> str:
         while chunk := await f.read(4096):
             sha512.update(chunk)
     return sha512.hexdigest()
+
+
+def chmod_directories(path: pathlib.Path, permissions: int = 0o755) -> None:
+    os.chmod(path, permissions)
+    for dir_path in path.rglob("*"):
+        if dir_path.is_dir():
+            os.chmod(dir_path, permissions)
 
 
 async def content_list(

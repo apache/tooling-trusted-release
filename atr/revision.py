@@ -85,6 +85,9 @@ async def create_and_manage(
         await aioshutil.rmtree(temp_dir)  # type: ignore[call-arg]
         raise
 
+    # Ensure that the permissions of every directory are 755
+    await asyncio.to_thread(util.chmod_directories, temp_dir_path)
+
     # Create a revision row, holding the write lock
     async with db.session() as data:
         # This is the only place where models.Revision is constructed

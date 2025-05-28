@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asyncio
 import datetime
 import logging
 from typing import TYPE_CHECKING, Any, Protocol
@@ -193,9 +194,13 @@ async def selected_post(
         # Do not put it in the data block after data.commit()
         # Otherwise util.release_directory() will not work
         release = await data.release(name=release.name).demand(RuntimeError(f"Release {release.name} does not exist"))
-        target = str(util.release_directory(release))
+        target_path = util.release_directory(release)
+        target = str(target_path)
         if await aiofiles.os.path.exists(target):
             raise routes.FlashError("Release already exists")
+
+    # Ensure that the permissions of every directory are 755
+    await asyncio.to_thread(util.chmod_directories, target_path)
 
     try:
         await aioshutil.move(source, target)

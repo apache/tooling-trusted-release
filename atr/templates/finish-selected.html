@@ -107,75 +107,69 @@
     </p>
   </div>
 
-  {% if can_move %}
-    <h2>Move items to a different directory</h2>
-    <p>
-      Note that files with associated metadata (e.g. <code>.asc</code> or <code>.sha512</code> files) are treated as a single unit and will be moved together if any one of them is selected for movement.
-    </p>
-    <div id="move-error-alert"
-         class="alert alert-danger d-none"
-         role="alert"
-         aria-live="assertive"></div>
-    <form class="atr-canary">
-      <div class="row">
-        <div class="col-lg-6">
-          <div class="card mb-4">
-            <div class="card-header bg-light">
-              <h3 class="mb-0">Select items to move</h3>
-            </div>
-            <div class="card-body">
-              <input type="text"
-                     id="file-filter"
-                     class="form-control mb-2"
-                     placeholder="Search for an item to move..." />
-              <table class="table table-sm table-striped border mt-3">
-                <tbody id="file-list-table-body">
-                </tbody>
-              </table>
-              <div id="file-list-more-info" class="text-muted small mt-1"></div>
-            </div>
+  <h2>Move items to a different directory</h2>
+  <p>
+    Note that files with associated metadata (e.g. <code>.asc</code> or <code>.sha512</code> files) are treated as a single unit and will be moved together if any one of them is selected for movement.
+  </p>
+  <div id="move-error-alert"
+       class="alert alert-danger d-none"
+       role="alert"
+       aria-live="assertive"></div>
+  <form class="atr-canary">
+    <div class="row">
+      <div class="col-lg-6">
+        <div class="card mb-4">
+          <div class="card-header bg-light">
+            <h3 class="mb-0">Select items to move</h3>
           </div>
-        </div>
-        <div class="col-lg-6">
-          <div class="card mb-4">
-            <div class="card-header bg-light">
-              <h3 class="mb-0">
-                <span id="selected-file-name-title">Select a destination for the file</span>
-              </h3>
-            </div>
-            <div class="card-body">
-              <input type="text"
-                     id="dir-filter-input"
-                     class="form-control mb-2"
-                     placeholder="Search for a directory to move to..." />
-              <table class="table table-sm table-striped border mt-3">
-                <tbody id="dir-list-table-body">
-                </tbody>
-              </table>
-              <div id="dir-list-more-info" class="text-muted small mt-1"></div>
-            </div>
+          <div class="card-body">
+            <input type="text"
+                   id="file-filter"
+                   class="form-control mb-2"
+                   placeholder="Search for an item to move..." />
+            <table class="table table-sm table-striped border mt-3">
+              <tbody id="file-list-table-body">
+              </tbody>
+            </table>
+            <div id="file-list-more-info" class="text-muted small mt-1"></div>
           </div>
         </div>
       </div>
-
-      <div>
-        <div class="mb-3">
-          <label for="maxFilesInput" class="form-label">Items to show per list:</label>
-          <input type="number"
-                 class="form-control form-control-sm w-25"
-                 id="max-files-input"
-                 value="{{ max_files_to_show }}"
-                 min="1" />
+      <div class="col-lg-6">
+        <div class="card mb-4">
+          <div class="card-header bg-light">
+            <h3 class="mb-0">
+              <span id="selected-file-name-title">Select a destination for the file</span>
+            </h3>
+          </div>
+          <div class="card-body">
+            <input type="text"
+                   id="dir-filter-input"
+                   class="form-control mb-2"
+                   placeholder="Search for a directory to move to..." />
+            <table class="table table-sm table-striped border mt-3">
+              <tbody id="dir-list-table-body">
+              </tbody>
+            </table>
+            <div id="dir-list-more-info" class="text-muted small mt-1"></div>
+          </div>
         </div>
-        <div id="current-move-selection-info" class="text-muted">Please select a file and a destination.</div>
-        <button type="button" id="confirm-move-button" class="btn btn-success mt-2">Move to selected directory</button>
       </div>
-    </form>
-  {% else %}
-    <div class="alert alert-info" role="alert">
-      File moving is disabled as all files are currently in the same directory or the revision is empty.
     </div>
-  {% endif %}
+
+    <div>
+      <div class="mb-3">
+        <label for="maxFilesInput" class="form-label">Items to show per list:</label>
+        <input type="number"
+               class="form-control form-control-sm w-25"
+               id="max-files-input"
+               value="{{ max_files_to_show }}"
+               min="1" />
+      </div>
+      <div id="current-move-selection-info" class="text-muted">Please select a file and a destination.</div>
+      <button type="button" id="confirm-move-button" class="btn btn-success mt-2">Move to selected directory</button>
+    </div>
+  </form>
   {% if delete_dir_form.directory_to_delete.choices %}
     <h2>Delete an empty directory</h2>
     <form method="post" class="mb-4">
