@@ -176,15 +176,20 @@
       File moving is disabled as all files are currently in the same directory or the revision is empty.
     </div>
   {% endif %}
-  <!--
-  TODO: Add a form to delete a directory.
-  <h3>Delete a directory</h3>
-  <p>Delete a directory to remove it from the release.</p>
-  <form>
-    <input type="text" class="form-control" placeholder="Directory name" />
-    <button type="submit" class="btn btn-danger">Delete directory</button>
-  </form>
--->
+  {% if delete_dir_form.directory_to_delete.choices %}
+    <h2>Delete an empty directory</h2>
+    <form method="post" class="mb-4">
+      {{ delete_dir_form.hidden_tag() }}
+      <div class="input-group">
+        {{ delete_dir_form.directory_to_delete(class="form-select") }}
+        <button type="submit"
+                class="btn btn-danger"
+                name="form_action"
+                value="delete_empty_dir">Delete directory</button>
+      </div>
+      {{ forms.errors(delete_dir_form.directory_to_delete, classes="text-danger small mt-1") }}
+    </form>
+  {% endif %}
 {% endblock content %}
 
 {% block javascripts %}

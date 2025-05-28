@@ -40,6 +40,15 @@ SPECIAL_SUFFIXES: Final[frozenset[str]] = frozenset({".asc", ".sha256", ".sha512
 _LOGGER: Final = logging.getLogger(__name__)
 
 
+class DeleteEmptyDirectoryForm(util.QuartFormTyped):
+    """Form for deleting an empty directory within a preview revision."""
+
+    directory_to_delete = wtforms.SelectField(
+        "Directory to delete", choices=[], validators=[wtforms.validators.DataRequired()]
+    )
+    submit = wtforms.SubmitField("Delete directory")
+
+
 class MoveFileForm(util.QuartFormTyped):
     """Form for moving one or more files within a preview revision."""
 
@@ -96,14 +105,30 @@ async def selected(
     move_form = await MoveFileForm.create_form(
         data=formdata if (formdata and formdata.get("form_action") != "create_dir") else None
     )
+    delete_dir_form = await DeleteEmptyDirectoryForm.create_form(
+        data=formdata if (formdata and formdata.get("form_action") == "delete_empty_dir") else None
+    )
 
     # Populate choices dynamically for both GET and POST
     move_form.source_files.choices = sorted([(str(p), str(p)) for p in source_files_rel])
     move_form.target_directory.choices = sorted([(str(d), str(d)) for d in target_dirs])
     can_move = (len(target_dirs) > 1) and (len(source_files_rel) > 0)
 
+    empty_deletable_dirs: list[pathlib.Path] = []
+    if latest_revision_dir.exists():
+        for d_rel in target_dirs:
+            if d_rel == pathlib.Path("."):
+                # Disallow deletion of the root directory
+                continue
+            d_full = latest_revision_dir / d_rel
+            if await aiofiles.os.path.isdir(d_full) and not await aiofiles.os.listdir(d_full):
+                empty_deletable_dirs.append(d_rel)
+    delete_dir_form.directory_to_delete.choices = sorted([(str(p), str(p)) for p in empty_deletable_dirs])
+
     if formdata:
-        result = await _process_formdata(formdata, session, project_name, version_name, move_form, can_move)
+        result = await _process_formdata(
+            formdata, session, project_name, version_name, move_form, delete_dir_form, can_move
+        )
         if result is not None:
             return result
 
@@ -119,6 +144,7 @@ async def selected(
         release=release,
         source_files=sorted(source_files_rel),
         form=move_form,
+        delete_dir_form=delete_dir_form,
         can_move=can_move,
         user_ssh_keys=user_ssh_keys,
         target_dirs=sorted(list(target_dirs)),
@@ -132,6 +158,7 @@ async def _process_formdata(
     project_name: str,
     version_name: str,
     move_form: MoveFileForm,
+    delete_dir_form: DeleteEmptyDirectoryForm,
     can_move: bool,
 ) -> tuple[quart_response.Response, int] | response.Response | str | None:
     form_action = formdata.get("form_action")
@@ -167,6 +194,24 @@ async def _process_formdata(
         return await _move_file_to_revision(
             source_files_rel, target_dir_rel, session, project_name, version_name, wants_json
         )
+
+    elif form_action == "delete_empty_dir":
+        wants_json = quart.request.accept_mimetypes.best_match(["application/json", "text/html"]) == "application/json"
+        if await delete_dir_form.validate_on_submit():
+            dir_to_delete_str = delete_dir_form.directory_to_delete.data
+            return await _delete_empty_dir_action(
+                pathlib.Path(dir_to_delete_str), session, project_name, version_name, wants_json
+            )
+        elif wants_json:
+            error_messages = []
+            for field_name_str, error_list in delete_dir_form.errors.items():
+                field_obj = getattr(delete_dir_form, field_name_str, None)
+                label_text = field_name_str.replace("_", " ").title()
+                if field_obj and hasattr(field_obj, "label") and field_obj.label:
+                    label_text = field_obj.label.text
+                error_messages.append(f"{label_text}: {', '.join(error_list)}")
+            error_msg = "; ".join(error_messages)
+            return await _respond(session, project_name, version_name, True, False, error_msg or "Invalid input.", 400)
 
     elif ((form_action != "create_dir") or (form_action is None)) and can_move:
         return await _move_file(move_form, session, project_name, version_name)
@@ -420,3 +465,36 @@ async def _sources_and_targets(latest_revision_dir: pathlib.Path) -> tuple[list[
             target_dirs.add(item_rel_path)
 
     return source_items_rel, target_dirs
+
+
+async def _delete_empty_dir_action(
+    dir_to_delete_rel: pathlib.Path,
+    session: routes.CommitterSession,
+    project_name: str,
+    version_name: str,
+    wants_json: bool,
+) -> tuple[quart_response.Response, int] | response.Response:
+    try:
+        description = f"Delete empty directory {dir_to_delete_rel} via web interface"
+        async with revision.create_and_manage(
+            project_name, version_name, session.uid, description=description
+        ) as creating:
+            path_to_remove = creating.interim_path / dir_to_delete_rel
+            path_to_remove.resolve().relative_to(creating.interim_path.resolve())
+            if not await aiofiles.os.path.isdir(path_to_remove):
+                raise revision.FailedError(f"Path '{dir_to_delete_rel}' is not a directory.")
+            if await aiofiles.os.listdir(path_to_remove):
+                raise revision.FailedError(f"Directory '{dir_to_delete_rel}' is not empty.")
+            await aiofiles.os.rmdir(path_to_remove)
+
+    except Exception:
+        _LOGGER.exception(f"Unexpected error deleting directory {dir_to_delete_rel} for {project_name}/{version_name}")
+        return await _respond(
+            session, project_name, version_name, wants_json, False, "An unexpected error occurred.", 500
+        )
+
+    if creating.failed is not None:
+        return await _respond(session, project_name, version_name, wants_json, False, str(creating.failed), 400)
+    return await _respond(
+        session, project_name, version_name, wants_json, True, f"Deleted empty directory '{dir_to_delete_rel}'.", 200
+    )
