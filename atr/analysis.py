@@ -133,6 +133,10 @@ VARIANT_PATTERNS: Final[list[str]] = [
     "src",
 ]
 
+_CANDIDATE_TAG: Final = r"(?: Candidate | candidate | RC | Rc | rc ) [.-]? [0-9]+"
+_CANDIDATE_PARTIAL: Final = re.compile(rf"(?x) - {_CANDIDATE_TAG}")
+_CANDIDATE_WHOLE: Final = re.compile(rf"(?x) ^ {_CANDIDATE_TAG} $")
+
 
 @dataclasses.dataclass
 class Analysis:
@@ -171,6 +175,20 @@ def architecture_pattern() -> str:
         "win(?:dows)?",
     ]
     return "(" + "|".join(architectures) + ")(?=[_.-])"
+
+
+def candidate_match(segment: str) -> re.Match[str] | None:
+    return _CANDIDATE_WHOLE.match(segment) or _CANDIDATE_PARTIAL.search(segment)
+
+
+def candidate_removed(path: pathlib.Path) -> pathlib.Path:
+    parts = []
+    for part in path.parts:
+        if _CANDIDATE_WHOLE.match(part):
+            continue
+        if part := _CANDIDATE_PARTIAL.sub("", part):
+            parts.append(part)
+    return pathlib.Path(*parts)
 
 
 def component_parse(i: int, component: str, size: int, elements: dict[str, str | None]) -> None:
@@ -291,6 +309,14 @@ def is_artifact(file_path: str | pathlib.Path) -> bool:
     filename = str(file_path)
     search = re.search(extension_pattern(), filename)
     return bool(search and search.group("artifact"))
+
+
+def is_candidate(path: pathlib.Path) -> bool:
+    return any(is_candidate_segment(part) for part in path.parts)
+
+
+def is_candidate_segment(segment: str) -> bool:
+    return bool(candidate_match(segment))
 
 
 def is_skippable(path: pathlib.Path) -> bool:
