@@ -175,7 +175,8 @@ async def selected_post(
 
             # Prepare paths for file operations
             source_base = util.release_directory_base(release)
-            source = str(source_base / release.unwrap_revision_number)
+            source_path = source_base / release.unwrap_revision_number
+            source = str(source_path)
 
             await _promote(release, data, preview_revision_number)
             await data.commit()
@@ -200,7 +201,7 @@ async def selected_post(
             raise routes.FlashError("Release already exists")
 
     # Ensure that the permissions of every directory are 755
-    await asyncio.to_thread(util.chmod_directories, target_path)
+    await asyncio.to_thread(util.chmod_directories, source_path)
 
     try:
         await aioshutil.move(source, target)

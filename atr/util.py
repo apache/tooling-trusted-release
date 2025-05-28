@@ -147,6 +147,13 @@ async def async_temporary_directory(
             pass
 
 
+def chmod_directories(path: pathlib.Path, permissions: int = 0o755) -> None:
+    os.chmod(path, permissions)
+    for dir_path in path.rglob("*"):
+        if dir_path.is_dir():
+            os.chmod(dir_path, permissions)
+
+
 def compute_sha3_256(file_data: bytes) -> str:
     """Compute SHA3-256 hash of file data."""
     return hashlib.sha3_256(file_data).hexdigest()
@@ -159,13 +166,6 @@ async def compute_sha512(file_path: pathlib.Path) -> str:
         while chunk := await f.read(4096):
             sha512.update(chunk)
     return sha512.hexdigest()
-
-
-def chmod_directories(path: pathlib.Path, permissions: int = 0o755) -> None:
-    os.chmod(path, permissions)
-    for dir_path in path.rglob("*"):
-        if dir_path.is_dir():
-            os.chmod(dir_path, permissions)
 
 
 async def content_list(
