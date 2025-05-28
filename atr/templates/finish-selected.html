@@ -108,7 +108,7 @@
   </div>
 
   {% if can_move %}
-    <h2>Move files to a different directory</h2>
+    <h2>Move items to a different directory</h2>
     <p>
       Note that files with associated metadata (e.g. <code>.asc</code> or <code>.sha512</code> files) are treated as a single unit and will be moved together if any one of them is selected for movement.
     </p>
@@ -121,13 +121,13 @@
         <div class="col-lg-6">
           <div class="card mb-4">
             <div class="card-header bg-light">
-              <h3 class="mb-0">Select files to move</h3>
+              <h3 class="mb-0">Select items to move</h3>
             </div>
             <div class="card-body">
               <input type="text"
                      id="file-filter"
                      class="form-control mb-2"
-                     placeholder="Search for a file to move..." />
+                     placeholder="Search for an item to move..." />
               <table class="table table-sm table-striped border mt-3">
                 <tbody id="file-list-table-body">
                 </tbody>
@@ -164,7 +164,7 @@
           <input type="number"
                  class="form-control form-control-sm w-25"
                  id="max-files-input"
-                 value="5"
+                 value="{{ max_files_to_show }}"
                  min="1" />
         </div>
         <div id="current-move-selection-info" class="text-muted">Please select a file and a destination.</div>

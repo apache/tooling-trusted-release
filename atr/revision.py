@@ -33,12 +33,16 @@ import atr.tasks as tasks
 import atr.util as util
 
 
+class FailedError(Exception):
+    pass
+
+
 @dataclasses.dataclass
 class Creating:
     old: models.Revision | None
     interim_path: pathlib.Path
     new: models.Revision | None
-    failed: bool = False
+    failed: FailedError | None = None
 
 
 # NOTE: The create_directory parameter is not used anymore
@@ -64,6 +68,7 @@ async def create_and_manage(
     # Use the tmp subdirectory of state, to ensure that it is on the same filesystem
     temp_dir: str = await asyncio.to_thread(tempfile.mkdtemp, dir=util.get_tmp_dir())
     temp_dir_path = pathlib.Path(temp_dir)
+    creating = Creating(old=old_revision, interim_path=temp_dir_path, new=None, failed=None)
     try:
         # The directory was created by mkdtemp, but it's empty
         if old_revision is not None:
@@ -71,15 +76,14 @@ async def create_and_manage(
             old_release_dir = util.release_directory(release)
             await util.create_hard_link_clone(old_release_dir, temp_dir_path, do_not_create_dest_dir=True)
         # The directory is either empty or its files are hard linked to the previous revision
-        creating = Creating(old=old_revision, interim_path=temp_dir_path, new=None, failed=False)
         yield creating
+    except FailedError as e:
+        await aioshutil.rmtree(temp_dir)  # type: ignore[call-arg]
+        creating.failed = e
+        return
     except Exception:
         await aioshutil.rmtree(temp_dir)  # type: ignore[call-arg]
         raise
-
-    if creating.failed:
-        await aioshutil.rmtree(temp_dir)  # type: ignore[call-arg]
-        return
 
     # Create a revision row, holding the write lock
     async with db.session() as data:

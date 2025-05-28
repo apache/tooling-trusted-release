@@ -505,7 +505,7 @@ async def _step_07b_process_validated_rsync_write(
                     f"rsync upload failed with exit status {exit_status} for {for_revision}. "
                     f"Command: {process.command} (run as {' '.join(argv)})"
                 )
-                creating.failed = True
+                raise revision.FailedError(f"rsync upload failed with exit status {exit_status} for {for_revision}")
         if creating.new is not None:
             _LOGGER.info(f"rsync upload successful for revision {creating.new.number}")
             host = config.get().APP_HOST
@@ -515,7 +515,7 @@ async def _step_07b_process_validated_rsync_write(
                 process.stderr.write(message.encode())
                 await process.stderr.drain()
         else:
-            _LOGGER.info(f"rsync upload successful for release {project_name}-{version_name}")
+            _LOGGER.info(f"rsync upload unsuccessful for release {project_name}-{version_name}")
         if not process.is_closing():
             process.exit(exit_status)
 

@@ -122,6 +122,7 @@ async def selected(
         can_move=can_move,
         user_ssh_keys=user_ssh_keys,
         target_dirs=sorted(list(target_dirs)),
+        max_files_to_show=10,
     )
 
 
@@ -245,14 +246,14 @@ async def _move_file_to_revision(
                 skipped_files_names,
             )
 
-        if creating.failed:
+        if creating.failed is not None:
             return await _respond(
                 session,
                 project_name,
                 version_name,
                 wants_json,
                 False,
-                "Directory names must not start with '.' or be '..'.",
+                str(creating.failed),
                 409,
             )
 
@@ -289,9 +290,7 @@ async def _move_file_to_revision(
         return await _respond(session, project_name, version_name, wants_json, False, f"Error moving file: {e}", 500)
     except Exception as e:
         _LOGGER.exception("Unexpected error during file move")
-        return await _respond(
-            session, project_name, version_name, wants_json, False, f"An unexpected error occurred: {e!s}", 500
-        )
+        return await _respond(session, project_name, version_name, wants_json, False, f"ERROR: {e!s}", 500)
 
 
 def _related_files(path: pathlib.Path) -> list[pathlib.Path]:
@@ -334,31 +333,30 @@ async def _setup_revision(
         target_path.resolve().relative_to(creating.interim_path.resolve())
     except ValueError:
         # Path traversal detected
-        creating.failed = True
-        return
+        raise revision.FailedError("Paths must be restricted to the release directory")
 
     if not await aiofiles.os.path.exists(target_path):
         for part in target_path.parts:
-            if (part == "..") or part.startswith("."):
-                creating.failed = True
-                return
+            # TODO: This .prefix check could include some existing directory segment
+            if part.startswith("."):
+                raise revision.FailedError("Segments must not start with '.'")
+            if ".." in part:
+                raise revision.FailedError("Segments must not contain '..'")
 
         try:
             await aiofiles.os.makedirs(target_path)
         except OSError:
-            creating.failed = True
-            return
+            raise revision.FailedError("Failed to create target directory")
     elif not await aiofiles.os.path.isdir(target_path):
-        creating.failed = True
-        return
+        raise revision.FailedError("Target path is not a directory")
 
     for source_file_rel in source_files_rel:
-        await _setup_revision_file(
+        await _setup_revision_item(
             source_file_rel, target_dir_rel, creating, moved_files_names, skipped_files_names, target_path
         )
 
 
-async def _setup_revision_file(
+async def _setup_revision_item(
     source_file_rel: pathlib.Path,
     target_dir_rel: pathlib.Path,
     creating: revision.Creating,
@@ -370,25 +368,45 @@ async def _setup_revision_file(
         skipped_files_names.append(source_file_rel.name)
         return
 
-    related_files = _related_files(source_file_rel)
-    bundle = [f for f in related_files if await aiofiles.os.path.exists(creating.interim_path / f)]
-    collisions = [f.name for f in bundle if await aiofiles.os.path.exists(target_path / f.name)]
-    if collisions:
-        creating.failed = True
-        return
+    full_source_item_path = creating.interim_path / source_file_rel
 
-    for f in bundle:
-        await aiofiles.os.rename(creating.interim_path / f, target_path / f.name)
-        if f == source_file_rel:
-            moved_files_names.append(f.name)
+    if await aiofiles.os.path.isdir(full_source_item_path):
+        if (target_dir_rel == source_file_rel) or (creating.interim_path / target_dir_rel).resolve().is_relative_to(
+            full_source_item_path.resolve()
+        ):
+            raise revision.FailedError("Cannot move a directory into itself or a subdirectory of itself")
+
+        final_target_for_item = target_path / source_file_rel.name
+        if await aiofiles.os.path.exists(final_target_for_item):
+            raise revision.FailedError("Target name already exists")
+
+        await aiofiles.os.rename(full_source_item_path, final_target_for_item)
+        moved_files_names.append(source_file_rel.name)
+    else:
+        related_files = _related_files(source_file_rel)
+        bundle = [f for f in related_files if await aiofiles.os.path.exists(creating.interim_path / f)]
+        for f_check in bundle:
+            if await aiofiles.os.path.isdir(creating.interim_path / f_check):
+                raise revision.FailedError("A related 'file' is actually a directory")
+
+        collisions = [f.name for f in bundle if await aiofiles.os.path.exists(target_path / f.name)]
+        if collisions:
+            raise revision.FailedError("A related file already exists in the target directory")
+
+        for f in bundle:
+            await aiofiles.os.rename(creating.interim_path / f, target_path / f.name)
+            if f == source_file_rel:
+                moved_files_names.append(f.name)
 
 
 async def _sources_and_targets(latest_revision_dir: pathlib.Path) -> tuple[list[pathlib.Path], set[pathlib.Path]]:
-    source_files_rel: list[pathlib.Path] = []
+    source_items_rel: list[pathlib.Path] = []
     target_dirs: set[pathlib.Path] = {pathlib.Path(".")}
 
     async for item_rel_path in util.paths_recursive_all(latest_revision_dir):
         current_parent = item_rel_path.parent
+        source_items_rel.append(item_rel_path)
+
         while True:
             target_dirs.add(current_parent)
             if current_parent == pathlib.Path("."):
@@ -397,8 +415,8 @@ async def _sources_and_targets(latest_revision_dir: pathlib.Path) -> tuple[list[
 
         item_abs_path = latest_revision_dir / item_rel_path
         if await aiofiles.os.path.isfile(item_abs_path):
-            source_files_rel.append(item_rel_path)
+            pass
         elif await aiofiles.os.path.isdir(item_abs_path):
             target_dirs.add(item_rel_path)
 
-    return source_files_rel, target_dirs
+    return source_items_rel, target_dirs

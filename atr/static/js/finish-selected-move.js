@@ -36,7 +36,7 @@ const TXT = Object.freeze({
     Selected: "Selected",
     MoreItemsHint: "more available (filter to browse)..."
 });
-const MAX_FILES_FALLBACK = 5;
+const MAX_FILES_FALLBACK = 10;
 let fileFilterInput;
 let fileListTableBody;
 let maxFilesInput;
@@ -79,39 +79,39 @@ function $(id) {
 }
 function updateMoveSelectionInfo() {
     if (selectedFileNameTitleElement) {
-        selectedFileNameTitleElement.textContent = uiState.currentlySelectedFilePaths.size > 0
-            ? `Select a destination for ${uiState.currentlySelectedFilePaths.size} file(s)`
-            : "Select a destination for the file";
+        selectedFileNameTitleElement.textContent = uiState.currentlySelectedPaths.size > 0
+            ? `Select a destination for ${uiState.currentlySelectedPaths.size} item(s)`
+            : "Select a destination for the item";
     }
-    const numSelectedFiles = uiState.currentlySelectedFilePaths.size;
+    const numSelectedItems = uiState.currentlySelectedPaths.size;
     const destinationDir = uiState.currentlyChosenDirectoryPath;
-    let message = "Please select files and a destination.";
+    let message = "Please select items and a destination.";
     let disableConfirmButton = true;
     currentMoveSelectionInfoElement.innerHTML = '';
-    if (!numSelectedFiles && destinationDir) {
+    if (!numSelectedItems && destinationDir) {
         currentMoveSelectionInfoElement.appendChild(document.createTextNode("Selected destination: "));
         const strongDest = document.createElement("strong");
-        strongDest.textContent = destinationDir;
+        strongDest.textContent = (destinationDir && destinationDir !== "." && !destinationDir.endsWith("/")) ? destinationDir + "/" : destinationDir;
         currentMoveSelectionInfoElement.appendChild(strongDest);
-        currentMoveSelectionInfoElement.appendChild(document.createTextNode(". Please select file(s) to move."));
+        currentMoveSelectionInfoElement.appendChild(document.createTextNode(". Please select item(s) to move."));
     }
-    else if (numSelectedFiles && !destinationDir) {
+    else if (numSelectedItems && !destinationDir) {
         currentMoveSelectionInfoElement.appendChild(document.createTextNode("Moving "));
         const strongN = document.createElement("strong");
-        strongN.textContent = `${numSelectedFiles} file(s)`;
+        strongN.textContent = `${numSelectedItems} item(s)`;
         currentMoveSelectionInfoElement.appendChild(strongN);
         currentMoveSelectionInfoElement.appendChild(document.createTextNode(" to (select destination)."));
     }
-    else if (numSelectedFiles && destinationDir) {
-        const filesArray = Array.from(uiState.currentlySelectedFilePaths);
-        const displayFiles = filesArray.length > 1 ? `${filesArray[0]} and ${filesArray.length - 1} other(s)` : filesArray[0];
+    else if (numSelectedItems && destinationDir) {
+        const itemsArray = Array.from(uiState.currentlySelectedPaths);
+        const displayItems = itemsArray.length > 1 ? `${itemsArray[0]} and ${itemsArray.length - 1} other(s)` : itemsArray[0];
         currentMoveSelectionInfoElement.appendChild(document.createTextNode("Move "));
-        const strongDisplayFiles = document.createElement("strong");
-        strongDisplayFiles.textContent = displayFiles;
-        currentMoveSelectionInfoElement.appendChild(strongDisplayFiles);
+        const strongDisplayItems = document.createElement("strong");
+        strongDisplayItems.textContent = displayItems;
+        currentMoveSelectionInfoElement.appendChild(strongDisplayItems);
         currentMoveSelectionInfoElement.appendChild(document.createTextNode(" to "));
         const strongDest = document.createElement("strong");
-        strongDest.textContent = destinationDir;
+        strongDest.textContent = (destinationDir && destinationDir !== "." && !destinationDir.endsWith("/")) ? destinationDir + "/" : destinationDir;
         currentMoveSelectionInfoElement.appendChild(strongDest);
         if (destinationDir && uiState.allTargetDirs.indexOf(destinationDir) === -1 && isValidNewDirName(destinationDir)) {
             const newDirSpan = document.createElement("span");
@@ -146,10 +146,19 @@ function renderListItems(tbodyElement, items, config) {
                 const checkbox = document.createElement("input");
                 checkbox.type = "checkbox";
                 checkbox.className = "form-check-input ms-2";
-                checkbox.dataset.filePath = itemPathString;
-                checkbox.checked = uiState.currentlySelectedFilePaths.has(itemPathString);
-                checkbox.setAttribute("aria-label", `Select file ${itemPathString}`);
+                checkbox.dataset.itemPath = itemPathString;
+                checkbox.checked = uiState.currentlySelectedPaths.has(itemPathString);
+                checkbox.setAttribute("aria-label", `Select item ${itemPathString}`);
+                const isKnownSourceDir = uiState.allTargetDirs.indexOf(itemPathString) !== -1;
+                if (isKnownSourceDir && itemPathString !== "." && !itemPathString.endsWith("/")) {
+                    span.textContent = itemPathString + "/";
+                }
                 if (uiState.currentlyChosenDirectoryPath && getParentPath(itemPathString) === uiState.currentlyChosenDirectoryPath) {
+                    checkbox.disabled = true;
+                    span.classList.add("page-extra-muted");
+                }
+                if (isKnownSourceDir && uiState.currentlyChosenDirectoryPath &&
+                    (uiState.currentlyChosenDirectoryPath === itemPathString || uiState.currentlyChosenDirectoryPath.startsWith(itemPathString + "/"))) {
                     checkbox.disabled = true;
                     span.classList.add("page-extra-muted");
                 }
@@ -165,6 +174,11 @@ function renderListItems(tbodyElement, items, config) {
                 radio.dataset.dirPath = itemPathString;
                 radio.checked = itemPathString === config.selectedItem;
                 radio.setAttribute("aria-label", `Choose directory ${itemPathString}`);
+                let displayDirPath = itemPathString;
+                if (itemPathString !== "." && !itemPathString.endsWith("/")) {
+                    displayDirPath = itemPathString + "/";
+                }
+                span.textContent = displayDirPath;
                 if (itemPathString === config.selectedItem) {
                     row.classList.add("page-item-selected");
                     row.setAttribute("aria-selected", "true");
@@ -200,13 +214,13 @@ function renderListItems(tbodyElement, items, config) {
     }
 }
 function renderAllLists() {
-    const filteredFilePaths = uiState.originalFilePaths.filter(fp => includesCaseInsensitive(fp, uiState.filters.file));
-    const filesConfig = {
+    const filteredSourcePaths = uiState.originalSourcePaths.filter(fp => includesCaseInsensitive(fp, uiState.filters.file));
+    const itemsConfig = {
         itemType: ItemType.File,
         selectedItem: null,
         moreInfoId: ID.fileListMoreInfo
     };
-    renderListItems(fileListTableBody, filteredFilePaths, filesConfig);
+    renderListItems(fileListTableBody, filteredSourcePaths, itemsConfig);
     const displayDirs = [...uiState.allTargetDirs];
     const trimmedDirFilter = uiState.filters.dir.trim();
     if (isValidNewDirName(trimmedDirFilter) && uiState.allTargetDirs.indexOf(trimmedDirFilter) === -1) {
@@ -237,14 +251,14 @@ function delegate(parent, selector, handler) {
         }
     });
 }
-function handleFileCheckbox(checkbox) {
-    const filePath = checkbox.dataset.filePath;
-    if (filePath) {
+function handleItemCheckbox(checkbox) {
+    const itemPath = checkbox.dataset.itemPath;
+    if (itemPath) {
         if (checkbox.checked) {
-            uiState.currentlySelectedFilePaths.add(filePath);
+            uiState.currentlySelectedPaths.add(itemPath);
         }
         else {
-            uiState.currentlySelectedFilePaths.delete(filePath);
+            uiState.currentlySelectedPaths.delete(itemPath);
         }
         renderAllLists();
     }
@@ -359,16 +373,16 @@ function onConfirmMoveClick() {
         errorAlert.textContent = "";
         const controller = new AbortController();
         window.addEventListener("beforeunload", () => controller.abort());
-        if (uiState.currentlySelectedFilePaths.size > 0 && uiState.currentlyChosenDirectoryPath && uiState.csrfToken) {
-            const { toMove, alreadyThere: filesAlreadyInDest } = splitMoveCandidates(uiState.currentlySelectedFilePaths, uiState.currentlyChosenDirectoryPath);
-            if (toMove.length === 0 && filesAlreadyInDest.length > 0 && uiState.currentlySelectedFilePaths.size > 0) {
+        if (uiState.currentlySelectedPaths.size > 0 && uiState.currentlyChosenDirectoryPath && uiState.csrfToken) {
+            const { toMove, alreadyThere: itemsAlreadyInDest } = splitMoveCandidates(uiState.currentlySelectedPaths, uiState.currentlyChosenDirectoryPath);
+            if (toMove.length === 0 && itemsAlreadyInDest.length > 0 && uiState.currentlySelectedPaths.size > 0) {
                 errorAlert.classList.remove("d-none");
-                errorAlert.textContent = `All selected files (${filesAlreadyInDest.join(", ")}) are already in the target directory. No files were moved.`;
+                errorAlert.textContent = `All selected items (${itemsAlreadyInDest.join(", ")}) are already in the target directory. No items were moved.`;
                 confirmMoveButton.disabled = false;
                 return;
             }
-            if (filesAlreadyInDest.length > 0) {
-                const alreadyInDestMsg = `Note: ${filesAlreadyInDest.join(", ")} ${filesAlreadyInDest.length === 1 ? "is" : "are"} already in the target directory and will not be moved.`;
+            if (itemsAlreadyInDest.length > 0) {
+                const alreadyInDestMsg = `Note: ${itemsAlreadyInDest.join(", ")} ${itemsAlreadyInDest.length === 1 ? "is" : "are"} already in the target directory and will not be moved.`;
                 const existingError = errorAlert.textContent;
                 errorAlert.textContent = existingError ? `${existingError} ${alreadyInDestMsg}` : alreadyInDestMsg;
             }
@@ -383,7 +397,7 @@ function onConfirmMoveClick() {
         }
         else {
             errorAlert.classList.remove("d-none");
-            errorAlert.textContent = "Please select file(s) and a destination directory.";
+            errorAlert.textContent = "Please select item(s) and a destination directory.";
         }
     });
 }
@@ -420,9 +434,9 @@ document.addEventListener("DOMContentLoaded", () => {
             dir: dirFilterInput.value || "",
         },
         maxFilesToShow: Math.max(parseInt(maxFilesInput.value, 10) || 0, 1) || MAX_FILES_FALLBACK,
-        currentlySelectedFilePaths: new Set(),
+        currentlySelectedPaths: new Set(),
         currentlyChosenDirectoryPath: null,
-        originalFilePaths: initialFilePaths,
+        originalSourcePaths: initialFilePaths,
         allTargetDirs: initialTargetDirs,
         csrfToken,
     };
@@ -430,7 +444,7 @@ document.addEventListener("DOMContentLoaded", () => {
     fileFilterInput.addEventListener("input", onFileFilterInput);
     dirFilterInput.addEventListener("input", onDirFilterInput);
     maxFilesInput.addEventListener("change", onMaxFilesChange);
-    delegate(fileListTableBody, "input[type='checkbox'][data-file-path]", handleFileCheckbox);
+    delegate(fileListTableBody, "input[type='checkbox'][data-item-path]", handleItemCheckbox);
     delegate(dirListTableBody, "input[type='radio'][name='target-directory-radio']", handleDirRadio);
     confirmMoveButton.addEventListener("click", () => {
         onConfirmMoveClick().catch(_err => {
