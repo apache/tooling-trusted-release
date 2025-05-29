@@ -266,6 +266,95 @@ class Project(sqlmodel.SQLModel, table=True):
         previews = await self.previews
         return drafts + candidates + previews
 
+    @property
+    def policy_announce_release_default(self) -> str:
+        return """\
+The Apache [COMMITTEE] project team is pleased to announce the
+release of [PROJECT] [VERSION].
+
+This is a stable release available for production use.
+
+Downloads are available from the following URL:
+
+[DOWNLOAD_URL]
+
+On behalf of the Apache [COMMITTEE] project team,
+
+[YOUR_FULL_NAME] ([YOUR_ASF_ID])
+"""
+
+    @property
+    def policy_start_vote_default(self) -> str:
+        return """Hello [COMMITTEE],
+
+I'd like to call a vote on releasing the following artifacts as
+Apache [PROJECT] [VERSION].
+
+The release candidate page, including downloads, can be found at:
+
+  [REVIEW_URL]
+
+The release artifacts are signed with one or more GPG keys from:
+
+  [KEYS_FILE]
+
+Please review the release candidate and vote accordingly.
+
+[ ] +1 Release this package
+[ ] +0 Abstain
+[ ] -1 Do not release this package (please provide specific comments)
+
+You can vote on ATR at the URL above, or manually by replying to this email.
+
+This vote will remain open for [DURATION] hours.
+
+[RELEASE_CHECKLIST]
+Thanks,
+[YOUR_FULL_NAME] ([YOUR_ASF_ID])
+"""
+
+    @property
+    def policy_announce_release_template(self) -> str:
+        if ((policy := self.release_policy) is None) or (policy.announce_release_template is None):
+            return self.policy_announce_release_default
+        return policy.announce_release_template
+
+    @property
+    def policy_mailto_addresses(self) -> list[str]:
+        if ((policy := self.release_policy) is None) or (policy.mailto_addresses is None):
+            return [f"dev@{self.name}.apache.org"]
+        return policy.mailto_addresses
+
+    @property
+    def policy_manual_vote(self) -> bool:
+        if ((policy := self.release_policy) is None) or (policy.manual_vote is None):
+            return False
+        return policy.manual_vote
+
+    @property
+    def policy_min_hours(self) -> int:
+        if ((policy := self.release_policy) is None) or (policy.min_hours is None):
+            return 72
+        return policy.min_hours
+
+    @property
+    def policy_pause_for_rm(self) -> bool:
+        if ((policy := self.release_policy) is None) or (policy.pause_for_rm is None):
+            return False
+        return policy.pause_for_rm
+
+    @property
+    def policy_release_checklist(self) -> str:
+        if ((policy := self.release_policy) is None) or (policy.release_checklist is None):
+            return ""
+        return policy.release_checklist
+
+    @property
+    def policy_start_vote_template(self) -> str:
+        if ((policy := self.release_policy) is None) or (policy.start_vote_template is None):
+            return self.policy_start_vote_default
+        return policy.start_vote_template
+
 
 class DistributionChannel(sqlmodel.SQLModel, table=True):
     id: int = sqlmodel.Field(default=None, primary_key=True)

@@ -85,27 +85,8 @@ async def announce_release_default(project_name: str) -> str:
         project = await data.project(name=project_name, _release_policy=True).demand(
             RuntimeError(f"Project {project_name} not found")
         )
-        release_policy = project.release_policy
-    if release_policy is not None:
-        # NOTE: Do not use "if release_policy.announce_release_template is None"
-        # We want to check for the empty string too
-        if release_policy.announce_release_template:
-            return release_policy.announce_release_template
 
-    return """\
-The Apache [COMMITTEE] project team is pleased to announce the
-release of [PROJECT] [VERSION].
-
-This is a stable release available for production use.
-
-Downloads are available from the following URL:
-
-[DOWNLOAD_URL]
-
-On behalf of the Apache [COMMITTEE] project team,
-
-[YOUR_FULL_NAME] ([YOUR_ASF_ID])
-"""
+    return project.policy_announce_release_template
 
 
 async def start_vote_body(body: str, options: StartVoteOptions) -> str:
@@ -155,38 +136,8 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
 
 async def start_vote_default(project_name: str) -> str:
     async with db.session() as data:
-        release_policy = await db.get_project_release_policy(data, project_name)
+        project = await data.project(name=project_name, _release_policy=True).demand(
+            RuntimeError(f"Project {project_name} not found")
+        )
 
-    if release_policy is not None:
-        # NOTE: Do not use "if release_policy.announce_release_template is None"
-        # We want to check for the empty string too
-        if release_policy.start_vote_template:
-            return release_policy.start_vote_template
-
-    return """Hello [COMMITTEE],
-
-I'd like to call a vote on releasing the following artifacts as
-Apache [PROJECT] [VERSION].
-
-The release candidate page, including downloads, can be found at:
-
-  [REVIEW_URL]
-
-The release artifacts are signed with one or more GPG keys from:
-
-  [KEYS_FILE]
-
-Please review the release candidate and vote accordingly.
-
-[ ] +1 Release this package
-[ ] +0 Abstain
-[ ] -1 Do not release this package (please provide specific comments)
-
-You can vote on ATR at the URL above, or manually by replying to this email.
-
-This vote will remain open for [DURATION] hours.
-
-[RELEASE_CHECKLIST]
-Thanks,
-[YOUR_FULL_NAME] ([YOUR_ASF_ID])
-"""
+    return project.policy_start_vote_template
