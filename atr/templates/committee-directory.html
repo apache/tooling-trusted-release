@@ -15,19 +15,44 @@
   <div class="mb-3">
     <input type="text"
            id="project-filter"
+           aria-label="Project name filter"
            class="form-control d-inline-block w-auto" />
-    <button type="button" class="btn btn-primary" id="filter-button">Filter</button>
+    <button type="button" class="btn btn-primary" id="filter-button">Filter all</button>
+    {% if current_user %}
+      <button type="button"
+              class="btn btn-secondary ms-2"
+              id="filter-participant-button"
+              aria-pressed="false"
+              data-showing="participant">
+        {% if current_user %}
+          Show all committees
+        {% else %}
+          Show my committees
+        {% endif %}
+      </button>
+    {% endif %}
   </div>
 
   <div class="mb-3">
-    <p>Total count: {{ committees|length }}</p>
+    <p>
+      Total count: <span id="committee-count">{{ committees|length }}</span>
+    </p>
   </div>
 
   <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
     {% for committee in committees %}
+      {% set is_part = false %}
+      {% if current_user and committee %}
+        {% if (current_user.uid in committee.committee_members) or
+          (current_user.uid in committee.committers) or
+          (current_user.uid in committee.release_managers) %}
+          {% set is_part = true %}
+        {% endif %}
+      {% endif %}
       <div class="col">
         <div class="card h-100 shadow-sm atr-cursor-pointer page-project-card"
-             data-project-url="{{ as_url(routes.committees.view, name=committee.name) }}">
+             data-project-url="{{ as_url(routes.committees.view, name=committee.name) }}"
+             data-is-participant="{{ 'true' if is_part else 'false' }}">
           <div class="card-body">
             <h3 class="card-title fs-4 mb-3">{{ committee.display_name }}</h3>
             <div class="row g-3">
@@ -66,30 +91,115 @@
 {% block javascripts %}
   {{ super() }}
   <script>
-      function filter() {
+      let allCommitteeCards = [];
+
+      function filterCommitteesByText() {
           const projectFilter = document.getElementById("project-filter").value;
-          const cards = document.querySelectorAll(".page-project-card");
+          const cards = allCommitteeCards;
+          let visibleCount = 0;
+
+          if (participantButton && participantButton.dataset.showing === "participant") {
+              participantButton.dataset.showing = "all";
+              participantButton.textContent = "Show my committees";
+              participantButton.setAttribute("aria-pressed", "false");
+          }
+
           for (let card of cards) {
               const nameElement = card.querySelector(".card-title");
-              const name = nameElement.innerHTML;
+              const name = nameElement.textContent.trim();
               if (!projectFilter) {
                   card.parentElement.hidden = false;
+                  visibleCount++;
               } else {
-                  card.parentElement.hidden = !name.match(new RegExp(projectFilter, 'i'));
+                  let regex;
+                  try {
+                      regex = new RegExp(projectFilter, "i");
+                  } catch (e) {
+                      const escapedFilter = projectFilter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                      regex = new RegExp(escapedFilter, "i");
+                  }
+                  card.parentElement.hidden = !name.match(regex);
+                  if (!card.parentElement.hidden) {
+                      visibleCount++;
+                  }
               }
           }
+          document.getElementById("committee-count").textContent = visibleCount;
       }
 
       // Add event listeners
-      document.getElementById("filter-button").addEventListener("click", filter);
+      document.getElementById("filter-button").addEventListener("click", filterCommitteesByText);
       document.getElementById("project-filter").addEventListener("keydown", function(event) {
           if (event.key === "Enter") {
-              filter();
+              filterCommitteesByText();
               event.preventDefault();
           }
       });
 
-      // Add click handlers for project cards
+      const participantButton = document.getElementById("filter-participant-button");
+      if (participantButton) {
+          participantButton.addEventListener("click", function() {
+              const showing = this.dataset.showing;
+              const cards = allCommitteeCards;
+              let visibleCount = 0;
+
+              if (showing === "all") {
+                  cards.forEach(card => {
+                      const isParticipant = card.dataset.isParticipant === "true";
+                      card.parentElement.hidden = !isParticipant;
+                      if (!card.parentElement.hidden) {
+                          visibleCount++;
+                      }
+                  });
+                  this.textContent = "Show all committees";
+                  this.dataset.showing = "participant";
+                  this.setAttribute("aria-pressed", "true");
+              } else {
+                  cards.forEach(card => {
+                      card.parentElement.hidden = false;
+                      visibleCount++;
+                  });
+                  this.textContent = "Show my committees";
+                  this.dataset.showing = "all";
+                  this.setAttribute("aria-pressed", "false");
+              }
+              document.getElementById("project-filter").value = "";
+              document.getElementById("committee-count").textContent = visibleCount;
+          });
+      }
+
+      document.addEventListener("DOMContentLoaded", function() {
+          allCommitteeCards = Array.from(document.querySelectorAll(".page-project-card"));
+          const cards = allCommitteeCards;
+          const committeeCountSpan = document.getElementById("committee-count");
+          let initialVisibleCount = 0;
+          const initialShowingMode = participantButton ? participantButton.dataset.showing : "all";
+
+          if (participantButton) {
+              if (initialShowingMode === "participant") {
+                  participantButton.setAttribute("aria-pressed", "true");
+              } else {
+                  participantButton.setAttribute("aria-pressed", "false");
+              }
+          }
+
+          if (initialShowingMode === "participant") {
+              cards.forEach(card => {
+                  const isParticipant = card.dataset.isParticipant === "true";
+                  card.parentElement.hidden = !isParticipant;
+                  if (!card.parentElement.hidden) {
+                      initialVisibleCount++;
+                  }
+              });
+          } else {
+              cards.forEach(card => {
+                  card.parentElement.hidden = false;
+                  initialVisibleCount++;
+              });
+          }
+          committeeCountSpan.textContent = initialVisibleCount;
+      });
+
       document.querySelectorAll(".page-project-card").forEach(function(card) {
           card.addEventListener("click", function() {
               window.location.href = this.getAttribute("data-project-url");
