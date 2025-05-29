@@ -52,6 +52,7 @@ class ReleasePolicyForm(util.QuartFormTyped):
     project_name = wtforms.HiddenField("project_name")
     default_start_vote_template_hash = wtforms.HiddenField()
     default_announce_release_template_hash = wtforms.HiddenField()
+    default_min_hours_value_at_render = wtforms.HiddenField()
 
     mailto_addresses = wtforms.FieldList(
         wtforms.StringField(
@@ -224,46 +225,18 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
             if quart.request.method == "POST":
                 form = await ReleasePolicyForm.create_form(data=await quart.request.form)
                 if await form.validate_on_submit():
-                    if project.release_policy is None:
-                        project.release_policy = models.ReleasePolicy(project=project)
-                        data.add(project.release_policy)
+                    release_policy = project.release_policy
+                    if release_policy is None:
+                        release_policy = models.ReleasePolicy(project=project)
+                        project.release_policy = release_policy
+                        data.add(release_policy)
 
-                    project.release_policy.mailto_addresses = [util.unwrap(form.mailto_addresses.entries[0].data)]
-                    project.release_policy.manual_vote = util.unwrap(form.manual_vote.data)
-                    project.release_policy.min_hours = util.unwrap(form.min_hours.data)
-                    project.release_policy.release_checklist = util.unwrap(form.release_checklist.data)
+                    release_policy.mailto_addresses = [util.unwrap(form.mailto_addresses.entries[0].data)]
+                    release_policy.manual_vote = util.unwrap(form.manual_vote.data)
+                    release_policy.release_checklist = util.unwrap(form.release_checklist.data)
+                    _set_default_fields(form, project, release_policy)
 
-                    # Handle start_vote_template
-                    submitted_start_template = str(util.unwrap(form.start_vote_template.data))
-                    submitted_start_template = submitted_start_template.replace("\r\n", "\n")
-                    rendered_default_start_hash = str(util.unwrap(form.default_start_vote_template_hash.data))
-                    current_default_start_text = project.policy_start_vote_default
-                    current_default_start_hash = util.compute_sha3_256(current_default_start_text.encode())
-                    submitted_start_hash = util.compute_sha3_256(submitted_start_template.encode())
-
-                    if (submitted_start_hash == rendered_default_start_hash) or (
-                        submitted_start_hash == current_default_start_hash
-                    ):
-                        project.release_policy.start_vote_template = ""
-                    else:
-                        project.release_policy.start_vote_template = submitted_start_template
-
-                    # Handle announce_release_template
-                    submitted_announce_template = str(util.unwrap(form.announce_release_template.data))
-                    submitted_announce_template = submitted_announce_template.replace("\r\n", "\n")
-                    rendered_default_announce_hash = str(util.unwrap(form.default_announce_release_template_hash.data))
-                    current_default_announce_text = project.policy_announce_release_default
-                    current_default_announce_hash = util.compute_sha3_256(current_default_announce_text.encode())
-                    submitted_announce_hash = util.compute_sha3_256(submitted_announce_template.encode())
-
-                    if (submitted_announce_hash == rendered_default_announce_hash) or (
-                        submitted_announce_hash == current_default_announce_hash
-                    ):
-                        project.release_policy.announce_release_template = ""
-                    else:
-                        project.release_policy.announce_release_template = submitted_announce_template
-
-                    project.release_policy.pause_for_rm = util.unwrap(form.pause_for_rm.data)
+                    release_policy.pause_for_rm = util.unwrap(form.pause_for_rm.data)
                     await data.commit()
                     await quart.flash("Release policy updated successfully.", "success")
                     return quart.redirect(util.as_url(view, name=project.name))
@@ -281,13 +254,15 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
                 form.start_vote_template.data = project.policy_start_vote_template
                 form.announce_release_template.data = project.policy_announce_release_template
                 form.pause_for_rm.data = project.policy_pause_for_rm
-                # Set the hashes of the current defaults
+
+                # Set the hashes and value of the current defaults
                 form.default_start_vote_template_hash.data = util.compute_sha3_256(
                     project.policy_start_vote_default.encode()
                 )
                 form.default_announce_release_template_hash.data = util.compute_sha3_256(
                     project.policy_announce_release_default.encode()
                 )
+                form.default_min_hours_value_at_render.data = str(project.policy_default_min_hours)
 
         return await template.render(
             "project-view.html",
@@ -374,3 +349,46 @@ async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
         await data.commit()
 
     return quart.redirect(util.as_url(view, name=new_project_label))
+
+
+def _set_default_fields(form: ReleasePolicyForm, project: models.Project, release_policy: models.ReleasePolicy) -> None:
+    # Handle start_vote_template
+    submitted_start_template = str(util.unwrap(form.start_vote_template.data))
+    submitted_start_template = submitted_start_template.replace("\r\n", "\n")
+    rendered_default_start_hash = str(util.unwrap(form.default_start_vote_template_hash.data))
+    current_default_start_text = project.policy_start_vote_default
+    current_default_start_hash = util.compute_sha3_256(current_default_start_text.encode())
+    submitted_start_hash = util.compute_sha3_256(submitted_start_template.encode())
+
+    if (submitted_start_hash == rendered_default_start_hash) or (submitted_start_hash == current_default_start_hash):
+        release_policy.start_vote_template = ""
+    else:
+        release_policy.start_vote_template = submitted_start_template
+
+    # Handle announce_release_template
+    submitted_announce_template = str(util.unwrap(form.announce_release_template.data))
+    submitted_announce_template = submitted_announce_template.replace("\r\n", "\n")
+    rendered_default_announce_hash = str(util.unwrap(form.default_announce_release_template_hash.data))
+    current_default_announce_text = project.policy_announce_release_default
+    current_default_announce_hash = util.compute_sha3_256(current_default_announce_text.encode())
+    submitted_announce_hash = util.compute_sha3_256(submitted_announce_template.encode())
+
+    if (submitted_announce_hash == rendered_default_announce_hash) or (
+        submitted_announce_hash == current_default_announce_hash
+    ):
+        release_policy.announce_release_template = ""
+    else:
+        release_policy.announce_release_template = submitted_announce_template
+
+    # Handle min_hours
+    submitted_min_hours = int(util.unwrap(form.min_hours.data) or 0)
+    default_value_seen_on_page_min_hours = int(util.unwrap(form.default_min_hours_value_at_render.data))
+    current_system_default_min_hours = project.policy_default_min_hours
+
+    if (
+        submitted_min_hours == default_value_seen_on_page_min_hours
+        or submitted_min_hours == current_system_default_min_hours
+    ):
+        release_policy.min_hours = None
+    else:
+        release_policy.min_hours = submitted_min_hours

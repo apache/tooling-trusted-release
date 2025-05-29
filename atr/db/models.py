@@ -120,7 +120,7 @@ class ReleasePolicy(sqlmodel.SQLModel, table=True):
     id: int = sqlmodel.Field(default=None, primary_key=True)
     mailto_addresses: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
     manual_vote: bool = sqlmodel.Field(default=False)
-    min_hours: int = sqlmodel.Field(default=0)
+    min_hours: int | None = sqlmodel.Field(default=None)
     release_checklist: str = sqlmodel.Field(default="")
     pause_for_rm: bool = sqlmodel.Field(default=False)
     start_vote_template: str = sqlmodel.Field(default="")
@@ -314,6 +314,10 @@ Thanks,
 """
 
     @property
+    def policy_default_min_hours(self) -> int:
+        return 72
+
+    @property
     def policy_announce_release_template(self) -> str:
         if ((policy := self.release_policy) is None) or (policy.announce_release_template == ""):
             return self.policy_announce_release_default
@@ -335,11 +339,9 @@ Thanks,
 
     @property
     def policy_min_hours(self) -> int:
-        if ((policy := self.release_policy) is None) or (policy.min_hours == 0):
-            # Not sure what the default should be
-            # Also, we can't use 0 as "default" because it's also "unlimited"
-            # This suggests that we make min_hours nullable and use None for the default value
-            return 72
+        if ((policy := self.release_policy) is None) or (policy.min_hours is None):
+            # TODO: Not sure what the default should be
+            return self.policy_default_min_hours
         return policy.min_hours
 
     @property
