@@ -8,6 +8,17 @@
   List of all ASF committees and their associated projects.
 {% endblock description %}
 
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .page-logo {
+          height: 48px;
+          width: auto;
+          object-fit: contain;
+      }
+  </style>
+{% endblock stylesheets %}
+
 {% block content %}
   <h1>Committee directory</h1>
   <p>Current ASF committees and their projects:</p>
@@ -54,25 +65,25 @@
              data-project-url="{{ as_url(routes.committees.view, name=committee.name) }}"
              data-is-participant="{{ 'true' if is_part else 'false' }}">
           <div class="card-body">
-            <h3 class="card-title fs-4 mb-3">{{ committee.display_name }}</h3>
+            <div class="row mb-3 align-items-center">
+              <div class="col">
+                <h3 class="card-title fs-4 mb-0">{{ committee.display_name }}</h3>
+              </div>
+              <div class="col-5 col-lg-4 text-center">
+                {% if committee.name == "incubator" or committee.name.startswith("incubator-") %}
+                  <img src="https://www.apache.org/logos/res/incubator/default.png"
+                       alt="Apache Incubator Logo"
+                       class="page-logo" />
+                {% else %}
+                  <img src="https://www.apache.org/logos/res/{{ committee.name }}/default.png"
+                       alt="{{ committee.display_name }} Logo"
+                       class="page-logo"
+                       onerror="this.style.display='none';" />
+                {% endif %}
+              </div>
+            </div>
             <div class="row g-3">
-              <div class="col-4">
-                <div class="card h-100 bg-light border-0">
-                  <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
-                    <small class="text-secondary">PMC members</small>
-                    <span class="fs-4 fw-medium mt-2">{{ committee.committee_members|length }}</span>
-                  </div>
-                </div>
-              </div>
-              <div class="col-4">
-                <div class="card h-100 bg-light border-0">
-                  <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
-                    <small class="text-secondary">Committers</small>
-                    <span class="fs-4 fw-medium mt-2">{{ committee.committers|length }}</span>
-                  </div>
-                </div>
-              </div>
-              <div class="col-4">
+              <div class="col">
                 <div class="card h-100 bg-light border-0">
                   <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
                     <small class="text-secondary">Projects</small>
