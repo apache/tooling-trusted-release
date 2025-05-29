@@ -11,6 +11,10 @@
 {% block stylesheets %}
   {{ super() }}
   <style>
+      .page-committee-title-link:hover {
+          cursor: pointer;
+      }
+
       .page-logo {
           max-height: 100%;
           width: auto;
@@ -23,6 +27,20 @@
           display: flex;
           justify-content: center;
           align-items: center;
+      }
+
+      .page-project-subcard {
+          min-height: 96px;
+          background-color: #f8f9fa;
+      }
+
+      .page-project-subcard:hover {
+          border-color: gray;
+          cursor: pointer;
+      }
+
+      .page-project-subcard-categories {
+          font-size: 0.8em;
       }
   </style>
 {% endblock stylesheets %}
@@ -69,13 +87,15 @@
         {% endif %}
       {% endif %}
       <div class="col">
-        <div class="card h-100 shadow-sm atr-cursor-pointer page-project-card"
-             data-project-url="{{ as_url(routes.committees.view, name=committee.name) }}"
+        <div class="card h-100 shadow-sm page-project-card"
              data-is-participant="{{ 'true' if is_part else 'false' }}">
           <div class="card-body">
             <div class="row mb-3 align-items-center">
               <div class="col">
-                <h3 class="card-title fs-4 mb-0">{{ committee.display_name }}</h3>
+                <h3 class="card-title fs-4 mb-0">
+                  <a href="{{ as_url(routes.committees.view, name=committee.name) }}"
+                     class="text-decoration-none text-dark page-committee-title-link">{{ committee.display_name }}</a>
+                </h3>
               </div>
               <div class="col-5 col-lg-4 text-center">
                 <div class="page-logo-container">
@@ -93,15 +113,60 @@
                 </div>
               </div>
             </div>
-            <div class="row g-3">
-              <div class="col">
-                <div class="card h-100 bg-light border-0">
-                  <div class="card-body p-2 d-flex flex-column justify-content-between text-center">
-                    <small class="text-secondary">Projects</small>
-                    <span class="fs-4 fw-medium mt-2">{{ committee.projects|length }}</span>
+            <div class="mt-3 page-project-list-container">
+              {% set max_initial_projects = 2 %}
+              {% if committee.projects %}
+                {% for project in committee.projects %}
+                  <div class="card mb-3 shadow-sm page-project-subcard {% if loop.index > max_initial_projects %}page-project-extra d-none{% endif %}"
+                       data-project-url="{{ as_url(routes.projects.view, name=project.name) }}">
+                    <div class="card-body p-3 d-flex flex-column h-100">
+                      <div class="d-flex justify-content-between align-items-start">
+                        <p class="mb-1 me-2 fs-6">
+                          <a href="{{ as_url(routes.projects.view, name=project.name) }}"
+                             class="text-decoration-none stretched-link">{{ project.display_name }}</a>
+                        </p>
+                        <div>
+                          {% if project.is_retired %}<span class="badge text-bg-secondary ms-1">retired</span>{% endif %}
+                        </div>
+                      </div>
+                      <div class="mb-1 page-project-subcard-categories">
+                        {% set categories = project.category.split(', ') if project.category else [] %}
+                        {% for category in categories[:1] %}
+                          {% if category != "retired" %}<span class="badge text-bg-primary me-1">{{ category }}</span>{% endif %}
+                        {% endfor %}
+                        {% set langs = project.programming_languages.split(', ') if project.programming_languages else [] %}
+                        {% for lang in langs[:1] %}<span class="badge text-bg-success me-1">{{ lang }}</span>{% endfor %}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                  {% if current_user and not project.super_project_name and is_part %}
+                    <a href="{{ as_url(routes.projects.add_project, project_name=project.name) }}"
+                       title="Create a sub-project for {{ project.display_name }}"
+                       class="text-decoration-none d-block mt-2 mb-3 {% if loop.index > max_initial_projects %}page-project-extra d-none{% endif %}">
+                      <div class="card h-100 shadow-sm atr-cursor-pointer page-project-subcard">
+                        <div class="card-body d-flex align-items-center text-secondary p-3">
+                          <div>
+                            <i class="bi bi-plus-circle me-2"></i>Create sub-project
+                            <br />
+                            <small class="text-muted">from {{ project.display_name }}</small>
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  {% endif %}
+                {% endfor %}
+
+                {% if committee.projects|length > max_initial_projects %}
+                  <button type="button"
+                          class="btn btn-sm btn-outline-secondary mt-2 page-toggle-committee-projects"
+                          aria-expanded="false"
+                          data-text-show="Show {{ committee.projects|length - max_initial_projects }} more projects..."
+                          data-text-hide="Show less...">
+                    Show {{ committee.projects|length - max_initial_projects }} more projects...
+                  </button>
+                {% endif %}
+                {# Add an else clause here if we decide to show an alternative to an empty card #}
+              {% endif %}
             </div>
           </div>
         </div>
@@ -220,11 +285,37 @@
               });
           }
           committeeCountSpan.textContent = initialVisibleCount;
-      });
 
-      document.querySelectorAll(".page-project-card").forEach(function(card) {
-          card.addEventListener("click", function() {
-              window.location.href = this.getAttribute("data-project-url");
+          // Add a click listener to project subcards to handle navigation
+          // TODO: Improve accessibility
+          document.querySelectorAll(".page-project-subcard").forEach(function(subcard) {
+              subcard.addEventListener("click", function(event) {
+                  if (this.dataset.projectUrl) {
+                      window.location.href = this.dataset.projectUrl;
+                  }
+              });
+          });
+
+          // Add a click listener for toggling project visibility within each committee
+          document.querySelectorAll(".page-toggle-committee-projects").forEach(function(button) {
+              button.addEventListener("click", function() {
+                  const projectListContainer = this.closest(".page-project-list-container");
+                  if (projectListContainer) {
+                      const extraProjects = projectListContainer.querySelectorAll(".page-project-extra");
+                      extraProjects.forEach(function(proj) {
+                          proj.classList.toggle("d-none");
+                      });
+
+                      const isExpanded = this.getAttribute("aria-expanded") === "true";
+                      if (isExpanded) {
+                          this.textContent = this.dataset.textShow;
+                          this.setAttribute("aria-expanded", "false");
+                      } else {
+                          this.textContent = this.dataset.textHide;
+                          this.setAttribute("aria-expanded", "true");
+                      }
+                  }
+              });
           });
       });
   </script>
