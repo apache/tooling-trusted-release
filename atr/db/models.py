@@ -323,6 +323,7 @@ Thanks,
     def policy_mailto_addresses(self) -> list[str]:
         if ((policy := self.release_policy) is None) or (not policy.mailto_addresses):
             # TODO: We actually need the top level project name here, not the project name
+            # Most ideally, we should use a definitive source
             return [f"dev@{self.name}.apache.org"]
         return policy.mailto_addresses
 
