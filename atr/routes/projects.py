@@ -78,7 +78,7 @@ class ReleasePolicyForm(util.QuartFormTyped):
         " If 0, then wait until 3 +1 votes and more +1 than -1.",
     )
     manual_vote = wtforms.BooleanField(
-        "Voting process",
+        "Manual voting process",
         description="If this is set then the vote will be completely manual and following policy is ignored.",
     )
     release_checklist = wtforms.StringField(

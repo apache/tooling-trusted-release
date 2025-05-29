@@ -33,7 +33,7 @@
   {% endif %}
 {% endmacro %}
 
-{% macro widget(field, classes="form-control", placeholder=None, rows=None, autocomplete=None, id=None) %}
+{% macro widget(field, classes="form-control", placeholder=None, rows=None, autocomplete=None, id=None, boolean_label=None) %}
   {% set widget_class = classes %}
   {% if field.errors %}
     {% set widget_class = widget_class + ' is-invalid' %}
@@ -54,6 +54,10 @@
   {% endif %}
 
   {{ field(**render_args) }}
+
+  {% if (field.type == "BooleanField") and (boolean_label is not none) %}
+    <label class="form-check-label" for="{{ field.id }}">{{ boolean_label }}</label>
+  {% endif %}
 {% endmacro %}
 
 {% macro errors(field, classes="invalid-feedback", item_separator="<br />") %}

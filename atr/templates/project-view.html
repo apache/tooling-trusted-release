@@ -82,9 +82,8 @@
             {{ forms.label(form.manual_vote, col="md3-high") }}
             <div class="col-sm-8">
               <div class="form-check">
-                {{ forms.widget(form.manual_vote, classes="form-check-input") }}
+                {{ forms.widget(form.manual_vote, classes="form-check-input", boolean_label="Enable") }}
                 {{ forms.errors(form.manual_vote, classes="invalid-feedback d-block") }}
-                <label class="form-check-label" for="{{ form.manual_vote.id }}">{{ form.manual_vote.label.text }}</label>
               </div>
               {{ forms.description(form.manual_vote) }}
             </div>
@@ -130,9 +129,8 @@
             {{ forms.label(form.pause_for_rm, col="md3-high") }}
             <div class="col-sm-8">
               <div class="form-check">
-                {{ forms.widget(form.pause_for_rm, classes="form-check-input") }}
+                {{ forms.widget(form.pause_for_rm, classes="form-check-input", boolean_label="Enable") }}
                 {{ forms.errors(form.pause_for_rm, classes="invalid-feedback d-block") }}
-                <label class="form-check-label" for="{{ form.pause_for_rm.id }}">{{ form.pause_for_rm.label.text }}</label>
               </div>
               {{ forms.description(form.pause_for_rm) }}
             </div>
