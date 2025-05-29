@@ -315,43 +315,47 @@ Thanks,
 
     @property
     def policy_announce_release_template(self) -> str:
-        if ((policy := self.release_policy) is None) or (policy.announce_release_template is None):
+        if ((policy := self.release_policy) is None) or (policy.announce_release_template == ""):
             return self.policy_announce_release_default
         return policy.announce_release_template
 
     @property
     def policy_mailto_addresses(self) -> list[str]:
-        if ((policy := self.release_policy) is None) or (policy.mailto_addresses is None):
+        if ((policy := self.release_policy) is None) or (not policy.mailto_addresses):
+            # TODO: We actually need the top level project name here, not the project name
             return [f"dev@{self.name}.apache.org"]
         return policy.mailto_addresses
 
     @property
     def policy_manual_vote(self) -> bool:
-        if ((policy := self.release_policy) is None) or (policy.manual_vote is None):
+        if (policy := self.release_policy) is None:
             return False
         return policy.manual_vote
 
     @property
     def policy_min_hours(self) -> int:
-        if ((policy := self.release_policy) is None) or (policy.min_hours is None):
+        if ((policy := self.release_policy) is None) or (policy.min_hours == 0):
+            # Not sure what the default should be
+            # Also, we can't use 0 as "default" because it's also "unlimited"
+            # This suggests that we make min_hours nullable and use None for the default value
             return 72
         return policy.min_hours
 
     @property
     def policy_pause_for_rm(self) -> bool:
-        if ((policy := self.release_policy) is None) or (policy.pause_for_rm is None):
+        if (policy := self.release_policy) is None:
             return False
         return policy.pause_for_rm
 
     @property
     def policy_release_checklist(self) -> str:
-        if ((policy := self.release_policy) is None) or (policy.release_checklist is None):
+        if ((policy := self.release_policy) is None) or (policy.release_checklist == ""):
             return ""
         return policy.release_checklist
 
     @property
     def policy_start_vote_template(self) -> str:
-        if ((policy := self.release_policy) is None) or (policy.start_vote_template is None):
+        if ((policy := self.release_policy) is None) or (policy.start_vote_template == ""):
             return self.policy_start_vote_default
         return policy.start_vote_template
 

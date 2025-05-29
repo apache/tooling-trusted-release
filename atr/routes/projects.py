@@ -57,7 +57,7 @@ class ReleasePolicyForm(util.QuartFormTyped):
                 wtforms.validators.InputRequired("Please provide a valid email address"),
                 wtforms.validators.Email(),
             ],
-            render_kw={"size": 30},
+            render_kw={"size": 30, "placeholder": "E.g. dev@project.apache.org"},
             description="Note: This field determines where vote and finished release announcement emails are sent."
             " You can set this value to your own mailing list, but ATR will currently only let you send to"
             " user-tests@tooling.apache.org.",
@@ -275,12 +275,51 @@ async def select(session: routes.CommitterSession) -> str:
     return await template.render("project-select.html", user_projects=user_projects)
 
 
-@routes.public("/projects/<name>")
-async def view(name: str) -> str:
+@routes.committer("/projects/<name>", methods=["GET", "POST"])
+async def view(session: routes.CommitterSession, name: str) -> response.Response | str:
+    form = None
+    can_edit_policy = False
     async with db.session() as data:
         project = await data.project(name=name, _committee_public_signing_keys=True, _release_policy=True).demand(
             http.client.HTTPException(404)
         )
+
+        if project.committee and session.uid:
+            can_edit_policy = user.is_committee_member(project.committee, session.uid) or user.is_admin(session.uid)
+
+        if can_edit_policy:
+            if quart.request.method == "POST":
+                form = await ReleasePolicyForm.create_form(data=await quart.request.form)
+                if await form.validate_on_submit():
+                    if project.release_policy is None:
+                        project.release_policy = models.ReleasePolicy(project=project)
+                        data.add(project.release_policy)
+
+                    project.release_policy.mailto_addresses = [util.unwrap(form.mailto_addresses.entries[0].data)]
+                    project.release_policy.manual_vote = util.unwrap(form.manual_vote.data)
+                    project.release_policy.min_hours = util.unwrap(form.min_hours.data)
+                    project.release_policy.release_checklist = util.unwrap(form.release_checklist.data)
+                    project.release_policy.start_vote_template = util.unwrap(form.start_vote_template.data)
+                    project.release_policy.announce_release_template = util.unwrap(form.announce_release_template.data)
+                    project.release_policy.pause_for_rm = util.unwrap(form.pause_for_rm.data)
+                    await data.commit()
+                    await quart.flash("Release policy updated successfully.", "success")
+                    return quart.redirect(util.as_url(view, name=project.name))
+
+            if form is None:
+                form = await ReleasePolicyForm.create_form()
+                form.project_name.data = project.name
+                if project.policy_mailto_addresses:
+                    form.mailto_addresses.entries[0].data = project.policy_mailto_addresses[0]
+                else:
+                    form.mailto_addresses.entries[0].data = f"dev@{project.name}.apache.org"
+                form.min_hours.data = project.policy_min_hours
+                form.manual_vote.data = project.policy_manual_vote
+                form.release_checklist.data = project.policy_release_checklist
+                form.start_vote_template.data = project.policy_start_vote_template
+                form.announce_release_template.data = project.policy_announce_release_template
+                form.pause_for_rm.data = project.policy_pause_for_rm
+
         return await template.render(
             "project-view.html",
             project=project,
@@ -292,6 +331,8 @@ async def view(name: str) -> str:
             number_of_release_files=util.number_of_release_files,
             now=datetime.datetime.now(datetime.UTC),
             empty_form=await util.EmptyForm.create_form(),
+            form=form,
+            can_edit_policy=can_edit_policy,
         )
 
 
