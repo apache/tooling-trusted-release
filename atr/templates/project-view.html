@@ -66,6 +66,7 @@
               novalidate>
           {{ form.hidden_tag() if form.hidden_tag }}
           {{ form.project_name(value=project.name) }}
+          {# TODO: Add default handling here #}
 
           <div class="mb-3 pb-3 row border-bottom">
             {{ forms.label(form.mailto_addresses.entries[0], col="md3") }}
