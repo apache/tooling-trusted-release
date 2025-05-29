@@ -12,9 +12,17 @@
   {{ super() }}
   <style>
       .page-logo {
-          height: 48px;
+          max-height: 100%;
           width: auto;
           object-fit: contain;
+      }
+
+      .page-logo-container {
+          height: 48px;
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          align-items: center;
       }
   </style>
 {% endblock stylesheets %}
@@ -70,16 +78,19 @@
                 <h3 class="card-title fs-4 mb-0">{{ committee.display_name }}</h3>
               </div>
               <div class="col-5 col-lg-4 text-center">
-                {% if committee.name == "incubator" or committee.name.startswith("incubator-") %}
-                  <img src="https://www.apache.org/logos/res/incubator/default.png"
-                       alt="Apache Incubator Logo"
-                       class="page-logo" />
-                {% else %}
-                  <img src="https://www.apache.org/logos/res/{{ committee.name }}/default.png"
-                       alt="{{ committee.display_name }} Logo"
-                       class="page-logo"
-                       onerror="this.style.display='none';" />
-                {% endif %}
+                <div class="page-logo-container">
+                  {% if (committee.name == "incubator") or committee.name.startswith("incubator-") %}
+                    <img src="https://www.apache.org/logos/res/incubator/default.png"
+                         alt=""
+                         class="page-logo"
+                         onerror="this.style.display='none';" />
+                  {% else %}
+                    <img src="https://www.apache.org/logos/res/{{ committee.name }}/default.png"
+                         alt=""
+                         class="page-logo"
+                         onerror="this.style.display='none';" />
+                  {% endif %}
+                </div>
               </div>
             </div>
             <div class="row g-3">
