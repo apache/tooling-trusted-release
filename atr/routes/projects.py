@@ -50,6 +50,8 @@ class ReleasePolicyForm(util.QuartFormTyped):
     """
 
     project_name = wtforms.HiddenField("project_name")
+    default_start_vote_template_hash = wtforms.HiddenField()
+    default_announce_release_template_hash = wtforms.HiddenField()
 
     mailto_addresses = wtforms.FieldList(
         wtforms.StringField(
@@ -230,10 +232,37 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
                     project.release_policy.manual_vote = util.unwrap(form.manual_vote.data)
                     project.release_policy.min_hours = util.unwrap(form.min_hours.data)
                     project.release_policy.release_checklist = util.unwrap(form.release_checklist.data)
-                    project.release_policy.start_vote_template = util.unwrap(form.start_vote_template.data)
-                    project.release_policy.announce_release_template = util.unwrap(form.announce_release_template.data)
 
-                    # TODO: Add default handling here
+                    # Handle start_vote_template
+                    submitted_start_template = str(util.unwrap(form.start_vote_template.data))
+                    submitted_start_template = submitted_start_template.replace("\r\n", "\n")
+                    rendered_default_start_hash = str(util.unwrap(form.default_start_vote_template_hash.data))
+                    current_default_start_text = project.policy_start_vote_default
+                    current_default_start_hash = util.compute_sha3_256(current_default_start_text.encode())
+                    submitted_start_hash = util.compute_sha3_256(submitted_start_template.encode())
+
+                    if (submitted_start_hash == rendered_default_start_hash) or (
+                        submitted_start_hash == current_default_start_hash
+                    ):
+                        project.release_policy.start_vote_template = ""
+                    else:
+                        project.release_policy.start_vote_template = submitted_start_template
+
+                    # Handle announce_release_template
+                    submitted_announce_template = str(util.unwrap(form.announce_release_template.data))
+                    submitted_announce_template = submitted_announce_template.replace("\r\n", "\n")
+                    rendered_default_announce_hash = str(util.unwrap(form.default_announce_release_template_hash.data))
+                    current_default_announce_text = project.policy_announce_release_default
+                    current_default_announce_hash = util.compute_sha3_256(current_default_announce_text.encode())
+                    submitted_announce_hash = util.compute_sha3_256(submitted_announce_template.encode())
+
+                    if (submitted_announce_hash == rendered_default_announce_hash) or (
+                        submitted_announce_hash == current_default_announce_hash
+                    ):
+                        project.release_policy.announce_release_template = ""
+                    else:
+                        project.release_policy.announce_release_template = submitted_announce_template
+
                     project.release_policy.pause_for_rm = util.unwrap(form.pause_for_rm.data)
                     await data.commit()
                     await quart.flash("Release policy updated successfully.", "success")
@@ -252,7 +281,13 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
                 form.start_vote_template.data = project.policy_start_vote_template
                 form.announce_release_template.data = project.policy_announce_release_template
                 form.pause_for_rm.data = project.policy_pause_for_rm
-                ...
+                # Set the hashes of the current defaults
+                form.default_start_vote_template_hash.data = util.compute_sha3_256(
+                    project.policy_start_vote_default.encode()
+                )
+                form.default_announce_release_template_hash.data = util.compute_sha3_256(
+                    project.policy_announce_release_default.encode()
+                )
 
         return await template.render(
             "project-view.html",

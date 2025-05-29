@@ -66,7 +66,8 @@
               novalidate>
           {{ form.hidden_tag() if form.hidden_tag }}
           {{ form.project_name(value=project.name) }}
-          {# TODO: Add default handling here #}
+          {{ form.default_start_vote_template_hash() }}
+          {{ form.default_announce_release_template_hash() }}
 
           <div class="mb-3 pb-3 row border-bottom">
             {{ forms.label(form.mailto_addresses.entries[0], col="md3") }}
