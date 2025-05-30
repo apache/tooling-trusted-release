@@ -558,7 +558,7 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
                 else:
                     updated_count += 1
 
-                podling.full_name = podling_data.name
+                podling.full_name = podling_data.name.removesuffix(" (Incubating)")
                 podling.committee = ppmc
                 # TODO: Why did the type checkers not detect this?
                 # podling.is_podling = True
