@@ -150,6 +150,7 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
 
     # Convert async generator to list
+    # There must be a revision on a preview
     file_stats = [
         stat
         async for stat in util.content_list(

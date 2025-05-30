@@ -46,101 +46,109 @@
     </div>
   {% endif %}
 
-  {{ forms.errors_summary(form) }}
-  <form method="post"
-        id="vote-initiate-form"
-        class="atr-canary py-4 px-5"
-        action="{{ as_url(routes.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=release.unwrap_revision_number) }}"
-        novalidate>
-    {{ form.hidden_tag() }}
+  {% set revision_number = release.latest_revision_number %}
+  {% if revision_number %}
+    {{ forms.errors_summary(form) }}
+    <form method="post"
+          id="vote-initiate-form"
+          class="atr-canary py-4 px-5"
+          action="{{ as_url(routes.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=revision_number) }}"
+          novalidate>
+      {{ form.hidden_tag() }}
 
-    {{ form.release_name }}
-    <div class="mb-4">
-      <div class="row mb-3 pb-3 border-bottom">
-        {{ forms.label(form.mailing_list, col="md3-high") }}
-        <div class="col-md-9">
-          <div class="d-flex gap-4 mb-2">
-            {% for subfield in form.mailing_list %}
-              <div class="form-check">
-                {{ subfield(class_='form-check-input') }}
-                {{ subfield.label(class_='form-check-label') }}
+      {{ form.release_name }}
+      <div class="mb-4">
+        <div class="row mb-3 pb-3 border-bottom">
+          {{ forms.label(form.mailing_list, col="md3-high") }}
+          <div class="col-md-9">
+            <div class="d-flex gap-4 mb-2">
+              {% for subfield in form.mailing_list %}
+                <div class="form-check">
+                  {{ subfield(class_='form-check-input') }}
+                  {{ subfield.label(class_='form-check-label') }}
+                </div>
+              {% endfor %}
+            </div>
+            {{ forms.errors(form.mailing_list) }}
+            {{ forms.description(form.mailing_list, classes="form-text text-muted") }}
+          </div>
+        </div>
+
+        <div class="row mb-3 pb-3 border-bottom">
+          {{ forms.label(form.vote_duration, col="md3") }}
+          <div class="col-md-9">
+            {{ forms.widget(form.vote_duration, classes="form-select w-75") }}
+            {{ forms.errors(form.vote_duration) }}
+            {{ forms.description(form.vote_duration, classes="form-text text-muted") }}
+          </div>
+        </div>
+
+        <div class="row mb-3 pb-3 border-bottom">
+          {{ forms.label(form.subject, col="md3") }}
+          <div class="col-md-9">
+            {{ forms.widget(form.subject, classes="form-control w-75") }}
+            {{ forms.errors(form.subject) }}
+          </div>
+        </div>
+
+        <div class="row mb-3 pb-3">
+          {{ forms.label(form.body, col="md3") }}
+          <div class="col-md-9">
+            <ul class="nav nav-tabs" id="emailBodyTab" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active"
+                        id="edit-body-tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#edit-body-pane"
+                        type="button"
+                        role="tab"
+                        aria-controls="edit-body-pane"
+                        aria-selected="true">Edit</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link"
+                        id="text-preview-body-tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#text-preview-body-pane"
+                        type="button"
+                        role="tab"
+                        aria-controls="text-preview-body-pane"
+                        aria-selected="false">Text preview</button>
+              </li>
+            </ul>
+            <div class="tab-content" id="emailBodyTabContent">
+              <div class="tab-pane fade show active"
+                   id="edit-body-pane"
+                   role="tabpanel"
+                   aria-labelledby="edit-body-tab">
+                {{ forms.widget(form.body, classes="form-control font-monospace mt-2", rows="20") }}
+                {{ forms.errors(form.body) }}
+                {{ forms.description(form.body, classes="form-text text-muted") }}
               </div>
-            {% endfor %}
-          </div>
-          {{ forms.errors(form.mailing_list) }}
-          {{ forms.description(form.mailing_list, classes="form-text text-muted") }}
-        </div>
-      </div>
-
-      <div class="row mb-3 pb-3 border-bottom">
-        {{ forms.label(form.vote_duration, col="md3") }}
-        <div class="col-md-9">
-          {{ forms.widget(form.vote_duration, classes="form-select w-75") }}
-          {{ forms.errors(form.vote_duration) }}
-          {{ forms.description(form.vote_duration, classes="form-text text-muted") }}
-        </div>
-      </div>
-
-      <div class="row mb-3 pb-3 border-bottom">
-        {{ forms.label(form.subject, col="md3") }}
-        <div class="col-md-9">
-          {{ forms.widget(form.subject, classes="form-control w-75") }}
-          {{ forms.errors(form.subject) }}
-        </div>
-      </div>
-
-      <div class="row mb-3 pb-3">
-        {{ forms.label(form.body, col="md3") }}
-        <div class="col-md-9">
-          <ul class="nav nav-tabs" id="emailBodyTab" role="tablist">
-            <li class="nav-item" role="presentation">
-              <button class="nav-link active"
-                      id="edit-body-tab"
-                      data-bs-toggle="tab"
-                      data-bs-target="#edit-body-pane"
-                      type="button"
-                      role="tab"
-                      aria-controls="edit-body-pane"
-                      aria-selected="true">Edit</button>
-            </li>
-            <li class="nav-item" role="presentation">
-              <button class="nav-link"
-                      id="text-preview-body-tab"
-                      data-bs-toggle="tab"
-                      data-bs-target="#text-preview-body-pane"
-                      type="button"
-                      role="tab"
-                      aria-controls="text-preview-body-pane"
-                      aria-selected="false">Text preview</button>
-            </li>
-          </ul>
-          <div class="tab-content" id="emailBodyTabContent">
-            <div class="tab-pane fade show active"
-                 id="edit-body-pane"
-                 role="tabpanel"
-                 aria-labelledby="edit-body-tab">
-              {{ forms.widget(form.body, classes="form-control font-monospace mt-2", rows="20") }}
-              {{ forms.errors(form.body) }}
-              {{ forms.description(form.body, classes="form-text text-muted") }}
-            </div>
-            <div class="tab-pane fade"
-                 id="text-preview-body-pane"
-                 role="tabpanel"
-                 aria-labelledby="text-preview-body-tab">
-              <pre class="mt-2 p-3 bg-light border rounded font-monospace overflow-auto"><code id="text-preview-content">Loading preview...</code></pre>
+              <div class="tab-pane fade"
+                   id="text-preview-body-pane"
+                   role="tabpanel"
+                   aria-labelledby="text-preview-body-tab">
+                <pre class="mt-2 p-3 bg-light border rounded font-monospace overflow-auto"><code id="text-preview-content">Loading preview...</code></pre>
+              </div>
             </div>
           </div>
         </div>
+
       </div>
 
+      <div class="mt-4 col-md-9 offset-md-3 px-1">
+        {{ form.submit(class_='btn btn-primary') }}
+        <a href="{{ as_url(routes.compose.selected, project_name=release.project.name, version_name=release.version) }}"
+           class="btn btn-link text-secondary">Cancel</a>
+      </div>
+    </form>
+  {% else %}
+    <div class="p-3 mb-4 bg-danger-subtle border border-danger rounded">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <strong>Error:</strong> This release has no revisions. Please create a revision first.
     </div>
-
-    <div class="mt-4 col-md-9 offset-md-3 px-1">
-      {{ form.submit(class_='btn btn-primary') }}
-      <a href="{{ as_url(routes.compose.selected, project_name=release.project.name, version_name=release.version) }}"
-         class="btn btn-link text-secondary">Cancel</a>
-    </div>
-  </form>
+  {% endif %}
 {% endblock content %}
 
 {% block javascripts %}

@@ -86,6 +86,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     announce_form = await _create_announce_form_instance(util.permitted_recipients(session.uid))
     # Hidden fields
     announce_form.preview_name.data = release.name
+    # There must be a revision to announce
     announce_form.preview_revision.data = release.unwrap_revision_number
 
     # Variables used in defaults for subject and body

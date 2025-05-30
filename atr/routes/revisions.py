@@ -49,7 +49,10 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     release_dir = util.release_directory_base(release)
 
     # Determine the current revision
-    latest_revision_number = release.unwrap_revision_number
+    latest_revision_number = release.latest_revision_number
+    if latest_revision_number is None:
+        # TODO: Set an error message, and redirect to the release page?
+        ...
 
     # Oldest to newest, to build diffs relative to previous revision
     async with db.session() as data_for_revisions:

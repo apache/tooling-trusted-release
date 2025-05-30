@@ -444,12 +444,13 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     release = await session.release(project_name, version_name)
 
     # Convert async generator to list
-    file_stats = [
-        stat
-        async for stat in util.content_list(
-            util.get_unfinished_dir(), project_name, version_name, release.unwrap_revision_number
-        )
-    ]
+    revision_number = release.latest_revision_number
+    file_stats = []
+    if revision_number is not None:
+        file_stats = [
+            stat
+            async for stat in util.content_list(util.get_unfinished_dir(), project_name, version_name, revision_number)
+        ]
     # Sort the files by FileStat.path
     file_stats.sort(key=lambda fs: fs.path)
 
