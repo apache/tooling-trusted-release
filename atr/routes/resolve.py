@@ -163,19 +163,6 @@ def task_mid_get(latest_vote_task: models.Task) -> str | None:
     return task_mid
 
 
-def _format_artifact_name(project_name: str, version: str, is_podling: bool = False) -> str:
-    """Format an artifact name according to Apache naming conventions.
-
-    For regular projects: apache-${project}-${version}
-    For podlings: apache-${project}-incubating-${version}
-    """
-    # TODO: Format this better based on committee and project
-    # Must depend on whether project is a subproject or not
-    if is_podling:
-        return f"apache-{project_name}-incubating-{version}"
-    return f"apache-{project_name}-{version}"
-
-
 async def _send_resolution(
     session: routes.CommitterSession,
     release: models.Release,

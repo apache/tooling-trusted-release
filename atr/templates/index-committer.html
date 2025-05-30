@@ -67,7 +67,7 @@
       <div class="mb-5" id="project-{{ project_id }}">
         <h2 class="border-bottom border-secondary pb-2 mb-3">
           {{ display_name_cleaned }}
-          {% if project.is_podling or project.name.startswith("incubator-") %}
+          {% if project.committee.is_podling or project.name.startswith("incubator-") %}
             <span class="text-muted fw-normal fs-5">(Incubating)</span>
             <img src="{{ url_for('static', filename='svg/apache_incubator.svg') }}"
                  alt=""

@@ -425,7 +425,7 @@ async def _project_add(form: AddFormProtocol, asf_id: str) -> response.Response:
 
         # Construct the new full name
         # We ensure that parenthesised suffixes like "(Incubating)" are preserved
-        base_name = base_project.full_name or base_project.name
+        base_name = base_project.display_name
         match = re.match(r"^(.*?) *(\(.*\))?$", base_name)
         if match:
             main_part = match.group(1).strip()
@@ -448,7 +448,6 @@ async def _project_add(form: AddFormProtocol, asf_id: str) -> response.Response:
         project = models.Project(
             name=new_project_label,
             full_name=new_project_full_name,
-            is_podling=base_project.is_podling,
             is_retired=base_project.is_retired,
             super_project_name=base_project.name,
             description=base_project.description,

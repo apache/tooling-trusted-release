@@ -1,0 +1,25 @@
+{% extends "layouts/base-admin.html" %}
+
+{% block title %}Cleanup incubating project names ~ ATR admin{% endblock %}
+
+{% block content %}
+        <h1 class="mb-4">Cleanup incubating project names</h1>
+        <p>
+          This action will remove the " (Incubating)" suffix from the full name of all projects where it is present.
+          This is a one time operation to help standardise project names in the database.
+        </p>
+
+        <div class="card shadow-sm mb-4">
+          <div class="card-body">
+            <h5 class="card-title">Confirm cleanup</h5>
+            <p class="card-text">
+              Press the button below to proceed with removing the " (Incubating)" suffix from project full names.
+              This change will be applied to the database immediately.
+            </p>
+            <form method="post" action="{{ url_for('admin.admin_cleanup_incubating_names') }}">
+              {{ form.csrf_token }}
+              <button type="submit" class="btn btn-danger">Cleanup project names</button>
+            </form>
+          </div>
+        </div>
+{% endblock %}

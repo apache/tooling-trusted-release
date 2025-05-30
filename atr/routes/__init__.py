@@ -213,7 +213,7 @@ class CommitterSession:
         phase: models.ReleasePhase | db.NotSet | None = db.NOT_SET,
         latest_revision_number: str | db.NotSet | None = db.NOT_SET,
         data: db.Session | None = None,
-        with_committee: bool = False,
+        with_committee: bool = True,
         with_project: bool = True,
         with_tasks: bool = False,
         with_revisions: bool = False,

@@ -170,11 +170,7 @@ class Project(sqlmodel.SQLModel, table=True):
     # We always include "Apache" in the full_name
     full_name: str | None = sqlmodel.Field(default=None)
 
-    # True if this a podling project
-    # TODO: We should have this on Committee too, or instead
-    is_podling: bool = sqlmodel.Field(default=False)
     is_retired: bool = sqlmodel.Field(default=False)
-
     super_project_name: str | None = sqlmodel.Field(default=None, foreign_key="project.name")
     # NOTE: Neither "Project" | None nor "Project | None" works
     super_project: Optional["Project"] = sqlmodel.Relationship()
@@ -207,7 +203,10 @@ class Project(sqlmodel.SQLModel, table=True):
     @property
     def display_name(self) -> str:
         """Get the display name for the Project."""
-        return self.full_name or self.name
+        base = self.full_name or self.name
+        if self.committee and self.committee.is_podling:
+            return f"{base} (Incubating)"
+        return base
 
     @property
     def short_display_name(self) -> str:

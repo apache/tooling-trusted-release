@@ -20,7 +20,7 @@
                 <h3 class="card-title fs-5 mb-2">{{ project.display_name }}</h3>
                 <h4 class="card-subtitle mb-2 text-muted fs-6">{{ project.name }}</h4>
                 <p>
-                  {% if project.is_podling or project.name.startswith("incubator-") %}
+                  {% if project.committee.is_podling or project.name.startswith("incubator-") %}
                     <img src="https://incubator.apache.org/images/SVG/apache_incubator.svg"
                          alt="" />
                   {% else %}

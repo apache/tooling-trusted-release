@@ -270,10 +270,9 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         self,
         name: Opt[str] = NOT_SET,
         full_name: Opt[str] = NOT_SET,
-        is_podling: Opt[bool] = NOT_SET,
         committee_name: Opt[str] = NOT_SET,
         release_policy_id: Opt[int] = NOT_SET,
-        _committee: bool = False,
+        _committee: bool = True,
         _releases: bool = False,
         _distribution_channels: bool = False,
         _super_project: bool = False,
@@ -286,8 +285,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Project.name == name)
         if is_defined(full_name):
             query = query.where(models.Project.full_name == full_name)
-        if is_defined(is_podling):
-            query = query.where(models.Project.is_podling == is_podling)
         if is_defined(committee_name):
             query = query.where(models.Project.committee_name == committee_name)
         if is_defined(release_policy_id):
@@ -359,9 +356,9 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         release_policy_id: Opt[int] = NOT_SET,
         votes: Opt[list[models.VoteEntry]] = NOT_SET,
         latest_revision_number: Opt[str | None] = NOT_SET,
-        _project: bool = False,
+        _project: bool = True,
+        _committee: bool = True,
         _release_policy: bool = False,
-        _committee: bool = False,
         _tasks: bool = False,
         _revisions: bool = False,
     ) -> Query[models.Release]:
