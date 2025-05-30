@@ -82,10 +82,12 @@
           <i class="bi bi-collection"></i>
           <a href="{{ as_url(routes.committees.directory) }}">Committees</a>
         </li>
-        <li>
-          <i class="bi bi-collection"></i>
-          <a href="{{ as_url(routes.projects.projects) }}">Projects</a>
-        </li>
+        {% if current_user.uid == "sbp" %}
+          <li>
+            <i class="bi bi-collection"></i>
+            <a href="{{ as_url(routes.projects.projects) }}">Projects</a>
+          </li>
+        {% endif %}
       </ul>
 
       <h3>Documentation</h3>
