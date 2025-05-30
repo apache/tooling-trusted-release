@@ -326,24 +326,6 @@ async def admin_performance() -> str:
     return await template.render("performance.html", stats=sorted_summary)
 
 
-@admin.BLUEPRINT.route("/cleanup-incubating-names", methods=["GET", "POST"])
-async def admin_cleanup_incubating_names() -> str | response.Response:
-    form = await util.EmptyForm.create_form()
-    if await form.validate_on_submit():
-        updated_count = 0
-        async with db.session() as data:
-            async with data.begin():
-                projects = await data.project().all()
-                for project_model in projects:
-                    if project_model.full_name and project_model.full_name.endswith(" (Incubating)"):
-                        project_model.full_name = project_model.full_name.removesuffix(" (Incubating)")
-                        data.add(project_model)
-                        updated_count += 1
-        await quart.flash(f"Successfully removed ' (Incubating)' from {updated_count} project full_names.", "success")
-        return quart.redirect(quart.url_for("admin.admin_cleanup_incubating_names"))
-    return await template.render("cleanup-incubating-names.html", form=form)
-
-
 @admin.BLUEPRINT.route("/projects/update", methods=["GET", "POST"])
 async def admin_projects_update() -> str | response.Response | tuple[Mapping[str, Any], int]:
     """Update projects from remote data."""
