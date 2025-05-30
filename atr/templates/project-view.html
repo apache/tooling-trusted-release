@@ -8,6 +8,17 @@
   Information regarding an Apache Project.
 {% endblock description %}
 
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .page-remove-tag {
+          font-size: 0.65em;
+          padding: 0.2em 0.3em;
+          cursor: pointer;
+      }
+  </style>
+{% endblock stylesheets %}
+
 {% block content %}
   <div class="row">
     <div class="col-md">
@@ -59,7 +70,7 @@
       <h3 class="mb-0">Release policy</h3>
     </div>
     <div class="card-body">
-      {% if can_edit_policy and policy_form %}
+      {% if can_edit and policy_form %}
         <form method="post"
               action="{{ as_url(routes.projects.view, name=project.name) }}"
               class="atr-canary py-4 px-5"
@@ -138,7 +149,7 @@
           </div>
 
           <div class="row">
-            <div class="col-sm-9 offset-sm-3">{{ policy_form.submit(class_="btn btn-primary mt-2") }}</div>
+            <div class="col-sm-9 offset-sm-3">{{ policy_form.submit_policy(class_="btn btn-primary mt-2") }}</div>
           </div>
         </form>
       {% elif project.release_policy or project.name %}
@@ -309,6 +320,87 @@
       </div>
     {% endif %}
 
+    {% if can_edit and metadata_form %}
+      <div class="card mb-4">
+        <div class="card-header bg-light">
+          <h3 class="mb-2">Categories</h3>
+        </div>
+        <div class="card-body">
+          <form method="post"
+                action="{{ as_url(routes.projects.view, name=project.name) }}"
+                class="mb-3">
+            {{ metadata_form.hidden_tag() if metadata_form.hidden_tag }}
+            {{ metadata_form.project_name() }}
+            <input type="hidden" name="submit_metadata" value="true" />
+
+            <div class="d-flex align-items-center mb-3">
+              {{ forms.widget(metadata_form.category_to_add, classes="form-control form-control-sm me-2", placeholder="New category") }}
+              <button type="submit"
+                      name="action"
+                      value="add_category"
+                      class="btn btn-sm btn-success text-nowrap pe-3">
+                <i class="bi bi-plus"></i> Add
+              </button>
+            </div>
+            {{ forms.errors(metadata_form.category_to_add) }}
+
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              {% set current_categories = project.category.split(", ") if project.category else [] %}
+              {% for cat in current_categories %}
+                <div class="badge bg-primary d-flex align-items-center p-2">
+                  <span>{{ cat }}</span>
+                  <button type="submit"
+                          name="action"
+                          value="remove_category:{{ cat }}"
+                          class="btn-close btn-close-white ms-2 page-remove-tag"
+                          aria-label="Remove {{ cat }}"></button>
+                </div>
+              {% endfor %}
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header bg-light">
+          <h3 class="mb-2">Programming languages</h3>
+        </div>
+        <div class="card-body">
+          <form method="post"
+                action="{{ as_url(routes.projects.view, name=project.name) }}"
+                class="mb-3">
+            {{ metadata_form.hidden_tag() if metadata_form.hidden_tag }}
+            {{ metadata_form.project_name() }}
+            <input type="hidden" name="submit_metadata" value="true" />
+
+            <div class="d-flex align-items-center mb-3">
+              {{ forms.widget(metadata_form.language_to_add, classes="form-control form-control-sm me-2", placeholder="New language") }}
+              <button type="submit"
+                      name="action"
+                      value="add_language"
+                      class="btn btn-sm btn-success text-nowrap pe-3">
+                <i class="bi bi-plus"></i> Add
+              </button>
+            </div>
+            {{ forms.errors(metadata_form.language_to_add) }}
+
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              {% set current_languages = project.programming_languages.split(", ") if project.programming_languages else [] %}
+              {% for lang in current_languages %}
+                <div class="badge bg-success d-flex align-items-center p-2">
+                  <span>{{ lang }}</span>
+                  <button type="submit"
+                          name="action"
+                          value="remove_language:{{ lang }}"
+                          class="btn-close btn-close-white ms-2 page-remove-tag"
+                          aria-label="Remove {{ lang }}"></button>
+                </div>
+              {% endfor %}
+            </div>
+          </form>
+        </div>
+      </div>
+    {% endif %}
   {% endblock content %}
 
   {% block javascripts %}
