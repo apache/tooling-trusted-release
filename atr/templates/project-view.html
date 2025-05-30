@@ -59,86 +59,86 @@
       <h3 class="mb-0">Release policy</h3>
     </div>
     <div class="card-body">
-      {% if can_edit_policy and form %}
+      {% if can_edit_policy and policy_form %}
         <form method="post"
               action="{{ as_url(routes.projects.view, name=project.name) }}"
               class="atr-canary py-4 px-5"
               novalidate>
-          {{ form.hidden_tag() if form.hidden_tag }}
-          {{ form.project_name(value=project.name) }}
-          {{ form.default_start_vote_template_hash() }}
-          {{ form.default_announce_release_template_hash() }}
-          {{ form.default_min_hours_value_at_render() }}
+          {{ policy_form.hidden_tag() if policy_form.hidden_tag }}
+          {{ policy_form.project_name(value=project.name) }}
+          {{ policy_form.default_start_vote_template_hash() }}
+          {{ policy_form.default_announce_release_template_hash() }}
+          {{ policy_form.default_min_hours_value_at_render() }}
 
           <div class="mb-3 pb-3 row border-bottom">
-            {{ forms.label(form.mailto_addresses.entries[0], col="md3") }}
+            {{ forms.label(policy_form.mailto_addresses.entries[0], col="md3") }}
             <div class="col-sm-8">
-              {{ forms.widget(form.mailto_addresses.entries[0]) }}
-              {{ forms.errors(form.mailto_addresses.entries[0]) }}
-              {{ forms.description(form.mailto_addresses.entries[0]) }}
+              {{ forms.widget(policy_form.mailto_addresses.entries[0]) }}
+              {{ forms.errors(policy_form.mailto_addresses.entries[0]) }}
+              {{ forms.description(policy_form.mailto_addresses.entries[0]) }}
             </div>
           </div>
 
           <div class="mb-3 pb-3 row border-bottom">
-            {{ forms.label(form.manual_vote, col="md3-high") }}
+            {{ forms.label(policy_form.manual_vote, col="md3-high") }}
             <div class="col-sm-8">
               <div class="form-check">
-                {{ forms.widget(form.manual_vote, classes="form-check-input", boolean_label="Enable") }}
-                {{ forms.errors(form.manual_vote, classes="invalid-feedback d-block") }}
+                {{ forms.widget(policy_form.manual_vote, classes="form-check-input", boolean_label="Enable") }}
+                {{ forms.errors(policy_form.manual_vote, classes="invalid-feedback d-block") }}
               </div>
-              {{ forms.description(form.manual_vote) }}
+              {{ forms.description(policy_form.manual_vote) }}
             </div>
           </div>
 
           <div class="mb-3 pb-3 row border-bottom">
-            {{ forms.label(form.min_hours, col="md3") }}
+            {{ forms.label(policy_form.min_hours, col="md3") }}
             <div class="col-sm-8">
-              {{ forms.widget(form.min_hours) }}
-              {{ forms.errors(form.min_hours) }}
-              {{ forms.description(form.min_hours) }}
+              {{ forms.widget(policy_form.min_hours) }}
+              {{ forms.errors(policy_form.min_hours) }}
+              {{ forms.description(policy_form.min_hours) }}
             </div>
           </div>
 
           <div class="mb-3 pb-3 row border-bottom">
-            {{ forms.label(form.release_checklist, col="md3") }}
+            {{ forms.label(policy_form.release_checklist, col="md3") }}
             <div class="col-sm-8">
-              {{ forms.widget(form.release_checklist, rows="10", classes="form-control font-monospace") }}
-              {{ forms.errors(form.release_checklist) }}
-              {{ forms.description(form.release_checklist) }}
+              {{ forms.widget(policy_form.release_checklist, rows="10", classes="form-control font-monospace") }}
+              {{ forms.errors(policy_form.release_checklist) }}
+              {{ forms.description(policy_form.release_checklist) }}
             </div>
           </div>
 
           <div class="mb-3 pb-3 row border-bottom">
-            {{ forms.label(form.start_vote_template, col="md3") }}
+            {{ forms.label(policy_form.start_vote_template, col="md3") }}
             <div class="col-sm-8">
-              {{ forms.widget(form.start_vote_template, rows="10", classes="form-control font-monospace") }}
-              {{ forms.errors(form.start_vote_template) }}
-              {{ forms.description(form.start_vote_template) }}
+              {{ forms.widget(policy_form.start_vote_template, rows="10", classes="form-control font-monospace") }}
+              {{ forms.errors(policy_form.start_vote_template) }}
+              {{ forms.description(policy_form.start_vote_template) }}
             </div>
           </div>
 
           <div class="mb-3 pb-3 row border-bottom">
-            {{ forms.label(form.announce_release_template, col="md3") }}
+            {{ forms.label(policy_form.announce_release_template, col="md3") }}
             <div class="col-sm-8">
-              {{ forms.widget(form.announce_release_template, rows="10", classes="form-control font-monospace") }}
-              {{ forms.errors(form.announce_release_template) }}
-              {{ forms.description(form.announce_release_template) }}
+              {{ forms.widget(policy_form.announce_release_template, rows="10", classes="form-control font-monospace") }}
+              {{ forms.errors(policy_form.announce_release_template) }}
+              {{ forms.description(policy_form.announce_release_template) }}
             </div>
           </div>
 
           <div class="mb-3 pb-3 row border-bottom">
-            {{ forms.label(form.pause_for_rm, col="md3-high") }}
+            {{ forms.label(policy_form.pause_for_rm, col="md3-high") }}
             <div class="col-sm-8">
               <div class="form-check">
-                {{ forms.widget(form.pause_for_rm, classes="form-check-input", boolean_label="Enable") }}
-                {{ forms.errors(form.pause_for_rm, classes="invalid-feedback d-block") }}
+                {{ forms.widget(policy_form.pause_for_rm, classes="form-check-input", boolean_label="Enable") }}
+                {{ forms.errors(policy_form.pause_for_rm, classes="invalid-feedback d-block") }}
               </div>
-              {{ forms.description(form.pause_for_rm) }}
+              {{ forms.description(policy_form.pause_for_rm) }}
             </div>
           </div>
 
           <div class="row">
-            <div class="col-sm-9 offset-sm-3">{{ form.submit(class_="btn btn-primary mt-2") }}</div>
+            <div class="col-sm-9 offset-sm-3">{{ policy_form.submit(class_="btn btn-primary mt-2") }}</div>
           </div>
         </form>
       {% elif project.release_policy or project.name %}

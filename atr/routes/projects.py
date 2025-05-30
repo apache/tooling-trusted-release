@@ -211,7 +211,7 @@ async def select(session: routes.CommitterSession) -> str:
 
 @routes.committer("/projects/<name>", methods=["GET", "POST"])
 async def view(session: routes.CommitterSession, name: str) -> response.Response | str:
-    form = None
+    policy_form = None
     can_edit_policy = False
     async with db.session() as data:
         project = await data.project(name=name, _committee_public_signing_keys=True, _release_policy=True).demand(
@@ -222,62 +222,71 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
             can_edit_policy = user.is_committee_member(project.committee, session.uid) or user.is_admin(session.uid)
 
         if can_edit_policy:
-            if quart.request.method == "POST":
-                form = await ReleasePolicyForm.create_form(data=await quart.request.form)
-                if await form.validate_on_submit():
-                    release_policy = project.release_policy
-                    if release_policy is None:
-                        release_policy = models.ReleasePolicy(project=project)
-                        project.release_policy = release_policy
-                        data.add(release_policy)
+            edited, policy_form = await _edit_policy(data, policy_form, project)
+            if edited is True:
+                await quart.flash("Release policy updated successfully.", "success")
+                return quart.redirect(util.as_url(view, name=project.name))
 
-                    release_policy.mailto_addresses = [util.unwrap(form.mailto_addresses.entries[0].data)]
-                    release_policy.manual_vote = util.unwrap(form.manual_vote.data)
-                    release_policy.release_checklist = util.unwrap(form.release_checklist.data)
-                    _set_default_fields(form, project, release_policy)
+    return await template.render(
+        "project-view.html",
+        project=project,
+        algorithms=routes.algorithms,
+        candidate_drafts=await project.candidate_drafts,
+        candidates=await project.candidates,
+        previews=await project.previews,
+        full_releases=await project.full_releases,
+        number_of_release_files=util.number_of_release_files,
+        now=datetime.datetime.now(datetime.UTC),
+        empty_form=await util.EmptyForm.create_form(),
+        policy_form=policy_form,
+        can_edit_policy=can_edit_policy,
+    )
 
-                    release_policy.pause_for_rm = util.unwrap(form.pause_for_rm.data)
-                    await data.commit()
-                    await quart.flash("Release policy updated successfully.", "success")
-                    return quart.redirect(util.as_url(view, name=project.name))
 
-            if form is None:
-                form = await ReleasePolicyForm.create_form()
-                form.project_name.data = project.name
-                if project.policy_mailto_addresses:
-                    form.mailto_addresses.entries[0].data = project.policy_mailto_addresses[0]
-                else:
-                    form.mailto_addresses.entries[0].data = f"dev@{project.name}.apache.org"
-                form.min_hours.data = project.policy_min_hours
-                form.manual_vote.data = project.policy_manual_vote
-                form.release_checklist.data = project.policy_release_checklist
-                form.start_vote_template.data = project.policy_start_vote_template
-                form.announce_release_template.data = project.policy_announce_release_template
-                form.pause_for_rm.data = project.policy_pause_for_rm
+async def _edit_policy(
+    data: db.Session, policy_form: ReleasePolicyForm | None, project: models.Project
+) -> tuple[bool, ReleasePolicyForm | None]:
+    if quart.request.method == "POST":
+        policy_form = await ReleasePolicyForm.create_form(data=await quart.request.form)
+        if await policy_form.validate_on_submit():
+            release_policy = project.release_policy
+            if release_policy is None:
+                release_policy = models.ReleasePolicy(project=project)
+                project.release_policy = release_policy
+                data.add(release_policy)
 
-                # Set the hashes and value of the current defaults
-                form.default_start_vote_template_hash.data = util.compute_sha3_256(
-                    project.policy_start_vote_default.encode()
-                )
-                form.default_announce_release_template_hash.data = util.compute_sha3_256(
-                    project.policy_announce_release_default.encode()
-                )
-                form.default_min_hours_value_at_render.data = str(project.policy_default_min_hours)
+            release_policy.mailto_addresses = [util.unwrap(policy_form.mailto_addresses.entries[0].data)]
+            release_policy.manual_vote = util.unwrap(policy_form.manual_vote.data)
+            release_policy.release_checklist = util.unwrap(policy_form.release_checklist.data)
+            _set_default_fields(policy_form, project, release_policy)
 
-        return await template.render(
-            "project-view.html",
-            project=project,
-            algorithms=routes.algorithms,
-            candidate_drafts=await project.candidate_drafts,
-            candidates=await project.candidates,
-            previews=await project.previews,
-            full_releases=await project.full_releases,
-            number_of_release_files=util.number_of_release_files,
-            now=datetime.datetime.now(datetime.UTC),
-            empty_form=await util.EmptyForm.create_form(),
-            form=form,
-            can_edit_policy=can_edit_policy,
+            release_policy.pause_for_rm = util.unwrap(policy_form.pause_for_rm.data)
+            await data.commit()
+            return True, None
+
+    if policy_form is None:
+        policy_form = await ReleasePolicyForm.create_form()
+        policy_form.project_name.data = project.name
+        if project.policy_mailto_addresses:
+            policy_form.mailto_addresses.entries[0].data = project.policy_mailto_addresses[0]
+        else:
+            policy_form.mailto_addresses.entries[0].data = f"dev@{project.name}.apache.org"
+        policy_form.min_hours.data = project.policy_min_hours
+        policy_form.manual_vote.data = project.policy_manual_vote
+        policy_form.release_checklist.data = project.policy_release_checklist
+        policy_form.start_vote_template.data = project.policy_start_vote_template
+        policy_form.announce_release_template.data = project.policy_announce_release_template
+        policy_form.pause_for_rm.data = project.policy_pause_for_rm
+
+        # Set the hashes and value of the current defaults
+        policy_form.default_start_vote_template_hash.data = util.compute_sha3_256(
+            project.policy_start_vote_default.encode()
         )
+        policy_form.default_announce_release_template_hash.data = util.compute_sha3_256(
+            project.policy_announce_release_default.encode()
+        )
+        policy_form.default_min_hours_value_at_render.data = str(project.policy_default_min_hours)
+    return False, policy_form
 
 
 async def _add_project(form: AddFormProtocol, asf_id: str) -> response.Response:
