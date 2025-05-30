@@ -22,6 +22,7 @@ from typing import Any, Final
 
 import atr.construct as construct
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.mail as mail
 import atr.schema as schema
 import atr.tasks.checks as checks
@@ -75,6 +76,13 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
         release = await data.release(name=args.release_name, _project=True, _committee=True).demand(
             VoteInitiationError(f"Release {args.release_name} not found")
         )
+        latest_revision_number = release.latest_revision_number
+        if latest_revision_number is None:
+            raise VoteInitiationError(f"No revisions found for release {args.release_name}")
+
+        ongoing_tasks = await interaction.tasks_ongoing(release.project.name, release.version, latest_revision_number)
+        if ongoing_tasks > 0:
+            raise VoteInitiationError(f"Cannot start vote for {args.release_name} as {ongoing_tasks} are not complete")
 
     # Calculate vote end date
     vote_duration_hours = args.vote_duration

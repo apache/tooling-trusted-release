@@ -26,6 +26,7 @@ import wtforms
 
 import atr.construct as construct
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.db.models as models
 import atr.routes as routes
 import atr.routes.compose as compose
@@ -125,6 +126,17 @@ async def selected_revision(
             if email_to not in permitted_recipients:
                 # This will be checked again by tasks/vote.py for extra safety
                 raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
+
+            # Check for ongoing tasks
+            ongoing_tasks = await interaction.tasks_ongoing(project_name, version_name, selected_revision_number)
+            if ongoing_tasks > 0:
+                return await session.redirect(
+                    selected_revision,
+                    project_name=project_name,
+                    version_name=version_name,
+                    revision=selected_revision_number,
+                    error="All checks must be completed before starting a vote.",
+                )
 
             # This sets the phase to RELEASE_CANDIDATE
             error = await _promote(data, release.name, selected_revision_number)
