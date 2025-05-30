@@ -582,7 +582,8 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
 
                 podling.full_name = podling_data.name
                 podling.committee = ppmc
-                podling.is_podling = True
+                # TODO: Why did the type checkers not detect this?
+                # podling.is_podling = True
 
             # Add projects and associate them with the right PMC
             for project_name, project_status in projects.items():
