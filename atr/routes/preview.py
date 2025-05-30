@@ -209,11 +209,5 @@ async def _delete_preview(data: db.Session, preview_name: str) -> None:
     if release.phase != models.ReleasePhase.RELEASE_PREVIEW:
         raise routes.FlashError("Release is not in the preview phase")
 
-    # TODO: Abstract this to a function
-    # We do something similar in admin.py and draft.py
-    # Delete any parent links
-    await data.ns_text_del_all(release.name + " draft")
-    await data.ns_text_del_all(release.name + " preview")
-
     # Delete the release record
     await data.delete(release)
