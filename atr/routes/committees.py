@@ -24,6 +24,7 @@ import atr.db as db
 import atr.db.models as models
 import atr.routes as routes
 import atr.template as template
+import atr.util as util
 
 
 @routes.public("/committees")
@@ -45,4 +46,5 @@ async def view(name: str) -> str:
             committee=committee,
             algorithms=routes.algorithms,
             now=datetime.datetime.now(datetime.UTC),
+            email_from_key=util.email_from_uid,
         )
