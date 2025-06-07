@@ -181,7 +181,7 @@ class ProjectStatus(schema.Strict):
     created: str | None = None
     description: str | None = None
     programming_language: str | None = schema.alias_opt("programming-language")
-    doap: str
+    doap: str | None = None
     homepage: str
     name: str
     pmc: str
