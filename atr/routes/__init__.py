@@ -177,6 +177,12 @@ class CommitterSession:
 
     async def check_access(self, project_name: str) -> None:
         if not any((p.name == project_name) for p in (await self.user_projects)):
+            if user.is_admin(self.uid):
+                # Admins can view all projects
+                # But we must warn them when the project is not one of their own
+                # TODO: This code is difficult to test locally
+                await quart.flash("This is not your project, but you have access as an admin", "warning")
+                return
             raise base.ASFQuartException("You do not have access to this project", errorcode=403)
 
     @property
