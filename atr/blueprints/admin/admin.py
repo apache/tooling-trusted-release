@@ -331,7 +331,7 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
     """Update projects from remote data."""
     if quart.request.method == "POST":
         try:
-            added_count, updated_count = await _update_committees()
+            added_count, updated_count = await _update_metadata()
             return {
                 "message": f"Successfully added {added_count} and updated {updated_count} committees and projects "
                 f"(PMCs and PPMCs) with membership data",
@@ -488,7 +488,42 @@ async def _delete_release_data(release_name: str) -> None:
         )
 
 
-async def _update_committees() -> tuple[int, int]:  # noqa: C901
+async def _update_committees(
+    data: db.Session, ldap_projects: apache.LDAPProjectsData, committees_by_name: Mapping[str, apache.Committee]
+) -> tuple[int, int]:
+    added_count = 0
+    updated_count = 0
+
+    # First create PMC committees
+    for project in ldap_projects.projects:
+        name = project.name
+        # Skip non-PMC committees
+        if project.pmc is not True:
+            continue
+
+        # Get or create PMC
+        committee = await data.committee(name=name).get()
+        if not committee:
+            committee = models.Committee(name=name)
+            data.add(committee)
+            added_count += 1
+        else:
+            updated_count += 1
+
+        committee.committee_members = project.owners
+        committee.committers = project.members
+        # We create PMCs for now
+        committee.is_podling = False
+        committee_info = committees_by_name.get(name)
+        if committee_info:
+            committee.full_name = committee_info.display_name
+
+        updated_count += 1
+
+    return added_count, updated_count
+
+
+async def _update_metadata() -> tuple[int, int]:
     ldap_projects = await apache.get_ldap_projects_data()
     projects = await apache.get_projects_data()
     podlings_data = await apache.get_current_podlings_data()
@@ -502,128 +537,139 @@ async def _update_committees() -> tuple[int, int]:  # noqa: C901
 
     async with db.session() as data:
         async with data.begin():
-            # First create PMC committees
-            for project in ldap_projects.projects:
-                name = project.name
-                # Skip non-PMC committees
-                if project.pmc is not True:
-                    continue
+            added, updated = await _update_committees(data, ldap_projects, committees_by_name)
+            added_count += added
+            updated_count += updated
 
-                # Get or create PMC
-                committee = await data.committee(name=name).get()
-                if not committee:
-                    committee = models.Committee(name=name)
-                    data.add(committee)
-                    added_count += 1
-                else:
-                    updated_count += 1
+            added, updated = await _update_podlings(data, podlings_data, ldap_projects_by_name)
+            added_count += added
+            updated_count += updated
 
-                committee.committee_members = project.owners
-                committee.committers = project.members
-                # We create PMCs for now
-                committee.is_podling = False
-                committee_info = committees_by_name.get(name)
-                if committee_info:
-                    committee.full_name = committee_info.display_name
+            added, updated = await _update_projects(data, projects)
+            added_count += added
+            updated_count += updated
 
-                updated_count += 1
+            added, updated = await _update_tooling(data)
+            added_count += added
+            updated_count += updated
 
-            # Then add PPMCs and their associated project (podlings)
-            for podling_name, podling_data in podlings_data:
-                # Get or create PPMC
-                ppmc = await data.committee(name=podling_name).get()
-                if not ppmc:
-                    ppmc = models.Committee(name=podling_name, is_podling=True)
-                    data.add(ppmc)
-                    added_count += 1
-                else:
-                    updated_count += 1
+    return added_count, updated_count
 
-                # We create a PPMC
-                ppmc.is_podling = True
-                ppmc.full_name = podling_data.name.removesuffix("(Incubating)").removeprefix("Apache").strip()
-                podling_project = ldap_projects_by_name.get(podling_name)
-                if podling_project is not None:
-                    ppmc.committee_members = podling_project.owners
-                    ppmc.committers = podling_project.members
-                else:
-                    _LOGGER.warning(f"could not find ldap data for podling {podling_name}")
 
-                podling = await data.project(name=podling_name).get()
-                if not podling:
-                    # Create the associated podling project
-                    podling = models.Project(name=podling_name, full_name=podling_data.name, committee=ppmc)
-                    data.add(podling)
-                    added_count += 1
-                else:
-                    updated_count += 1
+async def _update_podlings(
+    data: db.Session, podlings_data: apache.PodlingsData, ldap_projects_by_name: Mapping[str, apache.LDAPProject]
+) -> tuple[int, int]:
+    added_count = 0
+    updated_count = 0
 
-                podling.full_name = podling_data.name.removesuffix(" (Incubating)")
-                podling.committee = ppmc
-                # TODO: Why did the type checkers not detect this?
-                # podling.is_podling = True
+    # Then add PPMCs and their associated project (podlings)
+    for podling_name, podling_data in podlings_data:
+        # Get or create PPMC
+        ppmc = await data.committee(name=podling_name).get()
+        if not ppmc:
+            ppmc = models.Committee(name=podling_name, is_podling=True)
+            data.add(ppmc)
+            added_count += 1
+        else:
+            updated_count += 1
 
-            # Add projects and associate them with the right PMC
-            for project_name, project_status in projects.items():
-                # FIXME: this is a quick workaround for inconsistent data wrt webservices PMC / projects
-                #        the PMC seems to be identified by the key ws, but the associated projects use webservices
-                if project_name.startswith("webservices-"):
-                    project_name = project_name.replace("webservices-", "ws-")
-                    project_status.pmc = "ws"
+        # We create a PPMC
+        ppmc.is_podling = True
+        ppmc.full_name = podling_data.name.removesuffix("(Incubating)").removeprefix("Apache").strip()
+        podling_project = ldap_projects_by_name.get(podling_name)
+        if podling_project is not None:
+            ppmc.committee_members = podling_project.owners
+            ppmc.committers = podling_project.members
+        else:
+            _LOGGER.warning(f"could not find ldap data for podling {podling_name}")
 
-                # TODO: Annotator is in both projects and ldap_projects
-                # The projects version is called "incubator-annotator", with "incubator" as its pmc
-                # This is not detected by us as incubating, because we create those above
-                # ("Create the associated podling project")
-                # Since the Annotator project is in ldap_projects, we can just skip it here
-                # Originally reported in https://github.com/apache/tooling-trusted-release/issues/35
-                # Ideally it would be removed from the upstream data source, which is:
-                # https://projects.apache.org/json/foundation/projects.json
-                if project_name == "incubator-annotator":
-                    continue
+        podling = await data.project(name=podling_name).get()
+        if not podling:
+            # Create the associated podling project
+            podling = models.Project(name=podling_name, full_name=podling_data.name, committee=ppmc)
+            data.add(podling)
+            added_count += 1
+        else:
+            updated_count += 1
 
-                pmc = await data.committee(name=project_status.pmc).get()
-                if not pmc:
-                    _LOGGER.warning(f"could not find PMC for project {project_name}: {project_status.pmc}")
-                    continue
+        podling.full_name = podling_data.name.removesuffix(" (Incubating)")
+        podling.committee = ppmc
+        # TODO: Why did the type checkers not detect this?
+        # podling.is_podling = True
 
-                project_model = await data.project(name=project_name).get()
-                if not project_model:
-                    project_model = models.Project(name=project_name, committee=pmc)
-                    data.add(project_model)
-                    added_count += 1
-                else:
-                    updated_count += 1
+    return added_count, updated_count
 
-                project_model.full_name = project_status.name
-                project_model.category = project_status.category
-                project_model.description = project_status.description
-                project_model.programming_languages = project_status.programming_language
 
-                # TODO: find a better way to declare a project retired
-                #       right now we assume that a project is retired if its assigned to the attic PMC
-                #       maybe make that information configurable
-                project_model.is_retired = pmc.name == "attic"
+async def _update_projects(data: db.Session, projects: apache.ProjectsData) -> tuple[int, int]:
+    added_count = 0
+    updated_count = 0
 
-            # Tooling is not a committee
-            # We add a special entry for Tooling, pretending to be a PMC, for debugging and testing
-            tooling_committee = await data.committee(name="tooling").get()
-            if not tooling_committee:
-                tooling_committee = models.Committee(name="tooling", full_name="Tooling")
-                data.add(tooling_committee)
-                tooling_project = models.Project(
-                    name="tooling", full_name="Apache Tooling", committee=tooling_committee
-                )
-                data.add(tooling_project)
-                added_count += 1
-            else:
-                updated_count += 1
+    # Add projects and associate them with the right PMC
+    for project_name, project_status in projects.items():
+        # FIXME: this is a quick workaround for inconsistent data wrt webservices PMC / projects
+        #        the PMC seems to be identified by the key ws, but the associated projects use webservices
+        if project_name.startswith("webservices-"):
+            project_name = project_name.replace("webservices-", "ws-")
+            project_status.pmc = "ws"
 
-            # Update Tooling PMC data
-            # Could put this in the "if not tooling_committee" block, perhaps
-            tooling_committee.committee_members = ["wave", "tn", "sbp"]
-            tooling_committee.committers = ["wave", "tn", "sbp"]
-            tooling_committee.release_managers = ["wave"]
-            tooling_committee.is_podling = False
+        # TODO: Annotator is in both projects and ldap_projects
+        # The projects version is called "incubator-annotator", with "incubator" as its pmc
+        # This is not detected by us as incubating, because we create those above
+        # ("Create the associated podling project")
+        # Since the Annotator project is in ldap_projects, we can just skip it here
+        # Originally reported in https://github.com/apache/tooling-trusted-release/issues/35
+        # Ideally it would be removed from the upstream data source, which is:
+        # https://projects.apache.org/json/foundation/projects.json
+        if project_name == "incubator-annotator":
+            continue
+
+        pmc = await data.committee(name=project_status.pmc).get()
+        if not pmc:
+            _LOGGER.warning(f"could not find PMC for project {project_name}: {project_status.pmc}")
+            continue
+
+        project_model = await data.project(name=project_name).get()
+        if not project_model:
+            project_model = models.Project(name=project_name, committee=pmc)
+            data.add(project_model)
+            added_count += 1
+        else:
+            updated_count += 1
+
+        project_model.full_name = project_status.name
+        project_model.category = project_status.category
+        project_model.description = project_status.description
+        project_model.programming_languages = project_status.programming_language
+
+        # TODO: find a better way to declare a project retired
+        #       right now we assume that a project is retired if its assigned to the attic PMC
+        #       maybe make that information configurable
+        project_model.is_retired = pmc.name == "attic"
+
+    return added_count, updated_count
+
+
+async def _update_tooling(data: db.Session) -> tuple[int, int]:
+    added_count = 0
+    updated_count = 0
+
+    # Tooling is not a committee
+    # We add a special entry for Tooling, pretending to be a PMC, for debugging and testing
+    tooling_committee = await data.committee(name="tooling").get()
+    if not tooling_committee:
+        tooling_committee = models.Committee(name="tooling", full_name="Tooling")
+        data.add(tooling_committee)
+        tooling_project = models.Project(name="tooling", full_name="Apache Tooling", committee=tooling_committee)
+        data.add(tooling_project)
+        added_count += 1
+    else:
+        updated_count += 1
+
+    # Update Tooling PMC data
+    # Could put this in the "if not tooling_committee" block, perhaps
+    tooling_committee.committee_members = ["wave", "tn", "sbp"]
+    tooling_committee.committers = ["wave", "tn", "sbp"]
+    tooling_committee.release_managers = ["wave"]
+    tooling_committee.is_podling = False
 
     return added_count, updated_count
