@@ -32,6 +32,7 @@ import asfquart.session
 import httpx
 import quart
 import sqlalchemy.orm as orm
+import sqlmodel
 import werkzeug.wrappers.response as response
 import wtforms
 
@@ -488,6 +489,30 @@ async def _delete_release_data(release_name: str) -> None:
         )
 
 
+async def _process_undiscovered(data: db.Session) -> tuple[int, int]:
+    added_count = 0
+    updated_count = 0
+
+    via = models.validate_instrumented_attribute
+    committees_without_projects = await db.Query(
+        data, sqlmodel.select(models.Committee).where(~via(models.Committee.projects).any())
+    ).all()
+    # For all committees that have no associated projects
+    for committee in committees_without_projects:
+        if committee.name == "incubator":
+            continue
+        _LOGGER.warning(f"Missing top level project for committee {committee.name}")
+        # If a committee is missing, the following code can be activated to fix it
+        # But ideally the fix should be in the upstream data source
+        automatically_fix = False
+        if automatically_fix is True:
+            project = models.Project(name=committee.name, full_name=committee.full_name, committee=committee)
+            data.add(project)
+            added_count += 1
+
+    return added_count, updated_count
+
+
 async def _update_committees(
     data: db.Session, ldap_projects: apache.LDAPProjectsData, committees_by_name: Mapping[str, apache.Committee]
 ) -> tuple[int, int]:
@@ -550,6 +575,10 @@ async def _update_metadata() -> tuple[int, int]:
             updated_count += updated
 
             added, updated = await _update_tooling(data)
+            added_count += added
+            updated_count += updated
+
+            added, updated = await _process_undiscovered(data)
             added_count += added
             updated_count += updated
 
