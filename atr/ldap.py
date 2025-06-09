@@ -21,7 +21,6 @@ from typing import Final
 import ldap3
 import ldap3.utils.conv as conv
 
-LDAP_ATTRIBUTES: Final[list[str]] = ["uid", "cn", "mail", "asf-altEmail", "displayName"]
 LDAP_SEARCH_BASE: Final[str] = "ou=people,dc=apache,dc=org"
 LDAP_SERVER_HOST: Final[str] = "ldap-eu.apache.org"
 
@@ -95,7 +94,7 @@ def _search_core(params: SearchParameters) -> None:
     params.connection.search(
         search_base=LDAP_SEARCH_BASE,
         search_filter=search_filter,
-        attributes=LDAP_ATTRIBUTES,
+        attributes=ldap3.ALL_ATTRIBUTES,
     )
     for entry in params.connection.entries:
         result_item: dict[str, str | list[str]] = {"dn": entry.entry_dn}
