@@ -1,0 +1,38 @@
+{% extends "layouts/base-admin.html" %}
+
+{% block title %}Browse as user{% endblock title %}
+
+{% block description %}
+    Enter the ASF UID of the user to browse as.
+{% endblock description %}
+
+{% block content %}
+    <h1>Browse as user</h1>
+
+    <p class="mb-4">
+        Enter the ASF UID of the user to browse as.
+        This will allow you to view the site as that user.
+    </p>
+
+    <form method="post" class="form">
+        {{ form.csrf_token }}
+        <div class="field mb-3">
+            <label class="label" for="uid">{{ form.uid.label }}</label>
+            <div class="control">
+                {{ form.uid(class="form-control") }}
+            </div>
+            {% if form.uid.errors %}
+                <div class="invalid-feedback d-block">
+                    {% for error in form.uid.errors %}
+                        <span>{{ error }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+        <div class="field">
+            <div class="control">
+                {{ form.submit(class="btn btn-primary") }}
+            </div>
+        </div>
+    </form>
+{% endblock %}

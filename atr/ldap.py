@@ -15,11 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import collections
 import dataclasses
 from typing import Final
 
 import ldap3
 import ldap3.utils.conv as conv
+import ldap3.utils.dn as dn
 
 LDAP_SEARCH_BASE: Final[str] = "ou=people,dc=apache,dc=org"
 LDAP_SERVER_HOST: Final[str] = "ldap-eu.apache.org"
@@ -37,6 +39,15 @@ class SearchParameters:
     srv_info: str | None = None
     detail_err: str | None = None
     connection: ldap3.Connection | None = None
+
+
+def parse_dn(dn_string: str) -> dict[str, list[str]]:
+    parsed = collections.defaultdict(list)
+    parts = dn.parse_dn(dn_string)
+    for part in parts:
+        for attr, value in part:
+            parsed[attr].append(value)
+    return dict(parsed)
 
 
 def search(params: SearchParameters) -> None:

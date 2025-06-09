@@ -136,6 +136,11 @@
             <a href="{{ url_for('admin.admin_toggle_admin_view_page') }}"
                {% if request.endpoint == 'admin.admin_toggle_admin_view_page' %}class="active"{% endif %}>Toggle admin view</a>
           </li>
+          <li>
+            <i class="bi bi-person-plus"></i>
+            <a href="{{ url_for('admin.browse_as') }}"
+               {% if request.endpoint == 'admin.browse_as' %}class="active"{% endif %}>Browse as user</a>
+          </li>
         </ul>
       {% endif %}
     {% endif %}

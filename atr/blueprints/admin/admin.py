@@ -28,7 +28,7 @@ import aiofiles.os
 import aioshutil
 import asfquart
 import asfquart.base as base
-import asfquart.session
+import asfquart.session as session
 import httpx
 import quart
 import sqlalchemy.orm as orm
@@ -47,6 +47,17 @@ import atr.template as template
 import atr.util as util
 
 _LOGGER: Final = logging.getLogger(__name__)
+
+
+class BrowseAsUserForm(util.QuartFormTyped):
+    """Form for browsing as another user."""
+
+    uid = wtforms.StringField(
+        "ASF UID",
+        validators=[wtforms.validators.InputRequired()],
+        render_kw={"placeholder": "Enter the ASF UID to browse as"},
+    )
+    submit = wtforms.SubmitField("Browse as this user")
 
 
 class DeleteCommitteeKeysForm(util.QuartFormTyped):
@@ -378,7 +389,7 @@ async def admin_toggle_admin_view_page() -> str:
 async def admin_toggle_view() -> response.Response:
     await util.validate_empty_form()
 
-    web_session = await asfquart.session.read()
+    web_session = await session.read()
     if web_session is None:
         # For the type checker
         # We should pass this as an argument, then it's guaranteed
@@ -402,12 +413,54 @@ async def admin_toggle_view() -> response.Response:
     return quart.redirect(referrer or quart.url_for("admin.admin_data"))
 
 
+@admin.BLUEPRINT.route("/browse-as", methods=["GET", "POST"])
+async def browse_as() -> str | response.Response:
+    """Allows an admin to browse as another user."""
+    # TODO: Enable this in debugging mode only?
+    from atr.routes import root
+
+    form = await BrowseAsUserForm.create_form()
+    if not (await form.validate_on_submit()):
+        return await template.render("browse-as.html", form=form)
+
+    new_uid = str(util.unwrap(form.uid.data))
+    if not (current_session := await session.read()):
+        raise base.ASFQuartException("Not authenticated", 401)
+
+    bind_dn = quart.current_app.config.get("LDAP_BIND_DN")
+    bind_password = quart.current_app.config.get("LDAP_BIND_PASSWORD")
+    ldap_params = ldap.SearchParameters(
+        uid_query=new_uid,
+        bind_dn_from_config=bind_dn,
+        bind_password_from_config=bind_password,
+    )
+    await asyncio.to_thread(ldap.search, ldap_params)
+
+    if not ldap_params.results_list:
+        await quart.flash(f"User '{new_uid}' not found in LDAP.", "error")
+        return quart.redirect(quart.url_for("admin.browse_as"))
+
+    ldap_projects_data = await apache.get_ldap_projects_data()
+    committee_data = await apache.get_active_committee_data()
+    ldap_data = ldap_params.results_list[0]
+    _LOGGER.info("Current session data: %s", current_session)
+    new_session_data = _session_data(ldap_data, new_uid, current_session, ldap_projects_data, committee_data)
+    _LOGGER.info("New session data: %s", new_session_data)
+    session.write(new_session_data)
+
+    await quart.flash(
+        f"You are now browsing as '{new_uid}'. To return to your own account, please log out and log back in.",
+        "success",
+    )
+    return quart.redirect(util.as_url(root.index))
+
+
 @admin.BLUEPRINT.route("/ldap/", methods=["GET"])
 async def ldap_search() -> str:
     form = await LdapLookupForm.create_form(data=quart.request.args)
     asf_id_for_template: str | None = None
 
-    web_session = await asfquart.session.read()
+    web_session = await session.read()
     if web_session and web_session.uid:
         asf_id_for_template = web_session.uid
 
@@ -511,6 +564,42 @@ async def _process_undiscovered(data: db.Session) -> tuple[int, int]:
             added_count += 1
 
     return added_count, updated_count
+
+
+def _session_data(
+    ldap_data: dict[str, Any],
+    new_uid: str,
+    current_session: session.ClientSession,
+    ldap_projects: apache.LDAPProjectsData,
+    committee_data: apache.CommitteeData,
+) -> dict[str, Any]:
+    # This is not quite accurate
+    # For example, this misses "tooling" for tooling members
+    projects = {p.name for p in ldap_projects.projects if (new_uid in p.members) or (new_uid in p.owners)}
+    # And this adds "incubator", which is not in the OAuth data
+    committees = {p.name for p in ldap_projects.projects if (p.pmc and (new_uid in p.members)) or (new_uid in p.owners)}
+
+    # Or asf-member-status?
+    is_member = bool(projects or committees)
+    is_root = False
+    is_chair = any(new_uid in (user.id for user in c.chair) for c in committee_data.committees)
+
+    return {
+        "uid": ldap_data.get("uid", [new_uid])[0],
+        "dn": None,
+        "fullname": ldap_data.get("cn", [new_uid])[0],
+        # "email": ldap_user.get("mail", [""])[0],
+        # Or asf-committer-email?
+        "email": f"{new_uid}@apache.org",
+        "isMember": is_member,
+        "isChair": is_chair,
+        "isRoot": is_root,
+        "committees": sorted(list(committees)),
+        "projects": sorted(list(projects)),
+        "mfa": current_session.mfa,
+        "isRole": False,
+        "metadata": {},
+    }
 
 
 async def _update_committees(
