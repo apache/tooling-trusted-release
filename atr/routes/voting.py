@@ -50,9 +50,13 @@ async def selected_revision(
         # Check that the user is on the project committee for the release
         # TODO: Consider relaxing this to all committers
         # Otherwise we must not show the vote form
-        if not user.is_committee_member(release.committee, session.uid):
+        if not (user.is_committee_member(release.committee, session.uid) or user.is_admin(session.uid)):
             return await session.redirect(
-                compose.selected, error="You must be on the PMC of this project to start a vote"
+                compose.selected,
+                error="You must be on the PMC of this project to start a vote",
+                project_name=project_name,
+                version_name=version_name,
+                revision=revision,
             )
         committee = util.unwrap(release.committee)
         permitted_recipients = util.permitted_recipients(session.uid)
