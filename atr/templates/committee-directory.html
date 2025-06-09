@@ -116,7 +116,7 @@
             <div class="mt-3 page-project-list-container">
               {% set max_initial_projects = 2 %}
               {% if committee.projects %}
-                {% for project in committee.projects %}
+                {% for project in committee.projects|sort(attribute="name") %}
                   <div class="card mb-3 shadow-sm page-project-subcard {% if loop.index > max_initial_projects %}page-project-extra d-none{% endif %}"
                        data-project-url="{{ as_url(routes.projects.view, name=project.name) }}">
                     <div class="card-body p-3 d-flex flex-column h-100">
