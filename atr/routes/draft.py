@@ -72,9 +72,9 @@ class DeleteFileForm(util.QuartFormTyped):
 class DeleteForm(util.QuartFormTyped):
     """Form for deleting a candidate draft."""
 
-    candidate_draft_name = wtforms.StringField(
-        "Candidate draft name", validators=[wtforms.validators.InputRequired("Candidate draft name is required")]
-    )
+    release_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
+    project_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
+    version_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
     confirm_delete = wtforms.StringField(
         "Confirmation",
         validators=[
@@ -95,29 +95,32 @@ async def delete(session: routes.CommitterSession) -> response.Response:
                 await quart.flash(f"{error}", "error")
         return await session.redirect(root.index)
 
-    candidate_draft_name = form.candidate_draft_name.data
-    if not candidate_draft_name:
+    release_name = form.release_name.data
+    if not release_name:
         return await session.redirect(root.index, error="Missing required parameters")
 
-    # Extract project name and version
-    try:
-        project_name, version = candidate_draft_name.rsplit("-", 1)
-    except ValueError:
-        return await session.redirect(root.index, error="Invalid candidate draft name format")
+    project_name = form.project_name.data
+    if not project_name:
+        return await session.redirect(root.index, error="Missing required parameters")
+
+    version_name = form.version_name.data
+    if not version_name:
+        return await session.redirect(root.index, error="Missing required parameters")
+
     await session.check_access(project_name)
 
     # Delete the metadata from the database
     async with db.session() as data:
         async with data.begin():
             try:
-                await _delete_candidate_draft(data, candidate_draft_name)
+                await _delete_candidate_draft(data, release_name)
             except Exception as e:
                 logging.exception("Error deleting candidate draft:")
                 return await session.redirect(root.index, error=f"Error deleting candidate draft: {e!s}")
 
     # Delete the files on disk, including all revisions
     # We can't use util.release_directory_base here because we don't have the release object
-    draft_dir = util.get_unfinished_dir() / project_name / version
+    draft_dir = util.get_unfinished_dir() / project_name / version_name
     if await aiofiles.os.path.exists(draft_dir):
         # Believe this to be another bug in mypy Protocol handling
         # TODO: Confirm that this is a bug, and report upstream

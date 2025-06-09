@@ -67,7 +67,9 @@ async def check(
             revision_editor = None  # type: ignore[assignment]
             revision_timestamp = None  # type: ignore[assignment]
 
-    delete_draft_form = await draft.DeleteForm.create_form()
+    delete_draft_form = await draft.DeleteForm.create_form(
+        data={"release_name": release.name, "project_name": release.project.name, "version_name": release.version}
+    )
     delete_file_form = await draft.DeleteFileForm.create_form()
     resolve_form = await resolve.ResolveForm.create_form()
     empty_form = await util.EmptyForm.create_form()
