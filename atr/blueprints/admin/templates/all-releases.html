@@ -35,7 +35,7 @@
           <td>{{ release.project.name if release.project else "N/A" }}</td>
           <td>
             {% set phase_value = release.phase.value %}
-            {{ phase_value }} <br />
+            <!-- {{ phase_value }} <br> -->
             {% if phase_value == "release_candidate_draft" %}
               <span class="badge bg-secondary">1. Draft</span>
             {% elif phase_value == "release_candidate" %}
@@ -48,7 +48,7 @@
               <span class="badge bg-dark">Unknown</span>
             {% endif %}
           </td>
-          <td>{{ release.created.strftime('%Y-%m-%d %H:%M:%S UTC') }}</td>
+          <td>{{ release.created.strftime("%Y-%m-%d<br>%H:%M:%S UTC")|safe }}</td>
         </tr>
       {% else %}
         <tr>
