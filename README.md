@@ -9,7 +9,7 @@ This project contains code developed by the Apache Software Foundation (ASF) Too
 
 This codebase is in alpha development and subject to significant changes. We welcome feedback, but recommend focusing on architectural and design aspects rather than implementation details. Many known issues, especially regarding implementation details, are already scheduled for improvement. Documentation and code quality will be enhanced incrementally.
 
-We will be opening an alpha program within the next week or so.
+The code is available for testing at <https://release-test.apache.org/>.
 
 This repository is yet to be part of any officially maintained or supported ASF project. It does not represent final technical decisions for future ASF Tooling products.
 
