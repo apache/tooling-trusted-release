@@ -106,8 +106,7 @@ async def admin_consistency() -> quart.Response:
     database_dirs = []
     for release in releases:
         path = util.release_directory_version(release)
-        if await aiofiles.os.path.exists(path):
-            database_dirs.append(str(path))
+        database_dirs.append(str(path))
     if len(set(database_dirs)) != len(database_dirs):
         raise base.ASFQuartException("Duplicate release directories in database", errorcode=500)
 
