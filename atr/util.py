@@ -410,6 +410,42 @@ async def number_of_release_files(release: models.Release) -> int:
     return count
 
 
+async def number_of_release_files_debugging(release: models.Release) -> tuple[int, dict[str, str]]:
+    """Return the number of files in a release."""
+    debugging = {}
+    path_project = release.project.name
+    debugging["path_project"] = path_project
+    path_version = release.version
+    debugging["path_version"] = path_version
+    path_revision = release.latest_revision_number
+    debugging["path_revision"] = str(path_revision)
+    if path_revision is None:
+        debugging["reason"] = "path_revision is None"
+        return 0, debugging
+    match release.phase:
+        case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+            debugging["matched"] = "RELEASE_CANDIDATE_DRAFT"
+            path = get_unfinished_dir() / path_project / path_version / path_revision
+        case models.ReleasePhase.RELEASE_CANDIDATE:
+            debugging["matched"] = "RELEASE_CANDIDATE"
+            path = get_unfinished_dir() / path_project / path_version / path_revision
+        case models.ReleasePhase.RELEASE_PREVIEW:
+            debugging["matched"] = "RELEASE_PREVIEW"
+            path = get_unfinished_dir() / path_project / path_version / path_revision
+        case models.ReleasePhase.RELEASE:
+            debugging["matched"] = "RELEASE"
+            path = get_finished_dir() / path_project / path_version
+        case _:
+            raise ValueError(f"Unknown release phase: {release.phase}")
+    debugging["path"] = str(path)
+    count = 0
+    debugging["stat"] = str(await aiofiles.os.stat(path))
+    async for _ in paths_recursive(path):
+        count += 1
+    debugging["count"] = str(count)
+    return count, debugging
+
+
 def parse_key_blocks(keys_text: str) -> list[str]:
     """Extract GPG key blocks from a KEYS file."""
     key_blocks = []
