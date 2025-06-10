@@ -658,7 +658,11 @@ def _session_data(
     # For example, this misses "tooling" for tooling members
     projects = {p.name for p in ldap_projects.projects if (new_uid in p.members) or (new_uid in p.owners)}
     # And this adds "incubator", which is not in the OAuth data
-    committees = {p.name for p in ldap_projects.projects if (p.pmc and (new_uid in p.members)) or (new_uid in p.owners)}
+    committees = set()
+    for c in committee_data.committees:
+        for user in c.roster:
+            if user.id == new_uid:
+                committees.add(c.name)
 
     # Or asf-member-status?
     is_member = bool(projects or committees)
@@ -675,7 +679,7 @@ def _session_data(
         "isMember": is_member,
         "isChair": is_chair,
         "isRoot": is_root,
-        "committees": sorted(list(committees)),
+        "pmcs": sorted(list(committees)),
         "projects": sorted(list(projects)),
         "mfa": current_session.mfa,
         "isRole": False,

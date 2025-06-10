@@ -186,6 +186,16 @@ class CommitterSession:
                 return
             raise base.ASFQuartException("You do not have access to this project", errorcode=403)
 
+    async def check_access_committee(self, committee_name: str) -> None:
+        if committee_name not in self.committees:
+            if user.is_admin(self.uid):
+                # Admins can view all committees
+                # But we must warn them when the committee is not one of their own
+                # TODO: As above, this code is difficult to test locally
+                await quart.flash("This is not your committee, but you have access as an admin", "warning")
+                return
+            raise base.ASFQuartException("You do not have access to this committee", errorcode=403)
+
     @property
     def app_host(self) -> str:
         return config.get().APP_HOST
