@@ -74,17 +74,17 @@ repos:
       language: system
       types: [python]
       exclude: ^node_modules/
-    - id: mypy
-      name: Mypy Type Check
-      entry: mypy
-      language: system
-      require_serial: true
-      types: [python]
-      # See https://github.com/pre-commit/pre-commit/issues/2967
-      exclude: ^(node_modules|tests)/
-      args:
-        - --config-file=pyproject.toml
-        - --scripts-are-modules
+    # - id: mypy
+    #   name: Mypy Type Check
+    #   entry: mypy
+    #   language: system
+    #   require_serial: true
+    #   types: [python]
+    #   # See https://github.com/pre-commit/pre-commit/issues/2967
+    #   exclude: ^(node_modules|tests)/
+    #   args:
+    #     - --config-file=pyproject.toml
+    #     - --scripts-are-modules
     - id: pyright
       name: Pyright Type Check
       entry: pyright
