@@ -223,9 +223,9 @@ async def _promote(
 
     # Check that there is at least one file in the draft
     # This is why we require _project=True above
-    file_count, debugging = await util.number_of_release_files_debugging(release_for_pre_checks)
-    if (file_count == 0) or debugging:
-        return f"This candidate draft is empty, containing no files: {debugging}"
+    file_count = await util.number_of_release_files(release_for_pre_checks)
+    if file_count == 0:
+        return "This candidate draft is empty, containing no files"
 
     # Promote it to RELEASE_CANDIDATE
     # NOTE: We previously allowed skipping phases, but removed that functionality
