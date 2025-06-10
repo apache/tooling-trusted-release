@@ -97,6 +97,55 @@ class LdapLookupForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Lookup")
 
 
+@admin.BLUEPRINT.route("/consistency")
+async def admin_consistency() -> quart.Response:
+    """Check for consistency between the database and the filesystem."""
+    # Get all releases from the database
+    async with db.session() as data:
+        releases = await data.release().all()
+    database_dirs = []
+    for release in releases:
+        path = util.release_directory_version(release)
+        if await aiofiles.os.path.exists(path):
+            database_dirs.append(str(path))
+    if len(set(database_dirs)) != len(database_dirs):
+        raise base.ASFQuartException("Duplicate release directories in database", errorcode=500)
+
+    # Get all releases from the filesystem
+    filesystem_dirs = await _get_filesystem_dirs()
+
+    # Pair them up where possible
+    paired_dirs = []
+    for database_dir in database_dirs[:]:
+        for filesystem_dir in filesystem_dirs[:]:
+            if database_dir == filesystem_dir:
+                paired_dirs.append(database_dir)
+                database_dirs.remove(database_dir)
+                filesystem_dirs.remove(filesystem_dir)
+                break
+    return quart.Response(
+        f"""\
+=== BROKEN ===
+
+DATABASE ONLY:
+
+{"\n".join(sorted(database_dirs or ["-"]))}
+
+FILESYSTEM ONLY:
+
+{"\n".join(sorted(filesystem_dirs or ["-"]))}
+
+
+== Okay ==
+
+Paired correctly:
+
+{"\n".join(sorted(paired_dirs or ["-"]))}
+""",
+        mimetype="text/plain",
+    )
+
+
 @admin.BLUEPRINT.route("/data")
 @admin.BLUEPRINT.route("/data/<model>")
 async def admin_data(model: str = "Committee") -> str:
@@ -540,6 +589,39 @@ async def _delete_release_data(release_name: str) -> None:
             f"Database records for '{release_name}' deleted, but failed to delete filesystem directory: {e!s}",
             "warning",
         )
+
+
+async def _get_filesystem_dirs() -> list[str]:
+    filesystem_dirs = []
+    await _get_filesystem_dirs_finished(filesystem_dirs)
+    await _get_filesystem_dirs_unfinished(filesystem_dirs)
+    return filesystem_dirs
+
+
+async def _get_filesystem_dirs_finished(filesystem_dirs: list[str]) -> None:
+    finished_dir = util.get_finished_dir()
+    finished_dir_contents = await aiofiles.os.listdir(finished_dir)
+    for project_dir in finished_dir_contents:
+        project_dir_path = os.path.join(finished_dir, project_dir)
+        if await aiofiles.os.path.isdir(project_dir_path):
+            for version_dir in await aiofiles.os.listdir(project_dir_path):
+                if await aiofiles.os.path.isdir(os.path.join(project_dir_path, version_dir)):
+                    version_dir_path = os.path.join(project_dir_path, version_dir)
+                    if await aiofiles.os.path.isdir(version_dir_path):
+                        filesystem_dirs.append(version_dir_path)
+
+
+async def _get_filesystem_dirs_unfinished(filesystem_dirs: list[str]) -> None:
+    unfinished_dir = util.get_unfinished_dir()
+    unfinished_dir_contents = await aiofiles.os.listdir(unfinished_dir)
+    for project_dir in unfinished_dir_contents:
+        project_dir_path = os.path.join(unfinished_dir, project_dir)
+        if await aiofiles.os.path.isdir(project_dir_path):
+            for version_dir in await aiofiles.os.listdir(project_dir_path):
+                if await aiofiles.os.path.isdir(os.path.join(project_dir_path, version_dir)):
+                    version_dir_path = os.path.join(project_dir_path, version_dir)
+                    if await aiofiles.os.path.isdir(version_dir_path):
+                        filesystem_dirs.append(version_dir_path)
 
 
 async def _process_undiscovered(data: db.Session) -> tuple[int, int]:

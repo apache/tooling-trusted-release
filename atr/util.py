@@ -388,62 +388,12 @@ def is_user_viewing_as_admin(uid: str | None) -> bool:
 
 async def number_of_release_files(release: models.Release) -> int:
     """Return the number of files in a release."""
-    path_project = release.project.name
-    path_version = release.version
-    path_revision = release.latest_revision_number
-    if path_revision is None:
+    if (path := release_directory_revision(release)) is None:
         return 0
-    match release.phase:
-        case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-            path = get_unfinished_dir() / path_project / path_version / path_revision
-        case models.ReleasePhase.RELEASE_CANDIDATE:
-            path = get_unfinished_dir() / path_project / path_version / path_revision
-        case models.ReleasePhase.RELEASE_PREVIEW:
-            path = get_unfinished_dir() / path_project / path_version / path_revision
-        case models.ReleasePhase.RELEASE:
-            path = get_finished_dir() / path_project / path_version
-        case _:
-            raise ValueError(f"Unknown release phase: {release.phase}")
     count = 0
     async for _ in paths_recursive(path):
         count += 1
     return count
-
-
-async def number_of_release_files_debugging(release: models.Release) -> tuple[int, dict[str, str]]:
-    """Return the number of files in a release."""
-    debugging = {}
-    path_project = release.project.name
-    debugging["path_project"] = path_project
-    path_version = release.version
-    debugging["path_version"] = path_version
-    path_revision = release.latest_revision_number
-    debugging["path_revision"] = str(path_revision)
-    if path_revision is None:
-        debugging["reason"] = "path_revision is None"
-        return 0, debugging
-    match release.phase:
-        case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-            debugging["matched"] = "RELEASE_CANDIDATE_DRAFT"
-            path = get_unfinished_dir() / path_project / path_version / path_revision
-        case models.ReleasePhase.RELEASE_CANDIDATE:
-            debugging["matched"] = "RELEASE_CANDIDATE"
-            path = get_unfinished_dir() / path_project / path_version / path_revision
-        case models.ReleasePhase.RELEASE_PREVIEW:
-            debugging["matched"] = "RELEASE_PREVIEW"
-            path = get_unfinished_dir() / path_project / path_version / path_revision
-        case models.ReleasePhase.RELEASE:
-            debugging["matched"] = "RELEASE"
-            path = get_finished_dir() / path_project / path_version
-        case _:
-            raise ValueError(f"Unknown release phase: {release.phase}")
-    debugging["path"] = str(path)
-    count = 0
-    debugging["stat"] = str(await aiofiles.os.stat(path))
-    async for _ in paths_recursive(path):
-        count += 1
-    debugging["count"] = str(count)
-    return count, debugging
 
 
 def parse_key_blocks(keys_text: str) -> list[str]:
@@ -565,10 +515,8 @@ def release_directory(release: models.Release) -> pathlib.Path:
 def release_directory_base(release: models.Release) -> pathlib.Path:
     """Determine the filesystem directory for a given release based on its phase."""
     phase = release.phase
-    try:
-        project_name, version_name = release.name.rsplit("-", 1)
-    except ValueError:
-        raise base.ASFQuartException(f"Invalid release name format '{release.name}'", 500)
+    project_name = release.project.name
+    version_name = release.version
 
     base_dir: pathlib.Path | None = None
     match phase:
@@ -580,9 +528,44 @@ def release_directory_base(release: models.Release) -> pathlib.Path:
             base_dir = get_unfinished_dir()
         case models.ReleasePhase.RELEASE:
             base_dir = get_finished_dir()
-        # NOTE: Do NOT add "case _" here
-
+        # Do not add "case _" here
     return base_dir / project_name / version_name
+
+
+def release_directory_revision(release: models.Release) -> pathlib.Path | None:
+    """Return the path to the directory containing the active files for a given release phase."""
+    path_project = release.project.name
+    path_version = release.version
+    match release.phase:
+        case (
+            models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+            | models.ReleasePhase.RELEASE_CANDIDATE
+            | models.ReleasePhase.RELEASE_PREVIEW
+        ):
+            if (path_revision := release.latest_revision_number) is None:
+                return None
+            path = get_unfinished_dir() / path_project / path_version / path_revision
+        case models.ReleasePhase.RELEASE:
+            path = get_finished_dir() / path_project / path_version
+        # Do not add "case _" here
+    return path
+
+
+def release_directory_version(release: models.Release) -> pathlib.Path:
+    """Return the path to the directory containing the active files for a given release phase."""
+    path_project = release.project.name
+    path_version = release.version
+    match release.phase:
+        case (
+            models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+            | models.ReleasePhase.RELEASE_CANDIDATE
+            | models.ReleasePhase.RELEASE_PREVIEW
+        ):
+            path = get_unfinished_dir() / path_project / path_version
+        case models.ReleasePhase.RELEASE:
+            path = get_finished_dir() / path_project / path_version
+        # Do not add "case _" here
+    return path
 
 
 def unwrap(value: T | None, error_message: str = "unexpected None when unwrapping value") -> T:
