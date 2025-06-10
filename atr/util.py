@@ -532,6 +532,13 @@ def release_directory_base(release: models.Release) -> pathlib.Path:
     return base_dir / project_name / version_name
 
 
+def release_directory_eventual(release: models.Release) -> pathlib.Path:
+    """Return the path to the eventual destination of the release files."""
+    path_project = release.project.name
+    path_version = release.version
+    return get_finished_dir() / path_project / path_version
+
+
 def release_directory_revision(release: models.Release) -> pathlib.Path | None:
     """Return the path to the directory containing the active files for a given release phase."""
     path_project = release.project.name

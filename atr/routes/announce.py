@@ -96,7 +96,13 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     announce_form.subject.data = f"[ANNOUNCE] {project_display_name} {version_name} released"
     # The body can be changed, either from VoteTemplate or from the form
     announce_form.body.data = await construct.announce_release_default(project_name)
-    return await template.render("announce-selected.html", release=release, announce_form=announce_form)
+
+    eventual_path = util.release_directory_eventual(release)
+    finished_path = util.get_finished_dir()
+    url_path = f"/downloads/{eventual_path.relative_to(finished_path)}/"
+    return await template.render(
+        "announce-selected.html", release=release, announce_form=announce_form, url_path=url_path
+    )
 
 
 @routes.committer("/announce/<project_name>/<version_name>", methods=["POST"])
