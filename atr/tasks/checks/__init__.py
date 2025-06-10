@@ -73,9 +73,9 @@ class Recorder:
         self.afresh = afresh
         self.constructed = False
 
-        project_name, version_name = models.project_version(release_name)
-        self.project_name = project_name
-        self.version_name = version_name
+        # project_name, version_name = models.project_version(release_name)
+        # self.project_name = project_name
+        # self.version_name = version_name
 
     @classmethod
     async def create(

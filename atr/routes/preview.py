@@ -48,9 +48,9 @@ class AnnouncePreviewForm(util.QuartFormTyped):
 class DeleteForm(util.QuartFormTyped):
     """Form for deleting a release preview."""
 
-    preview_name = wtforms.StringField(
-        "Preview name", validators=[wtforms.validators.InputRequired("Preview name is required")]
-    )
+    release_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
+    project_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
+    version_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
     confirm_delete = wtforms.StringField(
         "Confirmation",
         validators=[
@@ -103,15 +103,11 @@ async def delete(session: routes.CommitterSession) -> response.Response:
                 await quart.flash(f"{error}", "error")
         return await session.redirect(root.index)
 
-    preview_name = form.preview_name.data
-    if not preview_name:
+    release_name = form.release_name.data
+    project_name = form.project_name.data
+    version_name = form.version_name.data
+    if not (release_name and project_name and version_name):
         return await session.redirect(root.index, error="Missing required parameters")
-
-    # Extract project name and version
-    try:
-        project_name, version = preview_name.rsplit("-", 1)
-    except ValueError:
-        return await session.redirect(root.index, error="Invalid preview name format")
 
     # Check that the user has access to the project
     async with db.session() as data:
@@ -128,14 +124,14 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         # Delete the metadata from the database
         async with data.begin():
             try:
-                await _delete_preview(data, preview_name)
+                await _delete_preview(data, release_name)
             except Exception as e:
                 logging.exception("Error deleting preview:")
                 return await session.redirect(root.index, error=f"Error deleting preview: {e!s}")
 
     # Delete the files on disk, including all revisions
     # We can't use util.release_directory_base here because we don't have the release object
-    preview_dir = util.get_unfinished_dir() / project_name / version
+    preview_dir = util.get_unfinished_dir() / project_name / version_name
     if await aiofiles.os.path.exists(preview_dir):
         await aioshutil.rmtree(preview_dir)
 
@@ -201,10 +197,10 @@ async def view_path(
     )
 
 
-async def _delete_preview(data: db.Session, preview_name: str) -> None:
+async def _delete_preview(data: db.Session, release_name: str) -> None:
     """Delete a release preview and all its associated files."""
     # Check that the release exists
-    release = await data.release(name=preview_name, _project=True).get()
+    release = await data.release(name=release_name, _project=True).get()
     if not release:
         raise routes.FlashError("Preview not found")
     if release.phase != models.ReleasePhase.RELEASE_PREVIEW:

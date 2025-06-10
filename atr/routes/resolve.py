@@ -90,12 +90,9 @@ async def selected_post(
             vote.selected, error="Missing candidate name", project_name=project_name, version_name=version_name
         )
 
-    # Extract project name
-    try:
-        project_name, version_name = candidate_name.rsplit("-", 1)
-    except ValueError:
+    if candidate_name != models.release_name(project_name, version_name):
         return await session.redirect(
-            vote.selected, error="Invalid candidate name format", project_name=project_name, version_name=version_name
+            vote.selected, error="Invalid candidate name", project_name=project_name, version_name=version_name
         )
 
     # Check that the user has access to the project

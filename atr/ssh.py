@@ -175,18 +175,19 @@ async def _step_01_handle_client(process: asyncssh.SSHServerProcess) -> None:
     # Unpack results
     # The release object is only present for read requests
     project_name, version_name, release_obj = validation_results
+    release_name = models.release_name(project_name, version_name)
 
     if is_read_request:
         if release_obj is None:
             # This should not happen if the validation logic is correct
             return _fail(process, "Internal error: Release object missing for read request after validation", None)
-        _LOGGER.info(f"Processing READ request for {project_name}-{version_name}")
+        _LOGGER.info(f"Processing READ request for {release_name}")
         ####################################################
         ### Calls _step_07a_process_validated_rsync_read ###
         ####################################################
         await _step_07a_process_validated_rsync_read(process, argv, path_index, release_obj)
     else:
-        _LOGGER.info(f"Processing WRITE request for {project_name}-{version_name}")
+        _LOGGER.info(f"Processing WRITE request for {release_name}")
         #####################################################
         ### Calls _step_07b_process_validated_rsync_write ###
         #####################################################
@@ -473,6 +474,7 @@ async def _step_07b_process_validated_rsync_write(
     asf_uid = process.get_extra_info("username")
     exit_status = 1
 
+    release_name = models.release_name(project_name, version_name)
     try:
         # Ensure the release object exists or is created
         # This must happen before creating the revision directory
@@ -500,7 +502,7 @@ async def _step_07b_process_validated_rsync_write(
                 if creating.old is not None:
                     for_revision = f"successor of revision {creating.old.number}"
                 else:
-                    for_revision = f"initial revision for release {project_name}-{version_name}"
+                    for_revision = f"initial revision for release {release_name}"
                 _LOGGER.error(
                     f"rsync upload failed with exit status {exit_status} for {for_revision}. "
                     f"Command: {process.command} (run as {' '.join(argv)})"
@@ -515,12 +517,12 @@ async def _step_07b_process_validated_rsync_write(
                 process.stderr.write(message.encode())
                 await process.stderr.drain()
         else:
-            _LOGGER.info(f"rsync upload unsuccessful for release {project_name}-{version_name}")
+            _LOGGER.info(f"rsync upload unsuccessful for release {release_name}")
         if not process.is_closing():
             process.exit(exit_status)
 
     except Exception as e:
-        _LOGGER.exception(f"Error during draft revision processing for {project_name}-{version_name}")
+        _LOGGER.exception(f"Error during draft revision processing for {release_name}")
         _fail(process, f"Internal error processing upload revision: {e}", None)
         if not process.is_closing():
             process.exit(1)
@@ -530,6 +532,7 @@ async def _step_07c_ensure_release_object_for_write(
     process: asyncssh.SSHServerProcess, project_name: str, version_name: str
 ) -> bool:
     """Ensure the release object exists or create it for a write operation."""
+    release_name = models.release_name(project_name, version_name)
     try:
         async with db.session() as data:
             async with data.begin():
@@ -544,7 +547,7 @@ async def _step_07c_ensure_release_object_for_write(
                         # This should ideally be caught by path validation, but double check
                         raise RuntimeError(f'Invalid version name "{version_name}": {version_name_error}')
                     # Create a new release object
-                    _LOGGER.info(f"Creating new release object for {project_name}-{version_name}")
+                    _LOGGER.info(f"Creating new release object for {release_name}")
                     release = models.Release(
                         project_name=project.name,
                         project=project,
@@ -562,7 +565,7 @@ async def _step_07c_ensure_release_object_for_write(
                     )
         return True
     except Exception as e:
-        _LOGGER.exception(f"Error ensuring release object for write: {project_name}-{version_name}")
+        _LOGGER.exception(f"Error ensuring release object for write: {release_name}")
         return _fail(process, f"Internal error ensuring release object: {e}", False)
 
 

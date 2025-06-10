@@ -734,15 +734,6 @@ def check_release_name(_mapper: orm.Mapper, _connection: sqlalchemy.Connection, 
         release.name = release_name(release.project_name, release.version)
 
 
-def project_version(release_name: str) -> tuple[str, str]:
-    """Return the project and version for a given release name."""
-    try:
-        project_name, version_name = release_name.rsplit("-", 1)
-        return (project_name, version_name)
-    except ValueError:
-        raise ValueError(f"Invalid release name: {release_name}")
-
-
 def release_name(project_name: str, version_name: str) -> str:
     """Return the release name for a given project and version."""
     return f"{project_name}-{version_name}"
