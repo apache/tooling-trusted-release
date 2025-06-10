@@ -19,7 +19,6 @@
 
 import datetime
 import http.client
-import re
 from typing import Protocol
 
 import asfquart.base as base
@@ -36,8 +35,9 @@ import atr.util as util
 
 
 class AddFormProtocol(Protocol):
-    project_name: wtforms.HiddenField
-    derived_project_name: wtforms.StringField
+    committee_name: wtforms.HiddenField
+    display_name: wtforms.StringField
+    label: wtforms.StringField
     submit: wtforms.SubmitField
 
 
@@ -113,33 +113,39 @@ class ReleasePolicyForm(util.QuartFormTyped):
     submit_policy = wtforms.SubmitField("Save")
 
 
-@routes.committer("/project/add/<project_name>", methods=["GET", "POST"])
-async def add_project(session: routes.CommitterSession, project_name: str) -> response.Response | str:
-    await session.check_access(project_name)
+@routes.committer("/project/add/<committee_name>", methods=["GET", "POST"])
+async def add_project(session: routes.CommitterSession, committee_name: str) -> response.Response | str:
+    await session.check_access_committee(committee_name)
 
     async with db.session() as data:
-        project = await data.project(name=project_name).demand(
-            base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
+        committee = await data.committee(name=committee_name).demand(
+            base.ASFQuartException(f"Committee {committee_name} not found", errorcode=404)
         )
 
     class AddForm(util.QuartFormTyped):
-        project_name = wtforms.HiddenField("project_name")
-        derived_project_name = wtforms.StringField(
-            "Derived project",
-            validators=[
-                wtforms.validators.InputRequired("Please provide a derived project name."),
-                wtforms.validators.Length(min=1, max=100),
-            ],
-            description="The desired suffix for the full project name.",
+        committee_name = wtforms.HiddenField("committee_name")
+        display_name = wtforms.StringField(
+            "Display name",
+            description=f"""\
+For example, "Apache {committee.display_name}" or "Apache {committee.display_name} Components".
+You must start with "Apache " and you must use title case.
+""",
+        )
+        label = wtforms.StringField(
+            "Label",
+            description=f"""\
+For example, "{committee.name}" or "{committee.name}-components".
+You must start with your committee label, and you must use lower case.
+""",
         )
         submit = wtforms.SubmitField("Add project")
 
-    form = await AddForm.create_form(data={"project_name": project_name})
+    form = await AddForm.create_form(data={"committee_name": committee_name})
 
     if await form.validate_on_submit():
         return await _project_add(form, session.uid)
 
-    return await template.render("project-add-project.html", form=form, project_name=project.display_name)
+    return await template.render("project-add-project.html", form=form, committee_name=committee.display_name)
 
 
 @routes.committer("/project/delete", methods=["POST"])
@@ -396,65 +402,36 @@ async def _policy_form_create(project: models.Project) -> ReleasePolicyForm:
 
 
 async def _project_add(form: AddFormProtocol, asf_id: str) -> response.Response:
-    base_project_name = str(form.project_name.data)
-    derived_project_name = str(form.derived_project_name.data).strip()
+    form_values = await _project_add_validate(form)
+    if form_values is None:
+        return quart.redirect(util.as_url(add_project, committee_name=form.committee_name.data))
+    committee_name, display_name, label = form_values
 
-    def _generate_label(text: str) -> str:
-        # TODO: We should probably add long name validation
-        text = text.lower()
-        text = re.sub(r" +", "-", text)
-        text = re.sub(r"[^a-z0-9-]", "", text)
-        return text
-
+    super_project = None
     async with db.session() as data:
         # Get the base project to derive from
-        base_project = await data.project(name=base_project_name).get()
-        if not base_project:
-            # This should not happen
-            raise RuntimeError(f"Base project {base_project_name} not found")
-        if base_project.super_project_name:
-            await quart.flash(f"Project {base_project.name} is already a derived project", "error")
-            return quart.redirect(util.as_url(add_project, project_name=base_project.name))
+        committee_projects = await data.project(committee_name=committee_name, _committee=True).all()
+        for committee_project in committee_projects:
+            if label.startswith(committee_project.name + "-"):
+                if (super_project is None) or (len(super_project.name) < len(committee_project.name)):
+                    super_project = committee_project
 
-        # Construct the new label
-        derived_label = _generate_label(derived_project_name)
-        if not derived_label:
-            await quart.flash("Derived project name must contain valid characters for label generation", "error")
-            return quart.redirect(util.as_url(add_project, project_name=base_project.name))
-        new_project_label = f"{base_project.name}-{derived_label}"
+        # Check whether the project already exists
+        if await data.project(name=label).get():
+            await quart.flash(f"Project {label} already exists", "error")
+            return quart.redirect(util.as_url(add_project, committee_name=committee_name))
 
-        # Construct the new full name
-        # We ensure that parenthesised suffixes like "(Incubating)" are preserved
-        base_name = base_project.display_name
-        match = re.match(r"^(.*?) *(\(.*\))?$", base_name)
-        if match:
-            main_part = match.group(1).strip()
-            suffix_part = match.group(2)
-        else:
-            main_part = base_name.strip()
-            suffix_part = None
-
-        if suffix_part:
-            new_project_full_name = f"{main_part} {derived_project_name} {suffix_part}"
-        else:
-            new_project_full_name = f"{main_part} {derived_project_name}"
-        new_project_full_name = re.sub(r"  +", " ", new_project_full_name).strip()
-
-        # Check whether the derived project already exists by its constructed label
-        if await data.project(name=new_project_label).get():
-            await quart.flash(f"Derived project {new_project_label} already exists", "error")
-            return quart.redirect(util.as_url(add_project, project_name=base_project.name))
-
+        # TODO: Fix the potential race condition here
         project = models.Project(
-            name=new_project_label,
-            full_name=new_project_full_name,
-            is_retired=base_project.is_retired,
-            super_project_name=base_project.name,
-            description=base_project.description,
-            category=base_project.category,
-            programming_languages=base_project.programming_languages,
-            committee_name=base_project.committee_name,
-            release_policy_id=base_project.release_policy_id,
+            name=label,
+            full_name=display_name,
+            is_retired=False,
+            super_project_name=super_project.name if super_project else None,
+            description=super_project.description if super_project else None,
+            category=super_project.category if super_project else None,
+            programming_languages=super_project.programming_languages if super_project else None,
+            committee_name=committee_name,
+            release_policy_id=super_project.release_policy_id if super_project else None,
             created=datetime.datetime.now(datetime.UTC),
             created_by=asf_id,
         )
@@ -462,7 +439,49 @@ async def _project_add(form: AddFormProtocol, asf_id: str) -> response.Response:
         data.add(project)
         await data.commit()
 
-    return quart.redirect(util.as_url(view, name=new_project_label))
+    return quart.redirect(util.as_url(view, name=label))
+
+
+async def _project_add_validate(form: AddFormProtocol) -> tuple[str, str, str] | None:
+    committee_name = str(form.committee_name.data)
+    display_name = str(form.display_name.data).strip()
+    if not display_name.startswith("Apache "):
+        await quart.flash("Display name must start with 'Apache '", "error")
+        return None
+    if not display_name.istitle():
+        await quart.flash("Display name must start with a capital letter", "error")
+        return None
+    # Hidden criterion!
+    # $ sqlite3 state/atr.db 'select full_name from project;' | grep -- '[^A-Za-z0-9 ]'
+    # Apache .NET Ant Library
+    # Apache Oltu - Parent
+    # Apache Commons Chain (Dormant)
+    # Apache Commons Functor (Dormant)
+    # Apache Commons OGNL (Dormant)
+    # Apache Commons Proxy (Dormant)
+    # Apache Empire-db
+    # Apache mod_ftp
+    # Apache Lucene.Net
+    # Apache mod_perl
+    # Apache Xalan for C++ XSLT Processor
+    # Apache Xerces for C++ XML Parser
+    if not display_name.replace(" ", "").replace(".", "").replace("+", "").isalnum():
+        await quart.flash("Display name must be alphanumeric and may include spaces or dots or plus signs", "error")
+        return None
+
+    label = str(form.label.data).strip()
+    if not (label.startswith(committee_name + "-") or (label == committee_name)):
+        await quart.flash(f"Label must start with '{committee_name}-'", "error")
+        return None
+    if not label.islower():
+        await quart.flash("Label must be all lower case", "error")
+        return None
+    # Hidden criterion!
+    if not label.replace("-", "").isalnum():
+        await quart.flash("Label must be alphanumeric and may include hyphens", "error")
+        return None
+
+    return (committee_name, display_name, label)
 
 
 def _set_default_fields(form: ReleasePolicyForm, project: models.Project, release_policy: models.ReleasePolicy) -> None:
