@@ -325,9 +325,11 @@ Thanks,
     @property
     def policy_mailto_addresses(self) -> list[str]:
         if ((policy := self.release_policy) is None) or (not policy.mailto_addresses):
-            # TODO: We actually need the top level project name here, not the project name
-            # Most ideally, we should use a definitive source
-            return [f"dev@{self.name}.apache.org"]
+            if self.committee is not None:
+                return [f"dev@{self.committee.name}.apache.org"]
+            else:
+                # TODO: Or raise an error?
+                return [f"dev@{self.name}.apache.org"]
         return policy.mailto_addresses
 
     @property

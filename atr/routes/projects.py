@@ -222,9 +222,9 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
     can_edit = False
 
     async with db.session() as data:
-        project = await data.project(name=name, _committee_public_signing_keys=True, _release_policy=True).demand(
-            http.client.HTTPException(404)
-        )
+        project = await data.project(
+            name=name, _committee=True, _committee_public_signing_keys=True, _release_policy=True
+        ).demand(http.client.HTTPException(404))
 
         is_committee_member = project.committee and (user.is_committee_member(project.committee, session.uid))
         is_privileged = user.is_admin(session.uid)
