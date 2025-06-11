@@ -152,7 +152,7 @@
                 {# Add an else clause here if we decide to show an alternative to an empty card #}
               {% endif %}
             </div>
-            {% if current_user and is_part %}
+            {% if current_user and is_part and (not committee_without_releases(committee.name)) %}
               <a href="{{ as_url(routes.projects.add_project, committee_name=committee.name) }}"
                  title="Create a project for {{ committee.display_name }}"
                  class="text-decoration-none d-block mt-4 mb-3">

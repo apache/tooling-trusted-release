@@ -677,6 +677,18 @@ async def _process_undiscovered(data: db.Session) -> tuple[int, int]:
     return added_count, updated_count
 
 
+def _project_is_retired(pmc: models.Committee, project_name: str, project_status: apache.ProjectStatus) -> bool:
+    if util.committee_without_releases(pmc.name):
+        return True
+    elif ("_dormant_" in project_name) or project_status.name.endswith("(Dormant)"):
+        # TODO: Dormant is not quite the same thing as retired
+        # But we can act on the assumption that projects can be unretired
+        # The Project.is_retired setting is not permanent
+        # We have to check the names because projects.json does not have a dormant property
+        return True
+    return False
+
+
 def _session_data(
     ldap_data: dict[str, Any],
     new_uid: str,
@@ -862,22 +874,20 @@ async def _update_projects(data: db.Session, projects: apache.ProjectsData) -> t
             continue
 
         project_model = await data.project(name=project_name).get()
+        # Check whether the project is retired, whether temporarily or otherwise
+        is_retired = _project_is_retired(pmc, project_name, project_status)
         if not project_model:
-            project_model = models.Project(name=project_name, committee=pmc)
+            project_model = models.Project(name=project_name, committee=pmc, is_retired=is_retired)
             data.add(project_model)
             added_count += 1
         else:
+            project_model.is_retired = is_retired
             updated_count += 1
 
         project_model.full_name = project_status.name
         project_model.category = project_status.category
         project_model.description = project_status.description
         project_model.programming_languages = project_status.programming_language
-
-        # TODO: find a better way to declare a project retired
-        #       right now we assume that a project is retired if its assigned to the attic PMC
-        #       maybe make that information configurable
-        project_model.is_retired = pmc.name == "attic"
 
     return added_count, updated_count
 

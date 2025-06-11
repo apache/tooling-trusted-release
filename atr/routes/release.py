@@ -75,7 +75,7 @@ async def bulk_status(session: routes.CommitterSession, task_id: int) -> str | r
 async def finished(project_name: str) -> str:
     """View all finished releases for a project."""
     async with db.session() as data:
-        project = await data.project(name=project_name).demand(
+        project = await data.project(name=project_name, is_retired=False).demand(
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
         )
 
@@ -126,7 +126,7 @@ async def select(session: routes.CommitterSession, project_name: str) -> str:
     await session.check_access(project_name)
 
     async with db.session() as data:
-        project = await data.project(name=project_name, _releases=True).demand(
+        project = await data.project(name=project_name, is_retired=False, _releases=True).demand(
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
         )
         releases = await project.releases_in_progress

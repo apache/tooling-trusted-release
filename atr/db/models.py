@@ -170,6 +170,7 @@ class Project(sqlmodel.SQLModel, table=True):
     # We always include "Apache" in the full_name
     full_name: str | None = sqlmodel.Field(default=None)
 
+    # The is_retired flag is not permanent, and is also used for dormant projects
     is_retired: bool = sqlmodel.Field(default=False)
     super_project_name: str | None = sqlmodel.Field(default=None, foreign_key="project.name")
     # NOTE: Neither "Project" | None nor "Project | None" works

@@ -32,7 +32,11 @@ async def directory() -> str:
     """Main committee directory page."""
     async with db.session() as data:
         committees = await data.committee(_projects=True).order_by(models.Committee.name).all()
-        return await template.render("committee-directory.html", committees=committees)
+        return await template.render(
+            "committee-directory.html",
+            committees=committees,
+            committee_without_releases=util.committee_without_releases,
+        )
 
 
 @routes.public("/committees/<name>")

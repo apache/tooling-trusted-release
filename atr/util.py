@@ -52,6 +52,12 @@ import atr.user as user
 F = TypeVar("F", bound="QuartFormTyped")
 T = TypeVar("T")
 
+_COMMITTEES_WITHOUT_RELEASES: Final[set[str]] = {
+    "attic",
+    "comdev",
+    "logodev",
+    "whimsy",
+}
 _LOGGER: Final = logging.getLogger(__name__)
 
 
@@ -152,6 +158,10 @@ def chmod_directories(path: pathlib.Path, permissions: int = 0o755) -> None:
     for dir_path in path.rglob("*"):
         if dir_path.is_dir():
             os.chmod(dir_path, permissions)
+
+
+def committee_without_releases(committee_name: str) -> bool:
+    return committee_name in _COMMITTEES_WITHOUT_RELEASES
 
 
 def compute_sha3_256(file_data: bytes) -> str:

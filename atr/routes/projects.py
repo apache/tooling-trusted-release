@@ -159,7 +159,9 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         return await session.redirect(projects, error="Missing project name for deletion.")
 
     async with db.session() as data:
-        project = await data.project(name=project_name, _releases=True, _distribution_channels=True).get()
+        project = await data.project(
+            name=project_name, is_retired=False, _releases=True, _distribution_channels=True
+        ).get()
 
         if not project:
             return await session.redirect(projects, error=f"Project '{project_name}' not found.")
@@ -205,7 +207,7 @@ async def select(session: routes.CommitterSession) -> str:
     if session.uid:
         async with db.session() as data:
             # TODO: Move this filtering logic somewhere else
-            all_projects = await data.project(_committee=True).all()
+            all_projects = await data.project(is_retired=False, _committee=True).all()
             user_projects = [
                 p
                 for p in all_projects
@@ -410,6 +412,8 @@ async def _project_add(form: AddFormProtocol, asf_id: str) -> response.Response:
     super_project = None
     async with db.session() as data:
         # Get the base project to derive from
+        # We're allowing derivation from a retired project here
+        # TODO: Should we disallow this instead?
         committee_projects = await data.project(committee_name=committee_name, _committee=True).all()
         for committee_project in committee_projects:
             if label.startswith(committee_project.name + "-"):

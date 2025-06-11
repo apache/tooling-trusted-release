@@ -50,7 +50,7 @@ async def create_release_draft(project_name: str, version: str, asf_uid: str) ->
     # Get the project from the project name
     async with db.session() as data:
         async with data.begin():
-            project = await data.project(name=project_name, _committee=True).get()
+            project = await data.project(name=project_name, is_retired=False, _committee=True).get()
             if not project:
                 raise routes.FlashError(f"Project {project_name} not found")
 
@@ -104,7 +104,7 @@ async def selected(session: routes.CommitterSession, project_name: str) -> respo
     await session.check_access(project_name)
 
     async with db.session() as data:
-        project = await data.project(name=project_name).demand(
+        project = await data.project(name=project_name, is_retired=False).demand(
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
         )
 
