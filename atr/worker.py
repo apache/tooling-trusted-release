@@ -199,8 +199,10 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
                 )
 
             # Validate required fields from the Task object itself
-            if task_obj.release_name is None:
-                raise ValueError(f"Task {task_id} is missing required release_name")
+            if task_obj.project_name is None:
+                raise ValueError(f"Task {task_id} is missing required project_name")
+            if task_obj.version_name is None:
+                raise ValueError(f"Task {task_id} is missing required version_name")
             if task_obj.revision_number is None:
                 raise ValueError(f"Task {task_id} is missing required revision_number")
 
@@ -213,14 +215,16 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
             async def recorder_factory() -> checks.Recorder:
                 return await checks.Recorder.create(
                     checker=handler,
-                    release_name=task_obj.release_name or "",
+                    project_name=task_obj.project_name or "",
+                    version_name=task_obj.version_name or "",
                     revision_number=task_obj.revision_number or "",
                     primary_rel_path=task_obj.primary_rel_path,
                 )
 
             function_arguments = checks.FunctionArguments(
                 recorder=recorder_factory,
-                release_name=task_obj.release_name,
+                project_name=task_obj.project_name or "",
+                version_name=task_obj.version_name or "",
                 revision_number=task_obj.revision_number,
                 primary_rel_path=task_obj.primary_rel_path,
                 extra_args=task_args,

@@ -19,6 +19,7 @@ import json
 import os
 
 import quart
+import sqlmodel
 import werkzeug.wrappers.response as response
 import wtforms
 
@@ -52,20 +53,22 @@ class ResolveForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Resolve vote")
 
 
-def release_latest_vote_task(release: models.Release) -> models.Task | None:
-    # Find the most recent VOTE_INITIATE task for this release
-    # TODO: Make this a proper query
-    for task in sorted(release.tasks, key=lambda t: t.added, reverse=True):
-        if task.task_type != models.TaskType.VOTE_INITIATE:
-            continue
-        # if task.status != models.TaskStatus.COMPLETED:
-        #     continue
-        if (task.status == models.TaskStatus.QUEUED) or (task.status == models.TaskStatus.ACTIVE):
-            continue
-        if task.result is None:
-            continue
+async def release_latest_vote_task(release: models.Release) -> models.Task | None:
+    """Find the most recent VOTE_INITIATE task for this release."""
+    via = models.validate_instrumented_attribute
+    async with db.session() as data:
+        query = (
+            sqlmodel.select(models.Task)
+            .where(models.Task.project_name == release.project_name)
+            .where(models.Task.version_name == release.version)
+            .where(models.Task.task_type == models.TaskType.VOTE_INITIATE)
+            .where(via(models.Task.status).notin_([models.TaskStatus.QUEUED, models.TaskStatus.ACTIVE]))
+            .where(via(models.Task.result).is_not(None))
+            .order_by(via(models.Task.added).desc())
+            .limit(1)
+        )
+        task = (await data.execute(query)).scalar_one_or_none()
         return task
-    return None
 
 
 @routes.committer("/resolve/<project_name>/<version_name>", methods=["POST"], measure_performance=False)
@@ -167,7 +170,7 @@ async def _send_resolution(
     body: str,
 ) -> str | None:
     # Get the email thread
-    latest_vote_task = release_latest_vote_task(release)
+    latest_vote_task = await release_latest_vote_task(release)
     if latest_vote_task is None:
         return "No vote task found, unable to send resolution message."
     vote_thread_mid = task_mid_get(latest_vote_task)
@@ -194,7 +197,8 @@ async def _send_resolution(
             body=body,
             in_reply_to=in_reply_to,
         ).model_dump(),
-        release_name=release.name,
+        project_name=release.project.name,
+        version_name=release.version,
     )
     async with db.session() as data:
         data.add(task)

@@ -124,7 +124,8 @@ def queued(
         status=models.TaskStatus.QUEUED,
         task_type=task_type,
         task_args=extra_args or {},
-        release_name=release.name,
+        project_name=release.project.name,
+        version_name=release.version,
         revision_number=revision_number,
         primary_rel_path=primary_rel_path,
     )

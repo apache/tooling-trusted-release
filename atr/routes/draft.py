@@ -310,8 +310,6 @@ async def sbomgen(
         # Create and queue the task, using paths within the new revision
         async with db.session() as data:
             # We still need release.name for the task metadata
-            release = await session.release(project_name, version_name, data=data)
-
             sbom_task = models.Task(
                 task_type=models.TaskType.SBOM_GENERATE_CYCLONEDX,
                 task_args=sbom.GenerateCycloneDX(
@@ -320,7 +318,8 @@ async def sbomgen(
                 ).model_dump(),
                 added=datetime.datetime.now(datetime.UTC),
                 status=models.TaskStatus.QUEUED,
-                release_name=release.name,
+                project_name=project_name,
+                version_name=version_name,
                 revision_number=creating.new.number,
             )
             data.add(sbom_task)
@@ -354,8 +353,6 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
     await session.check_access(project_name)
 
     form = await upload.SvnImportForm.create_form()
-    release = await session.release(project_name, version_name, with_project=False)
-
     if not await form.validate_on_submit():
         for _field, errors in form.errors.items():
             for error in errors:
@@ -381,7 +378,8 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
                 task_args=task_args,
                 added=datetime.datetime.now(datetime.UTC),
                 status=models.TaskStatus.QUEUED,
-                release_name=release.name,
+                project_name=project_name,
+                version_name=version_name,
             )
             data.add(svn_import_task)
             await data.commit()

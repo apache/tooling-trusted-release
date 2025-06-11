@@ -862,14 +862,16 @@ def test_projects_03_add_project(page: sync_api.Page, credentials: Credentials) 
     base_project_label = "tooling"
     project_name = "Apache Tooling Test Example"
     project_label = "tooling-test-example"
-    derived_project_input_value = "Test Example"
 
     logging.info("Navigating to the add derived project page")
     go_to_path(page, f"/project/add/{base_project_label}")
     logging.info("Add a new project page loaded")
 
-    logging.info(f"Filling derived project name '{derived_project_input_value}'")
-    page.locator('input[name="derived_project_name"]').fill(derived_project_input_value)
+    logging.info(f"Filling display name '{project_name}'")
+    page.locator('input[name="display_name"]').fill(project_name)
+
+    logging.info(f"Filling label '{project_label}'")
+    page.locator('input[name="label"]').fill(project_label)
 
     logging.info("Submitting the add derived project form")
     submit_button_locator = page.locator('input[type="submit"][value="Add project"]')

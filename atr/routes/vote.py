@@ -53,7 +53,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     release = await session.release(
         project_name, version_name, with_committee=True, with_tasks=True, phase=models.ReleasePhase.RELEASE_CANDIDATE
     )
-    latest_vote_task = resolve.release_latest_vote_task(release)
+    latest_vote_task = await resolve.release_latest_vote_task(release)
     archive_url = None
     task_mid = None
     if latest_vote_task is not None:
@@ -115,7 +115,7 @@ async def _send_vote(
     comment: str,
 ) -> tuple[str, str]:
     # Get the email thread
-    latest_vote_task = resolve.release_latest_vote_task(release)
+    latest_vote_task = await resolve.release_latest_vote_task(release)
     if latest_vote_task is None:
         return "", "No vote task found."
     vote_thread_mid = resolve.task_mid_get(latest_vote_task)
@@ -147,7 +147,8 @@ async def _send_vote(
             body=body_text,
             in_reply_to=in_reply_to,
         ).model_dump(),
-        release_name=release.name,
+        project_name=release.project.name,
+        version_name=release.version,
     )
     async with db.session() as data:
         data.add(task)

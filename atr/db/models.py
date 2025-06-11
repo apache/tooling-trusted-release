@@ -533,8 +533,8 @@ class Task(sqlmodel.SQLModel, table=True):
 
     # Used for check tasks
     # We don't put these in task_args because we want to query them efficiently
-    release_name: str | None = sqlmodel.Field(default=None, foreign_key="release.name")
-    release: Optional["Release"] = sqlmodel.Relationship(back_populates="tasks")
+    project_name: str | None = sqlmodel.Field(default=None, foreign_key="project.name")
+    version_name: str | None = sqlmodel.Field(default=None, index=True)
     revision_number: str | None = sqlmodel.Field(default=None, index=True)
     primary_rel_path: str | None = sqlmodel.Field(default=None, index=True)
 
@@ -610,11 +610,6 @@ class Release(sqlmodel.SQLModel, table=True):
             "foreign_keys": "[Revision.release_name]",
             "cascade": "all, delete-orphan",
         },
-    )
-
-    # One-to-many: A release can have multiple tasks
-    tasks: list["Task"] = sqlmodel.Relationship(
-        back_populates="release", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
 
     # One-to-many: A release can have multiple check results

@@ -266,13 +266,13 @@ async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathI
 
 
 async def tasks_ongoing(project_name: str, version_name: str, revision_number: str) -> int:
-    release_name = models.release_name(project_name, version_name)
     async with db.session() as data:
         query = (
             sqlmodel.select(sqlalchemy.func.count())
             .select_from(models.Task)
             .where(
-                models.Task.release_name == release_name,
+                models.Task.project_name == project_name,
+                models.Task.version_name == version_name,
                 models.Task.revision_number == revision_number,
                 models.validate_instrumented_attribute(models.Task.status).in_(
                     [models.TaskStatus.QUEUED, models.TaskStatus.ACTIVE]

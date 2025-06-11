@@ -40,7 +40,8 @@ import atr.util as util
 @dataclasses.dataclass
 class FunctionArguments:
     recorder: Callable[[], Awaitable[Recorder]]
-    release_name: str
+    project_name: str
+    version_name: str
     revision_number: str
     primary_rel_path: str | None
     extra_args: dict[str, Any]
@@ -59,35 +60,36 @@ class Recorder:
     def __init__(
         self,
         checker: str | Callable[..., Any],
-        release_name: str,
+        project_name: str,
+        version_name: str,
         revision_number: str,
         primary_rel_path: str | None = None,
         member_rel_path: str | None = None,
         afresh: bool = True,
     ) -> None:
         self.checker = function_key(checker) if callable(checker) else checker
-        self.release_name = release_name
+        self.release_name = models.release_name(project_name, version_name)
         self.revision_number = revision_number
         self.primary_rel_path = primary_rel_path
         self.member_rel_path = member_rel_path
         self.afresh = afresh
         self.constructed = False
 
-        # project_name, version_name = models.project_version(release_name)
-        # self.project_name = project_name
-        # self.version_name = version_name
+        self.project_name = project_name
+        self.version_name = version_name
 
     @classmethod
     async def create(
         cls,
         checker: str | Callable[..., Any],
-        release_name: str,
+        project_name: str,
+        version_name: str,
         revision_number: str,
         primary_rel_path: str | None = None,
         member_rel_path: str | None = None,
         afresh: bool = True,
     ) -> Recorder:
-        recorder = cls(checker, release_name, revision_number, primary_rel_path, member_rel_path, afresh)
+        recorder = cls(checker, project_name, version_name, revision_number, primary_rel_path, member_rel_path, afresh)
         if afresh is True:
             # Clear outer path whether it's specified or not
             await recorder.clear(primary_rel_path=primary_rel_path, member_rel_path=member_rel_path)

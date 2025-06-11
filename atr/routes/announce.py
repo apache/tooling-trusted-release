@@ -176,7 +176,8 @@ async def selected_post(
                     body=body,
                     in_reply_to=None,
                 ).model_dump(),
-                release_name=release.name,
+                project_name=project_name,
+                version_name=version_name,
             )
             data.add(task)
 

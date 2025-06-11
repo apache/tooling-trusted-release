@@ -558,7 +558,7 @@ async def _delete_release_data(release_name: str) -> None:
         # Delete from the database
         _LOGGER.info("Deleting database records for release: %s", release_name)
         # Cascade should handle this, but we delete manually anyway
-        tasks_to_delete = await data.task(release_name=release_name).all()
+        tasks_to_delete = await data.task(project_name=release.project.name, version_name=release.version).all()
         for task in tasks_to_delete:
             await data.delete(task)
         _LOGGER.debug("Deleted %d tasks for %s", len(tasks_to_delete), release_name)

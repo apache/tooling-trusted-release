@@ -394,8 +394,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.options(select_in_load(models.Release.release_policy))
         if _committee:
             query = query.options(select_in_load_nested(models.Release.project, models.Project.committee))
-        if _tasks:
-            query = query.options(select_in_load(models.Release.tasks))
         if _revisions:
             query = query.options(select_in_load(models.Release.revisions))
 
@@ -505,8 +503,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         completed: Opt[datetime.datetime | None] = NOT_SET,
         result: Opt[Any | None] = NOT_SET,
         error: Opt[str | None] = NOT_SET,
-        release_name: Opt[str | None] = NOT_SET,
-        _release: bool = False,
+        project_name: Opt[str | None] = NOT_SET,
+        version_name: Opt[str | None] = NOT_SET,
     ) -> Query[models.Task]:
         query = sqlmodel.select(models.Task)
 
@@ -530,11 +528,10 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Task.result == result)
         if is_defined(error):
             query = query.where(models.Task.error == error)
-        if is_defined(release_name):
-            query = query.where(models.Task.release_name == release_name)
-
-        if _release:
-            query = query.options(select_in_load(models.Task.release))
+        if is_defined(project_name):
+            query = query.where(models.Task.project_name == project_name)
+        if is_defined(version_name):
+            query = query.where(models.Task.version_name == version_name)
 
         return Query(self, query)
 

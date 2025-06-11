@@ -170,7 +170,8 @@ async def selected_revision(
                     subject=subject_data,
                     body=body_data,
                 ).model_dump(),
-                release_name=release.name,
+                project_name=project_name,
+                version_name=version,
             )
             data.add(task)
             await data.commit()
