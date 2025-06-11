@@ -191,17 +191,19 @@ async def content_list(
 
 
 async def create_hard_link_clone(
-    source_dir: pathlib.Path, dest_dir: pathlib.Path, do_not_create_dest_dir: bool = False
+    source_dir: pathlib.Path,
+    dest_dir: pathlib.Path,
+    do_not_create_dest_dir: bool = False,
+    exist_ok: bool = False,
 ) -> None:
     """Recursively create a clone of source_dir in dest_dir using hard links for files."""
-    # TODO: We're currently using cp -al instead
     # Ensure source exists and is a directory
     if not await aiofiles.os.path.isdir(source_dir):
         raise ValueError(f"Source path is not a directory or does not exist: {source_dir}")
 
     # Create destination directory
     if do_not_create_dest_dir is False:
-        await aiofiles.os.makedirs(dest_dir, exist_ok=False)
+        await aiofiles.os.makedirs(dest_dir, exist_ok=exist_ok)
 
     async def _clone_recursive(current_source: pathlib.Path, current_dest: pathlib.Path) -> None:
         for entry in await aiofiles.os.scandir(current_source):
@@ -319,6 +321,10 @@ async def get_asf_id_or_die() -> str:
     if web_session is None or web_session.uid is None:
         raise base.ASFQuartException("Not authenticated", errorcode=401)
     return web_session.uid
+
+
+def get_downloads_dir() -> pathlib.Path:
+    return pathlib.Path(config.get().DOWNLOADS_STORAGE_DIR)
 
 
 def get_finished_dir() -> pathlib.Path:
@@ -532,11 +538,11 @@ def release_directory_base(release: models.Release) -> pathlib.Path:
     return base_dir / project_name / version_name
 
 
-def release_directory_eventual(release: models.Release) -> pathlib.Path:
-    """Return the path to the eventual destination of the release files."""
-    path_project = release.project.name
-    path_version = release.version
-    return get_finished_dir() / path_project / path_version
+# def release_directory_eventual(release: models.Release) -> pathlib.Path:
+#     """Return the path to the eventual destination of the release files."""
+#     path_project = release.project.name
+#     path_version = release.version
+#     return get_finished_dir() / path_project / path_version
 
 
 def release_directory_revision(release: models.Release) -> pathlib.Path | None:

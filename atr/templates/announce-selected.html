@@ -144,12 +144,11 @@
       </div>
     </div>
     <div class="row mb-3 pb-3 border-bottom">
-      <label class="col-sm-3 col-form-label text-sm-end">Download path</label>
-      <div class="col-md-9 mb-3">
-        <pre class="p-2 px-3 bg-light border rounded font-monospace overflow-auto">{{ url_path }}</pre>
-      </div>
-      <div class="col-md-9 offset-md-3">
-        <p>This value is read-only.</p>
+      {{ forms.label(announce_form.download_path_suffix, col="sm3") }}
+      <div class="col-md-9">
+        {{ forms.widget(announce_form.download_path_suffix) }}
+        {{ forms.errors(announce_form.download_path_suffix) }}
+        {{ forms.description(announce_form.download_path_suffix) }}
       </div>
     </div>
     <div class="row mb-3">
@@ -229,6 +228,48 @@
           });
 
           fetchAndUpdateAnnouncePreview();
+
+          const pathInput = document.getElementById("download_path_suffix");
+          const pathHelpText = document.getElementById("download_path_suffix-help");
+
+          if (pathInput && pathHelpText) {
+              const initialText = pathHelpText.textContent;
+              if (initialText.includes(" plus this suffix")) {
+                  const baseText = initialText.substring(0, initialText.indexOf(" plus this suffix"));
+                  let pathDebounce;
+
+                  // This must match the validation code in announce.py
+                  function updatePathHelpText() {
+                      let suffix = pathInput.value;
+                      if (suffix.includes("..") || suffix.includes("//")) {
+                          pathHelpText.textContent = "Download path suffix must not contain .. or //";
+                          return;
+                      }
+                      if (suffix.startsWith("./")) {
+                          suffix = suffix.substring(1);
+                      } else if (suffix === ".") {
+                          suffix = "/";
+                      }
+                      if (!suffix.startsWith("/")) {
+                          suffix = "/" + suffix;
+                      }
+                      if (!suffix.endsWith("/")) {
+                          suffix = suffix + "/";
+                      }
+                      if (suffix.includes("/.")) {
+                          pathHelpText.textContent = "Download path suffix must not contain /.";
+                          return;
+                      }
+                      pathHelpText.textContent = baseText + suffix;
+                  }
+
+                  pathInput.addEventListener("input", () => {
+                      clearTimeout(pathDebounce);
+                      pathDebounce = setTimeout(updatePathHelpText, 10);
+                  });
+                  updatePathHelpText();
+              }
+          }
       });
   </script>
 {% endblock javascripts %}

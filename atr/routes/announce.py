@@ -18,7 +18,8 @@
 import asyncio
 import datetime
 import logging
-from typing import TYPE_CHECKING, Any, Protocol
+import pathlib
+from typing import Any, Protocol
 
 import aiofiles.os
 import aioshutil
@@ -27,6 +28,7 @@ import sqlmodel
 import werkzeug.wrappers.response as response
 import wtforms
 
+import atr.config as config
 import atr.construct as construct
 import atr.db as db
 import atr.db.models as models
@@ -38,9 +40,6 @@ import atr.tasks.message as message
 import atr.template as template
 import atr.util as util
 
-if TYPE_CHECKING:
-    import pathlib
-
 
 class AnnounceFormProtocol(Protocol):
     """Protocol for the dynamically generated AnnounceForm."""
@@ -49,6 +48,7 @@ class AnnounceFormProtocol(Protocol):
     preview_revision: wtforms.HiddenField
     mailing_list: wtforms.RadioField
     confirm_announce: wtforms.BooleanField
+    download_path_suffix: wtforms.StringField
     subject: wtforms.StringField
     body: wtforms.TextAreaField
     submit: wtforms.SubmitField
@@ -96,12 +96,22 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     announce_form.subject.data = f"[ANNOUNCE] {project_display_name} {version_name} released"
     # The body can be changed, either from VoteTemplate or from the form
     announce_form.body.data = await construct.announce_release_default(project_name)
+    # The download path suffix can be changed
+    # The defaults depend on whether the project is top level or not
+    if (committee := release.project.committee) is None:
+        raise ValueError("Release has no committee")
+    top_level_project = release.project.name == util.unwrap(committee.name)
+    # These defaults are as per #136, but we allow the user to change the result
+    announce_form.download_path_suffix.data = (
+        "/" if top_level_project else f"/{release.project.name}-{release.version}/"
+    )
+    description_download_prefix = f"https://{config.get().APP_HOST}/downloads/{committee.name}"
+    announce_form.download_path_suffix.description = f"The URL will be {description_download_prefix} plus this suffix"
 
-    eventual_path = util.release_directory_eventual(release)
-    finished_path = util.get_finished_dir()
-    url_path = f"/downloads/{eventual_path.relative_to(finished_path)}/"
     return await template.render(
-        "announce-selected.html", release=release, announce_form=announce_form, url_path=url_path
+        "announce-selected.html",
+        release=release,
+        announce_form=announce_form,
     )
 
 
@@ -131,10 +141,10 @@ async def selected_post(
     subject = str(announce_form.subject.data)
     body = str(announce_form.body.data)
     preview_revision_number = str(announce_form.preview_revision.data)
+    download_path_suffix = _download_path_suffix_validated(announce_form)
 
-    source: str = ""
-    target: str = ""
-    source_base: pathlib.Path | None = None
+    unfinished_dir: str = ""
+    finished_dir: str = ""
 
     async with db.session(log_queries=True) as data:
         try:
@@ -146,6 +156,8 @@ async def selected_post(
                 with_revisions=True,
                 data=data,
             )
+            if (committee := release.project.committee) is None:
+                raise ValueError("Release has no committee")
 
             test_list = "user-tests"
             recipient = f"{test_list}@tooling.apache.org"
@@ -182,11 +194,11 @@ async def selected_post(
             data.add(task)
 
             # Prepare paths for file operations
-            source_base = util.release_directory_base(release)
-            source_path = source_base / release.unwrap_revision_number
-            source = str(source_path)
+            unfinished_revisions_path = util.release_directory_base(release)
+            unfinished_path = unfinished_revisions_path / release.unwrap_revision_number
+            unfinished_dir = str(unfinished_path)
 
-            await _promote(release, data, preview_revision_number)
+            await _promote_in_database(release, data, preview_revision_number)
             await data.commit()
 
         except (routes.FlashError, Exception) as e:
@@ -203,18 +215,22 @@ async def selected_post(
         # Do not put it in the data block after data.commit()
         # Otherwise util.release_directory() will not work
         release = await data.release(name=release.name).demand(RuntimeError(f"Release {release.name} does not exist"))
-        target_path = util.release_directory(release)
-        target = str(target_path)
-        if await aiofiles.os.path.exists(target):
+        finished_path = util.release_directory(release)
+        finished_dir = str(finished_path)
+        if await aiofiles.os.path.exists(finished_dir):
             raise routes.FlashError("Release already exists")
 
     # Ensure that the permissions of every directory are 755
-    await asyncio.to_thread(util.chmod_directories, source_path)
+    await asyncio.to_thread(util.chmod_directories, unfinished_path)
 
     try:
-        await aioshutil.move(source, target)
-        if source_base:
-            await aioshutil.rmtree(str(source_base))  # type: ignore[call-arg]
+        # Move the release files from somewhere in unfinished to somewhere in finished
+        # The whole finished hierarchy is write once for each directory, and then read only
+        # TODO: Set permissions to help enforce this, or find alternative methods
+        await aioshutil.move(unfinished_dir, finished_dir)
+        if unfinished_revisions_path:
+            # This removes all of the prior revisions
+            await aioshutil.rmtree(str(unfinished_revisions_path))  # type: ignore[call-arg]
     except Exception as e:
         logging.exception("Error during release announcement, file system phase:")
         return await session.redirect(
@@ -223,6 +239,8 @@ async def selected_post(
             project_name=project_name,
             version_name=version_name,
         )
+
+    await _hard_link_downloads(committee, finished_path, download_path_suffix)
 
     routes_release_finished = routes_release.finished  # type: ignore[has-type]
     return await session.redirect(
@@ -248,6 +266,7 @@ async def _create_announce_form_instance(
             validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
             default="user-tests@tooling.apache.org",
         )
+        download_path_suffix = wtforms.StringField("Download path suffix", validators=[wtforms.validators.Optional()])
         confirm_announce = wtforms.BooleanField(
             "Confirm",
             validators=[wtforms.validators.DataRequired("You must confirm to proceed with announcement")],
@@ -260,7 +279,34 @@ async def _create_announce_form_instance(
     return form_instance
 
 
-async def _promote(release: models.Release, data: db.Session, preview_revision_number: str) -> None:
+def _download_path_suffix_validated(announce_form: AnnounceFormProtocol) -> str:
+    download_path_suffix = str(announce_form.download_path_suffix.data)
+    if (".." in download_path_suffix) or ("//" in download_path_suffix):
+        raise ValueError("Download path suffix must not contain .. or //")
+    if download_path_suffix.startswith("./"):
+        download_path_suffix = download_path_suffix[1:]
+    elif download_path_suffix == ".":
+        download_path_suffix = "/"
+    if not download_path_suffix.startswith("/"):
+        download_path_suffix = "/" + download_path_suffix
+    if not download_path_suffix.endswith("/"):
+        download_path_suffix = download_path_suffix + "/"
+    if "/." in download_path_suffix:
+        raise ValueError("Download path suffix must not contain /.")
+    return download_path_suffix
+
+
+async def _hard_link_downloads(
+    committee: models.Committee, unfinished_path: pathlib.Path, download_path_suffix: str
+) -> None:
+    """Hard link the release files to the downloads directory."""
+    # TODO: Rename *_dir functions to _path functions
+    downloads_base_path = util.get_downloads_dir()
+    downloads_path = downloads_base_path / committee.name / download_path_suffix.removeprefix("/")
+    await util.create_hard_link_clone(unfinished_path, downloads_path, exist_ok=True)
+
+
+async def _promote_in_database(release: models.Release, data: db.Session, preview_revision_number: str) -> None:
     """Promote a release preview to a release and delete its old revisions."""
     via = models.validate_instrumented_attribute
 

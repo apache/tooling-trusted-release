@@ -550,7 +550,7 @@ async def ongoing_tasks(project_name: str, version_name: str, revision: str) -> 
 async def _delete_release_data(release_name: str) -> None:
     """Handle the deletion of database records and filesystem data for a release."""
     async with db.session() as data:
-        release = await data.release(name=release_name).demand(
+        release = await data.release(name=release_name, _project=True).demand(
             base.ASFQuartException(f"Release '{release_name}' not found.", 404)
         )
         release_dir = util.release_directory_base(release)
@@ -572,6 +572,36 @@ async def _delete_release_data(release_name: str) -> None:
         _LOGGER.info("Deleted release record: %s", release_name)
         await data.commit()
 
+    await _delete_release_data_downloads(release)
+    await _delete_release_data_filesystem(release_dir, release_name)
+
+
+async def _delete_release_data_downloads(release: models.Release) -> None:
+    # Delete hard links from the downloads directory
+    finished_dir = util.release_directory(release)
+    if await aiofiles.os.path.isdir(finished_dir):
+        release_inodes = set()
+        async for file_path in util.paths_recursive(finished_dir):
+            try:
+                stat_result = await aiofiles.os.stat(finished_dir / file_path)
+                release_inodes.add(stat_result.st_ino)
+            except FileNotFoundError:
+                continue
+
+        if release_inodes:
+            downloads_dir = util.get_downloads_dir()
+            async for link_path in util.paths_recursive(downloads_dir):
+                full_link_path = downloads_dir / link_path
+                try:
+                    link_stat = await aiofiles.os.stat(full_link_path)
+                    if link_stat.st_ino in release_inodes:
+                        await aiofiles.os.remove(full_link_path)
+                        _LOGGER.info(f"Deleted hard link: {full_link_path}")
+                except FileNotFoundError:
+                    continue
+
+
+async def _delete_release_data_filesystem(release_dir: pathlib.Path, release_name: str) -> None:
     # Delete from the filesystem
     try:
         if await aiofiles.os.path.isdir(release_dir):

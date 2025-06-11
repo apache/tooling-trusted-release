@@ -50,6 +50,7 @@ class AppConfig:
     USE_BLOCKBUSTER = False
     SECRET_KEY = decouple.config("SECRET_KEY", default=secrets.token_hex(128 // 8))
     WTF_CSRF_ENABLED = decouple.config("WTF_CSRF_ENABLED", default=True, cast=bool)
+    DOWNLOADS_STORAGE_DIR = os.path.join(STATE_DIR, "downloads")
     FINISHED_STORAGE_DIR = os.path.join(STATE_DIR, "finished")
     UNFINISHED_STORAGE_DIR = os.path.join(STATE_DIR, "unfinished")
     SQLITE_DB_PATH = decouple.config("SQLITE_DB_PATH", default="atr.db")
@@ -117,6 +118,7 @@ def get() -> type[AppConfig]:
     absolute_paths = [
         (config.PROJECT_ROOT, "PROJECT_ROOT"),
         (config.STATE_DIR, "STATE_DIR"),
+        (config.DOWNLOADS_STORAGE_DIR, "DOWNLOADS_STORAGE_DIR"),
         (config.FINISHED_STORAGE_DIR, "FINISHED_STORAGE_DIR"),
         (config.UNFINISHED_STORAGE_DIR, "UNFINISHED_STORAGE_DIR"),
     ]

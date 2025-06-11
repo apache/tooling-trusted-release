@@ -1340,6 +1340,7 @@ def wait_for_path(page: sync_api.Page, path: str) -> None:
     parsed_url = urllib.parse.urlparse(page.url)
     if parsed_url.path != path:
         logging.error(f"Expected URL path '{path}', but got '{parsed_url.path}'")
+        logging.error(f"Page content:\\n{page.content()}")
         raise RuntimeError(f"Expected URL path '{path}', but got '{parsed_url.path}'")
     logging.info(f"Current URL: {page.url}")
 

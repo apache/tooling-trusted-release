@@ -67,6 +67,7 @@ async def announce_release_body(body: str, options: AnnounceReleaseOptions) -> s
     download_path = util.as_url(
         routes_release_view, project_name=options.project_name, version_name=options.version_name
     )
+    # TODO: This download_url should probably be for the proxy download directory, not the ATR view
     download_url = f"https://{host}{download_path}"
 
     # Perform substitutions in the body
