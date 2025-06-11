@@ -790,6 +790,14 @@ def test_lifecycle_07_release_exists(page: sync_api.Page, credentials: Credentia
 
 
 def test_login(page: sync_api.Page, credentials: Credentials) -> None:
+    debugging = False
+
+    def remove_debugging() -> None:
+        pass
+
+    if debugging:
+        remove_debugging = test_logging_debug(page, credentials)
+
     go_to_path(page, "/")
     logging.info(f"Initial page title: {page.title()}")
 
@@ -823,6 +831,35 @@ def test_login(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Redirected to /")
     logging.info(f"Page URL: {page.url}")
     logging.info("Login actions completed successfully")
+
+    if debugging:
+        remove_debugging()
+
+
+def test_logging_debug(page: sync_api.Page, credentials: Credentials) -> Callable[[], None]:
+    def log_request(request: sync_api.Request) -> None:
+        logging.info(f">> REQUEST: {request.method} {request.url}")
+        for key, value in request.headers.items():
+            logging.info(f"  REQ HEADER: {key}: {value}")
+
+    def log_response(response: sync_api.Response) -> None:
+        logging.info(f"<< RESPONSE: {response.status} {response.url}")
+        headers = response.headers
+        for key, value in headers.items():
+            logging.info(f"  RESP HEADER: {key}: {value}")
+        if "location" in headers:
+            logging.info(f"  >> REDIRECTING TO: {headers['location']}")
+        if response.status == 500:
+            logging.info(f"  BODY: {response.text()}")
+
+    page.on("request", log_request)
+    page.on("response", log_response)
+
+    def remove_debugging() -> None:
+        page.remove_listener("request", log_request)
+        page.remove_listener("response", log_response)
+
+    return remove_debugging
 
 
 @slow
