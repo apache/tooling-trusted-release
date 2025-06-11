@@ -27,6 +27,7 @@ import atr.routes.finish as finish
 import atr.routes.keys as keys
 import atr.routes.preview as preview
 import atr.routes.projects as projects
+import atr.routes.published as published
 import atr.routes.release as release
 import atr.routes.report as report
 import atr.routes.resolve as resolve
