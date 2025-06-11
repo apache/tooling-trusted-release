@@ -433,6 +433,7 @@ async def upload(session: routes.CommitterSession) -> str:
     class UploadKeyForm(util.QuartFormTyped):
         key = wtforms.FileField(
             "KEYS file",
+            validators=[wtforms.validators.InputRequired("A KEYS file is required")],
             description=(
                 "Upload a KEYS file containing multiple PGP public keys."
                 " The file should contain keys in ASCII-armored format, starting with"
