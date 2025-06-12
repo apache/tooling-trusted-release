@@ -212,56 +212,16 @@ async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathI
     latest_revision_number = release.latest_revision_number
     if latest_revision_number is None:
         return None
-    for path in paths:
-        # Get template and substitutions
-        # elements = {
-        #     "core": release.project.name,
-        #     "version": release.version,
-        #     "sub": None,
-        #     "template": None,
-        #     "substitutions": None,
-        # }
-        # template, substitutions = analysis.filename_parse(str(path), elements)
-        # info.templates[path] = template
-        # info.substitutions[path] = analysis.substitutions_format(substitutions) or "none"
-
-        # Get artifacts and metadata
-        search = re.search(analysis.extension_pattern(), str(path))
-        if search:
-            if search.group("artifact"):
-                info.artifacts.add(path)
-            elif search.group("metadata"):
-                info.metadata.add(path)
-
-        # Get successes, warnings, and errors
-        async with db.session() as data:
-            info.successes[path] = list(
-                await data.check_result(
-                    release_name=release.name,
-                    revision_number=latest_revision_number,
-                    primary_rel_path=str(path),
-                    member_rel_path=None,
-                    status=models.CheckResultStatus.SUCCESS,
-                ).all()
-            )
-            info.warnings[path] = list(
-                await data.check_result(
-                    release_name=release.name,
-                    revision_number=latest_revision_number,
-                    primary_rel_path=str(path),
-                    member_rel_path=None,
-                    status=models.CheckResultStatus.WARNING,
-                ).all()
-            )
-            info.errors[path] = list(
-                await data.check_result(
-                    release_name=release.name,
-                    revision_number=latest_revision_number,
-                    primary_rel_path=str(path),
-                    member_rel_path=None,
-                    status=models.CheckResultStatus.FAILURE,
-                ).all()
-            )
+    async with db.session() as data:
+        await _successes_errors_warnings(data, release, latest_revision_number, info)
+        for path in paths:
+            # Get artifacts and metadata
+            search = re.search(analysis.extension_pattern(), str(path))
+            if search:
+                if search.group("artifact"):
+                    info.artifacts.add(path)
+                elif search.group("metadata"):
+                    info.metadata.add(path)
     return info
 
 
@@ -369,3 +329,38 @@ async def _key_user_add_validate_key_properties(public_key: str) -> tuple[dict, 
         raise RuntimeError("RSA Key is not long enough; must be at least 2048 bits")
 
     return key_details, fingerprint_lower
+
+
+async def _successes_errors_warnings(
+    data: db.Session, release: models.Release, latest_revision_number: str, info: PathInfo
+) -> None:
+    # Get successes, warnings, and errors
+    successes = await data.check_result(
+        release_name=release.name,
+        revision_number=latest_revision_number,
+        member_rel_path=None,
+        status=models.CheckResultStatus.SUCCESS,
+    ).all()
+    for success in successes:
+        if primary_rel_path := success.primary_rel_path:
+            info.successes.setdefault(pathlib.Path(primary_rel_path), []).append(success)
+
+    warnings = await data.check_result(
+        release_name=release.name,
+        revision_number=latest_revision_number,
+        member_rel_path=None,
+        status=models.CheckResultStatus.WARNING,
+    ).all()
+    for warning in warnings:
+        if primary_rel_path := warning.primary_rel_path:
+            info.warnings.setdefault(pathlib.Path(primary_rel_path), []).append(warning)
+
+    errors = await data.check_result(
+        release_name=release.name,
+        revision_number=latest_revision_number,
+        member_rel_path=None,
+        status=models.CheckResultStatus.FAILURE,
+    ).all()
+    for error in errors:
+        if primary_rel_path := error.primary_rel_path:
+            info.errors.setdefault(pathlib.Path(primary_rel_path), []).append(error)

@@ -45,8 +45,11 @@ async def check(
 ) -> response.Response | str:
     base_path = util.release_directory(release)
 
+    # TODO: This takes 180ms for providers
+    # We could cache it
     paths = [path async for path in util.paths_recursive(base_path)]
     paths.sort()
+
     info = await interaction.path_info(release, paths)
 
     user_ssh_keys: Sequence[models.SSHKey] = []
