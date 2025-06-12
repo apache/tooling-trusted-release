@@ -452,8 +452,8 @@ async def _project_add_validate(form: AddFormProtocol) -> tuple[str, str, str] |
     if not display_name.startswith("Apache "):
         await quart.flash("Display name must start with 'Apache '", "error")
         return None
-    if not display_name.istitle():
-        await quart.flash("Display name must start with a capital letter", "error")
+    if not all(word[:1].isupper() for word in display_name.split(" ")):
+        await quart.flash("Display name must be in title case", "error")
         return None
     # Hidden criterion!
     # $ sqlite3 state/atr.db 'select full_name from project;' | grep -- '[^A-Za-z0-9 ]'
