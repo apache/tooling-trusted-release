@@ -61,38 +61,35 @@ async def ephemeral_gpg_home() -> AsyncGenerator[str]:
         yield str(temp_dir)
 
 
-async def key_user_add(asf_uid: str | None, public_key: str, selected_committees: list[str]) -> dict | None:
+async def key_user_add(asf_uid: str | None, public_key: str, selected_committees: list[str]) -> list[dict]:
     if not public_key:
         raise RuntimeError("Public key is required")
 
     # Validate the key using GPG and get its properties
-    key, _fingerprint = await _key_user_add_validate_key_properties(public_key)
+    keys = await _key_user_add_validate_key_properties(public_key)
 
-    # Determine ASF UID if not provided
-    if asf_uid is None:
-        for uid_str in key["uids"]:
-            if match := re.search(r"([A-Za-z0-9]+)@apache.org", uid_str):
-                asf_uid = match.group(1).lower()
-                break
-        else:
-            _LOGGER.warning(f"key_user_add called with no ASF UID found in key UIDs: {key.get('uids')}")
-            for uid_str in key.get("uids", []):
-                if asf_uid := await asyncio.to_thread(_asf_uid_from_uid_str, uid_str):
+    added_keys = []
+    for key in keys:
+        # Determine ASF UID if not provided
+        if asf_uid is None:
+            for uid_str in key["uids"]:
+                if match := re.search(r"([A-Za-z0-9]+)@apache.org", uid_str):
+                    asf_uid = match.group(1).lower()
                     break
-    # if asf_uid is None:
-    #     # We place this here to make it easier on the type checkers
-    #     non_asf_uids = key.get("uids", [])
-    #     first_non_asf_uid = non_asf_uids[0] if non_asf_uids else "None"
-    #     raise ApacheUserMissingError(
-    #         f"No Apache UID found. Fingerprint: {key.get('fingerprint', 'Unknown')}.
-    #         f" Primary UID: {first_non_asf_uid}",
-    #         fingerprint=key.get("fingerprint"),
-    #         primary_uid=first_non_asf_uid,
-    #     )
+            else:
+                _LOGGER.warning(f"key_user_add called with no ASF UID found in key UIDs: {key.get('uids')}")
+                for uid_str in key.get("uids", []):
+                    if asf_uid := await asyncio.to_thread(_asf_uid_from_uid_str, uid_str):
+                        break
 
-    # Store key in database
-    async with db.session() as data:
-        return await key_user_session_add(asf_uid, public_key, key, selected_committees, data)
+        # Store key in database
+        async with db.session() as data:
+            added = await key_user_session_add(asf_uid, public_key, key, selected_committees, data)
+            if added:
+                added_keys.append(added)
+            else:
+                _LOGGER.warning(f"Failed to add key {key} to user {asf_uid}")
+    return added_keys
 
 
 async def key_user_session_add(
@@ -124,26 +121,42 @@ async def key_user_session_add(
     uids = key.get("uids", [])
     key_record: models.PublicSigningKey | None = None
 
-    async with data.begin():
-        existing = await data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid).get()
+    latest_self_signature = _key_latest_self_signature(key)
+    created = datetime.datetime.fromtimestamp(int(key["date"]), tz=datetime.UTC)
+    expires = datetime.datetime.fromtimestamp(int(key["expires"]), tz=datetime.UTC) if key.get("expires") else None
 
+    async with data.begin():
+        existing = await data.public_signing_key(fingerprint=fingerprint).get()
         # TODO: This can race
         if existing:
-            logging.info(f"Found existing key {fingerprint}, updating associations")
+            # If the new key has a latest self signature
+            if latest_self_signature is not None:
+                # And the self signature is newer, update it
+                if (existing.latest_self_signature is None) or (existing.latest_self_signature < latest_self_signature):
+                    existing.fingerprint = fingerprint
+                    existing.algorithm = int(key["algo"])
+                    existing.length = int(key.get("length", "0"))
+                    existing.created = created
+                    existing.latest_self_signature = latest_self_signature
+                    existing.expires = expires
+                    existing.primary_declared_uid = uids[0] if uids else None
+                    existing.secondary_declared_uids = uids[1:]
+                    existing.apache_uid = asf_uid
+                    existing.ascii_armored_key = public_key
+                    logging.info(f"Found existing key {fingerprint}, updating associations")
+                else:
+                    logging.info(f"Found existing key {fingerprint}, no update needed")
             key_record = existing
         else:
             # Key doesn't exist, create it
             logging.info(f"Adding new key {fingerprint}")
-            created = datetime.datetime.fromtimestamp(int(key["date"]), tz=datetime.UTC)
-            expires = (
-                datetime.datetime.fromtimestamp(int(key["expires"]), tz=datetime.UTC) if key.get("expires") else None
-            )
 
             key_record = models.PublicSigningKey(
                 fingerprint=fingerprint,
                 algorithm=int(key["algo"]),
                 length=int(key.get("length", "0")),
                 created=created,
+                latest_self_signature=latest_self_signature,
                 expires=expires,
                 primary_declared_uid=uids[0] if uids else None,
                 secondary_declared_uids=uids[1:],
@@ -153,10 +166,6 @@ async def key_user_session_add(
             data.add(key_record)
             await data.flush()
             await data.refresh(key_record)
-
-        # Safety check, in case of strange flushes
-        if not key_record:
-            raise RuntimeError(f"Failed to obtain valid key record for fingerprint {fingerprint}")
 
         # Link key to selected PMCs and track status for each
         committee_statuses: dict[str, str] = {}
@@ -287,9 +296,31 @@ def _asf_uid_from_uid_str(uid_str: str) -> str | None:
     return ldap_uid_val[0] if isinstance(ldap_uid_val, list) else ldap_uid_val
 
 
-async def _key_user_add_validate_key_properties(public_key: str) -> tuple[dict, str]:
+def _key_latest_self_signature(key: dict) -> datetime.datetime | None:
+    print(key)
+    fingerprint = key["fingerprint"]
+    # TODO: Only 64 bits, which is not at all secure
+    fingerprint_suffix = fingerprint[-16:]
+    sig_lists = [key.get("sigs", [])] + [sub.get("sigs", []) for sub in key.get("subkey_info", {}).values()]
+    latest_sig_date = None
+    for sig_list in sig_lists:
+        for sig in sig_list:
+            if sig[0] in {fingerprint_suffix, fingerprint}:
+                if latest_sig_date is None:
+                    latest_sig_date = sig[3]
+                else:
+                    latest_sig_date = max(latest_sig_date, sig[3])
+    return datetime.datetime.fromtimestamp(latest_sig_date, tz=datetime.UTC) if latest_sig_date else None
+
+
+async def _key_user_add_validate_key_properties(public_key: str) -> list[dict]:
     """Validate GPG key string, import it, and return its properties and fingerprint."""
     import gnupg
+
+    def _sig_with_timestamp(self, args):
+        self.curkey["sigs"].append((args[4], args[9], args[10], int(args[5])))
+
+    gnupg.ListKeys.sig = _sig_with_timestamp
 
     async with ephemeral_gpg_home() as gpg_home:
         gpg = gnupg.GPG(gnupghome=gpg_home)
@@ -298,37 +329,30 @@ async def _key_user_add_validate_key_properties(public_key: str) -> tuple[dict, 
         if not import_result.fingerprints:
             raise RuntimeError("Invalid public key format or failed import")
 
-        fingerprint = import_result.fingerprints[0]
-        if fingerprint is None:
-            # Should be unreachable given the previous check, but satisfy type checker
-            raise RuntimeError("Failed to get fingerprint after import")
-        fingerprint_lower = fingerprint.lower()
-
         # List keys to get details
-        keys = await asyncio.to_thread(gpg.list_keys)
+        keys = await asyncio.to_thread(gpg.list_keys, keys=import_result.fingerprints, sigs=True)
+        for key in keys:
+            if key.get("fingerprint") is None:
+                continue
+    if not keys:
+        _LOGGER.warning(f"No keys found in {public_key}")
+        return []
 
     # Find the specific key details from the list using the fingerprint
-    key_details = None
-    for k in keys:
-        if k.get("fingerprint") is not None and k["fingerprint"].lower() == fingerprint_lower:
-            key_details = k
-            break
+    results = []
+    for key in keys:
+        if key.get("fingerprint") is None:
+            _LOGGER.warning(f"Key {key} has no fingerprint")
+            continue
 
-    if not key_details:
-        # This might indicate an issue with gpg.list_keys or the environment
-        logging.error(
-            f"Could not find key details for fingerprint {fingerprint_lower}"
-            f" after successful import. Keys listed: {keys}"
-        )
-        raise RuntimeError("Failed to retrieve key details after import")
+        # Validate key algorithm and length
+        # https://infra.apache.org/release-signing.html#note
+        # Says that keys must be at least 2048 bits
+        if (key.get("algo") == "1") and (int(key.get("length", "0")) < 2048):
+            raise RuntimeError("RSA Key is not long enough; must be at least 2048 bits")
+        results.append(key)
 
-    # Validate key algorithm and length
-    # https://infra.apache.org/release-signing.html#note
-    # Says that keys must be at least 2048 bits
-    if (key_details.get("algo") == "1") and (int(key_details.get("length", "0")) < 2048):
-        raise RuntimeError("RSA Key is not long enough; must be at least 2048 bits")
-
-    return key_details, fingerprint_lower
+    return results
 
 
 async def _successes_errors_warnings(

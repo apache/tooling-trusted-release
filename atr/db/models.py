@@ -100,6 +100,10 @@ class PublicSigningKey(sqlmodel.SQLModel, table=True):
     length: int
     # Creation date
     created: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
+    # Latest self signature
+    latest_self_signature: datetime.datetime | None = sqlmodel.Field(
+        default=None, sa_column=sqlalchemy.Column(UTCDateTime)
+    )
     # Expiration date
     expires: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
     # The primary UID declared in the key

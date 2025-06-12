@@ -114,9 +114,12 @@ async def add(session: routes.CommitterSession) -> str:
             if invalid_committees:
                 raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
 
-            key_info = await interaction.key_user_add(session.uid, public_key_data, selected_committees_data)
-            if key_info:
-                await quart.flash(f"GPG key {key_info.get('fingerprint', '')} added successfully.", "success")
+            added_keys = await interaction.key_user_add(session.uid, public_key_data, selected_committees_data)
+            for key_info in added_keys:
+                if key_info:
+                    await quart.flash(f"GPG key {key_info.get('fingerprint', '')} added successfully.", "success")
+            if not added_keys:
+                await quart.flash("No keys were added.", "error")
             # Clear form data on success by creating a new empty form instance
             form = await AddGpgKeyForm.create_form()
 
@@ -205,29 +208,26 @@ async def import_selected_revision(
     )
 
 
-async def key_add_post(
-    session: routes.CommitterSession, request: quart.Request, user_committees: Sequence[models.Committee]
-) -> dict | None:
-    form = await routes.get_form(request)
-    public_key = form.get("public_key")
-    if not public_key:
-        raise routes.FlashError("Public key is required")
-
-    # Get selected PMCs from form
-    selected_committees = form.getlist("selected_committees")
-    if not selected_committees:
-        raise routes.FlashError("You must select at least one PMC")
-
-    # Ensure that the selected PMCs are ones of which the user is actually a member
-    invalid_committees = [
-        committee
-        for committee in selected_committees
-        if (committee not in session.committees) and (committee not in session.projects)
-    ]
-    if invalid_committees:
-        raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
-
-    return await interaction.key_user_add(session.uid, public_key, selected_committees)
+# async def key_add_post(
+#     session: routes.CommitterSession, request: quart.Request, user_committees: Sequence[models.Committee]
+# ) -> list[dict]:
+#     form = await routes.get_form(request)
+#     public_key = form.get("public_key")
+#     if not public_key:
+#         raise routes.FlashError("Public key is required")
+#     # Get selected PMCs from form
+#     selected_committees = form.getlist("selected_committees")
+#     if not selected_committees:
+#         raise routes.FlashError("You must select at least one PMC")
+#     # Ensure that the selected PMCs are ones of which the user is actually a member
+#     invalid_committees = [
+#         committee
+#         for committee in selected_committees
+#         if (committee not in session.committees) and (committee not in session.projects)
+#     ]
+#     if invalid_committees:
+#         raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
+#     return await interaction.key_user_add(session.uid, public_key, selected_committees)
 
 
 def key_ssh_fingerprint(ssh_key_string: str) -> str:
@@ -552,14 +552,13 @@ async def _upload_process_key_blocks(key_blocks: list[str], selected_committees:
     # Process each key block
     for i, key_block in enumerate(key_blocks):
         try:
-            key_info = await interaction.key_user_add(None, key_block, selected_committees)
-            if key_info:
+            added_keys = await interaction.key_user_add(None, key_block, selected_committees)
+            for key_info in added_keys:
                 key_info["status"] = key_info.get("status", "success")
                 key_info["email"] = key_info.get("email", "Unknown")
                 key_info["committee_statuses"] = key_info.get("committee_statuses", {})
                 results.append(key_info)
-            else:
-                # Handle case where key_user_add might return None
+            if not added_keys:
                 results.append(
                     {
                         "status": "error",

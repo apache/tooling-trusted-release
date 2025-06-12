@@ -53,6 +53,6 @@ async def import_file(args: ImportFile) -> str | None:
     if release.committee is None:
         raise RuntimeError(f"Release {args.release_name} has no committee")
     for key_block in key_blocks:
-        add_result = await interaction.key_user_add(None, key_block, [release.committee.name])
-        _LOGGER.info(f"Added key block to user: {add_result}")
+        added_keys = await interaction.key_user_add(None, key_block, [release.committee.name])
+        _LOGGER.info(f"Added key block to user: {added_keys}")
     return None
