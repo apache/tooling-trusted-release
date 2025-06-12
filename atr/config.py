@@ -57,6 +57,8 @@ class AppConfig:
 
     # Apache RAT configuration
     APACHE_RAT_JAR_PATH = decouple.config("APACHE_RAT_JAR_PATH", default="/opt/tools/apache-rat-0.16.1.jar")
+    # Maximum content length for requests
+    MAX_CONTENT_LENGTH: int = decouple.config("MAX_CONTENT_LENGTH", default=512 * _MB, cast=int)
     # Maximum size limit for archive extraction
     MAX_EXTRACT_SIZE: int = decouple.config("MAX_EXTRACT_SIZE", default=2 * _GB, cast=int)
     # Chunk size for reading files during extraction
