@@ -94,7 +94,22 @@
       {% endif %}
     </div>
   </div>
+  {% if phase == "release_candidate_draft" %}
+    <h2>Debugging</h2>
+    <div class="mb-2">
+      <p class="text-muted">The following form is for debugging purposes only. It will create a new revision.</p>
+    </div>
+    <div>
+      <form method="post"
+            action="{{ as_url(routes.draft.fresh, project_name=release.project.name, version_name=release.version) }}"
+            class="mb-0">
+        {{ empty_form.hidden_tag() }}
 
+        <button type="submit" class="btn btn-primary">Restart all checks</button>
+      </form>
+    </div>
+
+  {% endif %}
   {% if phase == "release_candidate" %}
     {% include "check-selected-candidate-forms.html" %}
 

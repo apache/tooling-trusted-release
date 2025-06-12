@@ -96,15 +96,6 @@
       {% endfor %}
     {% endif %}
     <button type="button" onclick="toggleAllDetails()" class="btn btn-secondary">Toggle all details</button>
-    {% if is_viewing_as_admin_fn(current_user.uid) and (release.phase.value == "release_candidate_draft") %}
-      <form method="post"
-            action="{{ as_url(routes.draft.fresh, project_name=release.project.name, version_name=release.version) }}"
-            class="mb-0">
-        {{ empty_form.hidden_tag() }}
-
-        <button type="submit" class="btn btn-primary">Restart all checks</button>
-      </form>
-    {% endif %}
   </div>
 
   <div class="mb-3">
