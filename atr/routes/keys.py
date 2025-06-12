@@ -443,9 +443,7 @@ async def upload(session: routes.CommitterSession) -> str:
         submit = wtforms.SubmitField("Upload KEYS file")
         selected_committees = wtforms.SelectMultipleField(
             "Associate keys with committees",
-            choices=[
-                (c.name, c.display_name) for c in user_committees if (not util.committee_without_releases(c.name))
-            ],
+            choices=[(c.name, c.display_name) for c in user_committees if (not util.committee_is_standing(c.name))],
             coerce=str,
             option_widget=wtforms.widgets.CheckboxInput(),
             widget=wtforms.widgets.ListWidget(prefix_label=False),

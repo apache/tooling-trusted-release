@@ -164,7 +164,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
     async with db.session() as data:
         project = await data.project(
-            name=project_name, is_retired=False, _releases=True, _distribution_channels=True
+            name=project_name, status=models.ProjectStatus.ACTIVE, _releases=True, _distribution_channels=True
         ).get()
 
         if not project:
@@ -211,7 +211,7 @@ async def select(session: routes.CommitterSession) -> str:
     if session.uid:
         async with db.session() as data:
             # TODO: Move this filtering logic somewhere else
-            all_projects = await data.project(is_retired=False, _committee=True).all()
+            all_projects = await data.project(status=models.ProjectStatus.ACTIVE, _committee=True).all()
             user_projects = [
                 p
                 for p in all_projects
@@ -450,7 +450,7 @@ async def _project_add(form: AddFormProtocol, asf_id: str) -> response.Response:
         project = models.Project(
             name=label,
             full_name=display_name,
-            is_retired=False,
+            status=models.ProjectStatus.ACTIVE,
             super_project_name=super_project.name if super_project else None,
             description=super_project.description if super_project else None,
             category=super_project.category if super_project else None,

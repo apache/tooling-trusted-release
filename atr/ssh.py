@@ -284,7 +284,7 @@ async def _step_04_command_validate(
     ssh_uid = process.get_extra_info("username")
 
     async with db.session() as data:
-        project = await data.project(name=path_project, is_retired=False, _committee=True).get()
+        project = await data.project(name=path_project, status=models.ProjectStatus.ACTIVE, _committee=True).get()
         if project is None:
             # Projects are public, so existence information is public
             return _fail(process, f"Project '{path_project}' does not exist", None)
@@ -540,9 +540,9 @@ async def _step_07c_ensure_release_object_for_write(
                     name=models.release_name(project_name, version_name), _committee=True
                 ).get()
                 if release is None:
-                    project = await data.project(name=project_name, is_retired=False, _committee=True).demand(
-                        RuntimeError("Project not found after validation")
-                    )
+                    project = await data.project(
+                        name=project_name, status=models.ProjectStatus.ACTIVE, _committee=True
+                    ).demand(RuntimeError("Project not found after validation"))
                     if version_name_error := util.version_name_error(version_name):
                         # This should ideally be caught by path validation, but double check
                         raise RuntimeError(f'Invalid version name "{version_name}": {version_name_error}')

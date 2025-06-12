@@ -40,7 +40,7 @@
         {% endif %}
       {% endif %}
       <div class="col">
-        <div class="card h-100 shadow-sm atr-cursor-pointer page-project-card {{ 'bg-body-secondary' if project.is_retired else '' }}"
+        <div class="card h-100 shadow-sm atr-cursor-pointer page-project-card {{ '' if project.status.value.lower() == 'active' else 'bg-body-secondary' }}"
              data-project-url="{{ as_url(routes.projects.view, name=project.name) }}"
              data-is-participant="{{ 'true' if is_part else 'false' }}">
           <div class="card-body">
@@ -48,9 +48,9 @@
               <div class="col-sm">
                 <h3 class="card-title fs-4 mb-3">{{ project.display_name }}</h3>
               </div>
-              {% if project.is_retired %}
+              {% if project.status.value.lower() != 'active' %}
                 <div class="col-sm-2">
-                  <span class="badge text-bg-secondary">retired</span>
+                  <span class="badge text-bg-secondary">{{ project.status.value.lower() }}</span>
                 </div>
               {% endif %}
             </div>

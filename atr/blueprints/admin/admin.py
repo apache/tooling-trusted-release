@@ -677,16 +677,17 @@ async def _process_undiscovered(data: db.Session) -> tuple[int, int]:
     return added_count, updated_count
 
 
-def _project_is_retired(pmc: models.Committee, project_name: str, project_status: apache.ProjectStatus) -> bool:
-    if util.committee_without_releases(pmc.name):
-        return True
+def _project_status(
+    pmc: models.Committee, project_name: str, project_status: apache.ProjectStatus
+) -> models.ProjectStatus:
+    if pmc.name == "attic":
+        # This must come first, because attic is also a standing committee
+        return models.ProjectStatus.RETIRED
     elif ("_dormant_" in project_name) or project_status.name.endswith("(Dormant)"):
-        # TODO: Dormant is not quite the same thing as retired
-        # But we can act on the assumption that projects can be unretired
-        # The Project.is_retired setting is not permanent
-        # We have to check the names because projects.json does not have a dormant property
-        return True
-    return False
+        return models.ProjectStatus.DORMANT
+    elif util.committee_is_standing(pmc.name):
+        return models.ProjectStatus.STANDING
+    return models.ProjectStatus.ACTIVE
 
 
 def _session_data(
@@ -875,13 +876,13 @@ async def _update_projects(data: db.Session, projects: apache.ProjectsData) -> t
 
         project_model = await data.project(name=project_name).get()
         # Check whether the project is retired, whether temporarily or otherwise
-        is_retired = _project_is_retired(pmc, project_name, project_status)
+        status = _project_status(pmc, project_name, project_status)
         if not project_model:
-            project_model = models.Project(name=project_name, committee=pmc, is_retired=is_retired)
+            project_model = models.Project(name=project_name, committee=pmc, status=status)
             data.add(project_model)
             added_count += 1
         else:
-            project_model.is_retired = is_retired
+            project_model.status = status
             updated_count += 1
 
         project_model.full_name = project_status.name

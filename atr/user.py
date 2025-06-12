@@ -63,7 +63,7 @@ async def projects(uid: str, committee_only: bool = False, super_project: bool =
     async with db.session() as data:
         # Must have releases, because this is used in candidate_drafts
         projects = await data.project(
-            is_retired=False, _committee=True, _releases=True, _super_project=super_project
+            status=models.ProjectStatus.ACTIVE, _committee=True, _releases=True, _super_project=super_project
         ).all()
         for p in projects:
             if p.committee is None:

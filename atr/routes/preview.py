@@ -111,7 +111,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
     # Check that the user has access to the project
     async with db.session() as data:
-        project = await data.project(name=project_name, is_retired=False).get()
+        project = await data.project(name=project_name, status=models.ProjectStatus.ACTIVE).get()
         if not project or not any(
             (
                 (c.name == project.committee_name)

@@ -83,9 +83,9 @@ async def announce_release_body(body: str, options: AnnounceReleaseOptions) -> s
 
 async def announce_release_default(project_name: str) -> str:
     async with db.session() as data:
-        project = await data.project(name=project_name, is_retired=False, _release_policy=True).demand(
-            RuntimeError(f"Project {project_name} not found")
-        )
+        project = await data.project(
+            name=project_name, status=models.ProjectStatus.ACTIVE, _release_policy=True
+        ).demand(RuntimeError(f"Project {project_name} not found"))
 
     return project.policy_announce_release_template
 
@@ -137,8 +137,8 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
 
 async def start_vote_default(project_name: str) -> str:
     async with db.session() as data:
-        project = await data.project(name=project_name, is_retired=False, _release_policy=True).demand(
-            RuntimeError(f"Project {project_name} not found")
-        )
+        project = await data.project(
+            name=project_name, status=models.ProjectStatus.ACTIVE, _release_policy=True
+        ).demand(RuntimeError(f"Project {project_name} not found"))
 
     return project.policy_start_vote_template

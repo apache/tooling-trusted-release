@@ -52,13 +52,14 @@ import atr.user as user
 F = TypeVar("F", bound="QuartFormTyped")
 T = TypeVar("T")
 
-_COMMITTEES_WITHOUT_RELEASES: Final[set[str]] = {
+_LOGGER: Final = logging.getLogger(__name__)
+# TODO: Move to committee data
+_STANDING_COMMITTEES: Final[set[str]] = {
     "attic",
     "comdev",
     "logodev",
     "whimsy",
 }
-_LOGGER: Final = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -160,8 +161,8 @@ def chmod_directories(path: pathlib.Path, permissions: int = 0o755) -> None:
             os.chmod(dir_path, permissions)
 
 
-def committee_without_releases(committee_name: str) -> bool:
-    return committee_name in _COMMITTEES_WITHOUT_RELEASES
+def committee_is_standing(committee_name: str) -> bool:
+    return committee_name in _STANDING_COMMITTEES
 
 
 def compute_sha3_256(file_data: bytes) -> str:

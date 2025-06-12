@@ -272,7 +272,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         full_name: Opt[str] = NOT_SET,
         committee_name: Opt[str] = NOT_SET,
         release_policy_id: Opt[int] = NOT_SET,
-        is_retired: Opt[bool] = NOT_SET,
+        status: Opt[models.ProjectStatus] = NOT_SET,
         _committee: bool = True,
         _releases: bool = False,
         _distribution_channels: bool = False,
@@ -290,8 +290,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Project.committee_name == committee_name)
         if is_defined(release_policy_id):
             query = query.where(models.Project.release_policy_id == release_policy_id)
-        if is_defined(is_retired):
-            query = query.where(models.Project.is_retired == is_retired)
+        if is_defined(status):
+            query = query.where(models.Project.status == status)
 
         if _committee:
             query = query.options(select_in_load(models.Project.committee))
@@ -584,7 +584,7 @@ async def create_async_engine(app_config: type[config.AppConfig]) -> sqlalchemy.
 
 async def get_project_release_policy(data: Session, project_name: str) -> models.ReleasePolicy | None:
     """Fetch the ReleasePolicy for a project."""
-    project = await data.project(name=project_name, is_retired=False, _release_policy=True).demand(
+    project = await data.project(name=project_name, status=models.ProjectStatus.ACTIVE, _release_policy=True).demand(
         RuntimeError(f"Project {project_name} not found")
     )
     return project.release_policy

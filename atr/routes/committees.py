@@ -35,7 +35,7 @@ async def directory() -> str:
         return await template.render(
             "committee-directory.html",
             committees=committees,
-            committee_without_releases=util.committee_without_releases,
+            committee_is_standing=util.committee_is_standing,
         )
 
 

@@ -166,6 +166,13 @@ class Committee(sqlmodel.SQLModel, table=True):
         return f"{name} (PPMC)" if self.is_podling else name
 
 
+class ProjectStatus(str, enum.Enum):
+    ACTIVE = "active"
+    DORMANT = "dormant"
+    RETIRED = "retired"
+    STANDING = "standing"
+
+
 class Project(sqlmodel.SQLModel, table=True):
     # TODO: Consider using key or label for primary string keys
     # Then we can use simply "name" for full_name, and make it str rather than str | None
@@ -174,8 +181,7 @@ class Project(sqlmodel.SQLModel, table=True):
     # We always include "Apache" in the full_name
     full_name: str | None = sqlmodel.Field(default=None)
 
-    # The is_retired flag is not permanent, and is also used for dormant projects
-    is_retired: bool = sqlmodel.Field(default=False)
+    status: ProjectStatus = sqlmodel.Field(default=ProjectStatus.ACTIVE)
     super_project_name: str | None = sqlmodel.Field(default=None, foreign_key="project.name")
     # NOTE: Neither "Project" | None nor "Project | None" works
     super_project: Optional["Project"] = sqlmodel.Relationship()
