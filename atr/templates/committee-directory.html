@@ -131,7 +131,7 @@
                       </div>
                       <div class="mb-1 page-project-subcard-categories">
                         {% set categories = project.category.split(', ') if project.category else [] %}
-                        {% for category in categories[:1] %}
+                        {% for category in categories %}
                           {% if category != "retired" %}<span class="badge text-bg-primary me-1">{{ category }}</span>{% endif %}
                         {% endfor %}
                         {% set langs = project.programming_languages.split(', ') if project.programming_languages else [] %}

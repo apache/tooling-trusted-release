@@ -356,11 +356,13 @@
               {% for cat in current_categories %}
                 <div class="badge bg-primary d-flex align-items-center p-2">
                   <span>{{ cat }}</span>
-                  <button type="submit"
-                          name="action"
-                          value="remove_category:{{ cat }}"
-                          class="btn-close btn-close-white ms-2 page-remove-tag"
-                          aria-label="Remove {{ cat }}"></button>
+                  {% if cat not in forbidden_categories %}
+                    <button type="submit"
+                            name="action"
+                            value="remove_category:{{ cat }}"
+                            class="btn-close btn-close-white ms-2 page-remove-tag"
+                            aria-label="Remove {{ cat }}"></button>
+                  {% endif %}
                 </div>
               {% endfor %}
             </div>

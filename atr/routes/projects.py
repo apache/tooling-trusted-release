@@ -19,7 +19,7 @@
 
 import datetime
 import http.client
-from typing import Protocol
+from typing import Final, Protocol
 
 import asfquart.base as base
 import quart
@@ -32,6 +32,10 @@ import atr.routes as routes
 import atr.template as template
 import atr.user as user
 import atr.util as util
+
+_FORBIDDEN_CATEGORIES: Final[set[str]] = {
+    "retired",
+}
 
 
 class AddFormProtocol(Protocol):
@@ -268,6 +272,7 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
         policy_form=policy_form,
         can_edit=can_edit,
         metadata_form=metadata_form,
+        forbidden_categories=_FORBIDDEN_CATEGORIES,
     )
 
 
@@ -280,23 +285,11 @@ async def _metadata_category_edit(
     current_languages: list[str],
 ) -> bool:
     # TODO: Add error handling
-    # Also this only just squeaks by the complexity checker
     modified = False
     if (action_type == "add_category") and metadata_form.category_to_add.data:
-        new_cat = metadata_form.category_to_add.data.strip()
-        if new_cat and (new_cat not in current_categories):
-            if ":" in new_cat:
-                raise ValueError(f"Category '{new_cat}' contains a colon")
-            current_categories.append(new_cat)
-            current_categories.sort()
-            project.category = ", ".join(current_categories)
-            await quart.flash(f"Category '{new_cat}' added.", "success")
-            modified = True
+        modified = await _metadata_category_edit_add(metadata_form, project, current_categories)
     elif (action_type == "remove_category") and action_value and (action_value in current_categories):
-        current_categories.remove(action_value)
-        project.category = ", ".join(current_categories)
-        await quart.flash(f"Category '{action_value}' removed.", "success")
-        modified = True
+        modified = await _metadata_category_edit_remove(action_value, project, current_categories)
     elif (action_type == "add_language") and metadata_form.language_to_add.data:
         new_lang = metadata_form.language_to_add.data.strip()
         if new_lang and (new_lang not in current_languages):
@@ -313,6 +306,34 @@ async def _metadata_category_edit(
         await quart.flash(f"Language '{action_value}' removed.", "success")
         modified = True
     return modified
+
+
+async def _metadata_category_edit_add(
+    metadata_form: ProjectMetadataForm, project: models.Project, current_categories: list[str]
+) -> bool:
+    new_cat = util.unwrap(metadata_form.category_to_add.data).strip()
+    if new_cat and (new_cat not in current_categories):
+        if ":" in new_cat:
+            raise ValueError(f"Category '{new_cat}' contains a colon")
+        if new_cat in _FORBIDDEN_CATEGORIES:
+            raise ValueError(f"Category '{new_cat}' may not be added or removed")
+        current_categories.append(new_cat)
+        current_categories.sort()
+        project.category = ", ".join(current_categories)
+        await quart.flash(f"Category '{new_cat}' added.", "success")
+        return True
+    return False
+
+
+async def _metadata_category_edit_remove(
+    action_value: str, project: models.Project, current_categories: list[str]
+) -> bool:
+    if action_value in _FORBIDDEN_CATEGORIES:
+        raise ValueError(f"Category '{action_value}' may not be added or removed")
+    current_categories.remove(action_value)
+    project.category = ", ".join(current_categories)
+    await quart.flash(f"Category '{action_value}' removed.", "success")
+    return True
 
 
 async def _metadata_edit(
