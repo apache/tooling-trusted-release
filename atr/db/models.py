@@ -614,7 +614,9 @@ class Release(sqlmodel.SQLModel, table=True):
     )
 
     # One-to-many: A release can have multiple check results
-    check_results: list["CheckResult"] = sqlmodel.Relationship(back_populates="release")
+    check_results: list["CheckResult"] = sqlmodel.Relationship(
+        back_populates="release", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
     # The combination of project_name and version must be unique
     __table_args__ = (sqlmodel.UniqueConstraint("project_name", "version", name="unique_project_version"),)
@@ -704,7 +706,7 @@ class CheckResultStatus(str, enum.Enum):
 
 class CheckResult(sqlmodel.SQLModel, table=True):
     id: int = sqlmodel.Field(default=None, primary_key=True)
-    release_name: str = sqlmodel.Field(foreign_key="release.name")
+    release_name: str = sqlmodel.Field(foreign_key="release.name", ondelete="CASCADE")
     release: Release = sqlmodel.Relationship(back_populates="check_results")
     # We don't call this latest_revision_number, because it might not be the latest
     revision_number: str | None = sqlmodel.Field(default=None, index=True)
