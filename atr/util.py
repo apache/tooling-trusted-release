@@ -59,7 +59,9 @@ _LOGGER: Final = logging.getLogger(__name__)
 _STANDING_COMMITTEES: Final[set[str]] = {
     "attic",
     "comdev",
+    "incubator",
     "logodev",
+    "petri",
     "whimsy",
 }
 
