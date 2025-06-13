@@ -169,6 +169,7 @@ async def _task_archive_url(task_mid: str) -> str | None:
         async with httpx.AsyncClient() as client:
             response = await client.get(url)
         response.raise_for_status()
+        # TODO: Check whether this blocks from network
         email_data = response.json()
         mid = email_data["mid"]
         if not isinstance(mid, str):

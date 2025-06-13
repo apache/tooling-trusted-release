@@ -138,8 +138,8 @@
           </li>
           <li>
             <i class="bi bi-person-plus"></i>
-            <a href="{{ url_for('admin.browse_as') }}"
-               {% if request.endpoint == 'admin.browse_as' %}class="active"{% endif %}>Browse as user</a>
+            <a href="{{ url_for('admin.admin_browse_as') }}"
+               {% if request.endpoint == 'admin.admin_browse_as' %}class="active"{% endif %}>Browse as user</a>
           </li>
         </ul>
       {% endif %}

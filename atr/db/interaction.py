@@ -46,6 +46,14 @@ class ApacheUserMissingError(RuntimeError):
         self.primary_uid = primary_uid
 
 
+class InteractionError(RuntimeError):
+    pass
+
+
+class PublicKeyError(RuntimeError):
+    pass
+
+
 class PathInfo(schema.Strict):
     artifacts: set[pathlib.Path] = schema.factory(set)
     errors: dict[pathlib.Path, list[models.CheckResult]] = schema.factory(dict)
@@ -63,7 +71,7 @@ async def ephemeral_gpg_home() -> AsyncGenerator[str]:
 
 async def key_user_add(asf_uid: str | None, public_key: str, selected_committees: list[str]) -> list[dict]:
     if not public_key:
-        raise RuntimeError("Public key is required")
+        raise PublicKeyError("Public key is required")
 
     # Validate the key using GPG and get its properties
     keys = await _key_user_add_validate_key_properties(public_key)
@@ -77,7 +85,7 @@ async def key_user_add(asf_uid: str | None, public_key: str, selected_committees
                     asf_uid = match.group(1).lower()
                     break
             else:
-                _LOGGER.warning(f"key_user_add called with no ASF UID found in key UIDs: {key.get('uids')}")
+                # _LOGGER.warning(f"key_user_add called with no ASF UID found in key UIDs: {key.get('uids')}")
                 for uid_str in key.get("uids", []):
                     if asf_uid := await asyncio.to_thread(_asf_uid_from_uid_str, uid_str):
                         break
@@ -282,6 +290,32 @@ async def unfinished_releases(asfuid: str) -> dict[str, list[models.Release]]:
     return releases
 
 
+async def upload_keys(
+    user_committees: list[str], keys_text: str, selected_committees: list[str]
+) -> tuple[list[dict], int, int, list[str]]:
+    key_blocks = util.parse_key_blocks(keys_text)
+    if not key_blocks:
+        raise InteractionError("No valid GPG keys found in the uploaded file")
+
+    # Ensure that the selected committees are ones of which the user is actually a member
+    invalid_committees = [committee for committee in selected_committees if (committee not in user_committees)]
+    if invalid_committees:
+        raise InteractionError(f"Invalid committee selection: {', '.join(invalid_committees)}")
+
+    # TODO: Do we modify this? Store a copy just in case, for the template to use
+    submitted_committees = selected_committees[:]
+
+    # Process each key block
+    results = await _upload_process_key_blocks(key_blocks, selected_committees)
+    # if not results:
+    #     raise InteractionError("No keys were added")
+
+    success_count = sum(1 for result in results if result["status"] == "success")
+    error_count = len(results) - success_count
+
+    return results, success_count, error_count, submitted_committees
+
+
 def _asf_uid_from_uid_str(uid_str: str) -> str | None:
     if not (email_match := re.search(r"<([^>]+)>", uid_str)):
         return None
@@ -297,7 +331,6 @@ def _asf_uid_from_uid_str(uid_str: str) -> str | None:
 
 
 def _key_latest_self_signature(key: dict) -> datetime.datetime | None:
-    print(key)
     fingerprint = key["fingerprint"]
     # TODO: Only 64 bits, which is not at all secure
     fingerprint_suffix = fingerprint[-16:]
@@ -327,7 +360,7 @@ async def _key_user_add_validate_key_properties(public_key: str) -> list[dict]:
         import_result = await asyncio.to_thread(gpg.import_keys, public_key)
 
         if not import_result.fingerprints:
-            raise RuntimeError("Invalid public key format or failed import")
+            raise PublicKeyError("Invalid public key format or failed import")
 
         # List keys to get details
         keys = await asyncio.to_thread(gpg.list_keys, keys=import_result.fingerprints, sigs=True)
@@ -349,7 +382,7 @@ async def _key_user_add_validate_key_properties(public_key: str) -> list[dict]:
         # https://infra.apache.org/release-signing.html#note
         # Says that keys must be at least 2048 bits
         if (key.get("algo") == "1") and (int(key.get("length", "0")) < 2048):
-            raise RuntimeError("RSA Key is not long enough; must be at least 2048 bits")
+            raise PublicKeyError("RSA Key is not long enough; must be at least 2048 bits")
         results.append(key)
 
     return results
@@ -388,3 +421,65 @@ async def _successes_errors_warnings(
     for error in errors:
         if primary_rel_path := error.primary_rel_path:
             info.errors.setdefault(pathlib.Path(primary_rel_path), []).append(error)
+
+
+async def _upload_process_key_blocks(key_blocks: list[str], selected_committees: list[str]) -> list[dict]:
+    """Process GPG key blocks and add them to the user's account."""
+    results: list[dict] = []
+
+    # Process each key block
+    for i, key_block in enumerate(key_blocks):
+        try:
+            added_keys = await key_user_add(None, key_block, selected_committees)
+            for key_info in added_keys:
+                key_info["status"] = key_info.get("status", "success")
+                key_info["email"] = key_info.get("email", "Unknown")
+                key_info["committee_statuses"] = key_info.get("committee_statuses", {})
+                results.append(key_info)
+            if not added_keys:
+                results.append(
+                    {
+                        "status": "error",
+                        "message": "Failed to process key (key_user_add returned None)",
+                        "key_id": f"Key #{i + 1}",
+                        "fingerprint": "Unknown",
+                        "user_id": "Unknown",
+                        "email": "Unknown",
+                        "committee_statuses": {},
+                    }
+                )
+        except (InteractionError, PublicKeyError) as e:
+            # logging.warning(f"InteractionError processing key #{i + 1}: {e}")
+            results.append(
+                {
+                    "status": "error",
+                    "message": f"Validation Error: {e}",
+                    "key_id": f"Key #{i + 1}",
+                    "fingerprint": "Invalid",
+                    "user_id": "Unknown",
+                    "email": "Unknown",
+                    "committee_statuses": {},
+                }
+            )
+        except Exception as e:
+            logging.exception(f"Exception processing key #{i + 1}:")
+            fingerprint, user_id = "Unknown", "None"
+            if isinstance(e, ApacheUserMissingError):
+                fingerprint = e.fingerprint or "Unknown"
+                user_id = e.primary_uid or "None"
+            results.append(
+                {
+                    "status": "error",
+                    "message": f"Internal Exception: {e}",
+                    "key_id": f"Key #{i + 1}",
+                    "fingerprint": fingerprint,
+                    "user_id": user_id,
+                    "email": user_id,
+                    "committee_statuses": {},
+                }
+            )
+
+    # Primary key is email, secondary key is fingerprint
+    results_sorted = sorted(results, key=lambda x: (x.get("email", "").lower(), x.get("fingerprint", "")))
+
+    return results_sorted

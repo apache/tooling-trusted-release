@@ -97,8 +97,16 @@ class LdapLookupForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Lookup")
 
 
+@admin.BLUEPRINT.route("/all-releases")
+async def admin_all_releases() -> str:
+    """Display a list of all releases across all phases."""
+    async with db.session() as data:
+        releases = await data.release(_project=True, _committee=True).order_by(models.Release.name).all()
+    return await template.render("all-releases.html", releases=releases, release_as_url=mapping.release_as_url)
+
+
 @admin.BLUEPRINT.route("/browse-as", methods=["GET", "POST"])
-async def browse_as() -> str | response.Response:
+async def admin_browse_as() -> str | response.Response:
     """Allows an admin to browse as another user."""
     # TODO: Enable this in debugging mode only?
     from atr.routes import root
@@ -122,7 +130,7 @@ async def browse_as() -> str | response.Response:
 
     if not ldap_params.results_list:
         await quart.flash(f"User '{new_uid}' not found in LDAP.", "error")
-        return quart.redirect(quart.url_for("admin.browse_as"))
+        return quart.redirect(quart.url_for("admin.admin_browse_as"))
 
     ldap_projects_data = await apache.get_ldap_projects_data()
     committee_data = await apache.get_active_committee_data()
@@ -347,6 +355,32 @@ async def admin_env() -> quart.wrappers.response.Response:
     return quart.Response("\n".join(env_vars), mimetype="text/plain")
 
 
+@admin.BLUEPRINT.route("/keys/update", methods=["GET", "POST"])
+async def admin_keys_update() -> str | response.Response | tuple[Mapping[str, Any], int]:
+    """Update keys from remote data."""
+    if quart.request.method == "POST":
+        try:
+            added_count, updated_count = await _update_keys()
+            return {
+                "message": f"Successfully added {added_count} and updated {updated_count} keys",
+                "category": "success",
+            }, 200
+        except httpx.RequestError as e:
+            return {
+                "message": f"Failed to fetch data: {e!s}",
+                "category": "error",
+            }, 200
+        except Exception as e:
+            return {
+                "message": f"Failed to update projects: {e!s}",
+                "category": "error",
+            }, 200
+
+    # For GET requests, show the update form
+    empty_form = await util.EmptyForm.create_form()
+    return await template.render("update-keys.html", empty_form=empty_form)
+
+
 @admin.BLUEPRINT.route("/performance")
 async def admin_performance() -> str:
     """Display performance statistics for all routes."""
@@ -453,14 +487,6 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
     # For GET requests, show the update form
     empty_form = await util.EmptyForm.create_form()
     return await template.render("update-projects.html", empty_form=empty_form)
-
-
-@admin.BLUEPRINT.route("/all-releases")
-async def admin_all_releases() -> str:
-    """Display a list of all releases across all phases."""
-    async with db.session() as data:
-        releases = await data.release(_project=True, _committee=True).order_by(models.Release.name).all()
-    return await template.render("all-releases.html", releases=releases, release_as_url=mapping.release_as_url)
 
 
 @admin.BLUEPRINT.route("/tasks")
@@ -763,6 +789,40 @@ async def _update_committees(
         updated_count += 1
 
     return added_count, updated_count
+
+
+async def _update_keys() -> tuple[int, int]:
+    import httpx
+
+    successes = 0
+    failures = 0
+    async with db.session() as data:
+        # Get all committees
+        committees = await data.committee().all()
+        for committee in committees:
+            # Get the KEYS file
+            async with httpx.AsyncClient() as client:
+                response = await client.get(f"https://downloads.apache.org/{committee.name}/KEYS")
+                try:
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as e:
+                    _LOGGER.error(f"Failed to fetch KEYS file for {committee.name}: {e!s}")
+                    continue
+                keys_data = await response.aread()
+            keys_text = keys_data.decode("utf-8", errors="replace")
+            # results, success_count, error_count, submitted_committees
+            try:
+                _result, yes, no, _committees = await interaction.upload_keys(
+                    [committee.name], keys_text, [committee.name]
+                )
+            except interaction.InteractionError as e:
+                _LOGGER.error(f"Failed to update keys for {committee.name}: {e!s}")
+                continue
+            _LOGGER.info(f"Updated keys for {committee.name}: {yes} successes, {no} failures")
+            successes += yes
+            failures += no
+
+    return successes, failures
 
 
 async def _update_metadata() -> tuple[int, int]:

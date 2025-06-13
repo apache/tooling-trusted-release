@@ -1,0 +1,145 @@
+{% extends "layouts/base-admin.html" %}
+
+{% block title %}
+  Update keys ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Update keys from remote data sources.
+{% endblock description %}
+
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      .page-form-group {
+          margin-bottom: 1rem;
+      }
+
+      button {
+          margin-top: 1rem;
+          padding: 0.5rem 1rem;
+          background: #036;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 500;
+      }
+
+      button:hover {
+          background: #047;
+      }
+
+      button:disabled {
+          color: gray;
+      }
+
+      .page-warning {
+          margin: 1.5rem 0;
+          padding: 1rem;
+          background: #fff3cd;
+          border: 1px solid #ffeeba;
+          border-radius: 4px;
+          color: #856404;
+      }
+
+      .page-warning p:last-child {
+          margin-bottom: 0;
+      }
+
+      .page-warning strong {
+          color: #533f03;
+      }
+
+      .page-status-message {
+          margin: 1.5rem 0;
+          padding: 1rem;
+          border-radius: 4px;
+      }
+
+      .page-status-message.success {
+          background: #d4edda;
+          border: 1px solid #c3e6cb;
+          color: #155724;
+      }
+
+      .page-status-message.error {
+          background: #f8d7da;
+          border: 1px solid #f5c6cb;
+          color: #721c24;
+      }
+  </style>
+{% endblock stylesheets %}
+
+{% block content %}
+  <h1>Update keys</h1>
+  <p>
+    This page allows you to update keys in the database from remote data sources.
+  </p>
+
+  <div class="page-warning">
+    <p>
+      <strong>Note:</strong> This operation will update all keys from remote KEYS files.
+    </p>
+  </div>
+
+  <div id="status"></div>
+
+  <form action="javascript:submitForm().then(_ => { return false; })">
+    {{ empty_form.hidden_tag() }}
+
+    <button type="submit" id="submitButton">Update projects</button>
+  </form>
+
+  <script>
+    const submitForm = async () => {
+      const button = document.getElementById("submitButton");
+      button.disabled = true;
+      document.body.style.cursor = "wait";
+
+      const statusElement = document.getElementById("status");
+      while (statusElement.firstChild) {
+        statusElement.firstChild.remove();
+      }
+
+      const csrfToken = document.querySelector("input[name='csrf_token']").value;
+
+      try {
+          const response = await fetch(window.location.href, {
+              method: "POST",
+              headers: {
+                  "X-CSRFToken": csrfToken
+              }
+          });
+
+          if (!response.ok) {
+              addStatusMessage(statusElement, "Could not make network request", "error");
+              return
+          }
+
+          const data = await response.json();
+          addStatusMessage(statusElement, data.message, data.category)
+      } catch (error) {
+          addStatusMessage(statusElement, error, "error")
+      } finally {
+        button.disabled = false;
+        document.body.style.cursor = "default";
+      }
+    };
+
+    function addStatusMessage(parentElement, message, category) {
+      const divElement = document.createElement("div");
+      divElement.classList.add("page-status-message");
+      divElement.classList.add(category);
+      if (category === "error") {
+          const prefixElement = document.createElement("strong");
+          const textElement = document.createTextNode("Error: ");
+          prefixElement.appendChild(textElement);
+          divElement.appendChild(prefixElement);
+      }
+      const textNode = document.createTextNode(message);
+      divElement.appendChild(textNode);
+      parentElement.appendChild(divElement);
+    }
+  </script>
+{% endblock content %}

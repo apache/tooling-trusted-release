@@ -186,9 +186,12 @@ async def import_selected_revision(
     if release.committee is None:
         raise routes.FlashError("No committee found for release")
     selected_committees = [release.committee.name]
-    _upload_results, success_count, error_count, submitted_committees = await _upload_keys(
-        session, keys_text, selected_committees
-    )
+    try:
+        upload_results, success_count, error_count, submitted_committees = await interaction.upload_keys(
+            session.committees + session.projects, keys_text, selected_committees
+        )
+    except interaction.InteractionError as e:
+        return await session.redirect(compose.selected, error=str(e))
     message = f"Uploaded {success_count} keys,"
     if error_count > 0:
         message += f" failed to upload {error_count} keys for {', '.join(submitted_committees)}"
@@ -497,9 +500,12 @@ async def upload(session: routes.CommitterSession) -> str:
         keys_content = await asyncio.to_thread(key_file.read)
         keys_text = keys_content.decode("utf-8", errors="replace")
 
-        upload_results, success_count, error_count, submitted_committees = await _upload_keys(
-            session, keys_text, selected_committees
-        )
+        try:
+            upload_results, success_count, error_count, submitted_committees = await interaction.upload_keys(
+                project_list, keys_text, selected_committees
+            )
+        except interaction.InteractionError as e:
+            return await render(error=str(e))
         # We use results in a closure
         # So we have to mutate it, not replace it
         results[:] = upload_results
@@ -514,96 +520,6 @@ async def upload(session: routes.CommitterSession) -> str:
         )
 
     return await render()
-
-
-async def _upload_keys(
-    session: routes.CommitterSession, keys_text: str, selected_committees: list[str]
-) -> tuple[list[dict], int, int, list[str]]:
-    key_blocks = util.parse_key_blocks(keys_text)
-    if not key_blocks:
-        raise routes.FlashError("No valid GPG keys found in the uploaded file")
-
-    # Ensure that the selected committees are ones of which the user is actually a member
-    invalid_committees = [
-        committee for committee in selected_committees if (committee not in (session.committees + session.projects))
-    ]
-    if invalid_committees:
-        raise routes.FlashError(f"Invalid committee selection: {', '.join(invalid_committees)}")
-
-    # TODO: Do we modify this? Store a copy just in case, for the template to use
-    submitted_committees = selected_committees[:]
-
-    # Process each key block
-    results = await _upload_process_key_blocks(key_blocks, selected_committees)
-    if not results:
-        raise routes.FlashError("No keys were added")
-
-    success_count = sum(1 for result in results if result["status"] == "success")
-    error_count = len(results) - success_count
-
-    return results, success_count, error_count, submitted_committees
-
-
-async def _upload_process_key_blocks(key_blocks: list[str], selected_committees: list[str]) -> list[dict]:
-    """Process GPG key blocks and add them to the user's account."""
-    results: list[dict] = []
-
-    # Process each key block
-    for i, key_block in enumerate(key_blocks):
-        try:
-            added_keys = await interaction.key_user_add(None, key_block, selected_committees)
-            for key_info in added_keys:
-                key_info["status"] = key_info.get("status", "success")
-                key_info["email"] = key_info.get("email", "Unknown")
-                key_info["committee_statuses"] = key_info.get("committee_statuses", {})
-                results.append(key_info)
-            if not added_keys:
-                results.append(
-                    {
-                        "status": "error",
-                        "message": "Failed to process key (key_user_add returned None)",
-                        "key_id": f"Key #{i + 1}",
-                        "fingerprint": "Unknown",
-                        "user_id": "Unknown",
-                        "email": "Unknown",
-                        "committee_statuses": {},
-                    }
-                )
-        except routes.FlashError as e:
-            logging.warning(f"FlashError processing key #{i + 1}: {e}")
-            results.append(
-                {
-                    "status": "error",
-                    "message": f"Validation Error: {e}",
-                    "key_id": f"Key #{i + 1}",
-                    "fingerprint": "Invalid",
-                    "user_id": "Unknown",
-                    "email": "Unknown",
-                    "committee_statuses": {},
-                }
-            )
-        except Exception as e:
-            logging.exception(f"Exception processing key #{i + 1}:")
-            fingerprint, user_id = "Unknown", "None"
-            if isinstance(e, interaction.ApacheUserMissingError):
-                fingerprint = e.fingerprint or "Unknown"
-                user_id = e.primary_uid or "None"
-            results.append(
-                {
-                    "status": "error",
-                    "message": f"Internal Exception: {e}",
-                    "key_id": f"Key #{i + 1}",
-                    "fingerprint": fingerprint,
-                    "user_id": user_id,
-                    "email": user_id,
-                    "committee_statuses": {},
-                }
-            )
-
-    # Primary key is email, secondary key is fingerprint
-    results_sorted = sorted(results, key=lambda x: (x.get("email", "").lower(), x.get("fingerprint", "")))
-
-    return results_sorted
 
 
 async def _write_keys_file(
