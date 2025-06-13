@@ -283,6 +283,7 @@ async def keys(session: routes.CommitterSession) -> str:
         delete_form=delete_form,
         update_committee_keys_form=update_committee_keys_form,
         email_from_key=util.email_from_uid,
+        committee_is_standing=util.committee_is_standing,
     )
 
 

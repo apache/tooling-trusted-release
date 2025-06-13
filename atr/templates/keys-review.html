@@ -166,39 +166,41 @@
        class="btn btn-outline-primary">Upload a KEYS file</a>
   </div>
   {% for committee in committees %}
-    <h3 id="committee-{{ committee.name|slugify }}" class="mt-3">{{ committee.display_name }}</h3>
-    {% if committee.public_signing_keys %}
-      <div class="table-responsive mb-2">
-        <table class="table border table-striped table-hover table-sm">
-          <thead>
-            <tr>
-              <th class="px-2" scope="col">Fingerprint</th>
-              <th class="px-2" scope="col">Email</th>
-              <th class="px-2" scope="col">Apache UID</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for key in committee.public_signing_keys %}
+    {% if not committee_is_standing(committee.name) %}
+      <h3 id="committee-{{ committee.name|slugify }}" class="mt-3">{{ committee.display_name }}</h3>
+      {% if committee.public_signing_keys %}
+        <div class="table-responsive mb-2">
+          <table class="table border table-striped table-hover table-sm">
+            <thead>
               <tr>
-                <td class="text-break font-monospace px-2">
-                  <a href="{{ as_url(routes.keys.show_gpg_key, fingerprint=key.fingerprint) }}">{{ key.fingerprint[:16]|upper }}</a>
-                </td>
-                <td class="text-break px-2">{{ email_from_key(key.primary_declared_uid) or 'Not specified' }}</td>
-                <td class="text-break px-2">{{ key.apache_uid or "-" }}</td>
+                <th class="px-2" scope="col">Fingerprint</th>
+                <th class="px-2" scope="col">Email</th>
+                <th class="px-2" scope="col">Apache UID</th>
               </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <form method="post"
-            action="{{ as_url(routes.keys.update_committee_keys, committee_name=committee.name) }}"
-            class="mb-4 d-inline-block">
-        {{ update_committee_keys_form.hidden_tag() }}
+            </thead>
+            <tbody>
+              {% for key in committee.public_signing_keys %}
+                <tr>
+                  <td class="text-break font-monospace px-2">
+                    <a href="{{ as_url(routes.keys.show_gpg_key, fingerprint=key.fingerprint) }}">{{ key.fingerprint[:16]|upper }}</a>
+                  </td>
+                  <td class="text-break px-2">{{ email_from_key(key.primary_declared_uid) or 'Not specified' }}</td>
+                  <td class="text-break px-2">{{ key.apache_uid or "-" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <form method="post"
+              action="{{ as_url(routes.keys.update_committee_keys, committee_name=committee.name) }}"
+              class="mb-4 d-inline-block">
+          {{ update_committee_keys_form.hidden_tag() }}
 
-        {{ update_committee_keys_form.submit(class_='btn btn-sm btn-outline-secondary') }}
-      </form>
-    {% else %}
-      <p class="mb-4">No keys uploaded for this committee yet.</p>
+          {{ update_committee_keys_form.submit(class_='btn btn-sm btn-outline-secondary') }}
+        </form>
+      {% else %}
+        <p class="mb-4">No keys uploaded for this committee yet.</p>
+      {% endif %}
     {% endif %}
   {% endfor %}
 {% endblock content %}
