@@ -97,6 +97,48 @@ class LdapLookupForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Lookup")
 
 
+@admin.BLUEPRINT.route("/browse-as", methods=["GET", "POST"])
+async def browse_as() -> str | response.Response:
+    """Allows an admin to browse as another user."""
+    # TODO: Enable this in debugging mode only?
+    from atr.routes import root
+
+    form = await BrowseAsUserForm.create_form()
+    if not (await form.validate_on_submit()):
+        return await template.render("browse-as.html", form=form)
+
+    new_uid = str(util.unwrap(form.uid.data))
+    if not (current_session := await session.read()):
+        raise base.ASFQuartException("Not authenticated", 401)
+
+    bind_dn = quart.current_app.config.get("LDAP_BIND_DN")
+    bind_password = quart.current_app.config.get("LDAP_BIND_PASSWORD")
+    ldap_params = ldap.SearchParameters(
+        uid_query=new_uid,
+        bind_dn_from_config=bind_dn,
+        bind_password_from_config=bind_password,
+    )
+    await asyncio.to_thread(ldap.search, ldap_params)
+
+    if not ldap_params.results_list:
+        await quart.flash(f"User '{new_uid}' not found in LDAP.", "error")
+        return quart.redirect(quart.url_for("admin.browse_as"))
+
+    ldap_projects_data = await apache.get_ldap_projects_data()
+    committee_data = await apache.get_active_committee_data()
+    ldap_data = ldap_params.results_list[0]
+    _LOGGER.info("Current session data: %s", current_session)
+    new_session_data = _session_data(ldap_data, new_uid, current_session, ldap_projects_data, committee_data)
+    _LOGGER.info("New session data: %s", new_session_data)
+    session.write(new_session_data)
+
+    await quart.flash(
+        f"You are now browsing as '{new_uid}'. To return to your own account, please log out and log back in.",
+        "success",
+    )
+    return quart.redirect(util.as_url(root.index))
+
+
 @admin.BLUEPRINT.route("/consistency")
 async def admin_consistency() -> quart.Response:
     """Check for consistency between the database and the filesystem."""
@@ -459,48 +501,6 @@ async def admin_toggle_view() -> response.Response:
     await quart.flash(message, "success")
     referrer = quart.request.referrer
     return quart.redirect(referrer or quart.url_for("admin.admin_data"))
-
-
-@admin.BLUEPRINT.route("/browse-as", methods=["GET", "POST"])
-async def browse_as() -> str | response.Response:
-    """Allows an admin to browse as another user."""
-    # TODO: Enable this in debugging mode only?
-    from atr.routes import root
-
-    form = await BrowseAsUserForm.create_form()
-    if not (await form.validate_on_submit()):
-        return await template.render("browse-as.html", form=form)
-
-    new_uid = str(util.unwrap(form.uid.data))
-    if not (current_session := await session.read()):
-        raise base.ASFQuartException("Not authenticated", 401)
-
-    bind_dn = quart.current_app.config.get("LDAP_BIND_DN")
-    bind_password = quart.current_app.config.get("LDAP_BIND_PASSWORD")
-    ldap_params = ldap.SearchParameters(
-        uid_query=new_uid,
-        bind_dn_from_config=bind_dn,
-        bind_password_from_config=bind_password,
-    )
-    await asyncio.to_thread(ldap.search, ldap_params)
-
-    if not ldap_params.results_list:
-        await quart.flash(f"User '{new_uid}' not found in LDAP.", "error")
-        return quart.redirect(quart.url_for("admin.browse_as"))
-
-    ldap_projects_data = await apache.get_ldap_projects_data()
-    committee_data = await apache.get_active_committee_data()
-    ldap_data = ldap_params.results_list[0]
-    _LOGGER.info("Current session data: %s", current_session)
-    new_session_data = _session_data(ldap_data, new_uid, current_session, ldap_projects_data, committee_data)
-    _LOGGER.info("New session data: %s", new_session_data)
-    session.write(new_session_data)
-
-    await quart.flash(
-        f"You are now browsing as '{new_uid}'. To return to your own account, please log out and log back in.",
-        "success",
-    )
-    return quart.redirect(util.as_url(root.index))
 
 
 @admin.BLUEPRINT.route("/ldap/", methods=["GET"])
