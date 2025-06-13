@@ -19,6 +19,7 @@
 
 import datetime
 import http.client
+import re
 from typing import Final, Protocol
 
 import asfquart.base as base
@@ -469,12 +470,10 @@ async def _project_add(form: AddFormProtocol, asf_id: str) -> response.Response:
 
 async def _project_add_validate(form: AddFormProtocol) -> tuple[str, str, str] | None:
     committee_name = str(form.committee_name.data)
+    # Normalise spaces in the display name, then validate
     display_name = str(form.display_name.data).strip()
-    if not display_name.startswith("Apache "):
-        await quart.flash("Display name must start with 'Apache '", "error")
-        return None
-    if not all(word[:1].isupper() for word in display_name.split(" ")):
-        await quart.flash("Display name must be in title case", "error")
+    display_name = re.sub(r"  +", " ", display_name)
+    if not await _project_add_validate_display_name(display_name):
         return None
     # Hidden criterion!
     # $ sqlite3 state/atr.db 'select full_name from project;' | grep -- '[^A-Za-z0-9 ]'
@@ -507,6 +506,40 @@ async def _project_add_validate(form: AddFormProtocol) -> tuple[str, str, str] |
         return None
 
     return (committee_name, display_name, label)
+
+
+async def _project_add_validate_display_name(display_name: str) -> bool:
+    # We have three criteria for display names
+    must_start_apache = "The first display name word must be 'Apache'."
+    must_have_two_words = "The display name must have at least two words."
+    must_use_correct_case = "Display name words must be in PascalCase, camelCase, or mod_ case."
+
+    # First criterion, the first word must be "Apache"
+    display_name_words = display_name.split(" ")
+    if display_name_words[0] != "Apache":
+        await quart.flash(must_start_apache, "error")
+        return False
+
+    # Second criterion, the display name must have two or more words
+    if not display_name_words[1:]:
+        await quart.flash(must_have_two_words, "error")
+        return False
+
+    # Third criterion, the display name must use the correct case
+    allowed_irregular_words = {".NET", "C++", "Empire-db", "Lucene.NET", "for", "jclouds"}
+    r_pascal_case = re.compile(r"^([A-Z][0-9a-z]*)+$")
+    r_camel_case = re.compile(r"^[a-z]*([A-Z][0-9a-z]*)+$")
+    r_mod_case = re.compile(r"^mod(_[0-9a-z]+)+$")
+    for display_name_word in display_name_words[1:]:
+        if display_name_word in allowed_irregular_words:
+            continue
+        is_pascal_case = r_pascal_case.match(display_name_word)
+        is_camel_case = r_camel_case.match(display_name_word)
+        is_mod_case = r_mod_case.match(display_name_word)
+        if not (is_pascal_case or is_camel_case or is_mod_case):
+            await quart.flash(must_use_correct_case, "error")
+            return False
+    return True
 
 
 def _set_default_fields(form: ReleasePolicyForm, project: models.Project, release_policy: models.ReleasePolicy) -> None:
