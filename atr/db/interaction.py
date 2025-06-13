@@ -31,7 +31,6 @@ import sqlmodel
 import atr.analysis as analysis
 import atr.db as db
 import atr.db.models as models
-import atr.ldap as ldap
 import atr.schema as schema
 import atr.user as user
 import atr.util as util
@@ -78,18 +77,7 @@ async def key_user_add(asf_uid: str | None, public_key: str, selected_committees
 
     added_keys = []
     for key in keys:
-        # Determine ASF UID if not provided
-        if asf_uid is None:
-            for uid_str in key["uids"]:
-                if match := re.search(r"([A-Za-z0-9]+)@apache.org", uid_str):
-                    asf_uid = match.group(1).lower()
-                    break
-            else:
-                # _LOGGER.warning(f"key_user_add called with no ASF UID found in key UIDs: {key.get('uids')}")
-                for uid_str in key.get("uids", []):
-                    if asf_uid := await asyncio.to_thread(_asf_uid_from_uid_str, uid_str):
-                        break
-
+        asf_uid = await util.asf_uid_from_uids(key.get("uids", []))
         # Store key in database
         async with db.session() as data:
             added = await key_user_session_add(asf_uid, public_key, key, selected_committees, data)
@@ -314,20 +302,6 @@ async def upload_keys(
     error_count = len(results) - success_count
 
     return results, success_count, error_count, submitted_committees
-
-
-def _asf_uid_from_uid_str(uid_str: str) -> str | None:
-    if not (email_match := re.search(r"<([^>]+)>", uid_str)):
-        return None
-    email = email_match.group(1)
-    if email.endswith("@apache.org"):
-        return None
-    ldap_params = ldap.SearchParameters(email_query=email)
-    ldap.search(ldap_params)
-    if not (ldap_params.results_list and ("uid" in ldap_params.results_list[0])):
-        return None
-    ldap_uid_val = ldap_params.results_list[0]["uid"]
-    return ldap_uid_val[0] if isinstance(ldap_uid_val, list) else ldap_uid_val
 
 
 def _key_latest_self_signature(key: dict) -> datetime.datetime | None:

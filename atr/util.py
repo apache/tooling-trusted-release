@@ -37,6 +37,7 @@ import aioshutil
 import asfquart
 import asfquart.base as base
 import asfquart.session as session
+import httpx
 import jinja2
 import quart
 import quart_wtf
@@ -47,6 +48,7 @@ import wtforms
 # Therefore, this module must not import atr.db
 import atr.config as config
 import atr.db.models as models
+import atr.ldap as ldap
 import atr.user as user
 
 F = TypeVar("F", bound="QuartFormTyped")
@@ -137,6 +139,32 @@ def as_url(func: Callable, **kwargs: Any) -> str:
         _LOGGER.error(f"Cannot get annotations for {func} (type: {type(func)})")
         raise RuntimeError(f"Cannot get annotations for {func} (type: {type(func)})") from e
     return quart.url_for(annotations["endpoint"], **kwargs)
+
+
+def asf_uid_from_email(email: str) -> str | None:
+    ldap_params = ldap.SearchParameters(email_query=email)
+    ldap.search(ldap_params)
+    if not (ldap_params.results_list and ("uid" in ldap_params.results_list[0])):
+        return None
+    ldap_uid_val = ldap_params.results_list[0]["uid"]
+    return ldap_uid_val[0] if isinstance(ldap_uid_val, list) else ldap_uid_val
+
+
+async def asf_uid_from_uids(uids: list[str]) -> str | None:
+    # Determine ASF UID if not provided
+    emails = []
+    for uid_str in uids:
+        if match := re.search(r"<([^>]+)>", uid_str):
+            email = match.group(1).lower()
+            if email.endswith("@apache.org"):
+                return email.removesuffix("@apache.org")
+            emails.append(email)
+    # We did not find a direct @apache.org email address
+    # Therefore, search LDAP
+    for email in emails:
+        if asf_uid := await asyncio.to_thread(asf_uid_from_email, email):
+            return asf_uid
+    return None
 
 
 @contextlib.asynccontextmanager
@@ -373,6 +401,30 @@ def get_unfinished_dir() -> pathlib.Path:
     return pathlib.Path(config.get().UNFINISHED_STORAGE_DIR)
 
 
+async def get_urls_as_completed(urls: Sequence[str]) -> AsyncGenerator[tuple[str, int | str | None, bytes]]:
+    """GET a list of URLs in parallel and yield (url, status, content_bytes) as they become available."""
+    async with httpx.AsyncClient() as client:
+        tasks = [asyncio.create_task(client.get(url)) for url in urls]
+        for future in asyncio.as_completed(tasks):
+            try:
+                response = await future
+            except Exception as e:
+                yield ("", str(e), b"")
+                continue
+            url = str(response.url)
+            try:
+                response.raise_for_status()
+                yield (url, response.status_code, await response.aread())
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 200:
+                    # This should not happen
+                    yield (url, str(e), b"")
+                else:
+                    yield (url, e.response.status_code, b"")
+            except Exception as e:
+                yield (url, str(e), b"")
+
+
 async def is_dir_resolve(path: pathlib.Path) -> pathlib.Path | None:
     try:
         resolved_path = await asyncio.to_thread(path.resolve)
@@ -426,6 +478,26 @@ def parse_key_blocks(keys_text: str) -> list[str]:
         elif (line.strip() == "-----END PGP PUBLIC KEY BLOCK-----") and in_key_block:
             current_block.append(line)
             key_blocks.append("\n".join(current_block))
+            in_key_block = False
+        elif in_key_block:
+            current_block.append(line)
+
+    return key_blocks
+
+
+def parse_key_blocks_bytes(keys_data: bytes) -> list[str]:
+    """Extract GPG key blocks from a KEYS file."""
+    key_blocks = []
+    current_block = []
+    in_key_block = False
+
+    for line in keys_data.splitlines():
+        if line.strip() == b"-----BEGIN PGP PUBLIC KEY BLOCK-----":
+            in_key_block = True
+            current_block = [line]
+        elif (line.strip() == b"-----END PGP PUBLIC KEY BLOCK-----") and in_key_block:
+            current_block.append(line)
+            key_blocks.append(b"\n".join(current_block))
             in_key_block = False
         elif in_key_block:
             current_block.append(line)
