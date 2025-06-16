@@ -35,7 +35,6 @@ dependencies = [
   "quart-wtforms~=1.0.3",
   "rich~=14.0.0",
   "sqlmodel~=0.0.24",
-  "pysequoia (>=0.1.29,<0.2.0)",
 ]
 
 [dependency-groups]
