@@ -21,6 +21,7 @@ import logging
 import os
 import pathlib
 import statistics
+import time
 from collections.abc import Callable, Mapping
 from typing import Any, Final
 
@@ -88,7 +89,7 @@ class DeleteReleaseForm(util.QuartFormTyped):
 class LdapLookupForm(util.QuartFormTyped):
     uid = wtforms.StringField(
         "ASF UID (optional)",
-        render_kw={"placeholder": "Enter ASF UID, e.g. johnsmith"},
+        render_kw={"placeholder": "Enter ASF UID, e.g. johnsmith, or * for all"},
     )
     email = wtforms.StringField(
         "Email address (optional)",
@@ -546,13 +547,17 @@ async def ldap_search() -> str:
         bind_dn = quart.current_app.config.get("LDAP_BIND_DN")
         bind_password = quart.current_app.config.get("LDAP_BIND_PASSWORD")
 
+        start = time.perf_counter_ns()
         ldap_params = ldap.SearchParameters(
             uid_query=uid_query,
             email_query=email_query,
             bind_dn_from_config=bind_dn,
             bind_password_from_config=bind_password,
+            email_only=True,
         )
         await asyncio.to_thread(ldap.search, ldap_params)
+        end = time.perf_counter_ns()
+        _LOGGER.info("LDAP search took %d ms", (end - start) / 1000000)
 
     return await template.render(
         "ldap-lookup.html",
@@ -560,6 +565,7 @@ async def ldap_search() -> str:
         ldap_params=ldap_params,
         asf_id=asf_id_for_template,
         ldap_query_performed=ldap_params is not None,
+        uid_query=uid_query,
     )
 
 

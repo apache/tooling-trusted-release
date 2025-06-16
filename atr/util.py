@@ -152,7 +152,9 @@ def asf_uid_from_email(email: str) -> str | None:
     return ldap_uid_val[0] if isinstance(ldap_uid_val, list) else ldap_uid_val
 
 
-async def asf_uid_from_uids(uids: list[str]) -> str | None:
+async def asf_uid_from_uids(
+    uids: list[str], use_ldap: bool = True, ldap_data: dict[str, str] | None = None
+) -> str | None:
     # Determine ASF UID if not provided
     emails = []
     for uid_str in uids:
@@ -162,10 +164,18 @@ async def asf_uid_from_uids(uids: list[str]) -> str | None:
                 return email.removesuffix("@apache.org")
             emails.append(email)
     # We did not find a direct @apache.org email address
-    # Therefore, search LDAP
-    for email in emails:
-        if asf_uid := await asyncio.to_thread(asf_uid_from_email, email):
-            return asf_uid
+    # Therefore, search LDAP data, either cached or directly
+    if ldap_data is not None:
+        # Use cached LDAP data
+        for email in emails:
+            if email in ldap_data:
+                return ldap_data[email]
+        return None
+    if use_ldap:
+        # Search LDAP directly
+        for email in emails:
+            if asf_uid := await asyncio.to_thread(asf_uid_from_email, email):
+                return asf_uid
     return None
 
 

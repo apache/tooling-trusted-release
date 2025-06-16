@@ -68,7 +68,9 @@ async def ephemeral_gpg_home() -> AsyncGenerator[str]:
         yield str(temp_dir)
 
 
-async def key_user_add(asf_uid: str | None, public_key: str, selected_committees: list[str]) -> list[dict]:
+async def key_user_add(
+    asf_uid: str | None, public_key: str, selected_committees: list[str], ldap_data: dict[str, str] | None = None
+) -> list[dict]:
     if not public_key:
         raise PublicKeyError("Public key is required")
 
@@ -77,7 +79,7 @@ async def key_user_add(asf_uid: str | None, public_key: str, selected_committees
 
     added_keys = []
     for key in keys:
-        asf_uid = await util.asf_uid_from_uids(key.get("uids", []))
+        asf_uid = await util.asf_uid_from_uids(key.get("uids", []), ldap_data=ldap_data)
         # Store key in database
         async with db.session() as data:
             added = await key_user_session_add(asf_uid, public_key, key, selected_committees, data)
@@ -279,7 +281,10 @@ async def unfinished_releases(asfuid: str) -> dict[str, list[models.Release]]:
 
 
 async def upload_keys(
-    user_committees: list[str], keys_text: str, selected_committees: list[str]
+    user_committees: list[str],
+    keys_text: str,
+    selected_committees: list[str],
+    ldap_data: dict[str, str] | None = None,
 ) -> tuple[list[dict], int, int, list[str]]:
     key_blocks = util.parse_key_blocks(keys_text)
     if not key_blocks:
@@ -294,7 +299,36 @@ async def upload_keys(
     submitted_committees = selected_committees[:]
 
     # Process each key block
-    results = await _upload_process_key_blocks(key_blocks, selected_committees)
+    results = await _upload_process_key_blocks(key_blocks, selected_committees, ldap_data=ldap_data)
+    # if not results:
+    #     raise InteractionError("No keys were added")
+
+    success_count = sum(1 for result in results if result["status"] == "success")
+    error_count = len(results) - success_count
+
+    return results, success_count, error_count, submitted_committees
+
+
+async def upload_keys_bytes(
+    user_committees: list[str],
+    keys_bytes: bytes,
+    selected_committees: list[str],
+    ldap_data: dict[str, str] | None = None,
+) -> tuple[list[dict], int, int, list[str]]:
+    key_blocks = util.parse_key_blocks_bytes(keys_bytes)
+    if not key_blocks:
+        raise InteractionError("No valid GPG keys found in the uploaded file")
+
+    # Ensure that the selected committees are ones of which the user is actually a member
+    invalid_committees = [committee for committee in selected_committees if (committee not in user_committees)]
+    if invalid_committees:
+        raise InteractionError(f"Invalid committee selection: {', '.join(invalid_committees)}")
+
+    # TODO: Do we modify this? Store a copy just in case, for the template to use
+    submitted_committees = selected_committees[:]
+
+    # Process each key block
+    results = await _upload_process_key_blocks(key_blocks, selected_committees, ldap_data=ldap_data)
     # if not results:
     #     raise InteractionError("No keys were added")
 
@@ -397,14 +431,16 @@ async def _successes_errors_warnings(
             info.errors.setdefault(pathlib.Path(primary_rel_path), []).append(error)
 
 
-async def _upload_process_key_blocks(key_blocks: list[str], selected_committees: list[str]) -> list[dict]:
+async def _upload_process_key_blocks(
+    key_blocks: list[str], selected_committees: list[str], ldap_data: dict[str, str] | None = None
+) -> list[dict]:
     """Process GPG key blocks and add them to the user's account."""
     results: list[dict] = []
 
     # Process each key block
     for i, key_block in enumerate(key_blocks):
         try:
-            added_keys = await key_user_add(None, key_block, selected_committees)
+            added_keys = await key_user_add(None, key_block, selected_committees, ldap_data=ldap_data)
             for key_info in added_keys:
                 key_info["status"] = key_info.get("status", "success")
                 key_info["email"] = key_info.get("email", "Unknown")

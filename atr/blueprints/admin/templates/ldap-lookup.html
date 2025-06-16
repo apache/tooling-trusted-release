@@ -53,30 +53,51 @@
             {% endif %}
           </div>
         {% elif ldap_params and ldap_params.results_list %}
-          {% for result in ldap_params.results_list %}
-            <table class="table table-sm table-striped">
+          {% if uid_query == '*' %}
+            <table class="table table-sm table-striped table-bordered">
               <thead>
                 <tr>
-                  <th class="w-25">Attribute</th>
-                  <th>Value</th>
+                  <th>UID</th>
+                  <th>Full Name</th>
+                  <th>Email</th>
                 </tr>
               </thead>
               <tbody>
-                {% for key, value in result.items()|sort %}
+                {% for result in ldap_params.results_list %}
                   <tr>
-                    <td><strong>{{ key }}</strong></td>
-                    <td>
-                      {% if (value is iterable) and (value is not string) %}
-                        {{ value|join(", ") }}
-                      {% else %}
-                        {{ value }}
-                      {% endif %}
-                    </td>
+                    <td>{{ result.get('uid', [''])[0] }}</td>
+                    <td>{{ result.get('cn', [''])[0] }}</td>
+                    <td>{{ result.get('mail', [''])[0] }}</td>
                   </tr>
                 {% endfor %}
               </tbody>
             </table>
-          {% endfor %}
+          {% else %}
+            {% for result in ldap_params.results_list %}
+              <table class="table table-sm table-striped">
+                <thead>
+                  <tr>
+                    <th class="w-25">Attribute</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for key, value in result.items()|sort %}
+                    <tr>
+                      <td><strong>{{ key }}</strong></td>
+                      <td>
+                        {% if (value is iterable) and (value is not string) %}
+                          {{ value|join(", ") }}
+                        {% else %}
+                          {{ value }}
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            {% endfor %}
+          {% endif %}
         {% else %}
           <div class="alert alert-info" role="alert">No results found for the given criteria.</div>
         {% endif %}

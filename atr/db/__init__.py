@@ -34,6 +34,7 @@ import sqlmodel.sql.expression as expression
 
 import atr.config as config
 import atr.db.models as models
+import atr.schema as schema
 import atr.util as util
 
 if TYPE_CHECKING:
@@ -114,6 +115,24 @@ class Query(Generic[T]):
         self.log_query("all", log_query)
         result = await self.session.execute(self.query)
         return result.scalars().all()
+
+    async def bulk_upsert(self, items: list[schema.Strict], log_query: bool = False) -> None:
+        if not items:
+            return
+
+        self.log_query("bulk_upsert", log_query)
+        model_class = self.query.column_descriptions[0]["type"]
+        stmt = sqlalchemy.dialects.sqlite.insert(model_class).values([item.model_dump() for item in items])
+        # TODO: The primary key might not be the index element
+        # For example, we might have a unique constraint on other columns
+        primary_keys = [key.name for key in sqlalchemy.inspect(model_class).primary_key]
+        update_cols = {
+            col.name: getattr(stmt.excluded, col.name)
+            for col in sqlalchemy.inspect(model_class).c
+            if col.name not in primary_keys
+        }
+        stmt = stmt.on_conflict_do_update(index_elements=primary_keys, set_=update_cols)
+        await self.session.execute(stmt)
 
     # async def execute(self) -> sqlalchemy.Result[tuple[T]]:
     #     return await self.session.execute(self.query)

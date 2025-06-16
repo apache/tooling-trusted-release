@@ -39,6 +39,7 @@ class SearchParameters:
     srv_info: str | None = None
     detail_err: str | None = None
     connection: ldap3.Connection | None = None
+    email_only: bool = False
 
 
 def parse_dn(dn_string: str) -> dict[str, list[str]]:
@@ -83,7 +84,10 @@ def _search_core(params: SearchParameters) -> None:
 
     filters: list[str] = []
     if params.uid_query:
-        filters.append(f"(uid={conv.escape_filter_chars(params.uid_query)})")
+        if params.uid_query == "*":
+            filters.append("(uid=*)")
+        else:
+            filters.append(f"(uid={conv.escape_filter_chars(params.uid_query)})")
 
     if params.email_query:
         escaped_email = conv.escape_filter_chars(params.email_query)
@@ -102,10 +106,12 @@ def _search_core(params: SearchParameters) -> None:
         params.err_msg = "LDAP Connection object not established or auto_bind failed."
         return
 
+    email_attributes = ["uid", "mail", "asf-altEmail", "asf-committer-email"]
+    attributes = email_attributes if params.email_only else ldap3.ALL_ATTRIBUTES
     params.connection.search(
         search_base=LDAP_SEARCH_BASE,
         search_filter=search_filter,
-        attributes=ldap3.ALL_ATTRIBUTES,
+        attributes=attributes,
     )
     for entry in params.connection.entries:
         result_item: dict[str, str | list[str]] = {"dn": entry.entry_dn}
