@@ -44,6 +44,7 @@ import atr.db as db
 import atr.db.interaction as interaction
 import atr.db.models as models
 import atr.ldap as ldap
+import atr.routes.keys as keys
 import atr.routes.mapping as mapping
 import atr.template as template
 import atr.util as util
@@ -355,6 +356,31 @@ async def admin_env() -> quart.wrappers.response.Response:
     for key, value in os.environ.items():
         env_vars.append(f"{key}={value}")
     return quart.Response("\n".join(env_vars), mimetype="text/plain")
+
+
+@admin.BLUEPRINT.route("/keys/regenerate-all", methods=["GET", "POST"])
+async def admin_keys_regenerate_all() -> quart.Response:
+    """Regenerate the KEYS file for all committees."""
+    if quart.request.method != "POST":
+        empty_form = await util.EmptyForm.create_form()
+        return quart.Response(
+            f"""
+<form method="post">
+  <button type="submit">Regenerate all KEYS files</button>
+  {empty_form.hidden_tag()}
+</form>
+""",
+            mimetype="text/html",
+        )
+
+    try:
+        okay, failed = await _regenerate_keys_all()
+        return quart.Response(
+            f"KEYS file regeneration results: {okay} okay, {failed} failed",
+            mimetype="text/plain",
+        )
+    except Exception as e:
+        return quart.Response(f"Exception during KEYS file regeneration: {e!s}", mimetype="text/plain")
 
 
 @admin.BLUEPRINT.route("/keys/update", methods=["GET", "POST"])
@@ -723,6 +749,24 @@ def _project_status(
     elif util.committee_is_standing(pmc.name):
         return models.ProjectStatus.STANDING
     return models.ProjectStatus.ACTIVE
+
+
+async def _regenerate_keys_all() -> tuple[int, int]:
+    okay = 0
+    failed = 0
+    async with db.session() as data:
+        committees = await data.committee().all()
+        for committee in committees:
+            try:
+                error_msg = await keys.autogenerate_keys_file(committee.name, caller_data=data)
+            except Exception:
+                failed += 1
+                continue
+            if error_msg:
+                failed += 1
+            else:
+                okay += 1
+    return okay, failed
 
 
 def _session_data(
