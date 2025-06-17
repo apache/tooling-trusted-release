@@ -655,6 +655,7 @@ async def _write_keys_file(
 ) -> str | None:
     try:
         await asyncio.to_thread(committee_keys_dir.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(util.chmod_directories, committee_keys_dir, permissions=0o755)
         await asyncio.to_thread(committee_keys_path.write_text, full_keys_file_content, encoding="utf-8")
     except OSError as e:
         error_msg = f"Failed to write KEYS file for committee {committee_name}: {e}"

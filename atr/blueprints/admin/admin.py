@@ -374,11 +374,11 @@ async def admin_keys_regenerate_all() -> quart.Response:
         )
 
     try:
-        okay, failed = await _regenerate_keys_all()
-        return quart.Response(
-            f"KEYS file regeneration results: {okay} okay, {failed} failed",
-            mimetype="text/plain",
-        )
+        okay, failures = await _regenerate_keys_all()
+        msg = f"KEYS file regeneration results: {okay} okay, {len(failures)} failed"
+        if failures:
+            msg += f"\nFailures:\n{'\n'.join(failures)}"
+        return quart.Response(msg, mimetype="text/plain")
     except Exception as e:
         return quart.Response(f"Exception during KEYS file regeneration: {e!s}", mimetype="text/plain")
 
@@ -751,22 +751,22 @@ def _project_status(
     return models.ProjectStatus.ACTIVE
 
 
-async def _regenerate_keys_all() -> tuple[int, int]:
+async def _regenerate_keys_all() -> tuple[int, list[str]]:
     okay = 0
-    failed = 0
+    failures = []
     async with db.session() as data:
         committees = await data.committee().all()
         for committee in committees:
             try:
                 error_msg = await keys.autogenerate_keys_file(committee.name, caller_data=data)
-            except Exception:
-                failed += 1
+            except Exception as e:
+                failures.append(f"Caller error regenerating KEYS file for committee {committee.name}: {e!s}")
                 continue
             if error_msg:
-                failed += 1
+                failures.append(error_msg)
             else:
                 okay += 1
-    return okay, failed
+    return okay, failures
 
 
 def _session_data(
