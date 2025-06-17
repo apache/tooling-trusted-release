@@ -202,7 +202,10 @@ async def _keys_warning(
     release: models.Release,
 ) -> bool:
     """Return a warning about keys if there are any issues."""
-    keys_file_path = util.get_finished_dir() / release.project.name / "KEYS"
+    if release.committee is None:
+        raise base.ASFQuartException("Release has no associated committee", errorcode=400)
+
+    keys_file_path = util.get_downloads_dir() / release.committee.name / "KEYS"
     return not await aiofiles.os.path.isfile(keys_file_path)
 
 
