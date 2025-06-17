@@ -223,6 +223,18 @@ async def delete(session: routes.CommitterSession) -> response.Response:
             return await session.redirect(keys, error="Key not found or not owned by you")
 
 
+@routes.committer("/keys/export/<committee_name>")
+async def exports(session: routes.CommitterSession, committee_name: str) -> quart.Response:
+    """Generate a KEYS file for a specific committee."""
+    if committee_name not in (session.committees + session.projects):
+        quart.abort(403, description=f"You are not authorised to update the KEYS file for {committee_name}")
+
+    async with db.session() as data:
+        full_keys_file_content = await _keys_formatter(committee_name, data)
+
+    return quart.Response(full_keys_file_content, mimetype="text/plain")
+
+
 @routes.committer("/keys/import/<project_name>/<version_name>", methods=["POST"])
 async def import_selected_revision(
     session: routes.CommitterSession, project_name: str, version_name: str
@@ -238,7 +250,7 @@ async def import_selected_revision(
         raise routes.FlashError("No committee found for release")
     selected_committees = [release.committee.name]
     try:
-        upload_results, success_count, error_count, submitted_committees = await interaction.upload_keys(
+        _upload_results, success_count, error_count, submitted_committees = await interaction.upload_keys(
             session.committees + session.projects, keys_text, selected_committees
         )
     except interaction.InteractionError as e:
@@ -260,28 +272,6 @@ async def import_selected_revision(
         project_name=project_name,
         version_name=version_name,
     )
-
-
-# async def key_add_post(
-#     session: routes.CommitterSession, request: quart.Request, user_committees: Sequence[models.Committee]
-# ) -> list[dict]:
-#     form = await routes.get_form(request)
-#     public_key = form.get("public_key")
-#     if not public_key:
-#         raise routes.FlashError("Public key is required")
-#     # Get selected PMCs from form
-#     selected_committees = form.getlist("selected_committees")
-#     if not selected_committees:
-#         raise routes.FlashError("You must select at least one PMC")
-#     # Ensure that the selected PMCs are ones of which the user is actually a member
-#     invalid_committees = [
-#         committee
-#         for committee in selected_committees
-#         if (committee not in session.committees) and (committee not in session.projects)
-#     ]
-#     if invalid_committees:
-#         raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
-#     return await interaction.key_user_add(session.uid, public_key, selected_committees)
 
 
 def key_ssh_fingerprint(ssh_key_string: str) -> str:
@@ -418,51 +408,22 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
     if committee_name not in (session.committees + session.projects):
         quart.abort(403, description=f"You are not authorised to update the KEYS file for {committee_name}")
 
+    project_names_updated: list[str] = []
+    write_errors: list[str] = []
+    base_downloads_dir = util.get_downloads_dir()
+
     async with db.session() as data:
-        committee = await data.committee(name=committee_name, _public_signing_keys=True, _projects=True).demand(
-            base.ASFQuartException(f"Committee {committee_name} not found", errorcode=404)
+        full_keys_file_content = await _keys_formatter(committee_name, data)
+        committee_keys_dir = base_downloads_dir / committee_name
+        committee_keys_path = committee_keys_dir / "KEYS"
+        await _write_keys_file(
+            committee_keys_dir=committee_keys_dir,
+            full_keys_file_content=full_keys_file_content,
+            committee_keys_path=committee_keys_path,
+            committee_name=committee_name,
+            project_names_updated=project_names_updated,
+            write_errors=write_errors,
         )
-
-        if not committee.public_signing_keys:
-            return await session.redirect(
-                keys, error=f"No keys found for committee {committee_name} to generate KEYS file."
-            )
-
-        if not committee.projects:
-            return await session.redirect(keys, error=f"No projects found associated with committee {committee_name}.")
-
-        sorted_keys = sorted(committee.public_signing_keys, key=lambda k: k.fingerprint)
-
-        keys_content_list = []
-        for key in sorted_keys:
-            fingerprint_short = key.fingerprint[:16].upper()
-            apache_uid = key.apache_uid
-            # TODO: What if there is no email?
-            email = util.email_from_uid(key.primary_declared_uid or "") or ""
-            if email == f"{apache_uid}@apache.org":
-                comment_line = f"# {fingerprint_short} {email}"
-            else:
-                comment_line = f"# {fingerprint_short} {email} ({apache_uid})"
-            keys_content_list.append(f"{comment_line}\n\n{key.ascii_armored_key}")
-
-        key_blocks_str = "\n\n\n".join(keys_content_list) + "\n"
-
-        project_names_updated: list[str] = []
-        write_errors: list[str] = []
-        base_finished_dir = util.get_finished_dir()
-        committee_name_for_header = committee.display_name or committee.name
-        key_count_for_header = len(committee.public_signing_keys)
-
-        for project in committee.projects:
-            await _write_keys_file(
-                project,
-                base_finished_dir,
-                committee_name_for_header,
-                key_count_for_header,
-                key_blocks_str,
-                project_names_updated,
-                write_errors,
-            )
     if write_errors:
         error_summary = "; ".join(write_errors)
         await quart.flash(
@@ -569,38 +530,18 @@ async def upload(session: routes.CommitterSession) -> str:
     return await render()
 
 
-async def _get_keys_text(keys_url: str, render: Callable[[str], Awaitable[str]]) -> str:
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(keys_url, follow_redirects=True)
-            response.raise_for_status()
-            return response.text
-    except httpx.HTTPStatusError as e:
-        raise base.ASFQuartException(f"Error fetching URL: {e.response.status_code} {e.response.reason_phrase}")
-    except httpx.RequestError as e:
-        raise base.ASFQuartException(f"Error fetching URL: {e}")
-
-
-async def _write_keys_file(
-    project: models.Project,
-    base_finished_dir: pathlib.Path,
+async def _format_keys_file(
     committee_name_for_header: str,
     key_count_for_header: int,
     key_blocks_str: str,
-    project_names_updated: list[str],
-    write_errors: list[str],
-) -> None:
-    project_name = project.name
-    project_keys_dir = base_finished_dir / project_name
-    project_keys_path = project_keys_dir / "KEYS"
-
+) -> str:
     timestamp_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
     purpose_text = (
-        f"This file contains the PGP/GPG public keys used by committers of the "
-        f"Apache {project_name} project to sign official release artifacts. "
-        f"Verifying the signature on a downloaded artifact using one of the "
-        f"keys in this file provides confidence that the artifact is authentic "
-        f"and was published by the project team."
+        f"This file contains the {key_count_for_header} PGP/GPG public keys used by "
+        f"committers of the Apache {committee_name_for_header} projects to sign official "
+        f"release artifacts. Verifying the signature on a downloaded artifact using one "
+        f"of the keys in this file provides confidence that the artifact is authentic "
+        f"and was published by the committee."
     )
     wrapped_purpose = "\n".join(
         textwrap.wrap(
@@ -615,17 +556,12 @@ async def _write_keys_file(
 
     header_content = (
         f"""\
-# Apache Software Foundation (ASF) project signing keys
+# Apache Software Foundation (ASF)
+# Signing keys for the {committee_name_for_header} committee
+# Generated on {timestamp_str} UTC
 #
-# Project:   {project.display_name or project.name}
-# Committee: {committee_name_for_header}
-# Generated: {timestamp_str} UTC
-# Contains:  {key_count_for_header} PGP/GPG public {"key" if key_count_for_header == 1 else "keys"}
-#
-# Purpose:
 {wrapped_purpose}
 #
-# Usage (with GnuPG):
 # 1. Import these keys into your GPG keyring:
 #    gpg --import KEYS
 #
@@ -639,15 +575,88 @@ async def _write_keys_file(
     )
 
     full_keys_file_content = header_content + key_blocks_str
+    return full_keys_file_content
+
+
+async def _get_keys_text(keys_url: str, render: Callable[[str], Awaitable[str]]) -> str:
     try:
-        await asyncio.to_thread(project_keys_dir.mkdir, parents=True, exist_ok=True)
-        await asyncio.to_thread(project_keys_path.write_text, full_keys_file_content, encoding="utf-8")
-        project_names_updated.append(project_name)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(keys_url, follow_redirects=True)
+            response.raise_for_status()
+            return response.text
+    except httpx.HTTPStatusError as e:
+        raise base.ASFQuartException(f"Error fetching URL: {e.response.status_code} {e.response.reason_phrase}")
+    except httpx.RequestError as e:
+        raise base.ASFQuartException(f"Error fetching URL: {e}")
+
+
+async def _keys_formatter(committee_name: str, data: db.Session) -> str:
+    committee = await data.committee(name=committee_name, _public_signing_keys=True, _projects=True).demand(
+        base.ASFQuartException(f"Committee {committee_name} not found", errorcode=404)
+    )
+
+    if not committee.public_signing_keys:
+        raise base.ASFQuartException(
+            f"No keys found for committee {committee_name} to generate KEYS file.", errorcode=404
+        )
+
+    if not committee.projects:
+        raise base.ASFQuartException(f"No projects found associated with committee {committee_name}.", errorcode=404)
+
+    sorted_keys = sorted(committee.public_signing_keys, key=lambda k: k.fingerprint)
+
+    keys_content_list = []
+    for key in sorted_keys:
+        # fingerprint_short = key.fingerprint[:16].upper()
+        apache_uid = key.apache_uid
+        # TODO: What if there is no email?
+        email = util.email_from_uid(key.primary_declared_uid or "") or ""
+        comments = []
+        comments.append(f"Comment: {key.fingerprint.upper()}")
+        if email == f"{apache_uid}@apache.org":
+            comments.append(f"Comment: {email}")
+        else:
+            comments.append(f"Comment: {email} ({apache_uid})")
+        comment_lines = "\n".join(comments)
+        armored_key = key.ascii_armored_key
+        # Use the Sequoia format
+        # -----BEGIN PGP PUBLIC KEY BLOCK-----
+        # Comment: C46D 6658 489D DE09 CE93  8AF8 7B6A 6401 BF99 B4A3
+        # Comment: Redacted Name (CODE SIGNING KEY) <redacted@apache.org>
+        #
+        # [...]
+        armored_key = armored_key.replace("BLOCK-----", "\n" + comment_lines, 1)
+        keys_content_list.append(armored_key)
+
+    key_blocks_str = "\n\n\n".join(keys_content_list) + "\n"
+
+    committee_name_for_header = committee.display_name or committee.name
+    key_count_for_header = len(committee.public_signing_keys)
+
+    return await _format_keys_file(
+        committee_name_for_header=committee_name_for_header,
+        key_count_for_header=key_count_for_header,
+        key_blocks_str=key_blocks_str,
+    )
+
+
+async def _write_keys_file(
+    committee_keys_dir: pathlib.Path,
+    full_keys_file_content: str,
+    committee_keys_path: pathlib.Path,
+    committee_name: str,
+    project_names_updated: list[str],
+    write_errors: list[str],
+) -> None:
+    try:
+        await asyncio.to_thread(committee_keys_dir.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(committee_keys_path.write_text, full_keys_file_content, encoding="utf-8")
+        project_names_updated.append(committee_name)
     except OSError as e:
-        error_msg = f"Failed to write KEYS file for project {project_name}: {e}"
+        error_msg = f"Failed to write KEYS file for committee {committee_name}: {e}"
         logging.exception(error_msg)
         write_errors.append(error_msg)
     except Exception as e:
-        error_msg = f"An unexpected error occurred writing KEYS for project {project_name}: {e}"
+        error_msg = f"An unexpected error occurred writing KEYS for committee {committee_name}: {e}"
         logging.exception(error_msg)
         write_errors.append(error_msg)
