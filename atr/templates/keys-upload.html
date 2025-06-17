@@ -153,9 +153,50 @@
       <div class="row mb-3 pb-3 border-bottom">
         {{ forms.label(form.key, col="md2") }}
         <div class="col-md-9">
-          {{ forms.widget(form.key, id=form.key.id) }}
-          {{ forms.errors(form.key, classes="invalid-feedback d-block") }}
-          {{ forms.description(form.key, classes="form-text text-muted mt-2") }}
+          <ul class="nav nav-tabs" id="keysUploadTab" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active"
+                      id="file-upload-tab"
+                      data-bs-toggle="tab"
+                      data-bs-target="#file-upload-pane"
+                      type="button"
+                      role="tab"
+                      aria-controls="file-upload-pane"
+                      aria-selected="true">Upload from file</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link"
+                      id="url-upload-tab"
+                      data-bs-toggle="tab"
+                      data-bs-target="#url-upload-pane"
+                      type="button"
+                      role="tab"
+                      aria-controls="url-upload-pane"
+                      aria-selected="false">Upload from URL</button>
+            </li>
+          </ul>
+          <div class="tab-content" id="keysUploadTabContent">
+            <div class="tab-pane fade show active"
+                 id="file-upload-pane"
+                 role="tabpanel"
+                 aria-labelledby="file-upload-tab">
+              <div class="pt-3">
+                {{ forms.widget(form.key, id=form.key.id) }}
+                {{ forms.errors(form.key, classes="invalid-feedback d-block") }}
+                {{ forms.description(form.key, classes="form-text text-muted mt-2") }}
+              </div>
+            </div>
+            <div class="tab-pane fade"
+                 id="url-upload-pane"
+                 role="tabpanel"
+                 aria-labelledby="url-upload-tab">
+              <div class="pt-3">
+                {{ forms.widget(form.keys_url, classes="form-control") }}
+                {{ forms.errors(form.keys_url, classes="invalid-feedback d-block") }}
+                {{ forms.description(form.keys_url, classes="form-text text-muted mt-2") }}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

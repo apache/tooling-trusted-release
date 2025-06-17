@@ -26,11 +26,12 @@ import logging
 import logging.handlers
 import pathlib
 import textwrap
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 
 import aiofiles.os
 import asfquart as asfquart
 import asfquart.base as base
+import httpx
 import quart
 import sqlmodel
 import werkzeug.datastructures as datastructures
@@ -66,6 +67,56 @@ class DeleteKeyForm(util.QuartFormTyped):
 
 class UpdateCommitteeKeysForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Update KEYS file")
+
+
+class UploadKeyFormBase(util.QuartFormTyped):
+    key = wtforms.FileField(
+        "KEYS file",
+        validators=[wtforms.validators.Optional()],
+        description=(
+            "Upload a KEYS file containing multiple PGP public keys."
+            " The file should contain keys in ASCII-armored format, starting with"
+            ' "-----BEGIN PGP PUBLIC KEY BLOCK-----".'
+        ),
+    )
+    keys_url = wtforms.URLField(
+        "KEYS file URL",
+        validators=[wtforms.validators.Optional(), wtforms.validators.URL()],
+        render_kw={"placeholder": "Enter URL to KEYS file"},
+        description="Enter a URL to a KEYS file. This will be fetched by the server.",
+    )
+    submit = wtforms.SubmitField("Upload KEYS file")
+    selected_committees = wtforms.SelectMultipleField(
+        "Associate keys with committees",
+        choices=[(c.name, c.display_name) for c in [] if (not util.committee_is_standing(c.name))],
+        coerce=str,
+        option_widget=wtforms.widgets.CheckboxInput(),
+        widget=wtforms.widgets.ListWidget(prefix_label=False),
+        validators=[wtforms.validators.InputRequired("You must select at least one committee")],
+        description=(
+            "Select the committees with which to associate these keys. You must be a member of the selected committees."
+        ),
+    )
+
+    async def validate(self, extra_validators: dict | None = None) -> bool:
+        """Ensure that either a file is uploaded or a URL is provided, but not both."""
+        if not await super().validate(extra_validators):
+            return False
+        if not self.key.data and not self.keys_url.data:
+            msg = "Either a file or a URL is required."
+            if self.key.errors and isinstance(self.key.errors, list):
+                self.key.errors.append(msg)
+            else:
+                self.key.errors = [msg]
+            return False
+        if self.key.data and self.keys_url.data:
+            msg = "Provide either a file or a URL, not both."
+            if self.key.errors and isinstance(self.key.errors, list):
+                self.key.errors.append(msg)
+            else:
+                self.key.errors = [msg]
+            return False
+        return True
 
 
 @routes.committer("/keys/add", methods=["GET", "POST"])
@@ -426,7 +477,7 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
     return await session.redirect(keys)
 
 
-@routes.committer("/keys/upload", methods=["GET", "POST"])
+@routes.committer("/keys/upload", methods=["GET", "POST"], measure_performance=False)
 async def upload(session: routes.CommitterSession) -> str:
     """Upload a KEYS file containing multiple GPG keys."""
     # Get committees for all projects the user is a member of
@@ -434,17 +485,7 @@ async def upload(session: routes.CommitterSession) -> str:
         project_list = session.committees + session.projects
         user_committees = await data.committee(name_in=project_list).all()
 
-    class UploadKeyForm(util.QuartFormTyped):
-        key = wtforms.FileField(
-            "KEYS file",
-            validators=[wtforms.validators.InputRequired("A KEYS file is required")],
-            description=(
-                "Upload a KEYS file containing multiple PGP public keys."
-                " The file should contain keys in ASCII-armored format, starting with"
-                ' "-----BEGIN PGP PUBLIC KEY BLOCK-----".'
-            ),
-        )
-        submit = wtforms.SubmitField("Upload KEYS file")
+    class UploadKeyForm(UploadKeyFormBase):
         selected_committees = wtforms.SelectMultipleField(
             "Associate keys with committees",
             choices=[(c.name, c.display_name) for c in user_committees if (not util.committee_is_standing(c.name))],
@@ -487,9 +528,18 @@ async def upload(session: routes.CommitterSession) -> str:
         )
 
     if await form.validate_on_submit():
-        key_file = form.key.data
-        if not isinstance(key_file, datastructures.FileStorage):
-            return await render(error="Invalid file upload")
+        keys_text = ""
+        if form.key.data:
+            key_file = form.key.data
+            if not isinstance(key_file, datastructures.FileStorage):
+                return await render(error="Invalid file upload")
+            keys_content = await asyncio.to_thread(key_file.read)
+            keys_text = keys_content.decode("utf-8", errors="replace")
+        elif form.keys_url.data:
+            keys_text = await _get_keys_text(form.keys_url.data, render)
+
+        if not keys_text:
+            return await render(error="No KEYS data found.")
 
         # Get selected committee list from the form
         selected_committees = form.selected_committees.data
@@ -497,9 +547,6 @@ async def upload(session: routes.CommitterSession) -> str:
             return await render(error="You must select at least one committee")
         # This is a KEYS file of multiple GPG keys
         # We need to parse it and add each key to the user's account
-        keys_content = await asyncio.to_thread(key_file.read)
-        keys_text = keys_content.decode("utf-8", errors="replace")
-
         try:
             upload_results, success_count, error_count, submitted_committees = await interaction.upload_keys(
                 project_list, keys_text, selected_committees
@@ -520,6 +567,18 @@ async def upload(session: routes.CommitterSession) -> str:
         )
 
     return await render()
+
+
+async def _get_keys_text(keys_url: str, render: Callable[[str], Awaitable[str]]) -> str:
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(keys_url, follow_redirects=True)
+            response.raise_for_status()
+            return response.text
+    except httpx.HTTPStatusError as e:
+        raise base.ASFQuartException(f"Error fetching URL: {e.response.status_code} {e.response.reason_phrase}")
+    except httpx.RequestError as e:
+        raise base.ASFQuartException(f"Error fetching URL: {e}")
 
 
 async def _write_keys_file(
