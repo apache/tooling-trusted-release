@@ -440,7 +440,7 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
     if error_msg:
         await quart.flash(error_msg, "error")
     else:
-        await quart.flash(f"Successfully updated KEYS file for committee {committee_name}.", "success")
+        await quart.flash(f'Successfully regenerated the KEYS file for the "{committee_name}" committee.', "success")
 
     return await session.redirect(keys)
 
