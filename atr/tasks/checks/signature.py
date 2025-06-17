@@ -26,6 +26,7 @@ import sqlmodel
 import atr.db as db
 import atr.db.models as models
 import atr.tasks.checks as checks
+import atr.util as util
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -87,7 +88,22 @@ async def _check_core_logic(committee_name: str, artifact_path: str, signature_p
         result = await session.execute(statement)
         db_public_keys = result.scalars().all()
     _LOGGER.info(f"Found {len(db_public_keys)} public keys for committee_name: '{committee_name}'")
-    apache_uid_map = {key.fingerprint.lower(): bool(key.apache_uid) for key in db_public_keys if key.fingerprint}
+    apache_uid_map = {}
+    for key in db_public_keys:
+        if key.fingerprint:
+            apache_uid_map[key.fingerprint.lower()] = False
+            if key.apache_uid:
+                apache_uid_map[key.fingerprint.lower()] = True
+            elif key.primary_declared_uid:
+                if email := util.email_from_uid(key.primary_declared_uid):
+                    # Allow uploaded keys of the form private@<committee_name>.apache.org
+                    allowed_github_key_email = f"private@{committee_name}.apache.org"
+                    _LOGGER.info(
+                        f"Comparing {key.fingerprint} with email {email} to allowed {allowed_github_key_email}"
+                    )
+                    if email == allowed_github_key_email:
+                        apache_uid_map[key.fingerprint.lower()] = True
+
     public_keys = [key.ascii_armored_key for key in db_public_keys]
 
     return await asyncio.to_thread(

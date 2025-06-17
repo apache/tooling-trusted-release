@@ -158,8 +158,7 @@ async def asf_uid_from_uids(
     # Determine ASF UID if not provided
     emails = []
     for uid_str in uids:
-        if match := re.search(r"<([^>]+)>", uid_str):
-            email = match.group(1).lower()
+        if email := email_from_uid(uid_str):
             if email.endswith("@apache.org"):
                 return email.removesuffix("@apache.org")
             emails.append(email)
