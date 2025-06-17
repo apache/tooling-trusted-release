@@ -487,6 +487,9 @@ async def vote_preview(
         return await session.redirect(root.index, error="Invalid form data")
 
     release = await session.release(project_name, version_name)
+    if release.committee is None:
+        raise routes.FlashError("Release has no associated committee")
+
     form_body: str = util.unwrap(form.body.data)
     asfuid = session.uid
     project_name = release.project.name
@@ -498,6 +501,7 @@ async def vote_preview(
         construct.StartVoteOptions(
             asfuid=asfuid,
             fullname=session.fullname,
+            committee_name=release.committee.display_name,
             project_name=project_name,
             version_name=version_name,
             vote_duration=vote_duration,

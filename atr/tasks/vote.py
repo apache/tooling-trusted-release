@@ -115,6 +115,7 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
         construct.StartVoteOptions(
             asfuid=args.initiator_id,
             fullname=args.initiator_fullname,
+            committee_name=release.committee.display_name,
             project_name=release.project.name,
             version_name=release.version,
             vote_duration=args.vote_duration,
