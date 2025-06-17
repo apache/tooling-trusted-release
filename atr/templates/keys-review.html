@@ -191,6 +191,9 @@
             </tbody>
           </table>
         </div>
+        <p class="text-muted">
+          The <code>KEYS</code> file is automatically generated when you add or remove a key, but you can also use the form below to manually regenerate it.
+        </p>
         <form method="post"
               action="{{ as_url(routes.keys.update_committee_keys, committee_name=committee.name) }}"
               class="mb-4 d-inline-block">

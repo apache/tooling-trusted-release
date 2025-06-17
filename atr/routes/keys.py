@@ -66,7 +66,7 @@ class DeleteKeyForm(util.QuartFormTyped):
 
 
 class UpdateCommitteeKeysForm(util.QuartFormTyped):
-    submit = wtforms.SubmitField("Update KEYS file")
+    submit = wtforms.SubmitField("Regenerate KEYS file")
 
 
 class UploadKeyFormBase(util.QuartFormTyped):
@@ -169,6 +169,8 @@ async def add(session: routes.CommitterSession) -> str:
             for key_info in added_keys:
                 if key_info:
                     await quart.flash(f"GPG key {key_info.get('fingerprint', '')} added successfully.", "success")
+                    for committee_name in selected_committees_data:
+                        await _autogenerate_keys_file(committee_name)
             if not added_keys:
                 await quart.flash("No keys were added.", "error")
             # Clear form data on success by creating a new empty form instance
@@ -210,6 +212,8 @@ async def delete(session: routes.CommitterSession) -> response.Response:
             if key:
                 # Delete the GPG key
                 await data.delete(key)
+                for committee in key.committees:
+                    await _autogenerate_keys_file(committee.name)
                 return await session.redirect(keys, success="GPG key deleted successfully")
 
             # If not a GPG key, try to get an SSH key
@@ -255,6 +259,7 @@ async def import_selected_revision(
         )
     except interaction.InteractionError as e:
         return await session.redirect(compose.selected, error=str(e))
+    await _autogenerate_keys_file(release.committee.name)
     message = f"Uploaded {success_count} keys,"
     if error_count > 0:
         message += f" failed to upload {error_count} keys for {', '.join(submitted_committees)}"
@@ -408,32 +413,12 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
     if committee_name not in (session.committees + session.projects):
         quart.abort(403, description=f"You are not authorised to update the KEYS file for {committee_name}")
 
-    project_names_updated: list[str] = []
-    write_errors: list[str] = []
-    base_downloads_dir = util.get_downloads_dir()
+    error_msg = await _autogenerate_keys_file(committee_name)
 
-    async with db.session() as data:
-        full_keys_file_content = await _keys_formatter(committee_name, data)
-        committee_keys_dir = base_downloads_dir / committee_name
-        committee_keys_path = committee_keys_dir / "KEYS"
-        await _write_keys_file(
-            committee_keys_dir=committee_keys_dir,
-            full_keys_file_content=full_keys_file_content,
-            committee_keys_path=committee_keys_path,
-            committee_name=committee_name,
-            project_names_updated=project_names_updated,
-            write_errors=write_errors,
-        )
-    if write_errors:
-        error_summary = "; ".join(write_errors)
-        await quart.flash(
-            f"Completed KEYS update for {committee_name}, but encountered errors: {error_summary}", "error"
-        )
-    elif project_names_updated:
-        projects_str = ", ".join(project_names_updated)
-        await quart.flash(f"KEYS files updated successfully for projects: {projects_str}", "success")
+    if error_msg:
+        await quart.flash(error_msg, "error")
     else:
-        await quart.flash(f"No KEYS files were updated for committee {committee_name}.", "warning")
+        await quart.flash(f"Successfully updated KEYS file for committee {committee_name}.", "success")
 
     return await session.redirect(keys)
 
@@ -528,6 +513,22 @@ async def upload(session: routes.CommitterSession) -> str:
         )
 
     return await render()
+
+
+async def _autogenerate_keys_file(committee_name: str) -> str | None:
+    base_downloads_dir = util.get_downloads_dir()
+
+    async with db.session() as data:
+        full_keys_file_content = await _keys_formatter(committee_name, data)
+        committee_keys_dir = base_downloads_dir / committee_name
+        committee_keys_path = committee_keys_dir / "KEYS"
+        error_msg = await _write_keys_file(
+            committee_keys_dir=committee_keys_dir,
+            full_keys_file_content=full_keys_file_content,
+            committee_keys_path=committee_keys_path,
+            committee_name=committee_name,
+        )
+    return error_msg
 
 
 async def _format_keys_file(
@@ -645,18 +646,16 @@ async def _write_keys_file(
     full_keys_file_content: str,
     committee_keys_path: pathlib.Path,
     committee_name: str,
-    project_names_updated: list[str],
-    write_errors: list[str],
-) -> None:
+) -> str | None:
     try:
         await asyncio.to_thread(committee_keys_dir.mkdir, parents=True, exist_ok=True)
         await asyncio.to_thread(committee_keys_path.write_text, full_keys_file_content, encoding="utf-8")
-        project_names_updated.append(committee_name)
     except OSError as e:
         error_msg = f"Failed to write KEYS file for committee {committee_name}: {e}"
         logging.exception(error_msg)
-        write_errors.append(error_msg)
+        return error_msg
     except Exception as e:
         error_msg = f"An unexpected error occurred writing KEYS for committee {committee_name}: {e}"
         logging.exception(error_msg)
-        write_errors.append(error_msg)
+        return error_msg
+    return None
