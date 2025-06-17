@@ -77,10 +77,16 @@ def app_dirs_setup(app_config: type[config.AppConfig]) -> None:
         raise RuntimeError(f"State directory not found: {app_config.STATE_DIR}")
     os.chdir(app_config.STATE_DIR)
     print(f"Working directory changed to: {os.getcwd()}")
-    util.get_downloads_dir().mkdir(parents=True, exist_ok=True)
-    util.get_finished_dir().mkdir(parents=True, exist_ok=True)
-    util.get_tmp_dir().mkdir(parents=True, exist_ok=True)
-    util.get_unfinished_dir().mkdir(parents=True, exist_ok=True)
+
+    directories_to_ensure = [
+        util.get_downloads_dir(),
+        util.get_finished_dir(),
+        util.get_tmp_dir(),
+        util.get_unfinished_dir(),
+    ]
+    for directory in directories_to_ensure:
+        directory.mkdir(parents=True, exist_ok=True)
+        util.chmod_directories(directory, permissions=0o755)
 
 
 def app_setup_api_docs(app: base.QuartApp) -> None:
