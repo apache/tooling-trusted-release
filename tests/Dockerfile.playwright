@@ -10,7 +10,7 @@ RUN <<-EOF
     openssh-client \
     python3-dev \
     rsync
-  pip3 install --no-cache-dir \
+  pip3 install --no-cache-dir --break-system-packages \
     netifaces \
     playwright \
     rich
