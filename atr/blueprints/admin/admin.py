@@ -21,6 +21,7 @@ import logging
 import os
 import pathlib
 import statistics
+import sys
 import time
 from collections.abc import Callable, Mapping
 from typing import Any, Final
@@ -359,27 +360,29 @@ async def admin_env() -> quart.wrappers.response.Response:
 @admin.BLUEPRINT.route("/keys/update", methods=["GET", "POST"])
 async def admin_keys_update() -> str | response.Response | tuple[Mapping[str, Any], int]:
     """Update keys from remote data."""
-    if quart.request.method == "POST":
-        try:
-            added_count, updated_count = await _update_keys()
-            return {
-                "message": f"Successfully added {added_count} and updated {updated_count} keys",
-                "category": "success",
-            }, 200
-        except httpx.RequestError as e:
-            return {
-                "message": f"Failed to fetch data: {e!s}",
-                "category": "error",
-            }, 200
-        except Exception as e:
-            return {
-                "message": f"Failed to update projects: {e!s}",
-                "category": "error",
-            }, 200
+    if quart.request.method != "POST":
+        empty_form = await util.EmptyForm.create_form()
+        # Get the previous output from the log file
+        log_path = pathlib.Path("keys_import.log")
+        if not await aiofiles.os.path.exists(log_path):
+            previous_output = None
+        else:
+            async with aiofiles.open(log_path) as f:
+                previous_output = await f.read()
+        return await template.render("update-keys.html", empty_form=empty_form, previous_output=previous_output)
 
-    # For GET requests, show the update form
-    empty_form = await util.EmptyForm.create_form()
-    return await template.render("update-keys.html", empty_form=empty_form)
+    try:
+        pid = await _update_keys()
+        return {
+            "message": f"Successfully started key update process with PID {pid}",
+            "category": "success",
+        }, 200
+    except Exception as e:
+        _LOGGER.exception("Failed to start key update process")
+        return {
+            "message": f"Failed to update keys: {e!s}",
+            "category": "error",
+        }, 200
 
 
 @admin.BLUEPRINT.route("/performance")
@@ -797,38 +800,37 @@ async def _update_committees(
     return added_count, updated_count
 
 
-async def _update_keys() -> tuple[int, int]:
-    import httpx
+async def _update_keys() -> int:
+    async def _log_process(process: asyncio.subprocess.Process) -> None:
+        try:
+            stdout, stderr = await process.communicate()
+            if stdout:
+                _LOGGER.info(f"keys_import.py stdout:\n{stdout.decode('utf-8')[:1000]}")
+            if stderr:
+                _LOGGER.error(f"keys_import.py stderr:\n{stderr.decode('utf-8')[:1000]}")
+        except Exception:
+            _LOGGER.exception("Error reading from subprocess for keys_import.py")
 
-    successes = 0
-    failures = 0
-    async with db.session() as data:
-        # Get all committees
-        committees = await data.committee().all()
-        for committee in committees:
-            # Get the KEYS file
-            async with httpx.AsyncClient() as client:
-                response = await client.get(f"https://downloads.apache.org/{committee.name}/KEYS")
-                try:
-                    response.raise_for_status()
-                except httpx.HTTPStatusError as e:
-                    _LOGGER.error(f"Failed to fetch KEYS file for {committee.name}: {e!s}")
-                    continue
-                keys_data = await response.aread()
-            keys_text = keys_data.decode("utf-8", errors="replace")
-            # results, success_count, error_count, submitted_committees
-            try:
-                _result, yes, no, _committees = await interaction.upload_keys(
-                    [committee.name], keys_text, [committee.name]
-                )
-            except interaction.InteractionError as e:
-                _LOGGER.error(f"Failed to update keys for {committee.name}: {e!s}")
-                continue
-            _LOGGER.info(f"Updated keys for {committee.name}: {yes} successes, {no} failures")
-            successes += yes
-            failures += no
+    app = asfquart.APP
+    if not hasattr(app, "background_tasks"):
+        app.background_tasks = set()
 
-    return successes, failures
+    if await aiofiles.os.path.exists("../Dockerfile.alpine"):
+        # Not in a container, developing locally
+        command = ["poetry", "run", "python3", "scripts/keys_import.py"]
+    else:
+        # In a container
+        command = [sys.executable, "scripts/keys_import.py"]
+
+    process = await asyncio.create_subprocess_exec(
+        *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=".."
+    )
+
+    task = asyncio.create_task(_log_process(process))
+    app.background_tasks.add(task)
+    task.add_done_callback(app.background_tasks.discard)
+
+    return process.pid
 
 
 async def _update_metadata() -> tuple[int, int]:

@@ -88,8 +88,13 @@
   <form action="javascript:submitForm().then(_ => { return false; })">
     {{ empty_form.hidden_tag() }}
 
-    <button type="submit" id="submitButton">Update projects</button>
+    <button type="submit" id="submitButton">Update keys</button>
   </form>
+
+  {% if previous_output %}
+    <h2>Previous output</h2>
+    <pre>{{ previous_output }}</pre>
+  {% endif %}
 
   <script>
     const submitForm = async () => {
