@@ -222,11 +222,10 @@ def _step_02_command_simple_validate(argv: list[str]) -> tuple[str | None, int, 
 
     # Validate the options argument strictly
     options = argv[option_index]
-    if ("e." in options) and (options.split("e.", 1)[0] != "-vlogDtpr"):
-        # The options after -e. are compatibility flags and can be ignored
-        return "The options argument (after --sender) must be '-vlogDtpre.[compatibility flags]'", -1, True
-    elif options != "-vlogDtpr":
-        return "The options argument (after --sender) must be '-vlogDtpr'", -1, True
+    if "e." in options:
+        options = options.split("e.", 1)[0]
+    if options != "-vlogDtpr":
+        return "The options argument (after --sender) must be '-vlogDtpr[.e<FLAGS>]'", -1, True
 
     ####################################################
     ### Calls _step_03_validate_rsync_args_structure ###
