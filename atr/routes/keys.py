@@ -613,7 +613,7 @@ async def _keys_formatter(committee_name: str, data: db.Session) -> str:
         email = util.email_from_uid(key.primary_declared_uid or "") or ""
         comments = []
         comments.append(f"Comment: {key.fingerprint.upper()}")
-        if email == f"{apache_uid}@apache.org":
+        if (apache_uid is None) or (email == f"{apache_uid}@apache.org"):
             comments.append(f"Comment: {email}")
         else:
             comments.append(f"Comment: {email} ({apache_uid})")
