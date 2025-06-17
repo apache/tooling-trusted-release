@@ -632,6 +632,9 @@ async def _keys_formatter(committee_name: str, data: db.Session) -> str:
         # Comment: Redacted Name (CODE SIGNING KEY) <redacted@apache.org>
         #
         # [...]
+        if isinstance(armored_key, bytes):
+            # TODO: This should not happen, but it does
+            armored_key = armored_key.decode("utf-8", errors="replace")
         armored_key = armored_key.replace("BLOCK-----", "\n" + comment_lines, 1)
         keys_content_list.append(armored_key)
 
