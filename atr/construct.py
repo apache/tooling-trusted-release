@@ -39,6 +39,7 @@ class StartVoteOptions:
     asfuid: str
     fullname: str
     committee_name: str
+    is_podling: bool
     project_name: str
     version_name: str
     vote_duration: int
@@ -111,9 +112,14 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
     project_short_display_name = release.project.short_display_name if release.project else options.project_name
 
     keys_file = None
-    keys_file_path = util.get_finished_dir() / options.committee_name / "KEYS"
-    if await aiofiles.os.path.isfile(keys_file_path):
-        keys_file = f"https://{host}/downloads/{options.committee_name}/KEYS"
+    if options.is_podling:
+        keys_file_path = util.get_downloads_dir() / "incubator" / options.committee_name / "KEYS"
+        if await aiofiles.os.path.isfile(keys_file_path):
+            keys_file = f"https://{host}/downloads/incubator/{options.committee_name}/KEYS"
+    else:
+        keys_file_path = util.get_downloads_dir() / options.committee_name / "KEYS"
+        if await aiofiles.os.path.isfile(keys_file_path):
+            keys_file = f"https://{host}/downloads/{options.committee_name}/KEYS"
 
     checklist_content = ""
     async with db.session() as data:

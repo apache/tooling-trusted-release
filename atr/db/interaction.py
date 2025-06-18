@@ -356,6 +356,8 @@ def _key_latest_self_signature(key: dict) -> datetime.datetime | None:
 
 async def _key_user_add_validate_key_properties(public_key: str) -> list[dict]:
     """Validate GPG key string, import it, and return its properties and fingerprint."""
+    # import atr.gpgpatch as gpgpatch
+    # gnupg = gpgpatch.patch_gnupg()
     import gnupg
 
     def _sig_with_timestamp(self, args):

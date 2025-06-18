@@ -130,6 +130,7 @@ async def add(session: routes.CommitterSession) -> str:
         project_list = session.committees + session.projects
         user_committees = await data.committee(name_in=project_list).all()
 
+    committee_is_podling = {c.name: c.is_podling for c in user_committees}
     committee_choices = [(c.name, c.display_name or c.name) for c in user_committees]
 
     class AddGpgKeyForm(util.QuartFormTyped):
@@ -171,7 +172,8 @@ async def add(session: routes.CommitterSession) -> str:
                 if key_info:
                     await quart.flash(f"GPG key {key_info.get('fingerprint', '')} added successfully.", "success")
                     for committee_name in selected_committees_data:
-                        await autogenerate_keys_file(committee_name)
+                        is_podling = committee_is_podling[committee_name]
+                        await autogenerate_keys_file(committee_name, is_podling)
             if not added_keys:
                 await quart.flash("No keys were added.", "error")
             # Clear form data on success by creating a new empty form instance
@@ -194,7 +196,9 @@ async def add(session: routes.CommitterSession) -> str:
     )
 
 
-async def autogenerate_keys_file(committee_name: str, caller_data: db.Session | None = None) -> str | None:
+async def autogenerate_keys_file(
+    committee_name: str, is_podling: bool, caller_data: db.Session | None = None
+) -> str | None:
     base_downloads_dir = util.get_downloads_dir()
 
     if caller_data is None:
@@ -204,7 +208,10 @@ async def autogenerate_keys_file(committee_name: str, caller_data: db.Session | 
 
     async with manager as data:
         full_keys_file_content = await _keys_formatter(committee_name, data)
-        committee_keys_dir = base_downloads_dir / committee_name
+        if is_podling:
+            committee_keys_dir = base_downloads_dir / "incubator" / committee_name
+        else:
+            committee_keys_dir = base_downloads_dir / committee_name
         committee_keys_path = committee_keys_dir / "KEYS"
         error_msg = await _write_keys_file(
             committee_keys_dir=committee_keys_dir,
@@ -235,7 +242,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
                 # Delete the GPG key
                 await data.delete(key)
                 for committee in key.committees:
-                    await autogenerate_keys_file(committee.name, caller_data=data)
+                    await autogenerate_keys_file(committee.name, committee.is_podling, caller_data=data)
                 return await session.redirect(keys, success="GPG key deleted successfully")
 
             # If not a GPG key, try to get an SSH key
@@ -281,7 +288,7 @@ async def import_selected_revision(
         )
     except interaction.InteractionError as e:
         return await session.redirect(compose.selected, error=str(e))
-    await autogenerate_keys_file(release.committee.name)
+    await autogenerate_keys_file(release.committee.name, release.committee.is_podling)
     message = f"Uploaded {success_count} keys,"
     if error_count > 0:
         message += f" failed to upload {error_count} keys for {', '.join(submitted_committees)}"
@@ -435,7 +442,11 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
     if committee_name not in (session.committees + session.projects):
         quart.abort(403, description=f"You are not authorised to update the KEYS file for {committee_name}")
 
-    error_msg = await autogenerate_keys_file(committee_name)
+    async with db.session() as data:
+        committee = await data.committee(name=committee_name).demand(
+            base.ASFQuartException(f"Committee {committee_name} not found", errorcode=404)
+        )
+        error_msg = await autogenerate_keys_file(committee_name, committee.is_podling, caller_data=data)
 
     if error_msg:
         await quart.flash(error_msg, "error")

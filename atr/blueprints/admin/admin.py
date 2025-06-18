@@ -754,11 +754,12 @@ def _project_status(
 async def _regenerate_keys_all() -> tuple[int, list[str]]:
     okay = 0
     failures = []
+    downloads_dir = util.get_downloads_dir()
     async with db.session() as data:
         committees = await data.committee().all()
         for committee in committees:
             try:
-                error_msg = await keys.autogenerate_keys_file(committee.name, caller_data=data)
+                error_msg = await keys.autogenerate_keys_file(committee.name, committee.is_podling, caller_data=data)
             except Exception as e:
                 failures.append(f"Caller error regenerating KEYS file for committee {committee.name}: {e!s}")
                 continue
@@ -766,6 +767,10 @@ async def _regenerate_keys_all() -> tuple[int, list[str]]:
                 failures.append(error_msg)
             else:
                 okay += 1
+            if committee.is_podling:
+                if await aiofiles.os.path.isdir(downloads_dir / committee.name):
+                    # Accidental top level directory, so remove it
+                    await aiofiles.os.rmdir(downloads_dir / committee.name)
     return okay, failures
 
 

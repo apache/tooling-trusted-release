@@ -88,6 +88,8 @@ async def draft_checks(
 
 
 def ensure_session(caller_data: db.Session | None) -> db.Session | contextlib.nullcontext[db.Session]:
+    # TODO: Move to interaction.py
+    # This pattern is also used in routes/keys.py
     if caller_data is None:
         return db.session()
     return contextlib.nullcontext(caller_data)
