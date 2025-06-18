@@ -380,6 +380,7 @@ async def admin_keys_regenerate_all() -> quart.Response:
             msg += f"\nFailures:\n{'\n'.join(failures)}"
         return quart.Response(msg, mimetype="text/plain")
     except Exception as e:
+        _LOGGER.exception("Exception during KEYS file regeneration:")
         return quart.Response(f"Exception during KEYS file regeneration: {e!s}", mimetype="text/plain")
 
 
@@ -770,7 +771,7 @@ async def _regenerate_keys_all() -> tuple[int, list[str]]:
             if committee.is_podling:
                 if await aiofiles.os.path.isdir(downloads_dir / committee.name):
                     # Accidental top level directory, so remove it
-                    await aiofiles.os.rmdir(downloads_dir / committee.name)
+                    await aioshutil.rmtree(downloads_dir / committee.name)
     return okay, failures
 
 
