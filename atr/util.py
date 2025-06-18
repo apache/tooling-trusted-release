@@ -158,6 +158,7 @@ async def asf_uid_from_uids(
     # Determine ASF UID if not provided
     emails = []
     for uid_str in uids:
+        # This returns a lower case email address, no matter what the case of the input UID
         if email := email_from_uid(uid_str):
             if email.endswith("@apache.org"):
                 return email.removesuffix("@apache.org")
@@ -276,7 +277,7 @@ async def create_hard_link_clone(
 
 def email_from_uid(uid: str) -> str | None:
     if m := re.search(r"<([^>]+)>", uid):
-        return m.group(1)
+        return m.group(1).lower()
     return None
 
 
@@ -305,11 +306,11 @@ async def email_to_uid_map() -> dict[str, str]:
     for entry in ldap_params.results_list:
         uid = entry.get("uid", [""])[0]
         if mail := get(entry, "mail"):
-            email_to_uid[mail] = uid
+            email_to_uid[mail.lower()] = uid.lower()
         if alt_email := get(entry, "asf-altEmail"):
-            email_to_uid[alt_email] = uid
+            email_to_uid[alt_email.lower()] = uid.lower()
         if committer_email := get(entry, "asf-committer-email"):
-            email_to_uid[committer_email] = uid
+            email_to_uid[committer_email.lower()] = uid.lower()
     return email_to_uid
 
 

@@ -241,7 +241,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     async with db.session() as data:
         async with data.begin():
             # Try to get an OpenPGP key first
-            key = await data.public_signing_key(fingerprint=fingerprint, apache_uid=session.uid).get()
+            key = await data.public_signing_key(fingerprint=fingerprint, apache_uid=session.uid.lower()).get()
             if key:
                 # Delete the OpenPGP key
                 await data.delete(key)
@@ -411,7 +411,7 @@ async def keys(session: routes.CommitterSession) -> str:
     update_committee_keys_form = await UpdateCommitteeKeysForm.create_form()
 
     async with db.session() as data:
-        user_keys = await data.public_signing_key(apache_uid=session.uid, _committees=True).all()
+        user_keys = await data.public_signing_key(apache_uid=session.uid.lower(), _committees=True).all()
         user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
         user_committees_with_keys = await data.committee(name_in=committees_to_query, _public_signing_keys=True).all()
     for key in user_keys:
@@ -656,7 +656,9 @@ async def _key_and_is_owner(
 
     # Allow owners and committee members to view the key
     authorised = False
-    is_owner = key.apache_uid == session.uid
+    is_owner = False
+    if key.apache_uid and session.uid:
+        is_owner = key.apache_uid.lower() == session.uid.lower()
     if is_owner:
         authorised = True
     else:
@@ -690,7 +692,7 @@ async def _keys_formatter(committee_name: str, data: db.Session) -> str:
 
     keys_content_list = []
     for key in sorted_keys:
-        apache_uid = key.apache_uid
+        apache_uid = key.apache_uid.lower() if key.apache_uid else None
         # TODO: What if there is no email?
         email = util.email_from_uid(key.primary_declared_uid or "") or ""
         comments = []

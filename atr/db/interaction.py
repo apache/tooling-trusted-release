@@ -75,6 +75,7 @@ async def key_user_add(
     ldap_data: dict[str, str] | None = None,
     update_existing: bool = False,
 ) -> list[dict]:
+    session_asf_uid = session_asf_uid.lower() if session_asf_uid else None
     if not public_key:
         raise PublicKeyError("Public key is required")
 
@@ -157,7 +158,7 @@ async def key_user_session_add(
                 existing.expires = expires
                 existing.primary_declared_uid = uids[0] if uids else None
                 existing.secondary_declared_uids = uids[1:]
-                existing.apache_uid = asf_uid
+                existing.apache_uid = asf_uid.lower() if asf_uid else None
                 existing.ascii_armored_key = (
                     public_key.decode("utf-8", errors="replace") if isinstance(public_key, bytes) else public_key
                 )
@@ -178,7 +179,7 @@ async def key_user_session_add(
                 expires=expires,
                 primary_declared_uid=uids[0] if uids else None,
                 secondary_declared_uids=uids[1:],
-                apache_uid=asf_uid,
+                apache_uid=asf_uid.lower() if asf_uid else None,
                 ascii_armored_key=public_key,
             )
             data.add(key_record)
