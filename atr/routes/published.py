@@ -40,18 +40,6 @@ async def root(session: routes.CommitterSession) -> quart.Response:
     return await _path(session, "")
 
 
-async def _path(session: routes.CommitterSession, path: str) -> quart.Response:
-    downloads_path = util.get_downloads_dir()
-    full_path = downloads_path / path
-    if await aiofiles.os.path.isdir(full_path):
-        return await _directory_listing(full_path, path)
-
-    if await aiofiles.os.path.isfile(full_path):
-        return await _file_content(full_path)
-
-    return quart.abort(404)
-
-
 async def _directory_listing(full_path: pathlib.Path, current_path: str) -> quart.Response:
     html_parts = [
         "<!doctype html>",
@@ -101,3 +89,15 @@ async def _directory_listing(full_path: pathlib.Path, current_path: str) -> quar
 
 async def _file_content(full_path: pathlib.Path) -> quart.Response:
     return await quart.send_file(full_path)
+
+
+async def _path(session: routes.CommitterSession, path: str) -> quart.Response:
+    downloads_path = util.get_downloads_dir()
+    full_path = downloads_path / path
+    if await aiofiles.os.path.isdir(full_path):
+        return await _directory_listing(full_path, path)
+
+    if await aiofiles.os.path.isfile(full_path):
+        return await _file_content(full_path)
+
+    return quart.abort(404)

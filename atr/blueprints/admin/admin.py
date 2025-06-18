@@ -436,7 +436,7 @@ async def admin_keys_update() -> str | response.Response | tuple[Mapping[str, An
 
 
 @admin.BLUEPRINT.route("/ldap/", methods=["GET"])
-async def ldap_search() -> str:
+async def admin_ldap() -> str:
     form = await LdapLookupForm.create_form(data=quart.request.args)
     asf_id_for_template: str | None = None
 
@@ -475,7 +475,7 @@ async def ldap_search() -> str:
 
 
 @admin.BLUEPRINT.route("/ongoing-tasks/<project_name>/<version_name>/<revision>")
-async def ongoing_tasks(project_name: str, version_name: str, revision: str) -> quart.wrappers.response.Response:
+async def admin_ongoing_tasks(project_name: str, version_name: str, revision: str) -> quart.wrappers.response.Response:
     try:
         ongoing = await interaction.tasks_ongoing(project_name, version_name, revision)
         return quart.Response(str(ongoing), mimetype="text/plain")

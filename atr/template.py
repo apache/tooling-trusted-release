@@ -23,6 +23,21 @@ import quart
 import quart.app as app
 import quart.signals as signals
 
+render_async = quart.render_template
+
+
+async def render_sync(
+    template_name_or_list: str | jinja2.Template | list[str | jinja2.Template],
+    **context_vars: Any,
+) -> str:
+    app_instance = quart.current_app
+    await app_instance.update_template_context(context_vars)
+    template = app_instance.jinja_env.get_or_select_template(template_name_or_list)
+    return await _render_in_thread(template, context_vars, app_instance)
+
+
+render = render_sync
+
 
 async def _render_in_thread(template: jinja2.Template, context: dict, app: app.Quart) -> str:
     if template.environment.is_async is False:
@@ -41,19 +56,3 @@ async def _render_in_thread(template: jinja2.Template, context: dict, app: app.Q
         context=context,
     )
     return rendered_template
-
-
-render_async = quart.render_template
-
-
-async def render_sync(
-    template_name_or_list: str | jinja2.Template | list[str | jinja2.Template],
-    **context_vars: Any,
-) -> str:
-    app_instance = quart.current_app
-    await app_instance.update_template_context(context_vars)
-    template = app_instance.jinja_env.get_or_select_template(template_name_or_list)
-    return await _render_in_thread(template, context_vars, app_instance)
-
-
-render = render_sync
