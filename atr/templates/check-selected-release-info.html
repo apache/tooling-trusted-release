@@ -33,9 +33,16 @@
         <a href="{{ as_url(routes.upload.selected, project_name=release.project.name, version_name=release.version) }}"
            title="Upload files to this draft"
            class="btn btn-primary"><i class="bi bi-upload me-1"></i> Upload files</a>
+
         <a href="{{ as_url(routes.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
-           title="Download files"
-           class="btn btn-primary"><i class="bi bi-download me-1"></i> Download files</a>
+           title="Download {%- if has_files -%}files{%- else -%}links{%- endif -%}"
+           class="btn btn-primary"><i class="bi bi-download me-1"></i> Download
+          {% if has_files %}
+            files
+          {% else %}
+            links
+          {% endif %}
+        </a>
         <a href="{{ as_url(routes.revisions.selected, project_name=release.project.name, version_name=release.version) }}"
            title="View revision history"
            class="btn btn-secondary"><i class="bi bi-clock-history me-1"></i> Revisions</a>

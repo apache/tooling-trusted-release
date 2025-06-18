@@ -54,6 +54,11 @@
       <code>{{ file_count }}</code> files
     {% endif %}
     with a total size of <code>{{ formatted_size }}</code>.
+    {% if file_count == 0 %}
+      <br />
+      <br />
+      Although there are not yet any files in this release, this page gives instructions and links that you can use or share to prepare for when files have been added.
+    {% endif %}
   </p>
 
   <h2 id="download-zip">Download ZIP archive</h2>

@@ -77,6 +77,7 @@ async def check(
     resolve_form = await resolve.ResolveForm.create_form()
     empty_form = await util.EmptyForm.create_form()
     vote_task_warnings = _warnings_from_vote_result(vote_task)
+    has_files = await util.has_files(release)
 
     return await template.render(
         "check-selected.html",
@@ -103,6 +104,7 @@ async def check(
         archive_url=archive_url,
         vote_task_warnings=vote_task_warnings,
         empty_form=empty_form,
+        has_files=has_files,
     )
 
 
