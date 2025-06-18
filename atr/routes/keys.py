@@ -34,7 +34,6 @@ import asfquart as asfquart
 import asfquart.base as base
 import httpx
 import quart
-import sqlmodel
 import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
 import wtforms
@@ -256,8 +255,44 @@ async def delete(session: routes.CommitterSession) -> response.Response:
             return await session.redirect(keys, error="Key not found or not owned by you")
 
 
+@routes.committer("/keys/details/<fingerprint>", methods=["GET"])
+async def details(session: routes.CommitterSession, fingerprint: str) -> str:
+    """Display details for a specific GPG key."""
+    async with db.session() as data:
+        key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
+
+    if not key:
+        quart.abort(404, description="GPG key not found")
+    key.committees.sort(key=lambda c: c.name)
+
+    authorised = False
+    if key.apache_uid == session.uid:
+        authorised = True
+    else:
+        user_affiliations = set(session.committees + session.projects)
+        # async with db.session() as data:
+        #     key_committees = await data.execute(
+        #         sqlmodel.select(models.KeyLink.committee_name).where(models.KeyLink.key_fingerprint == fingerprint)
+        #     )
+        #     key_committee_names = {row[0] for row in key_committees.all()}
+        key_committee_names = {c.name for c in key.committees}
+        if user_affiliations.intersection(key_committee_names):
+            authorised = True
+
+    if not authorised:
+        quart.abort(403, description="You are not authorised to view this key")
+
+    return await template.render(
+        "keys-show-gpg.html",
+        key=key,
+        algorithms=routes.algorithms,
+        now=datetime.datetime.now(datetime.UTC),
+        asf_id=session.uid,
+    )
+
+
 @routes.committer("/keys/export/<committee_name>")
-async def exports(session: routes.CommitterSession, committee_name: str) -> quart.Response:
+async def export(session: routes.CommitterSession, committee_name: str) -> quart.Response:
     """Generate a KEYS file for a specific committee."""
     if committee_name not in (session.committees + session.projects):
         quart.abort(403, description=f"You are not authorised to update the KEYS file for {committee_name}")
@@ -362,40 +397,6 @@ async def keys(session: routes.CommitterSession) -> str:
         update_committee_keys_form=update_committee_keys_form,
         email_from_key=util.email_from_uid,
         committee_is_standing=util.committee_is_standing,
-    )
-
-
-@routes.committer("/keys/show-gpg/<fingerprint>", methods=["GET"])
-async def show_gpg_key(session: routes.CommitterSession, fingerprint: str) -> str:
-    """Display details for a specific GPG key."""
-    async with db.session() as data:
-        key = await data.public_signing_key(fingerprint=fingerprint).get()
-
-    if not key:
-        quart.abort(404, description="GPG key not found")
-
-    authorised = False
-    if key.apache_uid == session.uid:
-        authorised = True
-    else:
-        user_affiliations = set(session.committees + session.projects)
-        async with db.session() as data:
-            key_committees = await data.execute(
-                sqlmodel.select(models.KeyLink.committee_name).where(models.KeyLink.key_fingerprint == fingerprint)
-            )
-            key_committee_names = {row[0] for row in key_committees.all()}
-        if user_affiliations.intersection(key_committee_names):
-            authorised = True
-
-    if not authorised:
-        quart.abort(403, description="You are not authorised to view this key")
-
-    return await template.render(
-        "keys-show-gpg.html",
-        key=key,
-        algorithms=routes.algorithms,
-        now=datetime.datetime.now(datetime.UTC),
-        asf_id=session.uid,
     )
 
 

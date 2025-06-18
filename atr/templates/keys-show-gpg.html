@@ -31,6 +31,12 @@
           <td class="text-break">{{ key.created.strftime("%Y-%m-%d %H:%M:%S") }}</td>
         </tr>
         <tr>
+          <th class="p-2 text-dark">Latest self signature</th>
+          <td class="text-break">
+            {{ key.latest_self_signature.strftime("%Y-%m-%d %H:%M:%S") if key.latest_self_signature else 'Never' }}
+          </td>
+        </tr>
+        <tr>
           <th class="p-2 text-dark">Expires</th>
           <td class="text-break">
             {% if key.expires %}
@@ -54,18 +60,34 @@
           </td>
         </tr>
         <tr>
+          <th class="p-2 text-dark">Primary UID</th>
+          <td class="text-break">{{ key.primary_declared_uid or 'Not specified' }}</td>
+        </tr>
+        <tr>
+          <th class="p-2 text-dark">Secondary UIDs</th>
+          <td class="text-break">
+            {{ key.secondary_declared_uids | join(", ") if key.secondary_declared_uids else 'Not specified' }}
+          </td>
+        </tr>
+        <tr>
           <th class="p-2 text-dark">Apache UID</th>
           <td class="text-break">{{ key.apache_uid }}</td>
         </tr>
         <tr>
-          <th class="p-2 text-dark">Declared UID</th>
-          <td class="text-break">{{ key.declared_uid or 'Not specified' }}</td>
+          <th class="p-2 text-dark">Associated PMCs</th>
+          <td class="text-break">
+            {% if key.committees %}
+              {{ key.committees|map(attribute='name') |join(', ') }}
+            {% else %}
+              No PMCs associated
+            {% endif %}
+          </td>
         </tr>
       </tbody>
     </table>
 
     <details class="mt-3 p-3 bg-light rounded">
-      <summary class="fw-bold">View ASCII Armored Key</summary>
+      <summary class="fw-bold">View ASCII armored key</summary>
       <pre class="mt-3">{{ key.ascii_armored_key }}</pre>
     </details>
   </div>
