@@ -42,7 +42,9 @@
               <tbody>
                 <tr>
                   <th class="p-2 text-dark">Fingerprint</th>
-                  <td class="text-break">{{ key.fingerprint }}</td>
+                  <td class="text-break">
+                    <a href="{{ as_url(routes.keys.details, fingerprint=key.fingerprint) }}">{{ key.fingerprint }}</a>
+                  </td>
                 </tr>
                 <tr>
                   <th class="p-2 text-dark">Type</th>

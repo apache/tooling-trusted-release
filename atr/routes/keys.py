@@ -255,36 +255,63 @@ async def delete(session: routes.CommitterSession) -> response.Response:
             return await session.redirect(keys, error="Key not found or not owned by you")
 
 
-@routes.committer("/keys/details/<fingerprint>", methods=["GET"])
-async def details(session: routes.CommitterSession, fingerprint: str) -> str:
+@routes.committer("/keys/details/<fingerprint>", methods=["GET", "POST"])
+async def details(session: routes.CommitterSession, fingerprint: str) -> str | response.Response:
     """Display details for a specific GPG key."""
     async with db.session() as data:
-        key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
+        key, is_owner = await _key_and_is_owner(data, session, fingerprint)
+        form = None
+        if is_owner:
+            project_list = session.committees + session.projects
+            user_committees = await data.committee(name_in=project_list).all()
+            committee_choices = [(c.name, c.display_name or c.name) for c in user_committees]
 
-    if not key:
-        quart.abort(404, description="GPG key not found")
-    key.committees.sort(key=lambda c: c.name)
+            class UpdateKeyCommitteesForm(util.QuartFormTyped):
+                selected_committees = wtforms.SelectMultipleField(
+                    "Associated PMCs",
+                    coerce=str,
+                    choices=committee_choices,
+                    option_widget=wtforms.widgets.CheckboxInput(),
+                    widget=wtforms.widgets.ListWidget(prefix_label=False),
+                    description="Select the committees associated with this key.",
+                )
+                submit = wtforms.SubmitField("Update associations")
 
-    authorised = False
-    if key.apache_uid == session.uid:
-        authorised = True
-    else:
-        user_affiliations = set(session.committees + session.projects)
-        # async with db.session() as data:
-        #     key_committees = await data.execute(
-        #         sqlmodel.select(models.KeyLink.committee_name).where(models.KeyLink.key_fingerprint == fingerprint)
-        #     )
-        #     key_committee_names = {row[0] for row in key_committees.all()}
-        key_committee_names = {c.name for c in key.committees}
-        if user_affiliations.intersection(key_committee_names):
-            authorised = True
+            form = await UpdateKeyCommitteesForm.create_form(
+                data=await quart.request.form if (quart.request.method == "POST") else None
+            )
 
-    if not authorised:
-        quart.abort(403, description="You are not authorised to view this key")
+            if quart.request.method == "GET":
+                form.selected_committees.data = [c.name for c in key.committees]
+
+    if form and await form.validate_on_submit():
+        async with db.session() as data:
+            async with data.begin():
+                key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
+                if not key:
+                    quart.abort(404, description="GPG key not found")
+
+                selected_committee_names = form.selected_committees.data or []
+                old_committee_names = {c.name for c in key.committees}
+
+                new_committees = await data.committee(name_in=selected_committee_names).all()
+                key.committees = list(new_committees)
+                data.add(key)
+
+                affected_committee_names = old_committee_names.union(set(selected_committee_names))
+                if affected_committee_names:
+                    affected_committees = await data.committee(name_in=list(affected_committee_names)).all()
+                    for committee in affected_committees:
+                        await autogenerate_keys_file(committee.name, committee.is_podling, caller_data=data)
+
+            await quart.flash("Key committee associations updated successfully.", "success")
+            return await session.redirect(details, fingerprint=fingerprint)
 
     return await template.render(
+        # TODO: Rename to keys-details.html
         "keys-show-gpg.html",
         key=key,
+        form=form,
         algorithms=routes.algorithms,
         now=datetime.datetime.now(datetime.UTC),
         asf_id=session.uid,
@@ -609,6 +636,31 @@ async def _get_keys_text(keys_url: str, render: Callable[[str], Awaitable[str]])
         raise base.ASFQuartException(f"Error fetching URL: {e}")
 
 
+async def _key_and_is_owner(
+    data: db.Session, session: routes.CommitterSession, fingerprint: str
+) -> tuple[models.PublicSigningKey, bool]:
+    key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
+    if not key:
+        quart.abort(404, description="GPG key not found")
+    key.committees.sort(key=lambda c: c.name)
+
+    # Allow owners and committee members to view the key
+    authorised = False
+    is_owner = key.apache_uid == session.uid
+    if is_owner:
+        authorised = True
+    else:
+        user_affiliations = set(session.committees + session.projects)
+        key_committee_names = {c.name for c in key.committees}
+        if user_affiliations.intersection(key_committee_names):
+            authorised = True
+
+    if not authorised:
+        quart.abort(403, description="You are not authorised to view this key")
+
+    return key, is_owner
+
+
 async def _keys_formatter(committee_name: str, data: db.Session) -> str:
     committee = await data.committee(name=committee_name, _public_signing_keys=True, _projects=True).demand(
         base.ASFQuartException(f"Committee {committee_name} not found", errorcode=404)
@@ -619,7 +671,7 @@ async def _keys_formatter(committee_name: str, data: db.Session) -> str:
             f"No keys found for committee {committee_name} to generate KEYS file.", errorcode=404
         )
 
-    if not committee.projects:
+    if (not committee.projects) and (committee.name != "incubator"):
         raise base.ASFQuartException(f"No projects found associated with committee {committee_name}.", errorcode=404)
 
     sorted_keys = sorted(committee.public_signing_keys, key=lambda k: k.fingerprint)
