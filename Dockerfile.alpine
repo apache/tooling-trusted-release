@@ -50,7 +50,6 @@ RUN apk update && \
       make \
       nix \
       openjdk8 \
-      patch \
       rsync \
       subversion
 
@@ -65,8 +64,6 @@ COPY --from=builder /opt/atr/scripts ./scripts
 COPY --from=builder /opt/atr/Makefile .
 COPY --from=builder /opt/atr/alembic.ini .
 COPY --from=builder /opt/atr/start-atr.sh .
-
-RUN patch /opt/atr/.venv/lib/python3.13/site-packages/gnupg.py /opt/atr/patches/gnupg.py.patch
 
 RUN chmod +x ./start-atr.sh
 
