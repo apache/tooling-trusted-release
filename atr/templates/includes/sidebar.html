@@ -112,14 +112,49 @@
                {% if request.endpoint == 'admin.admin_browse_as' %}class="active"{% endif %}>Browse as user</a>
           </li>
           <li>
+            <i class="bi bi-arrow-repeat"></i>
+            <a href="{{ url_for('admin.admin_consistency') }}"
+               {% if request.endpoint == 'admin.admin_consistency' %}class="active"{% endif %}>Consistency</a>
+          </li>
+          <li>
             <i class="bi bi-database"></i>
             <a href="{{ url_for('admin.admin_data') }}"
                {% if request.endpoint == 'admin.admin_data' %}class="active"{% endif %}>Browse database</a>
           </li>
           <li>
             <i class="bi bi-trash"></i>
+            <a href="{{ url_for('admin.admin_delete_committee_keys') }}"
+               {% if request.endpoint == 'admin.admin_delete_committee_keys' %}class="active"{% endif %}>Delete committee keys</a>
+          </li>
+          <li>
+            <i class="bi bi-trash"></i>
             <a href="{{ url_for('admin.admin_delete_release') }}"
                {% if request.endpoint == 'admin.admin_delete_release' %}class="active"{% endif %}>Delete release</a>
+          </li>
+          <li>
+            <i class="bi bi-gear"></i>
+            <a href="{{ url_for('admin.admin_env') }}"
+               {% if request.endpoint == 'admin.admin_env' %}class="active"{% endif %}>Environment</a>
+          </li>
+          <li>
+            <i class="bi bi-key"></i>
+            <a href="{{ url_for('admin.admin_keys_check') }}"
+               {% if request.endpoint == 'admin.admin_keys_check' %}class="active"{% endif %}>Keys check</a>
+          </li>
+          <li>
+            <i class="bi bi-key"></i>
+            <a href="{{ url_for('admin.admin_keys_regenerate_all') }}"
+               {% if request.endpoint == 'admin.admin_keys_regenerate_all' %}class="active"{% endif %}>Regenerate all keys</a>
+          </li>
+          <li>
+            <i class="bi bi-key"></i>
+            <a href="{{ url_for('admin.admin_keys_update') }}"
+               {% if request.endpoint == 'admin.admin_keys_update' %}class="active"{% endif %}>Update keys</a>
+          </li>
+          <li>
+            <i class="bi bi-person-plus"></i>
+            <a href="{{ url_for('admin.ldap_search') }}"
+               {% if request.endpoint == 'admin.ldap_search' %}class="active"{% endif %}>LDAP search</a>
           </li>
           <li>
             <i class="bi bi-speedometer2"></i>
