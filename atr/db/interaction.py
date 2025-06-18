@@ -138,6 +138,7 @@ async def key_user_session_add(
         existing = await data.public_signing_key(fingerprint=fingerprint).get()
         # TODO: This can race
         if existing:
+            # TODO: Always update?
             # If the new key has a latest self signature
             if latest_self_signature is not None:
                 # And the self signature is newer, update it

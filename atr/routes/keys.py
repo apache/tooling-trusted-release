@@ -45,6 +45,7 @@ import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.template as template
+import atr.user as user
 import atr.util as util
 
 
@@ -659,6 +660,8 @@ async def _key_and_is_owner(
         user_affiliations = set(session.committees + session.projects)
         key_committee_names = {c.name for c in key.committees}
         if user_affiliations.intersection(key_committee_names):
+            authorised = True
+        elif user.is_admin(session.uid):
             authorised = True
 
     if not authorised:
