@@ -584,7 +584,7 @@ async def _format_keys_file(
 #    gpg --import KEYS
 #
 # 2. Verify the signature file against the release artifact:
-#    gpg --verify <artifact-name>.asc <artifact-name>
+#    gpg --verify "${{ARTIFACT}}.asc" "${{ARTIFACT}}"
 #
 # For details on Apache release signing and verification, see:
 # https://infra.apache.org/release-signing.html
@@ -630,7 +630,7 @@ async def _keys_formatter(committee_name: str, data: db.Session) -> str:
         # TODO: What if there is no email?
         email = util.email_from_uid(key.primary_declared_uid or "") or ""
         comments = []
-        comments.append(f"Comment: {key.fingerprint.upper()}")
+        comments.append(f"Comment: {key.fingerprint.lower()}")
         if (apache_uid is None) or (email == f"{apache_uid}@apache.org"):
             comments.append(f"Comment: {email}")
         else:
@@ -646,7 +646,7 @@ async def _keys_formatter(committee_name: str, data: db.Session) -> str:
         if isinstance(armored_key, bytes):
             # TODO: This should not happen, but it does
             armored_key = armored_key.decode("utf-8", errors="replace")
-        armored_key = armored_key.replace("BLOCK-----", "\n" + comment_lines, 1)
+        armored_key = armored_key.replace("BLOCK-----", "BLOCK-----\n" + comment_lines, 1)
         keys_content_list.append(armored_key)
 
     key_blocks_str = "\n\n\n".join(keys_content_list) + "\n"
