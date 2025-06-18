@@ -37,7 +37,7 @@ import playwright.sync_api as sync_api
 
 _SSH_KEY_COMMENT: Final[str] = "atr-playwright-test@127.0.0.1"
 _SSH_KEY_PATH: Final[str] = "/root/.ssh/id_ed25519"
-_GPG_TEST_UID: Final[str] = "<apache-tooling@example.invalid>"
+_OPENPGP_TEST_UID: Final[str] = "<apache-tooling@example.invalid>"
 
 
 @dataclasses.dataclass
@@ -486,8 +486,8 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
         test_lifecycle_06_announce_preview,
         test_lifecycle_07_release_exists,
     ]
-    tests["gpg"] = [
-        test_gpg_01_upload,
+    tests["openpgp"] = [
+        test_openpgp_01_upload,
     ]
     tests["ssh"] = [
         test_ssh_01_add_key,
@@ -692,19 +692,20 @@ def test_checks_06_targz(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Targz Structure status verified as Success")
 
 
-def test_gpg_01_upload(page: sync_api.Page, credentials: Credentials) -> None:
+def test_openpgp_01_upload(page: sync_api.Page, credentials: Credentials) -> None:
     key_fingerprint_lower = "e35604dd9e2892e5465b3d8a203f105a7b33a64f"
+    key_fingerprint_upper = key_fingerprint_lower.upper()
     key_path = f"/run/tests/{key_fingerprint_lower.upper()}.asc"
 
-    logging.info("Starting GPG key upload test")
+    logging.info("Starting OpenPGP key upload test")
     go_to_path(page, "/keys")
 
-    logging.info("Following link to add GPG key")
-    add_key_link_locator = page.locator('a:has-text("Add your GPG key")')
+    logging.info("Following link to add OpenPGP key")
+    add_key_link_locator = page.locator('a:has-text("Add your OpenPGP key")')
     sync_api.expect(add_key_link_locator).to_be_visible()
     add_key_link_locator.click()
 
-    logging.info("Waiting for Add GPG key page")
+    logging.info("Waiting for Add OpenPGP key page")
     wait_for_path(page, "/keys/add")
 
     try:
@@ -726,8 +727,8 @@ def test_gpg_01_upload(page: sync_api.Page, credentials: Credentials) -> None:
     sync_api.expect(select_all_button_locator).to_be_visible()
     select_all_button_locator.click()
 
-    logging.info("Submitting the Add GPG key form")
-    submit_button_locator = page.locator('input[type="submit"][value="Add GPG key"]')
+    logging.info("Submitting the Add OpenPGP key form")
+    submit_button_locator = page.locator('input[type="submit"][value="Add OpenPGP key"]')
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
@@ -737,16 +738,16 @@ def test_gpg_01_upload(page: sync_api.Page, credentials: Credentials) -> None:
     logging.info("Checking for success flash message on /keys/add page")
     flash_message_locator = page.locator("div.flash-success")
     sync_api.expect(flash_message_locator).to_be_visible()
-    sync_api.expect(flash_message_locator).to_contain_text(f"GPG key {key_fingerprint_lower} added successfully.")
-    logging.info("GPG key upload successful message shown")
+    sync_api.expect(flash_message_locator).to_contain_text(f"OpenPGP key {key_fingerprint_upper} added successfully.")
+    logging.info("OpenPGP key upload successful message shown")
 
     logging.info("Navigating back to /keys to verify key presence")
     go_to_path(page, "/keys")
 
-    logging.info(f"Verifying GPG key with fingerprint {key_fingerprint_lower} is visible")
-    key_card_locator = page.locator(f'div.card:has(td:has-text("{key_fingerprint_lower}"))')
+    logging.info(f"Verifying OpenPGP key with fingerprint {key_fingerprint_upper} is visible")
+    key_card_locator = page.locator(f'div.card:has(td:has-text("{key_fingerprint_upper}"))')
     sync_api.expect(key_card_locator).to_be_visible()
-    logging.info("GPG key fingerprint verified successfully on /keys page")
+    logging.info("OpenPGP key fingerprint verified successfully on /keys page")
 
 
 def test_lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials) -> None:
@@ -1065,22 +1066,22 @@ def test_tidy_up(page: sync_api.Page) -> None:
     test_tidy_up_releases(page)
     test_tidy_up_project(page)
     test_tidy_up_ssh_keys(page)
-    test_tidy_up_gpg_keys(page)
+    test_tidy_up_openpgp_keys(page)
 
 
-def test_tidy_up_gpg_keys(page: sync_api.Page) -> None:
-    logging.info("Starting GPG key tidy up")
+def test_tidy_up_openpgp_keys(page: sync_api.Page) -> None:
+    logging.info("Starting OpenPGP key tidy up")
     go_to_path(page, "/keys")
-    logging.info("Navigated to /keys page for GPG key cleanup")
+    logging.info("Navigated to /keys page for OpenPGP key cleanup")
 
-    gpg_key_section_locator = page.locator("h3:has-text('GPG keys')")
-    key_cards_container_locator = gpg_key_section_locator.locator(
+    openpgp_key_section_locator = page.locator("h3:has-text('OpenPGP keys')")
+    key_cards_container_locator = openpgp_key_section_locator.locator(
         "xpath=following-sibling::div[contains(@class, 'mb-5')]//div[contains(@class, 'd-grid')]"
     )
     key_cards_locator = key_cards_container_locator.locator("> div.card")
 
     key_cards = key_cards_locator.all()
-    logging.info(f"Found {len(key_cards)} potential GPG key cards to check")
+    logging.info(f"Found {len(key_cards)} potential OpenPGP key cards to check")
 
     fingerprints_to_delete = []
 
@@ -1089,60 +1090,60 @@ def test_tidy_up_gpg_keys(page: sync_api.Page) -> None:
         summary_element = details_element.locator("summary").first
 
         if not details_element.is_visible(timeout=500):
-            logging.warning("GPG key card: <details> element not found or not visible, skipping")
+            logging.warning("OpenPGP key card: <details> element not found or not visible, skipping")
             continue
         if not summary_element.is_visible(timeout=500):
-            logging.warning("GPG key card: <summary> element not found or not visible, skipping")
+            logging.warning("OpenPGP key card: <summary> element not found or not visible, skipping")
             continue
 
         is_already_open = details_element.evaluate("el => el.hasAttribute('open')")
 
         if not is_already_open:
-            logging.info("GPG key card: details is not open, clicking summary to open")
+            logging.info("OpenPGP key card: details is not open, clicking summary to open")
             summary_element.click()
             try:
                 sync_api.expect(details_element).to_have_attribute("open", "", timeout=2000)
-                logging.info("GPG key card: details successfully opened")
+                logging.info("OpenPGP key card: details successfully opened")
             except Exception as e:
                 logging.warning(
-                    f"GPG key card: failed to confirm details opened after clicking summary: {e}, skipping card"
+                    f"OpenPGP key card: failed to confirm details opened after clicking summary: {e}, skipping card"
                 )
                 continue
         else:
-            logging.info("GPG key card: Details already open.")
+            logging.info("OpenPGP key card: Details already open.")
 
         details_pre_locator = details_element.locator("pre").first
         try:
             sync_api.expect(details_pre_locator).to_be_visible(timeout=1000)
         except Exception as e:
             logging.warning(
-                f"GPG key card: <pre> tag not visible even after attempting to open details: {e}, skipping card"
+                f"OpenPGP key card: <pre> tag not visible even after attempting to open details: {e}, skipping card"
             )
             continue
 
         key_content = details_pre_locator.inner_text()
-        if _GPG_TEST_UID in key_content:
+        if _OPENPGP_TEST_UID in key_content:
             fingerprint_locator = card.locator('tr:has(th:has-text("Fingerprint")) > td').first
             fingerprint = fingerprint_locator.inner_text().strip()
             if fingerprint:
-                logging.info(f"Found test GPG key with fingerprint {fingerprint} for deletion")
+                logging.info(f"Found test OpenPGP key with fingerprint {fingerprint} for deletion")
                 fingerprints_to_delete.append(fingerprint)
             else:
-                logging.warning("Found test GPG key card but could not extract fingerprint")
+                logging.warning("Found test OpenPGP key card but could not extract fingerprint")
         else:
-            logging.debug(f"GPG key card: test UID '{_GPG_TEST_UID}' not found in key content")
+            logging.debug(f"OpenPGP key card: test UID '{_OPENPGP_TEST_UID}' not found in key content")
 
     # For the complexity linter only
-    test_tidy_up_gpg_keys_continued(page, fingerprints_to_delete)
+    test_tidy_up_openpgp_keys_continued(page, fingerprints_to_delete)
 
 
-def test_tidy_up_gpg_keys_continued(page: sync_api.Page, fingerprints_to_delete: list[str]) -> None:
+def test_tidy_up_openpgp_keys_continued(page: sync_api.Page, fingerprints_to_delete: list[str]) -> None:
     if not fingerprints_to_delete:
-        logging.info("No test GPG keys found to delete")
+        logging.info("No test OpenPGP keys found to delete")
         return
 
     # Delete identified keys
-    logging.info(f"Attempting to delete {len(fingerprints_to_delete)} test GPG keys")
+    logging.info(f"Attempting to delete {len(fingerprints_to_delete)} test OpenPGP keys")
     for fingerprint in fingerprints_to_delete:
         logging.info(f"Locating delete form for fingerprint: {fingerprint}")
         # Locate again by fingerprint for robustness
@@ -1155,24 +1156,24 @@ def test_tidy_up_gpg_keys_continued(page: sync_api.Page, fingerprints_to_delete:
             logging.info(f"Delete button found for {fingerprint}, proceeding with deletion")
 
             def handle_dialog(dialog: sync_api.Dialog) -> None:
-                logging.info(f"Accepting dialog for GPG key deletion: {dialog.message}")
+                logging.info(f"Accepting dialog for OpenPGP key deletion: {dialog.message}")
                 dialog.accept()
 
             page.once("dialog", handle_dialog)
             delete_button_locator.click()
 
-            logging.info(f"Waiting for page reload after deleting GPG key {fingerprint}")
+            logging.info(f"Waiting for page reload after deleting OpenPGP key {fingerprint}")
             page.wait_for_load_state()
             wait_for_path(page, "/keys")
 
             flash_message_locator = page.locator("div.flash-success")
-            sync_api.expect(flash_message_locator).to_contain_text("GPG key deleted successfully")
-            logging.info(f"Deletion successful for GPG key {fingerprint}")
+            sync_api.expect(flash_message_locator).to_contain_text("OpenPGP key deleted successfully")
+            logging.info(f"Deletion successful for OpenPGP key {fingerprint}")
 
         else:
-            logging.warning(f"Could not find delete button for GPG fingerprint {fingerprint} after re-locating")
+            logging.warning(f"Could not find delete button for OpenPGP fingerprint {fingerprint} after re-locating")
 
-    logging.info("GPG key tidy up finished")
+    logging.info("OpenPGP key tidy up finished")
 
 
 def test_tidy_up_project(page: sync_api.Page) -> None:

@@ -1,11 +1,11 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  GPG key details ~ ATR
+  OpenPGP key details ~ ATR
 {% endblock title %}
 
 {% block description %}
-  View details for a specific GPG public key.
+  View details for a specific OpenPGP public signing key.
 {% endblock description %}
 
 {% block content %}
@@ -13,14 +13,14 @@
     <a href="{{ as_url(routes.keys.keys) }}" class="atr-back-link">← Back to Manage keys</a>
   </p>
 
-  <h1>GPG key details</h1>
+  <h1>OpenPGP key details</h1>
 
   <div class="card p-3 border mb-4">
     <table class="mb-0">
       <tbody>
         <tr>
           <th class="p-2 text-dark">Fingerprint</th>
-          <td class="text-break">{{ key.fingerprint }}</td>
+          <td class="text-break">{{ key.fingerprint.upper() }}</td>
         </tr>
         <tr>
           <th class="p-2 text-dark">Type</th>

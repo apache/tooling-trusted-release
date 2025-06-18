@@ -99,7 +99,7 @@ async def _check_core_logic(committee_name: str, artifact_path: str, signature_p
                     # Allow uploaded keys of the form private@<committee_name>.apache.org
                     allowed_github_key_email = f"private@{committee_name}.apache.org"
                     _LOGGER.info(
-                        f"Comparing {key.fingerprint} with email {email} to allowed {allowed_github_key_email}"
+                        f"Comparing {key.fingerprint.upper()} with email {email} to allowed {allowed_github_key_email}"
                     )
                     if email == allowed_github_key_email:
                         apache_uid_map[key.fingerprint.lower()] = True
@@ -118,7 +118,7 @@ async def _check_core_logic(committee_name: str, artifact_path: str, signature_p
 def _check_core_logic_verify_signature(
     signature_path: str, artifact_path: str, ascii_armored_keys: list[str], apache_uid_map: dict[str, bool]
 ) -> dict[str, Any]:
-    """Verify a GPG signature for a file."""
+    """Verify an OpenPGP signature for a file."""
     with tempfile.TemporaryDirectory(prefix="gpg-") as gpg_dir, open(signature_path, "rb") as sig_file:
         gpg: Final[gnupg.GPG] = gnupg.GPG(gnupghome=gpg_dir)
 

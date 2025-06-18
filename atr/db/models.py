@@ -304,7 +304,7 @@ The release candidate page, including downloads, can be found at:
 
   [REVIEW_URL]
 
-The release artifacts are signed with one or more GPG keys from:
+The release artifacts are signed with one or more OpenPGP keys from:
 
   [KEYS_FILE]
 

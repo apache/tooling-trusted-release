@@ -5,7 +5,7 @@
 {% endblock title %}
 
 {% block description %}
-  Upload a KEYS file containing multiple GPG public keys.
+  Upload a KEYS file containing multiple OpenPGP public signing keys.
 {% endblock description %}
 
 {% block stylesheets %}
@@ -82,7 +82,7 @@
   </p>
 
   <h1>Upload a KEYS file</h1>
-  <p>Upload a KEYS file containing multiple GPG public keys.</p>
+  <p>Upload a KEYS file containing multiple OpenPGP public signing keys.</p>
 
   {{ forms.errors_summary(form) }}
 
@@ -95,7 +95,7 @@
       <table class="table table-striped page-table-bordered table-sm mt-3">
         <thead>
           <tr>
-            <th scope="col">Fingerprint</th>
+            <th scope="col">Key ID</th>
             <th scope="col">User ID</th>
             {% for committee_name in submitted_committees %}
               <th scope="col" class="page-rotated-header">
@@ -108,7 +108,7 @@
           {% for key_info in results %}
             <tr>
               <td class="page-key-details px-2">
-                <code>{{ key_info.fingerprint[:16]|upper }}</code>
+                <code>{{ key_info.fingerprint[-16:]|upper }}</code>
               </td>
               <td class="page-key-details px-2">{{ key_info.email }}</td>
               {% for committee_name in submitted_committees %}

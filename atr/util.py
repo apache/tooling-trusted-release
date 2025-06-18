@@ -477,7 +477,7 @@ async def number_of_release_files(release: models.Release) -> int:
 
 
 def parse_key_blocks(keys_text: str) -> list[str]:
-    """Extract GPG key blocks from a KEYS file."""
+    """Extract OpenPGP key blocks from a KEYS file."""
     key_blocks = []
     current_block = []
     in_key_block = False
@@ -497,7 +497,7 @@ def parse_key_blocks(keys_text: str) -> list[str]:
 
 
 def parse_key_blocks_bytes(keys_data: bytes) -> list[str]:
-    """Extract GPG key blocks from a KEYS file."""
+    """Extract OpenPGP key blocks from a KEYS file."""
     key_blocks = []
     current_block = []
     in_key_block = False

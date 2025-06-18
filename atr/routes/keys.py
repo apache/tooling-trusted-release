@@ -132,11 +132,11 @@ async def add(session: routes.CommitterSession) -> str:
     committee_is_podling = {c.name: c.is_podling for c in user_committees}
     committee_choices = [(c.name, c.display_name or c.name) for c in user_committees]
 
-    class AddGpgKeyForm(util.QuartFormTyped):
+    class AddOpenPGPKeyForm(util.QuartFormTyped):
         public_key = wtforms.TextAreaField(
-            "Public GPG key",
+            "Public OpenPGP key",
             validators=[wtforms.validators.InputRequired("Public key is required")],
-            render_kw={"placeholder": "Paste your ASCII-armored public GPG key here..."},
+            render_kw={"placeholder": "Paste your ASCII-armored public OpenPGP key here..."},
             description="Your public key should be in ASCII-armored format, starting with"
             ' "-----BEGIN PGP PUBLIC KEY BLOCK-----"',
         )
@@ -149,9 +149,11 @@ async def add(session: routes.CommitterSession) -> str:
             widget=wtforms.widgets.ListWidget(prefix_label=False),
             description="Select the committees with which to associate your key.",
         )
-        submit = wtforms.SubmitField("Add GPG key")
+        submit = wtforms.SubmitField("Add OpenPGP key")
 
-    form = await AddGpgKeyForm.create_form(data=await quart.request.form if quart.request.method == "POST" else None)
+    form = await AddOpenPGPKeyForm.create_form(
+        data=await quart.request.form if quart.request.method == "POST" else None
+    )
 
     if await form.validate_on_submit():
         try:
@@ -169,20 +171,22 @@ async def add(session: routes.CommitterSession) -> str:
             added_keys = await interaction.key_user_add(session.uid, public_key_data, selected_committees_data)
             for key_info in added_keys:
                 if key_info:
-                    await quart.flash(f"GPG key {key_info.get('fingerprint', '')} added successfully.", "success")
+                    await quart.flash(
+                        f"OpenPGP key {key_info.get('fingerprint', '').upper()} added successfully.", "success"
+                    )
                     for committee_name in selected_committees_data:
                         is_podling = committee_is_podling[committee_name]
                         await autogenerate_keys_file(committee_name, is_podling)
             if not added_keys:
                 await quart.flash("No keys were added.", "error")
             # Clear form data on success by creating a new empty form instance
-            form = await AddGpgKeyForm.create_form()
+            form = await AddOpenPGPKeyForm.create_form()
 
         except routes.FlashError as e:
-            logging.warning("FlashError adding GPG key: %s", e)
+            logging.warning("FlashError adding OpenPGP key: %s", e)
             await quart.flash(str(e), "error")
         except Exception as e:
-            logging.exception("Exception adding GPG key:")
+            logging.exception("Exception adding OpenPGP key:")
             await quart.flash(f"An unexpected error occurred: {e!s}", "error")
 
     return await template.render(
@@ -235,16 +239,16 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
     async with db.session() as data:
         async with data.begin():
-            # Try to get a GPG key first
+            # Try to get an OpenPGP key first
             key = await data.public_signing_key(fingerprint=fingerprint, apache_uid=session.uid).get()
             if key:
-                # Delete the GPG key
+                # Delete the OpenPGP key
                 await data.delete(key)
                 for committee in key.committees:
                     await autogenerate_keys_file(committee.name, committee.is_podling, caller_data=data)
-                return await session.redirect(keys, success="GPG key deleted successfully")
+                return await session.redirect(keys, success="OpenPGP key deleted successfully")
 
-            # If not a GPG key, try to get an SSH key
+            # If not an OpenPGP key, try to get an SSH key
             ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=session.uid).get()
             if ssh_key:
                 # Delete the SSH key
@@ -257,7 +261,8 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
 @routes.committer("/keys/details/<fingerprint>", methods=["GET", "POST"])
 async def details(session: routes.CommitterSession, fingerprint: str) -> str | response.Response:
-    """Display details for a specific GPG key."""
+    """Display details for a specific OpenPGP key."""
+    fingerprint = fingerprint.lower()
     async with db.session() as data:
         key, is_owner = await _key_and_is_owner(data, session, fingerprint)
         form = None
@@ -289,7 +294,7 @@ async def details(session: routes.CommitterSession, fingerprint: str) -> str | r
             async with data.begin():
                 key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
                 if not key:
-                    quart.abort(404, description="GPG key not found")
+                    quart.abort(404, description="OpenPGP key not found")
 
                 selected_committee_names = form.selected_committees.data or []
                 old_committee_names = {c.name for c in key.committees}
@@ -308,8 +313,7 @@ async def details(session: routes.CommitterSession, fingerprint: str) -> str | r
             return await session.redirect(details, fingerprint=fingerprint)
 
     return await template.render(
-        # TODO: Rename to keys-details.html
-        "keys-show-gpg.html",
+        "keys-details.html",
         key=key,
         form=form,
         algorithms=routes.algorithms,
@@ -486,7 +490,7 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
 
 @routes.committer("/keys/upload", methods=["GET", "POST"], measure_performance=False)
 async def upload(session: routes.CommitterSession) -> str:
-    """Upload a KEYS file containing multiple GPG keys."""
+    """Upload a KEYS file containing multiple OpenPGP keys."""
     # Get committees for all projects the user is a member of
     async with db.session() as data:
         project_list = session.committees + session.projects
@@ -552,7 +556,7 @@ async def upload(session: routes.CommitterSession) -> str:
         selected_committees = form.selected_committees.data
         if not selected_committees:
             return await render(error="You must select at least one committee")
-        # This is a KEYS file of multiple GPG keys
+        # This is a KEYS file of multiple OpenPGP keys
         # We need to parse it and add each key to the user's account
         try:
             upload_results, success_count, error_count, submitted_committees = await interaction.upload_keys(
@@ -583,7 +587,7 @@ async def _format_keys_file(
 ) -> str:
     timestamp_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
     purpose_text = (
-        f"This file contains the {key_count_for_header} PGP/GPG public keys used by "
+        f"This file contains the {key_count_for_header} OpenPGP public keys used by "
         f"committers of the Apache {committee_name_for_header} projects to sign official "
         f"release artifacts. Verifying the signature on a downloaded artifact using one "
         f"of the keys in this file provides confidence that the artifact is authentic "
@@ -641,7 +645,7 @@ async def _key_and_is_owner(
 ) -> tuple[models.PublicSigningKey, bool]:
     key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
     if not key:
-        quart.abort(404, description="GPG key not found")
+        quart.abort(404, description="OpenPGP key not found")
     key.committees.sort(key=lambda c: c.name)
 
     # Allow owners and committee members to view the key
@@ -678,12 +682,11 @@ async def _keys_formatter(committee_name: str, data: db.Session) -> str:
 
     keys_content_list = []
     for key in sorted_keys:
-        # fingerprint_short = key.fingerprint[:16].upper()
         apache_uid = key.apache_uid
         # TODO: What if there is no email?
         email = util.email_from_uid(key.primary_declared_uid or "") or ""
         comments = []
-        comments.append(f"Comment: {key.fingerprint.lower()}")
+        comments.append(f"Comment: {key.fingerprint.upper()}")
         if (apache_uid is None) or (email == f"{apache_uid}@apache.org"):
             comments.append(f"Comment: {email}")
         else:

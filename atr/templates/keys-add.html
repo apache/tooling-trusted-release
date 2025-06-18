@@ -1,7 +1,7 @@
 {% extends "layouts/base.html" %}
 
 {% block title %}
-  Add your GPG key ~ ATR
+  Add your OpenPGP key ~ ATR
 {% endblock title %}
 
 {% block description %}
@@ -14,7 +14,7 @@
   </p>
 
   <div class="my-4">
-    <h1 class="mb-4">Add your GPG key</h1>
+    <h1 class="mb-4">Add your OpenPGP key</h1>
 
     <p>Add your public key to use for signing release artifacts.</p>
     {% if form.errors %}<div class="alert alert-danger">Please correct the errors below:</div>{% endif %}
@@ -73,7 +73,7 @@
           <p>
             <strong>Key ID:</strong> {{ key_info.key_id }}
             <br />
-            <strong>Fingerprint:</strong> <code>{{ key_info.fingerprint }}</code>
+            <strong>Fingerprint:</strong> <code>{{ key_info.fingerprint.upper() }}</code>
             <br />
             <strong>User ID:</strong> {{ key_info.user_id }}
             <br />

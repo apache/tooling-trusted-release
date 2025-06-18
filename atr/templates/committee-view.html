@@ -54,7 +54,7 @@
           <table class="table border table-striped table-hover table-sm">
             <thead>
               <tr>
-                <th class="px-2" scope="col">Fingerprint</th>
+                <th class="px-2" scope="col">Key ID</th>
                 <th class="px-2" scope="col">Email</th>
                 <th class="px-2" scope="col">Apache UID</th>
               </tr>
@@ -63,7 +63,7 @@
               {% for key in committee.public_signing_keys %}
                 <tr>
                   <td class="text-break font-monospace px-2">
-                    <a href="{{ as_url(routes.keys.details, fingerprint=key.fingerprint) }}">{{ key.fingerprint[:16]|upper }}</a>
+                    <a href="{{ as_url(routes.keys.details, fingerprint=key.fingerprint) }}">{{ key.fingerprint[-16:]|upper }}</a>
                   </td>
                   <td class="text-break px-2">{{ email_from_key(key.primary_declared_uid) or 'Not specified' }}</td>
                   <td class="text-break px-2">{{ key.apache_uid or "-" }}</td>
