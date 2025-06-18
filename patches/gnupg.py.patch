@@ -1,0 +1,14 @@
+--- a/gnupg.py	2025-06-18 19:11:47
++++ b/gnupg.py	2025-06-18 19:11:18
+@@ -1307,6 +1307,11 @@
+         process.wait()
+         result.returncode = rc = process.returncode
+         if rc != 0:
++            logger.warning('result: %r', result)
++            if hasattr(result, 'data'):
++                logger.warning('stdout: %r', result.data)
++            if hasattr(result, 'stderr'):
++                logger.warning('stderr: %r', result.stderr)
+             logger.warning('gpg returned a non-zero error code: %d', rc)
+         if stdin is not None:
+             try:
