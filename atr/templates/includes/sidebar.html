@@ -102,14 +102,29 @@
         <h3>Administration</h3>
         <ul>
           <li>
+            <i class="bi bi-list-ul"></i>
+            <a href="{{ url_for('admin.admin_all_releases') }}"
+               {% if request.endpoint == 'admin.admin_all_releases' %}class="active"{% endif %}>All releases</a>
+          </li>
+          <li>
+            <i class="bi bi-person-plus"></i>
+            <a href="{{ url_for('admin.admin_browse_as') }}"
+               {% if request.endpoint == 'admin.admin_browse_as' %}class="active"{% endif %}>Browse as user</a>
+          </li>
+          <li>
             <i class="bi bi-database"></i>
             <a href="{{ url_for('admin.admin_data') }}"
                {% if request.endpoint == 'admin.admin_data' %}class="active"{% endif %}>Browse database</a>
           </li>
           <li>
-            <i class="bi bi-list-ul"></i>
-            <a href="{{ url_for('admin.admin_all_releases') }}"
-               {% if request.endpoint == 'admin.admin_all_releases' %}class="active"{% endif %}>All releases</a>
+            <i class="bi bi-trash"></i>
+            <a href="{{ url_for('admin.admin_delete_release') }}"
+               {% if request.endpoint == 'admin.admin_delete_release' %}class="active"{% endif %}>Delete release</a>
+          </li>
+          <li>
+            <i class="bi bi-speedometer2"></i>
+            <a href="{{ url_for('admin.admin_performance') }}"
+               {% if request.endpoint == 'admin.admin_performance' %}class="active"{% endif %}>Page performance</a>
           </li>
           <li>
             <i class="bi bi-arrow-repeat"></i>
@@ -122,24 +137,9 @@
                {% if request.endpoint == 'admin.admin_tasks' %}class="active"{% endif %}>Background tasks</a>
           </li>
           <li>
-            <i class="bi bi-speedometer2"></i>
-            <a href="{{ url_for('admin.admin_performance') }}"
-               {% if request.endpoint == 'admin.admin_performance' %}class="active"{% endif %}>Page performance</a>
-          </li>
-          <li>
-            <i class="bi bi-trash"></i>
-            <a href="{{ url_for('admin.admin_delete_release') }}"
-               {% if request.endpoint == 'admin.admin_delete_release' %}class="active"{% endif %}>Delete release</a>
-          </li>
-          <li>
             <i class="bi bi-person-badge"></i>
             <a href="{{ url_for('admin.admin_toggle_admin_view_page') }}"
                {% if request.endpoint == 'admin.admin_toggle_admin_view_page' %}class="active"{% endif %}>Toggle admin view</a>
-          </li>
-          <li>
-            <i class="bi bi-person-plus"></i>
-            <a href="{{ url_for('admin.admin_browse_as') }}"
-               {% if request.endpoint == 'admin.admin_browse_as' %}class="active"{% endif %}>Browse as user</a>
           </li>
         </ul>
       {% endif %}
