@@ -435,6 +435,55 @@ async def admin_keys_update() -> str | response.Response | tuple[Mapping[str, An
         }, 200
 
 
+@admin.BLUEPRINT.route("/ldap/", methods=["GET"])
+async def ldap_search() -> str:
+    form = await LdapLookupForm.create_form(data=quart.request.args)
+    asf_id_for_template: str | None = None
+
+    web_session = await session.read()
+    if web_session and web_session.uid:
+        asf_id_for_template = web_session.uid
+
+    uid_query = form.uid.data
+    email_query = form.email.data
+
+    ldap_params: ldap.SearchParameters | None = None
+    if (quart.request.method == "GET") and (uid_query or email_query):
+        bind_dn = quart.current_app.config.get("LDAP_BIND_DN")
+        bind_password = quart.current_app.config.get("LDAP_BIND_PASSWORD")
+
+        start = time.perf_counter_ns()
+        ldap_params = ldap.SearchParameters(
+            uid_query=uid_query,
+            email_query=email_query,
+            bind_dn_from_config=bind_dn,
+            bind_password_from_config=bind_password,
+            email_only=True,
+        )
+        await asyncio.to_thread(ldap.search, ldap_params)
+        end = time.perf_counter_ns()
+        _LOGGER.info("LDAP search took %d ms", (end - start) / 1000000)
+
+    return await template.render(
+        "ldap-lookup.html",
+        form=form,
+        ldap_params=ldap_params,
+        asf_id=asf_id_for_template,
+        ldap_query_performed=ldap_params is not None,
+        uid_query=uid_query,
+    )
+
+
+@admin.BLUEPRINT.route("/ongoing-tasks/<project_name>/<version_name>/<revision>")
+async def ongoing_tasks(project_name: str, version_name: str, revision: str) -> quart.wrappers.response.Response:
+    try:
+        ongoing = await interaction.tasks_ongoing(project_name, version_name, revision)
+        return quart.Response(str(ongoing), mimetype="text/plain")
+    except Exception:
+        _LOGGER.exception(f"Error fetching ongoing task count for {project_name} {version_name} rev {revision}:")
+        return quart.Response("", mimetype="text/plain")
+
+
 @admin.BLUEPRINT.route("/performance")
 async def admin_performance() -> str:
     """Display performance statistics for all routes."""
@@ -583,56 +632,7 @@ async def admin_toggle_view() -> response.Response:
     return quart.redirect(referrer or quart.url_for("admin.admin_data"))
 
 
-@admin.BLUEPRINT.route("/ldap/", methods=["GET"])
-async def ldap_search() -> str:
-    form = await LdapLookupForm.create_form(data=quart.request.args)
-    asf_id_for_template: str | None = None
-
-    web_session = await session.read()
-    if web_session and web_session.uid:
-        asf_id_for_template = web_session.uid
-
-    uid_query = form.uid.data
-    email_query = form.email.data
-
-    ldap_params: ldap.SearchParameters | None = None
-    if (quart.request.method == "GET") and (uid_query or email_query):
-        bind_dn = quart.current_app.config.get("LDAP_BIND_DN")
-        bind_password = quart.current_app.config.get("LDAP_BIND_PASSWORD")
-
-        start = time.perf_counter_ns()
-        ldap_params = ldap.SearchParameters(
-            uid_query=uid_query,
-            email_query=email_query,
-            bind_dn_from_config=bind_dn,
-            bind_password_from_config=bind_password,
-            email_only=True,
-        )
-        await asyncio.to_thread(ldap.search, ldap_params)
-        end = time.perf_counter_ns()
-        _LOGGER.info("LDAP search took %d ms", (end - start) / 1000000)
-
-    return await template.render(
-        "ldap-lookup.html",
-        form=form,
-        ldap_params=ldap_params,
-        asf_id=asf_id_for_template,
-        ldap_query_performed=ldap_params is not None,
-        uid_query=uid_query,
-    )
-
-
-@admin.BLUEPRINT.route("/ongoing-tasks/<project_name>/<version_name>/<revision>")
-async def ongoing_tasks(project_name: str, version_name: str, revision: str) -> quart.wrappers.response.Response:
-    try:
-        ongoing = await interaction.tasks_ongoing(project_name, version_name, revision)
-        return quart.Response(str(ongoing), mimetype="text/plain")
-    except Exception:
-        _LOGGER.exception(f"Error fetching ongoing task count for {project_name} {version_name} rev {revision}:")
-        return quart.Response("", mimetype="text/plain")
-
-
-async def _check_keys() -> str:
+async def _check_keys(fix: bool = False) -> str:
     email_to_uid = await util.email_to_uid_map()
     bad_keys = []
     async with db.session() as data:
@@ -646,6 +646,9 @@ async def _check_keys() -> str:
             asf_uid = await util.asf_uid_from_uids(uids, ldap_data=email_to_uid)
             if asf_uid != key.apache_uid:
                 bad_keys.append(f"{key.fingerprint} detected: {asf_uid}, key: {key.apache_uid}")
+            if fix:
+                key.apache_uid = asf_uid
+                await data.commit()
     message = f"Checked {len(keys)} keys"
     if bad_keys:
         message += f"\nFound {len(bad_keys)} bad keys:\n{'\n'.join(bad_keys)}"
