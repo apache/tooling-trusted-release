@@ -105,6 +105,9 @@ async def _check_core_logic(committee_name: str, artifact_path: str, signature_p
                         apache_uid_map[key.fingerprint.lower()] = True
 
     public_keys = [key.ascii_armored_key for key in db_public_keys]
+    for i, key in enumerate(public_keys):
+        if isinstance(key, bytes):
+            public_keys[i] = key.decode("utf-8", errors="replace")
 
     return await asyncio.to_thread(
         _check_core_logic_verify_signature,

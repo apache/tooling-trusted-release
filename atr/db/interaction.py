@@ -158,7 +158,9 @@ async def key_user_session_add(
                 existing.primary_declared_uid = uids[0] if uids else None
                 existing.secondary_declared_uids = uids[1:]
                 existing.apache_uid = asf_uid
-                existing.ascii_armored_key = public_key
+                existing.ascii_armored_key = (
+                    public_key.decode("utf-8", errors="replace") if isinstance(public_key, bytes) else public_key
+                )
                 logging.info(f"Found existing key {fingerprint.upper()}, updating associations")
             else:
                 logging.info(f"Found existing key {fingerprint.upper()}, no update needed")

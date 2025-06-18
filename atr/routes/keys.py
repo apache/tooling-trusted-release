@@ -313,6 +313,9 @@ async def details(session: routes.CommitterSession, fingerprint: str) -> str | r
             await quart.flash("Key committee associations updated successfully.", "success")
             return await session.redirect(details, fingerprint=fingerprint)
 
+    if isinstance(key.ascii_armored_key, bytes):
+        key.ascii_armored_key = key.ascii_armored_key.decode("utf-8", errors="replace")
+
     return await template.render(
         "keys-details.html",
         key=key,

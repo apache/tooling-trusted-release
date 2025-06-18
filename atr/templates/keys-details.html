@@ -103,6 +103,6 @@
     </tbody>
   </table>
   <h2>ASCII armored key</h2>
-  <pre class="mt-3 border border-2 p-3">{{ key.ascii_armored_key if isinstance(key.ascii_armored_key, str) else key.ascii_armored_key.decode('utf-8') }}</pre>
+  <pre class="mt-3 border border-2 p-3">{{ key.ascii_armored_key }}</pre>
   {# TODO: Add download button for the ASCII armored key #}
 {% endblock content %}

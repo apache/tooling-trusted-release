@@ -745,8 +745,8 @@ def test_openpgp_01_upload(page: sync_api.Page, credentials: Credentials) -> Non
     go_to_path(page, "/keys")
 
     logging.info(f"Verifying OpenPGP key with fingerprint {key_fingerprint_upper} is visible")
-    key_card_locator = page.locator(f'div.card:has(td:has-text("{key_fingerprint_upper}"))')
-    sync_api.expect(key_card_locator).to_be_visible()
+    key_row_locator = page.locator(f'tr.page-user-openpgp-key:has(a[href="/keys/details/{key_fingerprint_lower}"])')
+    sync_api.expect(key_row_locator).to_be_visible()
     logging.info("OpenPGP key fingerprint verified successfully on /keys page")
 
 
@@ -1075,63 +1075,33 @@ def test_tidy_up_openpgp_keys(page: sync_api.Page) -> None:
     logging.info("Navigated to /keys page for OpenPGP key cleanup")
 
     openpgp_key_section_locator = page.locator("h3:has-text('OpenPGP keys')")
-    key_cards_container_locator = openpgp_key_section_locator.locator(
-        "xpath=following-sibling::div[contains(@class, 'mb-5')]//div[contains(@class, 'd-grid')]"
-    )
-    key_cards_locator = key_cards_container_locator.locator("> div.card")
+    table_locator = openpgp_key_section_locator.locator("xpath=following-sibling::div//table")
+    key_rows_locator = table_locator.locator("tbody tr.page-user-openpgp-key")
 
-    key_cards = key_cards_locator.all()
-    logging.info(f"Found {len(key_cards)} potential OpenPGP key cards to check")
+    key_rows = key_rows_locator.all()
+    logging.info(f"Found {len(key_rows)} OpenPGP key rows to check")
 
     fingerprints_to_delete = []
 
-    for card in key_cards:
-        details_element = card.locator("details").first
-        summary_element = details_element.locator("summary").first
-
-        if not details_element.is_visible(timeout=500):
-            logging.warning("OpenPGP key card: <details> element not found or not visible, skipping")
+    for row in key_rows:
+        link_locator = row.locator('a[href^="/keys/details/"]')
+        href = link_locator.get_attribute("href")
+        if not href:
+            logging.warning("Could not find href for key details link in a row, skipping")
             continue
-        if not summary_element.is_visible(timeout=500):
-            logging.warning("OpenPGP key card: <summary> element not found or not visible, skipping")
-            continue
+        fingerprint = href.split("/")[-1]
 
-        is_already_open = details_element.evaluate("el => el.hasAttribute('open')")
+        go_to_path(page, href, wait=False)
 
-        if not is_already_open:
-            logging.info("OpenPGP key card: details is not open, clicking summary to open")
-            summary_element.click()
-            try:
-                sync_api.expect(details_element).to_have_attribute("open", "", timeout=2000)
-                logging.info("OpenPGP key card: details successfully opened")
-            except Exception as e:
-                logging.warning(
-                    f"OpenPGP key card: failed to confirm details opened after clicking summary: {e}, skipping card"
-                )
-                continue
-        else:
-            logging.info("OpenPGP key card: Details already open.")
+        pre_locator = page.locator("pre")
+        sync_api.expect(pre_locator).to_be_visible()
+        key_content = pre_locator.inner_text()
 
-        details_pre_locator = details_element.locator("pre").first
-        try:
-            sync_api.expect(details_pre_locator).to_be_visible(timeout=1000)
-        except Exception as e:
-            logging.warning(
-                f"OpenPGP key card: <pre> tag not visible even after attempting to open details: {e}, skipping card"
-            )
-            continue
-
-        key_content = details_pre_locator.inner_text()
         if _OPENPGP_TEST_UID in key_content:
-            fingerprint_locator = card.locator('tr:has(th:has-text("Fingerprint")) > td').first
-            fingerprint = fingerprint_locator.inner_text().strip()
-            if fingerprint:
-                logging.info(f"Found test OpenPGP key with fingerprint {fingerprint} for deletion")
-                fingerprints_to_delete.append(fingerprint)
-            else:
-                logging.warning("Found test OpenPGP key card but could not extract fingerprint")
-        else:
-            logging.debug(f"OpenPGP key card: test UID '{_OPENPGP_TEST_UID}' not found in key content")
+            logging.info(f"Found test OpenPGP key with fingerprint {fingerprint} for deletion")
+            fingerprints_to_delete.append(fingerprint)
+
+        go_to_path(page, "/keys")
 
     # For the complexity linter only
     test_tidy_up_openpgp_keys_continued(page, fingerprints_to_delete)
@@ -1147,8 +1117,8 @@ def test_tidy_up_openpgp_keys_continued(page: sync_api.Page, fingerprints_to_del
     for fingerprint in fingerprints_to_delete:
         logging.info(f"Locating delete form for fingerprint: {fingerprint}")
         # Locate again by fingerprint for robustness
-        card_to_delete_locator = page.locator(f'div.card:has(td:has-text("{fingerprint}"))')
-        delete_button_locator = card_to_delete_locator.locator(
+        row_to_delete_locator = page.locator(f'tr:has(a[href="/keys/details/{fingerprint}"])')
+        delete_button_locator = row_to_delete_locator.locator(
             'form[action="/keys/delete"] input[type="submit"][value="Delete key"]'
         )
 

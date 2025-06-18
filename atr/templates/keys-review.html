@@ -39,7 +39,7 @@
         </thead>
         <tbody>
           {% for key in user_keys %}
-            <tr>
+            <tr class="page-user-openpgp-key">
               <td class="text-break px-2 align-middle">
                 <a href="{{ as_url(routes.keys.details, fingerprint=key.fingerprint) }}">{{ key.fingerprint[-16:]|upper }}</a>
               </td>
