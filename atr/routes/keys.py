@@ -410,6 +410,8 @@ async def keys(session: routes.CommitterSession) -> str:
         user_keys = await data.public_signing_key(apache_uid=session.uid, _committees=True).all()
         user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
         user_committees_with_keys = await data.committee(name_in=committees_to_query, _public_signing_keys=True).all()
+    for key in user_keys:
+        key.committees.sort(key=lambda c: c.name)
 
     status_message = quart.request.args.get("status_message")
     status_type = quart.request.args.get("status_type")

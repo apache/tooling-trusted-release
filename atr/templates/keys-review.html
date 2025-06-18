@@ -19,12 +19,6 @@
   <h2 id="your-public-keys">Your public keys</h2>
   <p>Review your public keys used for signing release artifacts.</p>
 
-  <div>
-    <p>
-      Welcome, <strong>{{ asf_id }}</strong>! You are authenticated as an ASF committer.
-    </p>
-  </div>
-
   <div class="d-flex gap-3 mb-4">
     <a href="{{ as_url(routes.keys.add) }}" class="btn btn-outline-primary">Add your OpenPGP key</a>
     <a href="{{ as_url(routes.keys.ssh_add) }}"
@@ -34,84 +28,42 @@
   <h3>OpenPGP keys</h3>
 
   {% if user_keys %}
-    <div class="mb-5 p-4 bg-light rounded">
-      <div class="d-grid gap-4">
-        {% for key in user_keys %}
-          <div class="card p-3 border">
-            <table class="mb-0">
-              <tbody>
-                <tr>
-                  <th class="p-2 text-dark">Fingerprint</th>
-                  <td class="text-break">
-                    <a href="{{ as_url(routes.keys.details, fingerprint=key.fingerprint) }}">{{ key.fingerprint.upper() }}</a>
-                  </td>
-                </tr>
-                <tr>
-                  <th class="p-2 text-dark">Type</th>
-                  <td class="text-break">{{ algorithms[key.algorithm] }} ({{ key.length }} bits)</td>
-                </tr>
-                <tr>
-                  <th class="p-2 text-dark">Created</th>
-                  <td class="text-break">{{ key.created.strftime("%Y-%m-%d %H:%M:%S") }}</td>
-                </tr>
-                <tr>
-                  <th class="p-2 text-dark">Expires</th>
-                  <td class="text-break">
-                    {% if key.expires %}
-                      {% set days_until_expiry = (key.expires - now).days %}
-                      {% if days_until_expiry < 0 %}
-                        <span class="text-danger fw-bold">
-                          {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
-                          <span class="badge bg-danger text-white ms-2">Expired</span>
-                        </span>
-                      {% elif days_until_expiry <= 30 %}
-                        <span class="text-warning fw-bold">
-                          {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
-                          <span class="badge bg-warning text-dark ms-2">Expires in {{ days_until_expiry }} days</span>
-                        </span>
-                      {% else %}
-                        {{ key.expires.strftime("%Y-%m-%d %H:%M:%S") }}
-                      {% endif %}
-                    {% else %}
-                      Never
-                    {% endif %}
-                  </td>
-                </tr>
-                <tr>
-                  <th class="p-2 text-dark">User ID</th>
-                  <td class="text-break">{{ key.apache_uid or 'Not specified' }}</td>
-                </tr>
-                <tr>
-                  <th class="p-2 text-dark">Associated PMCs</th>
-                  <td class="text-break">
-                    {% if key.committees %}
-                      {{ key.committees|map(attribute='name') |join(', ') }}
-                    {% else %}
-                      No PMCs associated
-                    {% endif %}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            <!-- TODO: We could link to a downloadable version of the key instead -->
-            <details class="mt-3 p-3 bg-light rounded">
-              <summary class="fw-bold">View whole key</summary>
-              <pre class="mt-3">{{ key.ascii_armored_key }}</pre>
-            </details>
-
-            <form method="post"
-                  action="{{ as_url(routes.keys.delete) }}"
-                  class="mt-3"
-                  onsubmit="return confirm('Are you sure you want to delete this OpenPGP key?');">
-              {{ delete_form.hidden_tag() }}
-
-              <input type="hidden" name="fingerprint" value="{{ key.fingerprint }}" />
-              {{ delete_form.submit(class_='btn btn-danger', value='Delete key') }}
-            </form>
-          </div>
-        {% endfor %}
-      </div>
+    <div class="table-responsive mb-5">
+      <table class="table border table-striped table-hover table-sm">
+        <thead>
+          <tr>
+            <th class="px-2" scope="col">Key ID</th>
+            <th class="px-2" scope="col">Committees</th>
+            <th class="px-2" scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for key in user_keys %}
+            <tr>
+              <td class="text-break px-2 align-middle">
+                <a href="{{ as_url(routes.keys.details, fingerprint=key.fingerprint) }}">{{ key.fingerprint[-16:]|upper }}</a>
+              </td>
+              <td class="text-break px-2 align-middle">
+                {% if key.committees %}
+                  {{ key.committees|map(attribute='name') |join(', ') }}
+                {% else %}
+                  No PMCs associated
+                {% endif %}
+              </td>
+              <td class="px-2">
+                <form method="post"
+                      action="{{ as_url(routes.keys.delete) }}"
+                      class="m-0"
+                      onsubmit="return confirm('Are you sure you want to delete this OpenPGP key?');">
+                  {{ delete_form.hidden_tag() }}
+                  <input type="hidden" name="fingerprint" value="{{ key.fingerprint }}" />
+                  {{ delete_form.submit(class_='btn btn-sm btn-danger', value='Delete key') }}
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   {% else %}
     <p>
