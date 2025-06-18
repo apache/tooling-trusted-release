@@ -51,6 +51,7 @@ RUN apt-get update && \
       curl \
       git \
       gpg \
+      gpg-agent \
       make \
       openjdk-8-jdk \
       rsync \

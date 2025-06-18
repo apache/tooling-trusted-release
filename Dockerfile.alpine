@@ -46,6 +46,7 @@ RUN apk update && \
       file \
       git \
       gpg \
+      gpg-agent \
       make \
       nix \
       openjdk8 \
