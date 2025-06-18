@@ -339,73 +339,6 @@ async def _move_file_to_revision(
         return await respond(500, f"ERROR: {e!s}")
 
 
-async def _submission_process(
-    args: ProcessFormDataArgs,
-) -> tuple[quart_response.Response, int] | response.Response | str | None:
-    delete_empty_directory = "submit_delete_empty_dir" in args.formdata
-    remove_rc_tags = "submit_remove_rc_tags" in args.formdata
-    move_file = ("source_files" in args.formdata) and ("target_directory" in args.formdata)
-
-    if delete_empty_directory:
-        return await _submission_process_delete_empty_directory(args)
-
-    if remove_rc_tags:
-        return await _submission_process_remove_rc_tags(args)
-
-    if move_file:
-        return await _submission_process_move_file(args)
-
-    return None
-
-
-async def _submission_process_delete_empty_directory(
-    args: ProcessFormDataArgs,
-) -> tuple[quart_response.Response, int] | response.Response | str | None:
-    if await args.delete_dir_form.validate_on_submit():
-        dir_to_delete_str = args.delete_dir_form.directory_to_delete.data
-        return await _delete_empty_directory(
-            pathlib.Path(dir_to_delete_str), args.session, args.project_name, args.version_name, args.respond
-        )
-    elif args.wants_json:
-        error_messages = []
-        for field_name_str, error_list in args.delete_dir_form.errors.items():
-            field_obj = getattr(args.delete_dir_form, field_name_str, None)
-            label_text = field_name_str.replace("_", " ").title()
-            if field_obj and hasattr(field_obj, "label") and field_obj.label:
-                label_text = field_obj.label.text
-            error_messages.append(f"{label_text}: {', '.join(error_list)}")
-        error_msg = "; ".join(error_messages)
-        return await args.respond(400, error_msg or "Invalid input.")
-    return None
-
-
-async def _submission_process_move_file(
-    args: ProcessFormDataArgs,
-) -> tuple[quart_response.Response, int] | response.Response | str | None:
-    source_files_data = args.formdata.getlist("source_files")
-    target_dir_data = args.formdata.get("target_directory")
-
-    if not source_files_data or not target_dir_data:
-        return await args.respond(400, "Missing source file(s) or target directory.")
-    source_files_rel = [pathlib.Path(sf) for sf in source_files_data]
-    target_dir_rel = pathlib.Path(target_dir_data)
-    if not source_files_rel:
-        return await args.respond(400, "No source files selected.")
-    return await _move_file_to_revision(
-        source_files_rel, target_dir_rel, args.session, args.project_name, args.version_name, args.respond
-    )
-
-
-async def _submission_process_remove_rc_tags(
-    args: ProcessFormDataArgs,
-) -> tuple[quart_response.Response, int] | response.Response | str | None:
-    if await args.remove_rc_tags_form.validate_on_submit():
-        return await _remove_rc_tags(args.session, args.project_name, args.version_name, args.respond)
-    elif args.wants_json:
-        return await args.respond(400, "Invalid request for RC tag removal.")
-    return None
-
-
 def _related_files(path: pathlib.Path) -> list[pathlib.Path]:
     base_path = path.with_suffix("") if (path.suffix in SPECIAL_SUFFIXES) else path
     parent_dir = base_path.parent
@@ -619,3 +552,70 @@ async def _sources_and_targets(latest_revision_dir: pathlib.Path) -> tuple[list[
             target_dirs.add(item_rel_path)
 
     return source_items_rel, target_dirs
+
+
+async def _submission_process(
+    args: ProcessFormDataArgs,
+) -> tuple[quart_response.Response, int] | response.Response | str | None:
+    delete_empty_directory = "submit_delete_empty_dir" in args.formdata
+    remove_rc_tags = "submit_remove_rc_tags" in args.formdata
+    move_file = ("source_files" in args.formdata) and ("target_directory" in args.formdata)
+
+    if delete_empty_directory:
+        return await _submission_process_delete_empty_directory(args)
+
+    if remove_rc_tags:
+        return await _submission_process_remove_rc_tags(args)
+
+    if move_file:
+        return await _submission_process_move_file(args)
+
+    return None
+
+
+async def _submission_process_delete_empty_directory(
+    args: ProcessFormDataArgs,
+) -> tuple[quart_response.Response, int] | response.Response | str | None:
+    if await args.delete_dir_form.validate_on_submit():
+        dir_to_delete_str = args.delete_dir_form.directory_to_delete.data
+        return await _delete_empty_directory(
+            pathlib.Path(dir_to_delete_str), args.session, args.project_name, args.version_name, args.respond
+        )
+    elif args.wants_json:
+        error_messages = []
+        for field_name_str, error_list in args.delete_dir_form.errors.items():
+            field_obj = getattr(args.delete_dir_form, field_name_str, None)
+            label_text = field_name_str.replace("_", " ").title()
+            if field_obj and hasattr(field_obj, "label") and field_obj.label:
+                label_text = field_obj.label.text
+            error_messages.append(f"{label_text}: {', '.join(error_list)}")
+        error_msg = "; ".join(error_messages)
+        return await args.respond(400, error_msg or "Invalid input.")
+    return None
+
+
+async def _submission_process_move_file(
+    args: ProcessFormDataArgs,
+) -> tuple[quart_response.Response, int] | response.Response | str | None:
+    source_files_data = args.formdata.getlist("source_files")
+    target_dir_data = args.formdata.get("target_directory")
+
+    if not source_files_data or not target_dir_data:
+        return await args.respond(400, "Missing source file(s) or target directory.")
+    source_files_rel = [pathlib.Path(sf) for sf in source_files_data]
+    target_dir_rel = pathlib.Path(target_dir_data)
+    if not source_files_rel:
+        return await args.respond(400, "No source files selected.")
+    return await _move_file_to_revision(
+        source_files_rel, target_dir_rel, args.session, args.project_name, args.version_name, args.respond
+    )
+
+
+async def _submission_process_remove_rc_tags(
+    args: ProcessFormDataArgs,
+) -> tuple[quart_response.Response, int] | response.Response | str | None:
+    if await args.remove_rc_tags_form.validate_on_submit():
+        return await _remove_rc_tags(args.session, args.project_name, args.version_name, args.respond)
+    elif args.wants_json:
+        return await args.respond(400, "Invalid request for RC tag removal.")
+    return None
