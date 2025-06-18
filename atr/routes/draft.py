@@ -501,8 +501,6 @@ async def vote_preview(
         construct.StartVoteOptions(
             asfuid=asfuid,
             fullname=session.fullname,
-            committee_name=release.committee.display_name,
-            is_podling=release.committee.is_podling,
             project_name=project_name,
             version_name=version_name,
             vote_duration=vote_duration,

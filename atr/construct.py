@@ -38,8 +38,6 @@ class AnnounceReleaseOptions:
 class StartVoteOptions:
     asfuid: str
     fullname: str
-    committee_name: str
-    is_podling: bool
     project_name: str
     version_name: str
     vote_duration: int
@@ -63,7 +61,9 @@ async def announce_release_body(body: str, options: AnnounceReleaseOptions) -> s
             _committee=True,
             phase=models.ReleasePhase.RELEASE_PREVIEW,
         ).demand(RuntimeError(f"Release {options.project_name} {options.version_name} not found"))
-        committee_name = release.committee.display_name if release.committee else release.project.display_name
+        if not release.committee:
+            raise RuntimeError(f"Release {options.project_name} {options.version_name} has no committee")
+        committee = release.committee
 
     routes_release_view = routes_release.view  # type: ignore[has-type]
     download_path = util.as_url(
@@ -73,7 +73,7 @@ async def announce_release_body(body: str, options: AnnounceReleaseOptions) -> s
     download_url = f"https://{host}{download_path}"
 
     # Perform substitutions in the body
-    body = body.replace("[COMMITTEE]", committee_name)
+    body = body.replace("[COMMITTEE]", committee.display_name)
     body = body.replace("[DOWNLOAD_URL]", download_url)
     body = body.replace("[PROJECT]", options.project_name)
     body = body.replace("[VERSION]", options.version_name)
@@ -101,6 +101,9 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
             _project=True,
             _committee=True,
         ).demand(RuntimeError(f"Release {options.project_name} {options.version_name} not found"))
+        if not release.committee:
+            raise RuntimeError(f"Release {options.project_name} {options.version_name} has no committee")
+        committee = release.committee
 
     try:
         host = quart.request.host
@@ -108,18 +111,17 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
         host = config.get().APP_HOST
 
     review_url = f"https://{host}/vote/{options.project_name}/{options.version_name}"
-    committee_name = release.committee.display_name if release.committee else release.project.display_name
     project_short_display_name = release.project.short_display_name if release.project else options.project_name
 
     keys_file = None
-    if options.is_podling:
-        keys_file_path = util.get_downloads_dir() / "incubator" / options.committee_name / "KEYS"
+    if committee.is_podling:
+        keys_file_path = util.get_downloads_dir() / "incubator" / committee.name / "KEYS"
         if await aiofiles.os.path.isfile(keys_file_path):
-            keys_file = f"https://{host}/downloads/incubator/{options.committee_name}/KEYS"
+            keys_file = f"https://{host}/downloads/incubator/{committee.name}/KEYS"
     else:
-        keys_file_path = util.get_downloads_dir() / options.committee_name / "KEYS"
+        keys_file_path = util.get_downloads_dir() / committee.name / "KEYS"
         if await aiofiles.os.path.isfile(keys_file_path):
-            keys_file = f"https://{host}/downloads/{options.committee_name}/KEYS"
+            keys_file = f"https://{host}/downloads/{committee.name}/KEYS"
 
     checklist_content = ""
     async with db.session() as data:
@@ -129,7 +131,7 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
 
     # Perform substitutions in the body
     # TODO: Handle the DURATION == 0 case
-    body = body.replace("[COMMITTEE]", committee_name)
+    body = body.replace("[COMMITTEE]", committee.display_name)
     body = body.replace("[DURATION]", str(options.vote_duration))
     body = body.replace("[KEYS_FILE]", keys_file or "[Sorry, the KEYS file is missing!]")
     body = body.replace("[PROJECT]", project_short_display_name)
