@@ -123,70 +123,31 @@ async def selected_revision(
             vote_duration_choice: int = util.unwrap(form.vote_duration.data)
             subject_data: str = util.unwrap(form.subject.data)
             body_data: str = util.unwrap(form.body.data)
-
-            if committee is None:
-                raise base.ASFQuartException("Release has no associated committee", errorcode=400)
-
-            if email_to not in permitted_recipients:
-                # This will be checked again by tasks/vote.py for extra safety
-                raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
-
-            # Check for ongoing tasks
-            ongoing_tasks = await interaction.tasks_ongoing(project_name, version_name, selected_revision_number)
-            if ongoing_tasks > 0:
-                return await session.redirect(
-                    selected_revision,
-                    project_name=project_name,
-                    version_name=version_name,
-                    revision=selected_revision_number,
-                    error="All checks must be completed before starting a vote.",
-                )
-
-            # This sets the phase to RELEASE_CANDIDATE
-            error = await _promote(data, release.name, selected_revision_number)
-            if error:
-                return await session.redirect(root.index, error=error)
-
-            # Store when the release was put into the voting phase
-            release.vote_started = datetime.datetime.now(datetime.UTC)
-
-            # TODO: We also need to store the duration of the vote
-            # We can't allow resolution of the vote until the duration has elapsed
-            # But we allow the user to specify in the form
-            # And yet we also have ReleasePolicy.min_hours
-            # Presumably this sets the default, and the form takes precedence?
-            # ReleasePolicy.min_hours can also be 0, though
-
-            # Create a task for vote initiation
-            task = models.Task(
-                status=models.TaskStatus.QUEUED,
-                task_type=models.TaskType.VOTE_INITIATE,
-                task_args=tasks_vote.Initiate(
-                    release_name=release.name,
-                    email_to=email_to,
-                    vote_duration=vote_duration_choice,
-                    initiator_id=session.uid,
-                    initiator_fullname=session.fullname,
-                    subject=subject_data,
-                    body=body_data,
-                ).model_dump(),
-                project_name=project_name,
-                version_name=version,
-            )
-            data.add(task)
-            await data.commit()
-
-            # TODO: We should log all outgoing email and the session so that users can confirm
-            # And can be warned if there was a failure
-            # (The message should be shown on the vote resolution page)
-            return await session.redirect(
-                vote.selected,
-                success=f"The vote announcement email will soon be sent to {email_to}.",
-                project_name=project_name,
-                version_name=version,
+            return await _start_vote(
+                committee,
+                email_to,
+                permitted_recipients,
+                project_name,
+                version_name,
+                selected_revision_number,
+                session,
+                vote_duration_choice,
+                subject_data,
+                body_data,
+                data,
+                release,
+                version,
             )
 
         keys_warning = await _keys_warning(release)
+        has_files = await util.has_files(release)
+        if not has_files:
+            return await session.redirect(
+                compose.selected,
+                error="This release candidate draft has no files yet. Please add some files before starting a vote.",
+                project_name=project_name,
+                version_name=version,
+            )
 
         # For GET requests or failed POST validation
         return await template.render(
@@ -253,3 +214,81 @@ async def _promote(
         return "A newer revision appeared, please refresh and try again."
     await data.commit()
     return None
+
+
+async def _start_vote(
+    committee: models.Committee,
+    email_to: str,
+    permitted_recipients: list[str],
+    project_name: str,
+    version_name: str,
+    selected_revision_number: str,
+    session: routes.CommitterSession,
+    vote_duration_choice: int,
+    subject_data: str,
+    body_data: str,
+    data: db.Session,
+    release: models.Release,
+    version: str,
+):
+    if committee is None:
+        raise base.ASFQuartException("Release has no associated committee", errorcode=400)
+
+    if email_to not in permitted_recipients:
+        # This will be checked again by tasks/vote.py for extra safety
+        raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
+
+    # Check for ongoing tasks
+    ongoing_tasks = await interaction.tasks_ongoing(project_name, version_name, selected_revision_number)
+    if ongoing_tasks > 0:
+        return await session.redirect(
+            selected_revision,
+            project_name=project_name,
+            version_name=version_name,
+            revision=selected_revision_number,
+            error="All checks must be completed before starting a vote.",
+        )
+
+    # This sets the phase to RELEASE_CANDIDATE
+    error = await _promote(data, release.name, selected_revision_number)
+    if error:
+        return await session.redirect(root.index, error=error)
+
+    # Store when the release was put into the voting phase
+    release.vote_started = datetime.datetime.now(datetime.UTC)
+
+    # TODO: We also need to store the duration of the vote
+    # We can't allow resolution of the vote until the duration has elapsed
+    # But we allow the user to specify in the form
+    # And yet we also have ReleasePolicy.min_hours
+    # Presumably this sets the default, and the form takes precedence?
+    # ReleasePolicy.min_hours can also be 0, though
+
+    # Create a task for vote initiation
+    task = models.Task(
+        status=models.TaskStatus.QUEUED,
+        task_type=models.TaskType.VOTE_INITIATE,
+        task_args=tasks_vote.Initiate(
+            release_name=release.name,
+            email_to=email_to,
+            vote_duration=vote_duration_choice,
+            initiator_id=session.uid,
+            initiator_fullname=session.fullname,
+            subject=subject_data,
+            body=body_data,
+        ).model_dump(),
+        project_name=project_name,
+        version_name=version,
+    )
+    data.add(task)
+    await data.commit()
+
+    # TODO: We should log all outgoing email and the session so that users can confirm
+    # And can be warned if there was a failure
+    # (The message should be shown on the vote resolution page)
+    return await session.redirect(
+        vote.selected,
+        success=f"The vote announcement email will soon be sent to {email_to}.",
+        project_name=project_name,
+        version_name=version,
+    )

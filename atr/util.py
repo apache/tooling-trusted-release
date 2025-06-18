@@ -470,6 +470,19 @@ async def get_urls_as_completed(urls: Sequence[str]) -> AsyncGenerator[tuple[str
                 yield (url, str(e), b"")
 
 
+async def has_files(release: models.Release) -> bool:
+    """Check if a release has any files."""
+    base_dir = release_directory(release)
+    try:
+        async for rel_path in paths_recursive(base_dir):
+            full_path = base_dir / rel_path
+            if await aiofiles.os.path.isfile(full_path):
+                return True
+    except FileNotFoundError:
+        ...
+    return False
+
+
 async def is_dir_resolve(path: pathlib.Path) -> pathlib.Path | None:
     try:
         resolved_path = await asyncio.to_thread(path.resolve)
