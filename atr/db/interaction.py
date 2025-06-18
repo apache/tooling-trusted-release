@@ -69,19 +69,26 @@ async def ephemeral_gpg_home() -> AsyncGenerator[str]:
 
 
 async def key_user_add(
-    asf_uid: str | None, public_key: str, selected_committees: list[str], ldap_data: dict[str, str] | None = None
+    session_asf_uid: str | None,
+    public_key: str,
+    selected_committees: list[str],
+    ldap_data: dict[str, str] | None = None,
 ) -> list[dict]:
     if not public_key:
         raise PublicKeyError("Public key is required")
 
     # Validate the key using GPG and get its properties
+    # This does not add it to the database, only validates and gets its properties
     keys = await _key_user_add_validate_key_properties(public_key)
 
     added_keys = []
     for key in keys:
         asf_uid = await util.asf_uid_from_uids(key.get("uids", []), ldap_data=ldap_data)
-        # Store key in database
+        if session_asf_uid and (asf_uid != session_asf_uid):
+            # TODO: Give a more detailed error message about why and what to do
+            raise InteractionError(f"Key {key.get('fingerprint')} is not associated with your ASF account")
         async with db.session() as data:
+            # Store the key in the database
             added = await key_user_session_add(asf_uid, public_key, key, selected_committees, data)
             if added:
                 added_keys.append(added)
