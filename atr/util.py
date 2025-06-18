@@ -280,6 +280,39 @@ def email_from_uid(uid: str) -> str | None:
     return None
 
 
+async def email_to_uid_map() -> dict[str, str]:
+    def get(entry: dict, prop: str) -> str | None:
+        if prop in entry:
+            values = entry[prop]
+            if values:
+                return values[0]
+        return None
+
+    # Get all email addresses in LDAP
+    conf = config.AppConfig()
+    bind_dn = conf.LDAP_BIND_DN
+    bind_password = conf.LDAP_BIND_PASSWORD
+    ldap_params = ldap.SearchParameters(
+        uid_query="*",
+        bind_dn_from_config=bind_dn,
+        bind_password_from_config=bind_password,
+        email_only=True,
+    )
+    await asyncio.to_thread(ldap.search, ldap_params)
+
+    # Map the LDAP addresses to Apache UIDs
+    email_to_uid = {}
+    for entry in ldap_params.results_list:
+        uid = entry.get("uid", [""])[0]
+        if mail := get(entry, "mail"):
+            email_to_uid[mail] = uid
+        if alt_email := get(entry, "asf-altEmail"):
+            email_to_uid[alt_email] = uid
+        if committer_email := get(entry, "asf-committer-email"):
+            email_to_uid[committer_email] = uid
+    return email_to_uid
+
+
 async def file_sha3(path: str) -> str:
     """Compute SHA3-256 hash of a file."""
     sha3 = hashlib.sha3_256()

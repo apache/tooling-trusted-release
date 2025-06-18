@@ -13,7 +13,6 @@ sys.path.append(".")
 import atr.config as config
 import atr.db as db
 import atr.db.interaction as interaction
-import atr.ldap as ldap
 import atr.util as util
 
 
@@ -57,30 +56,10 @@ async def keys_import(conf: config.AppConfig) -> None:
 
     # Get all email addresses in LDAP
     # We'll discard them when we're finished
-    conf = config.AppConfig()
-    bind_dn = conf.LDAP_BIND_DN
-    bind_password = conf.LDAP_BIND_PASSWORD
-    ldap_params = ldap.SearchParameters(
-        uid_query="*",
-        bind_dn_from_config=bind_dn,
-        bind_password_from_config=bind_password,
-        email_only=True,
-    )
     start = time.perf_counter_ns()
-    await asyncio.to_thread(ldap.search, ldap_params)
+    email_to_uid = await util.email_to_uid_map()
     end = time.perf_counter_ns()
     write(f"LDAP search took {(end - start) / 1000000} ms")
-
-    # Map the LDAP addresses to Apache UIDs
-    email_to_uid = {}
-    for entry in ldap_params.results_list:
-        uid = entry.get("uid", [""])[0]
-        if mail := get(entry, "mail"):
-            email_to_uid[mail] = uid
-        if alt_email := get(entry, "asf-altEmail"):
-            email_to_uid[alt_email] = uid
-        if committer_email := get(entry, "asf-committer-email"):
-            email_to_uid[committer_email] = uid
     write(f"Email addresses from LDAP: {len(email_to_uid)}")
 
     # Open an ATR database connection
@@ -104,7 +83,7 @@ async def keys_import(conf: config.AppConfig) -> None:
             # Then we could use the bulk upsert query method
             try:
                 _result, yes, no, _committees = await interaction.upload_keys_bytes(
-                    [committee_name], content, [committee_name], ldap_data=email_to_uid
+                    [committee_name], content, [committee_name], ldap_data=email_to_uid, update_existing=True
                 )
             except Exception as e:
                 write(f"{committee_name} error: {e}")

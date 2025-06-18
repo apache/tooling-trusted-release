@@ -358,6 +358,29 @@ async def admin_env() -> quart.wrappers.response.Response:
     return quart.Response("\n".join(env_vars), mimetype="text/plain")
 
 
+@admin.BLUEPRINT.route("/keys/check", methods=["GET", "POST"])
+async def admin_keys_check() -> quart.Response:
+    """Check public signing key details."""
+    if quart.request.method != "POST":
+        empty_form = await util.EmptyForm.create_form()
+        return quart.Response(
+            f"""
+<form method="post">
+  <button type="submit">Check public signing key details</button>
+  {empty_form.hidden_tag()}
+</form>
+""",
+            mimetype="text/html",
+        )
+
+    try:
+        result = await _check_keys()
+        return quart.Response(result, mimetype="text/plain")
+    except Exception as e:
+        _LOGGER.exception("Exception during key check:")
+        return quart.Response(f"Exception during key check: {e!s}", mimetype="text/plain")
+
+
 @admin.BLUEPRINT.route("/keys/regenerate-all", methods=["GET", "POST"])
 async def admin_keys_regenerate_all() -> quart.Response:
     """Regenerate the KEYS file for all committees."""
@@ -607,6 +630,26 @@ async def ongoing_tasks(project_name: str, version_name: str, revision: str) -> 
     except Exception:
         _LOGGER.exception(f"Error fetching ongoing task count for {project_name} {version_name} rev {revision}:")
         return quart.Response("", mimetype="text/plain")
+
+
+async def _check_keys() -> str:
+    email_to_uid = await util.email_to_uid_map()
+    bad_keys = []
+    async with db.session() as data:
+        keys = await data.public_signing_key().all()
+        for key in keys:
+            uids = []
+            if key.primary_declared_uid:
+                uids.append(key.primary_declared_uid)
+            if key.secondary_declared_uids:
+                uids.extend(key.secondary_declared_uids)
+            asf_uid = await util.asf_uid_from_uids(uids, ldap_data=email_to_uid)
+            if asf_uid != key.apache_uid:
+                bad_keys.append(f"{key.fingerprint} detected: {asf_uid}, key: {key.apache_uid}")
+    message = f"Checked {len(keys)} keys"
+    if bad_keys:
+        message += f"\nFound {len(bad_keys)} bad keys:\n{'\n'.join(bad_keys)}"
+    return message
 
 
 async def _delete_release_data(release_name: str) -> None:

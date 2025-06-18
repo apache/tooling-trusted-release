@@ -73,6 +73,7 @@ async def key_user_add(
     public_key: str,
     selected_committees: list[str],
     ldap_data: dict[str, str] | None = None,
+    update_existing: bool = False,
 ) -> list[dict]:
     if not public_key:
         raise PublicKeyError("Public key is required")
@@ -93,7 +94,9 @@ async def key_user_add(
             raise InteractionError(f"Key {key.get('fingerprint', '').upper()} is not associated with your ASF account")
         async with db.session() as data:
             # Store the key in the database
-            added = await key_user_session_add(asf_uid, public_key, key, selected_committees, data)
+            added = await key_user_session_add(
+                asf_uid, public_key, key, selected_committees, data, update_existing=update_existing
+            )
             if added:
                 added_keys.append(added)
             else:
@@ -107,6 +110,7 @@ async def key_user_session_add(
     key: dict,
     selected_committees: list[str],
     data: db.Session,
+    update_existing: bool = False,
 ) -> dict | None:
     # TODO: Check if key already exists
     # psk_statement = select(PublicSigningKey).where(PublicSigningKey.apache_uid == session.uid)
@@ -138,24 +142,26 @@ async def key_user_session_add(
         existing = await data.public_signing_key(fingerprint=fingerprint).get()
         # TODO: This can race
         if existing:
-            # TODO: Always update?
+            update = update_existing
             # If the new key has a latest self signature
             if latest_self_signature is not None:
                 # And the self signature is newer, update it
                 if (existing.latest_self_signature is None) or (existing.latest_self_signature < latest_self_signature):
-                    existing.fingerprint = fingerprint
-                    existing.algorithm = int(key["algo"])
-                    existing.length = int(key.get("length", "0"))
-                    existing.created = created
-                    existing.latest_self_signature = latest_self_signature
-                    existing.expires = expires
-                    existing.primary_declared_uid = uids[0] if uids else None
-                    existing.secondary_declared_uids = uids[1:]
-                    existing.apache_uid = asf_uid
-                    existing.ascii_armored_key = public_key
-                    logging.info(f"Found existing key {fingerprint.upper()}, updating associations")
-                else:
-                    logging.info(f"Found existing key {fingerprint.upper()}, no update needed")
+                    update = True
+            if update:
+                existing.fingerprint = fingerprint
+                existing.algorithm = int(key["algo"])
+                existing.length = int(key.get("length", "0"))
+                existing.created = created
+                existing.latest_self_signature = latest_self_signature
+                existing.expires = expires
+                existing.primary_declared_uid = uids[0] if uids else None
+                existing.secondary_declared_uids = uids[1:]
+                existing.apache_uid = asf_uid
+                existing.ascii_armored_key = public_key
+                logging.info(f"Found existing key {fingerprint.upper()}, updating associations")
+            else:
+                logging.info(f"Found existing key {fingerprint.upper()}, no update needed")
             key_record = existing
         else:
             # Key doesn't exist, create it
@@ -326,6 +332,7 @@ async def upload_keys_bytes(
     keys_bytes: bytes,
     selected_committees: list[str],
     ldap_data: dict[str, str] | None = None,
+    update_existing: bool = False,
 ) -> tuple[list[dict], int, int, list[str]]:
     key_blocks = util.parse_key_blocks_bytes(keys_bytes)
     if not key_blocks:
@@ -340,7 +347,9 @@ async def upload_keys_bytes(
     submitted_committees = selected_committees[:]
 
     # Process each key block
-    results = await _upload_process_key_blocks(key_blocks, selected_committees, ldap_data=ldap_data)
+    results = await _upload_process_key_blocks(
+        key_blocks, selected_committees, ldap_data=ldap_data, update_existing=update_existing
+    )
     # if not results:
     #     raise InteractionError("No keys were added")
 
@@ -446,7 +455,10 @@ async def _successes_errors_warnings(
 
 
 async def _upload_process_key_blocks(
-    key_blocks: list[str], selected_committees: list[str], ldap_data: dict[str, str] | None = None
+    key_blocks: list[str],
+    selected_committees: list[str],
+    ldap_data: dict[str, str] | None = None,
+    update_existing: bool = False,
 ) -> list[dict]:
     """Process OpenPGP key blocks and add them to the user's account."""
     results: list[dict] = []
@@ -454,7 +466,9 @@ async def _upload_process_key_blocks(
     # Process each key block
     for i, key_block in enumerate(key_blocks):
         try:
-            added_keys = await key_user_add(None, key_block, selected_committees, ldap_data=ldap_data)
+            added_keys = await key_user_add(
+                None, key_block, selected_committees, ldap_data=ldap_data, update_existing=update_existing
+            )
             for key_info in added_keys:
                 key_info["status"] = key_info.get("status", "success")
                 key_info["email"] = key_info.get("email", "Unknown")
