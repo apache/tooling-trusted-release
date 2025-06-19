@@ -20,7 +20,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
-from typing import TYPE_CHECKING, Any, Final, Generic, TypeGuard, TypeVar
+from typing import TYPE_CHECKING, Any, Final, TypeGuard, TypeVar
 
 import alembic.command as command
 import alembic.config as alembic_config
@@ -80,7 +80,7 @@ NOT_SET: Final[NotSet] = NotSet()
 type Opt[T] = T | NotSet
 
 
-class Query(Generic[T]):
+class Query[T]:
     def __init__(self, session: Session, query: expression.SelectOfScalar[T]):
         self.query = query
         self.session = session
@@ -673,7 +673,7 @@ async def init_database_for_worker() -> None:
     )
 
 
-def is_defined(v: T | NotSet) -> TypeGuard[T]:
+def is_defined[T](v: T | NotSet) -> TypeGuard[T]:
     return not isinstance(v, NotSet)
 
 

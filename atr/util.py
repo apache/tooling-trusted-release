@@ -722,7 +722,7 @@ def release_directory_version(release: models.Release) -> pathlib.Path:
     return path
 
 
-def unwrap(value: T | None, error_message: str = "unexpected None when unwrapping value") -> T:
+def unwrap[T](value: T | None, error_message: str = "unexpected None when unwrapping value") -> T:
     """
     Will unwrap the given value or raise a ValueError if it is None
 
@@ -789,7 +789,7 @@ def user_releases(asf_uid: str, releases: Sequence[models.Release]) -> list[mode
     return user_releases
 
 
-def validate_as_type(value: Any, t: type[T]) -> T:
+def validate_as_type[T](value: Any, t: type[T]) -> T:
     """Validate the given value as the given type."""
     if not isinstance(value, t):
         raise ValueError(f"Expected {t}, got {type(value)}")

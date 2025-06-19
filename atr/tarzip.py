@@ -19,7 +19,7 @@ import tarfile
 import zipfile
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
-from typing import IO, Generic, TypeVar
+from typing import IO, TypeVar
 from typing import Protocol as TypingProtocol
 
 ArchiveT = TypeVar("ArchiveT", tarfile.TarFile, zipfile.ZipFile)
@@ -29,7 +29,7 @@ ArchiveT = TypeVar("ArchiveT", tarfile.TarFile, zipfile.ZipFile)
 MemberT = TypeVar("MemberT", tarfile.TarInfo, zipfile.ZipInfo, covariant=True)
 
 
-class AbstractArchiveMember(TypingProtocol, Generic[MemberT]):  # type: ignore[misc]
+class AbstractArchiveMember[MemberT: (tarfile.TarInfo, zipfile.ZipInfo)](TypingProtocol):  # type: ignore[misc]
     name: str
     _original_info: MemberT
 
@@ -64,7 +64,7 @@ class ZipMember(AbstractArchiveMember[zipfile.ZipInfo]):
 Member = TarMember | ZipMember
 
 
-class ArchiveContext(Generic[ArchiveT]):
+class ArchiveContext[ArchiveT: (tarfile.TarFile, zipfile.ZipFile)]:
     _archive_obj: ArchiveT
 
     def __init__(self, archive_obj: ArchiveT):

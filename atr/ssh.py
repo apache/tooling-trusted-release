@@ -132,7 +132,7 @@ async def server_stop(server: asyncssh.SSHAcceptor) -> None:
     _LOGGER.info("SSH server stopped")
 
 
-def _fail(process: asyncssh.SSHServerProcess, message: str, return_value: T) -> T:
+def _fail[T](process: asyncssh.SSHServerProcess, message: str, return_value: T) -> T:
     _LOGGER.error(message)
     # Ensure message is encoded before writing to stderr
     encoded_message = f"ATR SSH error: {message}\n".encode()
