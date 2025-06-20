@@ -18,6 +18,7 @@ dependencies = [
   "aiozipstream (>=0.4,<0.5)",
   "alembic~=1.14",
   "asfquart @ git+https://github.com/apache/infrastructure-asfquart.git@main",
+  "asfyaml (>=0.1.0,<0.2.0)",
   "asyncssh>=2.20.0,<3.0.0",
   "blockbuster>=1.5.23,<2.0.0",
   "cryptography~=44.0",
@@ -64,9 +65,9 @@ package-mode = false
 [tool.poetry.group.test.dependencies]
 netifaces = "^0.11.0"
 playwright = "^1.51.0"
+pyinstrument = "^5.0.2"
 pytest = ">=8.0"
 pytest-asyncio = ">=0.24"
-pyinstrument = "^5.0.2"
 
 [tool.poetry.group.dev.dependencies]
 decouple-types = ">=1.0"
@@ -82,9 +83,9 @@ types-aiofiles = ">=24.1.0.20241221,<25.0.0.0"
 [tool.pyright]
 include = ["atr", "playwright"]
 exclude = [
-  "**/node_modules",
-  "**/__pycache__",
   ".venv*",
+  "**/__pycache__",
+  "**/node_modules",
   "tests",
 ]
 ignore = []
@@ -106,16 +107,16 @@ extend-exclude = [
 [tool.ruff.lint]
 ignore = []
 select = [
-  "I",   # isort
+  "C90",
   "E",
-  "W",
   "F",
+  "I",   # isort
   "N",   # pep8-naming
   "RUF", # ruff-checks
-  "C90",
-  "TID", # flake8-tidy-imports
   "TC",  # flake8-type-checking
-  "UP"   # pyupgrade
+  "TID", # flake8-tidy-imports
+  "UP",  # pyupgrade
+  "W"
 ]
 
 [tool.ruff.lint.per-file-ignores]
