@@ -179,7 +179,7 @@ async def _check_path_process_single(
         await _check_metadata_rules(base_path, relative_path, relative_paths, ext_metadata, errors, warnings)
     else:
         _LOGGER.info("Checking general rules for %s", full_path)
-        allowed_top_level = {".asf.yaml", "CHANGES", "LICENSE", "NOTICE", "README"}
+        allowed_top_level = {"CHANGES", "LICENSE", "NOTICE", "README"}
         if (relative_path.parent == pathlib.Path(".")) and (relative_path.name not in allowed_top_level):
             warnings.append(f"Unknown top level file: {relative_path.name}")
 
