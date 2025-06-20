@@ -180,10 +180,10 @@ def headers_validate(content: bytes, _filename: str) -> tuple[bool, str | None]:
     for span in r_span.finditer(content):
         # Get only the words in the span
         words = r_words.findall(span.group(0))
-        joined = b" ".join(words)
-        if joined == HTTP_APACHE_LICENSE_HEADER:
+        joined = b" ".join(words).lower()
+        if joined == HTTP_APACHE_LICENSE_HEADER.lower():
             return True, None
-        elif joined == HTTPS_APACHE_LICENSE_HEADER:
+        elif joined == HTTPS_APACHE_LICENSE_HEADER.lower():
             return True, None
     return False, "Could not find Apache License header"
 
