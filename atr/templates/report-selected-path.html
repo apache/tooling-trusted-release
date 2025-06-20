@@ -150,7 +150,9 @@
                                       {% for k, v in value.items() %}
                                         <tr>
                                           <th class="bg-light fw-bold">{{ k|replace('_', ' ') |title }}</th>
-                                          <td>{{ v }}</td>
+                                          <td>
+                                            <pre class="atr-pre-wrap">{{ v }}</pre>
+                                          </td>
                                         </tr>
                                       {% endfor %}
                                     </table>
@@ -175,10 +177,10 @@
                                     {% else %}
                                       None
                                     {% endif %}
-                                  {% elif value is sequence and value is not string %}
+                                  {% elif (value is sequence) and (value is not string) %}
                                     {{ value|join(", ") }}
                                   {% else %}
-                                    {{ value }}
+                                    <pre class="atr-pre-wrap">{{ value }}</pre>
                                   {% endif %}
                                 </td>
                               </tr>

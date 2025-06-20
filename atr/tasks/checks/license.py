@@ -16,6 +16,7 @@
 # under the License.
 
 import asyncio
+import difflib
 import hashlib
 import logging
 import os
@@ -25,6 +26,7 @@ from typing import Any, Final
 
 import atr.db.models as models
 import atr.schema as schema
+import atr.static as static
 import atr.tarzip as tarzip
 import atr.tasks.checks as checks
 
@@ -193,21 +195,8 @@ def headers_validate(content: bytes, _filename: str) -> tuple[bool, str | None]:
 
 def _files_check_core_logic(artifact_path: str) -> Iterator[Result]:
     """Verify that LICENSE and NOTICE files exist and are placed and formatted correctly."""
-    files_found = []
-    license_ok = False
-    notice_ok = False
-    notice_issues: list[str] = []
-
-    # # First find and validate the root directory
-    # try:
-    #     root_dir = targz.root_directory(artifact_path)
-    # except targz.RootDirectoryError as e:
-    #     yield ArtifactResult(
-    #         status=models.CheckResultStatus.WARNING,
-    #         message=f"Could not determine root directory: {e!s}",
-    #         data=None,
-    #     )
-    #     # Continue checking files
+    license_results: dict[str, str | None] = {}
+    notice_results: dict[str, tuple[bool, list[str], str]] = {}
 
     # Check for license files in the root directory
     with tarzip.open_archive(artifact_path) as archive:
@@ -222,67 +211,59 @@ def _files_check_core_logic(artifact_path: str) -> Iterator[Result]:
                 continue
 
             filename = os.path.basename(member.name)
-            if filename in {"LICENSE", "NOTICE"}:
-                files_found.append(filename)
-                if filename == "LICENSE":
-                    # TODO: Check length, should be 11,358 bytes
-                    license_ok = _files_check_core_logic_license(archive, member)
-                elif filename == "NOTICE":
-                    # TODO: Check length doesn't exceed some preset
-                    notice_ok, notice_issues = _files_check_core_logic_notice(archive, member)
+            if filename == "LICENSE":
+                # TODO: Check length, should be 11,358 bytes
+                license_diff = _files_check_core_logic_license(archive, member)
+                license_results[filename] = license_diff
+            elif filename == "NOTICE":
+                # TODO: Check length doesn't exceed some preset
+                notice_ok, notice_issues, notice_preamble = _files_check_core_logic_notice(archive, member)
+                notice_results[filename] = (notice_ok, notice_issues, notice_preamble)
 
-    yield from _files_messages_build(files_found, license_ok, notice_ok, notice_issues)
-
-    if license_ok and notice_ok:
-        yield ArtifactResult(
-            status=models.CheckResultStatus.SUCCESS,
-            message="LICENSE and NOTICE files present and valid",
-            data=None,
-        )
-    elif license_ok:
-        yield ArtifactResult(
-            status=models.CheckResultStatus.FAILURE,
-            message="LICENSE file present but NOTICE file is not valid",
-            data=None,
-        )
-    elif notice_ok:
-        yield ArtifactResult(
-            status=models.CheckResultStatus.FAILURE,
-            message="NOTICE file present but LICENSE file is not valid",
-            data=None,
-        )
-    else:
-        yield ArtifactResult(
-            status=models.CheckResultStatus.FAILURE,
-            message="LICENSE and NOTICE files are not valid",
-            data=None,
-        )
+    yield from __license_results(license_results)
+    yield from __notice_results(notice_results)
 
 
-def _files_check_core_logic_license(archive: tarzip.Archive, member: tarzip.Member) -> bool:
-    """Verify that the LICENSE file matches the Apache 2.0 license."""
+def _files_check_core_logic_license(archive: tarzip.Archive, member: tarzip.Member) -> str | None:
+    """Verify that the start of the LICENSE file matches the Apache 2.0 license."""
     f = archive.extractfile(member)
     if not f:
-        return False
+        return None
 
-    sha3_expected = "5efa4839f385df309ffc022ca5ce9763c4bc709dab862ca77d9a894db6598456"
-    sha3 = hashlib.sha3_256()
-    for line in f:
-        octets = line.strip(b" \t\r\n")
-        if octets:
-            sha3.update(octets)
-        if sha3.hexdigest() == sha3_expected:
-            return True
-    return False
+    sha3e = hashlib.sha3_256()
+    sha3e.update(static.APACHE_LICENSE_2_0.encode("utf-8"))
+    sha3_expected = sha3e.hexdigest()
+
+    if sha3_expected != "5efa4839f385df309ffc022ca5ce9763c4bc709dab862ca77d9a894db6598456":
+        _LOGGER.error("SHA3 expected value is incorrect, please update the static.LICENSE constant")
+
+    # It is common for the license to be used without the leading blank line
+    apache_license_2_0 = static.APACHE_LICENSE_2_0.removeprefix("\n")
+    # Remove the trailing newline for further normalisation
+    apache_license_2_0 = apache_license_2_0.removesuffix("\n")
+    content = f.read()
+    package_license = content.decode("utf-8", errors="replace")
+    package_license = package_license.removeprefix("\n")
+    package_license = package_license[: len(apache_license_2_0)]
+    if package_license != apache_license_2_0:
+        # TODO: Only show a contextual diff, not the full diff
+        diff = difflib.ndiff(apache_license_2_0.splitlines(), package_license.splitlines())
+        return "\n".join(diff)
+
+    return None
 
 
-def _files_check_core_logic_notice(archive: tarzip.Archive, member: tarzip.Member) -> tuple[bool, list[str]]:
+def _files_check_core_logic_notice(archive: tarzip.Archive, member: tarzip.Member) -> tuple[bool, list[str], str]:
     """Verify that the NOTICE file follows the required format."""
     f = archive.extractfile(member)
     if not f:
-        return False, ["Could not read NOTICE file"]
+        return False, ["the NOTICE file is missing or could not be read"], ""
 
-    content = f.read().decode("utf-8")
+    try:
+        content = f.read().decode("utf-8")
+    except UnicodeDecodeError:
+        return False, ["the NOTICE file is not valid UTF-8"], ""
+    preamble = "".join(content.splitlines(keepends=True)[:3])
     issues = []
 
     if not re.search(r"Apache\s+[\w\-\.]+", content, re.MULTILINE):
@@ -294,53 +275,81 @@ def _files_check_core_logic_notice(archive: tarzip.Archive, member: tarzip.Membe
     ):
         issues.append("missing or invalid foundation attribution")
 
-    return len(issues) == 0, issues
+    return len(issues) == 0, issues, preamble
 
 
-def _files_messages_build(
-    files_found: list[str],
-    license_ok: bool,
-    notice_ok: bool,
-    notice_issues: list[str],
+def __license_results(
+    license_results: dict[str, str | None],
 ) -> Iterator[Result]:
     """Build status messages for license file verification."""
-    if not files_found:
+    license_files_size = len(license_results)
+    if license_files_size == 0:
         yield ArtifactResult(
             status=models.CheckResultStatus.FAILURE,
-            message="No LICENSE or NOTICE files found",
+            message="No LICENSE file found",
             data=None,
         )
         return
 
-    # Check the LICENSE file
-    if "LICENSE" not in files_found:
+    if license_files_size > 1:
         yield ArtifactResult(
             status=models.CheckResultStatus.FAILURE,
-            message="LICENSE file not found",
+            message="Multiple LICENSE files found",
             data=None,
         )
-    elif not license_ok:
-        yield MemberResult(
-            status=models.CheckResultStatus.FAILURE,
-            path="LICENSE",
-            message="LICENSE file does not match Apache 2.0 license",
-            data=None,
-        )
+        return
 
-    # Check the NOTICE file
-    if "NOTICE" not in files_found:
+    for filename, license_diff in license_results.items():
+        # Unpack the single result by iterating
+        if license_diff is None:
+            yield ArtifactResult(
+                status=models.CheckResultStatus.SUCCESS,
+                message=f"{filename} is valid",
+                data=None,
+            )
+        else:
+            yield ArtifactResult(
+                status=models.CheckResultStatus.FAILURE,
+                message=f"{filename} is invalid",
+                data={"diff": license_diff},
+            )
+
+
+def __notice_results(
+    notice_results: dict[str, tuple[bool, list[str], str]],
+) -> Iterator[Result]:
+    """Build status messages for notice file verification."""
+    notice_files_size = len(notice_results)
+    if notice_files_size == 0:
         yield ArtifactResult(
             status=models.CheckResultStatus.FAILURE,
-            message="NOTICE file not found",
+            message="No NOTICE file found",
             data=None,
         )
-    elif not notice_ok:
-        yield MemberResult(
+        return
+
+    if notice_files_size > 1:
+        yield ArtifactResult(
             status=models.CheckResultStatus.FAILURE,
-            path="NOTICE",
-            message="NOTICE file format issues: " + "; ".join(notice_issues),
+            message="Multiple NOTICE files found",
             data=None,
         )
+        return
+
+    for filename, (notice_ok, notice_issues, notice_preamble) in notice_results.items():
+        # Unpack the single result by iterating
+        if notice_ok:
+            yield ArtifactResult(
+                status=models.CheckResultStatus.SUCCESS,
+                message=f"{filename} is valid",
+                data=None,
+            )
+        else:
+            yield ArtifactResult(
+                status=models.CheckResultStatus.FAILURE,
+                message=f"{filename} is invalid",
+                data={"issues": notice_issues, "preamble": notice_preamble},
+            )
 
 
 # Header helpers

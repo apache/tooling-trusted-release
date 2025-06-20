@@ -482,3 +482,7 @@ aside.sidebar nav a:hover {
 .atr-hide {
     display: none;
 }
+
+.atr-pre-wrap {
+    white-space: pre-wrap;
+}
