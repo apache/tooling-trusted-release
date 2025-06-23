@@ -1046,6 +1046,17 @@ files = [
 ]
 
 [[package]]
+name = "gitignore-parser"
+version = "0.1.12"
+description = "A spec-compliant gitignore parser for Python 3.5+"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "gitignore_parser-0.1.12.tar.gz", hash = "sha256:78b22243adc0f02102c56c5e8c9a1d9121394142ca6143a90daa7f8d7a07a17e"},
+]
+
+[[package]]
 name = "greenlet"
 version = "3.2.3"
 description = "Lightweight in-process concurrent programming"
@@ -3184,4 +3195,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "~=3.13"
-content-hash = "b79174b297f7612b074db005aa6399eace902e49302d56e0168540befd71a8f1"
+content-hash = "54eafdba2809654d5c799509841e7fb6e3cb67635d88f7770de3217dc5c68c44"

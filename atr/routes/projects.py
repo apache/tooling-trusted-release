@@ -392,28 +392,7 @@ async def _metadata_edit(
 def _parse_artifact_paths(artifact_paths: str) -> list[str]:
     if not artifact_paths:
         return []
-    lines = artifact_paths.split("\n")
-    # This is similar to announce._download_path_suffix_validated
-    paths = []
-    for path in lines:
-        path = path.strip()
-        if not path:
-            continue
-        if (".." in path) or ("//" in path):
-            raise ValueError("Artifact path must not contain .. or //")
-        if path.startswith("./"):
-            path = path[1:]
-        elif path == ".":
-            path = "/"
-        if not path.startswith("/"):
-            path = "/" + path
-        # We differ from _download_path_suffix_validated in that we don't add a trailing slash
-        # if not path.endswith("/"):
-        #     path = path + "/"
-        if "/." in path:
-            raise ValueError("Artifact path must not contain /.")
-        paths.append(path)
-    return sorted(paths)
+    return [path.strip() for path in artifact_paths.split("\n") if path.strip()]
 
 
 async def _policy_edit(

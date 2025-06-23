@@ -48,6 +48,7 @@ async def check(args: checks.FunctionArguments) -> str | None:
     if not (artifact_abs_path := await recorder.abs_path()):
         return None
     if await recorder.primary_path_is_binary():
+        _LOGGER.info(f"Skipping RAT check for binary artifact {artifact_abs_path} (rel: {args.primary_rel_path})")
         return None
 
     _LOGGER.info(f"Checking RAT licenses for {artifact_abs_path} (rel: {args.primary_rel_path})")

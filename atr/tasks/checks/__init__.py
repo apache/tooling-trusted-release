@@ -19,11 +19,11 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
-import fnmatch
 import functools
 import pathlib
 from typing import TYPE_CHECKING, Any
 
+import gitignore_parser
 import sqlmodel
 
 if TYPE_CHECKING:
@@ -136,11 +136,6 @@ class Recorder:
 
     async def abs_path(self, rel_path: str | None = None) -> pathlib.Path | None:
         """Construct the absolute path using the required revision."""
-        base_dir = util.get_unfinished_dir()
-        project_part = self.project_name
-        version_part = self.version_name
-        revision_part = self.revision_number
-
         # Determine the relative path part
         rel_path_part: str | None = None
         if rel_path is not None:
@@ -148,11 +143,12 @@ class Recorder:
         elif self.primary_rel_path is not None:
             rel_path_part = self.primary_rel_path
 
-        # Construct the absolute path
-        abs_path_parts: list[str | pathlib.Path] = [base_dir, project_part, version_part, revision_part]
-        if isinstance(rel_path_part, str):
-            abs_path_parts.append(rel_path_part)
-        return pathlib.Path(*abs_path_parts)
+        if rel_path_part is None:
+            return self.abs_path_base()
+        return self.abs_path_base() / rel_path_part
+
+    def abs_path_base(self) -> pathlib.Path:
+        return pathlib.Path(util.get_unfinished_dir(), self.project_name, self.version_name, self.revision_number)
 
     async def project(self) -> models.Project:
         # TODO: Cache project
@@ -167,9 +163,11 @@ class Recorder:
         project = await self.project()
         if not project.policy_binary_artifact_paths:
             return False
-        paths = project.policy_binary_artifact_paths
-        slash_path = "/" + self.primary_rel_path
-        return any(fnmatch.fnmatch(slash_path, path) for path in paths)
+        matches = _create_path_matcher(
+            project.policy_binary_artifact_paths, self.abs_path_base() / ".ignore", self.abs_path_base()
+        )
+        abs_path = await self.abs_path()
+        return matches(str(abs_path))
 
     async def primary_path_is_source(self) -> bool:
         if self.primary_rel_path is None:
@@ -177,9 +175,11 @@ class Recorder:
         project = await self.project()
         if not project.policy_source_artifact_paths:
             return False
-        paths = project.policy_source_artifact_paths
-        slash_path = "/" + self.primary_rel_path
-        return any(fnmatch.fnmatch(slash_path, path) for path in paths)
+        matches = _create_path_matcher(
+            project.policy_source_artifact_paths, self.abs_path_base() / ".ignore", self.abs_path_base()
+        )
+        abs_path = await self.abs_path()
+        return matches(str(abs_path))
 
     async def clear(self, primary_rel_path: str | None = None, member_rel_path: str | None = None) -> None:
         async with db.session() as data:
@@ -254,3 +254,17 @@ def with_model(cls: type[schema.Strict]) -> Callable[[Callable[..., Any]], Calla
         return wrapper
 
     return decorator
+
+
+def _create_path_matcher(lines: list[str], full_path: pathlib.Path, base_dir: pathlib.Path) -> Callable[[str], bool]:
+    rules = []
+    negation = False
+    for line_no, line in enumerate(lines, start=1):
+        rule = gitignore_parser.rule_from_pattern(line.rstrip("\n"), base_path=base_dir, source=(full_path, line_no))
+        if rule:
+            rules.append(rule)
+            if rule.negation:
+                negation = True
+    if not negation:
+        return lambda file_path: any(r.match(file_path) for r in rules)
+    return lambda file_path: gitignore_parser.handle_negation(file_path, rules)
