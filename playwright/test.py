@@ -578,12 +578,12 @@ def test_checks_02_license_files(page: sync_api.Page, credentials: Credentials) 
 
     logging.info("Verifying License Files check status")
     check_row_locator = page.locator("tr.atr-result-primary:has(th:text-is('License Files'))")
-    sync_api.expect(check_row_locator).to_be_visible()
-    logging.info("Located License Files check row")
+    sync_api.expect(check_row_locator).to_have_count(2)
+    logging.info("Located 2 License Files check rows")
 
     success_badge_locator = check_row_locator.locator("td span.badge.bg-success:text-is('Success')")
-    sync_api.expect(success_badge_locator).to_be_visible()
-    logging.info("License Files check status verified as Success")
+    sync_api.expect(success_badge_locator).to_have_count(2)
+    logging.info("License Files check status verified as Success for 2 rows")
 
 
 def test_checks_03_license_headers(page: sync_api.Page, credentials: Credentials) -> None:
