@@ -93,6 +93,7 @@ def _check_core_logic(
     _LOGGER.info(f"PATH environment variable: {os.environ.get('PATH', 'PATH not found')}")
 
     # Check that Java is installed
+    # TODO: Run this only once, when the server starts
     try:
         java_version = subprocess.check_output(
             ["java", *_JAVA_MEMORY_ARGS, "-version"], stderr=subprocess.STDOUT, text=True
@@ -116,7 +117,7 @@ def _check_core_logic(
 
             # Try to find where Java might be located
             which_java = subprocess.run(["which", "java"], capture_output=True, text=True, check=False)
-            which_java_result = which_java.stdout.strip() if which_java.returncode == 0 else "not found"
+            which_java_result = which_java.stdout.strip() if (which_java.returncode == 0) else "not found"
             _LOGGER.info(f"Result for which java: {which_java_result}")
         except Exception as inner_e:
             _LOGGER.error(f"Additional error while trying to debug java: {inner_e}")
