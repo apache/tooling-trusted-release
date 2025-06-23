@@ -387,7 +387,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         _project: bool = True,
         _committee: bool = True,
         _release_policy: bool = False,
-        _tasks: bool = False,
         _revisions: bool = False,
     ) -> Query[models.Release]:
         query = sqlmodel.select(models.Release)

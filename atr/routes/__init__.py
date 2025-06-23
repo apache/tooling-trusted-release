@@ -232,7 +232,6 @@ class CommitterSession:
         data: db.Session | None = None,
         with_committee: bool = True,
         with_project: bool = True,
-        with_tasks: bool = False,
         with_revisions: bool = False,
     ) -> models.Release:
         # We reuse db.NOT_SET as an entirely different sentinel
@@ -252,7 +251,6 @@ class CommitterSession:
                     latest_revision_number=latest_revision_number,
                     _committee=with_committee,
                     _project=with_project,
-                    _tasks=with_tasks,
                     _revisions=with_revisions,
                 ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
         else:
@@ -262,7 +260,6 @@ class CommitterSession:
                 latest_revision_number=latest_revision_number,
                 _committee=with_committee,
                 _project=with_project,
-                _tasks=with_tasks,
                 _revisions=with_revisions,
             ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
         return release

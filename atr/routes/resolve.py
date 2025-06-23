@@ -107,7 +107,6 @@ async def selected_post(
             release = await session.release(
                 project_name,
                 version_name,
-                with_tasks=True,
                 with_project=True,
                 phase=models.ReleasePhase.RELEASE_CANDIDATE,
                 data=data,
