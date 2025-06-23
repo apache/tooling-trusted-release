@@ -394,6 +394,7 @@ def _parse_artifact_paths(artifact_paths: str) -> list[str]:
         return []
     lines = artifact_paths.split("\n")
     # This is similar to announce._download_path_suffix_validated
+    paths = []
     for path in lines:
         path = path.strip()
         if not path:
@@ -411,7 +412,8 @@ def _parse_artifact_paths(artifact_paths: str) -> list[str]:
         #     path = path + "/"
         if "/." in path:
             raise ValueError("Artifact path must not contain /.")
-    return sorted(lines)
+        paths.append(path)
+    return sorted(paths)
 
 
 async def _policy_edit(
