@@ -454,7 +454,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.ReleasePolicy.pause_for_rm == pause_for_rm)
 
         if _project:
-            query = query.options(select_in_load(models.ReleasePolicy.project))
+            query = query.options(joined_load(models.ReleasePolicy.project))
 
         return Query(self, query)
 
