@@ -129,6 +129,12 @@ class ReleasePolicy(sqlmodel.SQLModel, table=True):
     pause_for_rm: bool = sqlmodel.Field(default=False)
     start_vote_template: str = sqlmodel.Field(default="")
     announce_release_template: str = sqlmodel.Field(default="")
+    binary_artifact_paths: list[str] = sqlmodel.Field(
+        default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON)
+    )
+    source_artifact_paths: list[str] = sqlmodel.Field(
+        default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON)
+    )
 
     # One-to-One: A release policy is associated with a project
     project: "Project" = sqlmodel.Relationship(back_populates="release_policy")
@@ -373,6 +379,18 @@ Thanks,
         if ((policy := self.release_policy) is None) or (policy.start_vote_template == ""):
             return self.policy_start_vote_default
         return policy.start_vote_template
+
+    @property
+    def policy_binary_artifact_paths(self) -> list[str]:
+        if (policy := self.release_policy) is None:
+            return []
+        return policy.binary_artifact_paths
+
+    @property
+    def policy_source_artifact_paths(self) -> list[str]:
+        if (policy := self.release_policy) is None:
+            return []
+        return policy.source_artifact_paths
 
 
 class DistributionChannel(sqlmodel.SQLModel, table=True):

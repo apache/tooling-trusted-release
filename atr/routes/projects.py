@@ -111,6 +111,18 @@ class ReleasePolicyForm(util.QuartFormTyped):
         render_kw={"rows": 10},
         description="Email template for messages to announce a finished release.",
     )
+    binary_artifact_paths = wtforms.StringField(
+        "Binary artifact paths",
+        widget=wtforms.widgets.TextArea(),
+        render_kw={"rows": 5},
+        description="Paths to binary artifacts to be included in the release.",
+    )
+    source_artifact_paths = wtforms.StringField(
+        "Source artifact paths",
+        widget=wtforms.widgets.TextArea(),
+        render_kw={"rows": 5},
+        description="Paths to source artifacts to be included in the release.",
+    )
     pause_for_rm = wtforms.BooleanField(
         "Pause for RM", description="If enabled, RM can confirm manually if the vote has passed."
     )
@@ -377,6 +389,14 @@ async def _metadata_edit(
     return False, metadata_form
 
 
+def _parse_artifact_paths(artifact_paths: str) -> list[str]:
+    if not artifact_paths:
+        return []
+    lines = artifact_paths.split("\n")
+    paths = [path.strip() for path in lines if path.strip()]
+    return sorted(paths)
+
+
 async def _policy_edit(
     data: db.Session, project: models.Project, form_data: dict[str, str]
 ) -> tuple[bool, ReleasePolicyForm]:
@@ -391,6 +411,12 @@ async def _policy_edit(
         release_policy.mailto_addresses = [util.unwrap(policy_form.mailto_addresses.entries[0].data)]
         release_policy.manual_vote = util.unwrap(policy_form.manual_vote.data)
         release_policy.release_checklist = util.unwrap(policy_form.release_checklist.data)
+        release_policy.binary_artifact_paths = _parse_artifact_paths(
+            util.unwrap(policy_form.binary_artifact_paths.data)
+        )
+        release_policy.source_artifact_paths = _parse_artifact_paths(
+            util.unwrap(policy_form.source_artifact_paths.data)
+        )
         _set_default_fields(policy_form, project, release_policy)
 
         release_policy.pause_for_rm = util.unwrap(policy_form.pause_for_rm.data)
@@ -412,6 +438,8 @@ async def _policy_form_create(project: models.Project) -> ReleasePolicyForm:
     policy_form.release_checklist.data = project.policy_release_checklist
     policy_form.start_vote_template.data = project.policy_start_vote_template
     policy_form.announce_release_template.data = project.policy_announce_release_template
+    policy_form.binary_artifact_paths.data = "\n".join(project.policy_binary_artifact_paths)
+    policy_form.source_artifact_paths.data = "\n".join(project.policy_source_artifact_paths)
     policy_form.pause_for_rm.data = project.policy_pause_for_rm
 
     # Set the hashes and value of the current defaults

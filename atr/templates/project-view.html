@@ -139,6 +139,24 @@
             </div>
 
             <div class="mb-3 pb-3 row border-bottom">
+              {{ forms.label(policy_form.binary_artifact_paths, col="md3") }}
+              <div class="col-sm-8">
+                {{ forms.widget(policy_form.binary_artifact_paths, classes="form-control font-monospace") }}
+                {{ forms.errors(policy_form.binary_artifact_paths) }}
+                {{ forms.description(policy_form.binary_artifact_paths) }}
+              </div>
+            </div>
+
+            <div class="mb-3 pb-3 row border-bottom">
+              {{ forms.label(policy_form.source_artifact_paths, col="md3") }}
+              <div class="col-sm-8">
+                {{ forms.widget(policy_form.source_artifact_paths, classes="form-control font-monospace") }}
+                {{ forms.errors(policy_form.source_artifact_paths) }}
+                {{ forms.description(policy_form.source_artifact_paths) }}
+              </div>
+            </div>
+
+            <div class="mb-3 pb-3 row border-bottom">
               {{ forms.label(policy_form.pause_for_rm, col="md3-high") }}
               <div class="col-sm-8">
                 <div class="form-check">
