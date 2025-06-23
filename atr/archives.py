@@ -19,7 +19,10 @@ import logging
 import os
 import os.path
 import tarfile
+import zipfile
 from typing import Final
+
+import atr.tarzip as tarzip
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -28,46 +31,53 @@ class ExtractionError(Exception):
     pass
 
 
-def targz_extract(
+def extract(
     archive_path: str,
     extract_dir: str,
     max_size: int,
     chunk_size: int,
 ) -> int:
-    """Safe archive extraction."""
     total_extracted = 0
 
     try:
-        with tarfile.open(archive_path, mode="r|gz") as tf:
-            for member in tf:
-                keep_going, total_extracted = archive_extract_member(
-                    tf, member, extract_dir, total_extracted, max_size, chunk_size
-                )
-                if not keep_going:
-                    break
+        with tarzip.open_archive(archive_path) as archive:
+            match archive.specific():
+                case tarfile.TarFile() as tf:
+                    for member in tf:
+                        keep_going, total_extracted = archive_extract_member(
+                            tf, member, extract_dir, total_extracted, max_size, chunk_size
+                        )
+                        if not keep_going:
+                            break
 
-    except tarfile.ReadError as e:
+                case zipfile.ZipFile():
+                    for member in archive:
+                        if not isinstance(member, tarzip.ZipMember):
+                            continue
+                        keep_going, total_extracted = _zip_archive_extract_member(
+                            archive, member, extract_dir, total_extracted, max_size, chunk_size
+                        )
+                        if not keep_going:
+                            break
+
+                case _:
+                    raise ExtractionError("Unsupported archive type", {"archive_path": archive_path})
+
+    except (tarfile.TarError, zipfile.BadZipFile, ValueError) as e:
         raise ExtractionError(f"Failed to read archive: {e}", {"archive_path": archive_path}) from e
 
     return total_extracted
 
 
-def targz_total_size(tgz_path: str, chunk_size: int = 4096) -> int:
-    """Verify a .tar.gz file and compute its uncompressed size."""
-    total_size = 0
+def total_size(tgz_path: str, chunk_size: int = 4096) -> int:
+    with tarzip.open_archive(tgz_path) as archive:
+        match archive.specific():
+            case tarfile.TarFile() as tf:
+                total_size = _size_tar(tf, chunk_size)
 
-    with tarfile.open(tgz_path, mode="r|gz") as tf:
-        for member in tf:
-            # Do not skip metadata here
-            total_size += member.size
-            # Verify file by extraction
-            if member.isfile():
-                f = tf.extractfile(member)
-                if f is not None:
-                    while True:
-                        data = f.read(chunk_size)
-                        if not data:
-                            break
+            case zipfile.ZipFile():
+                total_size = _size_zip(archive, chunk_size)
+
     return total_size
 
 
@@ -216,3 +226,103 @@ def _safe_path(base_dir: str, *paths: str) -> str | None:
     if target.startswith(os.path.abspath(base_dir)):
         return target
     return None
+
+
+def _size_tar(tf: tarfile.TarFile, chunk_size: int) -> int:
+    total_size = 0
+    for member in tf:
+        total_size += member.size
+        if member.isfile():
+            fileobj = tf.extractfile(member)
+            if fileobj is not None:
+                while fileobj.read(chunk_size):
+                    pass
+    return total_size
+
+
+def _size_zip(archive: tarzip.Archive, chunk_size: int) -> int:
+    total_size = 0
+    for member in archive:
+        if not isinstance(member, tarzip.ZipMember):
+            continue
+        total_size += member.size
+        if member.isfile():
+            fileobj = archive.extractfile(member)
+            if fileobj is not None:
+                while fileobj.read(chunk_size):
+                    pass
+    return total_size
+
+
+def _zip_archive_extract_member(
+    archive: tarzip.Archive,
+    member: tarzip.ZipMember,
+    extract_dir: str,
+    total_extracted: int,
+    max_size: int,
+    chunk_size: int,
+) -> tuple[bool, int]:
+    if member.name.split("/")[-1].startswith("._"):
+        return False, 0
+
+    if member.isfile() and (total_extracted + member.size) > max_size:
+        raise ExtractionError(
+            f"Extraction would exceed maximum size limit of {max_size} bytes",
+            {"max_size": max_size, "current_size": total_extracted, "file_size": member.size},
+        )
+
+    if member.isdir():
+        target_path = os.path.join(extract_dir, member.name)
+        if not os.path.abspath(target_path).startswith(os.path.abspath(extract_dir)):
+            _LOGGER.warning("Skipping potentially unsafe path: %s", member.name)
+            return False, 0
+        os.makedirs(target_path, exist_ok=True)
+        return True, total_extracted
+
+    if member.isfile():
+        extracted_size = _zip_extract_safe_process_file(
+            archive, member, extract_dir, total_extracted, max_size, chunk_size
+        )
+        return True, total_extracted + extracted_size
+
+    return False, total_extracted
+
+
+def _zip_extract_safe_process_file(
+    archive: tarzip.Archive,
+    member: tarzip.ZipMember,
+    extract_dir: str,
+    total_extracted: int,
+    max_size: int,
+    chunk_size: int,
+) -> int:
+    target_path = os.path.join(extract_dir, member.name)
+    if not os.path.abspath(target_path).startswith(os.path.abspath(extract_dir)):
+        _LOGGER.warning(f"Skipping potentially unsafe path: {member.name}")
+        return 0
+
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+
+    source = archive.extractfile(member)
+    if source is None:
+        _LOGGER.warning(f"Could not extract {member.name} from archive")
+        return 0
+
+    extracted_file_size = 0
+    try:
+        with open(target_path, "wb") as target:
+            while chunk := source.read(chunk_size):
+                target.write(chunk)
+                extracted_file_size += len(chunk)
+
+                if (total_extracted + extracted_file_size) > max_size:
+                    target.close()
+                    os.unlink(target_path)
+                    raise ExtractionError(
+                        f"Extraction exceeded maximum size limit of {max_size} bytes",
+                        {"max_size": max_size, "current_size": total_extracted},
+                    )
+    finally:
+        source.close()
+
+    return extracted_file_size

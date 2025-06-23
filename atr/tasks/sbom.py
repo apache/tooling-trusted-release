@@ -87,7 +87,7 @@ async def _generate_cyclonedx_core(artifact_path: str, output_path: str) -> dict
         # TODO: Ideally we'd have task dependencies or archive caching
         _LOGGER.info(f"Extracting {artifact_path} to {temp_dir}")
         extracted_size = await asyncio.to_thread(
-            archives.targz_extract,
+            archives.extract,
             artifact_path,
             str(temp_dir),
             max_size=_CONFIG.MAX_EXTRACT_SIZE,

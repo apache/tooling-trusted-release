@@ -31,16 +31,24 @@ MemberT = TypeVar("MemberT", tarfile.TarInfo, zipfile.ZipInfo, covariant=True)
 
 class AbstractArchiveMember[MemberT: (tarfile.TarInfo, zipfile.ZipInfo)](TypingProtocol):  # type: ignore[misc]
     name: str
+    size: int
+    linkname: str | None
+
     _original_info: MemberT
 
     def isfile(self) -> bool: ...
     def isdir(self) -> bool: ...
+    def issym(self) -> bool: ...
+    def islnk(self) -> bool: ...
+    def isdev(self) -> bool: ...
 
 
 class TarMember(AbstractArchiveMember[tarfile.TarInfo]):
     def __init__(self, original: tarfile.TarInfo):
-        self.name: str = original.name
-        self._original_info: tarfile.TarInfo = original
+        self.name = original.name
+        self._original_info = original
+        self.size = original.size
+        self.linkname = original.linkname if hasattr(original, "linkname") else None
 
     def isfile(self) -> bool:
         return self._original_info.isfile()
@@ -48,17 +56,39 @@ class TarMember(AbstractArchiveMember[tarfile.TarInfo]):
     def isdir(self) -> bool:
         return self._original_info.isdir()
 
+    def issym(self) -> bool:
+        return self._original_info.issym()
+
+    def islnk(self) -> bool:
+        return self._original_info.islnk()
+
+    def isdev(self) -> bool:
+        return self._original_info.isdev()
+
 
 class ZipMember(AbstractArchiveMember[zipfile.ZipInfo]):
     def __init__(self, original: zipfile.ZipInfo):
-        self.name: str = original.filename
-        self._original_info: zipfile.ZipInfo = original
+        self.name = original.filename
+        self._original_info = original
+
+        self.size = original.file_size
+        # Link targets are not encoded in ZIP files
+        self.linkname: str | None = None
 
     def isfile(self) -> bool:
         return not self._original_info.is_dir()
 
     def isdir(self) -> bool:
         return self._original_info.is_dir()
+
+    def issym(self) -> bool:
+        return False
+
+    def islnk(self) -> bool:
+        return False
+
+    def isdev(self) -> bool:
+        return False
 
 
 Member = TarMember | ZipMember
@@ -74,6 +104,8 @@ class ArchiveContext[ArchiveT: (tarfile.TarFile, zipfile.ZipFile)]:
         match self._archive_obj:
             case tarfile.TarFile() as tf:
                 for member_orig in tf:
+                    if member_orig.isdev():
+                        continue
                     yield TarMember(member_orig)
             case zipfile.ZipFile() as zf:
                 for member_orig in zf.infolist():
@@ -93,8 +125,13 @@ class ArchiveContext[ArchiveT: (tarfile.TarFile, zipfile.ZipFile)]:
         except (KeyError, AttributeError, Exception):
             return None
 
+    def specific(self) -> tarfile.TarFile | zipfile.ZipFile:
+        return self._archive_obj
 
-Archive = ArchiveContext[tarfile.TarFile] | ArchiveContext[zipfile.ZipFile]
+
+TarArchive = ArchiveContext[tarfile.TarFile]
+ZipArchive = ArchiveContext[zipfile.ZipFile]
+Archive = TarArchive | ZipArchive
 
 
 @contextmanager

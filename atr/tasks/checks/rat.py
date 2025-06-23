@@ -26,7 +26,6 @@ from typing import Any, Final
 import atr.archives as archives
 import atr.config as config
 import atr.tasks.checks as checks
-import atr.tasks.checks.targz as targz
 
 _CONFIG: Final = config.get()
 _JAVA_MEMORY_ARGS: Final[list[str]] = []
@@ -89,51 +88,11 @@ def _check_core_logic(
 ) -> dict[str, Any]:
     """Verify license headers using Apache RAT."""
     _LOGGER.info(f"Verifying licenses with Apache RAT for {artifact_path}")
-
-    # Log the PATH environment variable
     _LOGGER.info(f"PATH environment variable: {os.environ.get('PATH', 'PATH not found')}")
 
-    # Check that Java is installed
-    # TODO: Run this only once, when the server starts
-    try:
-        java_version = subprocess.check_output(
-            ["java", *_JAVA_MEMORY_ARGS, "-version"], stderr=subprocess.STDOUT, text=True
-        )
-        _LOGGER.info(f"Java version: {java_version.splitlines()[0]}")
-    except (subprocess.SubprocessError, FileNotFoundError) as e:
-        _LOGGER.error(f"Java is not properly installed or not in PATH: {e}")
-
-        # Try to get some output even if the command failed
-        try:
-            # Use run instead of check_output to avoid exceptions
-            java_result = subprocess.run(
-                ["java", *_JAVA_MEMORY_ARGS, "-version"],
-                stderr=subprocess.STDOUT,
-                stdout=subprocess.PIPE,
-                text=True,
-                check=False,
-            )
-            _LOGGER.info(f"Java command return code: {java_result.returncode}")
-            _LOGGER.info(f"Java command output: {java_result.stdout or java_result.stderr}")
-
-            # Try to find where Java might be located
-            which_java = subprocess.run(["which", "java"], capture_output=True, text=True, check=False)
-            which_java_result = which_java.stdout.strip() if (which_java.returncode == 0) else "not found"
-            _LOGGER.info(f"Result for which java: {which_java_result}")
-        except Exception as inner_e:
-            _LOGGER.error(f"Additional error while trying to debug java: {inner_e}")
-
-        return {
-            "valid": False,
-            "message": "Java is not properly installed or not in PATH",
-            "total_files": 0,
-            "approved_licenses": 0,
-            "unapproved_licenses": 0,
-            "unknown_licenses": 0,
-            "unapproved_files": [],
-            "unknown_license_files": [],
-            "errors": [f"Java error: {e}"],
-        }
+    java_check = _check_java_installed()
+    if java_check is not None:
+        return java_check
 
     # Verify RAT JAR exists and is accessible
     rat_jar_path, jar_error = _check_core_logic_jar_exists(rat_jar_path)
@@ -146,33 +105,42 @@ def _check_core_logic(
         with tempfile.TemporaryDirectory(prefix="rat_verify_") as temp_dir:
             _LOGGER.info(f"Created temporary directory: {temp_dir}")
 
-            # Find and validate the root directory
-            try:
-                root_dir = targz.root_directory(artifact_path)
-            except targz.RootDirectoryError as e:
-                error_msg = str(e)
-                _LOGGER.error(f"Archive root directory issue: {error_msg}")
-                return {
-                    "valid": False,
-                    "message": "No root directory found",
-                    "total_files": 0,
-                    "approved_licenses": 0,
-                    "unapproved_licenses": 0,
-                    "unknown_licenses": 0,
-                    "unapproved_files": [],
-                    "unknown_license_files": [],
-                    "warning": error_msg or "No root directory found",
-                    "errors": [],
-                }
+            # # Find and validate the root directory
+            # try:
+            #     root_dir = targz.root_directory(artifact_path)
+            # except targz.RootDirectoryError as e:
+            #     error_msg = str(e)
+            #     _LOGGER.error(f"Archive root directory issue: {error_msg}")
+            #     return {
+            #         "valid": False,
+            #         "message": "No root directory found",
+            #         "total_files": 0,
+            #         "approved_licenses": 0,
+            #         "unapproved_licenses": 0,
+            #         "unknown_licenses": 0,
+            #         "unapproved_files": [],
+            #         "unknown_license_files": [],
+            #         "warning": error_msg or "No root directory found",
+            #         "errors": [],
+            #     }
 
-            extract_dir = os.path.join(temp_dir, root_dir)
+            # extract_dir = os.path.join(temp_dir, root_dir)
 
             # Extract the archive to the temporary directory
             _LOGGER.info(f"Extracting {artifact_path} to {temp_dir}")
-            extracted_size = archives.targz_extract(
-                artifact_path, temp_dir, max_size=max_extract_size, chunk_size=chunk_size
-            )
+            extracted_size = archives.extract(artifact_path, temp_dir, max_size=max_extract_size, chunk_size=chunk_size)
             _LOGGER.info(f"Extracted {extracted_size} bytes")
+
+            # Find the root directory
+            if (extract_dir := _extracted_dir(temp_dir)) is None:
+                _LOGGER.error("No root directory found in archive")
+                return {
+                    "valid": False,
+                    "message": "No root directory found in archive",
+                    "errors": [],
+                }
+
+            _LOGGER.info(f"Using root directory: {extract_dir}")
 
             # Execute RAT and get results or error
             error_result, xml_output_path = _check_core_logic_execute_rat(rat_jar_path, extract_dir, temp_dir)
@@ -180,28 +148,14 @@ def _check_core_logic(
                 return error_result
 
             # Parse the XML output
-            try:
-                _LOGGER.info(f"Parsing RAT XML output: {xml_output_path}")
-                # Make sure xml_output_path is not None before parsing
-                if xml_output_path is None:
-                    raise ValueError("XML output path is None")
+            _LOGGER.info(f"Parsing RAT XML output: {xml_output_path}")
+            # Make sure xml_output_path is not None before parsing
+            if xml_output_path is None:
+                raise ValueError("XML output path is None")
 
-                results = _check_core_logic_parse_output(xml_output_path, extract_dir)
-                _LOGGER.info(f"Successfully parsed RAT output with {results.get('total_files', 0)} files")
-                return results
-            except Exception as e:
-                _LOGGER.error(f"Error parsing RAT output: {e}")
-                return {
-                    "valid": False,
-                    "message": f"Failed to parse Apache RAT output: {e!s}",
-                    "total_files": 0,
-                    "approved_licenses": 0,
-                    "unapproved_licenses": 0,
-                    "unknown_licenses": 0,
-                    "unapproved_files": [],
-                    "unknown_license_files": [],
-                    "errors": [f"Parse error: {e}"],
-                }
+            results = _check_core_logic_parse_output(xml_output_path, extract_dir)
+            _LOGGER.info(f"Successfully parsed RAT output with {results.get('total_files', 0)} files")
+            return results
 
     except Exception as e:
         import traceback
@@ -475,3 +429,63 @@ with unapproved licenses, and {unknown_licenses} with unknown licenses"""
             "unknown_licenses": 0,
             "errors": [f"XML parsing error: {e!s}"],
         }
+
+
+def _check_java_installed() -> dict[str, Any] | None:
+    # Check that Java is installed
+    # TODO: Run this only once, when the server starts
+    try:
+        java_version = subprocess.check_output(
+            ["java", *_JAVA_MEMORY_ARGS, "-version"], stderr=subprocess.STDOUT, text=True
+        )
+        _LOGGER.info(f"Java version: {java_version.splitlines()[0]}")
+    except (subprocess.SubprocessError, FileNotFoundError) as e:
+        _LOGGER.error(f"Java is not properly installed or not in PATH: {e}")
+
+        # Try to get some output even if the command failed
+        try:
+            # Use run instead of check_output to avoid exceptions
+            java_result = subprocess.run(
+                ["java", *_JAVA_MEMORY_ARGS, "-version"],
+                stderr=subprocess.STDOUT,
+                stdout=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+            _LOGGER.info(f"Java command return code: {java_result.returncode}")
+            _LOGGER.info(f"Java command output: {java_result.stdout or java_result.stderr}")
+
+            # Try to find where Java might be located
+            which_java = subprocess.run(["which", "java"], capture_output=True, text=True, check=False)
+            which_java_result = which_java.stdout.strip() if (which_java.returncode == 0) else "not found"
+            _LOGGER.info(f"Result for which java: {which_java_result}")
+        except Exception as inner_e:
+            _LOGGER.error(f"Additional error while trying to debug java: {inner_e}")
+
+        return {
+            "valid": False,
+            "message": "Java is not properly installed or not in PATH",
+            "total_files": 0,
+            "approved_licenses": 0,
+            "unapproved_licenses": 0,
+            "unknown_licenses": 0,
+            "unapproved_files": [],
+            "unknown_license_files": [],
+            "errors": [f"Java error: {e}"],
+        }
+
+
+def _extracted_dir(temp_dir: str) -> str | None:
+    # Loop through all the dirs in temp_dir
+    extract_dir = None
+    for dir_name in os.listdir(temp_dir):
+        if dir_name.startswith("."):
+            continue
+        dir_path = os.path.join(temp_dir, dir_name)
+        if not os.path.isdir(dir_path):
+            raise ValueError(f"Unknown file type found in temporary directory: {dir_path}")
+        if extract_dir is None:
+            extract_dir = dir_path
+        else:
+            raise ValueError(f"Multiple root directories found: {extract_dir}, {dir_path}")
+    return extract_dir

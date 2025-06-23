@@ -196,7 +196,7 @@ async def zip_checks(release: models.Release, revision: str, path: str) -> list[
     tasks = [
         queued(models.TaskType.LICENSE_FILES, release, revision, path),
         queued(models.TaskType.LICENSE_HEADERS, release, revision, path),
-        # queued(models.TaskType.RAT_CHECK, release, revision, path),
+        queued(models.TaskType.RAT_CHECK, release, revision, path),
         queued(models.TaskType.ZIPFORMAT_INTEGRITY, release, revision, path),
         queued(models.TaskType.ZIPFORMAT_STRUCTURE, release, revision, path),
     ]

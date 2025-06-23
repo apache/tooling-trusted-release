@@ -42,7 +42,7 @@ async def integrity(args: checks.FunctionArguments) -> str | None:
 
     chunk_size = 4096
     try:
-        size = await asyncio.to_thread(archives.targz_total_size, str(artifact_abs_path), chunk_size)
+        size = await asyncio.to_thread(archives.total_size, str(artifact_abs_path), chunk_size)
         await recorder.success("Able to read all entries of the archive using tarfile", {"size": size})
     except Exception as e:
         await recorder.failure("Unable to read all entries of the archive using tarfile", {"error": str(e)})
