@@ -23,10 +23,10 @@ import tempfile
 import xml.etree.ElementTree as ElementTree
 from typing import Any, Final
 
+import atr.archives as archives
 import atr.config as config
 import atr.tasks.checks as checks
 import atr.tasks.checks.targz as targz
-import atr.tasks.sbom as sbom
 
 _CONFIG: Final = config.get()
 _JAVA_MEMORY_ARGS: Final[list[str]] = []
@@ -169,7 +169,7 @@ def _check_core_logic(
 
             # Extract the archive to the temporary directory
             _LOGGER.info(f"Extracting {artifact_path} to {temp_dir}")
-            extracted_size = sbom.archive_extract_safe(
+            extracted_size = archives.targz_extract(
                 artifact_path, temp_dir, max_size=max_extract_size, chunk_size=chunk_size
             )
             _LOGGER.info(f"Extracted {extracted_size} bytes")

@@ -19,11 +19,11 @@ import asyncio
 import json
 import logging
 import os
-import tarfile
 from typing import Any, Final
 
 import aiofiles
 
+import atr.archives as archives
 import atr.config as config
 import atr.schema as schema
 import atr.tasks.checks as checks
@@ -49,30 +49,6 @@ class SBOMGenerationError(Exception):
         self.details = details or {}
 
 
-def archive_extract_safe(
-    archive_path: str,
-    extract_dir: str,
-    max_size: int,
-    chunk_size: int,
-) -> int:
-    """Safe archive extraction."""
-    total_extracted = 0
-
-    try:
-        with tarfile.open(archive_path, mode="r|gz") as tf:
-            for member in tf:
-                keep_going, total_extracted = archive_extract_member(
-                    tf, member, extract_dir, total_extracted, max_size, chunk_size
-                )
-                if not keep_going:
-                    break
-
-    except tarfile.ReadError as e:
-        raise SBOMGenerationError(f"Failed to read archive: {e}", {"archive_path": archive_path}) from e
-
-    return total_extracted
-
-
 @checks.with_model(GenerateCycloneDX)
 async def generate_cyclonedx(args: GenerateCycloneDX) -> str | None:
     """Generate a CycloneDX SBOM for the given artifact and write it to the output path."""
@@ -83,152 +59,13 @@ async def generate_cyclonedx(args: GenerateCycloneDX) -> str | None:
         if not isinstance(msg, str):
             raise SBOMGenerationError(f"Invalid message type: {type(msg)}")
         return msg
-    except SBOMGenerationError as e:
-        _LOGGER.error(f"SBOM generation failed for {args.artifact_path}: {e.details}")
+    except (archives.ExtractionError, SBOMGenerationError) as e:
+        _LOGGER.error(f"SBOM generation failed for {args.artifact_path}: {e}")
         raise
 
 
-def _archive_extract_safe_process_file(
-    tf: tarfile.TarFile,
-    member: tarfile.TarInfo,
-    extract_dir: str,
-    total_extracted: int,
-    max_size: int,
-    chunk_size: int,
-) -> int:
-    """Process a single file member during safe archive extraction."""
-    target_path = os.path.join(extract_dir, member.name)
-    if not os.path.abspath(target_path).startswith(os.path.abspath(extract_dir)):
-        _LOGGER.warning(f"Skipping potentially unsafe path: {member.name}")
-        return 0
-
-    os.makedirs(os.path.dirname(target_path), exist_ok=True)
-
-    source = tf.extractfile(member)
-    if source is None:
-        # Should not happen if member.isreg() is true
-        _LOGGER.warning(f"Could not extract file object for member: {member.name}")
-        return 0
-
-    extracted_file_size = 0
-    try:
-        with open(target_path, "wb") as target:
-            while chunk := source.read(chunk_size):
-                target.write(chunk)
-                extracted_file_size += len(chunk)
-
-                # Check size limits during extraction
-                if (total_extracted + extracted_file_size) > max_size:
-                    # Clean up the partial file before raising
-                    target.close()
-                    os.unlink(target_path)
-                    raise SBOMGenerationError(
-                        f"Extraction exceeded maximum size limit of {max_size} bytes",
-                        {"max_size": max_size, "current_size": total_extracted},
-                    )
-    finally:
-        source.close()
-
-    return extracted_file_size
-
-
-def archive_extract_member(
-    tf: tarfile.TarFile, member: tarfile.TarInfo, extract_dir: str, total_extracted: int, max_size: int, chunk_size: int
-) -> tuple[bool, int]:
-    if member.name and member.name.split("/")[-1].startswith("._"):
-        # Metadata convention
-        return False, 0
-
-    # Skip any character device, block device, or FIFO
-    if member.isdev():
-        return False, 0
-
-    # Check whether extraction would exceed the size limit
-    if member.isreg() and ((total_extracted + member.size) > max_size):
-        raise SBOMGenerationError(
-            f"Extraction would exceed maximum size limit of {max_size} bytes",
-            {"max_size": max_size, "current_size": total_extracted, "file_size": member.size},
-        )
-
-    # Extract directories directly
-    if member.isdir():
-        # Ensure the path is safe before extracting
-        target_path = os.path.join(extract_dir, member.name)
-        if not os.path.abspath(target_path).startswith(os.path.abspath(extract_dir)):
-            _LOGGER.warning(f"Skipping potentially unsafe path: {member.name}")
-            return False, 0
-        tf.extract(member, extract_dir, numeric_owner=True)
-
-    elif member.isreg():
-        extracted_size = _archive_extract_safe_process_file(
-            tf, member, extract_dir, total_extracted, max_size, chunk_size
-        )
-        total_extracted += extracted_size
-
-    elif member.issym():
-        _archive_extract_safe_process_symlink(member, extract_dir)
-
-    elif member.islnk():
-        _archive_extract_safe_process_hardlink(member, extract_dir)
-
-    return True, total_extracted
-
-
-def _archive_extract_safe_process_hardlink(member: tarfile.TarInfo, extract_dir: str) -> None:
-    """Safely create a hard link from the TarInfo entry."""
-    target_path = _safe_path(extract_dir, member.name)
-    if target_path is None:
-        _LOGGER.warning(f"Skipping potentially unsafe hard link path: {member.name}")
-        return
-
-    link_target = member.linkname or ""
-    source_path = _safe_path(extract_dir, link_target)
-    if source_path is None or not os.path.exists(source_path):
-        _LOGGER.warning(f"Skipping hard link with invalid target: {member.name} -> {link_target}")
-        return
-
-    os.makedirs(os.path.dirname(target_path), exist_ok=True)
-
-    try:
-        if os.path.lexists(target_path):
-            return
-        os.link(source_path, target_path)
-    except (OSError, NotImplementedError) as e:
-        _LOGGER.warning(f"Failed to create hard link {target_path} -> {source_path}: {e}")
-
-
-def _archive_extract_safe_process_symlink(member: tarfile.TarInfo, extract_dir: str) -> None:
-    """Safely create a symbolic link from the TarInfo entry."""
-    target_path = _safe_path(extract_dir, member.name)
-    if target_path is None:
-        _LOGGER.warning(f"Skipping potentially unsafe symlink path: {member.name}")
-        return
-
-    link_target = member.linkname or ""
-
-    # Reject absolute targets to avoid links outside the tree
-    if os.path.isabs(link_target):
-        _LOGGER.warning(f"Skipping symlink with absolute target: {member.name} -> {link_target}")
-        return
-
-    # Ensure that the resolved link target stays within the extraction directory
-    resolved_target = _safe_path(os.path.dirname(target_path), link_target)
-    if resolved_target is None:
-        _LOGGER.warning(f"Skipping symlink pointing outside tree: {member.name} -> {link_target}")
-        return
-
-    os.makedirs(os.path.dirname(target_path), exist_ok=True)
-
-    try:
-        if os.path.lexists(target_path):
-            return
-        os.symlink(link_target, target_path)
-    except (OSError, NotImplementedError) as e:
-        _LOGGER.warning("Failed to create symlink %s -> %s: %s", target_path, link_target, e)
-
-
 async def _generate_cyclonedx_core(artifact_path: str, output_path: str) -> dict[str, Any]:
-    """Core logic to generate CycloneDX SBOM, raising SBOMGenerationError on failure."""
+    """Core logic to generate CycloneDX SBOM on failure."""
     _LOGGER.info(f"Generating CycloneDX SBOM for {artifact_path} -> {output_path}")
 
     async with util.async_temporary_directory(prefix="cyclonedx_sbom_") as temp_dir:
@@ -250,7 +87,7 @@ async def _generate_cyclonedx_core(artifact_path: str, output_path: str) -> dict
         # TODO: Ideally we'd have task dependencies or archive caching
         _LOGGER.info(f"Extracting {artifact_path} to {temp_dir}")
         extracted_size = await asyncio.to_thread(
-            archive_extract_safe,
+            archives.targz_extract,
             artifact_path,
             str(temp_dir),
             max_size=_CONFIG.MAX_EXTRACT_SIZE,
@@ -315,11 +152,3 @@ async def _generate_cyclonedx_core(artifact_path: str, output_path: str) -> dict
         except FileNotFoundError:
             _LOGGER.error("syft command not found. Is it installed and in PATH?")
             raise SBOMGenerationError("syft command not found")
-
-
-def _safe_path(base_dir: str, *paths: str) -> str | None:
-    """Return an absolute path within the base_dir built from the given paths, or None if it escapes."""
-    target = os.path.abspath(os.path.join(base_dir, *paths))
-    if target.startswith(os.path.abspath(base_dir)):
-        return target
-    return None

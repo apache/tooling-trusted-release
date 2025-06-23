@@ -20,6 +20,7 @@ import logging
 import tarfile
 from typing import Final
 
+import atr.archives as archives
 import atr.tasks.checks as checks
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ async def integrity(args: checks.FunctionArguments) -> str | None:
 
     chunk_size = 4096
     try:
-        size = await asyncio.to_thread(_integrity_core, str(artifact_abs_path), chunk_size)
+        size = await asyncio.to_thread(archives.targz_total_size, str(artifact_abs_path), chunk_size)
         await recorder.success("Able to read all entries of the archive using tarfile", {"size": size})
     except Exception as e:
         await recorder.failure("Unable to read all entries of the archive using tarfile", {"error": str(e)})
@@ -104,22 +105,3 @@ async def structure(args: checks.FunctionArguments) -> str | None:
     except Exception as e:
         await recorder.failure("Unable to verify archive structure", {"error": str(e)})
     return None
-
-
-def _integrity_core(tgz_path: str, chunk_size: int = 4096) -> int:
-    """Verify a .tar.gz file and compute its uncompressed size."""
-    total_size = 0
-
-    with tarfile.open(tgz_path, mode="r|gz") as tf:
-        for member in tf:
-            # Do not skip metadata here
-            total_size += member.size
-            # Verify file by extraction
-            if member.isfile():
-                f = tf.extractfile(member)
-                if f is not None:
-                    while True:
-                        data = f.read(chunk_size)
-                        if not data:
-                            break
-    return total_size
