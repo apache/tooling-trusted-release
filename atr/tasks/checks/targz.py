@@ -76,6 +76,8 @@ async def structure(args: checks.FunctionArguments) -> str | None:
     recorder = await args.recorder()
     if not (artifact_abs_path := await recorder.abs_path()):
         return None
+    if await recorder.primary_path_is_binary():
+        return None
 
     filename = artifact_abs_path.name
     expected_root: Final[str] = (

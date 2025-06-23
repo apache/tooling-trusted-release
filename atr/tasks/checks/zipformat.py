@@ -51,6 +51,8 @@ async def structure(args: checks.FunctionArguments) -> str | None:
     recorder = await args.recorder()
     if not (artifact_abs_path := await recorder.abs_path()):
         return None
+    if await recorder.primary_path_is_binary():
+        return None
 
     _LOGGER.info(f"Checking zip structure for {artifact_abs_path} (rel: {args.primary_rel_path})")
 

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import fnmatch
 import functools
 import pathlib
 from typing import TYPE_CHECKING, Any
@@ -152,6 +153,33 @@ class Recorder:
         if isinstance(rel_path_part, str):
             abs_path_parts.append(rel_path_part)
         return pathlib.Path(*abs_path_parts)
+
+    async def project(self) -> models.Project:
+        # TODO: Cache project
+        async with db.session() as data:
+            return await data.project(name=self.project_name, _release_policy=True).demand(
+                RuntimeError(f"Project {self.project_name} not found")
+            )
+
+    async def primary_path_is_binary(self) -> bool:
+        if self.primary_rel_path is None:
+            return False
+        project = await self.project()
+        if not project.policy_binary_artifact_paths:
+            return False
+        paths = project.policy_binary_artifact_paths
+        slash_path = "/" + self.primary_rel_path
+        return any(fnmatch.fnmatch(slash_path, path) for path in paths)
+
+    async def primary_path_is_source(self) -> bool:
+        if self.primary_rel_path is None:
+            return False
+        project = await self.project()
+        if not project.policy_source_artifact_paths:
+            return False
+        paths = project.policy_source_artifact_paths
+        slash_path = "/" + self.primary_rel_path
+        return any(fnmatch.fnmatch(slash_path, path) for path in paths)
 
     async def clear(self, primary_rel_path: str | None = None, member_rel_path: str | None = None) -> None:
         async with db.session() as data:

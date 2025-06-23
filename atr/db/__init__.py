@@ -101,12 +101,12 @@ class Query[T]:
     async def get(self, log_query: bool = False) -> T | None:
         self.log_query("get", log_query)
         result = await self.session.execute(self.query)
-        return result.scalar_one_or_none()
+        return result.unique().scalar_one_or_none()
 
     async def demand(self, error: Exception, log_query: bool = False) -> T:
         self.log_query("demand", log_query)
         result = await self.session.execute(self.query)
-        item = result.scalar_one_or_none()
+        item = result.unique().scalar_one_or_none()
         if item is None:
             raise error
         return item

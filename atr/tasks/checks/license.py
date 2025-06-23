@@ -126,6 +126,9 @@ async def files(args: checks.FunctionArguments) -> str | None:
     recorder = await args.recorder()
     if not (artifact_abs_path := await recorder.abs_path()):
         return None
+    if await recorder.primary_path_is_binary():
+        _LOGGER.info(f"Skipping license files check for {artifact_abs_path} (rel: {args.primary_rel_path})")
+        return None
 
     _LOGGER.info(f"Checking license files for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
@@ -150,6 +153,9 @@ async def headers(args: checks.FunctionArguments) -> str | None:
     """Check that all source files have valid license headers."""
     recorder = await args.recorder()
     if not (artifact_abs_path := await recorder.abs_path()):
+        return None
+    if await recorder.primary_path_is_binary():
+        _LOGGER.info(f"Skipping license headers check for {artifact_abs_path} (rel: {args.primary_rel_path})")
         return None
 
     _LOGGER.info(f"Checking license headers for {artifact_abs_path} (rel: {args.primary_rel_path})")
