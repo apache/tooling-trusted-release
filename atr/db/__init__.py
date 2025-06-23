@@ -190,7 +190,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.CheckResult.data == data)
 
         if _release:
-            query = query.options(select_in_load(models.CheckResult.release))
+            query = query.options(joined_load(models.CheckResult.release))
 
         return Query(self, query)
 
@@ -312,18 +312,24 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         if is_defined(status):
             query = query.where(models.Project.status == status)
 
-        if _committee:
-            query = query.options(select_in_load(models.Project.committee))
+        # Avoid multiple loaders for Project.committee on the same path
+        if _committee_public_signing_keys:
+            query = query.options(
+                joined_load(models.Project.committee).selectinload(
+                    models.validate_instrumented_attribute(models.Committee.public_signing_keys)
+                )
+            )
+        elif _committee:
+            query = query.options(joined_load(models.Project.committee))
+
         if _releases:
             query = query.options(select_in_load(models.Project.releases))
         if _distribution_channels:
             query = query.options(select_in_load(models.Project.distribution_channels))
         if _super_project:
-            query = query.options(select_in_load(models.Project.super_project))
+            query = query.options(joined_load(models.Project.super_project))
         if _release_policy:
-            query = query.options(select_in_load(models.Project.release_policy))
-        if _committee_public_signing_keys:
-            query = query.options(select_in_load_nested(models.Project.committee, models.Committee.public_signing_keys))
+            query = query.options(joined_load(models.Project.release_policy))
 
         return Query(self, query)
 
@@ -410,12 +416,14 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             # query = query.where(models.Release.latest_revision_number == latest_revision_number)
             query = query.where(models.latest_revision_number_query() == latest_revision_number)
 
-        if _project:
-            query = query.options(select_in_load(models.Release.project))
-        if _release_policy:
-            query = query.options(select_in_load(models.Release.release_policy))
+        # Avoid multiple loaders for Release.project on the same path
         if _committee:
-            query = query.options(select_in_load_nested(models.Release.project, models.Project.committee))
+            query = query.options(joined_load_nested(models.Release.project, models.Project.committee))
+        elif _project:
+            query = query.options(joined_load(models.Release.project))
+
+        if _release_policy:
+            query = query.options(joined_load(models.Release.release_policy))
         if _revisions:
             query = query.options(select_in_load(models.Release.revisions))
 
@@ -488,11 +496,11 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Revision.description == description)
 
         if _release:
-            query = query.options(select_in_load(models.Revision.release))
+            query = query.options(joined_load(models.Revision.release))
         if _parent:
-            query = query.options(select_in_load(models.Revision.parent))
+            query = query.options(joined_load(models.Revision.parent))
         if _child:
-            query = query.options(select_in_load(models.Revision.child))
+            query = query.options(joined_load(models.Revision.child))
 
         return Query(self, query)
 
@@ -679,6 +687,26 @@ def is_defined[T](v: T | NotSet) -> TypeGuard[T]:
 
 def is_undefined(v: object | NotSet) -> TypeGuard[NotSet]:
     return isinstance(v, NotSet)
+
+
+def joined_load(*entities: Any) -> orm.strategy_options._AbstractLoad:
+    """Eagerly load the given entities from the query using joinedload."""
+    validated_entities = []
+    for entity in entities:
+        if not isinstance(entity, orm.InstrumentedAttribute):
+            raise ValueError(f"Object must be an orm.InstrumentedAttribute, got: {type(entity)}")
+        validated_entities.append(entity)
+    return orm.joinedload(*validated_entities)
+
+
+def joined_load_nested(parent: Any, *descendants: Any) -> orm.strategy_options._AbstractLoad:
+    """Eagerly load the given nested entities from the query using joinedload."""
+    if not isinstance(parent, orm.InstrumentedAttribute):
+        raise ValueError(f"Parent must be an orm.InstrumentedAttribute, got: {type(parent)}")
+    for descendant in descendants:
+        if not isinstance(descendant, orm.InstrumentedAttribute):
+            raise ValueError(f"Descendant must be an orm.InstrumentedAttribute, got: {type(descendant)}")
+    return orm.joinedload(parent).joinedload(*descendants)
 
 
 @contextlib.contextmanager
