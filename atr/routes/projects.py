@@ -61,10 +61,22 @@ class ReleasePolicyForm(util.QuartFormTyped):
     """
 
     project_name = wtforms.HiddenField("project_name")
-    default_start_vote_template_hash = wtforms.HiddenField()
-    default_announce_release_template_hash = wtforms.HiddenField()
-    default_min_hours_value_at_render = wtforms.HiddenField()
 
+    # Compose section
+    source_artifact_paths = wtforms.StringField(
+        "Source artifact paths",
+        widget=wtforms.widgets.TextArea(),
+        render_kw={"rows": 5},
+        description="Paths to source artifacts to be included in the release.",
+    )
+    binary_artifact_paths = wtforms.StringField(
+        "Binary artifact paths",
+        widget=wtforms.widgets.TextArea(),
+        render_kw={"rows": 5},
+        description="Paths to binary artifacts to be included in the release.",
+    )
+
+    # Vote section
     mailto_addresses = wtforms.FieldList(
         wtforms.StringField(
             "Email",
@@ -79,6 +91,11 @@ class ReleasePolicyForm(util.QuartFormTyped):
         ),
         min_entries=1,
     )
+    manual_vote = wtforms.BooleanField(
+        "Manual voting process",
+        description="If this is set then the vote will be completely manual and following policy is ignored.",
+    )
+    default_min_hours_value_at_render = wtforms.HiddenField()
     min_hours = wtforms.IntegerField(
         "Minimum voting period",
         validators=[
@@ -89,9 +106,8 @@ class ReleasePolicyForm(util.QuartFormTyped):
         description="The minimum time to run the vote, in hours. Must be 0 or between 72 and 144 inclusive."
         " If 0, then wait until 3 +1 votes and more +1 than -1.",
     )
-    manual_vote = wtforms.BooleanField(
-        "Manual voting process",
-        description="If this is set then the vote will be completely manual and following policy is ignored.",
+    pause_for_rm = wtforms.BooleanField(
+        "Pause for RM", description="If enabled, RM can confirm manually if the vote has passed."
     )
     release_checklist = wtforms.StringField(
         "Release checklist",
@@ -99,32 +115,21 @@ class ReleasePolicyForm(util.QuartFormTyped):
         render_kw={"rows": 10},
         description="Markdown text describing how to test release candidates.",
     )
+    default_start_vote_template_hash = wtforms.HiddenField()
     start_vote_template = wtforms.StringField(
         "Start vote template",
         widget=wtforms.widgets.TextArea(),
         render_kw={"rows": 10},
         description="Email template for messages to start a vote on a release.",
     )
+
+    # Finish section
+    default_announce_release_template_hash = wtforms.HiddenField()
     announce_release_template = wtforms.StringField(
         "Announce release template",
         widget=wtforms.widgets.TextArea(),
         render_kw={"rows": 10},
         description="Email template for messages to announce a finished release.",
-    )
-    binary_artifact_paths = wtforms.StringField(
-        "Binary artifact paths",
-        widget=wtforms.widgets.TextArea(),
-        render_kw={"rows": 5},
-        description="Paths to binary artifacts to be included in the release.",
-    )
-    source_artifact_paths = wtforms.StringField(
-        "Source artifact paths",
-        widget=wtforms.widgets.TextArea(),
-        render_kw={"rows": 5},
-        description="Paths to source artifacts to be included in the release.",
-    )
-    pause_for_rm = wtforms.BooleanField(
-        "Pause for RM", description="If enabled, RM can confirm manually if the vote has passed."
     )
 
     submit_policy = wtforms.SubmitField("Save")

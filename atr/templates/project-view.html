@@ -82,6 +82,32 @@
             {{ policy_form.default_announce_release_template_hash() }}
             {{ policy_form.default_min_hours_value_at_render() }}
 
+            <div class="row mb-3">
+              <h3 class="mt-3 col-md-3 col-form-label text-md-end fs-4">Compose options</h3>
+            </div>
+
+            <div class="mb-3 pb-3 row border-bottom">
+              {{ forms.label(policy_form.source_artifact_paths, col="md3") }}
+              <div class="col-sm-8">
+                {{ forms.widget(policy_form.source_artifact_paths, classes="form-control font-monospace") }}
+                {{ forms.errors(policy_form.source_artifact_paths) }}
+                {{ forms.description(policy_form.source_artifact_paths) }}
+              </div>
+            </div>
+
+            <div class="mb-3 pb-3 row">
+              {{ forms.label(policy_form.binary_artifact_paths, col="md3") }}
+              <div class="col-sm-8">
+                {{ forms.widget(policy_form.binary_artifact_paths, classes="form-control font-monospace") }}
+                {{ forms.errors(policy_form.binary_artifact_paths) }}
+                {{ forms.description(policy_form.binary_artifact_paths) }}
+              </div>
+            </div>
+
+            <div class="row mt-5 mb-3">
+              <h3 class="col-md-3 col-form-label text-md-end fs-4">Vote options</h3>
+            </div>
+
             <div class="mb-3 pb-3 row border-bottom">
               {{ forms.label(policy_form.mailto_addresses.entries[0], col="md3") }}
               <div class="col-sm-8">
@@ -112,6 +138,17 @@
             </div>
 
             <div class="mb-3 pb-3 row border-bottom">
+              {{ forms.label(policy_form.pause_for_rm, col="md3-high") }}
+              <div class="col-sm-8">
+                <div class="form-check">
+                  {{ forms.widget(policy_form.pause_for_rm, classes="form-check-input", boolean_label="Enable") }}
+                  {{ forms.errors(policy_form.pause_for_rm, classes="invalid-feedback d-block") }}
+                </div>
+                {{ forms.description(policy_form.pause_for_rm) }}
+              </div>
+            </div>
+
+            <div class="mb-3 pb-3 row border-bottom">
               {{ forms.label(policy_form.release_checklist, col="md3") }}
               <div class="col-sm-8">
                 {{ forms.widget(policy_form.release_checklist, rows="10", classes="form-control font-monospace") }}
@@ -120,7 +157,7 @@
               </div>
             </div>
 
-            <div class="mb-3 pb-3 row border-bottom">
+            <div class="mb-3 pb-3 row">
               {{ forms.label(policy_form.start_vote_template, col="md3") }}
               <div class="col-sm-8">
                 {{ forms.widget(policy_form.start_vote_template, rows="10", classes="form-control font-monospace") }}
@@ -129,41 +166,16 @@
               </div>
             </div>
 
+            <div class="row mt-5 mb-3">
+              <h3 class="col-md-3 col-form-label text-md-end fs-4">Finish options</h3>
+            </div>
+
             <div class="mb-3 pb-3 row border-bottom">
               {{ forms.label(policy_form.announce_release_template, col="md3") }}
               <div class="col-sm-8">
                 {{ forms.widget(policy_form.announce_release_template, rows="10", classes="form-control font-monospace") }}
                 {{ forms.errors(policy_form.announce_release_template) }}
                 {{ forms.description(policy_form.announce_release_template) }}
-              </div>
-            </div>
-
-            <div class="mb-3 pb-3 row border-bottom">
-              {{ forms.label(policy_form.binary_artifact_paths, col="md3") }}
-              <div class="col-sm-8">
-                {{ forms.widget(policy_form.binary_artifact_paths, classes="form-control font-monospace") }}
-                {{ forms.errors(policy_form.binary_artifact_paths) }}
-                {{ forms.description(policy_form.binary_artifact_paths) }}
-              </div>
-            </div>
-
-            <div class="mb-3 pb-3 row border-bottom">
-              {{ forms.label(policy_form.source_artifact_paths, col="md3") }}
-              <div class="col-sm-8">
-                {{ forms.widget(policy_form.source_artifact_paths, classes="form-control font-monospace") }}
-                {{ forms.errors(policy_form.source_artifact_paths) }}
-                {{ forms.description(policy_form.source_artifact_paths) }}
-              </div>
-            </div>
-
-            <div class="mb-3 pb-3 row border-bottom">
-              {{ forms.label(policy_form.pause_for_rm, col="md3-high") }}
-              <div class="col-sm-8">
-                <div class="form-check">
-                  {{ forms.widget(policy_form.pause_for_rm, classes="form-check-input", boolean_label="Enable") }}
-                  {{ forms.errors(policy_form.pause_for_rm, classes="invalid-feedback d-block") }}
-                </div>
-                {{ forms.description(policy_form.pause_for_rm) }}
               </div>
             </div>
 
