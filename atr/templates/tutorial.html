@@ -26,6 +26,7 @@
     <a href="#vote" class="btn btn-outline-secondary">Vote</a>
     <a href="#finish" class="btn btn-outline-secondary">Finish</a>
     <a href="#releases" class="btn btn-outline-secondary">Releases</a>
+    <a href="#projects" class="btn btn-outline-secondary">Projects</a>
   </p>
 
   <h2 id="compose">Compose</h2>
@@ -84,7 +85,7 @@
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-vote-03.png') }}"
-         alt="Illustration: Review the voting thread, and case your own vote." />
+         alt="Illustration: Review the voting thread, and cast your own vote." />
   </p>
   <p>
     When the voting period concludes and the mandate is clear, record the outcome using the vote resolution form. This action also sends the outcome of the vote to the mailing list. A successful vote promotes the release candidate to the next phase; a failed vote returns it to the <em>Compose</em> phase.
@@ -124,4 +125,31 @@
   </p>
   <p>Each release entry provides a link to download the files in the release.</p>
   <p>This completes the ATR workflow, from private draft to finished public release.</p>
+
+  <h2 id="projects">Projects</h2>
+  <p>
+    ATR automatically imports as many projects as it can find, but it may still be necessary to create a project manually.
+  </p>
+  <p>
+    There is a <strong>Create project</strong> button under each committee in your <strong>Committee directory</strong>, accessible from the sidebar.
+  </p>
+  <p>
+    <img src="{{ url_for('static', filename='png/tutorial-projects-01.png') }}"
+         alt="Illustration: Use the Create project button to create a new project." />
+  </p>
+  <p>Follow the instructions under each form input carefully, otherwise your new project will not be created.</p>
+  <p>
+    <img src="{{ url_for('static', filename='png/tutorial-projects-02.png') }}"
+         alt="Illustration: The create project form has Display name and Label fields." />
+  </p>
+  <p>
+    Every successfully added project is listed on the <strong>Committee directory</strong> page. Use the project button, and the project page will be displayed with its release policy form. Edit the release policy form to your liking, and <strong>Save</strong> your changes.
+  </p>
+  <p>
+    <img src="{{ url_for('static', filename='png/tutorial-projects-03.png') }}"
+         alt="Illustration: The release policy form is split into three sections." />
+  </p>
+  <p>
+    Once your project has been created, you can <a href="#compose">compose releases</a> for it.
+  </p>
 {% endblock content %}
