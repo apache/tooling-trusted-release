@@ -20,6 +20,7 @@
 import argparse
 import dataclasses
 import getpass
+import glob
 import logging
 import os
 import re
@@ -693,9 +694,12 @@ def test_checks_06_targz(page: sync_api.Page, credentials: Credentials) -> None:
 
 
 def test_openpgp_01_upload(page: sync_api.Page, credentials: Credentials) -> None:
-    key_fingerprint_lower = "e35604dd9e2892e5465b3d8a203f105a7b33a64f"
-    key_fingerprint_upper = key_fingerprint_lower.upper()
-    key_path = f"/run/tests/{key_fingerprint_lower.upper()}.asc"
+    for key_path in glob.glob("/run/tests/*.asc"):
+        key_fingerprint_lower = os.path.basename(key_path).split(".")[0].lower()
+        key_fingerprint_upper = key_fingerprint_lower.upper()
+        break
+    else:
+        raise RuntimeError("No test key found")
 
     logging.info("Starting OpenPGP key upload test")
     go_to_path(page, "/keys")

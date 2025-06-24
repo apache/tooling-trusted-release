@@ -18,6 +18,7 @@
 import asyncio
 import logging
 import os
+import pathlib
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ElementTree
@@ -26,6 +27,7 @@ from typing import Any, Final
 import atr.archives as archives
 import atr.config as config
 import atr.tasks.checks as checks
+import atr.util as util
 
 _CONFIG: Final = config.get()
 _JAVA_MEMORY_ARGS: Final[list[str]] = []
@@ -39,6 +41,7 @@ _JAVA_MEMORY_ARGS: Final[list[str]] = []
 #     "-XX:CompressedClassSpaceSize=16m"
 # ]
 _LOGGER: Final = logging.getLogger(__name__)
+_RAT_EXCLUDES_FILENAMES: Final[set[str]] = {".rat-excludes", "rat-excludes.txt"}
 
 
 async def check(args: checks.FunctionArguments) -> str | None:
@@ -128,7 +131,13 @@ def _check_core_logic(
 
             # Extract the archive to the temporary directory
             _LOGGER.info(f"Extracting {artifact_path} to {temp_dir}")
-            extracted_size = archives.extract(artifact_path, temp_dir, max_size=max_extract_size, chunk_size=chunk_size)
+            extracted_size, extracted_paths = archives.extract(
+                artifact_path,
+                temp_dir,
+                max_size=max_extract_size,
+                chunk_size=chunk_size,
+                track_files=_RAT_EXCLUDES_FILENAMES,
+            )
             _LOGGER.info(f"Extracted {extracted_size} bytes")
 
             # Find the root directory
@@ -143,7 +152,9 @@ def _check_core_logic(
             _LOGGER.info(f"Using root directory: {extract_dir}")
 
             # Execute RAT and get results or error
-            error_result, xml_output_path = _check_core_logic_execute_rat(rat_jar_path, extract_dir, temp_dir)
+            error_result, xml_output_path = _check_core_logic_execute_rat(
+                rat_jar_path, extract_dir, temp_dir, extracted_paths
+            )
             if error_result:
                 return error_result
 
@@ -175,7 +186,7 @@ def _check_core_logic(
 
 
 def _check_core_logic_execute_rat(
-    rat_jar_path: str, extract_dir: str, temp_dir: str
+    rat_jar_path: str, extract_dir: str, temp_dir: str, excluded_paths: list[str]
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Execute Apache RAT and process its output."""
     # Define output file path
@@ -191,21 +202,20 @@ def _check_core_logic_execute_rat(
         *_JAVA_MEMORY_ARGS,
         "-jar",
         rat_jar_path,
-        "-d",
-        extract_dir,
         "-x",
         "-o",
         xml_output_path,
-        "--exclude",
-        "LICENSE",
-        "--exclude",
-        "NOTICE",
+        "-d",
+        "--",
+        ".",
     ]
+    if excluded_paths:
+        _rat_apply_exclusions(extract_dir, excluded_paths, temp_dir)
     _LOGGER.info(f"Running Apache RAT: {' '.join(command)}")
 
-    # Change working directory to temp_dir when running the process
+    # Change working directory to extract_dir when running the process
     current_dir = os.getcwd()
-    os.chdir(temp_dir)
+    os.chdir(extract_dir)
 
     _LOGGER.info(f"Executing Apache RAT from directory: {os.getcwd()}")
 
@@ -283,10 +293,7 @@ def _check_core_logic_execute_rat(
     os.chdir(current_dir)
 
     # Check that the output file exists
-    if os.path.exists(xml_output_path):
-        _LOGGER.info(f"Found XML output at: {xml_output_path} (size: {os.path.getsize(xml_output_path)} bytes)")
-        return None, xml_output_path
-    else:
+    if not os.path.exists(xml_output_path):
         _LOGGER.error(f"XML output file not found at: {xml_output_path}")
         # List files in the temporary directory
         _LOGGER.info(f"Files in {temp_dir}: {os.listdir(temp_dir)}")
@@ -303,6 +310,10 @@ def _check_core_logic_execute_rat(
             "unknown_license_files": [],
             "errors": [f"Missing output file: {xml_output_path}"],
         }, None
+
+    # The XML was found correctly
+    _LOGGER.info(f"Found XML output at: {xml_output_path} (size: {os.path.getsize(xml_output_path)} bytes)")
+    return None, xml_output_path
 
 
 def _check_core_logic_jar_exists(rat_jar_path: str) -> tuple[str, dict[str, Any] | None]:
@@ -356,68 +367,9 @@ def _check_core_logic_jar_exists(rat_jar_path: str) -> tuple[str, dict[str, Any]
 
 
 def _check_core_logic_parse_output(xml_file: str, base_dir: str) -> dict[str, Any]:
-    """Parse the XML output from Apache RAT."""
+    """Parse the XML output from Apache RAT safely."""
     try:
-        tree = ElementTree.parse(xml_file)
-        root = tree.getroot()
-
-        total_files = 0
-        approved_licenses = 0
-        unapproved_licenses = 0
-        unknown_licenses = 0
-
-        unapproved_files = []
-        unknown_license_files = []
-
-        # Process each resource
-        for resource in root.findall(".//resource"):
-            total_files += 1
-
-            # Get the name attribute value
-            name = resource.get("name", "")
-
-            # Remove base_dir prefix for cleaner display
-            if name.startswith(base_dir):
-                name = name[len(base_dir) :].lstrip("/")
-
-            # Get license information
-            license_approval = resource.find("license-approval")
-            license_family = resource.find("license-family")
-
-            is_approved = license_approval is not None and license_approval.get("name") == "true"
-            license_name = license_family.get("name") if license_family is not None else "Unknown"
-
-            # Update counters and lists
-            if is_approved:
-                approved_licenses += 1
-            elif license_name == "Unknown license":
-                unknown_licenses += 1
-                unknown_license_files.append({"name": name, "license": license_name})
-            else:
-                unapproved_licenses += 1
-                unapproved_files.append({"name": name, "license": license_name})
-
-        # Calculate overall validity
-        valid = unapproved_licenses == 0
-
-        # Prepare awkwardly long summary message
-        message = f"""\
-Found {approved_licenses} files with approved licenses, {unapproved_licenses} \
-with unapproved licenses, and {unknown_licenses} with unknown licenses"""
-
-        # We limit the number of files we report to 100
-        return {
-            "valid": valid,
-            "message": message,
-            "total_files": total_files,
-            "approved_licenses": approved_licenses,
-            "unapproved_licenses": unapproved_licenses,
-            "unknown_licenses": unknown_licenses,
-            "unapproved_files": unapproved_files[:100],
-            "unknown_license_files": unknown_license_files[:100],
-            "errors": [],
-        }
-
+        return _check_core_logic_parse_output_core(xml_file, base_dir)
     except Exception as e:
         _LOGGER.error(f"Error parsing RAT output: {e}")
         return {
@@ -429,6 +381,70 @@ with unapproved licenses, and {unknown_licenses} with unknown licenses"""
             "unknown_licenses": 0,
             "errors": [f"XML parsing error: {e!s}"],
         }
+
+
+def _check_core_logic_parse_output_core(xml_file: str, base_dir: str) -> dict[str, Any]:
+    """Parse the XML output from Apache RAT."""
+    tree = ElementTree.parse(xml_file)
+    root = tree.getroot()
+
+    total_files = 0
+    approved_licenses = 0
+    unapproved_licenses = 0
+    unknown_licenses = 0
+
+    unapproved_files = []
+    unknown_license_files = []
+
+    # Process each resource
+    for resource in root.findall(".//resource"):
+        total_files += 1
+
+        # Get the name attribute value
+        name = resource.get("name", "")
+
+        # Remove base_dir prefix for cleaner display
+        if name.startswith(base_dir):
+            name = name[len(base_dir) :].lstrip("/")
+
+        # Get license information
+        license_approval = resource.find("license-approval")
+        license_family = resource.find("license-family")
+
+        is_approved = True
+        if license_approval is not None:
+            if license_approval.get("name") == "false":
+                is_approved = False
+        license_name = license_family.get("name") if (license_family is not None) else "Unknown"
+
+        # Update counters and lists
+        if is_approved:
+            approved_licenses += 1
+        elif license_name == "Unknown license":
+            unknown_licenses += 1
+            unknown_license_files.append({"name": name, "license": license_name})
+        else:
+            unapproved_licenses += 1
+            unapproved_files.append({"name": name, "license": license_name})
+
+    # Calculate overall validity
+    valid = (unapproved_licenses == 0) and (unknown_licenses == 0)
+
+    # Prepare a summary message of just the right length
+    message = _summary_message(valid, unapproved_licenses, unknown_licenses)
+
+    # We limit the number of files we report to 100
+    return {
+        "valid": valid,
+        "message": message,
+        "total_files": total_files,
+        "approved_licenses": approved_licenses,
+        "unapproved_licenses": unapproved_licenses,
+        "unknown_licenses": unknown_licenses,
+        "unapproved_files": unapproved_files[:100],
+        "unknown_license_files": unknown_license_files[:100],
+        "errors": [],
+    }
 
 
 def _check_java_installed() -> dict[str, Any] | None:
@@ -478,6 +494,7 @@ def _check_java_installed() -> dict[str, Any] | None:
 def _extracted_dir(temp_dir: str) -> str | None:
     # Loop through all the dirs in temp_dir
     extract_dir = None
+    _LOGGER.info(f"Checking directories in {temp_dir}: {os.listdir(temp_dir)}")
     for dir_name in os.listdir(temp_dir):
         if dir_name.startswith("."):
             continue
@@ -489,3 +506,48 @@ def _extracted_dir(temp_dir: str) -> str | None:
         else:
             raise ValueError(f"Multiple root directories found: {extract_dir}, {dir_path}")
     return extract_dir
+
+
+def _rat_apply_exclusions(extract_dir: str, excluded_paths: list[str], temp_dir: str) -> None:
+    """Apply exclusions to the extracted directory."""
+    # Exclusions are difficult using the command line version of RAT
+    # Each line is interpreted as a literal AND a glob AND a regex
+    # Then, if ANY of those three match a filename, the file is excluded
+    # You cannot specify which syntax to use; all three are always tried
+    # You cannot specify that you want to match against the whole path
+    # Therefore, we take a different approach
+    # We interpret the exclusion file as a glob file in .gitignore format
+    # Then, we simply remove any files that match the glob
+    exclusion_lines = []
+    for excluded_path in excluded_paths:
+        abs_excluded_path = os.path.join(temp_dir, excluded_path)
+        if not os.path.exists(abs_excluded_path):
+            _LOGGER.error(f"Exclusion file not found: {abs_excluded_path}")
+            continue
+        if not os.path.isfile(abs_excluded_path):
+            _LOGGER.error(f"Exclusion file is not a file: {abs_excluded_path}")
+            continue
+        with open(abs_excluded_path, encoding="utf-8") as f:
+            exclusion_lines.extend(f.readlines())
+    matcher = util.create_path_matcher(
+        exclusion_lines, pathlib.Path(extract_dir) / ".ignore", pathlib.Path(extract_dir)
+    )
+    for root, _dirs, files in os.walk(extract_dir):
+        for file in files:
+            abs_path = os.path.join(root, file)
+            if matcher(abs_path):
+                _LOGGER.info(f"Removing {abs_path} because it matches the exclusion")
+                os.remove(abs_path)
+
+
+def _summary_message(valid: bool, unapproved_licenses: int, unknown_licenses: int) -> str:
+    message = "All files have approved licenses"
+    if not valid:
+        message = "Found "
+        if unapproved_licenses > 0:
+            message += f"{unapproved_licenses} files with unapproved licenses"
+            if unknown_licenses > 0:
+                message += " and "
+        if unknown_licenses > 0:
+            message += f"{unknown_licenses} files with unknown licenses"
+    return message

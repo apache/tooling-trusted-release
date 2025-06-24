@@ -29,7 +29,7 @@ import tarfile
 import tempfile
 import uuid
 import zipfile
-from collections.abc import AsyncGenerator, Callable, Sequence
+from collections.abc import AsyncGenerator, Callable, Iterable, Sequence
 from typing import Any, Final, TypeVar
 
 import aiofiles.os
@@ -37,6 +37,7 @@ import aioshutil
 import asfquart
 import asfquart.base as base
 import asfquart.session as session
+import gitignore_parser
 import httpx
 import jinja2
 import quart
@@ -273,6 +274,20 @@ async def create_hard_link_clone(
                 raise
 
     await _clone_recursive(source_dir, dest_dir)
+
+
+def create_path_matcher(lines: Iterable[str], full_path: pathlib.Path, base_dir: pathlib.Path) -> Callable[[str], bool]:
+    rules = []
+    negation = False
+    for line_no, line in enumerate(lines, start=1):
+        rule = gitignore_parser.rule_from_pattern(line.rstrip("\n"), base_path=base_dir, source=(full_path, line_no))
+        if rule:
+            rules.append(rule)
+            if rule.negation:
+                negation = True
+    if not negation:
+        return lambda file_path: any(r.match(file_path) for r in rules)
+    return lambda file_path: gitignore_parser.handle_negation(file_path, rules)
 
 
 def email_from_uid(uid: str) -> str | None:

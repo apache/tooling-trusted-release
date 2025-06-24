@@ -23,7 +23,6 @@ import functools
 import pathlib
 from typing import TYPE_CHECKING, Any
 
-import gitignore_parser
 import sqlmodel
 
 if TYPE_CHECKING:
@@ -163,7 +162,7 @@ class Recorder:
         project = await self.project()
         if not project.policy_binary_artifact_paths:
             return False
-        matches = _create_path_matcher(
+        matches = util.create_path_matcher(
             project.policy_binary_artifact_paths, self.abs_path_base() / ".ignore", self.abs_path_base()
         )
         abs_path = await self.abs_path()
@@ -175,7 +174,7 @@ class Recorder:
         project = await self.project()
         if not project.policy_source_artifact_paths:
             return False
-        matches = _create_path_matcher(
+        matches = util.create_path_matcher(
             project.policy_source_artifact_paths, self.abs_path_base() / ".ignore", self.abs_path_base()
         )
         abs_path = await self.abs_path()
@@ -254,17 +253,3 @@ def with_model(cls: type[schema.Strict]) -> Callable[[Callable[..., Any]], Calla
         return wrapper
 
     return decorator
-
-
-def _create_path_matcher(lines: list[str], full_path: pathlib.Path, base_dir: pathlib.Path) -> Callable[[str], bool]:
-    rules = []
-    negation = False
-    for line_no, line in enumerate(lines, start=1):
-        rule = gitignore_parser.rule_from_pattern(line.rstrip("\n"), base_path=base_dir, source=(full_path, line_no))
-        if rule:
-            rules.append(rule)
-            if rule.negation:
-                negation = True
-    if not negation:
-        return lambda file_path: any(r.match(file_path) for r in rules)
-    return lambda file_path: gitignore_parser.handle_negation(file_path, rules)

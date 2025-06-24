@@ -205,7 +205,7 @@ def _files_check_core_logic(artifact_path: str) -> Iterator[Result]:
     # Check for license files in the root directory
     with tarzip.open_archive(artifact_path) as archive:
         for member in archive:
-            _LOGGER.warning(f"Checking member: {member.name}")
+            # _LOGGER.warning(f"Checking member: {member.name}")
             if member.name and member.name.split("/")[-1].startswith("._"):
                 # Metadata convention
                 continue

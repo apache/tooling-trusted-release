@@ -85,11 +85,15 @@ async def key_user_add(
 
     added_keys = []
     for key in keys:
-        asf_uid = await util.asf_uid_from_uids(key.get("uids", []), ldap_data=ldap_data)
-        if (key.get("fingerprint") or "").upper() == "E35604DD9E2892E5465B3D8A203F105A7B33A64F":
+        uids = key.get("uids", [])
+        asf_uid = await util.asf_uid_from_uids(uids, ldap_data=ldap_data)
+        test_key_uids = ["Apache Tooling (For test use only) <apache-tooling@example.invalid>"]
+        is_admin = user.is_admin(session_asf_uid)
+        if (uids == test_key_uids) and is_admin:
             # Allow the test key
             # TODO: We should fix the test key, not add an exception for it
-            pass
+            # But the admin check probably makes this safe enough
+            asf_uid = session_asf_uid
         elif session_asf_uid and (asf_uid != session_asf_uid):
             # TODO: Give a more detailed error message about why and what to do
             raise InteractionError(f"Key {key.get('fingerprint', '').upper()} is not associated with your ASF account")

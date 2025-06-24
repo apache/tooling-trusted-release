@@ -36,37 +36,41 @@ def extract(
     extract_dir: str,
     max_size: int,
     chunk_size: int,
-) -> int:
+    track_files: bool | set[str] = False,
+) -> tuple[int, list[str]]:
+    _LOGGER.info(f"Extracting {archive_path} to {extract_dir}")
+
     total_extracted = 0
+    extracted_paths = []
 
     try:
         with tarzip.open_archive(archive_path) as archive:
             match archive.specific():
                 case tarfile.TarFile() as tf:
                     for member in tf:
-                        keep_going, total_extracted = archive_extract_member(
-                            tf, member, extract_dir, total_extracted, max_size, chunk_size
+                        total_extracted, extracted_paths = _archive_extract_member(
+                            tf, member, extract_dir, total_extracted, max_size, chunk_size, track_files, extracted_paths
                         )
-                        if not keep_going:
-                            break
 
                 case zipfile.ZipFile():
                     for member in archive:
                         if not isinstance(member, tarzip.ZipMember):
                             continue
-                        keep_going, total_extracted = _zip_archive_extract_member(
-                            archive, member, extract_dir, total_extracted, max_size, chunk_size
+                        total_extracted, extracted_paths = _zip_archive_extract_member(
+                            archive,
+                            member,
+                            extract_dir,
+                            total_extracted,
+                            max_size,
+                            chunk_size,
+                            track_files,
+                            extracted_paths,
                         )
-                        if not keep_going:
-                            break
-
-                case _:
-                    raise ExtractionError("Unsupported archive type", {"archive_path": archive_path})
 
     except (tarfile.TarError, zipfile.BadZipFile, ValueError) as e:
         raise ExtractionError(f"Failed to read archive: {e}", {"archive_path": archive_path}) from e
 
-    return total_extracted
+    return total_extracted, extracted_paths
 
 
 def total_size(tgz_path: str, chunk_size: int = 4096) -> int:
@@ -125,16 +129,27 @@ def _archive_extract_safe_process_file(
     return extracted_file_size
 
 
-def archive_extract_member(
-    tf: tarfile.TarFile, member: tarfile.TarInfo, extract_dir: str, total_extracted: int, max_size: int, chunk_size: int
-) -> tuple[bool, int]:
-    if member.name and member.name.split("/")[-1].startswith("._"):
+def _archive_extract_member(
+    tf: tarfile.TarFile,
+    member: tarfile.TarInfo,
+    extract_dir: str,
+    total_extracted: int,
+    max_size: int,
+    chunk_size: int,
+    track_files: bool | set[str] = False,
+    extracted_paths: list[str] = [],
+) -> tuple[int, list[str]]:
+    member_basename = os.path.basename(member.name)
+    if member_basename.startswith("._"):
         # Metadata convention
-        return False, 0
+        return 0, extracted_paths
 
     # Skip any character device, block device, or FIFO
     if member.isdev():
-        return False, 0
+        return 0, extracted_paths
+
+    if track_files and isinstance(track_files, set) and (member_basename in track_files):
+        extracted_paths.append(member.name)
 
     # Check whether extraction would exceed the size limit
     if member.isreg() and ((total_extracted + member.size) > max_size):
@@ -149,7 +164,7 @@ def archive_extract_member(
         target_path = os.path.join(extract_dir, member.name)
         if not os.path.abspath(target_path).startswith(os.path.abspath(extract_dir)):
             _LOGGER.warning(f"Skipping potentially unsafe path: {member.name}")
-            return False, 0
+            return 0, extracted_paths
         tf.extract(member, extract_dir, numeric_owner=True)
 
     elif member.isreg():
@@ -164,7 +179,7 @@ def archive_extract_member(
     elif member.islnk():
         _archive_extract_safe_process_hardlink(member, extract_dir)
 
-    return True, total_extracted
+    return total_extracted, extracted_paths
 
 
 def _archive_extract_safe_process_hardlink(member: tarfile.TarInfo, extract_dir: str) -> None:
@@ -261,9 +276,15 @@ def _zip_archive_extract_member(
     total_extracted: int,
     max_size: int,
     chunk_size: int,
-) -> tuple[bool, int]:
-    if member.name.split("/")[-1].startswith("._"):
-        return False, 0
+    track_files: bool | set[str] = False,
+    extracted_paths: list[str] = [],
+) -> tuple[int, list[str]]:
+    member_basename = os.path.basename(member.name)
+    if track_files and (isinstance(track_files, set) and (member_basename in track_files)):
+        extracted_paths.append(member.name)
+
+    if member_basename.startswith("._"):
+        return 0, extracted_paths
 
     if member.isfile() and (total_extracted + member.size) > max_size:
         raise ExtractionError(
@@ -275,17 +296,17 @@ def _zip_archive_extract_member(
         target_path = os.path.join(extract_dir, member.name)
         if not os.path.abspath(target_path).startswith(os.path.abspath(extract_dir)):
             _LOGGER.warning("Skipping potentially unsafe path: %s", member.name)
-            return False, 0
+            return 0, extracted_paths
         os.makedirs(target_path, exist_ok=True)
-        return True, total_extracted
+        return total_extracted, extracted_paths
 
     if member.isfile():
         extracted_size = _zip_extract_safe_process_file(
             archive, member, extract_dir, total_extracted, max_size, chunk_size
         )
-        return True, total_extracted + extracted_size
+        return total_extracted + extracted_size, extracted_paths
 
-    return False, total_extracted
+    return total_extracted, extracted_paths
 
 
 def _zip_extract_safe_process_file(

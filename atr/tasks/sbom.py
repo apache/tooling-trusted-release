@@ -86,7 +86,7 @@ async def _generate_cyclonedx_core(artifact_path: str, output_path: str) -> dict
         # Extract the archive to the temporary directory
         # TODO: Ideally we'd have task dependencies or archive caching
         _LOGGER.info(f"Extracting {artifact_path} to {temp_dir}")
-        extracted_size = await asyncio.to_thread(
+        extracted_size, _extracted_paths = await asyncio.to_thread(
             archives.extract,
             artifact_path,
             str(temp_dir),
