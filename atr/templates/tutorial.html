@@ -31,14 +31,14 @@
 
   <h2 id="compose">Compose</h2>
   <p>
-    Activate the <strong>Select release</strong> sidebar link [<code>1</code>], then use the <strong>Start a new release</strong> button for any project [<code>2</code>].
+    Use the <strong>Select release</strong> sidebar link [<code>1</code>], then press the <strong>Start a new release</strong> button for any project [<code>2</code>].
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-compose-01.png') }}"
          alt="Illustration: Follow the sidebar link, and use the button." />
   </p>
   <p>
-    Use the <strong>Upload files</strong> button on the empty <em>Compose</em> page to add files.
+    Press the <strong>Upload files</strong> button on the empty <em>Compose</em> page to add files.
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-compose-02.png') }}"
@@ -48,10 +48,10 @@
     Upload files via the browser, <code>svn</code>, or <code>rsync</code>. To use <code>rsync</code>, first submit an SSH key to ATR. We plan to read this from LDAP in future.
   </p>
   <p>
-    After upload, ATR checks your files. Review the check results on the <em>Compose</em> page [<code>1</code>]. Use the <strong>Show report</strong>, <strong>Show warnings</strong>, or <strong>Show errors</strong> buttons for a detailed review of the check results.
+    After upload, ATR checks your files. Review the check results on the <em>Compose</em> page [<code>1</code>]. Press the <strong>Show report</strong>, <strong>Show warnings</strong>, or <strong>Show errors</strong> buttons for a detailed review of the check results.
   </p>
   <p>
-    When the files are present and the check results are satisfactory, use the <strong>Start voting</strong> button to proceed [<code>2</code>].
+    When the files are present and the check results are satisfactory, press the <strong>Start voting</strong> button to proceed [<code>2</code>].
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-compose-03.png') }}"
@@ -67,7 +67,7 @@
 
   <h2 id="vote">Vote</h2>
   <p>
-    The <em>Vote</em> page is available to all project participants, and displays the report results from the end of the <em>Compose</em> phase to help participants decide how to cast their votes [<code>1</code>]. Use the <strong>Download files</strong> button to download the release candidate files to review them before voting [<code>2</code>].
+    The <em>Vote</em> page is available to all project participants, and displays the report results from the end of the <em>Compose</em> phase to help participants decide how to cast their votes [<code>1</code>]. Press the <strong>Download files</strong> button to download the release candidate files to review them before voting [<code>2</code>].
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-vote-01.png') }}"
@@ -88,7 +88,7 @@
          alt="Illustration: Review the voting thread, and cast your own vote." />
   </p>
   <p>
-    When the voting period concludes and the mandate is clear, record the outcome using the vote resolution form. This action also sends the outcome of the vote to the mailing list. A successful vote promotes the release candidate to the next phase; a failed vote returns it to the <em>Compose</em> phase.
+    When the voting period concludes and the mandate is clear, record the outcome using the vote resolution form. Submitting this form also sends the outcome of the vote to the mailing list. A successful vote promotes the release candidate to the next phase; a failed vote returns it to the <em>Compose</em> phase.
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-vote-04.png') }}"
@@ -100,17 +100,17 @@
     If the vote passes, the release enters the <em>Finish</em> phase. This phase may allow minor content adjustments before the announcement and final release. ATR currently supports moving files between directories, preserving filenames. We plan to support more types of adjustments in future.
   </p>
   <p>
-    During this phase you should distribute release artifacts to your package distribution networks such as Maven Central, PyPI, or Docker Hub. We also plan to add tools to assist with this.
+    During this phase you should distribute release artifacts to your package distribution networks such as Maven Central, PyPI, or Docker Hub. We plan to add tools to assist with this.
   </p>
   <p>
-    When the release is finished, use the <strong>Announce and distribute</strong> button.
+    When the release is finished, press the <strong>Announce and distribute</strong> button.
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-finish-01.png') }}"
          alt="Illustration: Use the Announce and distribute button." />
   </p>
   <p>
-    Using the announcement form sends a message to your selected mailing list. Use the <strong>Download path suffix</strong> field to choose a specific location from which users can download your release artifacts.
+    Submitting the announcement form sends a message to your selected mailing list. Complete the <strong>Download path suffix</strong> field to choose a specific location from which users can download your release artifacts.
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-finish-02.png') }}"
@@ -143,7 +143,7 @@
          alt="Illustration: The create project form has Display name and Label fields." />
   </p>
   <p>
-    Every successfully added project is listed on the <strong>Committee directory</strong> page. Use the project button, and the project page will be displayed with its release policy form. Edit the release policy form to your liking, and <strong>Save</strong> your changes.
+    Every successfully added project is listed on the <strong>Committee directory</strong> page. Press the project button, and the project page will be displayed with its release policy form. Edit the release policy form to your liking, and <strong>Save</strong> your changes.
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-projects-03.png') }}"
