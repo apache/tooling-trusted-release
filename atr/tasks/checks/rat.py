@@ -545,9 +545,11 @@ def _summary_message(valid: bool, unapproved_licenses: int, unknown_licenses: in
     if not valid:
         message = "Found "
         if unapproved_licenses > 0:
-            message += f"{unapproved_licenses} files with unapproved licenses"
+            files = "file" if (unapproved_licenses == 1) else "files"
+            message += f"{unapproved_licenses} {files} with unapproved licenses"
             if unknown_licenses > 0:
                 message += " and "
         if unknown_licenses > 0:
-            message += f"{unknown_licenses} files with unknown licenses"
+            files = "file" if (unknown_licenses == 1) else "files"
+            message += f"{unknown_licenses} {files} with unknown licenses"
     return message
