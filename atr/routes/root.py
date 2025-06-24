@@ -48,7 +48,7 @@ async def index() -> response.Response | str:
 
         async with db.session() as data:
             user_projects = await user.projects(uid)
-            user_projects.sort(key=lambda p: p.display_name)
+            user_projects.sort(key=lambda p: p.display_name.lower())
 
             projects_with_releases = []
             projects_without_releases = []
@@ -89,7 +89,7 @@ async def index() -> response.Response | str:
             project = item["project"]
             if not isinstance(project, models.Project):
                 return ""
-            return project.display_name
+            return project.display_name.lower()
 
         all_projects.sort(key=sort_key)
 
