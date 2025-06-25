@@ -41,12 +41,89 @@ class AnnotatedDivergence(NamedTuple):
 Divergences = Generator[Divergence]
 AnnotatedDivergences = Generator[AnnotatedDivergence]
 AsyncAnnotatedDivergences = AsyncGenerator[AnnotatedDivergence]
+CommitteeDivergences = Callable[[models.Committee], Divergences]
+CommitteeAnnotatedDivergences = Callable[[models.Committee], AnnotatedDivergences]
 ProjectDivergences = Callable[[models.Project], Divergences]
 ProjectAnnotatedDivergences = Callable[[models.Project], AnnotatedDivergences]
 ReleaseDivergences = Callable[[models.Release], Divergences]
 ReleaseAnnotatedDivergences = Callable[[models.Release], AnnotatedDivergences]
 
 T = TypeVar("T")
+
+
+def committee(c: models.Committee) -> AnnotatedDivergences:
+    """Check that a committee is valid."""
+
+    yield from committee_child_committees(c)
+    yield from committee_full_name(c)
+
+
+def committee_components(
+    *components: str,
+) -> Callable[[CommitteeDivergences], CommitteeAnnotatedDivergences]:
+    """Wrap a Committee divergence generator to yield annotated divergences."""
+
+    def wrap(original: CommitteeDivergences) -> CommitteeAnnotatedDivergences:
+        def replacement(c: models.Committee) -> AnnotatedDivergences:
+            yield from divergences_with_annotations(
+                components,
+                original.__name__,
+                c.name,
+                original(c),
+            )
+
+        return replacement
+
+    return wrap
+
+
+@committee_components("Committee.full_name")
+def committee_full_name(c: models.Committee) -> Divergences:
+    """Validate the Committee.full_name value."""
+
+    full_name = c.full_name
+
+    def present(fn: str | None) -> bool:
+        return bool(fn)
+
+    yield from divergences_predicate(
+        present,
+        "value to be set",
+        full_name,
+    )
+
+    def trimmed(fn: str | None) -> bool:
+        return False if fn is None else (fn == fn.strip())
+
+    yield from divergences_predicate(
+        trimmed,
+        "value not to have surrounding whitespace",
+        full_name,
+    )
+
+    def not_prefixed(fn: str | None) -> bool:
+        return False if fn is None else (not fn.startswith("Apache "))
+
+    yield from divergences_predicate(
+        not_prefixed,
+        "value not to start with 'Apache '",
+        full_name,
+    )
+
+
+@committee_components("Committee.child_committees")
+def committee_child_committees(c: models.Committee) -> Divergences:
+    """Check that a committee has no child_committees."""
+
+    expected: list[object] = []
+    actual = c.child_committees
+    yield from divergences(expected, actual)
+
+
+def committees(cs: Iterable[models.Committee]) -> AnnotatedDivergences:
+    """Validate multiple committees."""
+    for c in cs:
+        yield from committee(c)
 
 
 def divergences[T](expected: T, actual: T) -> Divergences:
@@ -74,8 +151,12 @@ def divergences_with_annotations(
 
 async def everything(data: db.Session) -> AsyncAnnotatedDivergences:
     """Yield divergences for all projects and releases in the DB."""
+    committees_sorted = await data.committee(_child_committees=True).order_by(models.Committee.name).all()
     projects_sorted = await data.project(_distribution_channels=True).order_by(models.Project.name).all()
     releases_sorted = await data.release().order_by(models.Release.name).all()
+
+    for c in await asyncio.to_thread(committees, committees_sorted):
+        yield c
 
     for p in await asyncio.to_thread(projects, projects_sorted):
         yield p

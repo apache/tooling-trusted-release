@@ -204,6 +204,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         committers: Opt[list[str]] = NOT_SET,
         release_managers: Opt[list[str]] = NOT_SET,
         name_in: Opt[list[str]] = NOT_SET,
+        _child_committees: bool = False,
         _projects: bool = False,
         _public_signing_keys: bool = False,
     ) -> Query[models.Committee]:
@@ -228,6 +229,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             models_committee_name = models.validate_instrumented_attribute(models.Committee.name)
             query = query.where(models_committee_name.in_(name_in))
 
+        if _child_committees:
+            query = query.options(select_in_load(models.Committee.child_committees))
         if _projects:
             query = query.options(select_in_load(models.Committee.projects))
         if _public_signing_keys:
