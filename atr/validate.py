@@ -16,10 +16,12 @@
 # under the License.
 
 import datetime
+import pathlib
 from collections.abc import Callable, Generator, Iterable, Sequence
 from typing import NamedTuple, TypeVar
 
 import atr.db.models as models
+import atr.util as util
 
 
 class Divergence(NamedTuple):
@@ -69,6 +71,7 @@ def release(r: models.Release) -> AnnotatedDivergences:
     """Check that a release is valid."""
     yield from release_created(r)
     yield from release_name(r)
+    yield from release_on_disk(r)
     yield from release_package_managers(r)
     yield from release_released(r)
     yield from release_sboms(r)
@@ -113,6 +116,19 @@ def release_name(r: models.Release) -> Divergences:
     expected = models.release_name(r.project_name, r.version)
     actual = r.name
     yield from divergences(expected, actual)
+
+
+@release_components()
+def release_on_disk(r: models.Release) -> Divergences:
+    """Check that the release is on disk."""
+    path = util.release_directory(r)
+
+    def okay(p: pathlib.Path) -> bool:
+        # The release directory must exist and contain at least one entry
+        return p.exists() and any(p.iterdir())
+
+    expected = "directory to exist and contain files"
+    yield from divergences_predicate(okay, expected, path)
 
 
 @release_components("Release.package_managers")

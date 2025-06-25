@@ -48,6 +48,7 @@ import atr.routes.keys as keys
 import atr.routes.mapping as mapping
 import atr.template as template
 import atr.util as util
+import atr.validate as validate
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -630,6 +631,21 @@ async def admin_toggle_view() -> response.Response:
     await quart.flash(message, "success")
     referrer = quart.request.referrer
     return quart.redirect(referrer or quart.url_for("admin.admin_data"))
+
+
+@admin.BLUEPRINT.route("/validate")
+async def admin_validate() -> str:
+    """Run validators and display any divergences."""
+
+    async with db.session() as data:
+        releases = await data.release().order_by(models.Release.name).all()
+
+    results = list(validate.releases(releases))
+
+    return await template.render(
+        "validation.html",
+        divergences=results,
+    )
 
 
 async def _check_keys(fix: bool = False) -> str:
