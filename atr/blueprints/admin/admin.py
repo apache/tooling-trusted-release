@@ -638,13 +638,11 @@ async def admin_validate() -> str:
     """Run validators and display any divergences."""
 
     async with db.session() as data:
-        releases = await data.release().order_by(models.Release.name).all()
-
-    results = list(validate.releases(releases))
+        divergences = [d async for d in validate.everything(data)]
 
     return await template.render(
         "validation.html",
-        divergences=results,
+        divergences=divergences,
     )
 
 

@@ -14,12 +14,13 @@ import atr.validate as validate
 async def amain() -> None:
     await db.init_database_for_worker()
     async with db.session() as data:
-        releases = await data.release().all()
-        divergences = 0
-        for divergence in validate.releases(releases):
+        divergences = [d async for d in validate.everything(data)]
+        for divergence in divergences:
             print(divergence)
-            divergences += 1
-        print(len(releases), "releases,", divergences, "errors")
+        print(len(divergences), "errors")
+
+    if divergences:
+        sys.exit(1)
 
 
 def main() -> None:

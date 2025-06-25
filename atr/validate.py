@@ -15,11 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asyncio
 import datetime
 import pathlib
-from collections.abc import Callable, Generator, Iterable, Sequence
+from collections.abc import AsyncGenerator, Callable, Generator, Iterable, Sequence
 from typing import NamedTuple, TypeVar
 
+import atr.db as db
 import atr.db.models as models
 import atr.util as util
 
@@ -38,6 +40,9 @@ class AnnotatedDivergence(NamedTuple):
 
 Divergences = Generator[Divergence]
 AnnotatedDivergences = Generator[AnnotatedDivergence]
+AsyncAnnotatedDivergences = AsyncGenerator[AnnotatedDivergence]
+ProjectDivergences = Callable[[models.Project], Divergences]
+ProjectAnnotatedDivergences = Callable[[models.Project], AnnotatedDivergences]
 ReleaseDivergences = Callable[[models.Release], Divergences]
 ReleaseAnnotatedDivergences = Callable[[models.Release], AnnotatedDivergences]
 
@@ -65,6 +70,138 @@ def divergences_with_annotations(
     """Wrap divergences with components, validator, and source."""
     for d in ds:
         yield AnnotatedDivergence(list(components), validator, source, d)
+
+
+async def everything(data: db.Session) -> AsyncAnnotatedDivergences:
+    """Yield divergences for all projects and releases in the DB."""
+    projects_sorted = await data.project(_distribution_channels=True).order_by(models.Project.name).all()
+    releases_sorted = await data.release().order_by(models.Release.name).all()
+
+    for p in await asyncio.to_thread(projects, projects_sorted):
+        yield p
+
+    for r in await asyncio.to_thread(releases, releases_sorted):
+        yield r
+
+
+def project(p: models.Project) -> AnnotatedDivergences:
+    """Check that a project is valid."""
+
+    yield from project_category(p)
+    yield from project_committee(p)
+    yield from project_created(p)
+    yield from project_distribution_channels(p)
+    yield from project_full_name(p)
+    yield from project_programming_languages(p)
+    yield from project_release_policy(p)
+
+
+def project_components(
+    *components: str,
+) -> Callable[[ProjectDivergences], ProjectAnnotatedDivergences]:
+    """Wrap a Project divergence generator to yield annotated divergences."""
+
+    def wrap(original: ProjectDivergences) -> ProjectAnnotatedDivergences:
+        def replacement(p: models.Project) -> AnnotatedDivergences:
+            yield from divergences_with_annotations(
+                components,
+                original.__name__,
+                p.name,
+                original(p),
+            )
+
+        return replacement
+
+    return wrap
+
+
+@project_components("Project.category")
+def project_category(p: models.Project) -> Divergences:
+    """Check that the category string uses 'label, label' syntax without colons."""
+
+    def okay(cat: str | None) -> bool:
+        if not cat:
+            return True
+        tokens = [t.strip() for t in cat.split(",")]
+        if any((not t) or (":" in t) for t in tokens):
+            return False
+        return True
+
+    expected = "comma separated labels without colon"
+    yield from divergences_predicate(okay, expected, p.category)
+
+
+@project_components("Project.committee_name")
+def project_committee(p: models.Project) -> Divergences:
+    """Check that the project is linked to a committee."""
+
+    def okay(cn: str | None) -> bool:
+        return cn is not None
+
+    expected = "committee_name to be set"
+    yield from divergences_predicate(okay, expected, p.committee_name)
+
+
+@project_components("Project.created")
+def project_created(p: models.Project) -> Divergences:
+    """Check that the project created timestamp is in the past."""
+    now = datetime.datetime.now(datetime.UTC)
+
+    def predicate(dt: datetime.datetime) -> bool:
+        return dt < now
+
+    expected = "value to be in the past"
+    yield from divergences_predicate(predicate, expected, p.created)
+
+
+@project_components("Project.distribution_channels")
+def project_distribution_channels(p: models.Project) -> Divergences:
+    """Check that distribution_channels is empty."""
+    expected: list[object] = []
+    actual = p.distribution_channels
+    yield from divergences(expected, actual)
+
+
+@project_components("Project.full_name")
+def project_full_name(p: models.Project) -> Divergences:
+    """Check that the project full_name is present and starts with 'Apache '."""
+
+    def okay(fn: str | None) -> bool:
+        return (fn is not None) and fn.startswith("Apache ")
+
+    expected = "full_name to be set and start with 'Apache '"
+    yield from divergences_predicate(okay, expected, p.full_name)
+
+
+@project_components("Project.programming_languages")
+def project_programming_languages(p: models.Project) -> Divergences:
+    """Check that programming_languages uses 'label, label' syntax without colons."""
+
+    def okay(pl: str | None) -> bool:
+        if not pl:
+            return True
+        tokens = [t.strip() for t in pl.split(",")]
+        if any((not t) or (":" in t) for t in tokens):
+            return False
+        return True
+
+    expected = "comma separated labels without colon"
+    yield from divergences_predicate(okay, expected, p.programming_languages)
+
+
+@project_components("Project.release_policy")
+def project_release_policy(p: models.Project) -> Divergences:
+    """Ensure that release_policy is None."""
+
+    expected = None
+    actual = p.release_policy_id
+    yield from divergences(expected, actual)
+
+
+def projects(ps: Iterable[models.Project]) -> AnnotatedDivergences:
+    """Validate multiple projects."""
+    for p in ps:
+        yield from project(p)
 
 
 def release(r: models.Release) -> AnnotatedDivergences:
