@@ -30,9 +30,9 @@ class Divergence(NamedTuple):
 
 
 class AnnotatedDivergence(NamedTuple):
-    source: str
-    validator: str
     components: list[str]
+    validator: str
+    source: str
     divergence: Divergence
 
 
@@ -57,14 +57,14 @@ def divergences_predicate[T](okay: Callable[[T], bool], expected: str, actual: T
 
 
 def divergences_with_annotations(
-    source: str,
-    validator: str,
     components: Sequence[str],
+    validator: str,
+    source: str,
     ds: Divergences,
 ) -> AnnotatedDivergences:
-    """Wrap divergences with a source, validator, and components."""
+    """Wrap divergences with components, validator, and source."""
     for d in ds:
-        yield AnnotatedDivergence(source, validator, list(components), d)
+        yield AnnotatedDivergence(list(components), validator, source, d)
 
 
 def release(r: models.Release) -> AnnotatedDivergences:
@@ -87,9 +87,9 @@ def release_components(
     def wrap(original: ReleaseDivergences) -> ReleaseAnnotatedDivergences:
         def replacement(r: models.Release) -> AnnotatedDivergences:
             yield from divergences_with_annotations(
-                r.name,
-                original.__name__,
                 components,
+                original.__name__,
+                r.name,
                 original(r),
             )
 
@@ -118,7 +118,7 @@ def release_name(r: models.Release) -> Divergences:
     yield from divergences(expected, actual)
 
 
-@release_components()
+@release_components("Release")
 def release_on_disk(r: models.Release) -> Divergences:
     """Check that the release is on disk."""
     path = util.release_directory(r)
