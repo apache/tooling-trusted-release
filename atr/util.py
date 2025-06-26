@@ -21,6 +21,7 @@ import contextlib
 import dataclasses
 import datetime
 import hashlib
+import json
 import logging
 import os
 import pathlib
@@ -736,6 +737,53 @@ def release_directory_version(release: models.Release) -> pathlib.Path:
     return path
 
 
+async def thread_messages(
+    thread_id: str,
+) -> AsyncGenerator[tuple[str, dict[str, Any]]]:
+    """Iterate over mailing list thread messages in chronological order."""
+
+    thread_url = f"https://lists.apache.org/api/thread.lua?id={thread_id}"
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(thread_url) as resp:
+                resp.raise_for_status()
+                thread_data: Any = await resp.json(content_type=None)
+    except Exception as exc:
+        raise RuntimeError(f"Failed fetching thread metadata for {thread_id}: {exc}") from exc
+
+    message_ids: set[str] = set()
+
+    if isinstance(thread_data, dict):
+        for email_entry in thread_data.get("emails", []):
+            if isinstance(email_entry, dict) and (mid := email_entry.get("id")):
+                message_ids.add(str(mid))
+        _thread_messages_walk(thread_data.get("thread"), message_ids)
+
+    if not message_ids:
+        return
+
+    email_urls = [f"https://lists.apache.org/api/email.lua?id={mid}" for mid in message_ids]
+
+    messages: list[dict[str, Any]] = []
+
+    async for url, status, content in get_urls_as_completed(email_urls):
+        if status != 200 or not content:
+            _LOGGER.warning("Failed to fetch email data from %s: %s", url, status)
+            continue
+        try:
+            msg_json = json.loads(content.decode())
+            messages.append(msg_json)
+        except Exception as exc:
+            _LOGGER.warning("Failed to parse email JSON from %s: %s", url, exc)
+
+    messages.sort(key=lambda m: m.get("epoch", 0))
+
+    for msg_json in messages:
+        msg_id = str(msg_json.get("id", ""))
+        yield msg_id, msg_json
+
+
 def unwrap[T](value: T | None, error_message: str = "unexpected None when unwrapping value") -> T:
     """
     Will unwrap the given value or raise a ValueError if it is None
@@ -854,3 +902,12 @@ def _generate_hexdump(data: bytes) -> str:
         line_num = f"{i:08x}"
         hex_lines.append(f"{line_num}  {hex_part_spaced}  |{ascii_part}|")
     return "\n".join(hex_lines)
+
+
+def _thread_messages_walk(node: dict[str, Any] | None, message_ids: set[str]) -> None:
+    if not isinstance(node, dict):
+        return
+    if mid := node.get("id"):
+        message_ids.add(str(mid))
+    for child in node.get("children", []):
+        _thread_messages_walk(child, message_ids)
