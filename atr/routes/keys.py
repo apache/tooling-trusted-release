@@ -30,9 +30,9 @@ import textwrap
 from collections.abc import Awaitable, Callable, Sequence
 
 import aiofiles.os
+import aiohttp
 import asfquart as asfquart
 import asfquart.base as base
-import httpx
 import quart
 import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
@@ -636,13 +636,13 @@ async def _format_keys_file(
 
 async def _get_keys_text(keys_url: str, render: Callable[[str], Awaitable[str]]) -> str:
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(keys_url, follow_redirects=True)
-            response.raise_for_status()
-            return response.text
-    except httpx.HTTPStatusError as e:
-        raise base.ASFQuartException(f"Error fetching URL: {e.response.status_code} {e.response.reason_phrase}")
-    except httpx.RequestError as e:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(keys_url, allow_redirects=True) as response:
+                response.raise_for_status()
+                return await response.text()
+    except aiohttp.ClientResponseError as e:
+        raise base.ASFQuartException(f"Error fetching URL: {e.status} {e.message}")
+    except aiohttp.ClientError as e:
         raise base.ASFQuartException(f"Error fetching URL: {e}")
 
 

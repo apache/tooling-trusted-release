@@ -27,11 +27,11 @@ from collections.abc import Callable, Mapping
 from typing import Any, Final
 
 import aiofiles.os
+import aiohttp
 import aioshutil
 import asfquart
 import asfquart.base as base
 import asfquart.session as session
-import httpx
 import quart
 import sqlalchemy.orm as orm
 import sqlmodel
@@ -577,7 +577,7 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
                 f"(PMCs and PPMCs) with membership data",
                 "category": "success",
             }, 200
-        except httpx.RequestError as e:
+        except aiohttp.ClientError as e:
             return {
                 "message": f"Failed to fetch data: {e!s}",
                 "category": "error",

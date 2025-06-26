@@ -27,7 +27,6 @@ dependencies = [
   "email-validator~=2.2.0",
   "gitignore-parser (>=0.1.12,<0.2.0)",
   "greenlet>=3.1.1,<4.0.0",
-  "httpx~=0.27",
   "hypercorn~=0.17",
   "ldap3 (==2.10.2rc2)",
   "python-decouple~=3.8",

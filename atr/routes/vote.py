@@ -19,7 +19,7 @@ import json
 import logging
 import os
 
-import httpx
+import aiohttp
 import quart
 import werkzeug.wrappers.response as response
 import wtforms
@@ -164,11 +164,11 @@ async def _task_archive_url(task_mid: str) -> str | None:
     lid = "user-tests.tooling.apache.org"
     url = f"https://lists.apache.org/api/email.lua?id=%3C{task_mid}%3E&listid=%3C{lid}%3E"
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-        response.raise_for_status()
-        # TODO: Check whether this blocks from network
-        email_data = response.json()
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                # TODO: Check whether this blocks from network
+                email_data = await response.json()
         mid = email_data["mid"]
         if not isinstance(mid, str):
             return None

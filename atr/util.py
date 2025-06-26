@@ -33,12 +33,12 @@ from collections.abc import AsyncGenerator, Callable, Iterable, Sequence
 from typing import Any, Final, TypeVar
 
 import aiofiles.os
+import aiohttp
 import aioshutil
 import asfquart
 import asfquart.base as base
 import asfquart.session as session
 import gitignore_parser
-import httpx
 import jinja2
 import quart
 import quart_wtf
@@ -463,26 +463,25 @@ def get_unfinished_dir() -> pathlib.Path:
 
 async def get_urls_as_completed(urls: Sequence[str]) -> AsyncGenerator[tuple[str, int | str | None, bytes]]:
     """GET a list of URLs in parallel and yield (url, status, content_bytes) as they become available."""
-    async with httpx.AsyncClient() as client:
-        tasks = [asyncio.create_task(client.get(url)) for url in urls]
+    async with aiohttp.ClientSession() as session:
+
+        async def _fetch(one_url: str) -> tuple[str, int | str | None, bytes]:
+            try:
+                async with session.get(one_url) as resp:
+                    try:
+                        resp.raise_for_status()
+                        return (str(resp.url), resp.status, await resp.read())
+                    except aiohttp.ClientResponseError as e:
+                        url = str(e.request_info.real_url)
+                        if e.status == 200:
+                            return (url, str(e), b"")
+                        return (url, e.status, b"")
+            except Exception as exc:
+                return ("", str(exc), b"")
+
+        tasks = [asyncio.create_task(_fetch(u)) for u in urls]
         for future in asyncio.as_completed(tasks):
-            try:
-                response = await future
-            except Exception as e:
-                yield ("", str(e), b"")
-                continue
-            url = str(response.url)
-            try:
-                response.raise_for_status()
-                yield (url, response.status_code, await response.aread())
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 200:
-                    # This should not happen
-                    yield (url, str(e), b"")
-                else:
-                    yield (url, e.response.status_code, b"")
-            except Exception as e:
-                yield (url, str(e), b"")
+            yield await future
 
 
 async def has_files(release: models.Release) -> bool:

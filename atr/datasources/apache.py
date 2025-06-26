@@ -22,7 +22,7 @@ from __future__ import annotations
 import datetime
 from typing import Annotated, Any, Final
 
-import httpx
+import aiohttp
 
 import atr.schema as schema
 
@@ -215,10 +215,10 @@ class ProjectsData(schema.DictRoot[ProjectStatus]):
 async def get_active_committee_data() -> CommitteeData:
     """Returns the list of currently active committees."""
 
-    async with httpx.AsyncClient() as client:
-        response = await client.get(_WHIMSY_COMMITTEE_INFO_URL)
-        response.raise_for_status()
-        data = response.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(_WHIMSY_COMMITTEE_INFO_URL) as response:
+            response.raise_for_status()
+            data = await response.json()
 
     return CommitteeData.model_validate(data)
 
@@ -226,28 +226,28 @@ async def get_active_committee_data() -> CommitteeData:
 async def get_current_podlings_data() -> PodlingsData:
     """Returns the list of current podlings."""
 
-    async with httpx.AsyncClient() as client:
-        response = await client.get(_PROJECTS_PODLINGS_URL)
-        response.raise_for_status()
-        data = response.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(_PROJECTS_PODLINGS_URL) as response:
+            response.raise_for_status()
+            data = await response.json()
     return PodlingsData.model_validate(data)
 
 
 async def get_groups_data() -> GroupsData:
     """Returns LDAP Groups with their members."""
 
-    async with httpx.AsyncClient() as client:
-        response = await client.get(_PROJECTS_GROUPS_URL)
-        response.raise_for_status()
-        data = response.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(_PROJECTS_GROUPS_URL) as response:
+            response.raise_for_status()
+            data = await response.json()
     return GroupsData.model_validate(data)
 
 
 async def get_ldap_projects_data() -> LDAPProjectsData:
-    async with httpx.AsyncClient() as client:
-        response = await client.get(_WHIMSY_PROJECTS_URL)
-        response.raise_for_status()
-        data = response.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(_WHIMSY_PROJECTS_URL) as response:
+            response.raise_for_status()
+            data = await response.json()
 
     return LDAPProjectsData.model_validate(data)
 
@@ -255,19 +255,19 @@ async def get_ldap_projects_data() -> LDAPProjectsData:
 async def get_projects_data() -> ProjectsData:
     """Returns the list of projects."""
 
-    async with httpx.AsyncClient() as client:
-        response = await client.get(_PROJECTS_PROJECTS_URL)
-        response.raise_for_status()
-        data = response.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(_PROJECTS_PROJECTS_URL) as response:
+            response.raise_for_status()
+            data = await response.json()
     return ProjectsData.model_validate(data)
 
 
 async def get_retired_committee_data() -> RetiredCommitteeData:
     """Returns the list of retired committees."""
 
-    async with httpx.AsyncClient() as client:
-        response = await client.get(_WHIMSY_COMMITTEE_RETIRED_URL)
-        response.raise_for_status()
-        data = response.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(_WHIMSY_COMMITTEE_RETIRED_URL) as response:
+            response.raise_for_status()
+            data = await response.json()
 
     return RetiredCommitteeData.model_validate(data)
