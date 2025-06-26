@@ -39,6 +39,7 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.blueprints.admin as admin
+import atr.config as config
 import atr.datasources.apache as apache
 import atr.db as db
 import atr.db.interaction as interaction
@@ -149,6 +150,29 @@ async def admin_browse_as() -> str | response.Response:
         "success",
     )
     return quart.redirect(util.as_url(root.index))
+
+
+@admin.BLUEPRINT.route("/config")
+async def admin_config() -> quart.wrappers.response.Response:
+    """Display the current application configuration values."""
+
+    conf = config.get()
+    values: list[str] = []
+    for name in dir(conf):
+        if name.startswith("_"):
+            continue
+        try:
+            val = getattr(conf, name)
+        except Exception as exc:
+            val = f"<error: {exc}>"
+        if name.endswith("_PASSWORD"):
+            val = "<redacted>"
+        if callable(val):
+            continue
+        values.append(f"{name}={val}")
+
+    values.sort()
+    return quart.Response("\n".join(values), mimetype="text/plain")
 
 
 @admin.BLUEPRINT.route("/consistency")
