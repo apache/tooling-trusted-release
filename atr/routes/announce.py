@@ -105,7 +105,11 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     announce_form.download_path_suffix.data = (
         "/" if top_level_project else f"/{release.project.name}-{release.version}/"
     )
-    description_download_prefix = f"https://{config.get().APP_HOST}/downloads/{committee.name}"
+    # This must NOT end with a "/"
+    description_download_prefix = f"https://{config.get().APP_HOST}/downloads"
+    if committee.is_podling:
+        description_download_prefix += "/incubator"
+    description_download_prefix += f"/{committee.name}"
     announce_form.download_path_suffix.description = f"The URL will be {description_download_prefix} plus this suffix"
 
     return await template.render(
