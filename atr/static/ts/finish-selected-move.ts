@@ -17,6 +17,7 @@ const ID = Object.freeze({
     fileFilter: "file-filter",
     fileListMoreInfo: "file-list-more-info",
     fileListTableBody: "file-list-table-body",
+    selectFilesToggleButton: "select-files-toggle-button",
     mainScriptData: "main-script-data",
     maxFilesInput: "max-files-input",
     selectedFileNameTitle: "selected-file-name-title",
@@ -56,6 +57,7 @@ let selectedFileNameTitleElement!: HTMLElement;
 let dirFilterInput!: HTMLInputElement;
 let dirListTableBody!: HTMLTableSectionElement;
 let confirmMoveButton!: HTMLButtonElement;
+let selectFilesToggleButton!: HTMLButtonElement;
 let currentMoveSelectionInfoElement!: HTMLElement;
 let errorAlert!: HTMLElement;
 
@@ -277,6 +279,11 @@ function renderAllLists(): void {
     renderListItems(dirListTableBody, filteredDirs, dirsConfig);
 
     updateMoveSelectionInfo();
+
+    if (selectFilesToggleButton) {
+        const anySelected = uiState.currentlySelectedPaths.size > 0 || uiState.currentlyChosenDirectoryPath !== null;
+        selectFilesToggleButton.textContent = anySelected ? "Unselect all" : "Select these files";
+    }
 }
 
 function handleDirSelection(dirPath: string | null): void {
@@ -477,6 +484,7 @@ document.addEventListener("DOMContentLoaded", () => {
   dirFilterInput = $<HTMLInputElement>(ID.dirFilterInput);
   dirListTableBody = $<HTMLTableSectionElement>(ID.dirListTableBody);
   confirmMoveButton = $<HTMLButtonElement>(ID.confirmMoveButton);
+  selectFilesToggleButton = $<HTMLButtonElement>(ID.selectFilesToggleButton);
   currentMoveSelectionInfoElement = $(ID.currentMoveSelectionInfo);
   currentMoveSelectionInfoElement.setAttribute("aria-live", "polite");
   errorAlert = $(ID.errorAlert);
@@ -535,6 +543,23 @@ document.addEventListener("DOMContentLoaded", () => {
             errorAlert.textContent = "An unexpected error occurred. Please try again.";
         }
     });
+  });
+
+  selectFilesToggleButton.addEventListener("click", () => {
+    const anySelected = uiState.currentlySelectedPaths.size > 0 || uiState.currentlyChosenDirectoryPath !== null;
+    if (anySelected) {
+        setState({ currentlySelectedPaths: new Set(), currentlyChosenDirectoryPath: null });
+    } else {
+        const displayedCheckboxes = fileListTableBody.querySelectorAll<HTMLInputElement>("input[type='checkbox'][data-item-path]");
+        const newSelected = new Set(uiState.currentlySelectedPaths);
+        displayedCheckboxes.forEach(cb => {
+            const p = cb.dataset.itemPath;
+            if (p) {
+                newSelected.add(p);
+            }
+        });
+        setState({ currentlySelectedPaths: newSelected });
+    }
   });
 
   renderAllLists();
