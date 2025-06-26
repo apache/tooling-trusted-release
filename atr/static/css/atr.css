@@ -465,6 +465,7 @@ aside.sidebar nav a:hover {
 
 .atr-phase-symbol-other {
     color: #aaaaaa;
+    font-weight: 650 !important;
 }
 
 .atr-phase-themed .atr-phase-one {
