@@ -45,7 +45,7 @@ class CastVoteForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Submit vote")
 
 
-@routes.committer("/vote/<project_name>/<version_name>", measure_performance=False)
+@routes.committer("/vote/<project_name>/<version_name>")
 async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show the contents of the release candidate draft."""
     await session.check_access(project_name)

@@ -494,7 +494,7 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
     return await session.redirect(keys)
 
 
-@routes.committer("/keys/upload", methods=["GET", "POST"], measure_performance=False)
+@routes.committer("/keys/upload", methods=["GET", "POST"])
 async def upload(session: routes.CommitterSession) -> str:
     """Upload a KEYS file containing multiple OpenPGP keys."""
     # Get committees for all projects the user is a member of

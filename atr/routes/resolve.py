@@ -71,7 +71,7 @@ async def release_latest_vote_task(release: models.Release) -> models.Task | Non
         return task
 
 
-@routes.committer("/resolve/<project_name>/<version_name>", methods=["POST"], measure_performance=False)
+@routes.committer("/resolve/<project_name>/<version_name>", methods=["POST"])
 async def selected_post(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
