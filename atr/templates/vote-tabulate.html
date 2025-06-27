@@ -50,6 +50,7 @@
         {% endfor %}
       </tbody>
     </table>
+    {% if summary %}<p>{{ summary }}</p>{% endif %}
   {% else %}
     <p>No votes tabulated yet.</p>
   {% endif %}

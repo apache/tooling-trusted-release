@@ -35,7 +35,7 @@ import atr.tasks.message as message
 import atr.template as template
 import atr.util as util
 
-TEST_MID = "CAFHDsVzgtfboqYF+a3owaNf+55MUiENWd3g53mU4rD=WHkXGwQ@mail.gmail.com"
+TEST_MID = "CANVKqzfLYj6TAVP_Sfsy5vFbreyhKskpRY-vs=F7aLed+rL+uA@mail.gmail.com"
 
 
 class CastVoteForm(util.QuartFormTyped):
@@ -146,10 +146,14 @@ async def tabulate(session: routes.CommitterSession, project_name: str, version_
     release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE)
     hidden_form = await util.HiddenFieldForm.create_form()
     tabulated_votes = None
+    summary = None
     if await hidden_form.validate_on_submit():
         archive_url = hidden_form.hidden_field.data or ""
         tabulated_votes = await _tabulate_votes(release, archive_url)
-    return await template.render("vote-tabulate.html", release=release, tabulated_votes=tabulated_votes)
+        summary = _tabulate_vote_summary(tabulated_votes)
+    return await template.render(
+        "vote-tabulate.html", release=release, tabulated_votes=tabulated_votes, summary=summary
+    )
 
 
 async def _send_vote(
@@ -348,6 +352,44 @@ async def _tabulate_vote_status(asf_uid: str, list_raw: str, release: models.Rel
     return status
 
 
+def _tabulate_vote_summary(tabulated_votes: dict[str, VoteEmail]) -> str:
+    binding_votes = 0
+    binding_votes_yes = 0
+    binding_votes_no = 0
+    binding_votes_abstain = 0
+    non_binding_votes = 0
+    non_binding_votes_yes = 0
+    non_binding_votes_no = 0
+    non_binding_votes_abstain = 0
+    other_votes = 0
+    for vote_email in tabulated_votes.values():
+        if vote_email.status == "Binding":
+            binding_votes += 1
+            if vote_email.vote.value == "Yes":
+                binding_votes_yes += 1
+            elif vote_email.vote.value == "No":
+                binding_votes_no += 1
+            else:
+                binding_votes_abstain += 1
+        elif vote_email.status == "Non-binding":
+            non_binding_votes += 1
+            if vote_email.vote.value == "Yes":
+                non_binding_votes_yes += 1
+            elif vote_email.vote.value == "No":
+                non_binding_votes_no += 1
+            else:
+                non_binding_votes_abstain += 1
+        else:
+            other_votes += 1
+    return f"""\
+Binding votes: {binding_votes}
+  ({binding_votes_yes} yes, {binding_votes_no} no, {binding_votes_abstain} abstain).
+Non-binding votes: {non_binding_votes}
+  ({non_binding_votes_yes} yes, {non_binding_votes_no} no, {non_binding_votes_abstain} abstain).
+Other votes: {other_votes}.
+"""
+
+
 async def _task_archive_url(task_mid: str) -> str | None:
     if "@" not in task_mid:
         return None
@@ -376,6 +418,8 @@ async def _task_archive_url_cached(task_mid: str | None) -> str | None:
         "818a44a3-6984-4aba-a650-834e86780b43@apache.org": "https://lists.apache.org/thread/619hn4x796mh3hkk3kxg1xnl48dy2s64",
         "CAA9ykM+bMPNk=BOF9hj0O+mjN1igppOJ+pKdZHcAM0ddVi+5_w@mail.gmail.com": "https://lists.apache.org/thread/x0m3p2xqjvflgtkb6oxqysm36cr9l5mg",
         "CAFHDsVzgtfboqYF+a3owaNf+55MUiENWd3g53mU4rD=WHkXGwQ@mail.gmail.com": "https://lists.apache.org/thread/brj0k3g8pq63g8f7xhmfg2rbt1240nts",
+        "CAMomwMrvKTQK7K2-OtZTrEO0JjXzO2g5ynw3gSoks_PXWPZfoQ@mail.gmail.com": "https://lists.apache.org/thread/y5rqp5qk6dmo08wlc3g20n862hznc9m8",
+        "CANVKqzfLYj6TAVP_Sfsy5vFbreyhKskpRY-vs=F7aLed+rL+uA@mail.gmail.com": "https://lists.apache.org/thread/oy969lhh6wlzd51ovckn8fly9rvpopwh",
     }
     if task_mid in dev_urls:
         return dev_urls[task_mid]
