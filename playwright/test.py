@@ -298,7 +298,7 @@ def poll_for_tasks_completion(page: sync_api.Page, project_name: str, version_na
     polling_url = f"https://{gateway_ip}:8080/admin/ongoing-tasks/{rev_path}"
     logging.info(f"Polling URL: {polling_url}")
 
-    max_wait_seconds = 12
+    max_wait_seconds = 18
     poll_interval_seconds = 0.01
     start_time = time.monotonic()
 

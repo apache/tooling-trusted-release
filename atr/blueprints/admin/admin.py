@@ -622,6 +622,24 @@ async def admin_tasks() -> str:
     return await template.render("tasks.html")
 
 
+@admin.BLUEPRINT.route("/task-times/<project_name>/<version_name>/<revision_number>")
+async def admin_task_times(
+    project_name: str, version_name: str, revision_number: str
+) -> quart.wrappers.response.Response:
+    values = []
+    async with db.session() as data:
+        tasks = await data.task(
+            project_name=project_name, version_name=version_name, revision_number=revision_number
+        ).all()  # type: ignore[reportOptionalMemberAccess]
+        for task in tasks:
+            if (task.started is None) or (task.completed is None):
+                continue
+            ms_elapsed = (task.completed - task.started).total_seconds() * 1000
+            values.append(f"{task.task_type} {ms_elapsed:.2f}ms")
+
+    return quart.Response("\n".join(values), mimetype="text/plain")
+
+
 @admin.BLUEPRINT.route("/toggle-view", methods=["GET"])
 async def admin_toggle_admin_view_page() -> str:
     """Display the page with a button to toggle between admin and user views."""

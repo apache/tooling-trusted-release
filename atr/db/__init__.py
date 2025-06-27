@@ -537,6 +537,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         error: Opt[str | None] = NOT_SET,
         project_name: Opt[str | None] = NOT_SET,
         version_name: Opt[str | None] = NOT_SET,
+        revision_number: Opt[str | None] = NOT_SET,
+        primary_rel_path: Opt[str | None] = NOT_SET,
     ) -> Query[models.Task]:
         query = sqlmodel.select(models.Task)
 
@@ -564,6 +566,10 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(models.Task.project_name == project_name)
         if is_defined(version_name):
             query = query.where(models.Task.version_name == version_name)
+        if is_defined(revision_number):
+            query = query.where(models.Task.revision_number == revision_number)
+        if is_defined(primary_rel_path):
+            query = query.where(models.Task.primary_rel_path == primary_rel_path)
 
         return Query(self, query)
 
