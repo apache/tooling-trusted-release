@@ -16,7 +16,6 @@
 # under the License.
 
 import json
-import os
 
 import quart
 import sqlmodel
@@ -138,7 +137,7 @@ async def selected_post(
 
 
 def task_mid_get(latest_vote_task: models.Task) -> str | None:
-    if "LOCAL_DEBUG" in os.environ:
+    if util.is_dev_environment():
         return "818a44a3-6984-4aba-a650-834e86780b43@apache.org"
     # TODO: Improve this
     task_mid = None

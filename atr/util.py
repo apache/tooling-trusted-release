@@ -291,6 +291,11 @@ def create_path_matcher(lines: Iterable[str], full_path: pathlib.Path, base_dir:
     return lambda file_path: gitignore_parser.handle_negation(file_path, rules)
 
 
+def is_dev_environment() -> bool:
+    conf = config.get()
+    return (conf.APP_HOST == "127.0.0.1") or conf.APP_HOST.startswith("127.0.0.1:")
+
+
 def email_from_uid(uid: str) -> str | None:
     if m := re.search(r"<([^>]+)>", uid):
         return m.group(1).lower()
