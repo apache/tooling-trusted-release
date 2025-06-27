@@ -97,42 +97,36 @@ async def selected_post(
             vote.selected, error="Invalid candidate name", project_name=project_name, version_name=version_name
         )
 
-    # Check that the user has access to the project
-    await session.check_access(project_name)
-
-    # Update release status in the database
-    async with db.session() as data:
-        async with data.begin():
-            release = await session.release(
-                project_name,
-                version_name,
-                with_project=True,
-                phase=models.ReleasePhase.RELEASE_CANDIDATE,
-                data=data,
-            )
-
-            # Update the release phase based on vote result
-            if vote_result == "passed":
-                release.phase = models.ReleasePhase.RELEASE_PREVIEW
-                success_message = "Vote marked as passed"
-                destination = finish.selected
-            else:
-                release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
-                success_message = "Vote marked as failed"
-                destination = compose.selected
-
-    description = "Create a preview revision from the last candidate draft"
-    async with revision.create_and_manage(
-        project_name, release.version, session.uid, description=description
-    ) as _creating:
-        pass
-
-    error_message = await _send_resolution(session, release, vote_result, resolution_body)
-    if error_message is not None:
-        await quart.flash(error_message, "error")
+    release, success_message = await _resolve_vote(session, project_name, version_name, vote_result, resolution_body)
+    destination = finish.selected if (vote_result == "passed") else compose.selected
 
     return await session.redirect(
         destination, success=success_message, project_name=project_name, version_name=release.version
+    )
+
+
+@routes.committer("/resolve/<project_name>/<version_name>/report", methods=["POST"])
+async def selected_report(
+    session: routes.CommitterSession, project_name: str, version_name: str
+) -> response.Response | str:
+    """Resolve a vote."""
+    await session.check_access(project_name)
+    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE)
+    latest_vote_task = await release_latest_vote_task(release)
+    if latest_vote_task is None:
+        return "No vote task found, unable to send resolution message."
+    resolve_form = await vote.ResolveVoteForm.create_form()
+    if not resolve_form.validate_on_submit():
+        # TODO: Render the page again with errors
+        return await session.redirect(
+            vote.tabulate, project_name=project_name, version_name=version_name, error="Invalid form submission."
+        )
+    email_body = util.unwrap(resolve_form.email_body.data)
+    vote_result = util.unwrap(resolve_form.vote_result.data)
+    release, success_message = await _resolve_vote(session, project_name, version_name, vote_result, email_body)
+    destination = finish.selected if (vote_result == "passed") else compose.selected
+    return await session.redirect(
+        destination, project_name=project_name, version_name=version_name, success=success_message
     )
 
 
@@ -159,6 +153,43 @@ def task_mid_get(latest_vote_task: models.Task) -> str | None:
         task_mid = "(malformed result)"
 
     return task_mid
+
+
+async def _resolve_vote(
+    session: routes.CommitterSession, project_name: str, version_name: str, vote_result: str, resolution_body: str
+) -> tuple[models.Release, str]:
+    # Check that the user has access to the project
+    await session.check_access(project_name)
+
+    # Update release status in the database
+    async with db.session() as data:
+        async with data.begin():
+            release = await session.release(
+                project_name,
+                version_name,
+                with_project=True,
+                phase=models.ReleasePhase.RELEASE_CANDIDATE,
+                data=data,
+            )
+
+            # Update the release phase based on vote result
+            if vote_result == "passed":
+                release.phase = models.ReleasePhase.RELEASE_PREVIEW
+                success_message = "Vote marked as passed"
+
+                description = "Create a preview revision from the last candidate draft"
+                async with revision.create_and_manage(
+                    project_name, release.version, session.uid, description=description
+                ) as _creating:
+                    pass
+            else:
+                release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+                success_message = "Vote marked as failed"
+
+    error_message = await _send_resolution(session, release, vote_result, resolution_body)
+    if error_message is not None:
+        await quart.flash(error_message, "error")
+    return release, success_message
 
 
 async def _send_resolution(

@@ -53,8 +53,8 @@ class CastVoteForm(util.QuartFormTyped):
 class ResolveVoteForm(util.QuartFormTyped):
     """Form for resolving a vote."""
 
-    # email_to = wtforms.HiddenField("email_to")
     email_body = wtforms.TextAreaField("Email body")
+    vote_result = wtforms.HiddenField("Vote result")
     submit = wtforms.SubmitField("Resolve vote")
 
 
@@ -181,17 +181,13 @@ async def tabulate(session: routes.CommitterSession, project_name: str, version_
         summary = _tabulate_vote_summary(tabulated_votes)
         passed, outcome = _tabulate_vote_outcome(release, start_unixtime, tabulated_votes)
     resolve_form = await ResolveVoteForm.create_form()
-    # latest_vote_task = await resolve.release_latest_vote_task(release)
-    # if latest_vote_task is None:
-    #     resolve_form = None
-    # else:
-    #     resolve_form.email_to.data = latest_vote_task.task_args["email_to"]
     if (committee is None) or (tabulated_votes is None) or (summary is None) or (passed is None) or (outcome is None):
         resolve_form = None
     else:
         resolve_form.email_body.data = _tabulate_vote_resolution(
             committee, release, tabulated_votes, summary, passed, outcome, full_name, asf_uid
         )
+        resolve_form.vote_result.data = "passed" if passed else "failed"
     return await template.render(
         "vote-tabulate.html",
         release=release,
