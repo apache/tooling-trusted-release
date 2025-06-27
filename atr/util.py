@@ -102,6 +102,11 @@ class EmptyForm(QuartFormTyped):
     pass
 
 
+class HiddenFieldForm(QuartFormTyped):
+    hidden_field = wtforms.HiddenField()
+    submit = wtforms.SubmitField()
+
+
 async def archive_listing(file_path: pathlib.Path) -> list[str] | None:
     """Attempt to list contents of supported archive files."""
     if not await aiofiles.os.path.isfile(file_path):

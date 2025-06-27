@@ -487,3 +487,7 @@ aside.sidebar nav a:hover {
 .atr-pre-wrap {
     white-space: pre-wrap;
 }
+
+.atr-nowrap {
+    white-space: nowrap;
+}

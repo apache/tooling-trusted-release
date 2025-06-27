@@ -15,8 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import enum
 import json
 import logging
+import time
 
 import aiohttp
 import quart
@@ -28,6 +30,7 @@ import atr.db.models as models
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.resolve as resolve
+import atr.schema as schema
 import atr.tasks.message as message
 import atr.template as template
 import atr.util as util
@@ -45,6 +48,22 @@ class CastVoteForm(util.QuartFormTyped):
     )
     vote_comment = wtforms.TextAreaField("Comment (optional)", validators=[wtforms.validators.Optional()])
     submit = wtforms.SubmitField("Submit vote")
+
+
+class Vote(enum.Enum):
+    YES = "Yes"
+    NO = "No"
+    ABSTAIN = "-"
+    UNKNOWN = "?"
+
+
+class VoteEmail(schema.Strict):
+    asf_uid: str
+    from_email: str
+    asf_eid: str
+    iso_datetime: str
+    vote: Vote
+    context: str
 
 
 @routes.committer("/vote/<project_name>/<version_name>")
@@ -70,13 +89,15 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         archive_url = await _task_archive_url_cached(task_mid)
 
     form = await CastVoteForm.create_form()
-    empty_form = await util.QuartFormTyped.create_form()
+    hidden_form = await util.HiddenFieldForm.create_form()
+    hidden_form.hidden_field.data = archive_url or ""
+    hidden_form.submit.label.text = "Tabulate votes"
     return await compose.check(
         session,
         release,
         task_mid=task_mid,
         form=form,
-        empty_form=empty_form,
+        hidden_form=hidden_form,
         archive_url=archive_url,
         vote_task=latest_vote_task,
     )
@@ -122,8 +143,12 @@ async def tabulate(session: routes.CommitterSession, project_name: str, version_
     await session.check_access(project_name)
 
     release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE)
-    await _tabulate_votes(session, release)
-    return await template.render("vote-tabulate.html", release=release)
+    hidden_form = await util.HiddenFieldForm.create_form()
+    tabulated_votes = None
+    if await hidden_form.validate_on_submit():
+        archive_url = hidden_form.hidden_field.data or ""
+        tabulated_votes = await _tabulate_votes(release, archive_url)
+    return await template.render("vote-tabulate.html", release=release, tabulated_votes=tabulated_votes)
 
 
 async def _send_vote(
@@ -176,9 +201,117 @@ async def _send_vote(
     return email_recipient, ""
 
 
-async def _tabulate_votes(session: routes.CommitterSession, release: models.Release) -> None:
+async def _tabulate_votes(release: models.Release, archive_url: str) -> dict[str, VoteEmail]:
     """Tabulate votes."""
-    pass
+    import logging
+
+    start = time.perf_counter_ns()
+    email_to_uid = await util.email_to_uid_map()
+    end = time.perf_counter_ns()
+    logging.info(f"LDAP search took {(end - start) / 1000000} ms")
+    logging.info(f"Email addresses from LDAP: {len(email_to_uid)}")
+
+    start = time.perf_counter_ns()
+    tabulated_votes = {}
+    thread_id = archive_url.split("/")[-1]
+    async for _mid, msg in util.thread_messages(thread_id):
+        from_email = util.email_from_uid(msg.get("from_raw", ""))
+        if not from_email:
+            continue
+        if from_email.endswith("@apache.org"):
+            asf_uid = from_email.split("@")[0]
+        elif from_email in email_to_uid:
+            asf_uid = email_to_uid[from_email]
+        else:
+            continue
+
+        subject = msg.get("subject", "")
+        if "[RESULT]" in subject:
+            break
+
+        body = msg.get("body", "")
+        if not body:
+            continue
+
+        castings = _tabulate_vote_castings(body)
+        if not castings:
+            continue
+
+        if len(castings) == 1:
+            vote_cast = castings[0][0]
+        else:
+            vote_cast = Vote.UNKNOWN
+        context = " // ".join([c[1] for c in castings])
+
+        vote_email = VoteEmail(
+            asf_uid=asf_uid,
+            from_email=from_email,
+            asf_eid=msg.get("mid", ""),
+            iso_datetime=msg.get("date", ""),
+            vote=vote_cast,
+            context=context,
+        )
+        tabulated_votes[asf_uid] = vote_email
+
+    end = time.perf_counter_ns()
+    logging.info(f"Tabulated votes: {len(tabulated_votes)}")
+    logging.info(f"Tabulation took {(end - start) / 1000000} ms")
+
+    return tabulated_votes
+
+
+def _tabulate_vote_castings(body: str) -> list[tuple[Vote, str]]:
+    castings = []
+    for line in body.split("\n"):
+        if _tabulate_vote_continue(line):
+            continue
+        if _tabulate_vote_break(line):
+            break
+
+        plus_one = line.startswith("+1") or " +1" in line
+        minus_one = line.startswith("-1") or " -1" in line
+        # We must be more stringent about zero votes, can't just check for "0" in line
+        zero = line in {"0", "-0", "+0"} or line.startswith("0 ") or line.startswith("+0 ") or line.startswith("-0 ")
+        if (plus_one and minus_one) or (plus_one and zero) or (minus_one and zero):
+            # Confusing result
+            continue
+        if plus_one:
+            castings.append((Vote.YES, line))
+        elif minus_one:
+            castings.append((Vote.NO, line))
+        elif zero:
+            castings.append((Vote.ABSTAIN, line))
+    return castings
+
+
+def _tabulate_vote_break(line: str) -> bool:
+    if line == "-- ":
+        # Start of a signature
+        return True
+    if line.startswith("On ") and line[6:8] == ", ":
+        # Start of a quoted email
+        return True
+    if line.startswith("________"):
+        # This is sometimes used as an "On " style quotation marker
+        return True
+    return False
+
+
+def _tabulate_vote_continue(line: str) -> bool:
+    explanation_indicators = [
+        "[ ] +1",
+        "[ ] -1",
+        "binding +1 votes",
+        "binding -1 votes",
+    ]
+    if any((indicator in line) for indicator in explanation_indicators):
+        # These indicators are used by the [VOTE] OP to indicate how to vote
+        return True
+
+    if line.startswith(">"):
+        # Used to quote other emails
+        return True
+    return False
 
 
 async def _task_archive_url(task_mid: str) -> str | None:

@@ -40,7 +40,7 @@ async def check(
     release: models.Release,
     task_mid: str | None = None,
     form: wtforms.Form | None = None,
-    empty_form: wtforms.Form | None = None,
+    hidden_form: wtforms.Form | None = None,
     archive_url: str | None = None,
     vote_task: models.Task | None = None,
 ) -> response.Response | str:
@@ -105,6 +105,7 @@ async def check(
         archive_url=archive_url,
         vote_task_warnings=vote_task_warnings,
         empty_form=empty_form,
+        hidden_form=hidden_form,
         has_files=has_files,
     )
 

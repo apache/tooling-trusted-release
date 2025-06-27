@@ -16,5 +16,35 @@
 
   <h1>Tabulated votes</h1>
 
-  <p>TODO</p>
+  <p>
+    This page attempts to automatically tabulate votes from the vote email thread for you. It is not always possible to parse the votes accurately, so you should check the results carefully. <strong>Do not use this page to decide how to resolve the vote without manual review.</strong>
+  </p>
+
+  {% if tabulated_votes %}
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>ASF UID</th>
+          <th>Vote</th>
+          <th>Link</th>
+          <th>Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for asf_uid, vote_email in tabulated_votes.items() %}
+          <tr>
+            <td class="atr-nowrap">{{ vote_email.asf_uid }}</td>
+            <td class="atr-nowrap text-center">{{ vote_email.vote.value }}</td>
+            <td class="atr-nowrap text-center">
+              <a href="https://lists.apache.org/thread/{{ vote_email.asf_eid }}"
+                 target="_blank">Email</a>
+            </td>
+            <td>{{ vote_email.context }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No votes tabulated yet.</p>
+  {% endif %}
 {% endblock content %}

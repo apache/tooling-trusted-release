@@ -2,14 +2,10 @@
 <div class="p-3 border rounded bg-white mb-3">
   {% if vote_task %}
     {% if vote_task.status.value == "completed" %}
-      <p class="mb-0 text-success fw-semibold">
+      <p class="mb-0 text-success fw-semibold"
+         {% if task_mid %}title="{{- task_mid -}}"{% endif %}>
         <i class="bi bi-check-circle me-1"></i> Vote thread started: {{ format_datetime(vote_task.completed) }}
       </p>
-      {% if task_mid %}
-        <p class="mt-2 mb-0 text-muted ps-4">
-          Message-ID: <code class="user-select-all">{{ task_mid }}</code>
-        </p>
-      {% endif %}
       {% if vote_task_warnings %}
         <div class="alert alert-warning mt-2 mb-0 p-2 border-2 rounded-3"
              role="alert">
@@ -52,10 +48,8 @@
         <form action="{{ as_url(routes.vote.tabulate, project_name=release.project.name, version_name=release.version) }}"
               method="post"
               class="mb-0">
-          {{ empty_form.hidden_tag() }}
-          <button class="btn btn-sm btn-outline-primary"
-                  title="Tabulate votes"
-                  type="submit">Tabulate votes</button>
+          {{ hidden_form.hidden_tag() }}
+          {{ hidden_form.submit(class="btn btn-sm btn-outline-primary") }}
         </form>
       </div>
     {% elif task_mid %}
