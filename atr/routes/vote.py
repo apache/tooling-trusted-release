@@ -29,6 +29,7 @@ import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.resolve as resolve
 import atr.tasks.message as message
+import atr.template as template
 import atr.util as util
 
 
@@ -55,19 +56,27 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     latest_vote_task = await resolve.release_latest_vote_task(release)
     archive_url = None
     task_mid = None
-    if latest_vote_task is not None:
-        # Move task_mid_get here?
-        task_mid = resolve.task_mid_get(latest_vote_task)
-        archive_url = await _task_archive_url_cached(task_mid)
 
     if util.is_dev_environment() and (latest_vote_task is not None):
         logging.warning("LOCAL_DEBUG: Setting vote task to completed")
         latest_vote_task.status = models.TaskStatus.COMPLETED
         latest_vote_task.result = [json.dumps({"mid": "818a44a3-6984-4aba-a650-834e86780b43@apache.org"})]
 
+    if latest_vote_task is not None:
+        # Move task_mid_get here?
+        task_mid = resolve.task_mid_get(latest_vote_task)
+        archive_url = await _task_archive_url_cached(task_mid)
+
     form = await CastVoteForm.create_form()
+    empty_form = await util.QuartFormTyped.create_form()
     return await compose.check(
-        session, release, task_mid=task_mid, form=form, archive_url=archive_url, vote_task=latest_vote_task
+        session,
+        release,
+        task_mid=task_mid,
+        form=form,
+        empty_form=empty_form,
+        archive_url=archive_url,
+        vote_task=latest_vote_task,
     )
 
 
@@ -103,6 +112,16 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
         return await session.redirect(
             selected, project_name=project_name, version_name=version_name, error=error_message
         )
+
+
+@routes.committer("/vote/<project_name>/<version_name>/tabulate", methods=["POST"])
+async def tabulate(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
+    """Tabulate votes."""
+    await session.check_access(project_name)
+
+    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE)
+    await _tabulate_votes(session, release)
+    return await template.render("vote-tabulate.html", release=release)
 
 
 async def _send_vote(
@@ -153,6 +172,11 @@ async def _send_vote(
         await data.commit()
 
     return email_recipient, ""
+
+
+async def _tabulate_votes(session: routes.CommitterSession, release: models.Release) -> None:
+    """Tabulate votes."""
+    pass
 
 
 async def _task_archive_url(task_mid: str) -> str | None:

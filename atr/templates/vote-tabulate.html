@@ -1,0 +1,20 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Tabulated votes ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Tabulated votes for a release.
+{% endblock description %}
+
+{% block content %}
+  <p>
+    <a href="{{ as_url(routes.release.view, project_name=release.project.name, version_name=release.version) }}"
+       class="atr-back-link">← Back to release</a>
+  </p>
+
+  <h1>Tabulated votes</h1>
+
+  <p>TODO</p>
+{% endblock content %}
