@@ -480,6 +480,14 @@ aside.sidebar nav a:hover {
     color: #cc0033;
 }
 
+.atr-green {
+    color: #007700 !important;
+}
+
+.atr-red {
+    color: #cc0033 !important;
+}
+
 .atr-hide {
     display: none;
 }

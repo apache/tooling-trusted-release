@@ -35,7 +35,7 @@ import atr.tasks.message as message
 import atr.template as template
 import atr.util as util
 
-TEST_MID = "CAH5JyZo8QnWmg9CwRSwWY=GivhXW4NiLyeNJO71FKdK81J5-Uw@mail.gmail.com"
+TEST_MID = "CAFHDsVzgtfboqYF+a3owaNf+55MUiENWd3g53mU4rD=WHkXGwQ@mail.gmail.com"
 
 
 class CastVoteForm(util.QuartFormTyped):
@@ -60,6 +60,7 @@ class Vote(enum.Enum):
 class VoteEmail(schema.Strict):
     asf_uid: str
     from_email: str
+    status: str
     asf_eid: str
     iso_datetime: str
     vote: Vote
@@ -215,15 +216,23 @@ async def _tabulate_votes(release: models.Release, archive_url: str) -> dict[str
     tabulated_votes = {}
     thread_id = archive_url.split("/")[-1]
     async for _mid, msg in util.thread_messages(thread_id):
-        from_email = util.email_from_uid(msg.get("from_raw", ""))
-        if not from_email:
+        from_raw = msg.get("from_raw", "")
+        from_email_lower = util.email_from_uid(from_raw)
+        if not from_email_lower:
             continue
-        if from_email.endswith("@apache.org"):
-            asf_uid = from_email.split("@")[0]
-        elif from_email in email_to_uid:
-            asf_uid = email_to_uid[from_email]
+        from_email_lower = from_email_lower.removesuffix(".invalid")
+        asf_uid = None
+        if from_email_lower.endswith("@apache.org"):
+            asf_uid = from_email_lower.split("@")[0]
+        elif from_email_lower in email_to_uid:
+            asf_uid = email_to_uid[from_email_lower]
+
+        if asf_uid is None:
+            asf_uid = from_email_lower
+            status = "Unknown"
         else:
-            continue
+            list_raw = msg.get("list_raw", "")
+            status = await _tabulate_vote_status(asf_uid, list_raw, release)
 
         subject = msg.get("subject", "")
         if "[RESULT]" in subject:
@@ -245,7 +254,8 @@ async def _tabulate_votes(release: models.Release, archive_url: str) -> dict[str
 
         vote_email = VoteEmail(
             asf_uid=asf_uid,
-            from_email=from_email,
+            from_email=from_email_lower,
+            status=status,
             asf_eid=msg.get("mid", ""),
             iso_datetime=msg.get("date", ""),
             vote=vote_cast,
@@ -258,6 +268,22 @@ async def _tabulate_votes(release: models.Release, archive_url: str) -> dict[str
     logging.info(f"Tabulation took {(end - start) / 1000000} ms")
 
     return tabulated_votes
+
+
+def _tabulate_vote_break(line: str) -> bool:
+    if line == "-- ":
+        # Start of a signature
+        return True
+    if line.startswith("On ") and (line[6:8] == ", "):
+        # Start of a quoted email
+        return True
+    if line.startswith("From: "):
+        # Start of a quoted email
+        return True
+    if line.startswith("________"):
+        # This is sometimes used as an "On " style quotation marker
+        return True
+    return False
 
 
 def _tabulate_vote_castings(body: str) -> list[tuple[Vote, str]]:
@@ -284,19 +310,6 @@ def _tabulate_vote_castings(body: str) -> list[tuple[Vote, str]]:
     return castings
 
 
-def _tabulate_vote_break(line: str) -> bool:
-    if line == "-- ":
-        # Start of a signature
-        return True
-    if line.startswith("On ") and line[6:8] == ", ":
-        # Start of a quoted email
-        return True
-    if line.startswith("________"):
-        # This is sometimes used as an "On " style quotation marker
-        return True
-    return False
-
-
 def _tabulate_vote_continue(line: str) -> bool:
     explanation_indicators = [
         "[ ] +1",
@@ -312,6 +325,27 @@ def _tabulate_vote_continue(line: str) -> bool:
         # Used to quote other emails
         return True
     return False
+
+
+async def _tabulate_vote_status(asf_uid: str, list_raw: str, release: models.Release) -> str:
+    status = "Unknown"
+    if util.is_dev_environment():
+        committee_label = list_raw.split(".apache.org", 1)[0].split(".", 1)[-1]
+        async with db.session() as data:
+            committee = await data.committee(name=committee_label).get()
+            if committee is not None:
+                if asf_uid in committee.committee_members:
+                    status = "Binding"
+                else:
+                    status = "Non-binding"
+    elif release.project is not None:
+        if release.project.committee is not None:
+            print(repr(asf_uid), release.project.committee.committee_members)
+            if asf_uid in release.project.committee.committee_members:
+                status = "Binding"
+            else:
+                status = "Non-binding"
+    return status
 
 
 async def _task_archive_url(task_mid: str) -> str | None:
@@ -340,6 +374,8 @@ async def _task_archive_url_cached(task_mid: str | None) -> str | None:
     dev_urls = {
         "CAH5JyZo8QnWmg9CwRSwWY=GivhXW4NiLyeNJO71FKdK81J5-Uw@mail.gmail.com": "https://lists.apache.org/thread/z0o7xnjnyw2o886rxvvq2ql4rdfn754w",
         "818a44a3-6984-4aba-a650-834e86780b43@apache.org": "https://lists.apache.org/thread/619hn4x796mh3hkk3kxg1xnl48dy2s64",
+        "CAA9ykM+bMPNk=BOF9hj0O+mjN1igppOJ+pKdZHcAM0ddVi+5_w@mail.gmail.com": "https://lists.apache.org/thread/x0m3p2xqjvflgtkb6oxqysm36cr9l5mg",
+        "CAFHDsVzgtfboqYF+a3owaNf+55MUiENWd3g53mU4rD=WHkXGwQ@mail.gmail.com": "https://lists.apache.org/thread/brj0k3g8pq63g8f7xhmfg2rbt1240nts",
     }
     if task_mid in dev_urls:
         return dev_urls[task_mid]

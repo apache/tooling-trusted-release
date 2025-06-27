@@ -24,9 +24,10 @@
     <table class="table table-striped">
       <thead>
         <tr>
-          <th>ASF UID</th>
-          <th>Vote</th>
-          <th>Link</th>
+          <th>ASF UID or email</th>
+          <th class="text-center">Vote</th>
+          <th class="text-center">Status</th>
+          <th class="text-center">Link</th>
           <th>Context</th>
         </tr>
       </thead>
@@ -34,7 +35,12 @@
         {% for asf_uid, vote_email in tabulated_votes.items() %}
           <tr>
             <td class="atr-nowrap">{{ vote_email.asf_uid }}</td>
-            <td class="atr-nowrap text-center">{{ vote_email.vote.value }}</td>
+            <td class="atr-nowrap text-center {% if vote_email.status == 'Binding' %}fw-bold{% endif %} {% if vote_email.vote.value == 'Yes' %}atr-green{% elif vote_email.vote.value == 'No' %}atr-red{% endif %}">
+              {{ vote_email.vote.value }}
+            </td>
+            <td class="atr-nowrap text-center {% if vote_email.status == 'Binding' %}fw-bold{% endif %}">
+              {{ vote_email.status }}
+            </td>
             <td class="atr-nowrap text-center">
               <a href="https://lists.apache.org/thread/{{ vote_email.asf_eid }}"
                  target="_blank">Email</a>
