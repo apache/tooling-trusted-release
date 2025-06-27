@@ -50,6 +50,14 @@ class CastVoteForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Submit vote")
 
 
+class ResolveVoteForm(util.QuartFormTyped):
+    """Form for resolving a vote."""
+
+    # email_to = wtforms.HiddenField("email_to")
+    email_body = wtforms.TextAreaField("Email body")
+    submit = wtforms.SubmitField("Resolve vote")
+
+
 class Vote(enum.Enum):
     YES = "Yes"
     NO = "No"
@@ -149,6 +157,8 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
 async def tabulate(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
     """Tabulate votes."""
     await session.check_access(project_name)
+    asf_uid = session.uid
+    full_name = session.fullname
 
     release = await session.release(
         project_name,
@@ -160,14 +170,35 @@ async def tabulate(session: routes.CommitterSession, project_name: str, version_
     hidden_form = await util.HiddenFieldForm.create_form()
     tabulated_votes = None
     summary = None
+    passed = None
     outcome = None
+    committee = None
     if await hidden_form.validate_on_submit():
         archive_url = hidden_form.hidden_field.data or ""
-        start_unixtime, tabulated_votes = await _tabulate_votes(release, archive_url)
+        thread_id = archive_url.split("/")[-1]
+        committee = await _tabulate_vote_committee(thread_id, release)
+        start_unixtime, tabulated_votes = await _tabulate_votes(committee, thread_id)
         summary = _tabulate_vote_summary(tabulated_votes)
-        outcome = _tabulate_vote_outcome(release, start_unixtime, tabulated_votes)
+        passed, outcome = _tabulate_vote_outcome(release, start_unixtime, tabulated_votes)
+    resolve_form = await ResolveVoteForm.create_form()
+    # latest_vote_task = await resolve.release_latest_vote_task(release)
+    # if latest_vote_task is None:
+    #     resolve_form = None
+    # else:
+    #     resolve_form.email_to.data = latest_vote_task.task_args["email_to"]
+    if (committee is None) or (tabulated_votes is None) or (summary is None) or (passed is None) or (outcome is None):
+        resolve_form = None
+    else:
+        resolve_form.email_body.data = _tabulate_vote_resolution(
+            committee, release, tabulated_votes, summary, passed, outcome, full_name, asf_uid
+        )
     return await template.render(
-        "vote-tabulate.html", release=release, tabulated_votes=tabulated_votes, summary=summary, outcome=outcome
+        "vote-tabulate.html",
+        release=release,
+        tabulated_votes=tabulated_votes,
+        summary=summary,
+        outcome=outcome,
+        resolve_form=resolve_form,
     )
 
 
@@ -221,7 +252,9 @@ async def _send_vote(
     return email_recipient, ""
 
 
-async def _tabulate_votes(release: models.Release, archive_url: str) -> tuple[int | None, dict[str, VoteEmail]]:
+async def _tabulate_votes(
+    committee: models.Committee | None, thread_id: str
+) -> tuple[int | None, dict[str, VoteEmail]]:
     """Tabulate votes."""
     import logging
 
@@ -233,8 +266,6 @@ async def _tabulate_votes(release: models.Release, archive_url: str) -> tuple[in
 
     start = time.perf_counter_ns()
     tabulated_votes = {}
-    thread_id = archive_url.split("/")[-1]
-    committee = await _tabulate_vote_committee(thread_id, release)
     start_unixtime = None
     async for _mid, msg in util.thread_messages(thread_id):
         from_raw = msg.get("from_raw", "")
@@ -377,7 +408,7 @@ def _tabulate_vote_identity(from_raw: str, email_to_uid: dict[str, str]) -> tupl
 
 def _tabulate_vote_outcome(
     release: models.Release, start_unixtime: int | None, tabulated_votes: dict[str, VoteEmail]
-) -> str:
+) -> tuple[bool, str]:
     now = int(time.time())
     duration_hours = 0
     if start_unixtime is not None:
@@ -406,20 +437,67 @@ def _tabulate_vote_outcome(
 
 def _tabulate_vote_outcome_format(
     duration_hours_remaining: float | int | None, binding_plus_one: int, binding_minus_one: int
-) -> str:
+) -> tuple[bool, str]:
     outcome_passed = (binding_plus_one >= 3) and (binding_plus_one > binding_minus_one)
     if not outcome_passed:
         if (duration_hours_remaining is not None) and (duration_hours_remaining > 0):
-            return (
-                f"The vote is still open for {duration_hours_remaining} hours, but the vote would fail if closed now."
-            )
+            msg = f"The vote is still open for {duration_hours_remaining} hours, but the vote would fail if closed now."
         elif duration_hours_remaining is None:
-            return "The vote would fail if closed now."
-        return "The vote failed."
+            msg = "The vote would fail if closed now."
+        else:
+            msg = "The vote failed."
+        return False, msg
 
     if (duration_hours_remaining is not None) and (duration_hours_remaining > 0):
-        return f"The vote is still open for {duration_hours_remaining} hours, but the vote would pass if closed now."
-    return "The vote passed."
+        msg = f"The vote is still open for {duration_hours_remaining} hours, but the vote would pass if closed now."
+    else:
+        msg = "The vote passed."
+    return True, msg
+
+
+def _tabulate_vote_resolution(
+    committee: models.Committee,
+    release: models.Release,
+    tabulated_votes: dict[str, VoteEmail],
+    summary: dict[str, int],
+    passed: bool,
+    outcome: str,
+    full_name: str,
+    asf_uid: str,
+) -> str:
+    """Generate a resolution email body."""
+    body = [f"Dear {committee.display_name} participants,", ""]
+    outcome = "passed" if passed else "failed"
+    body.append(f"The vote on {release.project.name} {release.version} {outcome}.")
+    body.append("")
+
+    body.append("The votes were cast as follows:")
+    body.append("")
+    for vote_email in tabulated_votes.values():
+        match vote_email.vote:
+            case Vote.YES:
+                symbol = "+1"
+            case Vote.NO:
+                symbol = "-1"
+            case Vote.ABSTAIN:
+                symbol = "0"
+            case Vote.UNKNOWN:
+                symbol = "?"
+        body.append(f"{symbol} {vote_email.asf_uid_or_email} ({vote_email.status.value.lower()})")
+    body.append("")
+    binding_total = summary["binding_votes"]
+    body.append(f"There were {binding_total} binding {'vote' if (binding_total == 1) else 'votes'}.")
+    body.append("")
+    binding_yes = summary["binding_votes_yes"]
+    binding_no = summary["binding_votes_no"]
+    binding_abstain = summary["binding_votes_abstain"]
+    body.append(f"Of these binding votes, {binding_yes} were +1, {binding_no} were -1, and {binding_abstain} were 0.")
+    body.append("")
+    body.append("Thank you for your participation.")
+    body.append("")
+    body.append("Sincerely,")
+    body.append(f"{full_name} ({asf_uid})")
+    return "\n".join(body)
 
 
 async def _tabulate_vote_status(asf_uid: str, list_raw: str, committee: models.Committee | None) -> VoteStatus:

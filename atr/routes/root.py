@@ -105,6 +105,12 @@ async def index() -> response.Response | str:
     return await template.render("index-public.html")
 
 
+@routes.committer("/todo", methods=["POST"])
+async def todo(session: routes.CommitterSession) -> str:
+    """POST target for development."""
+    return await template.render("todo.html")
+
+
 @routes.committer("/tutorial")
 async def tutorial(session: routes.CommitterSession) -> str:
     """Tutorial page."""

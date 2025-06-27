@@ -95,6 +95,20 @@
         No outcome yet.
       {% endif %}
     </p>
+    <h2>Resolve vote</h2>
+    <p>
+      If, after careful manual review of the information above, you concur with the automatically determined outcome of the vote, please enter the resolution email body here. Sending this will send the email to a new vote result thread, and the vote will be resolved.
+    </p>
+    <form class="atr-canary py-3 px-4 mb-4 border rounded"
+          action="{{ as_url(routes.root.todo) }}"
+          method="post">
+      {{ forms.errors_summary(resolve_form) }}
+      {{ resolve_form.hidden_tag() }}
+      {{ forms.label(resolve_form.email_body) }}
+      {{ forms.widget(resolve_form.email_body, rows=24) }}
+      {{ forms.errors(resolve_form.email_body, classes="invalid-feedback d-block") }}
+      {{ resolve_form.submit(class="btn btn-primary mt-2") }}
+    </form>
   {% else %}
     <p>No votes tabulated yet.</p>
   {% endif %}
