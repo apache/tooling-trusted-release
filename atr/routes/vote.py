@@ -57,14 +57,21 @@ class Vote(enum.Enum):
     UNKNOWN = "?"
 
 
+class VoteStatus(enum.Enum):
+    BINDING = "Binding"
+    COMMITTER = "Committer"
+    CONTRIBUTOR = "Contributor"
+    UNKNOWN = "Unknown"
+
+
 class VoteEmail(schema.Strict):
-    asf_uid: str
+    asf_uid_or_email: str
     from_email: str
-    status: str
+    status: VoteStatus
     asf_eid: str
     iso_datetime: str
     vote: Vote
-    context: str
+    quotation: str
 
 
 @routes.committer("/vote/<project_name>/<version_name>")
@@ -143,16 +150,24 @@ async def tabulate(session: routes.CommitterSession, project_name: str, version_
     """Tabulate votes."""
     await session.check_access(project_name)
 
-    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE)
+    release = await session.release(
+        project_name,
+        version_name,
+        phase=models.ReleasePhase.RELEASE_CANDIDATE,
+        with_release_policy=True,
+        with_project_release_policy=True,
+    )
     hidden_form = await util.HiddenFieldForm.create_form()
     tabulated_votes = None
     summary = None
+    outcome = None
     if await hidden_form.validate_on_submit():
         archive_url = hidden_form.hidden_field.data or ""
-        tabulated_votes = await _tabulate_votes(release, archive_url)
+        start_unixtime, tabulated_votes = await _tabulate_votes(release, archive_url)
         summary = _tabulate_vote_summary(tabulated_votes)
+        outcome = _tabulate_vote_outcome(release, start_unixtime, tabulated_votes)
     return await template.render(
-        "vote-tabulate.html", release=release, tabulated_votes=tabulated_votes, summary=summary
+        "vote-tabulate.html", release=release, tabulated_votes=tabulated_votes, summary=summary, outcome=outcome
     )
 
 
@@ -206,7 +221,7 @@ async def _send_vote(
     return email_recipient, ""
 
 
-async def _tabulate_votes(release: models.Release, archive_url: str) -> dict[str, VoteEmail]:
+async def _tabulate_votes(release: models.Release, archive_url: str) -> tuple[int | None, dict[str, VoteEmail]]:
     """Tabulate votes."""
     import logging
 
@@ -219,24 +234,26 @@ async def _tabulate_votes(release: models.Release, archive_url: str) -> dict[str
     start = time.perf_counter_ns()
     tabulated_votes = {}
     thread_id = archive_url.split("/")[-1]
+    committee = await _tabulate_vote_committee(thread_id, release)
+    start_unixtime = None
     async for _mid, msg in util.thread_messages(thread_id):
         from_raw = msg.get("from_raw", "")
-        from_email_lower = util.email_from_uid(from_raw)
-        if not from_email_lower:
+        ok, from_email_lower, asf_uid = _tabulate_vote_identity(from_raw, email_to_uid)
+        if not ok:
             continue
-        from_email_lower = from_email_lower.removesuffix(".invalid")
-        asf_uid = None
-        if from_email_lower.endswith("@apache.org"):
-            asf_uid = from_email_lower.split("@")[0]
-        elif from_email_lower in email_to_uid:
-            asf_uid = email_to_uid[from_email_lower]
 
         if asf_uid is None:
-            asf_uid = from_email_lower
-            status = "Unknown"
+            asf_uid_or_email = from_email_lower
+            status = VoteStatus.UNKNOWN
         else:
+            asf_uid_or_email = asf_uid
             list_raw = msg.get("list_raw", "")
-            status = await _tabulate_vote_status(asf_uid, list_raw, release)
+            status = await _tabulate_vote_status(asf_uid, list_raw, committee)
+
+        if start_unixtime is None:
+            epoch = msg.get("epoch", "")
+            if epoch:
+                start_unixtime = int(epoch)
 
         subject = msg.get("subject", "")
         if "[RESULT]" in subject:
@@ -254,16 +271,16 @@ async def _tabulate_votes(release: models.Release, archive_url: str) -> dict[str
             vote_cast = castings[0][0]
         else:
             vote_cast = Vote.UNKNOWN
-        context = " // ".join([c[1] for c in castings])
+        quotation = " // ".join([c[1] for c in castings])
 
         vote_email = VoteEmail(
-            asf_uid=asf_uid,
+            asf_uid_or_email=asf_uid_or_email,
             from_email=from_email_lower,
             status=status,
             asf_eid=msg.get("mid", ""),
             iso_datetime=msg.get("date", ""),
             vote=vote_cast,
-            context=context,
+            quotation=quotation,
         )
         tabulated_votes[asf_uid] = vote_email
 
@@ -271,7 +288,7 @@ async def _tabulate_votes(release: models.Release, archive_url: str) -> dict[str
     logging.info(f"Tabulated votes: {len(tabulated_votes)}")
     logging.info(f"Tabulation took {(end - start) / 1000000} ms")
 
-    return tabulated_votes
+    return start_unixtime, tabulated_votes
 
 
 def _tabulate_vote_break(line: str) -> bool:
@@ -314,6 +331,20 @@ def _tabulate_vote_castings(body: str) -> list[tuple[Vote, str]]:
     return castings
 
 
+async def _tabulate_vote_committee(thread_id: str, release: models.Release) -> models.Committee | None:
+    committee = None
+    if release.project is not None:
+        committee = release.project.committee
+    if util.is_dev_environment():
+        async for _mid, msg in util.thread_messages(thread_id):
+            list_raw = msg.get("list_raw", "")
+            committee_label = list_raw.split(".apache.org", 1)[0].split(".", 1)[-1]
+            async with db.session() as data:
+                committee = await data.committee(name=committee_label).get()
+            break
+    return committee
+
+
 def _tabulate_vote_continue(line: str) -> bool:
     explanation_indicators = [
         "[ ] +1",
@@ -331,22 +362,80 @@ def _tabulate_vote_continue(line: str) -> bool:
     return False
 
 
-async def _tabulate_vote_status(asf_uid: str, list_raw: str, release: models.Release) -> str:
-    status = "Unknown"
-    committee = None
+def _tabulate_vote_identity(from_raw: str, email_to_uid: dict[str, str]) -> tuple[bool, str, str | None]:
+    from_email_lower = util.email_from_uid(from_raw)
+    if not from_email_lower:
+        return False, "", None
+    from_email_lower = from_email_lower.removesuffix(".invalid")
+    asf_uid = None
+    if from_email_lower.endswith("@apache.org"):
+        asf_uid = from_email_lower.split("@")[0]
+    elif from_email_lower in email_to_uid:
+        asf_uid = email_to_uid[from_email_lower]
+    return True, from_email_lower, asf_uid
+
+
+def _tabulate_vote_outcome(
+    release: models.Release, start_unixtime: int | None, tabulated_votes: dict[str, VoteEmail]
+) -> str:
+    now = int(time.time())
+    duration_hours = 0
+    if start_unixtime is not None:
+        duration_hours = (now - start_unixtime) / 3600
+
+    min_duration_hours = 72
+    if release.project is not None:
+        if release.project.release_policy is not None:
+            min_duration_hours = release.project.release_policy.min_hours or None
+    duration_hours_remaining = None
+    if min_duration_hours is not None:
+        duration_hours_remaining = min_duration_hours - duration_hours
+
+    binding_plus_one = 0
+    binding_minus_one = 0
+    for vote_email in tabulated_votes.values():
+        if vote_email.status != VoteStatus.BINDING:
+            continue
+        if vote_email.vote == Vote.YES:
+            binding_plus_one += 1
+        elif vote_email.vote == Vote.NO:
+            binding_minus_one += 1
+
+    return _tabulate_vote_outcome_format(duration_hours_remaining, binding_plus_one, binding_minus_one)
+
+
+def _tabulate_vote_outcome_format(
+    duration_hours_remaining: float | int | None, binding_plus_one: int, binding_minus_one: int
+) -> str:
+    outcome_passed = (binding_plus_one >= 3) and (binding_plus_one > binding_minus_one)
+    if not outcome_passed:
+        if (duration_hours_remaining is not None) and (duration_hours_remaining > 0):
+            return (
+                f"The vote is still open for {duration_hours_remaining} hours, but the vote would fail if closed now."
+            )
+        elif duration_hours_remaining is None:
+            return "The vote would fail if closed now."
+        return "The vote failed."
+
+    if (duration_hours_remaining is not None) and (duration_hours_remaining > 0):
+        return f"The vote is still open for {duration_hours_remaining} hours, but the vote would pass if closed now."
+    return "The vote passed."
+
+
+async def _tabulate_vote_status(asf_uid: str, list_raw: str, committee: models.Committee | None) -> VoteStatus:
+    status = VoteStatus.UNKNOWN
+
     if util.is_dev_environment():
         committee_label = list_raw.split(".apache.org", 1)[0].split(".", 1)[-1]
         async with db.session() as data:
             committee = await data.committee(name=committee_label).get()
-    elif release.project is not None:
-        committee = release.project.committee
     if committee is not None:
         if asf_uid in committee.committee_members:
-            status = "Binding"
+            status = VoteStatus.BINDING
         elif asf_uid in committee.committers:
-            status = "Committer"
+            status = VoteStatus.COMMITTER
         else:
-            status = "Contributor"
+            status = VoteStatus.CONTRIBUTOR
     return status
 
 
@@ -367,12 +456,12 @@ def _tabulate_vote_summary(tabulated_votes: dict[str, VoteEmail]) -> dict[str, i
     }
 
     for vote_email in tabulated_votes.values():
-        if vote_email.status == "Binding":
+        if vote_email.status == VoteStatus.BINDING:
             result["binding_votes"] += 1
             result["binding_votes_yes"] += 1 if (vote_email.vote.value == "Yes") else 0
             result["binding_votes_no"] += 1 if (vote_email.vote.value == "No") else 0
             result["binding_votes_abstain"] += 1 if (vote_email.vote.value == "Abstain") else 0
-        elif vote_email.status in {"Committer", "Contributor"}:
+        elif vote_email.status in {VoteStatus.COMMITTER, VoteStatus.CONTRIBUTOR}:
             result["non_binding_votes"] += 1
             result["non_binding_votes_yes"] += 1 if (vote_email.vote.value == "Yes") else 0
             result["non_binding_votes_no"] += 1 if (vote_email.vote.value == "No") else 0
