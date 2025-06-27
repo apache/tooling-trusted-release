@@ -10,8 +10,8 @@
 
 {% block content %}
   <p>
-    <a href="{{ as_url(routes.release.view, project_name=release.project.name, version_name=release.version) }}"
-       class="atr-back-link">← Back to release</a>
+    <a href="{{ as_url(routes.vote.selected, project_name=release.project.name, version_name=release.version) }}"
+       class="atr-back-link">← Back to vote</a>
   </p>
 
   <h1>Tabulated votes</h1>

@@ -32,6 +32,8 @@ import atr.tasks.message as message
 import atr.template as template
 import atr.util as util
 
+TEST_MID = "CAH5JyZo8QnWmg9CwRSwWY=GivhXW4NiLyeNJO71FKdK81J5-Uw@mail.gmail.com"
+
 
 class CastVoteForm(util.QuartFormTyped):
     """Form for casting a vote."""
@@ -57,12 +59,12 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     archive_url = None
     task_mid = None
 
-    if util.is_dev_environment() and (latest_vote_task is not None):
-        logging.warning("LOCAL_DEBUG: Setting vote task to completed")
-        latest_vote_task.status = models.TaskStatus.COMPLETED
-        latest_vote_task.result = [json.dumps({"mid": "818a44a3-6984-4aba-a650-834e86780b43@apache.org"})]
-
     if latest_vote_task is not None:
+        if util.is_dev_environment():
+            logging.warning("Setting vote task to completed in dev environment")
+            latest_vote_task.status = models.TaskStatus.COMPLETED
+            latest_vote_task.result = [json.dumps({"mid": TEST_MID})]
+
         # Move task_mid_get here?
         task_mid = resolve.task_mid_get(latest_vote_task)
         archive_url = await _task_archive_url_cached(task_mid)
@@ -202,8 +204,13 @@ async def _task_archive_url(task_mid: str) -> str | None:
 
 
 async def _task_archive_url_cached(task_mid: str | None) -> str | None:
-    if util.is_dev_environment():
-        return "https://lists.apache.org/thread/619hn4x796mh3hkk3kxg1xnl48dy2s64"
+    dev_urls = {
+        "CAH5JyZo8QnWmg9CwRSwWY=GivhXW4NiLyeNJO71FKdK81J5-Uw@mail.gmail.com": "https://lists.apache.org/thread/z0o7xnjnyw2o886rxvvq2ql4rdfn754w",
+        "818a44a3-6984-4aba-a650-834e86780b43@apache.org": "https://lists.apache.org/thread/619hn4x796mh3hkk3kxg1xnl48dy2s64",
+    }
+    if task_mid in dev_urls:
+        return dev_urls[task_mid]
+
     if task_mid is None:
         return None
     if "@" not in task_mid:

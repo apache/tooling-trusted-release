@@ -138,7 +138,7 @@ async def selected_post(
 
 def task_mid_get(latest_vote_task: models.Task) -> str | None:
     if util.is_dev_environment():
-        return "818a44a3-6984-4aba-a650-834e86780b43@apache.org"
+        return vote.TEST_MID
     # TODO: Improve this
     task_mid = None
 
