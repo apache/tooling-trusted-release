@@ -50,7 +50,43 @@
         {% endfor %}
       </tbody>
     </table>
-    {% if summary %}<p>{{ summary }}</p>{% endif %}
+    {% if summary %}
+      <h2>Vote summary</h2>
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>Vote type</th>
+            <th>Yes</th>
+            <th>No</th>
+            <th>Abstain</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Binding votes</td>
+            <td>{{ summary.binding_votes_yes }}</td>
+            <td>{{ summary.binding_votes_no }}</td>
+            <td>{{ summary.binding_votes_abstain }}</td>
+            <td>{{ summary.binding_votes }}</td>
+          </tr>
+          <tr>
+            <td>Non-binding votes</td>
+            <td>{{ summary.non_binding_votes_yes }}</td>
+            <td>{{ summary.non_binding_votes_no }}</td>
+            <td>{{ summary.non_binding_votes_abstain }}</td>
+            <td>{{ summary.non_binding_votes }}</td>
+          </tr>
+          <tr>
+            <td>Unknown votes</td>
+            <td>{{ summary.unknown_votes_yes }}</td>
+            <td>{{ summary.unknown_votes_no }}</td>
+            <td>{{ summary.unknown_votes_abstain }}</td>
+            <td>{{ summary.unknown_votes }}</td>
+          </tr>
+        </tbody>
+      </table>
+    {% endif %}
   {% else %}
     <p>No votes tabulated yet.</p>
   {% endif %}

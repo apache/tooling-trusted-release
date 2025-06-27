@@ -333,61 +333,57 @@ def _tabulate_vote_continue(line: str) -> bool:
 
 async def _tabulate_vote_status(asf_uid: str, list_raw: str, release: models.Release) -> str:
     status = "Unknown"
+    committee = None
     if util.is_dev_environment():
         committee_label = list_raw.split(".apache.org", 1)[0].split(".", 1)[-1]
         async with db.session() as data:
             committee = await data.committee(name=committee_label).get()
-            if committee is not None:
-                if asf_uid in committee.committee_members:
-                    status = "Binding"
-                else:
-                    status = "Non-binding"
     elif release.project is not None:
-        if release.project.committee is not None:
-            print(repr(asf_uid), release.project.committee.committee_members)
-            if asf_uid in release.project.committee.committee_members:
-                status = "Binding"
-            else:
-                status = "Non-binding"
+        committee = release.project.committee
+    if committee is not None:
+        if asf_uid in committee.committee_members:
+            status = "Binding"
+        elif asf_uid in committee.committers:
+            status = "Committer"
+        else:
+            status = "Contributor"
     return status
 
 
-def _tabulate_vote_summary(tabulated_votes: dict[str, VoteEmail]) -> str:
-    binding_votes = 0
-    binding_votes_yes = 0
-    binding_votes_no = 0
-    binding_votes_abstain = 0
-    non_binding_votes = 0
-    non_binding_votes_yes = 0
-    non_binding_votes_no = 0
-    non_binding_votes_abstain = 0
-    other_votes = 0
+def _tabulate_vote_summary(tabulated_votes: dict[str, VoteEmail]) -> dict[str, int]:
+    result = {
+        "binding_votes": 0,
+        "binding_votes_yes": 0,
+        "binding_votes_no": 0,
+        "binding_votes_abstain": 0,
+        "non_binding_votes": 0,
+        "non_binding_votes_yes": 0,
+        "non_binding_votes_no": 0,
+        "non_binding_votes_abstain": 0,
+        "unknown_votes": 0,
+        "unknown_votes_yes": 0,
+        "unknown_votes_no": 0,
+        "unknown_votes_abstain": 0,
+    }
+
     for vote_email in tabulated_votes.values():
         if vote_email.status == "Binding":
-            binding_votes += 1
-            if vote_email.vote.value == "Yes":
-                binding_votes_yes += 1
-            elif vote_email.vote.value == "No":
-                binding_votes_no += 1
-            else:
-                binding_votes_abstain += 1
-        elif vote_email.status == "Non-binding":
-            non_binding_votes += 1
-            if vote_email.vote.value == "Yes":
-                non_binding_votes_yes += 1
-            elif vote_email.vote.value == "No":
-                non_binding_votes_no += 1
-            else:
-                non_binding_votes_abstain += 1
+            result["binding_votes"] += 1
+            result["binding_votes_yes"] += 1 if (vote_email.vote.value == "Yes") else 0
+            result["binding_votes_no"] += 1 if (vote_email.vote.value == "No") else 0
+            result["binding_votes_abstain"] += 1 if (vote_email.vote.value == "Abstain") else 0
+        elif vote_email.status in {"Committer", "Contributor"}:
+            result["non_binding_votes"] += 1
+            result["non_binding_votes_yes"] += 1 if (vote_email.vote.value == "Yes") else 0
+            result["non_binding_votes_no"] += 1 if (vote_email.vote.value == "No") else 0
+            result["non_binding_votes_abstain"] += 1 if (vote_email.vote.value == "Abstain") else 0
         else:
-            other_votes += 1
-    return f"""\
-Binding votes: {binding_votes}
-  ({binding_votes_yes} yes, {binding_votes_no} no, {binding_votes_abstain} abstain).
-Non-binding votes: {non_binding_votes}
-  ({non_binding_votes_yes} yes, {non_binding_votes_no} no, {non_binding_votes_abstain} abstain).
-Other votes: {other_votes}.
-"""
+            result["unknown_votes"] += 1
+            result["unknown_votes_yes"] += 1 if (vote_email.vote.value == "Yes") else 0
+            result["unknown_votes_no"] += 1 if (vote_email.vote.value == "No") else 0
+            result["unknown_votes_abstain"] += 1 if (vote_email.vote.value == "Abstain") else 0
+
+    return result
 
 
 async def _task_archive_url(task_mid: str) -> str | None:
