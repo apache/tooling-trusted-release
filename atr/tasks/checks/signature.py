@@ -18,6 +18,7 @@
 import asyncio
 import logging
 import tempfile
+import time
 from typing import Any, Final
 
 import gnupg
@@ -126,11 +127,18 @@ def _check_core_logic_verify_signature(
         gpg: Final[gnupg.GPG] = gnupg.GPG(gnupghome=gpg_dir)
 
         # Import all PMC public signing keys
-        for key in ascii_armored_keys:
-            import_result = gpg.import_keys(key)
-            if not import_result.fingerprints:
-                # TODO: Log warning about invalid key?
-                continue
+        start = time.perf_counter_ns()
+        # for key in ascii_armored_keys:
+        #     import_result = gpg.import_keys(key)
+        #     if not import_result.fingerprints:
+        #         # TODO: Log warning about invalid key?
+        #         continue
+        # TODO: Will this fail if one key doesn't work?
+        import_result = gpg.import_keys("\n\n".join(ascii_armored_keys))
+        if not import_result.fingerprints:
+            _LOGGER.warning("No fingerprints found after importing keys")
+        end = time.perf_counter_ns()
+        _LOGGER.info(f"Import {len(ascii_armored_keys)} keys took {(end - start) / 1000000} ms")
         verified = gpg.verify_file(sig_file, str(artifact_path))
 
     key_fp = verified.pubkey_fingerprint.lower() if verified.pubkey_fingerprint else None
