@@ -103,11 +103,10 @@ async def selected_revision(
             submit = wtforms.SubmitField("Send vote email")
 
         project = release.project
-        version = release.version
 
         # The subject can be changed by the user
         # TODO: We should consider not allowing the subject to be changed
-        default_subject = f"[VOTE] Release {project.display_name} {version}"
+        default_subject = f"[VOTE] Release {project.display_name} {version_name}"
         default_body = await construct.start_vote_default(project_name)
 
         form = await VoteInitiateForm.create_form(
@@ -125,7 +124,7 @@ async def selected_revision(
             vote_duration_choice: int = util.unwrap(form.vote_duration.data)
             subject_data: str = util.unwrap(form.subject.data)
             body_data: str = util.unwrap(form.body.data)
-            return await _start_vote(
+            return await start_vote(
                 committee,
                 email_to,
                 permitted_recipients,
@@ -138,7 +137,6 @@ async def selected_revision(
                 body_data,
                 data,
                 release,
-                version,
             )
 
         keys_warning = await _keys_warning(release)
@@ -148,7 +146,7 @@ async def selected_revision(
                 compose.selected,
                 error="This release candidate draft has no files yet. Please add some files before starting a vote.",
                 project_name=project_name,
-                version_name=version,
+                version_name=version_name,
             )
 
         # For GET requests or failed POST validation
@@ -218,7 +216,7 @@ async def _promote(
     return None
 
 
-async def _start_vote(
+async def start_vote(
     committee: models.Committee,
     email_to: str,
     permitted_recipients: list[str],
@@ -231,7 +229,6 @@ async def _start_vote(
     body_data: str,
     data: db.Session,
     release: models.Release,
-    version: str,
 ):
     if committee is None:
         raise base.ASFQuartException("Release has no associated committee", errorcode=400)
@@ -280,7 +277,7 @@ async def _start_vote(
             body=body_data,
         ).model_dump(),
         project_name=project_name,
-        version_name=version,
+        version_name=version_name,
     )
     data.add(task)
     await data.commit()
@@ -292,5 +289,5 @@ async def _start_vote(
         vote.selected,
         success=f"The vote announcement email will soon be sent to {email_to}.",
         project_name=project_name,
-        version_name=version,
+        version_name=version_name,
     )

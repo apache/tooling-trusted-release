@@ -21,6 +21,7 @@ import quart
 import sqlmodel
 import werkzeug.wrappers.response as response
 
+import atr.construct as construct
 import atr.db as db
 import atr.db.models as models
 import atr.revision as revision
@@ -28,6 +29,7 @@ import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.finish as finish
 import atr.routes.vote as vote
+import atr.routes.voting as voting
 import atr.tasks.message as message
 import atr.util as util
 
@@ -144,9 +146,28 @@ async def _resolve_vote(
                     return release, "Failure"
                 thread_id = archive_url.split("/")[-1]
                 release.podling_thread_id = thread_id
-                # TODO: We need to start the Incubator PMC vote here
+                # incubator_vote_address = "general@incubator.apache.org"
+                incubator_vote_address = "user-test@tooling.apache.org"
+                if not release.project.committee:
+                    raise ValueError("Project has no committee")
+                revision_number = release.latest_revision_number
+                if revision_number is None:
+                    raise ValueError("Release has no revision number")
+                await voting.start_vote(
+                    committee=release.project.committee,
+                    email_to=incubator_vote_address,
+                    permitted_recipients=[incubator_vote_address],
+                    project_name=release.project.name,
+                    version_name=release.version,
+                    selected_revision_number=revision_number,
+                    session=session,
+                    vote_duration_choice=latest_vote_task.task_args["vote_duration"],
+                    subject_data=f"[VOTE] Release {release.project.display_name} {release.version}",
+                    body_data=await construct.start_vote_default(release.project.name),
+                    data=data,
+                    release=release,
+                )
                 success_message = "Project PPMC vote marked as passed, and Incubator PMC vote automatically started"
-                raise NotImplementedError("Incubator PMC vote not implemented")
             elif vote_result == "passed":
                 release.phase = models.ReleasePhase.RELEASE_PREVIEW
                 success_message = "Vote marked as passed"
