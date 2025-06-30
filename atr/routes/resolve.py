@@ -20,7 +20,6 @@ import json
 import quart
 import sqlmodel
 import werkzeug.wrappers.response as response
-import wtforms
 
 import atr.db as db
 import atr.db.models as models
@@ -31,26 +30,6 @@ import atr.routes.finish as finish
 import atr.routes.vote as vote
 import atr.tasks.message as message
 import atr.util as util
-
-
-class ResolveForm(util.QuartFormTyped):
-    """Form for resolving a vote on a release candidate."""
-
-    candidate_name = wtforms.StringField(
-        "Candidate name", validators=[wtforms.validators.InputRequired("Candidate name is required")]
-    )
-    vote_result = wtforms.RadioField(
-        "Vote result",
-        choices=[("passed", "Passed"), ("failed", "Failed")],
-        validators=[wtforms.validators.InputRequired("Vote result is required")],
-    )
-    resolution_body = wtforms.TextAreaField(
-        "Resolution email body",
-        validators=[wtforms.validators.Optional()],
-        description="Enter optional comment for the resolution email (e.g., summary of issues if failed).",
-        render_kw={"rows": 12},
-    )
-    submit = wtforms.SubmitField("Resolve vote")
 
 
 async def release_latest_vote_task(release: models.Release) -> models.Task | None:
@@ -73,41 +52,6 @@ async def release_latest_vote_task(release: models.Release) -> models.Task | Non
 
 @routes.committer("/resolve/<project_name>/<version_name>", methods=["POST"])
 async def selected_post(
-    session: routes.CommitterSession, project_name: str, version_name: str
-) -> response.Response | str:
-    """Resolve the vote on a release candidate."""
-    await session.check_access(project_name)
-
-    form = await ResolveForm.create_form(data=await quart.request.form)
-    if not await form.validate_on_submit():
-        for _field, errors in form.errors.items():
-            for error in errors:
-                await quart.flash(f"{error}", "error")
-        return await session.redirect(vote.selected, project_name=project_name, version_name=version_name)
-
-    candidate_name = form.candidate_name.data
-    vote_result = form.vote_result.data
-    resolution_body = util.unwrap_type(form.resolution_body.data, str)
-    if not candidate_name:
-        return await session.redirect(
-            vote.selected, error="Missing candidate name", project_name=project_name, version_name=version_name
-        )
-
-    if candidate_name != models.release_name(project_name, version_name):
-        return await session.redirect(
-            vote.selected, error="Invalid candidate name", project_name=project_name, version_name=version_name
-        )
-
-    release, success_message = await _resolve_vote(session, project_name, version_name, vote_result, resolution_body)
-    destination = finish.selected if (vote_result == "passed") else compose.selected
-
-    return await session.redirect(
-        destination, success=success_message, project_name=project_name, version_name=release.version
-    )
-
-
-@routes.committer("/resolve/<project_name>/<version_name>/report", methods=["POST"])
-async def selected_report(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
     """Resolve a vote."""

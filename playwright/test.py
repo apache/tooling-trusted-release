@@ -180,6 +180,7 @@ def lifecycle_04_start_vote(page: sync_api.Page, credentials: Credentials, versi
 
     logging.info(f"Waiting for navigation to /vote/tooling-test-example/{version_name} after submitting vote email")
     wait_for_path(page, f"/vote/tooling-test-example/{version_name}")
+
     logging.info("Vote initiation actions completed successfully")
 
 
@@ -188,21 +189,48 @@ def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, ver
     go_to_path(page, f"/vote/tooling-test-example/{version_name}")
     logging.info("Vote page loaded successfully")
 
-    logging.info(f"Locating the form to resolve the vote for tooling-test-example {version_name}")
-    form_locator = page.locator(
-        f'form:has(input[name="candidate_name"][value="tooling-test-example-{esc_id(version_name)}"])'
-    )
-    sync_api.expect(form_locator).to_be_visible()
+    # Wait until the vote initiation background task has completed
+    # When it finishes the page shows a banner that begins with "Vote thread started"
+    # We poll for that banner before moving on
+    # Otherwise the subsequent Resolve step cannot find the completed VOTE_INITIATE task
+    # TODO: Make a poll_for_tasks_completion style function that can be used here
+    banner_locator = page.locator("p.text-success:has-text('Vote thread started')")
+    banner_found = False
+    for _ in range(30):
+        if banner_locator.is_visible(timeout=500):
+            banner_found = True
+            logging.info("Vote initiation banner detected, task completed")
+            break
+        time.sleep(0.5)
+        page.reload()
+    if not banner_found:
+        logging.warning("Vote initiation banner not detected after 15s, proceeding anyway")
 
-    logging.info("Locating and selecting the 'Passed' radio button")
-    passed_radio_locator = form_locator.locator('input[name="vote_result"][value="passed"]')
+    logging.info("Locating the 'Tabulate votes' button/form")
+    tabulate_form_locator = page.locator(f'form[action="/vote/tooling-test-example/{version_name}/tabulate"]')
+    sync_api.expect(tabulate_form_locator).to_be_visible()
+
+    tabulate_button_locator = tabulate_form_locator.locator('input[type="submit"][value="Tabulate votes"]')
+    sync_api.expect(tabulate_button_locator).to_be_enabled()
+    logging.info("Clicking 'Tabulate votes' button")
+    tabulate_button_locator.click()
+
+    logging.info("Waiting for navigation to tabulated votes page")
+    wait_for_path(page, f"/vote/tooling-test-example/{version_name}/tabulate")
+
+    logging.info("Locating the resolve vote form on the tabulated votes page")
+    resolve_form_locator = page.locator(f'form[action="/resolve/tooling-test-example/{version_name}"]')
+    sync_api.expect(resolve_form_locator).to_be_visible()
+
+    logging.info("Selecting 'Passed' radio button in resolve form")
+    passed_radio_locator = resolve_form_locator.locator('input[name="vote_result"][value="passed"]')
     sync_api.expect(passed_radio_locator).to_be_enabled()
     passed_radio_locator.check()
 
-    logging.info("Locating and activating the button to resolve the vote")
-    submit_button_locator = form_locator.locator('input[type="submit"][value="Resolve vote"]')
-    sync_api.expect(submit_button_locator).to_be_enabled()
-    submit_button_locator.click()
+    logging.info("Submitting resolve vote form")
+    resolve_submit_locator = resolve_form_locator.locator('input[type="submit"][value="Resolve vote"]')
+    sync_api.expect(resolve_submit_locator).to_be_enabled()
+    resolve_submit_locator.click()
 
     logging.info(f"Waiting for navigation to /finish/tooling-test-example/{version_name} after resolving the vote")
     wait_for_path(page, f"/finish/tooling-test-example/{version_name}")

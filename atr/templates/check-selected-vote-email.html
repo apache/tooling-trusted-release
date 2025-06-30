@@ -39,18 +39,13 @@
       </p>
     {% endif %}
     {% if archive_url %}
-      <div class="mt-2 mb-0 d-flex gap-2 align-items-center">
+      <div class="mt-3 mb-0 d-flex gap-2 align-items-center">
         <a class="btn btn-sm btn-outline-secondary me-2"
            href="{{ archive_url }}"
            rel="noopener"
            target="_blank"
            title="View vote email thread in the archive (opens in new window)">View archived vote thread <i class="bi bi-box-arrow-up-right ms-1"></i></a>
-        <form action="{{ as_url(routes.vote.tabulate, project_name=release.project.name, version_name=release.version) }}"
-              method="post"
-              class="mb-0">
-          {{ hidden_form.hidden_tag() }}
-          {{ hidden_form.submit(class="btn btn-sm btn-outline-primary") }}
-        </form>
+        <a class="btn btn-sm btn-outline-secondary" href="#resolve-vote">Resolve vote</a>
       </div>
     {% elif task_mid %}
       <p class="mt-2 mb-0 text-muted ps-4">Could not retrieve archive URL for this message.</p>

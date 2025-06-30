@@ -11,7 +11,7 @@
 {% block content %}
   <p>
     <a href="{{ as_url(routes.vote.selected, project_name=release.project.name, version_name=release.version) }}"
-       class="atr-back-link">← Back to vote</a>
+       class="atr-back-link">← Back to Vote for {{ release.short_display_name }}</a>
   </p>
 
   <h1>Tabulated votes</h1>
@@ -19,6 +19,8 @@
   <p>
     This page attempts to automatically tabulate votes from the vote email thread for you. It is not always possible to parse the votes accurately, so you should check the results carefully. <strong>Do not use this page to decide how to resolve the vote without manual review.</strong>
   </p>
+
+  <h2>Votes in detail</h2>
 
   {% if tabulated_votes %}
     <table class="table table-striped">
@@ -95,26 +97,43 @@
         No outcome yet.
       {% endif %}
     </p>
+  {% elif fetch_error %}
+    <div class="alert alert-danger">{{ fetch_error }}</div>
+  {% else %}
+    <p>No votes tabulated yet.</p>
+  {% endif %}
+  {% if resolve_form %}
     <h2>Resolve vote</h2>
+    <div class="border rounded bg-warning-subtle p-3 mb-3">
+      <i class="bi bi-info-circle me-1"></i>
+      <strong>NOTE:</strong> We are allowing a vote to be resolved early in order to facilitate testing. This is not the final behaviour.
+    </div>
     <p>
       If, after careful manual review of the information above, you concur with the automatically determined outcome of the vote, please enter the resolution email body here. Sending this will send the email to a new vote result thread, and the vote will be resolved.
     </p>
     <form class="atr-canary py-3 px-4 mb-4 border rounded"
-          action="{{ as_url(routes.resolve.selected_report, project_name=release.project.name, version_name=release.version) }}"
+          action="{{ as_url(routes.resolve.selected_post, project_name=release.project.name, version_name=release.version) }}"
           method="post">
       {{ forms.errors_summary(resolve_form) }}
       {{ resolve_form.hidden_tag() }}
       <div class="form-group">
-        {{ forms.label(resolve_form.email_body) }}
+        {{ forms.label(resolve_form.email_body, classes="pb-3") }}
         {{ forms.widget(resolve_form.email_body) }}
         {{ forms.errors(resolve_form.email_body, classes="invalid-feedback d-block") }}
       </div>
+      <div class="mt-3">
+        {{ forms.label(resolve_form.vote_result, col="md3") }}
+        <div class="pt-2">
+          {% for subfield in resolve_form.vote_result %}
+            <div class="form-check form-check-inline">
+              {{ forms.widget(subfield, classes="form-check-input", id=subfield.id ~ "_" ~ loop.index) }}
+              {{ forms.label(subfield, classes="form-check-label") }}
+            </div>
+          {% endfor %}
+          {{ forms.errors(resolve_form.vote_result, classes="invalid-feedback d-block") }}
+        </div>
+      </div>
       {{ resolve_form.submit(class="btn btn-primary my-3") }}
-      <p>
-        You can also <a href="{{ as_url(routes.vote.selected, project_name=release.project.name, version_name=release.version) }}#resolve-vote">resolve the vote manually</a>.
-      </p>
     </form>
-  {% else %}
-    <p>No votes tabulated yet.</p>
   {% endif %}
 {% endblock content %}

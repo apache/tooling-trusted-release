@@ -27,7 +27,6 @@ import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.draft as draft
-import atr.routes.resolve as resolve
 import atr.template as template
 import atr.util as util
 
@@ -75,7 +74,6 @@ async def check(
         data={"release_name": release.name, "project_name": release.project.name, "version_name": release.version}
     )
     delete_file_form = await draft.DeleteFileForm.create_form()
-    resolve_form = await resolve.ResolveForm.create_form()
     empty_form = await util.EmptyForm.create_form()
     vote_task_warnings = _warnings_from_vote_result(vote_task)
     has_files = await util.has_files(release)
@@ -100,7 +98,6 @@ async def check(
         models=models,
         task_mid=task_mid,
         form=form,
-        resolve_form=resolve_form,
         vote_task=vote_task,
         archive_url=archive_url,
         vote_task_warnings=vote_task_warnings,

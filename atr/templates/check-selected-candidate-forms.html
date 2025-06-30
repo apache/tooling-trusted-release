@@ -45,40 +45,10 @@
 </form>
 
 <h2 id="resolve-vote">Resolve vote</h2>
-<div class="border rounded bg-warning-subtle p-3 mb-3">
-  <i class="bi bi-info-circle me-1"></i>
-  <strong>NOTE:</strong> We are allowing a vote to be resolved early in order to facilitate testing. This is not the final behaviour.
-</div>
-<form method="post"
-      action="{{ as_url(routes.resolve.selected_post, project_name=release.project.name, version_name=release.version) }}"
-      class="atr-canary py-4 px-5"
-      novalidate>
-  {{ resolve_form.hidden_tag() }}
-
-  <input type="hidden" name="candidate_name" value="{{ release.name }}" />
-
-  <div class="mb-3 pb-3 row border-bottom">
-    {{ forms.label(resolve_form.vote_result, col="md3") }}
-    <div class="col-sm-9 pt-2">
-      {% for subfield in resolve_form.vote_result %}
-        <div class="form-check form-check-inline">
-          {{ forms.widget(subfield, classes="form-check-input", id=subfield.id ~ "_" ~ loop.index) }}
-          {{ forms.label(subfield, classes="form-check-label") }}
-        </div>
-      {% endfor %}
-      {{ forms.errors(resolve_form.vote_result, classes="invalid-feedback d-block") }}
-    </div>
-  </div>
-  <div class="row">
-    {{ forms.label(resolve_form.resolution_body, col="md3") }}
-    <div class="col-sm-9">
-      {{ forms.widget(resolve_form.resolution_body) }}
-      {{ forms.errors(resolve_form.resolution_body) }}
-      {{ forms.description(resolve_form.resolution_body) }}
-    </div>
-  </div>
-
-  <div class="row">
-    <div class="col-sm-9 offset-sm-3">{{ resolve_form.submit(class_="btn btn-primary mt-3") }}</div>
-  </div>
+<p>Press the button below to automatically tabulate the current votes, and display a form to resolve the vote.</p>
+<form action="{{ as_url(routes.vote.tabulate, project_name=release.project.name, version_name=release.version) }}"
+      method="post"
+      class="mb-0">
+  {{ hidden_form.hidden_tag() }}
+  {{ hidden_form.submit(class="btn btn-sm btn-outline-primary") }}
 </form>

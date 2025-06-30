@@ -102,6 +102,10 @@ class EmptyForm(QuartFormTyped):
     pass
 
 
+class FetchError(RuntimeError):
+    pass
+
+
 class HiddenFieldForm(QuartFormTyped):
     hidden_field = wtforms.HiddenField()
     submit = wtforms.SubmitField()
@@ -760,7 +764,7 @@ async def thread_messages(
                 resp.raise_for_status()
                 thread_data: Any = await resp.json(content_type=None)
     except Exception as exc:
-        raise RuntimeError(f"Failed fetching thread metadata for {thread_id}: {exc}") from exc
+        raise FetchError(f"Failed fetching thread metadata for {thread_id}: {exc}") from exc
 
     message_ids: set[str] = set()
 

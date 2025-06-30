@@ -36,7 +36,8 @@ import atr.tasks.message as message
 import atr.template as template
 import atr.util as util
 
-TEST_MID = "CAH5JyZo8QnWmg9CwRSwWY=GivhXW4NiLyeNJO71FKdK81J5-Uw@mail.gmail.com"
+# "CAH5JyZo8QnWmg9CwRSwWY=GivhXW4NiLyeNJO71FKdK81J5-Uw@mail.gmail.com"
+TEST_MID = None
 
 
 class CastVoteForm(util.QuartFormTyped):
@@ -55,7 +56,11 @@ class ResolveVoteForm(util.QuartFormTyped):
     """Form for resolving a vote."""
 
     email_body = wtforms.TextAreaField("Email body", render_kw={"rows": 24})
-    vote_result = wtforms.HiddenField("Vote result")
+    vote_result = wtforms.RadioField(
+        "Vote result",
+        choices=[("passed", "Passed"), ("failed", "Failed")],
+        validators=[wtforms.validators.InputRequired("Vote result is required")],
+    )
     submit = wtforms.SubmitField("Resolve vote")
 
 
@@ -176,13 +181,22 @@ async def tabulate(session: routes.CommitterSession, project_name: str, version_
     outcome = None
     committee = None
     thread_id = None
+    fetch_error = None
     if await hidden_form.validate_on_submit():
+        # TODO: Just pass the thread_id itself instead?
         archive_url = hidden_form.hidden_field.data or ""
         thread_id = archive_url.split("/")[-1]
-        committee = await _tabulate_vote_committee(thread_id, release)
-        start_unixtime, tabulated_votes = await _tabulate_votes(committee, thread_id)
-        summary = _tabulate_vote_summary(tabulated_votes)
-        passed, outcome = _tabulate_vote_outcome(release, start_unixtime, tabulated_votes)
+        if thread_id:
+            try:
+                committee = await _tabulate_vote_committee(thread_id, release)
+            except util.FetchError as e:
+                fetch_error = f"Failed to fetch thread metadata: {e}"
+            else:
+                start_unixtime, tabulated_votes = await _tabulate_votes(committee, thread_id)
+                summary = _tabulate_vote_summary(tabulated_votes)
+                passed, outcome = _tabulate_vote_outcome(release, start_unixtime, tabulated_votes)
+        else:
+            fetch_error = "The vote thread could not yet be found."
     resolve_form = await ResolveVoteForm.create_form()
     if (
         (committee is None)
@@ -192,13 +206,12 @@ async def tabulate(session: routes.CommitterSession, project_name: str, version_
         or (outcome is None)
         or (thread_id is None)
     ):
-        resolve_form = None
+        resolve_form.email_body.render_kw = {"rows": 12}
     else:
         resolve_form.email_body.data = _tabulate_vote_resolution(
             committee, release, tabulated_votes, summary, passed, outcome, full_name, asf_uid, thread_id
         )
         resolve_form.vote_result.data = "passed" if passed else "failed"
-        resolve_form.submit.label.text = f"Resolve vote as {'passed' if passed else 'failed'}"
     return await template.render(
         "vote-tabulate.html",
         release=release,
@@ -206,6 +219,7 @@ async def tabulate(session: routes.CommitterSession, project_name: str, version_
         summary=summary,
         outcome=outcome,
         resolve_form=resolve_form,
+        fetch_error=fetch_error,
     )
 
 
