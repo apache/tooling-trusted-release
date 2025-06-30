@@ -106,10 +106,13 @@
       {{ resolve_form.hidden_tag() }}
       <div class="form-group">
         {{ forms.label(resolve_form.email_body) }}
-        {{ forms.widget(resolve_form.email_body, rows=24) }}
+        {{ forms.widget(resolve_form.email_body) }}
         {{ forms.errors(resolve_form.email_body, classes="invalid-feedback d-block") }}
       </div>
-      {{ resolve_form.submit(class="btn btn-primary mt-2") }}
+      {{ resolve_form.submit(class="btn btn-primary my-3") }}
+      <p>
+        You can also <a href="{{ as_url(routes.vote.selected, project_name=release.project.name, version_name=release.version) }}#resolve-vote">resolve the vote manually</a>.
+      </p>
     </form>
   {% else %}
     <p>No votes tabulated yet.</p>

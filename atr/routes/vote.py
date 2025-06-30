@@ -53,7 +53,7 @@ class CastVoteForm(util.QuartFormTyped):
 class ResolveVoteForm(util.QuartFormTyped):
     """Form for resolving a vote."""
 
-    email_body = wtforms.TextAreaField("Email body")
+    email_body = wtforms.TextAreaField("Email body", render_kw={"rows": 24})
     vote_result = wtforms.HiddenField("Vote result")
     submit = wtforms.SubmitField("Resolve vote")
 
@@ -196,6 +196,7 @@ async def tabulate(session: routes.CommitterSession, project_name: str, version_
             committee, release, tabulated_votes, summary, passed, outcome, full_name, asf_uid, thread_id
         )
         resolve_form.vote_result.data = "passed" if passed else "failed"
+        resolve_form.submit.label.text = f"Resolve vote as {'passed' if passed else 'failed'}"
     return await template.render(
         "vote-tabulate.html",
         release=release,
