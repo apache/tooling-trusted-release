@@ -68,7 +68,9 @@ async def selected_post(
         )
     email_body = util.unwrap(resolve_form.email_body.data)
     vote_result = util.unwrap(resolve_form.vote_result.data)
-    release, success_message = await _resolve_vote(session, project_name, version_name, vote_result, email_body)
+    release, success_message = await _resolve_vote(
+        session, project_name, version_name, vote_result, email_body, latest_vote_task
+    )
     destination = finish.selected if (vote_result == "passed") else compose.selected
     return await session.redirect(
         destination, project_name=project_name, version_name=version_name, success=success_message
@@ -101,7 +103,12 @@ def task_mid_get(latest_vote_task: models.Task) -> str | None:
 
 
 async def _resolve_vote(
-    session: routes.CommitterSession, project_name: str, version_name: str, vote_result: str, resolution_body: str
+    session: routes.CommitterSession,
+    project_name: str,
+    version_name: str,
+    vote_result: str,
+    resolution_body: str,
+    latest_vote_task: models.Task,
 ) -> tuple[models.Release, str]:
     # Check that the user has access to the project
     await session.check_access(project_name)
@@ -113,12 +120,34 @@ async def _resolve_vote(
                 project_name,
                 version_name,
                 with_project=True,
+                with_committee=True,
                 phase=models.ReleasePhase.RELEASE_CANDIDATE,
                 data=data,
             )
 
+            is_podling = False
+            if release.project.committee is not None:
+                is_podling = release.project.committee.is_podling
+            podling_thread_id = release.podling_thread_id
+
             # Update the release phase based on vote result
-            if vote_result == "passed":
+            if is_podling and (podling_thread_id is None) and (vote_result == "passed"):
+                # This is the first podling vote, by the PPMC and not the Incubator PMC
+                # In this branch, we do not move to RELEASE_PREVIEW but keep everything the same
+                # We only set the podling_thread_id to the thread_id of the vote thread
+                # Then we automatically start the Incubator PMC vote
+                # TODO: Note on the resolve vote page that resolving the Project PPMC vote starts the Incubator PMC vote
+                task_mid = task_mid_get(latest_vote_task)
+                archive_url = await vote.task_archive_url_cached(task_mid)
+                if archive_url is None:
+                    await quart.flash("No archive URL found for podling vote", "error")
+                    return release, "Failure"
+                thread_id = archive_url.split("/")[-1]
+                release.podling_thread_id = thread_id
+                # TODO: We need to start the Incubator PMC vote here
+                success_message = "Project PPMC vote marked as passed, and Incubator PMC vote automatically started"
+                raise NotImplementedError("Incubator PMC vote not implemented")
+            elif vote_result == "passed":
                 release.phase = models.ReleasePhase.RELEASE_PREVIEW
                 success_message = "Vote marked as passed"
 

@@ -109,7 +109,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
 
         # Move task_mid_get here?
         task_mid = resolve.task_mid_get(latest_vote_task)
-        archive_url = await _task_archive_url_cached(task_mid)
+        archive_url = await task_archive_url_cached(task_mid)
 
     form = await CastVoteForm.create_form()
     hidden_form = await util.HiddenFieldForm.create_form()
@@ -221,6 +221,44 @@ async def tabulate(session: routes.CommitterSession, project_name: str, version_
         resolve_form=resolve_form,
         fetch_error=fetch_error,
     )
+
+
+async def task_archive_url_cached(task_mid: str | None) -> str | None:
+    dev_urls = {
+        "CAH5JyZo8QnWmg9CwRSwWY=GivhXW4NiLyeNJO71FKdK81J5-Uw@mail.gmail.com": "https://lists.apache.org/thread/z0o7xnjnyw2o886rxvvq2ql4rdfn754w",
+        "818a44a3-6984-4aba-a650-834e86780b43@apache.org": "https://lists.apache.org/thread/619hn4x796mh3hkk3kxg1xnl48dy2s64",
+        "CAA9ykM+bMPNk=BOF9hj0O+mjN1igppOJ+pKdZHcAM0ddVi+5_w@mail.gmail.com": "https://lists.apache.org/thread/x0m3p2xqjvflgtkb6oxqysm36cr9l5mg",
+        "CAFHDsVzgtfboqYF+a3owaNf+55MUiENWd3g53mU4rD=WHkXGwQ@mail.gmail.com": "https://lists.apache.org/thread/brj0k3g8pq63g8f7xhmfg2rbt1240nts",
+        "CAMomwMrvKTQK7K2-OtZTrEO0JjXzO2g5ynw3gSoks_PXWPZfoQ@mail.gmail.com": "https://lists.apache.org/thread/y5rqp5qk6dmo08wlc3g20n862hznc9m8",
+        "CANVKqzfLYj6TAVP_Sfsy5vFbreyhKskpRY-vs=F7aLed+rL+uA@mail.gmail.com": "https://lists.apache.org/thread/oy969lhh6wlzd51ovckn8fly9rvpopwh",
+        "CAH4123ZwGtkwszhEU7qnMByLa-yvyKz2W+DjH_UChPMuzaa54g@mail.gmail.com": "https://lists.apache.org/thread/7111mqyc25sfqxm6bf4ynwhs0bk0r4ys",
+        "CADL1oArKFcXvNb1MJfjN=10-yRfKxgpLTRUrdMM1R7ygaTkdYQ@mail.gmail.com": "https://lists.apache.org/thread/d7119h2qm7jrd5zsbp8ghkk0lpvnnxnw",
+    }
+    if task_mid in dev_urls:
+        return dev_urls[task_mid]
+
+    if task_mid is None:
+        return None
+    if "@" not in task_mid:
+        return None
+
+    async with db.session() as data:
+        url = await data.ns_text_get(
+            "mid-url-cache",
+            task_mid,
+        )
+        if url is not None:
+            return url
+
+    url = await _task_archive_url(task_mid)
+    if url is not None:
+        await data.ns_text_set(
+            "mid-url-cache",
+            task_mid,
+            url,
+        )
+
+    return url
 
 
 async def _send_vote(
@@ -620,41 +658,3 @@ async def _task_archive_url(task_mid: str) -> str | None:
     except Exception:
         logging.exception("Failed to get archive URL for task %s", task_mid)
         return None
-
-
-async def _task_archive_url_cached(task_mid: str | None) -> str | None:
-    dev_urls = {
-        "CAH5JyZo8QnWmg9CwRSwWY=GivhXW4NiLyeNJO71FKdK81J5-Uw@mail.gmail.com": "https://lists.apache.org/thread/z0o7xnjnyw2o886rxvvq2ql4rdfn754w",
-        "818a44a3-6984-4aba-a650-834e86780b43@apache.org": "https://lists.apache.org/thread/619hn4x796mh3hkk3kxg1xnl48dy2s64",
-        "CAA9ykM+bMPNk=BOF9hj0O+mjN1igppOJ+pKdZHcAM0ddVi+5_w@mail.gmail.com": "https://lists.apache.org/thread/x0m3p2xqjvflgtkb6oxqysm36cr9l5mg",
-        "CAFHDsVzgtfboqYF+a3owaNf+55MUiENWd3g53mU4rD=WHkXGwQ@mail.gmail.com": "https://lists.apache.org/thread/brj0k3g8pq63g8f7xhmfg2rbt1240nts",
-        "CAMomwMrvKTQK7K2-OtZTrEO0JjXzO2g5ynw3gSoks_PXWPZfoQ@mail.gmail.com": "https://lists.apache.org/thread/y5rqp5qk6dmo08wlc3g20n862hznc9m8",
-        "CANVKqzfLYj6TAVP_Sfsy5vFbreyhKskpRY-vs=F7aLed+rL+uA@mail.gmail.com": "https://lists.apache.org/thread/oy969lhh6wlzd51ovckn8fly9rvpopwh",
-        "CAH4123ZwGtkwszhEU7qnMByLa-yvyKz2W+DjH_UChPMuzaa54g@mail.gmail.com": "https://lists.apache.org/thread/7111mqyc25sfqxm6bf4ynwhs0bk0r4ys",
-        "CADL1oArKFcXvNb1MJfjN=10-yRfKxgpLTRUrdMM1R7ygaTkdYQ@mail.gmail.com": "https://lists.apache.org/thread/d7119h2qm7jrd5zsbp8ghkk0lpvnnxnw",
-    }
-    if task_mid in dev_urls:
-        return dev_urls[task_mid]
-
-    if task_mid is None:
-        return None
-    if "@" not in task_mid:
-        return None
-
-    async with db.session() as data:
-        url = await data.ns_text_get(
-            "mid-url-cache",
-            task_mid,
-        )
-        if url is not None:
-            return url
-
-    url = await _task_archive_url(task_mid)
-    if url is not None:
-        await data.ns_text_set(
-            "mid-url-cache",
-            task_mid,
-            url,
-        )
-
-    return url

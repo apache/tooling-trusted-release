@@ -631,6 +631,7 @@ class Release(sqlmodel.SQLModel, table=True):
 
     vote_started: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
     vote_resolved: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
+    podling_thread_id: str | None = sqlmodel.Field(default=None)
 
     revisions: list["Revision"] = sqlmodel.Relationship(
         back_populates="release",
