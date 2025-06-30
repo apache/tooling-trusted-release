@@ -61,7 +61,13 @@
       Vote on <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
     </h1>
     <p>
-      The {{ release.committee.display_name }} committee is currently voting on the <strong>release candidate</strong> for {{ release.project.display_name }} {{ version_name }}. This page allows you to review the automated checks run on the files in the release.
+      The
+      {% if release.podling_thread_id %}
+        Incubator
+      {% else %}
+        {{ release.committee.display_name }}
+      {% endif %}
+      committee is currently voting on the <strong>release candidate</strong> for {{ release.project.display_name }} {{ version_name }}. This page allows you to review the automated checks run on the files in the release.
     </p>
   {% endif %}
 

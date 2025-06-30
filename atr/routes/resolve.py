@@ -58,7 +58,20 @@ async def selected_post(
 ) -> response.Response | str:
     """Resolve a vote."""
     await session.check_access(project_name)
-    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE)
+
+    release = await session.release(
+        project_name,
+        version_name,
+        with_project=True,
+        with_committee=True,
+        phase=models.ReleasePhase.RELEASE_CANDIDATE,
+    )
+
+    is_podling = False
+    if release.project.committee is not None:
+        is_podling = release.project.committee.is_podling
+    podling_thread_id = release.podling_thread_id
+
     latest_vote_task = await release_latest_vote_task(release)
     if latest_vote_task is None:
         return "No vote task found, unable to send resolution message."
@@ -70,10 +83,22 @@ async def selected_post(
         )
     email_body = util.unwrap(resolve_form.email_body.data)
     vote_result = util.unwrap(resolve_form.vote_result.data)
+    first_podling_round_passed = is_podling and (podling_thread_id is not None) and (vote_result == "passed")
     release, success_message = await _resolve_vote(
-        session, project_name, version_name, vote_result, email_body, latest_vote_task
+        session,
+        project_name,
+        vote_result,
+        email_body,
+        latest_vote_task,
+        release,
+        first_podling_round_passed,
     )
-    destination = finish.selected if (vote_result == "passed") else compose.selected
+    if first_podling_round_passed:
+        destination = vote.selected
+    elif vote_result == "passed":
+        destination = finish.selected
+    else:
+        destination = compose.selected
     return await session.redirect(
         destination, project_name=project_name, version_name=version_name, success=success_message
     )
@@ -107,10 +132,11 @@ def task_mid_get(latest_vote_task: models.Task) -> str | None:
 async def _resolve_vote(
     session: routes.CommitterSession,
     project_name: str,
-    version_name: str,
     vote_result: str,
     resolution_body: str,
     latest_vote_task: models.Task,
+    release: models.Release,
+    first_podling_round_passed: bool,
 ) -> tuple[models.Release, str]:
     # Check that the user has access to the project
     await session.check_access(project_name)
@@ -118,22 +144,10 @@ async def _resolve_vote(
     # Update release status in the database
     async with db.session() as data:
         async with data.begin():
-            release = await session.release(
-                project_name,
-                version_name,
-                with_project=True,
-                with_committee=True,
-                phase=models.ReleasePhase.RELEASE_CANDIDATE,
-                data=data,
-            )
-
-            is_podling = False
-            if release.project.committee is not None:
-                is_podling = release.project.committee.is_podling
-            podling_thread_id = release.podling_thread_id
-
+            # Attach the existing release to the session
+            release = await data.merge(release)
             # Update the release phase based on vote result
-            if is_podling and (podling_thread_id is None) and (vote_result == "passed"):
+            if first_podling_round_passed:
                 # This is the first podling vote, by the PPMC and not the Incubator PMC
                 # In this branch, we do not move to RELEASE_PREVIEW but keep everything the same
                 # We only set the podling_thread_id to the thread_id of the vote thread
