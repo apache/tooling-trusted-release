@@ -166,6 +166,7 @@ async def _resolve_vote(
                     body_data=await construct.start_vote_default(release.project.name),
                     data=data,
                     release=release,
+                    promote=False,
                 )
                 success_message = "Project PPMC vote marked as passed, and Incubator PMC vote automatically started"
             elif vote_result == "passed":

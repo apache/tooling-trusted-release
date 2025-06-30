@@ -137,6 +137,7 @@ async def selected_revision(
                 body_data,
                 data,
                 release,
+                promote=True,
             )
 
         keys_warning = await _keys_warning(release)
@@ -229,6 +230,7 @@ async def start_vote(
     body_data: str,
     data: db.Session,
     release: models.Release,
+    promote: bool = True,
 ):
     if committee is None:
         raise base.ASFQuartException("Release has no associated committee", errorcode=400)
@@ -248,10 +250,11 @@ async def start_vote(
             error="All checks must be completed before starting a vote.",
         )
 
-    # This sets the phase to RELEASE_CANDIDATE
-    error = await _promote(data, release.name, selected_revision_number)
-    if error:
-        return await session.redirect(root.index, error=error)
+    if promote is True:
+        # This sets the phase to RELEASE_CANDIDATE
+        error = await _promote(data, release.name, selected_revision_number)
+        if error:
+            return await session.redirect(root.index, error=error)
 
     # Store when the release was put into the voting phase
     release.vote_started = datetime.datetime.now(datetime.UTC)
