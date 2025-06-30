@@ -36,7 +36,7 @@ import atr.tasks.message as message
 import atr.template as template
 import atr.util as util
 
-TEST_MID = "CADL1oArKFcXvNb1MJfjN=10-yRfKxgpLTRUrdMM1R7ygaTkdYQ@mail.gmail.com"
+TEST_MID = "CAH5JyZo8QnWmg9CwRSwWY=GivhXW4NiLyeNJO71FKdK81J5-Uw@mail.gmail.com"
 
 
 class CastVoteForm(util.QuartFormTyped):
@@ -81,6 +81,7 @@ class VoteEmail(schema.Strict):
     iso_datetime: str
     vote: Vote
     quotation: str
+    updated: bool
 
 
 @routes.committer("/vote/<project_name>/<version_name>")
@@ -279,13 +280,13 @@ async def _tabulate_votes(
         if not ok:
             continue
 
-        if asf_uid is None:
-            asf_uid_or_email = from_email_lower
-            status = VoteStatus.UNKNOWN
-        else:
+        if asf_uid is not None:
             asf_uid_or_email = asf_uid
             list_raw = msg.get("list_raw", "")
             status = await _tabulate_vote_status(asf_uid, list_raw, committee)
+        else:
+            asf_uid_or_email = from_email_lower
+            status = VoteStatus.UNKNOWN
 
         if start_unixtime is None:
             epoch = msg.get("epoch", "")
@@ -318,9 +319,9 @@ async def _tabulate_votes(
             iso_datetime=msg.get("date", ""),
             vote=vote_cast,
             quotation=quotation,
+            updated=asf_uid_or_email in tabulated_votes,
         )
-        tabulated_votes[asf_uid] = vote_email
-
+        tabulated_votes[asf_uid_or_email] = vote_email
     end = time.perf_counter_ns()
     logging.info(f"Tabulated votes: {len(tabulated_votes)}")
     logging.info(f"Tabulation took {(end - start) / 1000000} ms")
@@ -523,7 +524,11 @@ def _tabulate_vote_resolution_votes(tabulated_votes: dict[str, VoteEmail], statu
                 symbol = "0"
             case Vote.UNKNOWN:
                 symbol = "?"
-        yield f"{symbol} {vote_email.asf_uid_or_email} ({vote_email.status.value.lower()})"
+        user_info = vote_email.asf_uid_or_email
+        status = vote_email.status.value.lower()
+        if vote_email.updated:
+            status += ", updated"
+        yield f"{symbol} {user_info} ({status})"
     if header is None:
         yield ""
 
