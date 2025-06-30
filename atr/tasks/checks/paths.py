@@ -69,6 +69,7 @@ async def check(args: checks.FunctionArguments) -> None:
         _LOGGER.error("Base release directory does not exist or is not a directory: %s", base_path)
         return
 
+    is_podling = args.extra_args.get("is_podling", False)
     relative_paths = [p async for p in util.paths_recursive(base_path)]
     relative_paths_set = set(str(p) for p in relative_paths)
     for relative_path in relative_paths:
@@ -80,6 +81,7 @@ async def check(args: checks.FunctionArguments) -> None:
             recorder_warnings,
             recorder_success,
             relative_paths_set,
+            is_podling,
         )
 
     return None
@@ -149,6 +151,7 @@ async def _check_path_process_single(
     recorder_warnings: checks.Recorder,
     recorder_success: checks.Recorder,
     relative_paths: set[str],
+    is_podling: bool,
 ) -> None:
     """Process and check a single path within the release directory."""
     full_path = base_path / relative_path
@@ -172,6 +175,11 @@ async def _check_path_process_single(
     ext_artifact = search.group("artifact") if search else None
     ext_metadata = search.group("metadata") if search else None
 
+    allowed_top_level = _ALLOWED_TOP_LEVEL
+    if is_podling:
+        # TODO: We must also require that one of these is present
+        allowed_top_level |= {"DISCLAIMER", "DISCLAIMER-WIP"}
+
     if ext_artifact:
         _LOGGER.info("Checking artifact rules for %s", full_path)
         await _check_artifact_rules(base_path, relative_path, relative_paths, errors)
@@ -180,7 +188,7 @@ async def _check_path_process_single(
         await _check_metadata_rules(base_path, relative_path, relative_paths, ext_metadata, errors, warnings)
     else:
         _LOGGER.info("Checking general rules for %s", full_path)
-        if (relative_path.parent == pathlib.Path(".")) and (relative_path.name not in _ALLOWED_TOP_LEVEL):
+        if (relative_path.parent == pathlib.Path(".")) and (relative_path.name not in allowed_top_level):
             warnings.append(f"Unknown top level file: {relative_path.name}")
 
     for error in errors:

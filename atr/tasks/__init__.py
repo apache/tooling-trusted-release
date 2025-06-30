@@ -79,7 +79,13 @@ async def draft_checks(
                     task.revision_number = revision_number
                     data.add(task)
 
-        path_check_task = queued(models.TaskType.PATHS_CHECK, release, revision_number)
+        is_podling = False
+        if release.project.committee is not None:
+            if release.project.committee.is_podling:
+                is_podling = True
+        path_check_task = queued(
+            models.TaskType.PATHS_CHECK, release, revision_number, extra_args={"is_podling": is_podling}
+        )
         data.add(path_check_task)
         if caller_data is None:
             await data.commit()
