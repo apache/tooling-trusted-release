@@ -83,7 +83,7 @@ async def selected_post(
         )
     email_body = util.unwrap(resolve_form.email_body.data)
     vote_result = util.unwrap(resolve_form.vote_result.data)
-    first_podling_round_passed = is_podling and (podling_thread_id is not None) and (vote_result == "passed")
+    first_podling_round_passing = is_podling and (podling_thread_id is None) and (vote_result == "passed")
     release, success_message = await _resolve_vote(
         session,
         project_name,
@@ -91,9 +91,9 @@ async def selected_post(
         email_body,
         latest_vote_task,
         release,
-        first_podling_round_passed,
+        first_podling_round_passing,
     )
-    if first_podling_round_passed:
+    if first_podling_round_passing:
         destination = vote.selected
     elif vote_result == "passed":
         destination = finish.selected
@@ -136,7 +136,7 @@ async def _resolve_vote(
     resolution_body: str,
     latest_vote_task: models.Task,
     release: models.Release,
-    first_podling_round_passed: bool,
+    first_podling_round_passing: bool,
 ) -> tuple[models.Release, str]:
     # Check that the user has access to the project
     await session.check_access(project_name)
@@ -147,7 +147,7 @@ async def _resolve_vote(
             # Attach the existing release to the session
             release = await data.merge(release)
             # Update the release phase based on vote result
-            if first_podling_round_passed:
+            if first_podling_round_passing:
                 # This is the first podling vote, by the PPMC and not the Incubator PMC
                 # In this branch, we do not move to RELEASE_PREVIEW but keep everything the same
                 # We only set the podling_thread_id to the thread_id of the vote thread
