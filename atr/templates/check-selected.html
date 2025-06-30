@@ -60,6 +60,11 @@
     <h1>
       Vote on <strong>{{ release.project.short_display_name }}</strong> <em>{{ release.version }}</em>
     </h1>
+    {% if release.podling_thread_id %}
+      <p class="fs-3 mb-4">Second round of voting</p>
+    {% elif release.committee.is_podling %}
+      <p class="fs-3 mb-4">First round of voting</p>
+    {% endif %}
     <p>
       The
       {% if release.podling_thread_id %}

@@ -25,18 +25,12 @@
             </a>
             {% if revision_editor %}by {{ revision_editor }}{% endif %}
           </p>
-        {% elif release.project.committee.is_podling %}
-          {% if release.podling_thread_id %}
-            <p>
-              <strong>Voting round:</strong> 2
-              (<a href="https://lists.apache.org/thread/{{ release.podling_thread_id }}"
-   target="_blank">round 1 results</a>)
-            </p>
-          {% else %}
-            <p>
-              <strong>Voting round:</strong> 1
-            </p>
-          {% endif %}
+        {% elif release.podling_thread_id %}
+          <p>
+            <strong>Previous round:</strong>
+            <a href="https://lists.apache.org/thread/{{ release.podling_thread_id }}"
+               target="_blank">Vote thread</a>
+          </p>
         {% endif %}
       </div>
     </div>
