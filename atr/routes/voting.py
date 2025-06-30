@@ -167,7 +167,10 @@ async def _keys_warning(
     if release.committee is None:
         raise base.ASFQuartException("Release has no associated committee", errorcode=400)
 
-    keys_file_path = util.get_downloads_dir() / release.committee.name / "KEYS"
+    if release.committee.is_podling:
+        keys_file_path = util.get_downloads_dir() / "incubator" / release.committee.name / "KEYS"
+    else:
+        keys_file_path = util.get_downloads_dir() / release.committee.name / "KEYS"
     return not await aiofiles.os.path.isfile(keys_file_path)
 
 
