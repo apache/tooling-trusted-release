@@ -173,6 +173,7 @@ async def tabulate(session: routes.CommitterSession, project_name: str, version_
     passed = None
     outcome = None
     committee = None
+    thread_id = None
     if await hidden_form.validate_on_submit():
         archive_url = hidden_form.hidden_field.data or ""
         thread_id = archive_url.split("/")[-1]
@@ -181,11 +182,18 @@ async def tabulate(session: routes.CommitterSession, project_name: str, version_
         summary = _tabulate_vote_summary(tabulated_votes)
         passed, outcome = _tabulate_vote_outcome(release, start_unixtime, tabulated_votes)
     resolve_form = await ResolveVoteForm.create_form()
-    if (committee is None) or (tabulated_votes is None) or (summary is None) or (passed is None) or (outcome is None):
+    if (
+        (committee is None)
+        or (tabulated_votes is None)
+        or (summary is None)
+        or (passed is None)
+        or (outcome is None)
+        or (thread_id is None)
+    ):
         resolve_form = None
     else:
         resolve_form.email_body.data = _tabulate_vote_resolution(
-            committee, release, tabulated_votes, summary, passed, outcome, full_name, asf_uid
+            committee, release, tabulated_votes, summary, passed, outcome, full_name, asf_uid, thread_id
         )
         resolve_form.vote_result.data = "passed" if passed else "failed"
     return await template.render(
@@ -460,11 +468,16 @@ def _tabulate_vote_resolution(
     outcome: str,
     full_name: str,
     asf_uid: str,
+    thread_id: str,
 ) -> str:
     """Generate a resolution email body."""
     body = [f"Dear {committee.display_name} participants,", ""]
     outcome = "passed" if passed else "failed"
     body.append(f"The vote on {release.project.name} {release.version} {outcome}.")
+    body.append("")
+    body.append("The vote thread is archived at the following URL:")
+    body.append("")
+    body.append(f"https://lists.apache.org/thread/{thread_id}")
     body.append("")
 
     body.append("The votes were cast as follows:")
