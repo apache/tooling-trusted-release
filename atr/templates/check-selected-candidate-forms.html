@@ -43,12 +43,3 @@
     <div class="col-md-9 offset-md-3">{{ form.submit(class_="btn btn-primary") }}</div>
   </div>
 </form>
-
-<h2 id="resolve-vote">Resolve vote</h2>
-<p>Press the button below to automatically tabulate the current votes, and display a form to resolve the vote.</p>
-<form action="{{ as_url(routes.vote.tabulate, project_name=release.project.name, version_name=release.version) }}"
-      method="post"
-      class="mb-0">
-  {{ hidden_form.hidden_tag() }}
-  {{ hidden_form.submit(class="btn btn-sm btn-outline-primary") }}
-</form>

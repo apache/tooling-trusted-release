@@ -125,7 +125,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     form = await CastVoteForm.create_form()
     hidden_form = await util.HiddenFieldForm.create_form()
     hidden_form.hidden_field.data = archive_url or ""
-    hidden_form.submit.label.text = "Tabulate votes"
+    hidden_form.submit.label.text = "Resolve vote"
     return await compose.check(
         session,
         release,
