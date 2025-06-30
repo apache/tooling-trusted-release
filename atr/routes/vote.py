@@ -527,12 +527,22 @@ def _tabulate_vote_resolution(
     thread_id: str,
 ) -> str:
     """Generate a resolution email body."""
-    body = [f"Dear {committee.display_name} participants,", ""]
+    committee_name = committee.display_name
+    if release.podling_thread_id:
+        committee_name = "Incubator"
+    body = [f"Dear {committee_name} participants,", ""]
     outcome = "passed" if passed else "failed"
     body.append(f"The vote on {release.project.name} {release.version} {outcome}.")
     body.append("")
 
-    body.append("The vote thread is archived at the following URL:")
+    if release.podling_thread_id:
+        body.append("The previous round of voting is archived at the following URL:")
+        body.append("")
+        body.append(f"https://lists.apache.org/thread/{release.podling_thread_id}")
+        body.append("")
+        body.append("The current vote thread is archived at the following URL:")
+    else:
+        body.append("The vote thread is archived at the following URL:")
     body.append("")
     body.append(f"https://lists.apache.org/thread/{thread_id}")
     body.append("")
