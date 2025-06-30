@@ -19,6 +19,7 @@ import enum
 import json
 import logging
 import time
+from collections.abc import Generator
 
 import aiohttp
 import quart
@@ -476,14 +477,43 @@ def _tabulate_vote_resolution(
     outcome = "passed" if passed else "failed"
     body.append(f"The vote on {release.project.name} {release.version} {outcome}.")
     body.append("")
+
     body.append("The vote thread is archived at the following URL:")
     body.append("")
     body.append(f"https://lists.apache.org/thread/{thread_id}")
     body.append("")
 
-    body.append("The votes were cast as follows:")
+    body.extend(_tabulate_vote_resolution_votes(tabulated_votes, {VoteStatus.BINDING}))
+
+    binding_total = summary["binding_votes"]
+    body.append(f"There were {binding_total} binding {'vote' if (binding_total == 1) else 'votes'}.")
     body.append("")
+
+    binding_yes = summary["binding_votes_yes"]
+    binding_no = summary["binding_votes_no"]
+    binding_abstain = summary["binding_votes_abstain"]
+    body.append(f"Of these binding votes, {binding_yes} were +1, {binding_no} were -1, and {binding_abstain} were 0.")
+    body.append("")
+
+    body.extend(_tabulate_vote_resolution_votes(tabulated_votes, {VoteStatus.COMMITTER}))
+    body.extend(_tabulate_vote_resolution_votes(tabulated_votes, {VoteStatus.CONTRIBUTOR, VoteStatus.UNKNOWN}))
+
+    body.append("Thank you for your participation.")
+    body.append("")
+    body.append("Sincerely,")
+    body.append(f"{full_name} ({asf_uid})")
+    return "\n".join(body)
+
+
+def _tabulate_vote_resolution_votes(tabulated_votes: dict[str, VoteEmail], statuses: set[VoteStatus]) -> Generator[str]:
+    header: str | None = f"The {' and '.join(status.value.lower() for status in statuses)} votes were cast as follows:"
     for vote_email in tabulated_votes.values():
+        if vote_email.status not in statuses:
+            continue
+        if header is not None:
+            yield header
+            yield ""
+            header = None
         match vote_email.vote:
             case Vote.YES:
                 symbol = "+1"
@@ -493,21 +523,9 @@ def _tabulate_vote_resolution(
                 symbol = "0"
             case Vote.UNKNOWN:
                 symbol = "?"
-        body.append(f"{symbol} {vote_email.asf_uid_or_email} ({vote_email.status.value.lower()})")
-    body.append("")
-    binding_total = summary["binding_votes"]
-    body.append(f"There were {binding_total} binding {'vote' if (binding_total == 1) else 'votes'}.")
-    body.append("")
-    binding_yes = summary["binding_votes_yes"]
-    binding_no = summary["binding_votes_no"]
-    binding_abstain = summary["binding_votes_abstain"]
-    body.append(f"Of these binding votes, {binding_yes} were +1, {binding_no} were -1, and {binding_abstain} were 0.")
-    body.append("")
-    body.append("Thank you for your participation.")
-    body.append("")
-    body.append("Sincerely,")
-    body.append(f"{full_name} ({asf_uid})")
-    return "\n".join(body)
+        yield f"{symbol} {vote_email.asf_uid_or_email} ({vote_email.status.value.lower()})"
+    if header is None:
+        yield ""
 
 
 async def _tabulate_vote_status(asf_uid: str, list_raw: str, committee: models.Committee | None) -> VoteStatus:
