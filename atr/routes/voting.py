@@ -69,6 +69,7 @@ async def selected_revision(
             min_hours = release.release_policy.min_hours
         else:
             min_hours = 72
+        release_policy_mailto_addresses = ", ".join(release.project.policy_mailto_addresses)
 
         class VoteInitiateForm(util.QuartFormTyped):
             """Form for initiating a release vote."""
@@ -80,7 +81,8 @@ async def selected_revision(
                 validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
                 default="user-tests@tooling.apache.org",
                 description="NOTE: The limited options above are provided for testing purposes."
-                " In the finished version of ATR, you will be able to send to your own specified mailing lists.",
+                " In the finished version of ATR, you will be able to send to your own specified mailing lists, i.e. "
+                f"{release_policy_mailto_addresses}.",
             )
             vote_duration = wtforms.IntegerField(
                 "Minimum vote duration",

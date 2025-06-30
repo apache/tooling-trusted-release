@@ -343,10 +343,10 @@ Thanks,
     def policy_mailto_addresses(self) -> list[str]:
         if ((policy := self.release_policy) is None) or (not policy.mailto_addresses):
             if self.committee is not None:
-                return [f"dev@{self.committee.name}.apache.org"]
+                return [f"dev@{self.committee.name}.apache.org", f"private@{self.committee.name}.apache.org"]
             else:
                 # TODO: Or raise an error?
-                return [f"dev@{self.name}.apache.org"]
+                return [f"dev@{self.name}.apache.org", f"private@{self.name}.apache.org"]
         return policy.mailto_addresses
 
     @property
