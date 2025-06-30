@@ -171,8 +171,9 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
         )
 
 
-@routes.committer("/vote/<project_name>/<version_name>/tabulate", methods=["POST"])
-async def tabulate(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
+# TODO: Improve this URL
+@routes.committer("/vote/<project_name>/<version_name>/resolve", methods=["POST"])
+async def selected_resolve(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
     """Tabulate votes."""
     await session.check_access(project_name)
     asf_uid = session.uid
@@ -224,7 +225,7 @@ async def tabulate(session: routes.CommitterSession, project_name: str, version_
         )
         resolve_form.vote_result.data = "passed" if passed else "failed"
     return await template.render(
-        "vote-tabulate.html",
+        "vote-resolve.html",
         release=release,
         tabulated_votes=tabulated_votes,
         summary=summary,

@@ -69,7 +69,7 @@
            class="btn btn-primary"><i class="bi bi-download me-1"></i> Download files</a>
         <a href="{{ as_url(routes.candidate.view, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-secondary"><i class="bi bi-eye me-1"></i> View files</a>
-        <form action="{{ as_url(routes.vote.tabulate, project_name=release.project.name, version_name=release.version) }}"
+        <form action="{{ as_url(routes.vote.selected_resolve, project_name=release.project.name, version_name=release.version) }}"
               method="post"
               class="mb-0">
           {{ hidden_form.hidden_tag() }}

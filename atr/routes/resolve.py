@@ -79,7 +79,10 @@ async def selected_post(
     if not resolve_form.validate_on_submit():
         # TODO: Render the page again with errors
         return await session.redirect(
-            vote.tabulate, project_name=project_name, version_name=version_name, error="Invalid form submission."
+            vote.selected_resolve,
+            project_name=project_name,
+            version_name=version_name,
+            error="Invalid form submission.",
         )
     email_body = util.unwrap(resolve_form.email_body.data)
     vote_result = util.unwrap(resolve_form.vote_result.data)
