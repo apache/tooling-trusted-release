@@ -130,51 +130,55 @@
               </div>
             </div>
 
-            <div class="mb-3 pb-3 row border-bottom">
-              {{ forms.label(policy_form.mailto_addresses.entries[0], col="md3") }}
-              <div class="col-sm-8">
-                {{ forms.widget(policy_form.mailto_addresses.entries[0]) }}
-                {{ forms.errors(policy_form.mailto_addresses.entries[0]) }}
-                {{ forms.description(policy_form.mailto_addresses.entries[0]) }}
-              </div>
-            </div>
+            <div id="vote-options-extra">
 
-            <div class="mb-3 pb-3 row border-bottom">
-              {{ forms.label(policy_form.min_hours, col="md3") }}
-              <div class="col-sm-8">
-                {{ forms.widget(policy_form.min_hours) }}
-                {{ forms.errors(policy_form.min_hours) }}
-                {{ forms.description(policy_form.min_hours) }}
-              </div>
-            </div>
-
-            <div class="mb-3 pb-3 row border-bottom">
-              {{ forms.label(policy_form.pause_for_rm, col="md3-high") }}
-              <div class="col-sm-8">
-                <div class="form-check">
-                  {{ forms.widget(policy_form.pause_for_rm, classes="form-check-input", boolean_label="Enable") }}
-                  {{ forms.errors(policy_form.pause_for_rm, classes="invalid-feedback d-block") }}
+              <div class="mb-3 pb-3 row border-bottom">
+                {{ forms.label(policy_form.mailto_addresses.entries[0], col="md3") }}
+                <div class="col-sm-8">
+                  {{ forms.widget(policy_form.mailto_addresses.entries[0]) }}
+                  {{ forms.errors(policy_form.mailto_addresses.entries[0]) }}
+                  {{ forms.description(policy_form.mailto_addresses.entries[0]) }}
                 </div>
-                {{ forms.description(policy_form.pause_for_rm) }}
               </div>
-            </div>
 
-            <div class="mb-3 pb-3 row border-bottom">
-              {{ forms.label(policy_form.release_checklist, col="md3") }}
-              <div class="col-sm-8">
-                {{ forms.widget(policy_form.release_checklist, rows="10", classes="form-control font-monospace") }}
-                {{ forms.errors(policy_form.release_checklist) }}
-                {{ forms.description(policy_form.release_checklist) }}
+              <div class="mb-3 pb-3 row border-bottom">
+                {{ forms.label(policy_form.min_hours, col="md3") }}
+                <div class="col-sm-8">
+                  {{ forms.widget(policy_form.min_hours) }}
+                  {{ forms.errors(policy_form.min_hours) }}
+                  {{ forms.description(policy_form.min_hours) }}
+                </div>
               </div>
-            </div>
 
-            <div class="mb-3 pb-3 row">
-              {{ forms.label(policy_form.start_vote_template, col="md3") }}
-              <div class="col-sm-8">
-                {{ forms.widget(policy_form.start_vote_template, rows="10", classes="form-control font-monospace") }}
-                {{ forms.errors(policy_form.start_vote_template) }}
-                {{ forms.description(policy_form.start_vote_template) }}
+              <div class="mb-3 pb-3 row border-bottom">
+                {{ forms.label(policy_form.pause_for_rm, col="md3-high") }}
+                <div class="col-sm-8">
+                  <div class="form-check">
+                    {{ forms.widget(policy_form.pause_for_rm, classes="form-check-input", boolean_label="Enable") }}
+                    {{ forms.errors(policy_form.pause_for_rm, classes="invalid-feedback d-block") }}
+                  </div>
+                  {{ forms.description(policy_form.pause_for_rm) }}
+                </div>
               </div>
+
+              <div class="mb-3 pb-3 row border-bottom">
+                {{ forms.label(policy_form.release_checklist, col="md3") }}
+                <div class="col-sm-8">
+                  {{ forms.widget(policy_form.release_checklist, rows="10", classes="form-control font-monospace") }}
+                  {{ forms.errors(policy_form.release_checklist) }}
+                  {{ forms.description(policy_form.release_checklist) }}
+                </div>
+              </div>
+
+              <div class="mb-3 pb-3 row">
+                {{ forms.label(policy_form.start_vote_template, col="md3") }}
+                <div class="col-sm-8">
+                  {{ forms.widget(policy_form.start_vote_template, rows="10", classes="form-control font-monospace") }}
+                  {{ forms.errors(policy_form.start_vote_template) }}
+                  {{ forms.description(policy_form.start_vote_template) }}
+                </div>
+              </div>
+
             </div>
 
             <div class="row mt-5 mb-3">
@@ -456,4 +460,19 @@
 
   {% block javascripts %}
     {{ super() }}
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const manual = document.querySelector("input[name='manual_vote']");
+            const extra = document.getElementById("vote-options-extra");
+            if (!manual || !extra) return;
+
+            function toggle() {
+                extra.hidden = manual.checked;
+                extra.querySelectorAll("input, textarea, select").forEach(el => (el.disabled = manual.checked));
+            }
+
+            manual.addEventListener("change", toggle);
+            toggle();
+        });
+    </script>
   {% endblock javascripts %}
