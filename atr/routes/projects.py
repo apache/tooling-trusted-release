@@ -81,6 +81,10 @@ class ReleasePolicyForm(util.QuartFormTyped):
     )
 
     # Vote section
+    manual_vote = wtforms.BooleanField(
+        "Manual voting process",
+        description="If this is set then the vote will be completely manual and following policy is ignored.",
+    )
     mailto_addresses = wtforms.FieldList(
         wtforms.StringField(
             "Email",
@@ -94,10 +98,6 @@ class ReleasePolicyForm(util.QuartFormTyped):
             " user-tests@tooling.apache.org.",
         ),
         min_entries=1,
-    )
-    manual_vote = wtforms.BooleanField(
-        "Manual voting process",
-        description="If this is set then the vote will be completely manual and following policy is ignored.",
     )
     default_min_hours_value_at_render = wtforms.HiddenField()
     min_hours = wtforms.IntegerField(
@@ -415,6 +415,7 @@ async def _policy_edit(
             project.release_policy = release_policy
             data.add(release_policy)
 
+        # TODO: Sort these properties by form order
         release_policy.mailto_addresses = [util.unwrap(policy_form.mailto_addresses.entries[0].data)]
         release_policy.manual_vote = util.unwrap(policy_form.manual_vote.data)
         release_policy.release_checklist = util.unwrap(policy_form.release_checklist.data)

@@ -120,15 +120,6 @@
             </div>
 
             <div class="mb-3 pb-3 row border-bottom">
-              {{ forms.label(policy_form.mailto_addresses.entries[0], col="md3") }}
-              <div class="col-sm-8">
-                {{ forms.widget(policy_form.mailto_addresses.entries[0]) }}
-                {{ forms.errors(policy_form.mailto_addresses.entries[0]) }}
-                {{ forms.description(policy_form.mailto_addresses.entries[0]) }}
-              </div>
-            </div>
-
-            <div class="mb-3 pb-3 row border-bottom">
               {{ forms.label(policy_form.manual_vote, col="md3-high") }}
               <div class="col-sm-8">
                 <div class="form-check">
@@ -136,6 +127,15 @@
                   {{ forms.errors(policy_form.manual_vote, classes="invalid-feedback d-block") }}
                 </div>
                 {{ forms.description(policy_form.manual_vote) }}
+              </div>
+            </div>
+
+            <div class="mb-3 pb-3 row border-bottom">
+              {{ forms.label(policy_form.mailto_addresses.entries[0], col="md3") }}
+              <div class="col-sm-8">
+                {{ forms.widget(policy_form.mailto_addresses.entries[0]) }}
+                {{ forms.errors(policy_form.mailto_addresses.entries[0]) }}
+                {{ forms.description(policy_form.mailto_addresses.entries[0]) }}
               </div>
             </div>
 
