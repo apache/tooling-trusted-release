@@ -77,6 +77,9 @@ async def check(
     empty_form = await util.EmptyForm.create_form()
     vote_task_warnings = _warnings_from_vote_result(vote_task)
     has_files = await util.has_files(release)
+    has_any_errors = any(info.errors[path] for path in paths) if info else False
+    strict_checking = release.project.policy_strict_checking
+    strict_checking_errors = strict_checking and has_any_errors
 
     return await template.render(
         "check-selected.html",
@@ -104,6 +107,7 @@ async def check(
         empty_form=empty_form,
         hidden_form=hidden_form,
         has_files=has_files,
+        strict_checking_errors=strict_checking_errors,
     )
 
 
@@ -112,7 +116,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     """Show the contents of the release candidate draft."""
     await session.check_access(project_name)
 
-    release = await session.release(project_name, version_name, with_committee=True)
+    release = await session.release(project_name, version_name, with_committee=True, with_project_release_policy=True)
     return await check(session, release)
 
 

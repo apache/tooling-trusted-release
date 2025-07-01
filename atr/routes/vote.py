@@ -107,7 +107,11 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     await session.check_access(project_name)
 
     release = await session.release(
-        project_name, version_name, with_committee=True, phase=models.ReleasePhase.RELEASE_CANDIDATE
+        project_name,
+        version_name,
+        with_committee=True,
+        phase=models.ReleasePhase.RELEASE_CANDIDATE,
+        with_project_release_policy=True,
     )
     latest_vote_task = await resolve.release_latest_vote_task(release)
     archive_url = None
