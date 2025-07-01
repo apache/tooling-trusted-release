@@ -47,7 +47,7 @@
   {% endif %}
 
   {% set revision_number = release.latest_revision_number %}
-  {% if revision_number %}
+  {% if revision_number and (not manual_vote_process_form) %}
     {{ forms.errors_summary(form) }}
     <form method="post"
           id="vote-initiate-form"
@@ -141,6 +141,18 @@
         {{ form.submit(class_='btn btn-primary') }}
         <a href="{{ as_url(routes.compose.selected, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-link text-secondary">Cancel</a>
+      </div>
+    </form>
+  {% elif manual_vote_process_form %}
+    <p>
+      This release has manual vote process enabled. Use the form below to start a vote. Once the vote is started, you must manually send the vote email to the appropriate mailing list, wait for the vote to complete, and then manually advance the release to the next phase. The ATR requires you to submit the vote and vote result thread URLs to proceed.
+    </p>
+    <form method="post"
+          action="{{ as_url(routes.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=revision_number) }}"
+          novalidate>
+      {{ manual_vote_process_form.hidden_tag() }}
+      <div>
+        <button type="submit" class="btn btn-primary">Start vote</button>
       </div>
     </form>
   {% else %}

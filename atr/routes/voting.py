@@ -38,6 +38,37 @@ import atr.user as user
 import atr.util as util
 
 
+class VoteInitiateForm(util.QuartFormTyped):
+    """Form for initiating a release vote."""
+
+    release_name = wtforms.HiddenField("Release Name")
+    mailing_list = wtforms.RadioField(
+        "Send vote email to",
+        choices=[("example@example.org.INVALID", "example@example.org.INVALID")],
+        validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
+        default="user-tests@tooling.apache.org",
+        description="NOTE: The limited options above are provided for testing purposes."
+        " In the finished version of ATR, you will be able to send to your own specified mailing lists.",
+    )
+    vote_duration = wtforms.IntegerField(
+        "Minimum vote duration",
+        validators=[
+            wtforms.validators.InputRequired("Vote duration is required"),
+            util.validate_vote_duration,
+        ],
+        default=72,
+        description="Minimum number of hours the vote will be open for.",
+    )
+    subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
+    body = wtforms.TextAreaField(
+        "Body",
+        validators=[wtforms.validators.Optional()],
+        description="Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT],"
+        " [DURATION], [REVIEW_URL], and [YOUR_ASF_ID] will be filled in automatically when the email is sent.",
+    )
+    submit = wtforms.SubmitField("Send vote email")
+
+
 @routes.committer("/voting/<project_name>/<version_name>/<revision>", methods=["GET", "POST"])
 async def selected_revision(
     session: routes.CommitterSession, project_name: str, version_name: str, revision: str
@@ -75,66 +106,27 @@ async def selected_revision(
                 version_name=version_name,
                 revision=revision,
             )
-        committee = util.unwrap(release.committee)
-        permitted_recipients = util.permitted_recipients(session.uid)
 
         selected_revision_number = release.latest_revision_number
         if selected_revision_number is None:
             return await session.redirect(compose.selected, error="No revision found for this release")
 
+        committee = util.unwrap(release.committee)
+        permitted_recipients = util.permitted_recipients(session.uid)
         if release.release_policy:
-            min_hours = release.release_policy.min_hours
+            min_hours = release.release_policy.min_hours if (release.release_policy.min_hours is not None) else 72
         else:
             min_hours = 72
         release_policy_mailto_addresses = ", ".join(release.project.policy_mailto_addresses)
 
-        class VoteInitiateForm(util.QuartFormTyped):
-            """Form for initiating a release vote."""
-
-            release_name = wtforms.HiddenField("Release Name")
-            mailing_list = wtforms.RadioField(
-                "Send vote email to",
-                choices=sorted([(recipient, recipient) for recipient in permitted_recipients]),
-                validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
-                default="user-tests@tooling.apache.org",
-                description="NOTE: The limited options above are provided for testing purposes."
-                " In the finished version of ATR, you will be able to send to your own specified mailing lists, i.e. "
-                f"{release_policy_mailto_addresses}.",
-            )
-            vote_duration = wtforms.IntegerField(
-                "Minimum vote duration",
-                validators=[
-                    wtforms.validators.InputRequired("Vote duration is required"),
-                    util.validate_vote_duration,
-                ],
-                default=min_hours,
-                description="Minimum number of hours the vote will be open for.",
-            )
-            subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
-            body = wtforms.TextAreaField(
-                "Body",
-                validators=[wtforms.validators.Optional()],
-                description="Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT],"
-                " [DURATION], [REVIEW_URL], and [YOUR_ASF_ID] will be filled in automatically when the email is sent.",
-            )
-            submit = wtforms.SubmitField("Send vote email")
-
-        project = release.project
-
-        # The subject can be changed by the user
-        # TODO: We should consider not allowing the subject to be changed
-        default_subject = f"[VOTE] Release {project.display_name} {version_name}"
-        default_body = await construct.start_vote_default(project_name)
-
-        form = await VoteInitiateForm.create_form(
-            data=await quart.request.form if quart.request.method == "POST" else None,
+        form = await _form(
+            release,
+            project_name,
+            version_name,
+            permitted_recipients,
+            release_policy_mailto_addresses,
+            min_hours,
         )
-        # Set hidden field data explicitly
-        form.release_name.data = release.name
-
-        if quart.request.method == "GET":
-            form.subject.data = default_subject
-            form.body.data = default_body
 
         if await form.validate_on_submit():
             email_to: str = util.unwrap(form.mailing_list.data)
@@ -157,24 +149,82 @@ async def selected_revision(
                 promote=True,
             )
 
-        keys_warning = await _keys_warning(release)
-        has_files = await util.has_files(release)
-        if not has_files:
-            return await session.redirect(
-                compose.selected,
-                error="This release candidate draft has no files yet. Please add some files before starting a vote.",
-                project_name=project_name,
-                version_name=version_name,
-            )
-
-        # For GET requests or failed POST validation
-        return await template.render(
-            "voting-selected-revision.html",
-            release=release,
-            form=form,
-            revision=revision,
-            keys_warning=keys_warning,
+    keys_warning = await _keys_warning(release)
+    manual_vote_process_form = None
+    if release.project.policy_manual_vote:
+        manual_vote_process_form = await util.HiddenFieldForm.create_form()
+        manual_vote_process_form.hidden_field.data = selected_revision_number
+    has_files = await util.has_files(release)
+    if not has_files:
+        return await session.redirect(
+            compose.selected,
+            error="This release candidate draft has no files yet. Please add some files before starting a vote.",
+            project_name=project_name,
+            version_name=version_name,
         )
+
+    # For GET requests or failed POST validation
+    return await template.render(
+        "voting-selected-revision.html",
+        release=release,
+        form=form,
+        revision=revision,
+        keys_warning=keys_warning,
+        manual_vote_process_form=manual_vote_process_form,
+    )
+
+
+async def _form(
+    release: models.Release,
+    project_name: str,
+    version_name: str,
+    permitted_recipients: list[str],
+    release_policy_mailto_addresses: str,
+    min_hours: int,
+) -> VoteInitiateForm:
+    class SubsetVoteInitiateForm(VoteInitiateForm):
+        """Form for initiating a release vote."""
+
+        mailing_list = wtforms.RadioField(
+            "Send vote email to",
+            choices=sorted([(recipient, recipient) for recipient in permitted_recipients]),
+            validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
+            default="user-tests@tooling.apache.org",
+            description="NOTE: The limited options above are provided for testing purposes."
+            " In the finished version of ATR, you will be able to send to your own specified mailing lists, i.e. "
+            f"{release_policy_mailto_addresses}.",
+        )
+        vote_duration = wtforms.IntegerField(
+            "Minimum vote duration",
+            validators=[
+                wtforms.validators.InputRequired("Vote duration is required"),
+                util.validate_vote_duration,
+            ],
+            default=min_hours,
+            description="Minimum number of hours the vote will be open for.",
+        )
+
+    project = release.project
+
+    # The subject can be changed by the user
+    # TODO: We should consider not allowing the subject to be changed
+    default_subject = f"[VOTE] Release {project.display_name} {version_name}"
+    default_body = await construct.start_vote_default(project_name)
+
+    data = (await quart.request.form) if (quart.request.method == "POST") else None
+    if (data or {}).get("hidden_field"):
+        raise NotImplementedError("Manual vote process")
+
+    form = await SubsetVoteInitiateForm.create_form(
+        data=data if (quart.request.method == "POST") else None,
+    )
+    # Set hidden field data explicitly
+    form.release_name.data = release.name
+
+    if quart.request.method == "GET":
+        form.subject.data = default_subject
+        form.body.data = default_body
+    return form
 
 
 async def _keys_warning(
