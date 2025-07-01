@@ -133,7 +133,8 @@ async def files(args: checks.FunctionArguments) -> results.Results | None:
     _LOGGER.info(f"Checking license files for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
-        for result in await asyncio.to_thread(_files_check_core_logic, str(artifact_abs_path)):
+        is_podling = args.extra_args.get("is_podling", False)
+        for result in await asyncio.to_thread(_files_check_core_logic, str(artifact_abs_path), is_podling):
             match result:
                 case ArtifactResult():
                     await _record_artifact(recorder, result)
@@ -198,15 +199,15 @@ def headers_validate(content: bytes, _filename: str) -> tuple[bool, str | None]:
 # File helpers
 
 
-def _files_check_core_logic(artifact_path: str) -> Iterator[Result]:
+def _files_check_core_logic(artifact_path: str, is_podling: bool) -> Iterator[Result]:
     """Verify that LICENSE and NOTICE files exist and are placed and formatted correctly."""
     license_results: dict[str, str | None] = {}
     notice_results: dict[str, tuple[bool, list[str], str]] = {}
+    disclaimer_found = False
 
     # Check for license files in the root directory
     with tarzip.open_archive(artifact_path) as archive:
         for member in archive:
-            # _LOGGER.warning(f"Checking member: {member.name}")
             if member.name and member.name.split("/")[-1].startswith("._"):
                 # Metadata convention
                 continue
@@ -224,9 +225,17 @@ def _files_check_core_logic(artifact_path: str) -> Iterator[Result]:
                 # TODO: Check length doesn't exceed some preset
                 notice_ok, notice_issues, notice_preamble = _files_check_core_logic_notice(archive, member)
                 notice_results[filename] = (notice_ok, notice_issues, notice_preamble)
+            elif filename in {"DISCLAIMER", "DISCLAIMER-WIP"}:
+                disclaimer_found = True
 
     yield from __license_results(license_results)
     yield from __notice_results(notice_results)
+    if is_podling and (not disclaimer_found):
+        yield ArtifactResult(
+            status=models.CheckResultStatus.FAILURE,
+            message="No DISCLAIMER or DISCLAIMER-WIP file found",
+            data=None,
+        )
 
 
 def _files_check_core_logic_license(archive: tarzip.Archive, member: tarzip.Member) -> str | None:
