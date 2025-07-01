@@ -16,14 +16,14 @@
 # under the License.
 
 import datetime
-import json
 import logging
-from typing import Any, Final
+from typing import Final
 
 import atr.construct as construct
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.mail as mail
+import atr.results as results
 import atr.schema as schema
 import atr.tasks.checks as checks
 import atr.util as util
@@ -49,11 +49,10 @@ class VoteInitiationError(Exception): ...
 
 
 @checks.with_model(Initiate)
-async def initiate(args: Initiate) -> str | None:
+async def initiate(args: Initiate) -> results.Results | None:
     """Initiate a vote for a release."""
     try:
-        result_data = await _initiate_core_logic(args)
-        return json.dumps(result_data)
+        return await _initiate_core_logic(args)
 
     except VoteInitiationError as e:
         _LOGGER.error(f"Vote initiation failed: {e}")
@@ -63,7 +62,7 @@ async def initiate(args: Initiate) -> str | None:
         raise
 
 
-async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
+async def _initiate_core_logic(args: Initiate) -> results.Results | None:
     """Get arguments, create an email, and then send it to the recipient."""
     _LOGGER.info("Starting initiate_core")
 
@@ -137,18 +136,18 @@ async def _initiate_core_logic(args: Initiate) -> dict[str, Any]:
     mid, mail_errors = await mail.send(message)
 
     # Original success message structure
-    result_data: dict[str, str | list[str]] = {
-        "message": "Vote announcement email sent successfully",
-        "email_to": args.email_to,
-        "vote_end": vote_end_str,
-        "subject": subject,
-        "mid": mid,
-    }
+    result = results.VoteInitiate(
+        kind="vote_initiate",
+        message="Vote announcement email sent successfully",
+        email_to=args.email_to,
+        vote_end=vote_end_str,
+        subject=subject,
+        mid=mid,
+        mail_send_warnings=mail_errors,
+    )
 
     if mail_errors:
         _LOGGER.warning(f"Start vote for {args.release_name}: sending to {args.email_to}  gave errors: {mail_errors}")
-        result_data["mail_send_warnings"] = mail_errors
     else:
         _LOGGER.info(f"Vote email sent successfully to {args.email_to}")
-
-    return result_data
+    return result

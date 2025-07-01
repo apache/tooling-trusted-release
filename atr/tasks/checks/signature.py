@@ -26,13 +26,14 @@ import sqlmodel
 
 import atr.db as db
 import atr.db.models as models
+import atr.results as results
 import atr.tasks.checks as checks
 import atr.util as util
 
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-async def check(args: checks.FunctionArguments) -> str | None:
+async def check(args: checks.FunctionArguments) -> results.Results | None:
     """Check a signature file."""
     recorder = await args.recorder()
     if not (primary_abs_path := await recorder.abs_path()):

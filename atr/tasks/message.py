@@ -15,11 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import json
 import logging
 from typing import Final
 
 import atr.mail as mail
+import atr.results as results
 import atr.schema as schema
 import atr.tasks.checks as checks
 import atr.util as util
@@ -43,7 +43,7 @@ class SendError(Exception): ...
 
 
 @checks.with_model(Send)
-async def send(args: Send) -> str | None:
+async def send(args: Send) -> results.Results | None:
     if args.email_recipient not in util.permitted_recipients(args.email_sender):
         raise SendError(f"You are not permitted to send announcements to {args.email_recipient}")
 
@@ -59,14 +59,15 @@ async def send(args: Send) -> str | None:
     # TODO: Move this call into send itself?
     await mail.set_secret_key_default()
     mid, mail_errors = await mail.send(message)
-
-    result_data: dict[str, str | list[str]] = {"mid": mid}
     if mail_errors:
         _LOGGER.warning(f"Mail sending to {args.email_recipient} for subject '{args.subject}' encountered errors:")
         for error in mail_errors:
             _LOGGER.warning(f"- {error}")
-        result_data["mail_send_warnings"] = mail_errors
 
     # TODO: Record the vote in the database?
     # We'd need to sync with manual votes too
-    return json.dumps(result_data)
+    return results.MessageSend(
+        kind="message_send",
+        mid=mid,
+        mail_send_warnings=mail_errors,
+    )

@@ -21,6 +21,7 @@ import tarfile
 from typing import Final
 
 import atr.archives as archives
+import atr.results as results
 import atr.tasks.checks as checks
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ class RootDirectoryError(Exception):
     ...
 
 
-async def integrity(args: checks.FunctionArguments) -> str | None:
+async def integrity(args: checks.FunctionArguments) -> results.Results | None:
     """Check the integrity of a .tar.gz file."""
     recorder = await args.recorder()
     if not (artifact_abs_path := await recorder.abs_path()):
@@ -72,7 +73,7 @@ def root_directory(tgz_path: str) -> str:
     return root
 
 
-async def structure(args: checks.FunctionArguments) -> str | None:
+async def structure(args: checks.FunctionArguments) -> results.Results | None:
     """Check the structure of a .tar.gz file."""
     recorder = await args.recorder()
     if not (artifact_abs_path := await recorder.abs_path()):

@@ -23,6 +23,7 @@ import aiofiles
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.db.models as models
+import atr.results as results
 import atr.schema as schema
 import atr.tasks.checks as checks
 import atr.util as util
@@ -38,7 +39,7 @@ class ImportFile(schema.Strict):
 
 
 @checks.with_model(ImportFile)
-async def import_file(args: ImportFile) -> str | None:
+async def import_file(args: ImportFile) -> results.Results | None:
     """Import a KEYS file from a draft release candidate revision."""
     async with db.session() as data:
         release = await data.release(name=args.release_name).demand(

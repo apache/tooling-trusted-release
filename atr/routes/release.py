@@ -49,10 +49,6 @@ async def bulk_status(session: routes.CommitterSession, task_id: int) -> str | r
         if task.task_type != "package_bulk_download":
             return await session.redirect(root.index, error=f"Task with ID {task_id} is not a bulk download task.")
 
-        # If result is a list or tuple with a single item, extract it
-        if isinstance(task.result, list | tuple) and (len(task.result) == 1):
-            task.result = task.result[0]
-
         # Get the release associated with this task if available
         release = None
         # Debug print the task.task_args using the logger

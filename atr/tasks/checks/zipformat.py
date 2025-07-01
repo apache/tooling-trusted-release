@@ -21,12 +21,13 @@ import os
 import zipfile
 from typing import Any, Final
 
+import atr.results as results
 import atr.tasks.checks as checks
 
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-async def integrity(args: checks.FunctionArguments) -> str | None:
+async def integrity(args: checks.FunctionArguments) -> results.Results | None:
     """Check that the zip archive is not corrupted and can be opened."""
     recorder = await args.recorder()
     if not (artifact_abs_path := await recorder.abs_path()):
@@ -46,7 +47,7 @@ async def integrity(args: checks.FunctionArguments) -> str | None:
     return None
 
 
-async def structure(args: checks.FunctionArguments) -> str | None:
+async def structure(args: checks.FunctionArguments) -> results.Results | None:
     """Check that the zip archive has a single root directory matching the artifact name."""
     recorder = await args.recorder()
     if not (artifact_abs_path := await recorder.abs_path()):

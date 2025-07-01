@@ -17,9 +17,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Final
+from typing import Final
 
 import atr.db.models as models
+import atr.results as results
 
 QUEUED: Final = models.TaskStatus.QUEUED
 ACTIVE: Final = models.TaskStatus.ACTIVE
@@ -30,13 +31,6 @@ FAILED: Final = models.TaskStatus.FAILED
 class Error(Exception):
     """Error during task execution."""
 
-    def __init__(self, message: str, *result: Any) -> None:
+    def __init__(self, message: str, *result: results.Results | None) -> None:
         self.message = message
-        self.result = tuple(result)
-
-
-def results_as_tuple(item: Any) -> tuple[Any, ...]:
-    """Ensure that returned results are structured as a tuple."""
-    if not isinstance(item, tuple):
-        return (item,)
-    return item
+        self.result = result

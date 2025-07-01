@@ -16,7 +16,6 @@
 # under the License.
 
 import enum
-import json
 import logging
 import time
 from collections.abc import Generator
@@ -29,6 +28,7 @@ import wtforms
 
 import atr.db as db
 import atr.db.models as models
+import atr.results as results
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.resolve as resolve
@@ -116,7 +116,15 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         if util.is_dev_environment():
             logging.warning("Setting vote task to completed in dev environment")
             latest_vote_task.status = models.TaskStatus.COMPLETED
-            latest_vote_task.result = [json.dumps({"mid": TEST_MID})]
+            latest_vote_task.result = results.VoteInitiate(
+                kind="vote_initiate",
+                message="Vote announcement email sent successfully",
+                email_to="example@example.org.INVALID",
+                vote_end="2025-07-01 12:00:00",
+                subject="Test vote",
+                mid=TEST_MID,
+                mail_send_warnings=[],
+            )
 
         # Move task_mid_get here?
         task_mid = resolve.task_mid_get(latest_vote_task)

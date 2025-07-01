@@ -25,7 +25,6 @@
 import asyncio
 import datetime
 import inspect
-import json
 import logging
 import os
 import resource
@@ -37,6 +36,7 @@ import sqlmodel
 
 import atr.db as db
 import atr.db.models as models
+import atr.results as results
 import atr.tasks as tasks
 import atr.tasks.checks as checks
 import atr.tasks.task as task
@@ -105,34 +105,6 @@ def _setup_logging() -> None:
 # Task functions
 
 
-async def _task_error_handle(task_id: int, e: Exception) -> None:
-    """Handle task error by updating the database with error information."""
-    if isinstance(e, task.Error):
-        _LOGGER.error(f"Task {task_id} failed: {e.message}")
-        _LOGGER.error("".join(traceback.format_exception(e)))
-        result = json.dumps(e.result)
-
-        async with db.session() as data:
-            async with data.begin():
-                task_obj = await data.task(id=task_id).get()
-                if task_obj:
-                    task_obj.status = task.FAILED
-                    task_obj.completed = datetime.datetime.now(datetime.UTC)
-                    task_obj.error = e.message
-                    task_obj.result = result
-    else:
-        _LOGGER.error(f"Task {task_id} failed: {e}")
-        _LOGGER.error("".join(traceback.format_exception(e)))
-
-        async with db.session() as data:
-            async with data.begin():
-                task_obj = await data.task(id=task_id).get()
-                if task_obj:
-                    task_obj.status = task.FAILED
-                    task_obj.completed = datetime.datetime.now(datetime.UTC)
-                    task_obj.error = str(e)
-
-
 async def _task_next_claim() -> tuple[int, str, list[str] | dict[str, Any]] | None:
     """
     Attempt to claim the oldest unclaimed task.
@@ -181,10 +153,10 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
         task_type_member = models.TaskType(task_type)
     except ValueError as e:
         _LOGGER.error(f"Invalid task type: {task_type}")
-        await _task_result_process(task_id, tuple(), task.FAILED, str(e))
+        await _task_result_process(task_id, None, task.FAILED, str(e))
         return
 
-    task_results: tuple[Any, ...]
+    task_results: results.Results | None
     try:
         handler = tasks.resolve(task_type_member)
         sig = inspect.signature(handler)
@@ -235,11 +207,11 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
             # Otherwise, it's not a check handler
             handler_result = await handler(task_args)
 
-        task_results = (handler_result,)
+        task_results = handler_result
         status = task.COMPLETED
         error = None
     except Exception as e:
-        task_results = tuple()
+        task_results = None
         status = task.FAILED
         error_details = traceback.format_exc()
         _LOGGER.error(f"Task {task_id} failed processing: {error_details}")
@@ -248,7 +220,7 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
 
 
 async def _task_result_process(
-    task_id: int, task_results: tuple[Any, ...], status: models.TaskStatus, error: str | None = None
+    task_id: int, task_results: results.Results | None, status: models.TaskStatus, error: str | None = None
 ) -> None:
     """Process and store task results in the database."""
     async with db.session() as data:

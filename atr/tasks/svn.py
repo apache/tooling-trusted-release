@@ -23,6 +23,7 @@ from typing import Any, Final
 import aiofiles.os
 import aioshutil
 
+import atr.results as results
 import atr.revision as revision
 import atr.schema as schema
 import atr.tasks.checks as checks
@@ -50,11 +51,14 @@ class SvnImportError(Exception):
 
 
 @checks.with_model(SvnImport)
-async def import_files(args: SvnImport) -> str | None:
+async def import_files(args: SvnImport) -> results.Results | None:
     """Import files from SVN into a draft release candidate revision."""
     try:
         result_message = await _import_files_core(args)
-        return result_message
+        return results.SvnImportFiles(
+            kind="svn_import",
+            msg=result_message,
+        )
     except SvnImportError as e:
         _LOGGER.error(f"SVN import failed: {e.details}")
         raise

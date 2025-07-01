@@ -23,6 +23,7 @@ from typing import Final
 import aiofiles.os
 
 import atr.analysis as analysis
+import atr.results as results
 import atr.tasks.checks as checks
 import atr.util as util
 
@@ -30,7 +31,7 @@ _ALLOWED_TOP_LEVEL = {"CHANGES", "LICENSE", "NOTICE", "README"}
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-async def check(args: checks.FunctionArguments) -> None:
+async def check(args: checks.FunctionArguments) -> results.Results | None:
     """Check file path structure and naming conventions against ASF release policy for all files in a release."""
     # We refer to the following authoritative policies:
     # - Release Creation Process (RCP)

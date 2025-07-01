@@ -25,6 +25,7 @@ from collections.abc import Iterator
 from typing import Any, Final
 
 import atr.db.models as models
+import atr.results as results
 import atr.schema as schema
 import atr.static as static
 import atr.tarzip as tarzip
@@ -121,7 +122,7 @@ Result = ArtifactResult | MemberResult | MemberSkippedResult
 # Tasks
 
 
-async def files(args: checks.FunctionArguments) -> str | None:
+async def files(args: checks.FunctionArguments) -> results.Results | None:
     """Check that the LICENSE and NOTICE files exist and are valid."""
     recorder = await args.recorder()
     if not (artifact_abs_path := await recorder.abs_path()):
@@ -148,7 +149,7 @@ async def files(args: checks.FunctionArguments) -> str | None:
     return None
 
 
-async def headers(args: checks.FunctionArguments) -> str | None:
+async def headers(args: checks.FunctionArguments) -> results.Results | None:
     """Check that all source files have valid license headers."""
     recorder = await args.recorder()
     if not (artifact_abs_path := await recorder.abs_path()):

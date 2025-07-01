@@ -207,7 +207,7 @@ def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, ver
         logging.warning("Vote initiation banner not detected after 15s, proceeding anyway")
 
     logging.info("Locating the 'Resolve vote' button")
-    tabulate_form_locator = page.locator(f'form[action="/vote/tooling-test-example/{version_name}/tabulate"]')
+    tabulate_form_locator = page.locator(f'form[action="/vote/tooling-test-example/{version_name}/resolve"]')
     sync_api.expect(tabulate_form_locator).to_be_visible()
 
     tabulate_button_locator = tabulate_form_locator.locator('button[type="submit"]:has-text("Resolve vote")')
@@ -216,7 +216,7 @@ def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, ver
     tabulate_button_locator.click()
 
     logging.info("Waiting for navigation to tabulated votes page")
-    wait_for_path(page, f"/vote/tooling-test-example/{version_name}/tabulate")
+    wait_for_path(page, f"/vote/tooling-test-example/{version_name}/resolve")
 
     logging.info("Locating the resolve vote form on the tabulated votes page")
     resolve_form_locator = page.locator(f'form[action="/resolve/tooling-test-example/{version_name}"]')

@@ -26,6 +26,7 @@ from typing import Any, Final
 
 import atr.archives as archives
 import atr.config as config
+import atr.results as results
 import atr.tasks.checks as checks
 import atr.util as util
 
@@ -44,7 +45,7 @@ _LOGGER: Final = logging.getLogger(__name__)
 _RAT_EXCLUDES_FILENAMES: Final[set[str]] = {".rat-excludes", "rat-excludes.txt"}
 
 
-async def check(args: checks.FunctionArguments) -> str | None:
+async def check(args: checks.FunctionArguments) -> results.Results | None:
     """Use Apache RAT to check the licenses of the files in the artifact."""
     recorder = await args.recorder()
     if not (artifact_abs_path := await recorder.abs_path()):

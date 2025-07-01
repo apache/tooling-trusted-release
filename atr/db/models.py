@@ -31,6 +31,7 @@ import sqlalchemy.orm as orm
 import sqlalchemy.sql.expression as expression
 import sqlmodel
 
+import atr.results as results
 import atr.schema as schema
 
 sqlmodel.SQLModel.metadata = sqlalchemy.MetaData(
@@ -75,6 +76,28 @@ class UTCDateTime(sqlalchemy.types.TypeDecorator):
             return value.replace(tzinfo=datetime.UTC)
         else:
             return value
+
+
+class ResultsJSON(sqlalchemy.types.TypeDecorator):
+    impl = sqlalchemy.JSON
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if hasattr(value, "model_dump"):
+            return value.model_dump()
+        if isinstance(value, dict):
+            return value
+        raise ValueError("Unsupported value for Results column")
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        try:
+            return results.ResultsAdapter.validate_python(value)
+        except pydantic.ValidationError:
+            return None
 
 
 class UserRole(str, enum.Enum):
@@ -557,7 +580,7 @@ class Task(sqlmodel.SQLModel, table=True):
         default=None,
         sa_column=sqlalchemy.Column(UTCDateTime),
     )
-    result: Any | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
+    result: results.Results | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(ResultsJSON))
     error: str | None = None
 
     # Used for check tasks

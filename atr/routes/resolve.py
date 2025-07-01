@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import json
 
 import quart
 import sqlmodel
@@ -24,6 +23,7 @@ import werkzeug.wrappers.response as response
 import atr.construct as construct
 import atr.db as db
 import atr.db.models as models
+import atr.results as results
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
@@ -111,25 +111,11 @@ def task_mid_get(latest_vote_task: models.Task) -> str | None:
     if util.is_dev_environment():
         return vote.TEST_MID
     # TODO: Improve this
-    task_mid = None
 
-    try:
-        for result in latest_vote_task.result or []:
-            if isinstance(result, str):
-                parsed_result = json.loads(result)
-            else:
-                # Shouldn't happen
-                parsed_result = result
-            if isinstance(parsed_result, dict):
-                task_mid = parsed_result.get("mid", "(mid not found in result)")
-                break
-            else:
-                task_mid = "(malformed result)"
-
-    except (json.JSONDecodeError, TypeError):
-        task_mid = "(malformed result)"
-
-    return task_mid
+    result = latest_vote_task.result
+    if not isinstance(result, results.VoteInitiate):
+        return None
+    return result.mid
 
 
 async def _resolve_vote(

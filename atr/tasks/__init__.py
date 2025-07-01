@@ -21,6 +21,7 @@ from typing import Any, Final
 
 import atr.db as db
 import atr.db.models as models
+import atr.results as results
 import atr.tasks.checks.hashing as hashing
 import atr.tasks.checks.license as license
 import atr.tasks.checks.paths as paths
@@ -139,7 +140,7 @@ def queued(
     )
 
 
-def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[str | None]]:  # noqa: C901
+def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[results.Results | None]]:  # noqa: C901
     match task_type:
         case models.TaskType.HASHING_CHECK:
             return hashing.check

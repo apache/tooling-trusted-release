@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import json
 from typing import TYPE_CHECKING
 
 import werkzeug.wrappers.response as response
@@ -24,6 +23,7 @@ import wtforms
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.db.models as models
+import atr.results as results
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.draft as draft
@@ -124,28 +124,8 @@ def _warnings_from_vote_result(vote_task: models.Task | None) -> list[str]:
     if not vote_task or (not vote_task.result):
         return ["No vote task result found."]
 
-    if not isinstance(vote_task.result, list):
-        return ["Vote task result is not a list."]
+    vote_task_result = vote_task.result
+    if not isinstance(vote_task_result, results.VoteInitiate):
+        return ["Vote task result is not a results.VoteInitiate instance."]
 
-    if len(vote_task.result) != 1:
-        return ["Vote task result list length invalid."]
-
-    if not (first_task_result := vote_task.result[0]):
-        return ["Vote task result item is empty."]
-
-    if not isinstance(first_task_result, str):
-        return ["Vote task result item is not a string."]
-
-    try:
-        data_after_json_parse = json.loads(first_task_result)
-    except json.JSONDecodeError:
-        return ["Vote task result content not valid JSON."]
-
-    if not isinstance(data_after_json_parse, dict):
-        return ["Vote task result JSON content not a dictionary."]
-
-    existing_warnings_list = data_after_json_parse.get("mail_send_warnings", [])
-    if not isinstance(existing_warnings_list, list):
-        return ["Vote task result mail_send_warnings is not a list."]
-
-    return existing_warnings_list
+    return vote_task_result.mail_send_warnings

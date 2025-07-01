@@ -22,12 +22,13 @@ from typing import Final
 
 import aiofiles
 
+import atr.results as results
 import atr.tasks.checks as checks
 
 _LOGGER: Final = logging.getLogger(__name__)
 
 
-async def check(args: checks.FunctionArguments) -> str | None:
+async def check(args: checks.FunctionArguments) -> results.Results | None:
     """Check the hash of a file."""
     recorder = await args.recorder()
     if not (hash_abs_path := await recorder.abs_path()):

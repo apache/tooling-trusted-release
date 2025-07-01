@@ -25,6 +25,7 @@ import aiofiles
 
 import atr.archives as archives
 import atr.config as config
+import atr.results as results
 import atr.schema as schema
 import atr.tasks.checks as checks
 import atr.tasks.checks.targz as targz
@@ -50,7 +51,7 @@ class SBOMGenerationError(Exception):
 
 
 @checks.with_model(GenerateCycloneDX)
-async def generate_cyclonedx(args: GenerateCycloneDX) -> str | None:
+async def generate_cyclonedx(args: GenerateCycloneDX) -> results.Results | None:
     """Generate a CycloneDX SBOM for the given artifact and write it to the output path."""
     try:
         result_data = await _generate_cyclonedx_core(args.artifact_path, args.output_path)
@@ -58,7 +59,10 @@ async def generate_cyclonedx(args: GenerateCycloneDX) -> str | None:
         msg = result_data["message"]
         if not isinstance(msg, str):
             raise SBOMGenerationError(f"Invalid message type: {type(msg)}")
-        return msg
+        return results.SBOMGenerateCycloneDX(
+            kind="sbom_generate_cyclonedx",
+            msg=msg,
+        )
     except (archives.ExtractionError, SBOMGenerationError) as e:
         _LOGGER.error(f"SBOM generation failed for {args.artifact_path}: {e}")
         raise
