@@ -46,7 +46,24 @@ async def selected_revision(
     await session.check_access(project_name)
 
     async with db.session() as data:
-        release = await session.release(project_name, version_name, data=data, with_project=True, with_committee=True)
+        release = await session.release(
+            project_name,
+            version_name,
+            data=data,
+            with_project=True,
+            with_committee=True,
+            with_project_release_policy=True,
+        )
+        if release.project.policy_strict_checking:
+            if await interaction.has_failing_checks(release, revision, caller_data=data):
+                return await session.redirect(
+                    compose.selected,
+                    error="This release candidate draft has errors. Please fix the errors before starting a vote.",
+                    project_name=project_name,
+                    version_name=version_name,
+                    revision=revision,
+                )
+
         # Check that the user is on the project committee for the release
         # TODO: Consider relaxing this to all committers
         # Otherwise we must not show the vote form

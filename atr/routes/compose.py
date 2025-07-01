@@ -77,7 +77,8 @@ async def check(
     empty_form = await util.EmptyForm.create_form()
     vote_task_warnings = _warnings_from_vote_result(vote_task)
     has_files = await util.has_files(release)
-    has_any_errors = any(info.errors[path] for path in paths) if info else False
+
+    has_any_errors = any(info.errors.get(path, []) for path in paths) if info else False
     strict_checking = release.project.policy_strict_checking
     strict_checking_errors = strict_checking and has_any_errors
 

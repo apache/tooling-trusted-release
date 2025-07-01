@@ -61,11 +61,34 @@ class PathInfo(schema.Strict):
     warnings: dict[pathlib.Path, list[models.CheckResult]] = schema.factory(dict)
 
 
+def ensure_session(caller_data: db.Session | None) -> db.Session | contextlib.nullcontext[db.Session]:
+    if caller_data is None:
+        return db.session()
+    return contextlib.nullcontext(caller_data)
+
+
 @contextlib.asynccontextmanager
 async def ephemeral_gpg_home() -> AsyncGenerator[str]:
     """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
     async with util.async_temporary_directory(prefix="gpg-") as temp_dir:
         yield str(temp_dir)
+
+
+async def has_failing_checks(
+    release: models.Release, revision_number: str, caller_data: db.Session | None = None
+) -> bool:
+    async with ensure_session(caller_data) as data:
+        query = (
+            sqlmodel.select(sqlalchemy.func.count())
+            .select_from(models.CheckResult)
+            .where(
+                models.CheckResult.release_name == release.name,
+                models.CheckResult.revision_number == revision_number,
+                models.CheckResult.status == models.CheckResultStatus.FAILURE,
+            )
+        )
+        result = await data.execute(query)
+        return result.scalar_one() > 0
 
 
 async def key_user_add(
