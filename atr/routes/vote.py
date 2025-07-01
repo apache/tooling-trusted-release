@@ -562,7 +562,9 @@ def _tabulate_vote_resolution(
     body.extend(_tabulate_vote_resolution_votes(tabulated_votes, {VoteStatus.BINDING}))
 
     binding_total = summary["binding_votes"]
-    body.append(f"There were {binding_total} binding {'vote' if (binding_total == 1) else 'votes'}.")
+    were_word = "was" if (binding_total == 1) else "were"
+    votes_word = "vote" if (binding_total == 1) else "votes"
+    body.append(f"There {were_word} {binding_total} binding {votes_word}.")
     body.append("")
 
     binding_yes = summary["binding_votes_yes"]
