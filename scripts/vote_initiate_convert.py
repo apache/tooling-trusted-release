@@ -8,6 +8,7 @@ import json
 import sys
 from typing import Any, Final, cast
 
+import pydantic
 import sqlalchemy
 import sqlmodel
 
@@ -39,7 +40,7 @@ def _convert_legacy(raw_val: Any) -> results.VoteInitiate | None:
     """Convert legacy JSON payloads to VoteInitiate, return None if impossible."""
 
     if raw_val in (None, "", "[]", []):
-        return None
+        raise ValueError("Empty or null result")
 
     # If it's bytes, decode to str first
     if isinstance(raw_val, bytes | bytearray):
@@ -50,35 +51,42 @@ def _convert_legacy(raw_val: Any) -> results.VoteInitiate | None:
     if isinstance(raw_val, str):
         try:
             raw_val = json.loads(raw_val)
-        except json.JSONDecodeError:
-            return None
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Top level JSON decode failed: {exc}") from exc
+
     return _convert_legacy_continued(raw_val)
 
 
-def _convert_legacy_continued(raw_val: Any) -> results.VoteInitiate | None:
+def _convert_legacy_continued(raw_val: Any) -> results.VoteInitiate:
     # If we now have list or tuple, take the first element
     if isinstance(raw_val, list | tuple):
         if not raw_val:
-            return None
+            raise ValueError("List payload empty")
         raw_val = raw_val[0]
         # That element might itself be a JSON string
         if isinstance(raw_val, str):
             try:
                 raw_val = json.loads(raw_val)
-            except json.JSONDecodeError:
-                return None
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Inner JSON decode failed: {exc}") from exc
 
     # Expect raw_val to be dict now
     if not isinstance(raw_val, dict):
-        return None
+        raise ValueError(f"Unexpected type after normalisation: {type(raw_val).__name__}")
 
     # Inject the discriminator
     raw_val.setdefault("kind", "vote_initiate")
 
+    # Normalise optional or missing fields expected by VoteInitiate
+    raw_val.setdefault("mail_send_warnings", [])
+    # Ensure type is list[str]
+    if not isinstance(raw_val["mail_send_warnings"], list):
+        raw_val["mail_send_warnings"] = [str(raw_val["mail_send_warnings"])]
+
     try:
         return results.VoteInitiate.model_validate(raw_val)
-    except Exception:
-        return None
+    except pydantic.ValidationError as exc:
+        raise ValueError(f"Pydantic validation failed: {exc}") from exc
 
 
 async def audit_vote_initiate_results() -> None:
@@ -101,15 +109,14 @@ async def audit_vote_initiate_results() -> None:
                 continue
 
             raw_val = await _raw_result(data, task.id)
-            new_val = _convert_legacy(raw_val)
-
-            if new_val is None:
+            try:
+                new_val = _convert_legacy(raw_val)
+            except ValueError as err:
                 skipped += 1
-                # For diagnostics, print raw value in truncated form
                 preview = (
-                    f"{str(raw_val)[:120]}..." if isinstance(raw_val, str) and len(raw_val) > 120 else str(raw_val)
+                    f"{str(raw_val)[:120]}..." if isinstance(raw_val, str) and len(str(raw_val)) > 120 else str(raw_val)
                 )
-                _write(f"Task id={task.id}: could not convert legacy result, raw preview: {preview}")
+                _write(f"Task id={task.id}: conversion error -> {err}; raw preview: {preview}")
                 continue
 
             # Apply upgrade in current transaction
