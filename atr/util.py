@@ -308,6 +308,8 @@ def is_dev_environment() -> bool:
 def email_from_uid(uid: str) -> str | None:
     if m := re.search(r"<([^>]+)>", uid):
         return m.group(1).lower()
+    elif m := re.search(r"^([^@ ]+)@apache.org$", uid):
+        return uid
     return None
 
 

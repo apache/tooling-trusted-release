@@ -48,6 +48,7 @@ _THREAD_URLS_FOR_DEVELOPMENT: Final[dict[str, str]] = {
     "CANVKqzfLYj6TAVP_Sfsy5vFbreyhKskpRY-vs=F7aLed+rL+uA@mail.gmail.com": "https://lists.apache.org/thread/oy969lhh6wlzd51ovckn8fly9rvpopwh",
     "CAH4123ZwGtkwszhEU7qnMByLa-yvyKz2W+DjH_UChPMuzaa54g@mail.gmail.com": "https://lists.apache.org/thread/7111mqyc25sfqxm6bf4ynwhs0bk0r4ys",
     "CADL1oArKFcXvNb1MJfjN=10-yRfKxgpLTRUrdMM1R7ygaTkdYQ@mail.gmail.com": "https://lists.apache.org/thread/d7119h2qm7jrd5zsbp8ghkk0lpvnnxnw",
+    "a1507118-88b1-4b7b-923e-7f2b5330fc01@apache.org": "https://lists.apache.org/thread/gzjd2jv7yod5sk5rgdf4x33g5l3fdf5o",
 }
 
 
@@ -510,7 +511,8 @@ def _tabulate_vote_outcome_format(
     outcome_passed = (binding_plus_one >= 3) and (binding_plus_one > binding_minus_one)
     if not outcome_passed:
         if (duration_hours_remaining is not None) and (duration_hours_remaining > 0):
-            msg = f"The vote is still open for {duration_hours_remaining} hours, but the vote would fail if closed now."
+            rounded = round(duration_hours_remaining, 2)
+            msg = f"The vote is still open for {rounded} hours, but it would fail if closed now."
         elif duration_hours_remaining is None:
             msg = "The vote would fail if closed now."
         else:
@@ -518,7 +520,8 @@ def _tabulate_vote_outcome_format(
         return False, msg
 
     if (duration_hours_remaining is not None) and (duration_hours_remaining > 0):
-        msg = f"The vote is still open for {duration_hours_remaining} hours, but the vote would pass if closed now."
+        rounded = round(duration_hours_remaining, 2)
+        msg = f"The vote is still open for {rounded} hours, but it would pass if closed now."
     else:
         msg = "The vote passed."
     return True, msg
