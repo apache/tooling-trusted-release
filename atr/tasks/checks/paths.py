@@ -35,7 +35,11 @@ async def check(args: checks.FunctionArguments) -> results.Results | None:
     """Check file path structure and naming conventions against ASF release policy for all files in a release."""
     # We refer to the following authoritative policies:
     # - Release Creation Process (RCP)
+    # https://infra.apache.org/release-publishing.html
     # - Release Distribution Policy (RDP)
+    # https://infra.apache.org/release-distribution.html
+    # - Incubation Policy (IP)
+    # https://incubator.apache.org/policy/incubation.html
 
     recorder_errors = await checks.Recorder.create(
         checker=checks.function_key(check) + "_errors",
@@ -89,7 +93,7 @@ async def check(args: checks.FunctionArguments) -> results.Results | None:
 
 
 async def _check_artifact_rules(
-    base_path: pathlib.Path, relative_path: pathlib.Path, relative_paths: set[str], errors: list[str]
+    base_path: pathlib.Path, relative_path: pathlib.Path, relative_paths: set[str], errors: list[str], is_podling: bool
 ) -> None:
     """Check rules specific to artifact files."""
     full_path = base_path / relative_path
@@ -106,6 +110,12 @@ async def _check_artifact_rules(
     has_sha512 = str(relative_sha512_path) in relative_paths
     if not (has_sha256 or has_sha512):
         errors.append(f"Missing corresponding checksum file ({relative_path}.sha256 or {relative_path}.sha512)")
+
+    # IP requires "incubating" in the filename
+    if is_podling is True:
+        # TODO: Allow "incubator" too as #114 requests?
+        if "incubating" not in full_path.name:
+            errors.append("Podling artifact filenames must include 'incubating'")
 
 
 async def _check_metadata_rules(
@@ -177,13 +187,9 @@ async def _check_path_process_single(
     ext_metadata = search.group("metadata") if search else None
 
     allowed_top_level = _ALLOWED_TOP_LEVEL
-    if is_podling:
-        # TODO: We must also require that one of these is present
-        allowed_top_level |= {"DISCLAIMER", "DISCLAIMER-WIP"}
-
     if ext_artifact:
         _LOGGER.info("Checking artifact rules for %s", full_path)
-        await _check_artifact_rules(base_path, relative_path, relative_paths, errors)
+        await _check_artifact_rules(base_path, relative_path, relative_paths, errors, is_podling)
     elif ext_metadata:
         _LOGGER.info("Checking metadata rules for %s", full_path)
         await _check_metadata_rules(base_path, relative_path, relative_paths, ext_metadata, errors, warnings)
