@@ -313,6 +313,15 @@ def email_from_uid(uid: str) -> str | None:
     return None
 
 
+async def email_mid_from_thread_id(thread_id: str) -> tuple[str, str]:
+    async for msg_id, msg_json in thread_messages(thread_id):
+        email_to = email_from_uid(msg_json.get("to", ""))
+        if email_to is None:
+            raise RuntimeError(f"Cannot find email address for {msg_id}")
+        return email_to, msg_id
+    raise RuntimeError(f"Cannot find any messages in {thread_id}")
+
+
 async def email_to_uid_map() -> dict[str, str]:
     def get(entry: dict, prop: str) -> str | None:
         if prop in entry:

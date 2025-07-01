@@ -539,48 +539,71 @@ def _tabulate_vote_resolution(
     thread_id: str,
 ) -> str:
     """Generate a resolution email body."""
+    return "\n".join(
+        _tabulate_vote_resolution_body(
+            committee, release, tabulated_votes, summary, passed, outcome, full_name, asf_uid, thread_id
+        )
+    )
+
+
+def _tabulate_vote_resolution_body(
+    committee: models.Committee,
+    release: models.Release,
+    tabulated_votes: dict[str, VoteEmail],
+    summary: dict[str, int],
+    passed: bool,
+    outcome: str,
+    full_name: str,
+    asf_uid: str,
+    thread_id: str,
+) -> Generator[str]:
     committee_name = committee.display_name
     if release.podling_thread_id:
         committee_name = "Incubator"
-    body = [f"Dear {committee_name} participants,", ""]
+    yield f"Dear {committee_name} participants,"
+    yield ""
     outcome = "passed" if passed else "failed"
-    body.append(f"The vote on {release.project.name} {release.version} {outcome}.")
-    body.append("")
+    yield f"The vote on {release.project.name} {release.version} {outcome}."
+    yield ""
 
     if release.podling_thread_id:
-        body.append("The previous round of voting is archived at the following URL:")
-        body.append("")
-        body.append(f"https://lists.apache.org/thread/{release.podling_thread_id}")
-        body.append("")
-        body.append("The current vote thread is archived at the following URL:")
+        yield "The previous round of voting is archived at the following URL:"
+        yield ""
+        yield f"https://lists.apache.org/thread/{release.podling_thread_id}"
+        yield ""
+        yield "The current vote thread is archived at the following URL:"
     else:
-        body.append("The vote thread is archived at the following URL:")
-    body.append("")
-    body.append(f"https://lists.apache.org/thread/{thread_id}")
-    body.append("")
+        yield "The vote thread is archived at the following URL:"
+    yield ""
+    yield f"https://lists.apache.org/thread/{thread_id}"
+    yield ""
 
-    body.extend(_tabulate_vote_resolution_votes(tabulated_votes, {VoteStatus.BINDING}))
+    yield from _tabulate_vote_resolution_body_votes(tabulated_votes, summary)
+    yield "Thank you for your participation."
+    yield ""
+    yield "Sincerely,"
+    yield f"{full_name} ({asf_uid})"
+
+
+def _tabulate_vote_resolution_body_votes(
+    tabulated_votes: dict[str, VoteEmail], summary: dict[str, int]
+) -> Generator[str]:
+    yield from _tabulate_vote_resolution_votes(tabulated_votes, {VoteStatus.BINDING})
 
     binding_total = summary["binding_votes"]
     were_word = "was" if (binding_total == 1) else "were"
     votes_word = "vote" if (binding_total == 1) else "votes"
-    body.append(f"There {were_word} {binding_total} binding {votes_word}.")
-    body.append("")
+    yield f"There {were_word} {binding_total} binding {votes_word}."
+    yield ""
 
     binding_yes = summary["binding_votes_yes"]
     binding_no = summary["binding_votes_no"]
     binding_abstain = summary["binding_votes_abstain"]
-    body.append(f"Of these binding votes, {binding_yes} were +1, {binding_no} were -1, and {binding_abstain} were 0.")
-    body.append("")
+    yield f"Of these binding votes, {binding_yes} were +1, {binding_no} were -1, and {binding_abstain} were 0."
+    yield ""
 
-    body.extend(_tabulate_vote_resolution_votes(tabulated_votes, {VoteStatus.COMMITTER}))
-    body.extend(_tabulate_vote_resolution_votes(tabulated_votes, {VoteStatus.CONTRIBUTOR, VoteStatus.UNKNOWN}))
-
-    body.append("Thank you for your participation.")
-    body.append("")
-    body.append("Sincerely,")
-    body.append(f"{full_name} ({asf_uid})")
-    return "\n".join(body)
+    yield from _tabulate_vote_resolution_votes(tabulated_votes, {VoteStatus.COMMITTER})
+    yield from _tabulate_vote_resolution_votes(tabulated_votes, {VoteStatus.CONTRIBUTOR, VoteStatus.UNKNOWN})
 
 
 def _tabulate_vote_resolution_votes(tabulated_votes: dict[str, VoteEmail], statuses: set[VoteStatus]) -> Generator[str]:

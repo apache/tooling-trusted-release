@@ -74,7 +74,7 @@ async def selected_post(
 
     latest_vote_task = await release_latest_vote_task(release)
     if latest_vote_task is None:
-        return "No vote task found, unable to send resolution message."
+        raise RuntimeError("No vote task found, unable to send resolution message.")
     resolve_form = await vote.ResolveVoteForm.create_form()
     if not resolve_form.validate_on_submit():
         # TODO: Render the page again with errors
@@ -86,7 +86,9 @@ async def selected_post(
         )
     email_body = util.unwrap(resolve_form.email_body.data)
     vote_result = util.unwrap(resolve_form.vote_result.data)
-    first_podling_round_passing = is_podling and (podling_thread_id is None) and (vote_result == "passed")
+    voting_round = None
+    if is_podling is True:
+        voting_round = 1 if (podling_thread_id is None) else 2
     release, success_message = await _resolve_vote(
         session,
         project_name,
@@ -94,14 +96,16 @@ async def selected_post(
         email_body,
         latest_vote_task,
         release,
-        first_podling_round_passing,
+        voting_round,
     )
-    if first_podling_round_passing:
-        destination = vote.selected
-    elif vote_result == "passed":
-        destination = finish.selected
+    if vote_result == "passed":
+        if voting_round == 1:
+            destination = vote.selected
+        else:
+            destination = finish.selected
     else:
         destination = compose.selected
+
     return await session.redirect(
         destination, project_name=project_name, version_name=version_name, success=success_message
     )
@@ -125,7 +129,7 @@ async def _resolve_vote(
     resolution_body: str,
     latest_vote_task: models.Task,
     release: models.Release,
-    first_podling_round_passing: bool,
+    voting_round: int | None,
 ) -> tuple[models.Release, str]:
     # Check that the user has access to the project
     await session.check_access(project_name)
@@ -136,7 +140,8 @@ async def _resolve_vote(
             # Attach the existing release to the session
             release = await data.merge(release)
             # Update the release phase based on vote result
-            if first_podling_round_passing:
+            extra_destination = None
+            if (voting_round == 1) and (vote_result == "passed"):
                 # This is the first podling vote, by the PPMC and not the Incubator PMC
                 # In this branch, we do not move to RELEASE_PREVIEW but keep everything the same
                 # We only set the podling_thread_id to the thread_id of the vote thread
@@ -181,11 +186,18 @@ async def _resolve_vote(
                     project_name, release.version, session.uid, description=description
                 ) as _creating:
                     pass
+                if (voting_round == 2) and (release.podling_thread_id is not None):
+                    round_one_email_address, round_one_message_id = await util.email_mid_from_thread_id(
+                        release.podling_thread_id
+                    )
+                    extra_destination = (round_one_email_address, round_one_message_id)
             else:
                 release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
                 success_message = "Vote marked as failed"
 
-    error_message = await _send_resolution(session, release, vote_result, resolution_body)
+    error_message = await _send_resolution(
+        session, release, vote_result, resolution_body, extra_destination=extra_destination
+    )
     if error_message is not None:
         await quart.flash(error_message, "error")
     return release, success_message
@@ -196,6 +208,7 @@ async def _send_resolution(
     release: models.Release,
     resolution: str,
     body: str,
+    extra_destination: tuple[str, str] | None = None,
 ) -> str | None:
     # Get the email thread
     latest_vote_task = await release_latest_vote_task(release)
@@ -228,8 +241,24 @@ async def _send_resolution(
         project_name=release.project.name,
         version_name=release.version,
     )
+    tasks = [task]
+    if extra_destination is not None:
+        task = models.Task(
+            status=models.TaskStatus.QUEUED,
+            task_type=models.TaskType.MESSAGE_SEND,
+            task_args=message.Send(
+                email_sender=email_sender,
+                email_recipient=extra_destination[0],
+                subject=subject,
+                body=body,
+                in_reply_to=extra_destination[1],
+            ).model_dump(),
+            project_name=release.project.name,
+            version_name=release.version,
+        )
+        tasks.append(task)
     async with db.session() as data:
-        data.add(task)
+        data.add_all(tasks)
         await data.flush()
         await data.commit()
     return None
