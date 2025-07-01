@@ -158,6 +158,7 @@ class ReleasePolicy(sqlmodel.SQLModel, table=True):
     source_artifact_paths: list[str] = sqlmodel.Field(
         default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON)
     )
+    strict_checking: bool = sqlmodel.Field(default=False)
 
     # One-to-One: A release policy is associated with a project
     project: "Project" = sqlmodel.Relationship(back_populates="release_policy")
@@ -414,6 +415,12 @@ Thanks,
         if (policy := self.release_policy) is None:
             return []
         return policy.source_artifact_paths
+
+    @property
+    def policy_strict_checking(self) -> bool:
+        if (policy := self.release_policy) is None:
+            return False
+        return policy.strict_checking
 
 
 class DistributionChannel(sqlmodel.SQLModel, table=True):

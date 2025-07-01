@@ -75,6 +75,10 @@ class ReleasePolicyForm(util.QuartFormTyped):
         render_kw={"rows": 5},
         description="Paths to binary artifacts to be included in the release.",
     )
+    strict_checking = wtforms.BooleanField(
+        "Strict checking",
+        description="If enabled, then the release cannot be voted upon unless all checks pass.",
+    )
 
     # Vote section
     mailto_addresses = wtforms.FieldList(
@@ -420,6 +424,7 @@ async def _policy_edit(
         release_policy.source_artifact_paths = _parse_artifact_paths(
             util.unwrap(policy_form.source_artifact_paths.data)
         )
+        release_policy.strict_checking = util.unwrap(policy_form.strict_checking.data)
         _set_default_fields(policy_form, project, release_policy)
 
         release_policy.pause_for_rm = util.unwrap(policy_form.pause_for_rm.data)
@@ -430,6 +435,7 @@ async def _policy_edit(
 
 
 async def _policy_form_create(project: models.Project) -> ReleasePolicyForm:
+    # TODO: Use form order for all of these fields
     policy_form = await ReleasePolicyForm.create_form()
     policy_form.project_name.data = project.name
     if project.policy_mailto_addresses:
@@ -444,6 +450,7 @@ async def _policy_form_create(project: models.Project) -> ReleasePolicyForm:
     policy_form.binary_artifact_paths.data = "\n".join(project.policy_binary_artifact_paths)
     policy_form.source_artifact_paths.data = "\n".join(project.policy_source_artifact_paths)
     policy_form.pause_for_rm.data = project.policy_pause_for_rm
+    policy_form.strict_checking.data = project.policy_strict_checking
 
     # Set the hashes and value of the current defaults
     policy_form.default_start_vote_template_hash.data = util.compute_sha3_256(

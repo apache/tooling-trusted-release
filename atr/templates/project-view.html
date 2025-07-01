@@ -104,6 +104,17 @@
               </div>
             </div>
 
+            <div class="mb-3 pb-3 row border-bottom">
+              {{ forms.label(policy_form.strict_checking, col="md3-high") }}
+              <div class="col-sm-8">
+                <div class="form-check">
+                  {{ forms.widget(policy_form.strict_checking, classes="form-check-input", boolean_label="Enable") }}
+                  {{ forms.errors(policy_form.strict_checking, classes="invalid-feedback d-block") }}
+                </div>
+                {{ forms.description(policy_form.strict_checking) }}
+              </div>
+            </div>
+
             <div class="row mt-5 mb-3">
               <h3 class="col-md-3 col-form-label text-md-end fs-4">Vote options</h3>
             </div>
