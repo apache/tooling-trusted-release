@@ -20,7 +20,7 @@
 import datetime
 import http.client
 import re
-from typing import Final, Protocol
+from typing import Any, Final, Protocol
 
 import asfquart.base as base
 import quart
@@ -137,6 +137,36 @@ class ReleasePolicyForm(util.QuartFormTyped):
     )
 
     submit_policy = wtforms.SubmitField("Save")
+
+    async def validate(self, extra_validators: dict[str, Any] | None = None) -> bool:
+        await super().validate(extra_validators=extra_validators)
+
+        if self.manual_vote.data:
+            optional_fields = (
+                "mailto_addresses",
+                "min_hours",
+                "pause_for_rm",
+                "release_checklist",
+                "start_vote_template",
+            )
+            for field_name in optional_fields:
+                field = getattr(self, field_name, None)
+                if field is None:
+                    continue
+                _form_clear(field)
+                if hasattr(field, "entries"):
+                    for entry in field.entries:
+                        _form_clear(entry)
+                self.errors.pop(field_name, None)
+
+        if self.manual_vote.data and self.strict_checking.data:
+            msg = "Manual voting process and strict checking cannot be enabled simultaneously."
+            _form_append(self.manual_vote, msg)
+            _form_append(self.strict_checking, msg)
+            # _form_setdefault_append(self, "manual_vote", [], msg)
+            # _form_setdefault_append(self, "strict_checking", [], msg)
+
+        return not self.errors
 
 
 @routes.committer("/project/add/<committee_name>", methods=["GET", "POST"])
@@ -298,6 +328,27 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
     )
 
 
+def _form_append(obj: wtforms.Field, msg: str) -> None:
+    if not isinstance(obj.errors, list):
+        obj.errors = list(obj.errors)
+    obj.errors.append(msg)
+
+
+def _form_clear(obj: wtforms.Field) -> None:
+    if not isinstance(obj.errors, list):
+        obj.errors = list(obj.errors)
+    obj.errors[:] = []
+
+
+# def _form_setdefault_append(obj: util.QuartFormTyped, key: str, default: list[str], msg: str) -> None:
+#     obj.errors.setdefault(key, default)
+#     errors = obj.errors[key]
+#     if isinstance(errors, list):
+#         errors.append(msg)
+#     else:
+#         obj.errors[key] = [repr(errors), msg]
+
+
 async def _metadata_category_edit(
     metadata_form: ProjectMetadataForm,
     project: models.Project,
@@ -415,23 +466,34 @@ async def _policy_edit(
             project.release_policy = release_policy
             data.add(release_policy)
 
-        # TODO: Sort these properties by form order
-        release_policy.mailto_addresses = [util.unwrap(policy_form.mailto_addresses.entries[0].data)]
-        release_policy.manual_vote = util.unwrap(policy_form.manual_vote.data)
-        release_policy.release_checklist = util.unwrap(policy_form.release_checklist.data)
-        release_policy.binary_artifact_paths = _parse_artifact_paths(
-            util.unwrap(policy_form.binary_artifact_paths.data)
-        )
+        # Compose section
         release_policy.source_artifact_paths = _parse_artifact_paths(
             util.unwrap(policy_form.source_artifact_paths.data)
         )
+        release_policy.binary_artifact_paths = _parse_artifact_paths(
+            util.unwrap(policy_form.binary_artifact_paths.data)
+        )
         release_policy.strict_checking = util.unwrap(policy_form.strict_checking.data)
-        _set_default_fields(policy_form, project, release_policy)
 
-        release_policy.pause_for_rm = util.unwrap(policy_form.pause_for_rm.data)
+        # Vote section
+        release_policy.manual_vote = util.unwrap(policy_form.manual_vote.data)
+        if not release_policy.manual_vote:
+            release_policy.mailto_addresses = [util.unwrap(policy_form.mailto_addresses.entries[0].data)]
+            _set_default_min_hours(policy_form, project, release_policy)
+            release_policy.pause_for_rm = util.unwrap(policy_form.pause_for_rm.data)
+            release_policy.release_checklist = util.unwrap(policy_form.release_checklist.data)
+            _set_default_start_vote_template(policy_form, project, release_policy)
+
+        # Finish section
+        _set_default_announce_release_template(policy_form, project, release_policy)
+
         await data.commit()
         await quart.flash("Release policy updated successfully.", "success")
         return True, policy_form
+    else:
+        import logging
+
+        logging.info(f"policy_form.errors: {policy_form.errors}")
     return False, policy_form
 
 
@@ -581,21 +643,9 @@ async def _project_add_validate_display_name(display_name: str) -> bool:
     return True
 
 
-def _set_default_fields(form: ReleasePolicyForm, project: models.Project, release_policy: models.ReleasePolicy) -> None:
-    # Handle start_vote_template
-    submitted_start_template = str(util.unwrap(form.start_vote_template.data))
-    submitted_start_template = submitted_start_template.replace("\r\n", "\n")
-    rendered_default_start_hash = str(util.unwrap(form.default_start_vote_template_hash.data))
-    current_default_start_text = project.policy_start_vote_default
-    current_default_start_hash = util.compute_sha3_256(current_default_start_text.encode())
-    submitted_start_hash = util.compute_sha3_256(submitted_start_template.encode())
-
-    if (submitted_start_hash == rendered_default_start_hash) or (submitted_start_hash == current_default_start_hash):
-        release_policy.start_vote_template = ""
-    else:
-        release_policy.start_vote_template = submitted_start_template
-
-    # Handle announce_release_template
+def _set_default_announce_release_template(
+    form: ReleasePolicyForm, project: models.Project, release_policy: models.ReleasePolicy
+) -> None:
     submitted_announce_template = str(util.unwrap(form.announce_release_template.data))
     submitted_announce_template = submitted_announce_template.replace("\r\n", "\n")
     rendered_default_announce_hash = str(util.unwrap(form.default_announce_release_template_hash.data))
@@ -610,7 +660,10 @@ def _set_default_fields(form: ReleasePolicyForm, project: models.Project, releas
     else:
         release_policy.announce_release_template = submitted_announce_template
 
-    # Handle min_hours
+
+def _set_default_min_hours(
+    form: ReleasePolicyForm, project: models.Project, release_policy: models.ReleasePolicy
+) -> None:
     submitted_min_hours = int(util.unwrap(form.min_hours.data) or 0)
     default_value_seen_on_page_min_hours = int(util.unwrap(form.default_min_hours_value_at_render.data))
     current_system_default_min_hours = project.policy_default_min_hours
@@ -622,3 +675,19 @@ def _set_default_fields(form: ReleasePolicyForm, project: models.Project, releas
         release_policy.min_hours = None
     else:
         release_policy.min_hours = submitted_min_hours
+
+
+def _set_default_start_vote_template(
+    form: ReleasePolicyForm, project: models.Project, release_policy: models.ReleasePolicy
+) -> None:
+    submitted_start_template = str(util.unwrap(form.start_vote_template.data))
+    submitted_start_template = submitted_start_template.replace("\r\n", "\n")
+    rendered_default_start_hash = str(util.unwrap(form.default_start_vote_template_hash.data))
+    current_default_start_text = project.policy_start_vote_default
+    current_default_start_hash = util.compute_sha3_256(current_default_start_text.encode())
+    submitted_start_hash = util.compute_sha3_256(submitted_start_template.encode())
+
+    if (submitted_start_hash == rendered_default_start_hash) or (submitted_start_hash == current_default_start_hash):
+        release_policy.start_vote_template = ""
+    else:
+        release_policy.start_vote_template = submitted_start_template
