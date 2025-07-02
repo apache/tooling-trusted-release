@@ -237,6 +237,7 @@ async def tabulated_selected_post(session: routes.CommitterSession, project_name
     outcome = None
     committee = None
     thread_id = None
+    archive_url = None
     fetch_error = None
     if await hidden_form.validate_on_submit():
         # TODO: Just pass the thread_id itself instead?
@@ -276,6 +277,7 @@ async def tabulated_selected_post(session: routes.CommitterSession, project_name
         outcome=outcome,
         resolve_form=resolve_form,
         fetch_error=fetch_error,
+        archive_url=archive_url,
     )
 
 

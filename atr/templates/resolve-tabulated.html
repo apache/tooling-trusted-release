@@ -18,7 +18,13 @@
 
   <h2>Tabulated votes</h2>
   <p>
-    This page attempts to automatically tabulate votes from the vote email thread for you. It is not always possible to parse the votes accurately, so you should check the results carefully. <strong>Do not use this page to decide how to resolve the vote without manual review.</strong>
+    This page attempts to automatically tabulate votes from
+    {% if archive_url %}
+      <a href="{{ archive_url }}" target="_blank">the vote email thread</a>
+    {% else %}
+      the vote email thread
+    {% endif %}
+    for you. It is not always possible to parse the votes accurately, so you should check the results carefully. <strong>Do not use this page to decide how to resolve the vote without manual review.</strong>
   </p>
   {% if tabulated_votes %}
     <table class="table table-striped">
