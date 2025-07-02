@@ -52,7 +52,6 @@ class ResolveVoteForm(util.QuartFormTyped):
 class ResolveVoteManualForm(util.QuartFormTyped):
     """Form for resolving a vote manually."""
 
-    email_body = wtforms.TextAreaField("Email body", render_kw={"rows": 24})
     vote_result = wtforms.RadioField(
         "Vote result",
         choices=[("passed", "Passed"), ("failed", "Failed")],
@@ -126,11 +125,32 @@ async def manual_selected_post(
             version_name=version_name,
             error="Invalid form submission.",
         )
-    # email_body = util.unwrap(resolve_form.email_body.data)
+    vote_result = util.unwrap(resolve_form.vote_result.data)
+    vote_thread_url = util.unwrap(resolve_form.vote_thread_url.data)
+    vote_result_url = util.unwrap(resolve_form.vote_result_url.data)
+    await _committees_check(vote_thread_url, vote_result_url)
+
+    async with db.session() as data:
+        async with data.begin():
+            release = await data.merge(release)
+            if vote_result == "passed":
+                release.phase = models.ReleasePhase.RELEASE_PREVIEW
+                success_message = "Vote marked as passed"
+                description = "Create a preview revision from the last candidate draft"
+                async with revision.create_and_manage(
+                    project_name, release.version, session.uid, description=description
+                ) as _creating:
+                    pass
+            else:
+                release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+                success_message = "Vote marked as failed"
+    if vote_result == "passed":
+        destination = finish.selected
+    else:
+        destination = compose.selected
+
     return await session.redirect(
-        manual_selected,
-        project_name=project_name,
-        version_name=version_name,
+        destination, project_name=project_name, version_name=version_name, success=success_message
     )
 
 
@@ -268,6 +288,38 @@ def task_mid_get(latest_vote_task: models.Task) -> str | None:
     if not isinstance(result, results.VoteInitiate):
         return None
     return result.mid
+
+
+async def _committees_check(vote_thread_url: str, vote_result_url: str) -> None:
+    if not vote_thread_url.startswith("https://lists.apache.org/thread/"):
+        raise RuntimeError("Vote thread URL is not a valid Apache email thread URL")
+    if not vote_result_url.startswith("https://lists.apache.org/thread/"):
+        raise RuntimeError("Vote result URL is not a valid Apache email thread URL")
+
+    vote_thread_id = vote_thread_url.removeprefix("https://lists.apache.org/thread/")
+    result_thread_id = vote_result_url.removeprefix("https://lists.apache.org/thread/")
+
+    vote_committee_label = None
+    result_committee_label = None
+    async for _mid, msg in util.thread_messages(vote_thread_id):
+        if "list_raw" in msg:
+            list_raw = msg["list_raw"]
+            vote_committee_label = list_raw.split(".apache.org", 1)[0].split(".", 1)[-1]
+            break
+
+    async for _mid, msg in util.thread_messages(result_thread_id):
+        if "list_raw" in msg:
+            list_raw = msg["list_raw"]
+            result_committee_label = list_raw.split(".apache.org", 1)[0].split(".", 1)[-1]
+            break
+
+    if vote_committee_label != result_committee_label:
+        raise RuntimeError("Vote committee and result committee do not match")
+
+    if vote_committee_label is None:
+        raise RuntimeError("Vote committee not found")
+    if result_committee_label is None:
+        raise RuntimeError("Result committee not found")
 
 
 async def _resolve_vote(

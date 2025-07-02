@@ -58,15 +58,6 @@
       </div>
     </div>
 
-    <div class="mb-3 pb-3 row border-bottom">
-      {{ forms.label(resolve_form.email_body, col="md3") }}
-      <div class="col-sm-8">
-        {{ forms.widget(resolve_form.email_body, rows="12", classes="form-control font-monospace") }}
-        {{ forms.errors(resolve_form.email_body, classes="invalid-feedback d-block") }}
-        {{ forms.description(resolve_form.email_body) }}
-      </div>
-    </div>
-
     <div class="row">
       <div class="col-sm-9 offset-sm-3">{{ forms.widget(resolve_form.submit, classes="btn btn-primary") }}</div>
     </div>
