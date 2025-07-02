@@ -44,6 +44,15 @@ class Pagination:
 # We implicitly have /api/openapi.json
 
 
+@api.BLUEPRINT.route("/committees")
+@quart_schema.validate_response(list[models.Committee], 200)
+async def committees() -> tuple[list[Mapping], int]:
+    """List all committees in the database."""
+    async with db.session() as data:
+        committees = await data.committee().all()
+        return [committee.model_dump() for committee in committees], 200
+
+
 @api.BLUEPRINT.route("/projects")
 @quart_schema.validate_response(list[models.Committee], 200)
 async def projects() -> tuple[list[Mapping], int]:
@@ -59,6 +68,14 @@ async def projects_name(name: str) -> tuple[Mapping, int]:
     async with db.session() as data:
         committee = await data.committee(name=name).demand(exceptions.NotFound())
         return committee.model_dump(), 200
+
+
+@api.BLUEPRINT.route("/projects/<name>/releases")
+@quart_schema.validate_response(list[models.Release], 200)
+async def projects_name_releases(name: str) -> tuple[list[Mapping], int]:
+    async with db.session() as data:
+        releases = await data.release(project_name=name).all()
+        return [release.model_dump() for release in releases], 200
 
 
 @api.BLUEPRINT.route("/tasks")
