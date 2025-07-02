@@ -1,0 +1,74 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  Resolve vote ~ ATR
+{% endblock title %}
+
+{% block description %}
+  Resolve vote for a release.
+{% endblock description %}
+
+{% block content %}
+  <p>
+    <a href="{{ as_url(routes.vote.selected, project_name=release.project.name, version_name=release.version) }}"
+       class="atr-back-link">← Back to Vote for {{ release.short_display_name }}</a>
+  </p>
+
+  <h1>Resolve vote for {{ release.short_display_name }}</h1>
+  <p>This is a manual vote resolution.</p>
+
+  {{ forms.errors_summary(resolve_form) }}
+
+  <form method="post"
+        class="atr-canary py-4 px-5 mb-4 border rounded"
+        novalidate>
+    {{ resolve_form.hidden_tag() }}
+
+    <div class="mb-3 pb-3 row border-bottom">
+      {{ forms.label(resolve_form.vote_result, col="md3-high") }}
+      <div class="col-sm-8">
+        <div class="d-flex gap-4 mb-2">
+          {% for subfield in resolve_form.vote_result %}
+            <div class="form-check">
+              {{ subfield(class_='form-check-input') }}
+              {{ subfield.label(class_='form-check-label') }}
+            </div>
+          {% endfor %}
+        </div>
+        {{ forms.errors(resolve_form.vote_result, classes="invalid-feedback d-block") }}
+        {{ forms.description(resolve_form.vote_result) }}
+      </div>
+    </div>
+
+    <div class="mb-3 pb-3 row border-bottom">
+      {{ forms.label(resolve_form.vote_thread_url, col="md3") }}
+      <div class="col-sm-8">
+        {{ forms.widget(resolve_form.vote_thread_url, classes="form-control") }}
+        {{ forms.errors(resolve_form.vote_thread_url, classes="invalid-feedback d-block") }}
+        {{ forms.description(resolve_form.vote_thread_url) }}
+      </div>
+    </div>
+
+    <div class="mb-3 pb-3 row border-bottom">
+      {{ forms.label(resolve_form.vote_result_url, col="md3") }}
+      <div class="col-sm-8">
+        {{ forms.widget(resolve_form.vote_result_url, classes="form-control") }}
+        {{ forms.errors(resolve_form.vote_result_url, classes="invalid-feedback d-block") }}
+        {{ forms.description(resolve_form.vote_result_url) }}
+      </div>
+    </div>
+
+    <div class="mb-3 pb-3 row border-bottom">
+      {{ forms.label(resolve_form.email_body, col="md3") }}
+      <div class="col-sm-8">
+        {{ forms.widget(resolve_form.email_body, rows="12", classes="form-control font-monospace") }}
+        {{ forms.errors(resolve_form.email_body, classes="invalid-feedback d-block") }}
+        {{ forms.description(resolve_form.email_body) }}
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-sm-9 offset-sm-3">{{ forms.widget(resolve_form.submit, classes="btn btn-primary") }}</div>
+    </div>
+  </form>
+{% endblock content %}

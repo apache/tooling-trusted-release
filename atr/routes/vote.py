@@ -76,6 +76,20 @@ class ResolveVoteForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Resolve vote")
 
 
+class ResolveVoteManualForm(util.QuartFormTyped):
+    """Form for resolving a vote manually."""
+
+    email_body = wtforms.TextAreaField("Email body", render_kw={"rows": 24})
+    vote_result = wtforms.RadioField(
+        "Vote result",
+        choices=[("passed", "Passed"), ("failed", "Failed")],
+        validators=[wtforms.validators.InputRequired("Vote result is required")],
+    )
+    vote_thread_url = wtforms.StringField("Vote thread URL")
+    vote_result_url = wtforms.StringField("Vote result URL")
+    submit = wtforms.SubmitField("Resolve vote")
+
+
 class Vote(enum.Enum):
     YES = "Yes"
     NO = "No"
@@ -200,11 +214,12 @@ async def selected_resolve(session: routes.CommitterSession, project_name: str, 
         with_project_release_policy=True,
     )
     if release.vote_manual:
-        raise NotImplementedError("Manual vote process is not implemented yet")
-        # return await template.render(
-        #     "vote-resolve-manual.html",
-        #     release=release,
-        # )
+        resolve_form = await ResolveVoteManualForm.create_form()
+        return await template.render(
+            "vote-resolve-manual.html",
+            release=release,
+            resolve_form=resolve_form,
+        )
 
     hidden_form = await util.HiddenFieldForm.create_form()
     tabulated_votes = None
