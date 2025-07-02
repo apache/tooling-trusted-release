@@ -110,7 +110,7 @@
       If, after careful manual review of the information above, you concur with the automatically determined outcome of the vote, please enter the resolution email body here. Sending this will send the email to a new vote result thread, and the vote will be resolved.
     </p>
     <form class="atr-canary py-3 px-4 mb-4 border rounded"
-          action="{{ as_url(routes.resolve.selected_post, project_name=release.project.name, version_name=release.version) }}"
+          action="{{ as_url(routes.resolve.submit_selected, project_name=release.project.name, version_name=release.version) }}"
           method="post">
       {{ forms.errors_summary(resolve_form) }}
       {{ resolve_form.hidden_tag() }}

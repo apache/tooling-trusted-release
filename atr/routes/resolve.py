@@ -19,6 +19,7 @@
 import quart
 import sqlmodel
 import werkzeug.wrappers.response as response
+import wtforms
 
 import atr.construct as construct
 import atr.db as db
@@ -30,8 +31,36 @@ import atr.routes.compose as compose
 import atr.routes.finish as finish
 import atr.routes.vote as vote
 import atr.routes.voting as voting
+import atr.tabulate as tabulate
 import atr.tasks.message as message
+import atr.template as template
 import atr.util as util
+
+
+class ResolveVoteForm(util.QuartFormTyped):
+    """Form for resolving a vote."""
+
+    email_body = wtforms.TextAreaField("Email body", render_kw={"rows": 24})
+    vote_result = wtforms.RadioField(
+        "Vote result",
+        choices=[("passed", "Passed"), ("failed", "Failed")],
+        validators=[wtforms.validators.InputRequired("Vote result is required")],
+    )
+    submit = wtforms.SubmitField("Resolve vote")
+
+
+class ResolveVoteManualForm(util.QuartFormTyped):
+    """Form for resolving a vote manually."""
+
+    email_body = wtforms.TextAreaField("Email body", render_kw={"rows": 24})
+    vote_result = wtforms.RadioField(
+        "Vote result",
+        choices=[("passed", "Passed"), ("failed", "Failed")],
+        validators=[wtforms.validators.InputRequired("Vote result is required")],
+    )
+    vote_thread_url = wtforms.StringField("Vote thread URL")
+    vote_result_url = wtforms.StringField("Vote result URL")
+    submit = wtforms.SubmitField("Resolve vote")
 
 
 async def release_latest_vote_task(release: models.Release) -> models.Task | None:
@@ -52,8 +81,61 @@ async def release_latest_vote_task(release: models.Release) -> models.Task | Non
         return task
 
 
-@routes.committer("/resolve/<project_name>/<version_name>", methods=["POST"])
-async def selected_post(
+@routes.committer("/resolve/manual/<project_name>/<version_name>")
+async def manual_selected(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
+    """Get the manual vote resolution page."""
+    await session.check_access(project_name)
+
+    release = await session.release(
+        project_name,
+        version_name,
+        phase=models.ReleasePhase.RELEASE_CANDIDATE,
+        with_release_policy=True,
+        with_project_release_policy=True,
+    )
+    if not release.vote_manual:
+        raise RuntimeError("This page is for manual votes only")
+    resolve_form = await ResolveVoteManualForm.create_form()
+    return await template.render(
+        "resolve-manual.html",
+        release=release,
+        resolve_form=resolve_form,
+    )
+
+
+@routes.committer("/resolve/manual/<project_name>/<version_name>", methods=["POST"])
+async def manual_selected_post(
+    session: routes.CommitterSession, project_name: str, version_name: str
+) -> response.Response | str:
+    """Post the manual vote resolution page."""
+    await session.check_access(project_name)
+    release = await session.release(
+        project_name,
+        version_name,
+        phase=models.ReleasePhase.RELEASE_CANDIDATE,
+        with_release_policy=True,
+        with_project_release_policy=True,
+    )
+    if not release.vote_manual:
+        raise RuntimeError("This page is for manual votes only")
+    resolve_form = await ResolveVoteManualForm.create_form()
+    if not resolve_form.validate_on_submit():
+        return await session.redirect(
+            manual_selected,
+            project_name=project_name,
+            version_name=version_name,
+            error="Invalid form submission.",
+        )
+    # email_body = util.unwrap(resolve_form.email_body.data)
+    return await session.redirect(
+        manual_selected,
+        project_name=project_name,
+        version_name=version_name,
+    )
+
+
+@routes.committer("/resolve/submit/<project_name>/<version_name>", methods=["POST"])
+async def submit_selected(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
     """Resolve a vote."""
@@ -75,11 +157,11 @@ async def selected_post(
     latest_vote_task = await release_latest_vote_task(release)
     if latest_vote_task is None:
         raise RuntimeError("No vote task found, unable to send resolution message.")
-    resolve_form = await vote.ResolveVoteForm.create_form()
+    resolve_form = await ResolveVoteForm.create_form()
     if not resolve_form.validate_on_submit():
         # TODO: Render the page again with errors
         return await session.redirect(
-            vote.selected_resolve,
+            vote.selected,
             project_name=project_name,
             version_name=version_name,
             error="Invalid form submission.",
@@ -108,6 +190,72 @@ async def selected_post(
 
     return await session.redirect(
         destination, project_name=project_name, version_name=version_name, success=success_message
+    )
+
+
+@routes.committer("/resolve/tabulated/<project_name>/<version_name>", methods=["POST"])
+async def tabulated_selected_post(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
+    """Tabulate votes."""
+    await session.check_access(project_name)
+    asf_uid = session.uid
+    full_name = session.fullname
+
+    release = await session.release(
+        project_name,
+        version_name,
+        phase=models.ReleasePhase.RELEASE_CANDIDATE,
+        with_release_policy=True,
+        with_project_release_policy=True,
+    )
+    if release.vote_manual:
+        raise RuntimeError("This page is for tabulated votes only")
+
+    hidden_form = await util.HiddenFieldForm.create_form()
+    tabulated_votes = None
+    summary = None
+    passed = None
+    outcome = None
+    committee = None
+    thread_id = None
+    fetch_error = None
+    if await hidden_form.validate_on_submit():
+        # TODO: Just pass the thread_id itself instead?
+        archive_url = hidden_form.hidden_field.data or ""
+        thread_id = archive_url.split("/")[-1]
+        if thread_id:
+            try:
+                committee = await tabulate.vote_committee(thread_id, release)
+            except util.FetchError as e:
+                fetch_error = f"Failed to fetch thread metadata: {e}"
+            else:
+                start_unixtime, tabulated_votes = await tabulate.votes(committee, thread_id)
+                summary = tabulate.vote_summary(tabulated_votes)
+                passed, outcome = tabulate.vote_outcome(release, start_unixtime, tabulated_votes)
+        else:
+            fetch_error = "The vote thread could not yet be found."
+    resolve_form = await ResolveVoteForm.create_form()
+    if (
+        (committee is None)
+        or (tabulated_votes is None)
+        or (summary is None)
+        or (passed is None)
+        or (outcome is None)
+        or (thread_id is None)
+    ):
+        resolve_form.email_body.render_kw = {"rows": 12}
+    else:
+        resolve_form.email_body.data = tabulate.vote_resolution(
+            committee, release, tabulated_votes, summary, passed, outcome, full_name, asf_uid, thread_id
+        )
+        resolve_form.vote_result.data = "passed" if passed else "failed"
+    return await template.render(
+        "resolve-tabulated.html",
+        release=release,
+        tabulated_votes=tabulated_votes,
+        summary=summary,
+        outcome=outcome,
+        resolve_form=resolve_form,
+        fetch_error=fetch_error,
     )
 
 
