@@ -41,28 +41,7 @@ class Pagination:
     limit: int = 20
 
 
-@api.BLUEPRINT.route("/tasks")
-@quart_schema.validate_querystring(Pagination)
-async def api_tasks(query_args: Pagination) -> quart.Response:
-    async with db.session() as data:
-        statement = (
-            sqlmodel.select(models.Task)
-            .limit(query_args.limit)
-            .offset(query_args.offset)
-            .order_by(models.Task.id.desc())  # type: ignore
-        )
-        paged_tasks = (await data.execute(statement)).scalars().all()
-        count = (await data.execute(sqlalchemy.select(sqlalchemy.func.count(models.Task.id)))).scalar_one()  # type: ignore
-        result = {"data": [x.model_dump(exclude={"result"}) for x in paged_tasks], "count": count}
-        return quart.jsonify(result)
-
-
-@api.BLUEPRINT.route("/projects/<name>")
-@quart_schema.validate_response(models.Committee, 200)
-async def project_by_name(name: str) -> tuple[Mapping, int]:
-    async with db.session() as data:
-        committee = await data.committee(name=name).demand(exceptions.NotFound())
-        return committee.model_dump(), 200
+# We implicitly have /api/openapi.json
 
 
 @api.BLUEPRINT.route("/projects")
@@ -72,3 +51,37 @@ async def projects() -> tuple[list[Mapping], int]:
     async with db.session() as data:
         committees = await data.committee().all()
         return [committee.model_dump() for committee in committees], 200
+
+
+@api.BLUEPRINT.route("/projects/<name>")
+@quart_schema.validate_response(models.Committee, 200)
+async def projects_name(name: str) -> tuple[Mapping, int]:
+    async with db.session() as data:
+        committee = await data.committee(name=name).demand(exceptions.NotFound())
+        return committee.model_dump(), 200
+
+
+@api.BLUEPRINT.route("/tasks")
+@quart_schema.validate_querystring(Pagination)
+async def tasks(query_args: Pagination) -> quart.Response:
+    _pagination_args_validate(query_args)
+    via = models.validate_instrumented_attribute
+    async with db.session() as data:
+        statement = (
+            sqlmodel.select(models.Task)
+            .limit(query_args.limit)
+            .offset(query_args.offset)
+            .order_by(via(models.Task.id).desc())
+        )
+        paged_tasks = (await data.execute(statement)).scalars().all()
+        count = (await data.execute(sqlalchemy.select(sqlalchemy.func.count(via(models.Task.id))))).scalar_one()
+        result = {"data": [paged_task.model_dump(exclude={"result"}) for paged_task in paged_tasks], "count": count}
+        return quart.jsonify(result)
+
+
+def _pagination_args_validate(query_args: Pagination) -> None:
+    # Users could request any amount using limit=N with arbitrarily high N
+    # We therefore limit the maximum limit to 1000
+    if query_args.limit > 1000:
+        # quart.abort(400, "Limit is too high")
+        raise exceptions.BadRequest("Maximum limit of 1000 exceeded")
