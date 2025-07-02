@@ -121,16 +121,18 @@
               <h3 class="col-md-3 col-form-label text-md-end fs-4">Vote options</h3>
             </div>
 
-            <div class="mb-3 pb-3 row border-bottom">
-              {{ forms.label(policy_form.manual_vote, col="md3-high") }}
-              <div class="col-sm-8">
-                <div class="form-check">
-                  {{ forms.widget(policy_form.manual_vote, classes="form-check-input", boolean_label="Enable") }}
-                  {{ forms.errors(policy_form.manual_vote, classes="invalid-feedback d-block") }}
+            {% if not project.committee.is_podling %}
+              <div class="mb-3 pb-3 row border-bottom">
+                {{ forms.label(policy_form.manual_vote, col="md3-high") }}
+                <div class="col-sm-8">
+                  <div class="form-check">
+                    {{ forms.widget(policy_form.manual_vote, classes="form-check-input", boolean_label="Enable") }}
+                    {{ forms.errors(policy_form.manual_vote, classes="invalid-feedback d-block") }}
+                  </div>
+                  {{ forms.description(policy_form.manual_vote) }}
                 </div>
-                {{ forms.description(policy_form.manual_vote) }}
               </div>
-            </div>
+            {% endif %}
 
             <div id="vote-options-extra">
 
@@ -464,19 +466,21 @@
 
   {% block javascripts %}
     {{ super() }}
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const manual = document.querySelector("input[name='manual_vote']");
-            const extra = document.getElementById("vote-options-extra");
-            if (!manual || !extra) return;
+    {% if not project.committee.is_podling %}
+      <script>
+          document.addEventListener("DOMContentLoaded", () => {
+              const manual = document.querySelector("input[name='manual_vote']");
+              const extra = document.getElementById("vote-options-extra");
+              if (!manual || !extra) return;
 
-            function toggle() {
-                extra.hidden = manual.checked;
-                extra.querySelectorAll("input, textarea, select").forEach(el => (el.disabled = manual.checked));
-            }
+              function toggle() {
+                  extra.hidden = manual.checked;
+                  extra.querySelectorAll("input, textarea, select").forEach(el => (el.disabled = manual.checked));
+              }
 
-            manual.addEventListener("change", toggle);
-            toggle();
-        });
-    </script>
+              manual.addEventListener("change", toggle);
+              toggle();
+          });
+      </script>
+    {% endif %}
   {% endblock javascripts %}

@@ -84,6 +84,7 @@ class ReleasePolicyForm(util.QuartFormTyped):
     manual_vote = wtforms.BooleanField(
         "Manual voting process",
         description="If this is set then the vote will be completely manual and following policy is ignored.",
+        default=False,
     )
     mailto_addresses = wtforms.FieldList(
         wtforms.StringField(
@@ -476,13 +477,17 @@ async def _policy_edit(
         release_policy.strict_checking = util.unwrap(policy_form.strict_checking.data)
 
         # Vote section
-        release_policy.manual_vote = util.unwrap(policy_form.manual_vote.data)
+        release_policy.manual_vote = policy_form.manual_vote.data or False
         if not release_policy.manual_vote:
             release_policy.mailto_addresses = [util.unwrap(policy_form.mailto_addresses.entries[0].data)]
             _set_default_min_hours(policy_form, project, release_policy)
             release_policy.pause_for_rm = util.unwrap(policy_form.pause_for_rm.data)
             release_policy.release_checklist = util.unwrap(policy_form.release_checklist.data)
             _set_default_start_vote_template(policy_form, project, release_policy)
+        elif project.committee and project.committee.is_podling:
+            # The caller ensures that project.committee is not None
+            await quart.flash("Manual voting is not allowed for podlings.", "error")
+            return False, policy_form
 
         # Finish section
         _set_default_announce_release_template(policy_form, project, release_policy)
