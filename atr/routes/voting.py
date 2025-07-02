@@ -16,10 +16,12 @@
 # under the License.
 
 import datetime
+from typing import Any, Protocol
 
 import aiofiles.os
 import asfquart.base as base
 import quart
+import quart_wtf.typing as typing
 import sqlmodel
 import werkzeug.wrappers.response as response
 import wtforms
@@ -38,35 +40,20 @@ import atr.user as user
 import atr.util as util
 
 
-class VoteInitiateForm(util.QuartFormTyped):
-    """Form for initiating a release vote."""
+class VoteInitiateFormProtocol(Protocol):
+    """Protocol for the dynamically generated VoteInitiateForm."""
 
-    release_name = wtforms.HiddenField("Release Name")
-    mailing_list = wtforms.RadioField(
-        "Send vote email to",
-        choices=[("example@example.org.INVALID", "example@example.org.INVALID")],
-        validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
-        default="user-tests@tooling.apache.org",
-        description="NOTE: The limited options above are provided for testing purposes."
-        " In the finished version of ATR, you will be able to send to your own specified mailing lists.",
-    )
-    vote_duration = wtforms.IntegerField(
-        "Minimum vote duration",
-        validators=[
-            wtforms.validators.InputRequired("Vote duration is required"),
-            util.validate_vote_duration,
-        ],
-        default=72,
-        description="Minimum number of hours the vote will be open for.",
-    )
-    subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
-    body = wtforms.TextAreaField(
-        "Body",
-        validators=[wtforms.validators.Optional()],
-        description="Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT],"
-        " [DURATION], [REVIEW_URL], and [YOUR_ASF_ID] will be filled in automatically when the email is sent.",
-    )
-    submit = wtforms.SubmitField("Send vote email")
+    release_name: wtforms.HiddenField
+    mailing_list: wtforms.RadioField
+    vote_duration: wtforms.IntegerField
+    subject: wtforms.StringField
+    body: wtforms.TextAreaField
+    submit: wtforms.SubmitField
+
+    @property
+    def errors(self) -> dict[str, Any]: ...
+
+    async def validate_on_submit(self) -> bool: ...
 
 
 @routes.committer("/voting/<project_name>/<version_name>/<revision>", methods=["GET", "POST"])
@@ -111,7 +98,7 @@ async def selected_revision(
         if selected_revision_number is None:
             return await session.redirect(compose.selected, error="No revision found for this release")
 
-        committee = util.unwrap(release.committee)
+        # committee = util.unwrap(release.committee)
         permitted_recipients = util.permitted_recipients(session.uid)
         if release.release_policy:
             min_hours = release.release_policy.min_hours if (release.release_policy.min_hours is not None) else 72
@@ -119,8 +106,22 @@ async def selected_revision(
             min_hours = 72
         release_policy_mailto_addresses = ", ".join(release.project.policy_mailto_addresses)
 
+        form_data = (await quart.request.form) if (quart.request.method == "POST") else None
+        hidden_field = (form_data or {}).get("hidden_field")
+        if isinstance(hidden_field, str):
+            # This hidden_field is set to selected_revision_number
+            # It's manual_vote_process_form.hidden_field.data in selected_revision
+            selected_revision_number = hidden_field
+            return await start_vote_manual(
+                release,
+                selected_revision_number,
+                session,
+                data,
+            )
+
         form = await _form(
             release,
+            form_data,
             project_name,
             version_name,
             permitted_recipients,
@@ -134,7 +135,6 @@ async def selected_revision(
             subject_data: str = util.unwrap(form.subject.data)
             body_data: str = util.unwrap(form.body.data)
             return await start_vote(
-                committee,
                 email_to,
                 permitted_recipients,
                 project_name,
@@ -176,15 +176,17 @@ async def selected_revision(
 
 async def _form(
     release: models.Release,
+    form_data: typing.FormData | None,
     project_name: str,
     version_name: str,
     permitted_recipients: list[str],
     release_policy_mailto_addresses: str,
     min_hours: int,
-) -> VoteInitiateForm:
-    class SubsetVoteInitiateForm(VoteInitiateForm):
+) -> VoteInitiateFormProtocol:
+    class VoteInitiateForm(util.QuartFormTyped):
         """Form for initiating a release vote."""
 
+        release_name = wtforms.HiddenField("Release Name")
         mailing_list = wtforms.RadioField(
             "Send vote email to",
             choices=sorted([(recipient, recipient) for recipient in permitted_recipients]),
@@ -203,6 +205,14 @@ async def _form(
             default=min_hours,
             description="Minimum number of hours the vote will be open for.",
         )
+        subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
+        body = wtforms.TextAreaField(
+            "Body",
+            validators=[wtforms.validators.Optional()],
+            description="Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT],"
+            " [DURATION], [REVIEW_URL], and [YOUR_ASF_ID] will be filled in automatically when the email is sent.",
+        )
+        submit = wtforms.SubmitField("Send vote email")
 
     project = release.project
 
@@ -211,12 +221,9 @@ async def _form(
     default_subject = f"[VOTE] Release {project.display_name} {version_name}"
     default_body = await construct.start_vote_default(project_name)
 
-    data = (await quart.request.form) if (quart.request.method == "POST") else None
-    if (data or {}).get("hidden_field"):
-        raise NotImplementedError("Manual vote process")
-
-    form = await SubsetVoteInitiateForm.create_form(
-        data=data if (quart.request.method == "POST") else None,
+    # Must use data, not formdata, otherwise everything breaks
+    form = await VoteInitiateForm.create_form(
+        data=form_data if (quart.request.method == "POST") else None,
     )
     # Set hidden field data explicitly
     form.release_name.data = release.name
@@ -245,17 +252,29 @@ async def _promote(
     data: db.Session,
     release_name: str,
     selected_revision_number: str,
+    vote_manual: bool = False,
 ) -> str | None:
     """Promote a release candidate draft to a new phase."""
     # TODO: Use session.release here
     release_for_pre_checks = await data.release(name=release_name, _project=True).demand(
         routes.FlashError("Release candidate draft not found")
     )
+    project_name = release_for_pre_checks.project.name
+    version_name = release_for_pre_checks.version
+
+    # Check for ongoing tasks
+    ongoing_tasks = await interaction.tasks_ongoing(project_name, version_name, selected_revision_number)
+    if ongoing_tasks > 0:
+        return "All checks must be completed before starting a vote"
 
     # Verify that it's in the correct phase
     # The atomic update below will also check this
     if release_for_pre_checks.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
         return "This release is not in the candidate draft phase"
+
+    # Check that the revision number is the latest
+    if release_for_pre_checks.latest_revision_number != selected_revision_number:
+        return "The selected revision number does not match the latest revision number"
 
     # Check that there is at least one file in the draft
     # This is why we require _project=True above
@@ -276,6 +295,8 @@ async def _promote(
         )
         .values(
             phase=models.ReleasePhase.RELEASE_CANDIDATE,
+            vote_started=datetime.datetime.now(datetime.UTC),
+            vote_manual=vote_manual,
         )
     )
 
@@ -288,7 +309,6 @@ async def _promote(
 
 
 async def start_vote(
-    committee: models.Committee,
     email_to: str,
     permitted_recipients: list[str],
     project_name: str,
@@ -302,32 +322,15 @@ async def start_vote(
     release: models.Release,
     promote: bool = True,
 ):
-    if committee is None:
-        raise base.ASFQuartException("Release has no associated committee", errorcode=400)
-
     if email_to not in permitted_recipients:
         # This will be checked again by tasks/vote.py for extra safety
         raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
 
-    # Check for ongoing tasks
-    ongoing_tasks = await interaction.tasks_ongoing(project_name, version_name, selected_revision_number)
-    if ongoing_tasks > 0:
-        return await session.redirect(
-            selected_revision,
-            project_name=project_name,
-            version_name=version_name,
-            revision=selected_revision_number,
-            error="All checks must be completed before starting a vote.",
-        )
-
     if promote is True:
-        # This sets the phase to RELEASE_CANDIDATE
-        error = await _promote(data, release.name, selected_revision_number)
+        # This verifies the state and sets the phase to RELEASE_CANDIDATE
+        error = await _promote(data, release.name, selected_revision_number, vote_manual=False)
         if error:
             return await session.redirect(root.index, error=error)
-
-    # Store when the release was put into the voting phase
-    release.vote_started = datetime.datetime.now(datetime.UTC)
 
     # TODO: We also need to store the duration of the vote
     # We can't allow resolution of the vote until the duration has elapsed
@@ -363,4 +366,22 @@ async def start_vote(
         success=f"The vote announcement email will soon be sent to {email_to}.",
         project_name=project_name,
         version_name=version_name,
+    )
+
+
+async def start_vote_manual(
+    release: models.Release,
+    selected_revision_number: str,
+    session: routes.CommitterSession,
+    data: db.Session,
+) -> response.Response | str:
+    # This verifies the state and sets the phase to RELEASE_CANDIDATE
+    error = await _promote(data, release.name, selected_revision_number, vote_manual=True)
+    if error:
+        return await session.redirect(root.index, error=error)
+    return await session.redirect(
+        vote.selected,
+        success="The manual vote process has been started.",
+        project_name=release.project.name,
+        version_name=release.version,
     )

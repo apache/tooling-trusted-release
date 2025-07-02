@@ -199,6 +199,13 @@ async def selected_resolve(session: routes.CommitterSession, project_name: str, 
         with_release_policy=True,
         with_project_release_policy=True,
     )
+    if release.vote_manual:
+        raise NotImplementedError("Manual vote process is not implemented yet")
+        # return await template.render(
+        #     "vote-resolve-manual.html",
+        #     release=release,
+        # )
+
     hidden_form = await util.HiddenFieldForm.create_form()
     tabulated_votes = None
     summary = None

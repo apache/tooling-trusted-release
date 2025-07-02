@@ -17,6 +17,11 @@
         <p>
           <strong>Created:</strong> {{ format_datetime(release.created) }}
         </p>
+        {% if release.vote_manual %}
+          <p>
+            <strong>Manual vote process:</strong> Yes
+          </p>
+        {% endif %}
         {% if (phase == "release_candidate_draft") and revision_time %}
           <p>
             <strong>Revision:</strong>

@@ -1,4 +1,7 @@
-{% include "check-selected-vote-email.html" %}
+{% if not release.vote_manual %}
+  {% include "check-selected-vote-email.html" %}
+
+{% endif %}
 
 <h2>Cast your vote</h2>
 <div class="card bg-warning-subtle mb-3">

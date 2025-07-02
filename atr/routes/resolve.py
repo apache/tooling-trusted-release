@@ -162,7 +162,6 @@ async def _resolve_vote(
                 if revision_number is None:
                     raise ValueError("Release has no revision number")
                 await voting.start_vote(
-                    committee=release.project.committee,
                     email_to=incubator_vote_address,
                     permitted_recipients=[incubator_vote_address],
                     project_name=release.project.name,

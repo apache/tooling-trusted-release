@@ -660,7 +660,7 @@ class Release(sqlmodel.SQLModel, table=True):
     )
 
     votes: list[VoteEntry] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
-
+    vote_manual: bool = sqlmodel.Field(default=False)
     vote_started: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
     vote_resolved: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
     podling_thread_id: str | None = sqlmodel.Field(default=None)
