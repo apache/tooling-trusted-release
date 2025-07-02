@@ -418,6 +418,8 @@ Thanks,
 
     @property
     def policy_strict_checking(self) -> bool:
+        # This is bool, so it should never be None
+        # TODO: Should we make it nullable for defaulting?
         if (policy := self.release_policy) is None:
             return False
         return policy.strict_checking

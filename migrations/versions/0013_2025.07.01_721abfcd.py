@@ -19,7 +19,7 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     with op.batch_alter_table("releasepolicy", schema=None) as batch_op:
-        batch_op.add_column(sa.Column("strict_checking", sa.Boolean(), nullable=False))
+        batch_op.add_column(sa.Column("strict_checking", sa.Boolean(), nullable=False, server_default=sa.false()))
 
 
 def downgrade() -> None:
