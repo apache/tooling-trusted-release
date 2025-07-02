@@ -140,6 +140,7 @@ async def projects_name(name: str) -> tuple[Mapping, int]:
 @api.BLUEPRINT.route("/projects/<name>/releases")
 @quart_schema.validate_response(list[models.Release], 200)
 async def projects_name_releases(name: str) -> tuple[list[Mapping], int]:
+    """List all releases for a specific project."""
     async with db.session() as data:
         releases = await data.release(project_name=name).all()
         return [release.model_dump() for release in releases], 200
@@ -207,6 +208,28 @@ async def releases_project_version_revisions(project: str, version: str) -> tupl
         release_name = models.release_name(project, version)
         revisions = await data.revision(release_name=release_name).all()
         return [rev.model_dump() for rev in revisions], 200
+
+
+@api.BLUEPRINT.route("/ssh-keys")
+@quart_schema.validate_querystring(Pagination)
+async def ssh_keys(query_args: Pagination) -> quart.Response:
+    """Paged list of developer SSH public keys."""
+    _pagination_args_validate(query_args)
+    via = models.validate_instrumented_attribute
+    async with db.session() as data:
+        statement = (
+            sqlmodel.select(models.SSHKey)
+            .limit(query_args.limit)
+            .offset(query_args.offset)
+            .order_by(via(models.SSHKey.fingerprint).asc())
+        )
+        paged_keys = (await data.execute(statement)).scalars().all()
+
+        count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(models.SSHKey.fingerprint)))
+        count = (await data.execute(count_stmt)).scalar_one()
+
+        result = {"data": [key.model_dump() for key in paged_keys], "count": count}
+        return quart.jsonify(result)
 
 
 @api.BLUEPRINT.route("/tasks")
