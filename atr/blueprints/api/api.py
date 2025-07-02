@@ -41,6 +41,11 @@ class Pagination:
     limit: int = 20
 
 
+@dataclasses.dataclass
+class Task(Pagination):
+    status: str | None = None
+
+
 # We implicitly have /api/openapi.json
 
 
@@ -79,19 +84,22 @@ async def projects_name_releases(name: str) -> tuple[list[Mapping], int]:
 
 
 @api.BLUEPRINT.route("/tasks")
-@quart_schema.validate_querystring(Pagination)
-async def tasks(query_args: Pagination) -> quart.Response:
+@quart_schema.validate_querystring(Task)
+async def tasks(query_args: Task) -> quart.Response:
     _pagination_args_validate(query_args)
     via = models.validate_instrumented_attribute
     async with db.session() as data:
-        statement = (
-            sqlmodel.select(models.Task)
-            .limit(query_args.limit)
-            .offset(query_args.offset)
-            .order_by(via(models.Task.id).desc())
-        )
+        statement = sqlmodel.select(models.Task).limit(query_args.limit).offset(query_args.offset)
+        if query_args.status:
+            if query_args.status not in models.TaskStatus:
+                raise exceptions.BadRequest(f"Invalid status: {query_args.status}")
+            statement = statement.where(models.Task.status == query_args.status)
+        statement = statement.order_by(via(models.Task.id).desc())
         paged_tasks = (await data.execute(statement)).scalars().all()
-        count = (await data.execute(sqlalchemy.select(sqlalchemy.func.count(via(models.Task.id))))).scalar_one()
+        count_statement = sqlalchemy.select(sqlalchemy.func.count(via(models.Task.id)))
+        if query_args.status:
+            count_statement = count_statement.where(via(models.Task.status) == query_args.status)
+        count = (await data.execute(count_statement)).scalar_one()
         result = {"data": [paged_task.model_dump(exclude={"result"}) for paged_task in paged_tasks], "count": count}
         return quart.jsonify(result)
 
