@@ -58,6 +58,36 @@ async def committees() -> tuple[list[Mapping], int]:
         return [committee.model_dump() for committee in committees], 200
 
 
+@api.BLUEPRINT.route("/keys")
+@quart_schema.validate_querystring(Pagination)
+async def public_keys(query_args: Pagination) -> quart.Response:
+    """List all public signing keys with pagination support."""
+    _pagination_args_validate(query_args)
+    via = models.validate_instrumented_attribute
+    async with db.session() as data:
+        statement = (
+            sqlmodel.select(models.PublicSigningKey)
+            .limit(query_args.limit)
+            .offset(query_args.offset)
+            .order_by(via(models.PublicSigningKey.fingerprint).asc())
+        )
+        paged_keys = (await data.execute(statement)).scalars().all()
+        count = (
+            await data.execute(sqlalchemy.select(sqlalchemy.func.count(via(models.PublicSigningKey.fingerprint))))
+        ).scalar_one()
+        result = {"data": [key.model_dump() for key in paged_keys], "count": count}
+        return quart.jsonify(result)
+
+
+@api.BLUEPRINT.route("/keys/<fingerprint>")
+@quart_schema.validate_response(models.PublicSigningKey, 200)
+async def public_keys_fingerprint(fingerprint: str) -> tuple[Mapping, int]:
+    """Return a single public signing key by fingerprint."""
+    async with db.session() as data:
+        key = await data.public_signing_key(fingerprint=fingerprint.lower()).demand(exceptions.NotFound())
+        return key.model_dump(), 200
+
+
 @api.BLUEPRINT.route("/projects")
 @quart_schema.validate_response(list[models.Committee], 200)
 async def projects() -> tuple[list[Mapping], int]:
