@@ -42,6 +42,11 @@ class Pagination:
 
 
 @dataclasses.dataclass
+class Releases(Pagination):
+    phase: str | None = None
+
+
+@dataclasses.dataclass
 class Task(Pagination):
     status: str | None = None
 
@@ -138,6 +143,70 @@ async def projects_name_releases(name: str) -> tuple[list[Mapping], int]:
     async with db.session() as data:
         releases = await data.release(project_name=name).all()
         return [release.model_dump() for release in releases], 200
+
+
+@api.BLUEPRINT.route("/releases")
+@quart_schema.validate_querystring(Releases)
+async def releases(query_args: Releases) -> quart.Response:
+    """Paged list of releases with optional filtering by phase."""
+    _pagination_args_validate(query_args)
+    via = models.validate_instrumented_attribute
+    async with db.session() as data:
+        statement = sqlmodel.select(models.Release)
+
+        if query_args.phase:
+            try:
+                phase_value = models.ReleasePhase(query_args.phase)
+            except ValueError:
+                raise exceptions.BadRequest(f"Invalid phase: {query_args.phase}")
+            statement = statement.where(models.Release.phase == phase_value)
+
+        statement = (
+            statement.order_by(via(models.Release.created).desc()).limit(query_args.limit).offset(query_args.offset)
+        )
+
+        paged_releases = (await data.execute(statement)).scalars().all()
+
+        count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(models.Release.name)))
+        if query_args.phase:
+            phase_value = models.ReleasePhase(query_args.phase) if query_args.phase else None
+            if phase_value is not None:
+                count_stmt = count_stmt.where(via(models.Release.phase) == phase_value)
+
+        count = (await data.execute(count_stmt)).scalar_one()
+
+        result = {"data": [release.model_dump() for release in paged_releases], "count": count}
+        return quart.jsonify(result)
+
+
+@api.BLUEPRINT.route("/releases/<project>/<version>")
+@quart_schema.validate_response(models.Release, 200)
+async def releases_project_version(project: str, version: str) -> tuple[Mapping, int]:
+    """Return a single release by project and version."""
+    async with db.session() as data:
+        release_name = models.release_name(project, version)
+        release = await data.release(name=release_name).demand(exceptions.NotFound())
+        return release.model_dump(), 200
+
+
+@api.BLUEPRINT.route("/releases/<project>/<version>/check-results")
+@quart_schema.validate_response(list[models.CheckResult], 200)
+async def releases_project_version_check_results(project: str, version: str) -> tuple[list[Mapping], int]:
+    """List all check results for a given release."""
+    async with db.session() as data:
+        release_name = models.release_name(project, version)
+        check_results = await data.check_result(release_name=release_name).all()
+        return [cr.model_dump() for cr in check_results], 200
+
+
+@api.BLUEPRINT.route("/releases/<project>/<version>/revisions")
+@quart_schema.validate_response(list[models.Revision], 200)
+async def releases_project_version_revisions(project: str, version: str) -> tuple[list[Mapping], int]:
+    """List all revisions for a given release."""
+    async with db.session() as data:
+        release_name = models.release_name(project, version)
+        revisions = await data.revision(release_name=release_name).all()
+        return [rev.model_dump() for rev in revisions], 200
 
 
 @api.BLUEPRINT.route("/tasks")
