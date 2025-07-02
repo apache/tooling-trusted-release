@@ -58,6 +58,33 @@ async def committees() -> tuple[list[Mapping], int]:
         return [committee.model_dump() for committee in committees], 200
 
 
+@api.BLUEPRINT.route("/committees/<name>")
+@quart_schema.validate_response(models.Committee, 200)
+async def committees_name(name: str) -> tuple[Mapping, int]:
+    """Get a specific committee by name."""
+    async with db.session() as data:
+        committee = await data.committee(name=name).demand(exceptions.NotFound())
+        return committee.model_dump(), 200
+
+
+@api.BLUEPRINT.route("/committees/<name>/keys")
+@quart_schema.validate_response(list[models.PublicSigningKey], 200)
+async def committees_name_keys(name: str) -> tuple[list[Mapping], int]:
+    """List all public signing keys associated with a specific committee."""
+    async with db.session() as data:
+        committee = await data.committee(name=name, _public_signing_keys=True).demand(exceptions.NotFound())
+        return [key.model_dump() for key in committee.public_signing_keys], 200
+
+
+@api.BLUEPRINT.route("/committees/<name>/projects")
+@quart_schema.validate_response(list[models.Project], 200)
+async def committees_name_projects(name: str) -> tuple[list[Mapping], int]:
+    """List all projects for a specific committee."""
+    async with db.session() as data:
+        committee = await data.committee(name=name, _projects=True).demand(exceptions.NotFound())
+        return [project.model_dump() for project in committee.projects], 200
+
+
 @api.BLUEPRINT.route("/keys")
 @quart_schema.validate_querystring(Pagination)
 async def public_keys(query_args: Pagination) -> quart.Response:
