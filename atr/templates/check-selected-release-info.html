@@ -83,15 +83,19 @@
            class="btn btn-primary"><i class="bi bi-download me-1"></i> Download files</a>
         <a href="{{ as_url(routes.candidate.view, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-secondary"><i class="bi bi-eye me-1"></i> View files</a>
-        <form action="{{ as_url(routes.resolve.tabulated_selected_post, project_name=release.project.name, version_name=release.version) }}"
-              method="post"
-              class="mb-0">
-          {{ hidden_form.hidden_tag() }}
-          <button type="submit" class="btn btn-success">
-            <i class="bi bi-clipboard-check me-1"></i> Resolve vote
-          </button>
-        </form>
-
+        {% if release.vote_manual %}
+          <a href="{{ as_url(routes.resolve.manual_selected, project_name=release.project.name, version_name=release.version) }}"
+             class="btn btn-success"><i class="bi bi-clipboard-check me-1"></i> Resolve vote</a>
+        {% else %}
+          <form action="{{ as_url(routes.resolve.tabulated_selected_post, project_name=release.project.name, version_name=release.version) }}"
+                method="post"
+                class="mb-0">
+            {{ hidden_form.hidden_tag() }}
+            <button type="submit" class="btn btn-success">
+              <i class="bi bi-clipboard-check me-1"></i> Resolve vote
+            </button>
+          </form>
+        {% endif %}
       {% endif %}
     </div>
   </div>
