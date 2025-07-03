@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Coroutine
 
 
-def issue(uid: str, *, ttl: int = 24 * 3600) -> str:
+def issue(uid: str, *, ttl: int = 90 * 60) -> str:
     now = datetime.datetime.now(tz=datetime.UTC)
     payload = {
         "sub": uid,
