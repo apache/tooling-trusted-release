@@ -16,6 +16,8 @@
 # under the License.
 
 import dataclasses
+import datetime
+import hashlib
 from collections.abc import Mapping
 
 import quart
@@ -29,6 +31,7 @@ import atr.blueprints.api as api
 import atr.db as db
 import atr.db.models as models
 import atr.jwtoken as jwtoken
+import atr.schema as schema
 
 # FIXME: we need to return the dumped model instead of the actual pydantic class
 #        as otherwise pyright will complain about the return type
@@ -50,6 +53,11 @@ class Releases(Pagination):
 @dataclasses.dataclass
 class Task(Pagination):
     status: str | None = None
+
+
+class PATJWTRequest(schema.Strict):
+    asfuid: str
+    pat: str
 
 
 # We implicitly have /api/openapi.json
@@ -89,6 +97,28 @@ async def committees_name_projects(name: str) -> tuple[list[Mapping], int]:
     async with db.session() as data:
         committee = await data.committee(name=name, _projects=True).demand(exceptions.NotFound())
         return [project.model_dump() for project in committee.projects], 200
+
+
+@api.BLUEPRINT.route("/jwt", methods=["POST"])
+async def pat_jwt_post() -> quart.Response:
+    """Generate a JWT from a valid PAT."""
+    # Expects {"asfuid": "uid", "pat": "pat-token"}
+    # Returns {"asfuid": "uid", "jwt": "jwt-token"}
+
+    payload = await quart.request.get_json(force=True, silent=False)
+    if not isinstance(payload, dict):
+        return quart.Response("Invalid JSON", status=400)
+
+    pat_request = PATJWTRequest.model_validate(payload)
+    token_hash = hashlib.sha3_256(pat_request.pat.encode()).hexdigest()
+    pat_rec = await _get_pat(pat_request.asfuid, token_hash)
+
+    now = datetime.datetime.now(datetime.UTC)
+    if (pat_rec is None) or (pat_rec.expires < now):
+        return quart.Response("Invalid PAT", status=401)
+
+    jwt_token = jwtoken.issue(pat_request.asfuid)
+    return quart.jsonify({"asfuid": pat_request.asfuid, "jwt": jwt_token})
 
 
 @api.BLUEPRINT.route("/keys")
@@ -261,6 +291,16 @@ async def tasks(query_args: Task) -> quart.Response:
         count = (await data.execute(count_statement)).scalar_one()
         result = {"data": [paged_task.model_dump(exclude={"result"}) for paged_task in paged_tasks], "count": count}
         return quart.jsonify(result)
+
+
+@db.session_function
+async def _get_pat(data: db.Session, uid: str, token_hash: str) -> models.PersonalAccessToken | None:
+    return await data.query_one_or_none(
+        sqlmodel.select(models.PersonalAccessToken).where(
+            models.PersonalAccessToken.asfuid == uid,
+            models.PersonalAccessToken.token_hash == token_hash,
+        )
+    )
 
 
 def _pagination_args_validate(query_args: Pagination) -> None:
