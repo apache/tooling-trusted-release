@@ -798,3 +798,15 @@ def check_release_name(_mapper: orm.Mapper, _connection: sqlalchemy.Connection, 
 def release_name(project_name: str, version_name: str) -> str:
     """Return the release name for a given project and version."""
     return f"{project_name}-{version_name}"
+
+
+class PersonalAccessToken(sqlmodel.SQLModel, table=True):
+    id: int | None = sqlmodel.Field(default=None, primary_key=True)
+    asfuid: str = sqlmodel.Field(index=True)
+    token_hash: str = sqlmodel.Field(unique=True)
+    created: datetime.datetime = sqlmodel.Field(
+        default_factory=lambda: datetime.datetime.now(datetime.UTC), sa_column=sqlalchemy.Column(UTCDateTime)
+    )
+    expires: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
+    last_used: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
+    label: str | None = None

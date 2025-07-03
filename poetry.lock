@@ -1165,6 +1165,21 @@ files = [
 ]
 
 [[package]]
+name = "htpy"
+version = "25.7.0"
+description = "htpy - HTML in Python"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "htpy-25.7.0-py3-none-any.whl", hash = "sha256:439a568e208890e4cf8d6629662d88af9fa4f7e6737b59d3674aac62414d2497"},
+    {file = "htpy-25.7.0.tar.gz", hash = "sha256:7dceccdca7f177a91354aec0b417d8ac9f2f103c225ec888e63cd0e769f1b2db"},
+]
+
+[package.dependencies]
+markupsafe = ">=2.0.0"
+
+[[package]]
 name = "hypercorn"
 version = "0.17.3"
 description = "A ASGI Server based on Hyper libraries and inspired by Gunicorn"
@@ -3166,4 +3181,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "~=3.13"
-content-hash = "cf3130d7e028316482b7e62383c05fe183f64284f99b788b5aea94be162934d8"
+content-hash = "90ea9e07b07f883138297fa9a2aac6656cc8db5d7ca25e28cb8bcd6b13027803"

@@ -18,14 +18,12 @@
 """root.py"""
 
 import asfquart.session
-import quart
 import sqlalchemy.orm as orm
 import sqlmodel
 import werkzeug.wrappers.response as response
 
 import atr.db as db
 import atr.db.models as models
-import atr.jwtoken as jwtoken
 import atr.routes as routes
 import atr.template as template
 import atr.user as user
@@ -111,12 +109,6 @@ async def index() -> response.Response | str:
 async def todo(session: routes.CommitterSession) -> str:
     """POST target for development."""
     return await template.render("todo.html")
-
-
-@routes.committer("/token")
-async def token(session: routes.CommitterSession) -> quart.Response:
-    token = jwtoken.issue(session.uid)
-    return quart.jsonify({"token": token})
 
 
 @routes.committer("/tutorial")
