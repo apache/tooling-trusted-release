@@ -28,6 +28,7 @@ import werkzeug.exceptions as exceptions
 import atr.blueprints.api as api
 import atr.db as db
 import atr.db.models as models
+import atr.jwtoken as jwtoken
 
 # FIXME: we need to return the dumped model instead of the actual pydantic class
 #        as otherwise pyright will complain about the return type
@@ -208,6 +209,15 @@ async def releases_project_version_revisions(project: str, version: str) -> tupl
         release_name = models.release_name(project, version)
         revisions = await data.revision(release_name=release_name).all()
         return [rev.model_dump() for rev in revisions], 200
+
+
+@api.BLUEPRINT.route("/secret")
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_response(dict[str, str], 200)
+async def secret() -> tuple[Mapping, int]:
+    """Return a secret."""
+    return {"secret": "*******"}, 200
 
 
 @api.BLUEPRINT.route("/ssh-keys")

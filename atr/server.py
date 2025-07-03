@@ -105,6 +105,12 @@ def app_setup_api_docs(app: base.QuartApp) -> None:
         openapi_provider_class=ApiOnlyOpenAPIProvider,
         swagger_ui_path="/api/docs",
         openapi_path="/api/openapi.json",
+        security_schemes={
+            "BearerAuth": quart_schema.HttpSecurityScheme(
+                scheme="bearer",
+                bearer_format="JWT",
+            )
+        },
     )
 
 

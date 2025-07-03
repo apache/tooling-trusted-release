@@ -15,6 +15,28 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asfquart.base as base
 import quart
+import werkzeug.exceptions as exceptions
 
 BLUEPRINT = quart.Blueprint("api_blueprint", __name__, url_prefix="/api")
+
+
+@BLUEPRINT.errorhandler(base.ASFQuartException)
+async def handle_asfquart_exception(err: base.ASFQuartException) -> tuple[quart.Response, int]:
+    status = getattr(err, "errorcode", 500)
+    return _json_error(str(err), status)
+
+
+@BLUEPRINT.errorhandler(Exception)
+async def handle_generic_exception(err: Exception) -> tuple[quart.Response, int]:
+    return _json_error(str(err), 500)
+
+
+@BLUEPRINT.errorhandler(exceptions.HTTPException)
+async def handle_http_exception(err: exceptions.HTTPException) -> tuple[quart.Response, int]:
+    return _json_error(err.description or err.name, err.code)
+
+
+def _json_error(message: str, status_code: int | None) -> tuple[quart.Response, int]:
+    return quart.jsonify({"error": message}), status_code or 500
