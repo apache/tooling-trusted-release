@@ -20,6 +20,7 @@ import datetime
 import hashlib
 from collections.abc import Mapping
 
+import asfquart.base as base
 import quart
 import quart_schema
 import sqlalchemy
@@ -31,6 +32,8 @@ import atr.blueprints.api as api
 import atr.db as db
 import atr.db.models as models
 import atr.jwtoken as jwtoken
+import atr.routes as routes
+import atr.routes.start as start
 import atr.schema as schema
 
 # FIXME: we need to return the dumped model instead of the actual pydantic class
@@ -58,6 +61,11 @@ class Task(Pagination):
 class PATJWTRequest(schema.Strict):
     asfuid: str
     pat: str
+
+
+class ReleaseCreateRequest(schema.Strict):
+    project_name: str
+    version: str
 
 
 # We implicitly have /api/openapi.json
@@ -211,6 +219,32 @@ async def releases(query_args: Releases) -> quart.Response:
         return quart.jsonify(result)
 
 
+@api.BLUEPRINT.route("/releases/create", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_response(models.Release, 201)
+async def releases_create() -> tuple[Mapping, int]:
+    """Create a new release draft for a project via POSTed JSON."""
+
+    payload = await quart.request.get_json(force=True, silent=False)
+    if not isinstance(payload, dict):
+        raise exceptions.BadRequest("Invalid JSON")
+
+    request_data = ReleaseCreateRequest.model_validate(payload)
+    asf_uid = _jwt_asf_uid()
+
+    try:
+        release, _project = await start.create_release_draft(
+            project_name=request_data.project_name,
+            version=request_data.version,
+            asf_uid=asf_uid,
+        )
+    except routes.FlashError as exc:
+        raise exceptions.BadRequest(str(exc))
+
+    return release.model_dump(), 201
+
+
 @api.BLUEPRINT.route("/releases/<project>/<version>")
 @quart_schema.validate_response(models.Release, 200)
 async def releases_project_version(project: str, version: str) -> tuple[Mapping, int]:
@@ -301,6 +335,14 @@ async def _get_pat(data: db.Session, uid: str, token_hash: str) -> models.Person
             models.PersonalAccessToken.token_hash == token_hash,
         )
     )
+
+
+def _jwt_asf_uid() -> str:
+    claims = getattr(quart.g, "jwt_claims", {})
+    asf_uid = claims.get("sub")
+    if not isinstance(asf_uid, str):
+        raise base.ASFQuartException("Invalid token subject", errorcode=401)
+    return asf_uid
 
 
 def _pagination_args_validate(query_args: Pagination) -> None:
