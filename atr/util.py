@@ -81,6 +81,8 @@ class FileStat:
 class QuartFormTyped(quart_wtf.QuartForm):
     """Quart form with type annotations."""
 
+    csrf_token = wtforms.HiddenField()
+
     @classmethod
     async def create_form(
         cls: type[F],
@@ -760,6 +762,11 @@ def release_directory_version(release: models.Release) -> pathlib.Path:
             path = get_finished_dir() / path_project / path_version
         # Do not add "case _" here
     return path
+
+
+def static_path(*args: str) -> str:
+    filename = str(pathlib.PurePosixPath(*args))
+    return quart.url_for("static", filename=filename)
 
 
 async def thread_messages(

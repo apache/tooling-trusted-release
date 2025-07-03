@@ -30,10 +30,11 @@ import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
 import wtforms
 import wtforms.fields.core as core
-from htpy import Element, code, div, form, h1, h2, p, strong, table, tbody, td, th, thead, tr
+from htpy import Element, code, div, form, h1, h2, p, pre, strong, table, tbody, td, th, thead, tr
 
 import atr.db as db
 import atr.db.models as models
+import atr.jwtoken as jwtoken
 import atr.routes as routes
 import atr.template as templates
 import atr.util as util
@@ -41,11 +42,11 @@ import atr.util as util
 _EXPIRY_DAYS: Final[int] = 180
 _LOGGER: Final[logging.Logger] = logging.getLogger(__name__)
 
+
 type Fragment = Element | core.Field | str
 
 
 class AddTokenForm(util.QuartFormTyped):
-    csrf_token: wtforms.Field
     label = wtforms.StringField(
         "Label",
         validators=[wtforms.validators.Optional(), wtforms.validators.Length(max=100)],
@@ -55,9 +56,20 @@ class AddTokenForm(util.QuartFormTyped):
 
 
 class DeleteTokenForm(util.QuartFormTyped):
-    csrf_token: wtforms.Field
     token_id = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
     submit = wtforms.SubmitField("Delete")
+
+
+class IssueJWTForm(util.QuartFormTyped):
+    submit = wtforms.SubmitField("Generate JWT")
+
+
+@routes.committer("/tokens/jwt", methods=["POST"])
+async def jwt_post(session: routes.CommitterSession) -> quart.Response:
+    await util.validate_empty_form()
+
+    jwt_token = jwtoken.issue(session.uid)
+    return quart.Response(jwt_token, mimetype="text/plain")
 
 
 @routes.committer("/tokens", methods=["GET", "POST"])
@@ -70,6 +82,7 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
             return maybe_response
 
     add_form = await AddTokenForm.create_form(data=request_form if is_post else None)
+    issue_form = await IssueJWTForm.create_form(data=request_form if is_post else None)
 
     start = time.perf_counter_ns()
     tokens_list = await _fetch_tokens(session.uid)
@@ -78,7 +91,18 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
 
     start = time.perf_counter_ns()
     add_form_elem = _build_add_form_element(add_form)
+    issue_form_elem = _build_issue_jwt_form_element(issue_form)
     tokens_table = _build_tokens_table(tokens_list)
+
+    issue_jwt_elem = div[
+        p[
+            "Generate a JSON Web Token (JWT) to authenticate calls to ATR's private API routes. "
+            "Treat the token like a password and include it in the Authorization header "
+            "as a Bearer token when invoking the protected endpoints.",
+        ],
+        issue_form_elem,
+        pre(id="jwt-output", class_="d-none mt-2 p-3 atr-word-wrap border rounded w-50"),
+    ]
 
     content_elem = div[
         h1["Tokens"],
@@ -93,6 +117,8 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
             div(".card-body")[add_form_elem],
         ],
         tokens_table,
+        h2["JSON Web Token (JWT)"],
+        issue_jwt_elem,
     ]
     end = time.perf_counter_ns()
     _LOGGER.info("Content elem built in %dms", (end - start) / 1_000_000)
@@ -101,8 +127,9 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
     rendered = await templates.render(
         "blank.html",
         title="Tokens",
-        description="Manage your Personal Access Tokens.",
+        description="Manage your PATs and JWTs.",
         content=content_elem,
+        javascripts=[util.static_path("js", "create-a-jwt.js")],
     )
     end = time.perf_counter_ns()
     _LOGGER.info("Rendered in %dms", (end - start) / 1_000_000)
@@ -133,6 +160,14 @@ def _build_delete_form_element(token_id: int | None) -> markupsafe.Markup:
         _as_markup(d_form.csrf_token),
         _as_markup(d_form.token_id),
         d_form.submit(class_="btn btn-sm btn-danger"),
+    ]
+    return _as_markup(elem)
+
+
+def _build_issue_jwt_form_element(j_form: IssueJWTForm) -> markupsafe.Markup:
+    elem = form("#issue-jwt-form", method="post", action=util.as_url(jwt_post))[
+        _as_markup(j_form.csrf_token),
+        j_form.submit(class_="btn btn-primary"),
     ]
     return _as_markup(elem)
 
@@ -213,15 +248,17 @@ async def _handle_post(
     session: routes.CommitterSession, request_form: datastructures.MultiDict
 ) -> response.Response | None:
     if "token_id" in request_form:
-        del_form = await DeleteTokenForm.create_form(data=request_form)
-        if await del_form.validate_on_submit():
-            token_id_val = int(str(del_form.token_id.data))
-            await _delete_token(session.uid, token_id_val)
-            await quart.flash("Token deleted successfully", "success")
-            return await session.redirect(tokens)
-        await quart.flash("Invalid delete request", "error")
-        return None
+        return await _handle_delete_token_post(session, request_form)
 
+    if "label" in request_form:
+        return await _handle_add_token_post(session, request_form)
+
+    return await _handle_issue_jwt_post(session, request_form)
+
+
+async def _handle_add_token_post(
+    session: routes.CommitterSession, request_form: datastructures.MultiDict
+) -> response.Response | None:
     add_form = await AddTokenForm.create_form(data=request_form)
     if await add_form.validate_on_submit():
         label_val = str(add_form.label.data) if add_form.label.data else None
@@ -233,6 +270,39 @@ async def _handle_post(
                 code(".bg-light.border.rounded.px-1")[plaintext],
             ],
             p(".mb-0")["Copy it now as you will not be able to see it again."],
+        ]
+        await quart.flash(_as_markup(success_msg), "success")
+        return await session.redirect(tokens)
+
+    return None
+
+
+async def _handle_delete_token_post(
+    session: routes.CommitterSession, request_form: datastructures.MultiDict
+) -> response.Response | None:
+    del_form = await DeleteTokenForm.create_form(data=request_form)
+    if await del_form.validate_on_submit():
+        token_id_val = int(str(del_form.token_id.data))
+        await _delete_token(session.uid, token_id_val)
+        await quart.flash("Token deleted successfully", "success")
+        return await session.redirect(tokens)
+
+    await quart.flash("Invalid delete request", "error")
+    return None
+
+
+async def _handle_issue_jwt_post(
+    session: routes.CommitterSession, request_form: datastructures.MultiDict
+) -> response.Response | None:
+    issue_form = await IssueJWTForm.create_form(data=request_form)
+    if await issue_form.validate_on_submit():
+        jwt_token = jwtoken.issue(session.uid)
+        success_msg = div[
+            p[
+                strong["Your new JWT"],
+                " is:",
+            ],
+            p[code(".bg-light.border.rounded.px-1.atr-word-wrap")[jwt_token],],
         ]
         await quart.flash(_as_markup(success_msg), "success")
         return await session.redirect(tokens)

@@ -499,3 +499,8 @@ aside.sidebar nav a:hover {
 .atr-nowrap {
     white-space: nowrap;
 }
+
+.atr-word-wrap {
+    overflow-wrap: anywhere;
+    word-break: break-all;
+}

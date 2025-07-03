@@ -11,3 +11,10 @@
 {% block content %}
   {{ content }}
 {% endblock content %}
+
+{% block javascripts %}
+  {{ super() }}
+  {% if javascripts %}
+    {% for js in javascripts %}<script src="{{- js -}}"></script>{% endfor %}
+  {% endif %}
+{% endblock javascripts %}
