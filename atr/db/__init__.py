@@ -18,9 +18,11 @@
 from __future__ import annotations
 
 import contextlib
+import functools
 import logging
 import os
-from typing import TYPE_CHECKING, Any, Final, TypeGuard, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any, Concatenate, Final, TypeGuard, TypeVar
 
 import alembic.command as command
 import alembic.config as alembic_config
@@ -39,7 +41,7 @@ import atr.util as util
 
 if TYPE_CHECKING:
     import datetime
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Awaitable, Callable, Iterator, Sequence
 
     import asfquart.base as base
 
@@ -51,6 +53,7 @@ _global_atr_sessionmaker: sqlalchemy.ext.asyncio.async_sessionmaker | None = Non
 
 
 T = TypeVar("T")
+R = TypeVar("R")
 
 
 class NotSet:
@@ -374,6 +377,22 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.options(select_in_load(models.PublicSigningKey.committees))
 
         return Query(self, query)
+
+    async def query_all(self, stmt: sql.Select[Any]) -> list[Any]:
+        result = await self.execute(stmt)
+        return list(result.scalars().all())
+
+    async def query_first(self, stmt: sql.Select[Any]) -> Any | None:
+        result = await self.execute(stmt)
+        return result.scalars().first()
+
+    async def query_one(self, stmt: sql.Select[Any]) -> Any:
+        result = await self.execute(stmt)
+        return result.scalars().one()
+
+    async def query_one_or_none(self, stmt: sql.Select[Any]) -> Any | None:
+        result = await self.execute(stmt)
+        return result.scalars().one_or_none()
 
     def release(
         self,
@@ -798,6 +817,29 @@ def session(log_queries: bool | None = None) -> Session:
     else:
         session_instance = util.validate_as_type(_global_atr_sessionmaker(), Session)
     return session_instance
+
+
+def session_commit_function[**P, R](
+    func: Callable[Concatenate[Session, P], Awaitable[R]],
+) -> Callable[P, Awaitable[R]]:
+    @functools.wraps(func)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        async with session() as data:
+            async with data.begin():
+                return await func(data, *args, **kwargs)
+
+    return wrapper
+
+
+def session_function[**P, R](
+    func: Callable[Concatenate[Session, P], Awaitable[R]],
+) -> Callable[P, Awaitable[R]]:
+    @functools.wraps(func)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        async with session() as data:
+            return await func(data, *args, **kwargs)
+
+    return wrapper
 
 
 async def shutdown_database() -> None:

@@ -186,27 +186,27 @@ async def _create_token(uid: str, label: str | None) -> str:
     return plaintext
 
 
-async def _delete_token(uid: str, token_id: int) -> None:
-    async with db.session() as data:
-        async with data.begin():
-            stmt = sqlmodel.select(models.PersonalAccessToken).where(
-                models.PersonalAccessToken.id == token_id,
-                models.PersonalAccessToken.asfuid == uid,
-            )
-            pat = (await data.execute(stmt)).scalar_one_or_none()
-            if pat:
-                await data.delete(pat)
-
-
-async def _fetch_tokens(uid: str) -> list[models.PersonalAccessToken]:
-    via = models.validate_instrumented_attribute
-    async with db.session() as data:
-        stmt = (
-            sqlmodel.select(models.PersonalAccessToken)
-            .where(models.PersonalAccessToken.asfuid == uid)
-            .order_by(via(models.PersonalAccessToken.created))
+@db.session_commit_function
+async def _delete_token(data: db.Session, uid: str, token_id: int) -> None:
+    pat = await data.query_one_or_none(
+        sqlmodel.select(models.PersonalAccessToken).where(
+            models.PersonalAccessToken.id == token_id,
+            models.PersonalAccessToken.asfuid == uid,
         )
-        return list((await data.execute(stmt)).scalars())
+    )
+    if pat:
+        await data.delete(pat)
+
+
+@db.session_function
+async def _fetch_tokens(data: db.Session, uid: str) -> list[models.PersonalAccessToken]:
+    via = models.validate_instrumented_attribute
+    stmt = (
+        sqlmodel.select(models.PersonalAccessToken)
+        .where(models.PersonalAccessToken.asfuid == uid)
+        .order_by(via(models.PersonalAccessToken.created))
+    )
+    return await data.query_all(stmt)
 
 
 async def _handle_post(
