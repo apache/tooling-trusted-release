@@ -222,8 +222,22 @@ def app_jwt_show() -> None:
 
 @RELEASE.command(name="add", help="Add a release.")
 def app_release_add(project: str, version: str) -> None:
-    print(project, version)
-    raise NotImplementedError("Release add not implemented yet")
+    with config_lock():
+        cfg = config_read()
+        jwt_token = cfg.get("tokens", {}).get("jwt")
+
+    if jwt_token is None:
+        LOGGER.error("No JWT stored in configuration.")
+        sys.exit(1)
+
+    host = cfg.get("atr", {}).get("host", "release-test.apache.org")
+    url = f"https://{host}/api/releases/create"
+
+    payload: dict[str, str] = {"project_name": project, "version": version}
+
+    verify_ssl = not host.startswith("127.0.0.1")
+    result = asyncio.run(web_post(url, payload, jwt_token, verify_ssl))
+    print(result)
 
 
 @APP.command(name="set", help="Set a configuration value using dot notation.")
@@ -352,7 +366,7 @@ def timestamp_format(ts: int | str | None) -> str | None:
 
 
 async def web_fetch(url: str, asfuid: str, pat_token: str, verify_ssl: bool = True) -> str:
-    connector = aiohttp.TCPConnector(ssl=verify_ssl) if not verify_ssl else None
+    connector = aiohttp.TCPConnector(ssl=verify_ssl) if (not verify_ssl) else None
     async with aiohttp.ClientSession(connector=connector) as session:
         payload = {"asfuid": asfuid, "pat": pat_token}
         async with session.post(url, json=payload) as resp:
@@ -365,6 +379,23 @@ async def web_fetch(url: str, asfuid: str, pat_token: str, verify_ssl: bool = Tr
             if "jwt" in data:
                 return data["jwt"]
             raise RuntimeError(f"Unexpected response: {data}")
+
+
+async def web_post(url: str, payload: dict[str, Any], jwt_token: str, verify_ssl: bool = True) -> Any:
+    connector = aiohttp.TCPConnector(ssl=verify_ssl) if (not verify_ssl) else None
+    headers = {"Authorization": f"Bearer {jwt_token}"}
+    async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
+        async with session.post(url, json=payload) as resp:
+            if resp.status not in (200, 201):
+                text = await resp.text()
+                LOGGER.error(f"Release add failed: {resp.status} {text}")
+                sys.exit(1)
+
+            try:
+                return await resp.json()
+            except Exception:
+                text = await resp.text()
+                return text
 
 
 if __name__ == "__main__":
