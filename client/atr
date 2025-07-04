@@ -65,7 +65,7 @@ RELEASE: cyclopts.App = cyclopts.App(name="release", help="Release operations.")
 YAML_DEFAULTS: dict[str, Any] = {"atr": {}, "tokens": {}}
 YAML_SCHEMA: strictyaml.Map = strictyaml.Map(
     {
-        "atr": strictyaml.Map({strictyaml.Optional("host"): strictyaml.Str()}),
+        strictyaml.Optional("atr"): strictyaml.Map({strictyaml.Optional("host"): strictyaml.Str()}),
         "tokens": strictyaml.Map({strictyaml.Optional("pat"): strictyaml.Str()}),
     }
 )
@@ -75,7 +75,7 @@ APP.command(PAT)
 APP.command(RELEASE)
 
 
-@CONFIG.command(name="drop", help="Remove a configuration key from atr section.")
+@CONFIG.command(name="drop", help="Remove a configuration key from the atr section.")
 def app_config_drop(key: Literal["host"]) -> None:
     with config_lock():
         cfg = config_read()
@@ -93,12 +93,24 @@ def app_config_drop(key: Literal["host"]) -> None:
         LOGGER.info(f"Configuration key removed: {key}")
 
 
-@CONFIG.command(name="path", help="Show configuration file path.")
+@CONFIG.command(name="file", help="Display the configuration file contents.")
+def app_config_file() -> None:
+    cfg = config_path()
+    if not cfg.exists():
+        LOGGER.error("No configuration file found.")
+        sys.exit(1)
+
+    with cfg.open("r", encoding="utf-8") as fh:
+        for chunk in fh:
+            print(chunk, end="")
+
+
+@CONFIG.command(name="path", help="Show the configuration file path.")
 def app_config_path() -> None:
     print(config_path())
 
 
-@CONFIG.command(name="set", help="Set a configuration key in atr section.")
+@CONFIG.command(name="set", help="Set a configuration key in the atr section.")
 def app_config_set(key: Literal["host"], value: str) -> None:
     with config_lock():
         cfg = config_read()
@@ -110,16 +122,16 @@ def app_config_set(key: Literal["host"], value: str) -> None:
         LOGGER.info(f"Configuration key set: {key}")
 
 
-@CONFIG.command(name="show", help="Display the configuration file contents.")
-def app_config_show() -> None:
-    cfg = config_path()
-    if not cfg.exists():
-        LOGGER.error("No configuration file found.")
+@CONFIG.command(name="show", help="Show a configuration value from the atr section.")
+def app_config_show(key: Literal["host"]) -> None:
+    with config_lock():
+        value = config_read().get("atr", {}).get(key)
+
+    if value is None:
+        LOGGER.error(f"Key not found in atr: {key}")
         sys.exit(1)
 
-    with cfg.open("r", encoding="utf-8") as fh:
-        for chunk in fh:
-            print(chunk, end="")
+    print(value)
 
 
 @PAT.command(name="drop", help="Remove the stored Personal Access Token.")
