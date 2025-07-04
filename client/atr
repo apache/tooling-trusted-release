@@ -20,6 +20,7 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
+#     "aiohttp",
 #     "cyclopts",
 #     "filelock",
 #     "platformdirs",
@@ -44,6 +45,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -52,6 +54,7 @@ import sys
 import tempfile
 from typing import Any, Literal
 
+import aiohttp  # type: ignore[import-not-found]
 import cyclopts  # type: ignore[import-not-found]
 import filelock  # type: ignore[import-not-found]
 import platformdirs  # type: ignore[import-not-found]
@@ -66,7 +69,7 @@ YAML_DEFAULTS: dict[str, Any] = {"atr": {}, "tokens": {}}
 YAML_SCHEMA: strictyaml.Map = strictyaml.Map(
     {
         strictyaml.Optional("atr"): strictyaml.Map({strictyaml.Optional("host"): strictyaml.Str()}),
-        "tokens": strictyaml.Map({strictyaml.Optional("pat"): strictyaml.Str()}),
+        strictyaml.Optional("tokens"): strictyaml.Map({strictyaml.Optional("pat"): strictyaml.Str()}),
     }
 )
 
@@ -170,6 +173,28 @@ def app_pat_show() -> None:
         sys.exit(1)
 
 
+@PAT.command(name="jwt", help="Fetch a JWT using the stored PAT.")
+def app_pat_jwt(asf_uid: str | None = None) -> None:
+    with config_lock():
+        cfg = config_read()
+
+    pat_token = cfg.get("tokens", {}).get("pat")
+    if pat_token is None:
+        LOGGER.error("No Personal Access Token stored.")
+        sys.exit(1)
+
+    host = cfg.get("atr", {}).get("host", "release-test.apache.org")
+    url = f"https://{host}/api/jwt"
+
+    if asf_uid is None:
+        LOGGER.error("No ASF UID provided.")
+        sys.exit(1)
+
+    verify_ssl = not host.startswith("127.0.0.1")
+    jwt = asyncio.run(web_fetch(url, asf_uid, pat_token, verify_ssl))
+    print(jwt)
+
+
 @RELEASE.command(name="add", help="Add a release.")
 def app_release_add(project: str, version: str) -> None:
     print(project, version)
@@ -222,6 +247,22 @@ def config_write(data: dict[str, Any]) -> None:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     APP()
+
+
+async def web_fetch(url: str, asfuid: str, pat_token: str, verify_ssl: bool = True) -> str:
+    connector = aiohttp.TCPConnector(ssl=verify_ssl) if not verify_ssl else None
+    async with aiohttp.ClientSession(connector=connector) as session:
+        payload = {"asfuid": asfuid, "pat": pat_token}
+        async with session.post(url, json=payload) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                LOGGER.error(f"JWT fetch failed: {resp.status} {text}")
+                sys.exit(1)
+
+            data: dict[str, Any] = await resp.json()
+            if "jwt" in data:
+                return data["jwt"]
+            raise RuntimeError(f"Unexpected response: {data}")
 
 
 if __name__ == "__main__":
