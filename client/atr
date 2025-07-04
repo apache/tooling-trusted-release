@@ -86,16 +86,6 @@ def app_config_show() -> None:
             print(chunk, end="")
 
 
-@PAT.command(name="add", help="Add a Personal Access Token.")
-def app_pat_add(token: str) -> None:
-    with config_lock():
-        cfg = config_read()
-        cfg.setdefault("tokens", {})
-        cfg["tokens"]["pat"] = token
-        config_write(cfg)
-    LOGGER.info("Personal Access Token stored.")
-
-
 @PAT.command(name="drop", help="Remove the stored Personal Access Token.")
 def app_pat_drop() -> None:
     with config_lock():
@@ -108,6 +98,16 @@ def app_pat_drop() -> None:
         else:
             LOGGER.error("No Personal Access Token stored.")
             sys.exit(1)
+
+
+@PAT.command(name="set", help="Set a Personal Access Token.")
+def app_pat_set(token: str) -> None:
+    with config_lock():
+        cfg = config_read()
+        cfg.setdefault("tokens", {})
+        cfg["tokens"]["pat"] = token
+        config_write(cfg)
+    LOGGER.info("Personal Access Token stored.")
 
 
 @PAT.command(name="show", help="Display the stored Personal Access Token.")
