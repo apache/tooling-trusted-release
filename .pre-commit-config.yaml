@@ -62,29 +62,21 @@ repos:
       language: python
       pass_filenames: false
       files: ^(.*/)?(poetry\.lock|pyproject\.toml)$
+
     - id: ruff
       name: Ruff Linter
       entry: ruff check --fix
       language: system
       types: [python]
       exclude: ^node_modules/
+
     - id: ruff-format
       name: Ruff Formatter
       entry: ruff format --force-exclude
       language: system
       types: [python]
       exclude: ^node_modules/
-    # - id: mypy
-    #   name: Mypy Type Check
-    #   entry: mypy
-    #   language: system
-    #   require_serial: true
-    #   types: [python]
-    #   # See https://github.com/pre-commit/pre-commit/issues/2967
-    #   exclude: ^(node_modules|tests)/
-    #   args:
-    #     - --config-file=pyproject.toml
-    #     - --scripts-are-modules
+
     - id: pyright
       name: Pyright Type Check
       entry: pyright
@@ -92,6 +84,27 @@ repos:
       require_serial: true
       types: [python]
       exclude: ^tests/
+
+    # The separate ATR client hooks are needed because of the uv shebang
+    - id: ruff-client
+      name: Ruff Linter (client)
+      entry: ruff check --fix client/atr
+      language: system
+      pass_filenames: false
+
+    - id: ruff-format-client
+      name: Ruff Formatter (client)
+      entry: ruff format --force-exclude client/atr
+      language: system
+      pass_filenames: false
+
+    - id: pyright-client
+      name: Pyright Type Check (client)
+      entry: pyright client/atr
+      language: system
+      require_serial: true
+      pass_filenames: false
+
     - id: jinja-route-check
       name: Jinja Route Checker
       description: Check whether routes used in Jinja2 templates actually exist

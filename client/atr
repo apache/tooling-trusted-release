@@ -1,0 +1,180 @@
+#!/usr/bin/env -S uv run --script
+
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "cyclopts",
+#     "filelock",
+#     "platformdirs",
+#     "strictyaml",
+# ]
+# [tool.uv]
+# exclude-newer = "2025-07-04T13:08:00Z"
+# ///
+
+# Guide to contributors:
+#
+# - Use "import A", not "from A import ...", except for "from typing"
+# - Group constants, types, and functions, then order alphabetically
+# - Name functions in object oriented style, noun first and verb last
+# - Use list, | None, etc. in types
+# - Use match and case, and the walrus operator
+# - Keep functions very short, and avoid indentation
+# - Always group binary subexpressions in boolean expressions
+# - Do not add any comments
+
+
+from __future__ import annotations
+
+import contextlib
+import logging
+import os
+import pathlib
+import sys
+import tempfile
+from typing import Any
+
+import cyclopts  # type: ignore[import-not-found]
+import filelock  # type: ignore[import-not-found]
+import platformdirs  # type: ignore[import-not-found]
+import strictyaml  # type: ignore[import-not-found]
+
+APP: cyclopts.App = cyclopts.App()
+CONFIG: cyclopts.App = cyclopts.App(name="config", help="Configuration operations.")
+LOGGER = logging.getLogger(__name__)
+PAT: cyclopts.App = cyclopts.App(name="pat", help="Personal Access Token operations.")
+RELEASE: cyclopts.App = cyclopts.App(name="release", help="Release operations.")
+YAML_DEFAULTS: dict[str, Any] = {"tokens": {}}
+YAML_SCHEMA: strictyaml.Map = strictyaml.Map({"tokens": strictyaml.Map({strictyaml.Optional("pat"): strictyaml.Str()})})
+
+APP.command(CONFIG)
+APP.command(PAT)
+APP.command(RELEASE)
+
+
+@CONFIG.command(name="path", help="Show configuration file path.")
+def app_config_path() -> None:
+    print(config_path())
+
+
+@CONFIG.command(name="show", help="Display the configuration file contents.")
+def app_config_show() -> None:
+    cfg = config_path()
+    if not cfg.exists():
+        LOGGER.error("No configuration file found.")
+        sys.exit(1)
+
+    with cfg.open("r", encoding="utf-8") as fh:
+        for chunk in fh:
+            print(chunk, end="")
+
+
+@PAT.command(name="add", help="Add a Personal Access Token.")
+def app_pat_add(token: str) -> None:
+    with config_lock():
+        cfg = config_read()
+        cfg.setdefault("tokens", {})
+        cfg["tokens"]["pat"] = token
+        config_write(cfg)
+    LOGGER.info("Personal Access Token stored.")
+
+
+@PAT.command(name="drop", help="Remove the stored Personal Access Token.")
+def app_pat_drop() -> None:
+    with config_lock():
+        cfg = config_read()
+        if cfg.get("tokens", {}).pop("pat", None) is not None:
+            if not cfg["tokens"]:
+                cfg.pop("tokens")
+            config_write(cfg)
+            LOGGER.info("Personal Access Token removed.")
+        else:
+            LOGGER.error("No Personal Access Token stored.")
+            sys.exit(1)
+
+
+@PAT.command(name="show", help="Display the stored Personal Access Token.")
+def app_pat_show() -> None:
+    with config_lock():
+        cfg = config_read()
+        token = cfg.get("tokens", {}).get("pat")
+    if token is not None:
+        print(token)
+    else:
+        LOGGER.error("No Personal Access Token stored.")
+        sys.exit(1)
+
+
+@RELEASE.command(name="add", help="Add a release.")
+def app_release_add(project: str, version: str) -> None:
+    print(project, version)
+    raise NotImplementedError("Release add not implemented yet")
+
+
+@contextlib.contextmanager
+def config_lock():
+    lock = filelock.FileLock(str(config_path()) + ".lock")
+    with lock:
+        yield
+
+
+def config_path() -> pathlib.Path:
+    return platformdirs.user_config_path("atr", appauthor="ASF") / "atr.yaml"
+
+
+def config_read() -> dict[str, Any]:
+    config_file = config_path()
+    if config_file.exists():
+        try:
+            return strictyaml.load(config_file.read_text(), YAML_SCHEMA).data
+        except strictyaml.YAMLValidationError as exc:
+            raise RuntimeError(f"Invalid atr.yaml: {exc}") from exc
+    return YAML_DEFAULTS.copy()
+
+
+def config_write(data: dict[str, Any]) -> None:
+    config_file = config_path()
+
+    if not data or (data.keys() == {"tokens"} and not data["tokens"]):
+        if config_file.exists():
+            config_file.unlink()
+        return
+
+    config_file.parent.mkdir(parents=True, exist_ok=True)
+
+    yaml_doc = strictyaml.as_document(data, YAML_SCHEMA)
+    yaml_str = yaml_doc.as_yaml()
+
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=config_file.parent, delete=False) as tmp:
+        tmp.write(yaml_str)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+        temp_path = pathlib.Path(tmp.name)
+
+    os.replace(temp_path, config_file)
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    APP()
+
+
+if __name__ == "__main__":
+    main()
