@@ -25,10 +25,11 @@
 #     "filelock",
 #     "platformdirs",
 #     "pyjwt",
+#     "pytest>=8.4.1",
 #     "strictyaml",
 # ]
 # [tool.uv]
-# exclude-newer = "2025-07-04T13:08:00Z"
+# exclude-newer = "2025-07-04T19:04:51Z"
 # ///
 
 # Guide to contributors:
@@ -53,8 +54,12 @@ import datetime
 import json
 import logging
 import os
+import pathlib
+import re
+import subprocess
 import sys
-from typing import TYPE_CHECKING, Any, Literal
+import tempfile
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import aiohttp  # type: ignore[import-not-found]
 import cyclopts  # type: ignore[import-not-found]
@@ -64,11 +69,11 @@ import platformdirs  # type: ignore[import-not-found]
 import strictyaml  # type: ignore[import-not-found]
 
 if TYPE_CHECKING:
-    import pathlib
     from collections.abc import Generator
 
 APP: cyclopts.App = cyclopts.App()
 CONFIG: cyclopts.App = cyclopts.App(name="config", help="Configuration operations.")
+DEV: cyclopts.App = cyclopts.App(name="dev", help="Developer operations.")
 JWT: cyclopts.App = cyclopts.App(name="jwt", help="JWT operations.")
 LOGGER = logging.getLogger(__name__)
 RELEASE: cyclopts.App = cyclopts.App(name="release", help="Release operations.")
@@ -87,6 +92,7 @@ YAML_SCHEMA: strictyaml.Map = strictyaml.Map(
 )
 
 APP.command(CONFIG)
+APP.command(DEV)
 APP.command(JWT)
 APP.command(RELEASE)
 
@@ -106,6 +112,24 @@ def app_config_file() -> None:
 @CONFIG.command(name="path", help="Show the configuration file path.")
 def app_config_path() -> None:
     print(config_path())
+
+
+@DEV.command(name="lock", help="Regenerate uv lockfile.")
+def app_dev_lock() -> None:
+    subprocess.check_call(["uv", "lock", "--script", str(pathlib.Path(__file__))])
+
+
+@DEV.command(name="stamp", help="Update date stamp in header.")
+def app_dev_stamp() -> None:
+    path = pathlib.Path(__file__)
+    text = path.read_text()
+    ts = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    new_text = re.sub(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", ts, text)
+    if text == new_text:
+        LOGGER.info("No stamp updated.")
+        return
+    path.write_text(new_text, "utf-8")
+    LOGGER.info(f"Stamp updated to {ts}.")
 
 
 @APP.command(name="drop", help="Remove a configuration key using dot notation.")
@@ -253,6 +277,28 @@ def app_show(path: str) -> None:
     print(value)
 
 
+@APP.command(name="test", help="Run tests.")
+def app_test(q: Annotated[bool, cyclopts.Parameter(alias="-q")] = False, *pytest_args: str) -> None:
+    import pytest
+
+    cwd = os.getcwd()
+    with tempfile.TemporaryDirectory() as td:
+        p = pathlib.Path(td, "atr_api_client.py")
+        p.write_bytes(pathlib.Path(__file__).read_bytes())
+        os.chdir(td)
+        prev = os.environ.get("ATR_CLIENT_CONFIG_PATH")
+        os.environ["ATR_CLIENT_CONFIG_PATH"] = str(pathlib.Path(td, "atr_test.yaml"))
+        try:
+            args = (["-q"] if q else []) + list(pytest_args) + [str(p)]
+            sys.exit(pytest.main(args))
+        finally:
+            if prev is None:
+                os.environ.pop("ATR_CLIENT_CONFIG_PATH", None)
+            else:
+                os.environ["ATR_CLIENT_CONFIG_PATH"] = prev
+            os.chdir(cwd)
+
+
 def config_drop(cfg: dict[str, Any], parts: list[str]) -> None:
     config_walk(cfg, parts, "drop")
 
@@ -272,6 +318,8 @@ def config_lock(write: bool = False) -> Generator[dict[str, Any]]:
 
 
 def config_path() -> pathlib.Path:
+    if env := os.getenv("ATR_CLIENT_CONFIG_PATH"):
+        return pathlib.Path(env).expanduser()
     return platformdirs.user_config_path("atr", appauthor="ASF") / "atr.yaml"
 
 
@@ -335,6 +383,16 @@ def config_write(data: dict[str, Any]) -> None:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     APP()
+
+
+def test_config_set_get_roundtrip() -> None:
+    config: dict[str, object] = {}
+    config_set(config, ["abc", "pqr"], 123)
+    assert config_get(config, ["abc", "pqr"]) == 123
+
+
+def test_timestamp_format_epoch() -> None:
+    assert timestamp_format(0) == "01 Jan 1970 at 00:00:00 UTC"
 
 
 def timestamp_format(ts: int | str | None) -> str | None:
