@@ -66,6 +66,7 @@ import cyclopts  # type: ignore[import-not-found]
 import filelock  # type: ignore[import-not-found]
 import jwt  # type: ignore[import-not-found]
 import platformdirs  # type: ignore[import-not-found]
+import pytest  # type: ignore[import-not-found]
 import strictyaml  # type: ignore[import-not-found]
 
 if TYPE_CHECKING:
@@ -279,8 +280,6 @@ def app_show(path: str) -> None:
 
 @APP.command(name="test", help="Run tests.")
 def app_test(q: Annotated[bool, cyclopts.Parameter(alias="-q")] = False, *pytest_args: str) -> None:
-    import pytest
-
     cwd = os.getcwd()
     with tempfile.TemporaryDirectory() as td:
         p = pathlib.Path(td, "atr_api_client.py")
@@ -299,12 +298,12 @@ def app_test(q: Annotated[bool, cyclopts.Parameter(alias="-q")] = False, *pytest
             os.chdir(cwd)
 
 
-def config_drop(cfg: dict[str, Any], parts: list[str]) -> None:
-    config_walk(cfg, parts, "drop")
+def config_drop(config: dict[str, Any], parts: list[str]) -> None:
+    config_walk(config, parts, "drop")
 
 
-def config_get(cfg: dict[str, Any], parts: list[str]) -> Any | None:
-    return config_walk(cfg, parts, "get")[1]
+def config_get(config: dict[str, Any], parts: list[str]) -> Any | None:
+    return config_walk(config, parts, "get")[1]
 
 
 @contextlib.contextmanager
@@ -333,8 +332,8 @@ def config_read() -> dict[str, Any]:
     return YAML_DEFAULTS.copy()
 
 
-def config_set(cfg: dict[str, Any], parts: list[str], val: Any) -> None:
-    config_walk(cfg, parts, "set", val)
+def config_set(config: dict[str, Any], parts: list[str], val: Any) -> None:
+    config_walk(config, parts, "set", val)
 
 
 def config_walk(
@@ -369,14 +368,18 @@ def config_walk(
 
 
 def config_write(data: dict[str, Any]) -> None:
+    data = {k: v for k, v in data.items() if not (isinstance(v, dict) and not v)}
     path = config_path()
-    if not any(data.values()):
+    if not data:
         if path.exists():
             path.unlink()
         return
     tmp = path.with_suffix(".tmp")
     tmp.parent.mkdir(parents=True, exist_ok=True)
-    tmp.write_text(strictyaml.as_document(data, YAML_SCHEMA).as_yaml(), "utf-8")
+    tmp.write_text(
+        strictyaml.as_document(data, YAML_SCHEMA).as_yaml(),
+        encoding="utf-8",
+    )
     os.replace(tmp, path)
 
 
@@ -385,14 +388,80 @@ def main() -> None:
     APP()
 
 
+def test_app_set_show(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+    app_set("atr.host", "example.invalid")
+    app_show("atr.host")
+    assert capsys.readouterr().out == "example.invalid\n"
+
+
 def test_config_set_get_roundtrip() -> None:
-    config: dict[str, object] = {}
+    config: dict[str, Any] = {}
     config_set(config, ["abc", "pqr"], 123)
     assert config_get(config, ["abc", "pqr"]) == 123
 
 
+def test_config_walk_drop() -> None:
+    config: dict[str, Any] = {"a": {"b": 1}}
+    changed, _ = config_walk(config, ["a", "b"], "drop")
+    assert changed is True
+    assert config == {}
+
+
+def test_config_write_delete(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+    config_path = tmp_path / "atr.yaml"
+    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(config_path))
+    config_write({"atr": {"host": "example.invalid"}})
+    assert config_path.exists() is True
+    config_write({})
+    assert config_path.exists() is False
+
+
+def test_config_write_empty_dict_filter(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+    config_write({"atr": {}, "asf": {"uid": ""}})
+    config = config_read()
+    assert "atr" not in config
+    assert config_get(config, ["asf", "uid"]) == ""
+
+
 def test_timestamp_format_epoch() -> None:
     assert timestamp_format(0) == "01 Jan 1970 at 00:00:00 UTC"
+
+
+def test_timestamp_format_none_and_bad() -> None:
+    assert timestamp_format(None) is None
+    assert timestamp_format("bad") == "bad"
+
+
+def test_web_fetch_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Response:
+        status = 500
+
+        async def text(self):
+            return "error"
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class Session:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, *args, **kwargs):
+            return Response()
+
+    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **kw: Session())
+    with pytest.raises(SystemExit):
+        asyncio.run(web_fetch("https://error.invalid", "uid", "pat", verify_ssl=False))
 
 
 def timestamp_format(ts: int | str | None) -> str | None:
