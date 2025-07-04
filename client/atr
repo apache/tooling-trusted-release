@@ -36,6 +36,7 @@
 # - Name functions in object oriented style, noun first and verb last
 # - Use list, | None, etc. in types
 # - Use match and case, and the walrus operator
+# - Never use "case _" with exhaustive types
 # - Keep functions very short, and avoid indentation
 # - Always group binary subexpressions in boolean expressions
 # - Do not add any comments
@@ -49,7 +50,7 @@ import os
 import pathlib
 import sys
 import tempfile
-from typing import Any
+from typing import Any, Literal
 
 import cyclopts  # type: ignore[import-not-found]
 import filelock  # type: ignore[import-not-found]
@@ -61,17 +62,52 @@ CONFIG: cyclopts.App = cyclopts.App(name="config", help="Configuration operation
 LOGGER = logging.getLogger(__name__)
 PAT: cyclopts.App = cyclopts.App(name="pat", help="Personal Access Token operations.")
 RELEASE: cyclopts.App = cyclopts.App(name="release", help="Release operations.")
-YAML_DEFAULTS: dict[str, Any] = {"tokens": {}}
-YAML_SCHEMA: strictyaml.Map = strictyaml.Map({"tokens": strictyaml.Map({strictyaml.Optional("pat"): strictyaml.Str()})})
+YAML_DEFAULTS: dict[str, Any] = {"atr": {}, "tokens": {}}
+YAML_SCHEMA: strictyaml.Map = strictyaml.Map(
+    {
+        "atr": strictyaml.Map({strictyaml.Optional("host"): strictyaml.Str()}),
+        "tokens": strictyaml.Map({strictyaml.Optional("pat"): strictyaml.Str()}),
+    }
+)
 
 APP.command(CONFIG)
 APP.command(PAT)
 APP.command(RELEASE)
 
 
+@CONFIG.command(name="drop", help="Remove a configuration key from atr section.")
+def app_config_drop(key: Literal["host"]) -> None:
+    with config_lock():
+        cfg = config_read()
+
+        atr_map = cfg.get("atr", {})
+        if key in atr_map:
+            atr_map.pop(key)
+            if not atr_map:
+                cfg.pop("atr")
+        else:
+            LOGGER.error(f"Key not found in atr: {key}")
+            sys.exit(1)
+
+        config_write(cfg)
+        LOGGER.info(f"Configuration key removed: {key}")
+
+
 @CONFIG.command(name="path", help="Show configuration file path.")
 def app_config_path() -> None:
     print(config_path())
+
+
+@CONFIG.command(name="set", help="Set a configuration key in atr section.")
+def app_config_set(key: Literal["host"], value: str) -> None:
+    with config_lock():
+        cfg = config_read()
+
+        cfg.setdefault("atr", {})
+        cfg["atr"][key] = value
+
+        config_write(cfg)
+        LOGGER.info(f"Configuration key set: {key}")
 
 
 @CONFIG.command(name="show", help="Display the configuration file contents.")
@@ -152,7 +188,7 @@ def config_read() -> dict[str, Any]:
 def config_write(data: dict[str, Any]) -> None:
     config_file = config_path()
 
-    if not data or (data.keys() == {"tokens"} and not data["tokens"]):
+    if not any(bool(v) for v in data.values()):
         if config_file.exists():
             config_file.unlink()
         return
