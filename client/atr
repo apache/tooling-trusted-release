@@ -220,8 +220,8 @@ def app_jwt_show() -> None:
     return app_show("tokens.jwt")
 
 
-@RELEASE.command(name="add", help="Add a release.")
-def app_release_add(project: str, version: str) -> None:
+@RELEASE.command(name="start", help="Start a release.")
+def app_release_start(project: str, version: str) -> None:
     with config_lock():
         cfg = config_read()
         jwt_token = cfg.get("tokens", {}).get("jwt")
