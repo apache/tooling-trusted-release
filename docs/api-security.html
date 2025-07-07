@@ -1,0 +1,22 @@
+<h1>ATR API security model</h1>
+<p>All ATR routes, on both the website and the API, require HTTPS using TLS 1.2 or newer for their transport.</p>
+<p>There are two access levels to the ATR API: public and committer. Public API endpoints are accessible to everybody. Committer endpoints have the following accessibility criteria instead.</p>
+<h2>PATs</h2>
+<p>Committers must obtain a <a href="https://en.wikipedia.org/wiki/Personal_access_token">Personal Access Token</a> (PAT) from the ATR website at the route <code>/tokens</code>. Only committers, signed in through <a href="https://oauth.apache.org/api.html">ASF OAuth</a> to ATR, can obtain PATs. Each PAT expires in 180 days, and can be revoked at any time by the user at the same route. ATR does not store PATs, only the hashes of PATs.</p>
+<h2>JWTs</h2>
+<p>To make a request to a committer protected endpoint on the API, committers must first obtain a <a href="https://en.wikipedia.org/wiki/JSON_Web_Token">JWT</a>. They can do this in one of two ways:</p>
+<ol>
+<li>For debugging, obtaining a JWT from the <code>/tokens</code> page.</li>
+<li>For script use, obtaining a JWT by POSTing their PAT in a JSON payload to the API endpoint <code>/api/jwt</code>. This is a public route, and requires a payload such as <code>{&quot;asfuid&quot;: &quot;${ASF_UID}&quot;, &quot;pat&quot;: &quot;${PAT_TOKEN}&quot;}</code>. The response will be <code>{&quot;asfuid&quot;: &quot;${ASF_UID}&quot;, &quot;jwt&quot;: &quot;${JWT_TOKEN}&quot;}</code>.</li>
+</ol>
+<p>Every JWT issued by the ATR expires in 90 minutes, uses the HS256 (HMAC-SHA256) algorithm, and makes <code>sub</code> (ASF UID), <code>iat</code> (issue time), <code>exp</code> (expires at), and <code>jti</code> (token payload) claims. JWTs are stateless, so there is no analogue stored by the ATR, except for the secret symmetric key of the server which is initialised on startup. If the ATR server is restarted, all JWTs are expired immediately.</p>
+<p>The JWT can be used to access protected endpoints by using it in the <code>Authorization</code> header as a bearer token, i.e. <code>Authorization: Bearer ${JWT_TOKEN}</code>. PATs and JWTs must never appear in URLs. They must be protected by the user at all times. Accidental sharing of a PAT or a JWT must be reported to ASF security.</p>
+<p>Note that PATs cannot be used to access protected endpoints. They can only be used to issue a JWT, which is then used to access protected endpoints.</p>
+<p>Endpoints which mutate state, require significant computation, or have large or sensitive payloads use POST. All other endpoints use GET.</p>
+<h2>Limitations</h2>
+<p>We do not currently support scopes in either PATs or JWTs, but are considering this.</p>
+<p>Admins are able to revoke any PAT, and users are able to revoke any of their own PATs, but neither admins nor users are able to revoke JWTs on an individual basis. Restarting the server resets the server secret symmetric key, which has the side effect of expiring all JWTs, and can be used in an emergency.</p>
+<p>We do not have refresh tokens, and do not plan to implement refresh tokens. PATs must be used to issue a new JWT through the API.</p>
+<p>We do not presently have logging or auditing of the logging for the API. Once we implement logging, we must ensure that tokens and other sensitive data are not stored.</p>
+<p>We do not use all available JWT fields, such as <code>iss</code> (issuer).</p>
+<p>We do not rate limit PAT or JWT issuance.</p>
