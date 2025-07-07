@@ -436,6 +436,13 @@ def config_write(data: dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+def iso_to_human(ts: str) -> str:
+    dt = datetime.datetime.fromisoformat(ts.rstrip("Z"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.UTC)
+    return dt.strftime("%Y-%m-%d %H:%MZ")
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     APP()
@@ -454,7 +461,7 @@ def releases_display(result: dict[str, Any]) -> None:
         return
 
     print(f"Total releases: {count}")
-    print(f"  {'Version':<24} {'Phase':<11} {'Created'}")
+    print(f"  {'Version':<24} {'Latest':<7} {'Phase':<11} {'Created'}")
     for release in releases:
         version = release.get("version", "Unknown")
         phase = release.get("phase", "Unknown")
@@ -465,8 +472,9 @@ def releases_display(result: dict[str, Any]) -> None:
             "release": "finished",
         }.get(phase, "unknown")
         created = release.get("created")
-        created_formatted = timestamp_format(created) if created else "Unknown"
-        print(f"  {version:<24} {phase_short:<11} {created_formatted}")
+        created_formatted = iso_to_human(created) if created else "Unknown"
+        latest = release.get("latest_revision_number") or "-"
+        print(f"  {version:<24} {latest:<7} {phase_short:<11} {created_formatted}")
 
 
 def test_app_release_list_not_found(
@@ -518,8 +526,18 @@ def test_app_release_list_success(
         async def json(self):
             return {
                 "data": [
-                    {"version": "2.3.1", "phase": "release_candidate_draft", "created": 1735689600},
-                    {"version": "2.3.0", "phase": "release", "created": 1720051200},
+                    {
+                        "version": "2.3.1",
+                        "phase": "release_candidate_draft",
+                        "created": "2025-01-01T00:00:00.000000Z",
+                        "latest_revision_number": "00003",
+                    },
+                    {
+                        "version": "2.3.0",
+                        "phase": "release",
+                        "created": "2024-07-04T00:00:00.000000Z",
+                        "latest_revision_number": "00001",
+                    },
                 ],
                 "count": 2,
             }
