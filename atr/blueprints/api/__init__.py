@@ -45,6 +45,11 @@ async def _handle_http_exception(err: exceptions.HTTPException) -> tuple[quart.R
     return _json_error(err.description or err.name, err.code)
 
 
+@BLUEPRINT.errorhandler(exceptions.NotFound)
+async def _handle_not_found(err: exceptions.NotFound) -> tuple[quart.Response, int]:
+    return _json_error(err.description or err.name, 404)
+
+
 def _json_error(message: str, status_code: int | None) -> tuple[quart.Response, int]:
     return quart.jsonify({"error": message}), status_code or 500
 

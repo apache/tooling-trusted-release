@@ -543,8 +543,8 @@ async def web_get(url: str, jwt_token: str, verify_ssl: bool = True) -> Any:
                 text = await resp.text()
                 try:
                     error_data = json.loads(text)
-                    if isinstance(error_data, dict) and "message" in error_data:
-                        LOGGER.error(error_data["message"])
+                    if isinstance(error_data, dict) and "error" in error_data:
+                        LOGGER.error(error_data["error"])
                     else:
                         LOGGER.error(f"Request failed: {resp.status} {text}")
                 except json.JSONDecodeError:

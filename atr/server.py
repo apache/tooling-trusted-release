@@ -28,6 +28,7 @@ import asfquart.base as base
 import asfquart.generics
 import asfquart.session
 import blockbuster
+import quart
 import quart_schema
 import quart_wtf
 import rich.logging as rich_logging
@@ -245,6 +246,11 @@ def register_routes(app: base.QuartApp) -> ModuleType:
     async def handle_any_exception(error: Exception) -> Any:
         import traceback
 
+        # If the request was made to the API, return JSON
+        if quart.request.path.startswith("/api"):
+            status_code = getattr(error, "code", 500) if isinstance(error, Exception) else 500
+            return quart.jsonify({"error": str(error)}), status_code
+
         # Required to give to the error.html template
         tb = traceback.format_exc()
         app.logger.exception("Unhandled exception")
@@ -253,6 +259,9 @@ def register_routes(app: base.QuartApp) -> ModuleType:
     @app.errorhandler(base.ASFQuartException)
     async def handle_asfquart_exception(error: base.ASFQuartException) -> Any:
         # TODO: Figure out why pyright doesn't know about this attribute
+        if quart.request.path.startswith("/api"):
+            errorcode = getattr(error, "errorcode", 500)
+            return quart.jsonify({"error": str(error)}), errorcode
         if not hasattr(error, "errorcode"):
             errorcode = 500
         else:
@@ -262,6 +271,9 @@ def register_routes(app: base.QuartApp) -> ModuleType:
     # Add a global error handler in case a page does not exist.
     @app.errorhandler(404)
     async def handle_not_found(error: Exception) -> Any:
+        # Serve JSON for API endpoints, HTML otherwise
+        if quart.request.path.startswith("/api"):
+            return quart.jsonify({"error": "404 Not Found"}), 404
         return await template.render("notfound.html", error="404 Not Found", traceback="", status_code=404), 404
 
     return modules
