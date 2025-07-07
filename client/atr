@@ -115,7 +115,7 @@ def app_checks_status(project: str, version: str, revision: str) -> None:
     verify_ssl = not host.startswith("127.0.0.1")
     results = asyncio.run(web_get(url, jwt_value, verify_ssl))
 
-    check_results_display(results)
+    checks_display(results)
 
 
 @CONFIG.command(name="file", help="Display the configuration file contents.")
@@ -330,6 +330,27 @@ def app_test(q: Annotated[bool, cyclopts.Parameter(alias="-q")] = False, *pytest
             os.chdir(cwd)
 
 
+def checks_display(results: list[dict[str, Any]]) -> None:
+    if not results:
+        print("No check results found for this revision.")
+        return
+
+    by_status = {}
+    for result in results:
+        status = result["status"]
+        by_status.setdefault(status, []).append(result)
+
+    print(f"Total checks: {len(results)}")
+    for status, checks in by_status.items():
+        print(f"  {status}: {len(checks)}")
+
+    for status in ["FAILURE", "EXCEPTION", "WARNING"]:
+        if status in by_status:
+            print(f"\n{status}:")
+            for check in by_status[status]:
+                print(f"  - {check['checker']}: {check['message']}")
+
+
 def config_drop(config: dict[str, Any], parts: list[str]) -> None:
     config_walk(config, parts, "drop")
 
@@ -415,25 +436,9 @@ def config_write(data: dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
-def check_results_display(results: list[dict[str, Any]]) -> None:
-    if not results:
-        print("No check results found for this revision.")
-        return
-
-    by_status = {}
-    for result in results:
-        status = result["status"]
-        by_status.setdefault(status, []).append(result)
-
-    print(f"Total checks: {len(results)}")
-    for status, checks in by_status.items():
-        print(f"  {status}: {len(checks)}")
-
-    for status in ["FAILURE", "EXCEPTION", "WARNING"]:
-        if status in by_status:
-            print(f"\n{status}:")
-            for check in by_status[status]:
-                print(f"  - {check['checker']}: {check['message']}")
+def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    APP()
 
 
 def releases_display(result: dict[str, Any]) -> None:
@@ -462,11 +467,6 @@ def releases_display(result: dict[str, Any]) -> None:
         created = release.get("created")
         created_formatted = timestamp_format(created) if created else "Unknown"
         print(f"  {version:<24} {phase_short:<11} {created_formatted}")
-
-
-def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
-    APP()
 
 
 def test_app_release_list_not_found(
