@@ -1,4 +1,4 @@
-*.pyc
+__pycache__/
 .DS_Store
 .env
 .mypy_cache/
@@ -7,10 +7,11 @@
 .venv-poetry/
 .venv-uv/
 .vscode/
-__pycache__/
+*.pyc
 apptoken.txt
+atr/_version.py
 bootstrap/build/
+dev/
 node_modules/
 package-lock.json
 state/
-atr/_version.py
