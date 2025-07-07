@@ -449,13 +449,19 @@ def releases_display(result: dict[str, Any]) -> None:
         return
 
     print(f"Total releases: {count}")
-    print(f"  {'Version':<12} {'Phase':<25} {'Created'}")
+    print(f"  {'Version':<24} {'Phase':<11} {'Created'}")
     for release in releases:
         version = release.get("version", "Unknown")
         phase = release.get("phase", "Unknown")
+        phase_short = {
+            "release_candidate_draft": "draft",
+            "release_candidate": "candidate",
+            "release_preview": "preview",
+            "release": "finished",
+        }.get(phase, "unknown")
         created = release.get("created")
         created_formatted = timestamp_format(created) if created else "Unknown"
-        print(f"  {version:<12} {phase:<25} {created_formatted}")
+        print(f"  {version:<24} {phase_short:<11} {created_formatted}")
 
 
 def main() -> None:
