@@ -256,9 +256,9 @@ async def releases_project_version(project: str, version: str) -> tuple[Mapping,
         return release.model_dump(), 200
 
 
-@api.BLUEPRINT.route("/releases/<project>/<version>/check-results")
+@api.BLUEPRINT.route("/checks/<project>/<version>")
 @quart_schema.validate_response(list[models.CheckResult], 200)
-async def releases_project_version_check_results(project: str, version: str) -> tuple[list[Mapping], int]:
+async def checks_project_version(project: str, version: str) -> tuple[list[Mapping], int]:
     """List all check results for a given release."""
     async with db.session() as data:
         release_name = models.release_name(project, version)
@@ -274,6 +274,28 @@ async def releases_project_version_revisions(project: str, version: str) -> tupl
         release_name = models.release_name(project, version)
         revisions = await data.revision(release_name=release_name).all()
         return [rev.model_dump() for rev in revisions], 200
+
+
+@api.BLUEPRINT.route("/checks/<project>/<version>/<revision>")
+@quart_schema.validate_response(list[models.CheckResult], 200)
+async def checks_project_version_revision(project: str, version: str, revision: str) -> tuple[list[Mapping], int]:
+    """List all check results for a specific revision of a release."""
+    async with db.session() as data:
+        project_result = await data.project(name=project).get()
+        if project_result is None:
+            raise exceptions.NotFound(f"Project '{project}' does not exist")
+
+        release_name = models.release_name(project, version)
+        release_result = await data.release(name=release_name).get()
+        if release_result is None:
+            raise exceptions.NotFound(f"Release '{project}-{version}' does not exist")
+
+        revision_result = await data.revision(release_name=release_name, number=revision).get()
+        if revision_result is None:
+            raise exceptions.NotFound(f"Revision '{revision}' does not exist for release '{project}-{version}'")
+
+        check_results = await data.check_result(release_name=release_name, revision_number=revision).all()
+        return [cr.model_dump() for cr in check_results], 200
 
 
 @api.BLUEPRINT.route("/secret")
