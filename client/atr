@@ -249,6 +249,18 @@ def app_jwt_show() -> None:
     return app_show("tokens.jwt")
 
 
+@RELEASE.command(name="list", help="List releases for PROJECT.")
+def app_release_list(project: str) -> None:
+    with config_lock() as config:
+        host = config.get("atr", {}).get("host", "release-test.apache.org")
+
+    url = f"https://{host}/api/releases/{project}"
+    verify_ssl = not host.startswith("127.0.0.1")
+
+    result = asyncio.run(web_get_public(url, verify_ssl))
+    releases_display(result)
+
+
 @RELEASE.command(name="start", help="Start a release.")
 def app_release_start(project: str, version: str) -> None:
     with config_lock() as config:
@@ -424,9 +436,114 @@ def check_results_display(results: list[dict[str, Any]]) -> None:
                 print(f"  - {check['checker']}: {check['message']}")
 
 
+def releases_display(result: dict[str, Any]) -> None:
+    if ("data" not in result) or ("count" not in result):
+        LOGGER.error("Invalid response format")
+        sys.exit(1)
+
+    releases = result["data"]
+    count = result["count"]
+
+    if not releases:
+        print("No releases found for this project.")
+        return
+
+    print(f"Total releases: {count}")
+    print(f"  {'Version':<12} {'Phase':<25} {'Created'}")
+    for release in releases:
+        version = release.get("version", "Unknown")
+        phase = release.get("phase", "Unknown")
+        created = release.get("created")
+        created_formatted = timestamp_format(created) if created else "Unknown"
+        print(f"  {version:<12} {phase:<25} {created_formatted}")
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     APP()
+
+
+def test_app_release_list_not_found(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+    app_set("atr.host", "example.invalid")
+
+    class Response:
+        status = 404
+
+        async def json(self):
+            return {}
+
+        async def text(self):
+            return "Not Found"
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class Session:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, *args, **kwargs):
+            return Response()
+
+    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **kw: Session())
+
+    with pytest.raises(SystemExit):
+        app_release_list("nonexistent-project")
+
+
+def test_app_release_list_success(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+    app_set("atr.host", "example.invalid")
+
+    class Response:
+        status = 200
+
+        async def json(self):
+            return {
+                "data": [
+                    {"version": "2.3.1", "phase": "release_candidate_draft", "created": 1735689600},
+                    {"version": "2.3.0", "phase": "release", "created": 1720051200},
+                ],
+                "count": 2,
+            }
+
+        async def text(self):
+            return ""
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class Session:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, *args, **kwargs):
+            return Response()
+
+    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **kw: Session())
+
+    app_release_list("test-project")
+    captured = capsys.readouterr()
+    assert "Total releases: 2" in captured.out
+    assert "2.3.1" in captured.out
+    assert "2.3.0" in captured.out
 
 
 def test_app_set_show(
@@ -538,6 +655,24 @@ async def web_get(url: str, jwt_token: str, verify_ssl: bool = True) -> Any:
     connector = None if verify_ssl else aiohttp.TCPConnector(ssl=False)
     headers = {"Authorization": f"Bearer {jwt_token}"}
     async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
+        async with session.get(url) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                try:
+                    error_data = json.loads(text)
+                    if isinstance(error_data, dict) and "error" in error_data:
+                        LOGGER.error(error_data["error"])
+                    else:
+                        LOGGER.error(f"Request failed: {resp.status} {text}")
+                except json.JSONDecodeError:
+                    LOGGER.error(f"Request failed: {resp.status} {text}")
+                sys.exit(1)
+            return await resp.json()
+
+
+async def web_get_public(url: str, verify_ssl: bool = True) -> Any:
+    connector = None if verify_ssl else aiohttp.TCPConnector(ssl=False)
+    async with aiohttp.ClientSession(connector=connector) as session:
         async with session.get(url) as resp:
             if resp.status != 200:
                 text = await resp.text()

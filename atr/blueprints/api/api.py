@@ -72,6 +72,38 @@ class ReleaseCreateRequest(schema.Strict):
 # We implicitly have /api/openapi.json
 
 
+@api.BLUEPRINT.route("/checks/<project>/<version>")
+@quart_schema.validate_response(list[models.CheckResult], 200)
+async def checks_project_version(project: str, version: str) -> tuple[list[Mapping], int]:
+    """List all check results for a given release."""
+    async with db.session() as data:
+        release_name = models.release_name(project, version)
+        check_results = await data.check_result(release_name=release_name).all()
+        return [cr.model_dump() for cr in check_results], 200
+
+
+@api.BLUEPRINT.route("/checks/<project>/<version>/<revision>")
+@quart_schema.validate_response(list[models.CheckResult], 200)
+async def checks_project_version_revision(project: str, version: str, revision: str) -> tuple[list[Mapping], int]:
+    """List all check results for a specific revision of a release."""
+    async with db.session() as data:
+        project_result = await data.project(name=project).get()
+        if project_result is None:
+            raise exceptions.NotFound(f"Project '{project}' does not exist")
+
+        release_name = models.release_name(project, version)
+        release_result = await data.release(name=release_name).get()
+        if release_result is None:
+            raise exceptions.NotFound(f"Release '{project}-{version}' does not exist")
+
+        revision_result = await data.revision(release_name=release_name, number=revision).get()
+        if revision_result is None:
+            raise exceptions.NotFound(f"Revision '{revision}' does not exist for release '{project}-{version}'")
+
+        check_results = await data.check_result(release_name=release_name, revision_number=revision).all()
+        return [cr.model_dump() for cr in check_results], 200
+
+
 @api.BLUEPRINT.route("/committees")
 @quart_schema.validate_response(list[models.Committee], 200)
 async def committees() -> tuple[list[Mapping], int]:
@@ -246,6 +278,36 @@ async def releases_create() -> tuple[Mapping, int]:
     return release.model_dump(), 201
 
 
+@api.BLUEPRINT.route("/releases/<project>")
+@quart_schema.validate_querystring(Pagination)
+async def releases_project(project: str, query_args: Pagination) -> quart.Response:
+    """List all releases for a specific project with pagination."""
+    _pagination_args_validate(query_args)
+    async with db.session() as data:
+        project_result = await data.project(name=project).get()
+        if project_result is None:
+            raise exceptions.NotFound(f"Project '{project}' does not exist")
+
+        via = models.validate_instrumented_attribute
+        statement = (
+            sqlmodel.select(models.Release)
+            .where(models.Release.project_name == project)
+            .order_by(via(models.Release.created).desc())
+            .limit(query_args.limit)
+            .offset(query_args.offset)
+        )
+
+        paged_releases = (await data.execute(statement)).scalars().all()
+
+        count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(models.Release.name))).where(
+            via(models.Release.project_name) == project
+        )
+        count = (await data.execute(count_stmt)).scalar_one()
+
+        result = {"data": [release.model_dump() for release in paged_releases], "count": count}
+        return quart.jsonify(result)
+
+
 @api.BLUEPRINT.route("/releases/<project>/<version>")
 @quart_schema.validate_response(models.Release, 200)
 async def releases_project_version(project: str, version: str) -> tuple[Mapping, int]:
@@ -256,16 +318,7 @@ async def releases_project_version(project: str, version: str) -> tuple[Mapping,
         return release.model_dump(), 200
 
 
-@api.BLUEPRINT.route("/checks/<project>/<version>")
-@quart_schema.validate_response(list[models.CheckResult], 200)
-async def checks_project_version(project: str, version: str) -> tuple[list[Mapping], int]:
-    """List all check results for a given release."""
-    async with db.session() as data:
-        release_name = models.release_name(project, version)
-        check_results = await data.check_result(release_name=release_name).all()
-        return [cr.model_dump() for cr in check_results], 200
-
-
+# TODO: Rename this to revisions? I.e. /revisions/<project>/<version>
 @api.BLUEPRINT.route("/releases/<project>/<version>/revisions")
 @quart_schema.validate_response(list[models.Revision], 200)
 async def releases_project_version_revisions(project: str, version: str) -> tuple[list[Mapping], int]:
@@ -276,35 +329,13 @@ async def releases_project_version_revisions(project: str, version: str) -> tupl
         return [rev.model_dump() for rev in revisions], 200
 
 
-@api.BLUEPRINT.route("/checks/<project>/<version>/<revision>")
-@quart_schema.validate_response(list[models.CheckResult], 200)
-async def checks_project_version_revision(project: str, version: str, revision: str) -> tuple[list[Mapping], int]:
-    """List all check results for a specific revision of a release."""
-    async with db.session() as data:
-        project_result = await data.project(name=project).get()
-        if project_result is None:
-            raise exceptions.NotFound(f"Project '{project}' does not exist")
-
-        release_name = models.release_name(project, version)
-        release_result = await data.release(name=release_name).get()
-        if release_result is None:
-            raise exceptions.NotFound(f"Release '{project}-{version}' does not exist")
-
-        revision_result = await data.revision(release_name=release_name, number=revision).get()
-        if revision_result is None:
-            raise exceptions.NotFound(f"Revision '{revision}' does not exist for release '{project}-{version}'")
-
-        check_results = await data.check_result(release_name=release_name, revision_number=revision).all()
-        return [cr.model_dump() for cr in check_results], 200
-
-
-@api.BLUEPRINT.route("/secret")
-@jwtoken.require
-@quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_response(dict[str, str], 200)
-async def secret() -> tuple[Mapping, int]:
-    """Return a secret."""
-    return {"secret": "*******"}, 200
+# @api.BLUEPRINT.route("/secret")
+# @jwtoken.require
+# @quart_schema.security_scheme([{"BearerAuth": []}])
+# @quart_schema.validate_response(dict[str, str], 200)
+# async def secret() -> tuple[Mapping, int]:
+#     """Return a secret."""
+#     return {"secret": "*******"}, 200
 
 
 @api.BLUEPRINT.route("/ssh-keys")
