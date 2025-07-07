@@ -110,9 +110,28 @@ def app_checks_status(project: str, version: str, revision: str) -> None:
         sys.exit(1)
 
     host = config.get("atr", {}).get("host", "release-test.apache.org")
-    url = f"https://{host}/api/checks/{project}/{version}/{revision}"
-
     verify_ssl = not host.startswith("127.0.0.1")
+
+    release_url = f"https://{host}/api/releases/{project}"
+    releases_result = asyncio.run(web_get_public(release_url, verify_ssl))
+
+    target_release = None
+    for release in releases_result.get("data", []):
+        if release.get("version") == version:
+            target_release = release
+            break
+
+    if target_release is None:
+        LOGGER.error(f"Release {project}-{version} not found.")
+        sys.exit(1)
+
+    phase = target_release.get("phase")
+    if phase != "release_candidate_draft":
+        print("Checks are not applicable for this release phase.")
+        print("Checks are only performed during the draft phase.")
+        return
+
+    url = f"https://{host}/api/checks/{project}/{version}/{revision}"
     results = asyncio.run(web_get(url, jwt_value, verify_ssl))
 
     checks_display(results)
@@ -568,6 +587,56 @@ def test_app_release_list_success(
     assert "Total releases: 2" in captured.out
     assert "2.3.1" in captured.out
     assert "2.3.0" in captured.out
+
+
+def test_app_checks_status_non_draft_phase(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+    app_set("atr.host", "example.invalid")
+    app_set("tokens.jwt", "dummy_jwt_token")
+
+    class Response:
+        status = 200
+
+        async def json(self):
+            return {
+                "data": [
+                    {
+                        "version": "2.3.0",
+                        "phase": "release",
+                        "created": "2024-07-04T00:00:00.000000Z",
+                        "latest_revision_number": "00001",
+                    }
+                ],
+                "count": 1,
+            }
+
+        async def text(self):
+            return ""
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class Session:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, *args, **kwargs):
+            return Response()
+
+    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **kw: Session())
+
+    app_checks_status("test-project", "2.3.0", "00001")
+    captured = capsys.readouterr()
+    assert "Checks are not applicable for this release phase." in captured.out
+    assert "Checks are only performed during the draft phase." in captured.out
 
 
 def test_app_set_show(
