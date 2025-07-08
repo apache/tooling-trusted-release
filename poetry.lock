@@ -2132,6 +2132,26 @@ files = [
 typing-extensions = ">=4.6.0,<4.7.0 || >4.7.0"
 
 [[package]]
+name = "pydantic-xml"
+version = "2.17.2"
+description = "pydantic xml extension"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "pydantic_xml-2.17.2-py3-none-any.whl", hash = "sha256:3990908939ecc18f304045f3ee544bbdb68e253248fde20dc1af6829e80c03f5"},
+    {file = "pydantic_xml-2.17.2.tar.gz", hash = "sha256:0e0f2ae84518198373b593eca58bba12b08c1a7ace368dd4ed12b60babc8182d"},
+]
+
+[package.dependencies]
+pydantic = ">=2.6.0,<2.10.0b1 || >2.10.0b1"
+pydantic-core = ">=2.15.0"
+
+[package.extras]
+docs = ["Sphinx (>=5.3.0,<6.0.0)", "furo (>=2022.12.7,<2023.0.0)", "sphinx-copybutton (>=0.5.1,<0.6.0)", "sphinx_design (>=0.3.0,<0.4.0)", "toml (>=0.10.2,<0.11.0)"]
+lxml = ["lxml (>=4.9.0)"]
+
+[[package]]
 name = "pyee"
 version = "13.0.0"
 description = "A rough port of Node.js's EventEmitter to Python with a few tricks of its own"
@@ -3181,4 +3201,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "~=3.13"
-content-hash = "90ea9e07b07f883138297fa9a2aac6656cc8db5d7ca25e28cb8bcd6b13027803"
+content-hash = "6f35f6e6782c7279eb97f34d47d9284126aa9a7d5c640b5a90841f559db03f3b"

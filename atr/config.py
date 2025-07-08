@@ -44,6 +44,10 @@ class AppConfig:
     STATE_DIR = decouple.config("STATE_DIR", default=os.path.join(PROJECT_ROOT, "state"))
     LDAP_BIND_DN = _config_secrets("LDAP_BIND_DN", STATE_DIR, default=None, cast=str)
     LDAP_BIND_PASSWORD = _config_secrets("LDAP_BIND_PASSWORD", STATE_DIR, default=None, cast=str)
+    PUBSUB_URL = _config_secrets("PUBSUB_URL", STATE_DIR, default=None, cast=str)
+    PUBSUB_USER = _config_secrets("PUBSUB_USER", STATE_DIR, default=None, cast=str)
+    PUBSUB_PASSWORD = _config_secrets("PUBSUB_PASSWORD", STATE_DIR, default=None, cast=str)
+    SVN_TOKEN = _config_secrets("SVN_TOKEN", STATE_DIR, default=None, cast=str)
 
     DEBUG = False
     TEMPLATES_AUTO_RELOAD = False
@@ -53,6 +57,9 @@ class AppConfig:
     DOWNLOADS_STORAGE_DIR = os.path.join(STATE_DIR, "downloads")
     FINISHED_STORAGE_DIR = os.path.join(STATE_DIR, "finished")
     UNFINISHED_STORAGE_DIR = os.path.join(STATE_DIR, "unfinished")
+    # TODO: By convention this is at /x1/, but we can symlink it here perhaps?
+    # TODO: We need to get Puppet to check SVN out initially, or do it manually
+    SVN_STORAGE_DIR = os.path.join(STATE_DIR, "svn")
     SQLITE_DB_PATH = decouple.config("SQLITE_DB_PATH", default="atr.db")
 
     # Apache RAT configuration
@@ -123,6 +130,7 @@ def get() -> type[AppConfig]:
         (config.DOWNLOADS_STORAGE_DIR, "DOWNLOADS_STORAGE_DIR"),
         (config.FINISHED_STORAGE_DIR, "FINISHED_STORAGE_DIR"),
         (config.UNFINISHED_STORAGE_DIR, "UNFINISHED_STORAGE_DIR"),
+        (config.SVN_STORAGE_DIR, "SVN_STORAGE_DIR"),
     ]
     relative_paths = [
         (config.SQLITE_DB_PATH, "SQLITE_DB_PATH"),

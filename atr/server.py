@@ -17,6 +17,8 @@
 
 """server.py"""
 
+import asyncio
+import contextlib
 import logging
 import os
 from collections.abc import Iterable
@@ -43,6 +45,7 @@ import atr.filters as filters
 import atr.manager as manager
 import atr.preload as preload
 import atr.ssh as ssh
+import atr.svn.pubsub as pubsub
 import atr.template as template
 import atr.user as user
 import atr.util as util
@@ -147,6 +150,31 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
         worker_manager = manager.get_worker_manager()
         await worker_manager.start()
 
+        conf = config.get()
+        pubsub_url = conf.PUBSUB_URL
+        pubsub_user = conf.PUBSUB_USER
+        pubsub_password = conf.PUBSUB_PASSWORD
+
+        if pubsub_url and pubsub_user and pubsub_password:
+            app.logger.info("Starting SVN listener")
+            listener = pubsub.SVNListener(
+                working_copy_root=conf.SVN_STORAGE_DIR,
+                url=pubsub_url,
+                username=pubsub_user,
+                password=pubsub_password,
+            )
+            task = asyncio.create_task(listener.start())
+            app.extensions["svn_listener"] = task
+            app.logger.info("SVN listener task created")
+        else:
+            app.logger.info(
+                "SVN listener not started: url=%s user=%s password=%s",
+                bool(pubsub_url),
+                bool(pubsub_user),
+                # Essential to use bool(...) here to avoid logging the password
+                bool(pubsub_password),
+            )
+
         ssh_server = await ssh.server_start()
         app.extensions["ssh_server"] = ssh_server
 
@@ -159,6 +187,11 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
         ssh_server = app.extensions.get("ssh_server")
         if ssh_server:
             await ssh.server_stop(ssh_server)
+
+        if task := app.extensions.get("svn_listener"):
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
 
         await db.shutdown_database()
 

@@ -27,16 +27,17 @@ dependencies = [
   "email-validator~=2.2.0",
   "gitignore-parser (>=0.1.12,<0.2.0)",
   "greenlet>=3.1.1,<4.0.0",
+  "htpy (>=25.7.0,<26.0.0)",
   "hypercorn~=0.17",
   "ldap3 (==2.10.2rc2)",
+  "pydantic-xml (>=2.17.2,<3.0.0)",
+  "pyjwt (>=2.10.1,<3.0.0)",
   "python-decouple~=3.8",
   "python-gnupg~=0.5",
   "quart-schema[pydantic]~=0.21",
   "quart-wtforms~=1.0.3",
   "rich~=14.0.0",
   "sqlmodel~=0.0.24",
-  "pyjwt (>=2.10.1,<3.0.0)",
-  "htpy (>=25.7.0,<26.0.0)",
 ]
 
 [dependency-groups]
