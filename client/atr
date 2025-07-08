@@ -27,10 +27,11 @@
 #     "platformdirs",
 #     "pyjwt",
 #     "pytest>=8.4.1",
+#     "pytest-asyncio",
 #     "strictyaml",
 # ]
 # [tool.uv]
-# exclude-newer = "2025-07-08T10:42:10Z"
+# exclude-newer = "2025-07-08T10:59:31Z"
 # ///
 
 # Guide to contributors:
@@ -555,6 +556,13 @@ def config_write(data: dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+@pytest.fixture
+def fixture_config_env(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> pathlib.Path:
+    path = tmp_path / "atr.yaml"
+    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(path))
+    return path
+
+
 def iso_to_human(ts: str) -> str:
     dt = datetime.datetime.fromisoformat(ts.rstrip("Z"))
     if dt.tzinfo is None:
@@ -598,9 +606,8 @@ def releases_display(result: dict[str, Any]) -> None:
 
 
 def test_app_checks_status_non_draft_phase(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+    capsys: pytest.CaptureFixture[str], fixture_config_env: pathlib.Path
 ) -> None:
-    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
     app_set("atr.host", "example.invalid")
     app_set("tokens.jwt", "dummy_jwt_token")
 
@@ -630,10 +637,7 @@ def test_app_checks_status_non_draft_phase(
         assert "Checks are only performed during the draft phase." in captured.out
 
 
-def test_app_checks_status_verbose(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+def test_app_checks_status_verbose(capsys: pytest.CaptureFixture[str], fixture_config_env: pathlib.Path) -> None:
     app_set("atr.host", "example.invalid")
     app_set("tokens.jwt", "dummy_jwt_token")
 
@@ -688,10 +692,7 @@ def test_app_checks_status_verbose(
         assert "test_checker1 → file1.txt : Test failure 1" in captured.out
 
 
-def test_app_release_list_not_found(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+def test_app_release_list_not_found(capsys: pytest.CaptureFixture[str], fixture_config_env: pathlib.Path) -> None:
     app_set("atr.host", "example.invalid")
 
     releases_url = "https://example.invalid/api/releases/nonexistent-project"
@@ -703,10 +704,7 @@ def test_app_release_list_not_found(
             app_release_list("nonexistent-project")
 
 
-def test_app_release_list_success(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+def test_app_release_list_success(capsys: pytest.CaptureFixture[str], fixture_config_env: pathlib.Path) -> None:
     app_set("atr.host", "example.invalid")
 
     releases_url = "https://example.invalid/api/releases/test-project"
@@ -740,10 +738,7 @@ def test_app_release_list_success(
         assert "2.3.0" in captured.out
 
 
-def test_app_set_show(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+def test_app_set_show(capsys: pytest.CaptureFixture[str], fixture_config_env: pathlib.Path) -> None:
     app_set("atr.host", "example.invalid")
     app_show("atr.host")
     assert capsys.readouterr().out == "example.invalid\n"
@@ -762,8 +757,7 @@ def test_config_walk_drop() -> None:
     assert config == {}
 
 
-def test_config_write_delete(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
-    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+def test_config_write_delete(fixture_config_env: pathlib.Path) -> None:
     config_write({"atr": {"host": "example.invalid"}})
     config_path_obj = config_path()
     assert config_path_obj.exists() is True
@@ -771,8 +765,7 @@ def test_config_write_delete(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.
     assert config_path_obj.exists() is False
 
 
-def test_config_write_empty_dict_filter(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
-    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+def test_config_write_empty_dict_filter(fixture_config_env: pathlib.Path) -> None:
     config_write({"atr": {}, "asf": {"uid": ""}})
     config = config_read()
     assert "atr" not in config
@@ -788,14 +781,12 @@ def test_timestamp_format_none_and_bad() -> None:
     assert timestamp_format("bad") == "bad"
 
 
-def test_web_fetch_failure() -> None:
-    with aioresponses.aioresponses() as mock:
+@pytest.mark.asyncio
+async def test_web_fetch_failure() -> None:
+    with aioresponses.aioresponses() as mock, pytest.raises(SystemExit):
         mock.post("https://error.invalid", status=500, body="error")
-
-        with pytest.raises(SystemExit):
-            asyncio.run(web_fetch("https://error.invalid", "uid", "pat", verify_ssl=False))
-
-        assert len(mock.requests) == 1
+        await web_fetch("https://error.invalid", "uid", "pat", verify_ssl=False)
+    assert (len(mock.requests)) == 1
 
 
 def timestamp_format(ts: int | str | None) -> str | None:
