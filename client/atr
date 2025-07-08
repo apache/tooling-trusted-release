@@ -56,6 +56,7 @@ import logging
 import os
 import pathlib
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -100,17 +101,46 @@ APP.command(JWT)
 APP.command(RELEASE)
 
 
+@CHECKS.command(name="exceptions", help="Get check exceptions for a release revision.")
+def app_checks_exceptions(
+    project: str,
+    version: str,
+    revision: str,
+    *,
+    members: Annotated[bool, cyclopts.Parameter(alias="-m", name="--members")] = False,
+) -> None:
+    jwt_value = config_jwt_get()
+    host, verify_ssl = config_host_get()
+    url = f"https://{host}/api/checks/{project}/{version}/{revision}"
+    results = asyncio.run(web_get(url, jwt_value, verify_ssl))
+    checks_display_status("exception", results, members=members)
+
+
+@CHECKS.command(name="failures", help="Get check failures for a release revision.")
+def app_checks_failures(
+    project: str,
+    version: str,
+    revision: str,
+    *,
+    members: Annotated[bool, cyclopts.Parameter(alias="-m", name="--members")] = False,
+) -> None:
+    jwt_value = config_jwt_get()
+    host, verify_ssl = config_host_get()
+    url = f"https://{host}/api/checks/{project}/{version}/{revision}"
+    results = asyncio.run(web_get(url, jwt_value, verify_ssl))
+    checks_display_status("failure", results, members=members)
+
+
 @CHECKS.command(name="status", help="Get check status for a release revision.")
-def app_checks_status(project: str, version: str, revision: str) -> None:
-    with config_lock() as config:
-        jwt_value = config_get(config, ["tokens", "jwt"])
-
-    if jwt_value is None:
-        LOGGER.error("No JWT stored in configuration.")
-        sys.exit(1)
-
-    host = config.get("atr", {}).get("host", "release-test.apache.org")
-    verify_ssl = not host.startswith("127.0.0.1")
+def app_checks_status(
+    project: str,
+    version: str,
+    revision: str,
+    *,
+    verbose: Annotated[bool, cyclopts.Parameter(alias="-v", name="--verbose")] = False,
+) -> None:
+    jwt_value = config_jwt_get()
+    host, verify_ssl = config_host_get()
 
     release_url = f"https://{host}/api/releases/{project}"
     releases_result = asyncio.run(web_get_public(release_url, verify_ssl))
@@ -134,7 +164,22 @@ def app_checks_status(project: str, version: str, revision: str) -> None:
     url = f"https://{host}/api/checks/{project}/{version}/{revision}"
     results = asyncio.run(web_get(url, jwt_value, verify_ssl))
 
-    checks_display(results)
+    checks_display(results, verbose)
+
+
+@CHECKS.command(name="warnings", help="Get check warnings for a release revision.")
+def app_checks_warnings(
+    project: str,
+    version: str,
+    revision: str,
+    *,
+    members: Annotated[bool, cyclopts.Parameter(alias="-m", name="--members")] = False,
+) -> None:
+    jwt_value = config_jwt_get()
+    host, verify_ssl = config_host_get()
+    url = f"https://{host}/api/checks/{project}/{version}/{revision}"
+    results = asyncio.run(web_get(url, jwt_value, verify_ssl))
+    checks_display_status("warning", results, members=members)
 
 
 @CONFIG.command(name="file", help="Display the configuration file contents.")
@@ -190,12 +235,7 @@ def app_drop(path: str) -> None:
 
 @JWT.command(name="dump", help="Show decoded JWT payload from stored config.")
 def app_jwt_dump() -> None:
-    with config_lock() as config:
-        jwt_value = config_get(config, ["tokens", "jwt"])
-
-    if jwt_value is None:
-        LOGGER.error("No JWT stored in configuration.")
-        sys.exit(1)
+    jwt_value = config_jwt_get()
 
     header = jwt.get_unverified_header(jwt_value)
     if header != {"alg": "HS256", "typ": "JWT"}:
@@ -213,12 +253,7 @@ def app_jwt_dump() -> None:
 
 @JWT.command(name="info", help="Show JWT payload in human-readable form.")
 def app_jwt_info() -> None:
-    with config_lock() as config:
-        jwt_value = config_get(config, ["tokens", "jwt"])
-
-    if jwt_value is None:
-        LOGGER.error("No JWT stored in configuration.")
-        sys.exit(1)
+    jwt_value = config_jwt_get()
 
     try:
         payload = jwt.decode(jwt_value, options={"verify_signature": False})
@@ -244,7 +279,7 @@ def app_jwt_refresh(asf_uid: str | None = None) -> None:
         LOGGER.error("No Personal Access Token stored.")
         sys.exit(1)
 
-    host = config.get("atr", {}).get("host", "release-test.apache.org")
+    host, verify_ssl = config_host_get()
     url = f"https://{host}/api/jwt"
 
     if asf_uid is None:
@@ -254,7 +289,6 @@ def app_jwt_refresh(asf_uid: str | None = None) -> None:
         LOGGER.error("No ASF UID provided and asf.uid not configured.")
         sys.exit(1)
 
-    verify_ssl = not host.startswith("127.0.0.1")
     jwt_token = asyncio.run(web_fetch(url, asf_uid, pat_value, verify_ssl))
 
     with config_lock(write=True) as config:
@@ -270,31 +304,20 @@ def app_jwt_show() -> None:
 
 @RELEASE.command(name="list", help="List releases for PROJECT.")
 def app_release_list(project: str) -> None:
-    with config_lock() as config:
-        host = config.get("atr", {}).get("host", "release-test.apache.org")
-
+    host, verify_ssl = config_host_get()
     url = f"https://{host}/api/releases/{project}"
-    verify_ssl = not host.startswith("127.0.0.1")
-
     result = asyncio.run(web_get_public(url, verify_ssl))
     releases_display(result)
 
 
 @RELEASE.command(name="start", help="Start a release.")
 def app_release_start(project: str, version: str) -> None:
-    with config_lock() as config:
-        jwt_value = config_get(config, ["tokens", "jwt"])
-
-    if jwt_value is None:
-        LOGGER.error("No JWT stored in configuration.")
-        sys.exit(1)
-
-    host = config.get("atr", {}).get("host", "release-test.apache.org")
+    jwt_value = config_jwt_get()
+    host, verify_ssl = config_host_get()
     url = f"https://{host}/api/releases/create"
 
     payload: dict[str, str] = {"project_name": project, "version": version}
 
-    verify_ssl = not host.startswith("127.0.0.1")
     result = asyncio.run(web_post(url, payload, jwt_value, verify_ssl))
     print(result)
 
@@ -349,7 +372,7 @@ def app_test(q: Annotated[bool, cyclopts.Parameter(alias="-q")] = False, *pytest
             os.chdir(cwd)
 
 
-def checks_display(results: list[dict[str, Any]]) -> None:
+def checks_display(results: list[dict[str, Any]], verbose: bool = False) -> None:
     if not results:
         print("No check results found for this revision.")
         return
@@ -359,15 +382,70 @@ def checks_display(results: list[dict[str, Any]]) -> None:
         status = result["status"]
         by_status.setdefault(status, []).append(result)
 
-    print(f"Total checks: {len(results)}")
-    for status, checks in by_status.items():
-        print(f"  {status}: {len(checks)}")
+    checks_display_summary(by_status, verbose, len(results))
+    checks_display_details(by_status, verbose)
 
-    for status in ["FAILURE", "EXCEPTION", "WARNING"]:
-        if status in by_status:
-            print(f"\n{status}:")
-            for check in by_status[status]:
-                print(f"  - {check['checker']}: {check['message']}")
+
+def checks_display_details(by_status: dict[str, list[dict[str, Any]]], verbose: bool) -> None:
+    if not verbose:
+        return
+    for status_key in by_status.keys():
+        if status_key.upper() not in ["FAILURE", "EXCEPTION", "WARNING"]:
+            continue
+        print(f"\n{status_key}:")
+        checks_display_verbose_details(by_status[status_key])
+
+
+def checks_display_status(
+    status: Literal["failure", "exception", "warning"], results: list[dict[str, Any]], members: bool
+) -> None:
+    messages = {}
+    for result in results:
+        result_status = result.get("status")
+        if result_status != status:
+            continue
+        member_rel_path = result.get("member_rel_path")
+        if member_rel_path and (not members):
+            continue
+        checker = result.get("checker") or ""
+        message = result.get("message")
+        primary_rel_path = result.get("primary_rel_path")
+        if not member_rel_path:
+            path = primary_rel_path
+        else:
+            path = f"{primary_rel_path} → {member_rel_path}"
+
+        if path not in messages:
+            messages[path] = []
+        msg = f" - {message} ({checker.removeprefix('atr.tasks.checks.')})"
+        messages[path].append(msg)
+
+    for path in sorted(messages):
+        print(path)
+        for msg in sorted(messages[path]):
+            print(msg)
+        print()
+
+
+def checks_display_summary(by_status: dict[str, list[dict[str, Any]]], verbose: bool, total: int) -> None:
+    print(f"Total checks: {total}")
+    for status, checks in by_status.items():
+        if verbose and status.upper() in ["FAILURE", "EXCEPTION", "WARNING"]:
+            top = sum(r["member_rel_path"] is None for r in checks)
+            inner = len(checks) - top
+            print(f"  {status}: {len(checks)} (top-level {top}, inner {inner})")
+        else:
+            print(f"  {status}: {len(checks)}")
+
+
+def checks_display_verbose_details(checks: list[dict[str, Any]]) -> None:
+    for check in checks[:10]:
+        checker = check["checker"]
+        primary_rel_path = check.get("primary_rel_path", "")
+        member_rel_path = check.get("member_rel_path", "")
+        message = check["message"]
+        member_part = f" ({member_rel_path})" if member_rel_path else ""
+        print(f"  {checker} → {primary_rel_path}{member_part} : {message}")
 
 
 def config_drop(config: dict[str, Any], parts: list[str]) -> None:
@@ -376,6 +454,24 @@ def config_drop(config: dict[str, Any], parts: list[str]) -> None:
 
 def config_get(config: dict[str, Any], parts: list[str]) -> Any | None:
     return config_walk(config, parts, "get")[1]
+
+
+def config_host_get() -> tuple[str, bool]:
+    with config_lock() as config:
+        host = config.get("atr", {}).get("host", "release-test.apache.org")
+    verify_ssl = not ((host == "127.0.0.1") or host.startswith("127.0.0.1:"))
+    return host, verify_ssl
+
+
+def config_jwt_get() -> str:
+    with config_lock() as config:
+        jwt_value = config_get(config, ["tokens", "jwt"])
+
+    if jwt_value is None:
+        LOGGER.error("No JWT stored in configuration.")
+        sys.exit(1)
+
+    return jwt_value
 
 
 @contextlib.contextmanager
@@ -463,6 +559,7 @@ def iso_to_human(ts: str) -> str:
 
 
 def main() -> None:
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     APP()
 
@@ -494,6 +591,69 @@ def releases_display(result: dict[str, Any]) -> None:
         created_formatted = iso_to_human(created) if created else "Unknown"
         latest = release.get("latest_revision_number") or "-"
         print(f"  {version:<24} {latest:<7} {phase_short:<11} {created_formatted}")
+
+
+def test_app_checks_status_non_draft_phase(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+    app_set("atr.host", "example.invalid")
+    app_set("tokens.jwt", "dummy_jwt_token")
+
+    class Response:
+        status = 200
+
+        async def json(self):
+            return {
+                "data": [
+                    {
+                        "version": "2.3.0",
+                        "phase": "release",
+                        "created": "2024-07-04T00:00:00.000000Z",
+                        "latest_revision_number": "00001",
+                    }
+                ],
+                "count": 1,
+            }
+
+        async def text(self):
+            return ""
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class Session:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, *args, **kwargs):
+            return Response()
+
+    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **kw: Session())
+
+    app_checks_status("test-project", "2.3.0", "00001")
+    captured = capsys.readouterr()
+    assert "Checks are not applicable for this release phase." in captured.out
+    assert "Checks are only performed during the draft phase." in captured.out
+
+
+def test_app_checks_status_verbose(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    verbose_test_setup(monkeypatch, tmp_path)
+    verbose_test_mock_session(monkeypatch)
+
+    app_checks_status("test-project", "2.3.1", "00003", verbose=True)
+    captured = capsys.readouterr()
+    assert "(top-level" in captured.out
+    assert "FAILURE: 2 (top-level 1, inner 1)" in captured.out
+    assert "test_checker1 → file1.txt : Test failure 1" in captured.out
 
 
 def test_app_release_list_not_found(
@@ -589,56 +749,6 @@ def test_app_release_list_success(
     assert "2.3.0" in captured.out
 
 
-def test_app_checks_status_non_draft_phase(
-    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
-    app_set("atr.host", "example.invalid")
-    app_set("tokens.jwt", "dummy_jwt_token")
-
-    class Response:
-        status = 200
-
-        async def json(self):
-            return {
-                "data": [
-                    {
-                        "version": "2.3.0",
-                        "phase": "release",
-                        "created": "2024-07-04T00:00:00.000000Z",
-                        "latest_revision_number": "00001",
-                    }
-                ],
-                "count": 1,
-            }
-
-        async def text(self):
-            return ""
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-    class Session:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        def get(self, *args, **kwargs):
-            return Response()
-
-    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **kw: Session())
-
-    app_checks_status("test-project", "2.3.0", "00001")
-    captured = capsys.readouterr()
-    assert "Checks are not applicable for this release phase." in captured.out
-    assert "Checks are only performed during the draft phase." in captured.out
-
-
 def test_app_set_show(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
@@ -724,6 +834,99 @@ def timestamp_format(ts: int | str | None) -> str | None:
         return dt.strftime("%d %b %Y at %H:%M:%S UTC")
     except Exception:
         return str(ts)
+
+
+def verbose_test_checks_response():
+    class ChecksResponse:
+        status = 200
+
+        async def json(self):
+            return [
+                {
+                    "status": "FAILURE",
+                    "checker": "test_checker1",
+                    "primary_rel_path": "file1.txt",
+                    "member_rel_path": None,
+                    "message": "Test failure 1",
+                },
+                {
+                    "status": "FAILURE",
+                    "checker": "test_checker2",
+                    "primary_rel_path": "file2.txt",
+                    "member_rel_path": "inner.txt",
+                    "message": "Test failure 2",
+                },
+                {
+                    "status": "SUCCESS",
+                    "checker": "test_checker3",
+                    "primary_rel_path": "file3.txt",
+                    "member_rel_path": None,
+                    "message": "Test success",
+                },
+            ]
+
+        async def text(self):
+            return ""
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    return ChecksResponse()
+
+
+def verbose_test_mock_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    class MockSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url, **kwargs):
+            if "releases" in url:
+                return verbose_test_release_response()
+            else:
+                return verbose_test_checks_response()
+
+    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **kw: MockSession())
+
+
+def verbose_test_release_response():
+    class ReleaseResponse:
+        status = 200
+
+        async def json(self):
+            return {
+                "data": [
+                    {
+                        "version": "2.3.1",
+                        "phase": "release_candidate_draft",
+                        "created": "2025-01-01T00:00:00.000000Z",
+                        "latest_revision_number": "00003",
+                    }
+                ],
+                "count": 1,
+            }
+
+        async def text(self):
+            return ""
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    return ReleaseResponse()
+
+
+def verbose_test_setup(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+    app_set("atr.host", "example.invalid")
+    app_set("tokens.jwt", "dummy_jwt_token")
 
 
 async def web_fetch(url: str, asfuid: str, pat_token: str, verify_ssl: bool = True) -> str:
