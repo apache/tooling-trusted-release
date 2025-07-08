@@ -21,6 +21,7 @@
 # requires-python = ">=3.13"
 # dependencies = [
 #     "aiohttp",
+#     "aioresponses",
 #     "cyclopts",
 #     "filelock",
 #     "platformdirs",
@@ -29,7 +30,7 @@
 #     "strictyaml",
 # ]
 # [tool.uv]
-# exclude-newer = "2025-07-04T19:04:51Z"
+# exclude-newer = "2025-07-08T10:42:10Z"
 # ///
 
 # Guide to contributors:
@@ -45,6 +46,8 @@
 # - Always group binary subexpressions in boolean expressions
 # - Do not add any comments
 
+# TODO: Use Pydantic models to validate API responses
+# TODO: Use transcript style script testing
 
 from __future__ import annotations
 
@@ -63,6 +66,7 @@ import tempfile
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import aiohttp  # type: ignore[import-not-found]
+import aioresponses  # type: ignore[import-not-found]
 import cyclopts  # type: ignore[import-not-found]
 import filelock  # type: ignore[import-not-found]
 import jwt  # type: ignore[import-not-found]
@@ -600,11 +604,13 @@ def test_app_checks_status_non_draft_phase(
     app_set("atr.host", "example.invalid")
     app_set("tokens.jwt", "dummy_jwt_token")
 
-    class Response:
-        status = 200
+    releases_url = "https://example.invalid/api/releases/test-project"
 
-        async def json(self):
-            return {
+    with aioresponses.aioresponses() as mock:
+        mock.get(
+            releases_url,
+            status=200,
+            payload={
                 "data": [
                     {
                         "version": "2.3.0",
@@ -614,46 +620,72 @@ def test_app_checks_status_non_draft_phase(
                     }
                 ],
                 "count": 1,
-            }
+            },
+        )
 
-        async def text(self):
-            return ""
+        app_checks_status("test-project", "2.3.0", "00001")
 
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-    class Session:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        def get(self, *args, **kwargs):
-            return Response()
-
-    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **kw: Session())
-
-    app_checks_status("test-project", "2.3.0", "00001")
-    captured = capsys.readouterr()
-    assert "Checks are not applicable for this release phase." in captured.out
-    assert "Checks are only performed during the draft phase." in captured.out
+        captured = capsys.readouterr()
+        assert "Checks are not applicable for this release phase." in captured.out
+        assert "Checks are only performed during the draft phase." in captured.out
 
 
 def test_app_checks_status_verbose(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
-    verbose_test_setup(monkeypatch, tmp_path)
-    verbose_test_mock_session(monkeypatch)
+    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
+    app_set("atr.host", "example.invalid")
+    app_set("tokens.jwt", "dummy_jwt_token")
 
-    app_checks_status("test-project", "2.3.1", "00003", verbose=True)
-    captured = capsys.readouterr()
-    assert "(top-level" in captured.out
-    assert "FAILURE: 2 (top-level 1, inner 1)" in captured.out
-    assert "test_checker1 → file1.txt : Test failure 1" in captured.out
+    release_url = "https://example.invalid/api/releases/test-project"
+    checks_url = "https://example.invalid/api/checks/test-project/2.3.1/00003"
+
+    release_payload = {
+        "data": [
+            {
+                "version": "2.3.1",
+                "phase": "release_candidate_draft",
+                "created": "2025-01-01T00:00:00.000000Z",
+                "latest_revision_number": "00003",
+            }
+        ],
+        "count": 1,
+    }
+
+    checks_payload = [
+        {
+            "status": "FAILURE",
+            "checker": "test_checker1",
+            "primary_rel_path": "file1.txt",
+            "member_rel_path": None,
+            "message": "Test failure 1",
+        },
+        {
+            "status": "FAILURE",
+            "checker": "test_checker2",
+            "primary_rel_path": "file2.txt",
+            "member_rel_path": "inner.txt",
+            "message": "Test failure 2",
+        },
+        {
+            "status": "SUCCESS",
+            "checker": "test_checker3",
+            "primary_rel_path": "file3.txt",
+            "member_rel_path": None,
+            "message": "Test success",
+        },
+    ]
+
+    with aioresponses.aioresponses() as mock:
+        mock.get(release_url, status=200, payload=release_payload)
+        mock.get(checks_url, status=200, payload=checks_payload)
+
+        app_checks_status("test-project", "2.3.1", "00003", verbose=True)
+
+        captured = capsys.readouterr()
+        assert "(top-level" in captured.out
+        assert "FAILURE: 2 (top-level 1, inner 1)" in captured.out
+        assert "test_checker1 → file1.txt : Test failure 1" in captured.out
 
 
 def test_app_release_list_not_found(
@@ -662,35 +694,13 @@ def test_app_release_list_not_found(
     monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
     app_set("atr.host", "example.invalid")
 
-    class Response:
-        status = 404
+    releases_url = "https://example.invalid/api/releases/nonexistent-project"
 
-        async def json(self):
-            return {}
+    with aioresponses.aioresponses() as mock:
+        mock.get(releases_url, status=404, body="Not Found")
 
-        async def text(self):
-            return "Not Found"
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-    class Session:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        def get(self, *args, **kwargs):
-            return Response()
-
-    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **kw: Session())
-
-    with pytest.raises(SystemExit):
-        app_release_list("nonexistent-project")
+        with pytest.raises(SystemExit):
+            app_release_list("nonexistent-project")
 
 
 def test_app_release_list_success(
@@ -699,54 +709,35 @@ def test_app_release_list_success(
     monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
     app_set("atr.host", "example.invalid")
 
-    class Response:
-        status = 200
+    releases_url = "https://example.invalid/api/releases/test-project"
 
-        async def json(self):
-            return {
-                "data": [
-                    {
-                        "version": "2.3.1",
-                        "phase": "release_candidate_draft",
-                        "created": "2025-01-01T00:00:00.000000Z",
-                        "latest_revision_number": "00003",
-                    },
-                    {
-                        "version": "2.3.0",
-                        "phase": "release",
-                        "created": "2024-07-04T00:00:00.000000Z",
-                        "latest_revision_number": "00001",
-                    },
-                ],
-                "count": 2,
-            }
+    payload = {
+        "data": [
+            {
+                "version": "2.3.1",
+                "phase": "release_candidate_draft",
+                "created": "2025-01-01T00:00:00.000000Z",
+                "latest_revision_number": "00003",
+            },
+            {
+                "version": "2.3.0",
+                "phase": "release",
+                "created": "2024-07-04T00:00:00.000000Z",
+                "latest_revision_number": "00001",
+            },
+        ],
+        "count": 2,
+    }
 
-        async def text(self):
-            return ""
+    with aioresponses.aioresponses() as mock:
+        mock.get(releases_url, status=200, payload=payload)
 
-        async def __aenter__(self):
-            return self
+        app_release_list("test-project")
 
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-    class Session:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        def get(self, *args, **kwargs):
-            return Response()
-
-    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **kw: Session())
-
-    app_release_list("test-project")
-    captured = capsys.readouterr()
-    assert "Total releases: 2" in captured.out
-    assert "2.3.1" in captured.out
-    assert "2.3.0" in captured.out
+        captured = capsys.readouterr()
+        assert "Total releases: 2" in captured.out
+        assert "2.3.1" in captured.out
+        assert "2.3.0" in captured.out
 
 
 def test_app_set_show(
@@ -772,12 +763,12 @@ def test_config_walk_drop() -> None:
 
 
 def test_config_write_delete(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
-    config_path = tmp_path / "atr.yaml"
-    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(config_path))
+    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
     config_write({"atr": {"host": "example.invalid"}})
-    assert config_path.exists() is True
+    config_path_obj = config_path()
+    assert config_path_obj.exists() is True
     config_write({})
-    assert config_path.exists() is False
+    assert config_path_obj.exists() is False
 
 
 def test_config_write_empty_dict_filter(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
@@ -797,32 +788,14 @@ def test_timestamp_format_none_and_bad() -> None:
     assert timestamp_format("bad") == "bad"
 
 
-def test_web_fetch_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    class Response:
-        status = 500
+def test_web_fetch_failure() -> None:
+    with aioresponses.aioresponses() as mock:
+        mock.post("https://error.invalid", status=500, body="error")
 
-        async def text(self):
-            return "error"
+        with pytest.raises(SystemExit):
+            asyncio.run(web_fetch("https://error.invalid", "uid", "pat", verify_ssl=False))
 
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-    class Session:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        def post(self, *args, **kwargs):
-            return Response()
-
-    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **kw: Session())
-    with pytest.raises(SystemExit):
-        asyncio.run(web_fetch("https://error.invalid", "uid", "pat", verify_ssl=False))
+        assert len(mock.requests) == 1
 
 
 def timestamp_format(ts: int | str | None) -> str | None:
@@ -834,99 +807,6 @@ def timestamp_format(ts: int | str | None) -> str | None:
         return dt.strftime("%d %b %Y at %H:%M:%S UTC")
     except Exception:
         return str(ts)
-
-
-def verbose_test_checks_response():
-    class ChecksResponse:
-        status = 200
-
-        async def json(self):
-            return [
-                {
-                    "status": "FAILURE",
-                    "checker": "test_checker1",
-                    "primary_rel_path": "file1.txt",
-                    "member_rel_path": None,
-                    "message": "Test failure 1",
-                },
-                {
-                    "status": "FAILURE",
-                    "checker": "test_checker2",
-                    "primary_rel_path": "file2.txt",
-                    "member_rel_path": "inner.txt",
-                    "message": "Test failure 2",
-                },
-                {
-                    "status": "SUCCESS",
-                    "checker": "test_checker3",
-                    "primary_rel_path": "file3.txt",
-                    "member_rel_path": None,
-                    "message": "Test success",
-                },
-            ]
-
-        async def text(self):
-            return ""
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-    return ChecksResponse()
-
-
-def verbose_test_mock_session(monkeypatch: pytest.MonkeyPatch) -> None:
-    class MockSession:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        def get(self, url, **kwargs):
-            if "releases" in url:
-                return verbose_test_release_response()
-            else:
-                return verbose_test_checks_response()
-
-    monkeypatch.setattr("aiohttp.ClientSession", lambda *a, **kw: MockSession())
-
-
-def verbose_test_release_response():
-    class ReleaseResponse:
-        status = 200
-
-        async def json(self):
-            return {
-                "data": [
-                    {
-                        "version": "2.3.1",
-                        "phase": "release_candidate_draft",
-                        "created": "2025-01-01T00:00:00.000000Z",
-                        "latest_revision_number": "00003",
-                    }
-                ],
-                "count": 1,
-            }
-
-        async def text(self):
-            return ""
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-    return ReleaseResponse()
-
-
-def verbose_test_setup(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
-    monkeypatch.setenv("ATR_CLIENT_CONFIG_PATH", str(tmp_path / "atr.yaml"))
-    app_set("atr.host", "example.invalid")
-    app_set("tokens.jwt", "dummy_jwt_token")
 
 
 async def web_fetch(url: str, asfuid: str, pat_token: str, verify_ssl: bool = True) -> str:
