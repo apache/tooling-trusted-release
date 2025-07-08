@@ -156,7 +156,7 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
         pubsub_password = conf.PUBSUB_PASSWORD
 
         if pubsub_url and pubsub_user and pubsub_password:
-            app.logger.info("Starting SVN listener")
+            app.logger.info("Starting PubSub SVN listener")
             listener = pubsub.SVNListener(
                 working_copy_root=conf.SVN_STORAGE_DIR,
                 url=pubsub_url,
@@ -165,10 +165,10 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
             )
             task = asyncio.create_task(listener.start())
             app.extensions["svn_listener"] = task
-            app.logger.info("SVN listener task created")
+            app.logger.info("PubSub SVN listener task created")
         else:
             app.logger.info(
-                "SVN listener not started: url=%s user=%s password=%s",
+                "PubSub SVN listener not started: pubsub_url=%s pubsub_user=%s pubsub_password=%s",
                 bool(pubsub_url),
                 bool(pubsub_user),
                 # Essential to use bool(...) here to avoid logging the password

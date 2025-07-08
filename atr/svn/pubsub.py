@@ -55,6 +55,7 @@ class SVNListener:
         """Run forever, processing PubSub payloads as they arrive."""
         # TODO: Add reconnection logic here?
         # Or does asfpy.pubsub.listen() already do this?
+        _LOGGER.info("SVNListener.start() called")
         async for payload in asfpy.pubsub.listen(
             # TODO: Upstream this change to BAT
             urllib.parse.urljoin(self.url, self.topics),
@@ -71,6 +72,7 @@ class SVNListener:
 
             _LOGGER.debug("PubSub payload: %s", payload)
             await self._process_payload(payload)
+        _LOGGER.info("SVNListener.start() finished")
 
     async def _process_payload(self, payload: dict) -> None:
         """
