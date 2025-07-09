@@ -70,8 +70,8 @@ class Task(Pagination):
 class FileUploadRequest(schema.Strict):
     project_name: str
     version: str
+    rel_path: str
     content: str
-    file_name: str | None = None
 
 
 class PATJWTRequest(schema.Strict):
@@ -163,6 +163,27 @@ async def committees_name_projects(name: str) -> tuple[list[Mapping], int]:
     async with db.session() as data:
         committee = await data.committee(name=name, _projects=True).demand(exceptions.NotFound())
         return [project.model_dump() for project in committee.projects], 200
+
+
+@api.BLUEPRINT.route("/list/<project>/<version>")
+@api.BLUEPRINT.route("/list/<project>/<version>/<revision>")
+@quart_schema.validate_response(dict[str, list[str]], 200)
+async def list_project_version(
+    project: str, version: str, revision: str | None = None
+) -> tuple[dict[str, list[str]], int]:
+    async with db.session() as data:
+        release_name = models.release_name(project, version)
+        release = await data.release(name=release_name).demand(exceptions.NotFound())
+        if revision is None:
+            dir_path = util.release_directory(release)
+        else:
+            await data.revision(release_name=release_name, number=revision).demand(exceptions.NotFound())
+            dir_path = util.release_directory_version(release) / revision
+    if not (await aiofiles.os.path.isdir(dir_path)):
+        raise exceptions.NotFound("Files not found")
+    files: list[str] = [str(path) for path in [p async for p in util.paths_recursive(dir_path)]]
+    files.sort()
+    return {"rel_paths": files}, 200
 
 
 @api.BLUEPRINT.route("/jwt", methods=["POST"])
@@ -348,6 +369,19 @@ async def releases_project_version_revisions(project: str, version: str) -> tupl
         return [rev.model_dump() for rev in revisions], 200
 
 
+@api.BLUEPRINT.route("/revisions/<project>/<version>")
+@quart_schema.validate_response(dict[str, list[models.Revision]], 200)
+async def revisions_project_version(project: str, version: str) -> tuple[dict[str, list[models.Revision]], int]:
+    async with db.session() as data:
+        release_name = models.release_name(project, version)
+        await data.release(name=release_name).demand(exceptions.NotFound())
+        revisions = await data.revision(release_name=release_name).all()
+    if not isinstance(revisions, list):
+        revisions = list(revisions)
+    revisions.sort(key=lambda rev: rev.number)
+    return {"revisions": revisions}, 200
+
+
 # @api.BLUEPRINT.route("/secret")
 # @jwtoken.require
 # @quart_schema.security_scheme([{"BearerAuth": []}])
@@ -464,8 +498,8 @@ async def upload() -> tuple[Mapping, int]:
         if not (user.is_committee_member(project.committee, asf_uid) or user.is_admin(asf_uid)):
             raise exceptions.Forbidden("You do not have permission to upload to this project")
 
-    revision_row = await _upload_process_file(req, asf_uid)
-    return revision_row.model_dump(), 201
+    revision = await _upload_process_file(req, asf_uid)
+    return revision.model_dump(), 201
 
 
 @db.session_function
@@ -503,10 +537,10 @@ async def _payload_get() -> dict:
 
 async def _upload_process_file(req: FileUploadRequest, asf_uid: str) -> models.Revision:
     file_bytes = base64.b64decode(req.content, validate=True)
-    file_name = (req.file_name or "uploaded-file").lstrip("/")
-    description = f"Upload via API: {file_name}"
+    file_path = req.rel_path.lstrip("/")
+    description = f"Upload via API: {file_path}"
     async with revision.create_and_manage(req.project_name, req.version, asf_uid, description=description) as creating:
-        target_path = pathlib.Path(creating.interim_path) / file_name
+        target_path = pathlib.Path(creating.interim_path) / file_path
         await aiofiles.os.makedirs(target_path.parent, exist_ok=True)
         async with aiofiles.open(target_path, "wb") as f:
             await f.write(file_bytes)
