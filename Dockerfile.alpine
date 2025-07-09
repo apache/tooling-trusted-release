@@ -4,14 +4,14 @@ ENV PIP_DEFAULT_TIMEOUT=100 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
-    POETRY_VERSION=2.1.1
+    UV_VERSION=0.7.19
 
 RUN apk update && \
     apk add --no-cache \
       make \
       git
 
-RUN pip3 install poetry==${POETRY_VERSION}
+RUN pip3 install uv==${UV_VERSION}
 
 # use the same workdir as in the final image
 # as the created venv will use that path
@@ -27,9 +27,6 @@ RUN make generate-version
 
 # final image
 FROM python:3.13.2-alpine3.21
-
-ARG SCRIPTS=scripts/poetry
-ENV SCRIPTS=${SCRIPTS}
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1

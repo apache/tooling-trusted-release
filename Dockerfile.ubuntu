@@ -5,7 +5,7 @@ ENV PIP_DEFAULT_TIMEOUT=100 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
-    POETRY_VERSION=2.1.1
+    UV_VERSION=0.7.19
 
 RUN apt-get update && \
     apt-get install -y \
@@ -19,7 +19,7 @@ RUN add-apt-repository ppa:deadsnakes/ppa && \
 
 RUN rm -rf /usr/local && python3.13 -m venv /usr/local
 
-RUN pip3 install poetry==${POETRY_VERSION}
+RUN pip3 install uv==${UV_VERSION}
 
 # use the same workdir as in the final image
 # as the created venv will use that path
@@ -28,16 +28,13 @@ WORKDIR /opt/atr
 COPY . .
 
 # only install runtime dependencies
-RUN make sync PYTHON="$(find /usr/bin -name python3.13 | head -n 1)"
+RUN make sync
 
 # generate a version.py module from git information
 RUN make generate-version
 
 # final image
 FROM ubuntu:24.04
-
-ARG SCRIPTS=scripts/poetry
-ENV SCRIPTS=${SCRIPTS}
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1

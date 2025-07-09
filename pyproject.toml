@@ -57,29 +57,6 @@ test = [
   "pytest>=8.0",
 ]
 
-# Other configuration
-
-# Poetry specific config
-
-[tool.poetry]
-package-mode = false
-
-[tool.poetry.group.test.dependencies]
-netifaces = "^0.11.0"
-playwright = "^1.51.0"
-pyinstrument = "^5.0.2"
-pytest = ">=8.0"
-pytest-asyncio = ">=0.24"
-
-[tool.poetry.group.dev.dependencies]
-decouple-types = ">=1.0"
-djlint = "^1.36.4"
-mypy = "^1.15.0"
-pre-commit = ">=2.20.0"
-pyright = ">=1.1.393"
-ruff = ">=0.9.4"
-types-aiofiles = ">=24.1.0.20241221,<25.0.0.0"
-
 # Additional tools
 
 [tool.pyright]

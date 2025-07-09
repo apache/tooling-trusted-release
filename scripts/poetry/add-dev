@@ -1,2 +1,0 @@
-#!/bin/sh
-exec poetry add --group dev "$1"
