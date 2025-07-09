@@ -67,7 +67,7 @@ serve:
 
 serve-local:
 	APP_HOST=127.0.0.1:8080 LOCAL_DEBUG=1 SECRET_KEY=insecure-local-key \
-	  SSH_HOST=127.0.0.1 $(SCRIPTS)/run hypercorn --bind $(BIND) \
+	  SSH_HOST=127.0.0.1 uv run hypercorn --bind $(BIND) \
 	  --keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
 
 sync:
