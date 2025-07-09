@@ -17,7 +17,7 @@ repos:
   hooks:
     - id: insert-license
       name: Add license for all Python files
-      files: ^(atr|tests)/(.*\.py$|.*\.pyi)$
+      files: ^(atr|scripts|tests)/(.*\.py$|.*\.pyi)$
       args:
         - --comment-style
         - "|#|"
@@ -83,27 +83,7 @@ repos:
       language: system
       require_serial: true
       types: [python]
-      exclude: ^tests/
-
-    # The separate ATR client hooks are needed because of the uv shebang
-    - id: ruff-client
-      name: Ruff Linter (client)
-      entry: ruff check --fix client/atr
-      language: system
-      pass_filenames: false
-
-    - id: ruff-format-client
-      name: Ruff Formatter (client)
-      entry: ruff format --force-exclude client/atr
-      language: system
-      pass_filenames: false
-
-    - id: pyright-client
-      name: Pyright Type Check (client)
-      entry: pyright client/atr
-      language: system
-      require_serial: true
-      pass_filenames: false
+      exclude: ^(node_modules|tests)/
 
     - id: jinja-route-check
       name: Jinja Route Checker
