@@ -16,11 +16,14 @@
 # under the License.
 
 
+import base64
 import dataclasses
 import datetime
 import hashlib
+import pathlib
 from collections.abc import Mapping
 
+import aiofiles.os
 import asfquart.base as base
 import quart
 import quart_schema
@@ -33,9 +36,14 @@ import atr.blueprints.api as api
 import atr.db as db
 import atr.db.models as models
 import atr.jwtoken as jwtoken
+import atr.revision as revision
 import atr.routes as routes
 import atr.routes.start as start
+import atr.routes.voting as voting
 import atr.schema as schema
+import atr.tasks.vote as tasks_vote
+import atr.user as user
+import atr.util as util
 
 # FIXME: we need to return the dumped model instead of the actual pydantic class
 #        as otherwise pyright will complain about the return type
@@ -59,6 +67,13 @@ class Task(Pagination):
     status: str | None = None
 
 
+class FileUploadRequest(schema.Strict):
+    project_name: str
+    version: str
+    content: str
+    file_name: str | None = None
+
+
 class PATJWTRequest(schema.Strict):
     asfuid: str
     pat: str
@@ -67,6 +82,16 @@ class PATJWTRequest(schema.Strict):
 class ReleaseCreateRequest(schema.Strict):
     project_name: str
     version: str
+
+
+class VoteStartRequest(schema.Strict):
+    project_name: str
+    version: str
+    revision: str
+    email_to: str
+    vote_duration: int
+    subject: str
+    body: str
 
 
 # We implicitly have /api/openapi.json
@@ -146,10 +171,7 @@ async def pat_jwt_post() -> quart.Response:
     # Expects {"asfuid": "uid", "pat": "pat-token"}
     # Returns {"asfuid": "uid", "jwt": "jwt-token"}
 
-    payload = await quart.request.get_json(force=True, silent=False)
-    if not isinstance(payload, dict):
-        return quart.Response("Invalid JSON", status=400)
-
+    payload = await _payload_get()
     pat_request = PATJWTRequest.model_validate(payload)
     token_hash = hashlib.sha3_256(pat_request.pat.encode()).hexdigest()
     pat_rec = await _get_pat(pat_request.asfuid, token_hash)
@@ -259,10 +281,7 @@ async def releases(query_args: Releases) -> quart.Response:
 async def releases_create() -> tuple[Mapping, int]:
     """Create a new release draft for a project via POSTed JSON."""
 
-    payload = await quart.request.get_json(force=True, silent=False)
-    if not isinstance(payload, dict):
-        raise exceptions.BadRequest("Invalid JSON")
-
+    payload = await _payload_get()
     request_data = ReleaseCreateRequest.model_validate(payload)
     asf_uid = _jwt_asf_uid()
 
@@ -381,6 +400,74 @@ async def tasks(query_args: Task) -> quart.Response:
         return quart.jsonify(result)
 
 
+@api.BLUEPRINT.route("/vote/start", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_response(models.Task, 201)
+async def vote_start() -> tuple[Mapping, int]:
+    payload = await _payload_get()
+    req = VoteStartRequest.model_validate(payload)
+    asf_uid = _jwt_asf_uid()
+
+    permitted_recipients = util.permitted_recipients(asf_uid)
+    if req.email_to not in permitted_recipients:
+        raise exceptions.Forbidden("Invalid mailing list choice")
+
+    async with db.session() as data:
+        release_name = models.release_name(req.project_name, req.version)
+        release = await data.release(name=release_name, _project=True, _committee=True).demand(exceptions.NotFound())
+
+        if not (user.is_committee_member(release.committee, asf_uid) or user.is_admin(asf_uid)):
+            raise exceptions.Forbidden("You do not have permission to start a vote for this project")
+
+        revision_exists = await data.revision(release_name=release_name, number=req.revision).get()
+        if revision_exists is None:
+            raise exceptions.NotFound(f"Revision '{req.revision}' does not exist")
+
+        error = await voting.promote_release(data, release_name, req.revision, vote_manual=False)
+        if error:
+            raise exceptions.BadRequest(error)
+
+        # TODO: Move this into a function in routes/voting.py
+        task = models.Task(
+            status=models.TaskStatus.QUEUED,
+            task_type=models.TaskType.VOTE_INITIATE,
+            task_args=tasks_vote.Initiate(
+                release_name=release_name,
+                email_to=req.email_to,
+                vote_duration=req.vote_duration,
+                initiator_id=asf_uid,
+                initiator_fullname=asf_uid,
+                subject=req.subject,
+                body=req.body,
+            ).model_dump(),
+            project_name=req.project_name,
+            version_name=req.version,
+        )
+        data.add(task)
+        await data.commit()
+        return task.model_dump(exclude={"result"}), 201
+
+
+@api.BLUEPRINT.route("/upload", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_response(models.Revision, 201)
+async def upload() -> tuple[Mapping, int]:
+    payload = await _payload_get()
+    req = FileUploadRequest.model_validate(payload)
+    asf_uid = _jwt_asf_uid()
+
+    async with db.session() as data:
+        project = await data.project(name=req.project_name, _committee=True).demand(exceptions.NotFound())
+        # TODO: user.is_participant(project, asf_uid)
+        if not (user.is_committee_member(project.committee, asf_uid) or user.is_admin(asf_uid)):
+            raise exceptions.Forbidden("You do not have permission to upload to this project")
+
+    revision_row = await _upload_process_file(req, asf_uid)
+    return revision_row.model_dump(), 201
+
+
 @db.session_function
 async def _get_pat(data: db.Session, uid: str, token_hash: str) -> models.PersonalAccessToken | None:
     return await data.query_one_or_none(
@@ -405,3 +492,26 @@ def _pagination_args_validate(query_args: Pagination) -> None:
     if query_args.limit > 1000:
         # quart.abort(400, "Limit is too high")
         raise exceptions.BadRequest("Maximum limit of 1000 exceeded")
+
+
+async def _payload_get() -> dict:
+    payload = await quart.request.get_json(force=True, silent=False)
+    if not isinstance(payload, dict):
+        raise exceptions.BadRequest("Invalid JSON")
+    return payload
+
+
+async def _upload_process_file(req: FileUploadRequest, asf_uid: str) -> models.Revision:
+    file_bytes = base64.b64decode(req.content, validate=True)
+    file_name = (req.file_name or "uploaded-file").lstrip("/")
+    description = f"Upload via API: {file_name}"
+    async with revision.create_and_manage(req.project_name, req.version, asf_uid, description=description) as creating:
+        target_path = pathlib.Path(creating.interim_path) / file_name
+        await aiofiles.os.makedirs(target_path.parent, exist_ok=True)
+        async with aiofiles.open(target_path, "wb") as f:
+            await f.write(file_bytes)
+    if creating.new is None:
+        raise exceptions.InternalServerError("Failed to create revision")
+    async with db.session() as data:
+        release_name = models.release_name(req.project_name, req.version)
+        return await data.revision(release_name=release_name, number=creating.new.number).demand(exceptions.NotFound())

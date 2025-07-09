@@ -53,7 +53,7 @@ def require[**P, R](func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Aw
         try:
             claims = verify(token)
         except jwt.PyJWTError as exc:
-            raise base.ASFQuartException(f"Invalid token: {exc}", errorcode=401) from exc
+            raise base.ASFQuartException(f"Invalid Bearer JWT: {exc}", errorcode=401) from exc
 
         quart.g.jwt_claims = claims
         return await func(*args, **kwargs)
@@ -69,5 +69,5 @@ def _extract_bearer_token(request: quart.Request) -> str:
     header = request.headers.get("Authorization", "")
     scheme, _, token = header.partition(" ")
     if scheme.lower() != "bearer" or not token:
-        raise base.ASFQuartException("Bearer token missing", errorcode=401)
+        raise base.ASFQuartException("Bearer JWT missing", errorcode=401)
     return token
