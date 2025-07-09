@@ -55,31 +55,31 @@ repos:
       args: ['--fix']
 - repo: local
   hooks:
-    - id: poetry-check
-      name: poetry-check
-      description: run poetry check to validate config
-      entry: poetry check
-      language: python
-      pass_filenames: false
-      files: ^(.*/)?(poetry\.lock|pyproject\.toml)$
+    # - id: poetry-check
+    #   name: poetry-check
+    #   description: run poetry check to validate config
+    #   entry: poetry check
+    #   language: python
+    #   pass_filenames: false
+    #   files: ^(.*/)?(poetry\.lock|pyproject\.toml)$
 
     - id: ruff
       name: Ruff Linter
-      entry: ruff check --fix
+      entry: uv run ruff check --fix
       language: system
       types: [python]
       exclude: ^node_modules/
 
     - id: ruff-format
       name: Ruff Formatter
-      entry: ruff format --force-exclude
+      entry: uv run ruff format --force-exclude
       language: system
       types: [python]
       exclude: ^node_modules/
 
     - id: pyright
       name: Pyright Type Check
-      entry: pyright
+      entry: uv run pyright
       language: system
       require_serial: true
       types: [python]
@@ -88,7 +88,7 @@ repos:
     - id: jinja-route-check
       name: Jinja Route Checker
       description: Check whether routes used in Jinja2 templates actually exist
-      entry: poetry run python scripts/lint/jinja_route_checker.py
+      entry: uv run python scripts/lint/jinja_route_checker.py
       language: system
       pass_filenames: false
       always_run: true
