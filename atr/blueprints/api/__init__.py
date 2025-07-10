@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import sys
+
 import asfquart.base as base
 import quart
 import quart.blueprints as blueprints
@@ -51,7 +53,14 @@ async def _handle_not_found(err: exceptions.NotFound) -> tuple[quart.Response, i
 
 
 def _json_error(message: str, status_code: int | None) -> tuple[quart.Response, int]:
-    return quart.jsonify({"error": message}), status_code or 500
+    payload = {"error": message}
+    show_traceback = False
+    if show_traceback:
+        import traceback
+
+        traceback_str = "".join(traceback.format_exception(*sys.exc_info()))
+        payload["traceback"] = traceback_str
+    return quart.jsonify(payload), status_code or 500
 
 
 @BLUEPRINT.record_once

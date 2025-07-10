@@ -38,6 +38,7 @@ import atr.db.models as models
 import atr.jwtoken as jwtoken
 import atr.revision as revision
 import atr.routes as routes
+import atr.routes.draft as draft
 import atr.routes.start as start
 import atr.routes.voting as voting
 import atr.schema as schema
@@ -92,6 +93,11 @@ class VoteStartRequest(schema.Strict):
     vote_duration: int
     subject: str
     body: str
+
+
+class DraftDeleteRequest(schema.Strict):
+    project_name: str
+    version: str
 
 
 # We implicitly have /api/openapi.json
@@ -163,6 +169,31 @@ async def committees_name_projects(name: str) -> tuple[list[Mapping], int]:
     async with db.session() as data:
         committee = await data.committee(name=name, _projects=True).demand(exceptions.NotFound())
         return [project.model_dump() for project in committee.projects], 200
+
+
+@api.BLUEPRINT.route("/draft/delete", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_response(dict[str, str], 200)
+async def draft_delete_project_version() -> tuple[dict[str, str], int]:
+    payload = await _payload_get()
+    req = DraftDeleteRequest.model_validate(payload)
+    asf_uid = _jwt_asf_uid()
+
+    async with db.session() as data:
+        release_name = models.release_name(req.project_name, req.version)
+        release = await data.release(
+            name=release_name, phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT, _committee=True
+        ).demand(exceptions.NotFound())
+        if not (user.is_committee_member(release.project.committee, asf_uid) or user.is_admin(asf_uid)):
+            raise exceptions.Forbidden("You do not have permission to delete this draft")
+
+        # TODO: This causes "A transaction is already begun on this Session"
+        # async with data.begin():
+        # Probably due to autobegin in data.release above
+        await draft.delete_candidate_draft(data, release_name)
+        await data.commit()
+    return {"deleted": release_name}, 200
 
 
 @api.BLUEPRINT.route("/list/<project>/<version>")
