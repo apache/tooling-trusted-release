@@ -20,6 +20,7 @@ import contextlib
 import dataclasses
 import datetime
 import pathlib
+import secrets
 import tempfile
 from collections.abc import AsyncGenerator
 
@@ -45,6 +46,24 @@ class Creating:
     failed: FailedError | None = None
 
 
+class SafeSession:
+    def __init__(self, temp_dir: str):
+        self._stack = contextlib.AsyncExitStack()
+        self._manager = db.session()
+        self._temp_dir = temp_dir
+
+    async def __aenter__(self) -> db.Session:
+        try:
+            return await self._stack.enter_async_context(self._manager)
+        except Exception:
+            await aioshutil.rmtree(self._temp_dir)  # type: ignore[call-arg]
+            raise
+
+    async def __aexit__(self, _exc_type, _exc, _tb):
+        await self._stack.aclose()
+        return False
+
+
 # NOTE: The create_directory parameter is not used anymore
 # The temporary directory will always be created
 @contextlib.asynccontextmanager
@@ -66,7 +85,8 @@ async def create_and_manage(
     # Create a temporary directory
     # We ensure, below, that it's removed on any exception
     # Use the tmp subdirectory of state, to ensure that it is on the same filesystem
-    temp_dir: str = await asyncio.to_thread(tempfile.mkdtemp, dir=util.get_tmp_dir())
+    prefix_token = secrets.token_hex(16)
+    temp_dir: str = await asyncio.to_thread(tempfile.mkdtemp, prefix=prefix_token, dir=util.get_tmp_dir())
     temp_dir_path = pathlib.Path(temp_dir)
     creating = Creating(old=old_revision, interim_path=temp_dir_path, new=None, failed=None)
     try:
@@ -86,47 +106,55 @@ async def create_and_manage(
         raise
 
     # Ensure that the permissions of every directory are 755
-    await asyncio.to_thread(util.chmod_directories, temp_dir_path)
+    try:
+        await asyncio.to_thread(util.chmod_directories, temp_dir_path)
+    except Exception:
+        await aioshutil.rmtree(temp_dir)  # type: ignore[call-arg]
+        raise
 
-    # Create a revision row, holding the write lock
-    async with db.session() as data:
-        # This is the only place where models.Revision is constructed
-        # That makes models.populate_revision_sequence_and_name safe against races
-        # Because that event is called when data.add is called below
-        # And we have a write lock at that point through the use of data.begin_immediate
-        new_revision = models.Revision(
-            release_name=release_name,
-            release=release,
-            asfuid=asf_uid,
-            created=datetime.datetime.now(datetime.UTC),
-            phase=release.phase,
-            description=description,
-        )
+    async with SafeSession(temp_dir) as data:
+        try:
+            # This is the only place where models.Revision is constructed
+            # That makes models.populate_revision_sequence_and_name safe against races
+            # Because that event is called when data.add is called below
+            # And we have a write lock at that point through the use of data.begin_immediate
+            new_revision = models.Revision(
+                release_name=release_name,
+                release=release,
+                asfuid=asf_uid,
+                created=datetime.datetime.now(datetime.UTC),
+                phase=release.phase,
+                description=description,
+            )
 
-        # Acquire the write lock and add the row
-        # We need this write lock for moving the directory below atomically
-        # But it also helps to make models.populate_revision_sequence_and_name safe against races
-        await data.begin_immediate()
-        data.add(new_revision)
+            # Acquire the write lock and add the row
+            # We need this write lock for moving the directory below atomically
+            # But it also helps to make models.populate_revision_sequence_and_name safe against races
+            await data.begin_immediate()
+            data.add(new_revision)
 
-        # Flush but do not commit the row to get its name and number
-        # The row will still be invisible to other sessions after flushing
-        await data.flush()
-        # Give the caller details about the new revision
-        creating.new = new_revision
+            # Flush but do not commit the new revision row to get its name and number
+            # The row will still be invisible to other sessions after flushing
+            await data.flush()
+            # Give the caller details about the new revision
+            creating.new = new_revision
 
-        # Rename the directory to the new revision number
-        await data.refresh(release)
-        new_revision_dir = util.release_directory(release)
+            # Rename the directory to the new revision number
+            await data.refresh(release)
+            new_revision_dir = util.release_directory(release)
 
-        # Ensure that the parent directory exists
-        await aiofiles.os.makedirs(new_revision_dir.parent, exist_ok=True)
+            # Ensure that the parent directory exists
+            await aiofiles.os.makedirs(new_revision_dir.parent, exist_ok=True)
 
-        # Rename the temporary interim directory to the new revision number
-        await aiofiles.os.rename(temp_dir, new_revision_dir)
+            # Rename the temporary interim directory to the new revision number
+            await aiofiles.os.rename(temp_dir, new_revision_dir)
+        except Exception:
+            await aioshutil.rmtree(temp_dir)  # type: ignore[call-arg]
+            raise
 
         # Commit to end the transaction started by data.begin_immediate
         # We must commit the revision before starting the checks
+        # This also releases the write lock
         await data.commit()
 
         async with data.begin():
