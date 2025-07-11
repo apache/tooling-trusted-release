@@ -86,7 +86,7 @@ async def create_and_manage(
     # We ensure, below, that it's removed on any exception
     # Use the tmp subdirectory of state, to ensure that it is on the same filesystem
     prefix_token = secrets.token_hex(16)
-    temp_dir: str = await asyncio.to_thread(tempfile.mkdtemp, prefix=prefix_token, dir=util.get_tmp_dir())
+    temp_dir: str = await asyncio.to_thread(tempfile.mkdtemp, prefix=prefix_token + "-", dir=util.get_tmp_dir())
     temp_dir_path = pathlib.Path(temp_dir)
     creating = Creating(old=old_revision, interim_path=temp_dir_path, new=None, failed=None)
     try:

@@ -34,11 +34,11 @@ import werkzeug.exceptions as exceptions
 
 import atr.blueprints.api as api
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.db.models as models
 import atr.jwtoken as jwtoken
 import atr.revision as revision
 import atr.routes as routes
-import atr.routes.draft as draft
 import atr.routes.start as start
 import atr.routes.voting as voting
 import atr.schema as schema
@@ -191,7 +191,11 @@ async def draft_delete_project_version() -> tuple[dict[str, str], int]:
         # TODO: This causes "A transaction is already begun on this Session"
         # async with data.begin():
         # Probably due to autobegin in data.release above
-        await draft.delete_candidate_draft(data, release_name)
+        # We pass the phase again to guard against races
+        # But the removal is not actually locked
+        await interaction.release_delete(
+            release_name, phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
+        )
         await data.commit()
     return {"deleted": release_name}, 200
 

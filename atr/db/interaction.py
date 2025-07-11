@@ -25,6 +25,10 @@ import re
 from collections.abc import AsyncGenerator
 from typing import Final
 
+import aiofiles.os
+import aioshutil
+import asfquart.base as base
+import quart
 import sqlalchemy
 import sqlmodel
 
@@ -280,6 +284,38 @@ async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathI
     return info
 
 
+async def release_delete(
+    release_name: str, phase: db.Opt[models.ReleasePhase] = db.NOT_SET, include_downloads: bool = True
+) -> None:
+    """Handle the deletion of database records and filesystem data for a release."""
+    async with db.session() as data:
+        release = await data.release(name=release_name, phase=phase, _project=True).demand(
+            base.ASFQuartException(f"Release '{release_name}' not found.", 404)
+        )
+        release_dir = util.release_directory_base(release)
+
+        # Delete from the database
+        _LOGGER.info("Deleting database records for release: %s", release_name)
+        # Cascade should handle this, but we delete manually anyway
+        tasks_to_delete = await data.task(project_name=release.project.name, version_name=release.version).all()
+        for task in tasks_to_delete:
+            await data.delete(task)
+        _LOGGER.debug("Deleted %d tasks for %s", len(tasks_to_delete), release_name)
+
+        checks_to_delete = await data.check_result(release_name=release_name).all()
+        for check in checks_to_delete:
+            await data.delete(check)
+        _LOGGER.debug("Deleted %d check results for %s", len(checks_to_delete), release_name)
+
+        await data.delete(release)
+        _LOGGER.info("Deleted release record: %s", release_name)
+        await data.commit()
+
+    if include_downloads:
+        await _delete_release_data_downloads(release)
+    await _delete_release_data_filesystem(release_dir, release_name)
+
+
 async def tasks_ongoing(project_name: str, version_name: str, revision_number: str) -> int:
     async with db.session() as data:
         query = (
@@ -387,6 +423,50 @@ async def upload_keys_bytes(
     error_count = len(results) - success_count
 
     return results, success_count, error_count, submitted_committees
+
+
+async def _delete_release_data_downloads(release: models.Release) -> None:
+    # Delete hard links from the downloads directory
+    finished_dir = util.release_directory(release)
+    if await aiofiles.os.path.isdir(finished_dir):
+        release_inodes = set()
+        async for file_path in util.paths_recursive(finished_dir):
+            try:
+                stat_result = await aiofiles.os.stat(finished_dir / file_path)
+                release_inodes.add(stat_result.st_ino)
+            except FileNotFoundError:
+                continue
+
+        if release_inodes:
+            downloads_dir = util.get_downloads_dir()
+            async for link_path in util.paths_recursive(downloads_dir):
+                full_link_path = downloads_dir / link_path
+                try:
+                    link_stat = await aiofiles.os.stat(full_link_path)
+                    if link_stat.st_ino in release_inodes:
+                        await aiofiles.os.remove(full_link_path)
+                        _LOGGER.info(f"Deleted hard link: {full_link_path}")
+                except FileNotFoundError:
+                    continue
+
+
+async def _delete_release_data_filesystem(release_dir: pathlib.Path, release_name: str) -> None:
+    # Delete from the filesystem
+    try:
+        if await aiofiles.os.path.isdir(release_dir):
+            _LOGGER.info("Deleting filesystem directory: %s", release_dir)
+            # Believe this to be another bug in mypy Protocol handling
+            # TODO: Confirm that this is a bug, and report upstream
+            await aioshutil.rmtree(release_dir)  # type: ignore[call-arg]
+            _LOGGER.info("Successfully deleted directory: %s", release_dir)
+        else:
+            _LOGGER.warning("Filesystem directory not found, skipping deletion: %s", release_dir)
+    except Exception as e:
+        _LOGGER.exception("Error deleting filesystem directory %s:", release_dir)
+        await quart.flash(
+            f"Database records for '{release_name}' deleted, but failed to delete filesystem directory: {e!s}",
+            "warning",
+        )
 
 
 def _key_latest_self_signature(key: dict) -> datetime.datetime | None:

@@ -24,7 +24,7 @@ import datetime
 import hashlib
 import logging
 import pathlib
-from typing import TYPE_CHECKING, Final, Protocol, TypeVar
+from typing import TYPE_CHECKING, Protocol, TypeVar
 
 import aiofiles.os
 import aioshutil
@@ -35,6 +35,7 @@ import wtforms
 import atr.analysis as analysis
 import atr.construct as construct
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.db.models as models
 import atr.revision as revision
 import atr.routes as routes
@@ -48,8 +49,7 @@ import atr.util as util
 if TYPE_CHECKING:
     import werkzeug.wrappers.response as response
 
-# _CONFIG: Final = config.get()
-_LOGGER: Final = logging.getLogger(__name__)
+# _LOGGER: Final = logging.getLogger(__name__)
 
 
 T = TypeVar("T")
@@ -113,7 +113,9 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     async with db.session() as data:
         async with data.begin():
             try:
-                await delete_candidate_draft(data, release_name)
+                await interaction.release_delete(
+                    release_name, phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
+                )
             except Exception as e:
                 logging.exception("Error deleting candidate draft:")
                 return await session.redirect(root.index, error=f"Error deleting candidate draft: {e!s}")
@@ -129,20 +131,6 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         await aioshutil.rmtree(draft_dir)  # type: ignore[call-arg]
 
     return await session.redirect(root.index, success="Candidate draft deleted successfully")
-
-
-async def delete_candidate_draft(data: db.Session, candidate_draft_name: str) -> None:
-    """Delete a candidate draft and all its associated files."""
-    # Check that the release exists
-    # TODO: Use session.release here
-    release = await data.release(name=candidate_draft_name, _project=True).get()
-    if not release:
-        raise routes.FlashError("Candidate draft not found")
-    if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-        raise routes.FlashError("Candidate draft is not in the release candidate draft phase")
-
-    # Delete the release record
-    await data.delete(release)
 
 
 @routes.committer("/draft/delete-file/<project_name>/<version_name>", methods=["POST"])
