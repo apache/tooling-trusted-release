@@ -17,7 +17,6 @@
 
 import asyncio
 import datetime
-import logging
 import pathlib
 from typing import Any, Protocol
 
@@ -39,6 +38,10 @@ import atr.routes.release as routes_release
 import atr.tasks.message as message
 import atr.template as template
 import atr.util as util
+
+
+class AnnounceError(Exception):
+    """Exception for announce errors."""
 
 
 class AnnounceFormProtocol(Protocol):
@@ -142,42 +145,72 @@ async def selected_post(
         await quart.flash(error_message, "error")
         return await template.render("announce-selected.html", release=release, announce_form=announce_form)
 
+    recipient = str(announce_form.mailing_list.data)
+    if recipient not in permitted_recipients:
+        raise AnnounceError(f"You are not permitted to send announcements to {recipient}")
+
     subject = str(announce_form.subject.data)
     body = str(announce_form.body.data)
     preview_revision_number = str(announce_form.preview_revision.data)
     download_path_suffix = _download_path_suffix_validated(announce_form)
 
+    try:
+        await announce(
+            project_name,
+            version_name,
+            preview_revision_number,
+            recipient,
+            subject,
+            body,
+            download_path_suffix,
+            session.uid,
+            session.fullname,
+        )
+    except AnnounceError as e:
+        return await session.redirect(selected, error=str(e), project_name=project_name, version_name=version_name)
+
+    routes_release_finished = routes_release.finished  # type: ignore[has-type]
+    return await session.redirect(
+        routes_release_finished,
+        success="Preview successfully announced",
+        project_name=project_name,
+    )
+
+
+async def announce(
+    project_name: str,
+    version_name: str,
+    preview_revision_number: str,
+    recipient: str,
+    subject: str,
+    body: str,
+    download_path_suffix: str,
+    uid: str,
+    fullname: str,
+) -> None:
+    if recipient not in util.permitted_recipients(uid):
+        raise AnnounceError(f"You are not permitted to send announcements to {recipient}")
+
     unfinished_dir: str = ""
     finished_dir: str = ""
 
-    async with db.session(log_queries=True) as data:
+    async with db.session() as data:
         try:
-            release = await session.release(
-                project_name,
-                version_name,
+            release = await data.release(
+                project_name=project_name,
+                version=version_name,
                 phase=sql.ReleasePhase.RELEASE_PREVIEW,
                 latest_revision_number=preview_revision_number,
-                with_revisions=True,
-                data=data,
-            )
+                _revisions=True,
+            ).demand(RuntimeError(f"Release {project_name} {version_name} {preview_revision_number} does not exist"))
             if (committee := release.project.committee) is None:
                 raise ValueError("Release has no committee")
-
-            test_list = "user-tests"
-            recipient = f"{test_list}@tooling.apache.org"
-            if recipient not in util.permitted_recipients(session.uid):
-                return await session.redirect(
-                    selected,
-                    error=f"You are not permitted to send announcements to {recipient}",
-                    project_name=project_name,
-                    version_name=version_name,
-                )
 
             body = await construct.announce_release_body(
                 body,
                 options=construct.AnnounceReleaseOptions(
-                    asfuid=session.uid,
-                    fullname=session.fullname,
+                    asfuid=uid,
+                    fullname=fullname,
                     project_name=project_name,
                     version_name=version_name,
                 ),
@@ -186,7 +219,7 @@ async def selected_post(
                 status=sql.TaskStatus.QUEUED,
                 task_type=sql.TaskType.MESSAGE_SEND,
                 task_args=message.Send(
-                    email_sender=f"{session.uid}@apache.org",
+                    email_sender=f"{uid}@apache.org",
                     email_recipient=recipient,
                     subject=subject,
                     body=body,
@@ -206,13 +239,7 @@ async def selected_post(
             await data.commit()
 
         except (routes.FlashError, Exception) as e:
-            logging.exception("Error during release announcement, database phase:")
-            return await session.redirect(
-                selected,
-                error=f"Error announcing preview: {e!s}",
-                project_name=project_name,
-                version_name=version_name,
-            )
+            raise AnnounceError(f"Error announcing preview: {e!s}")
 
     async with db.session() as data:
         # This must come after updating the release object
@@ -236,22 +263,9 @@ async def selected_post(
             # This removes all of the prior revisions
             await aioshutil.rmtree(str(unfinished_revisions_path))  # type: ignore[call-arg]
     except Exception as e:
-        logging.exception("Error during release announcement, file system phase:")
-        return await session.redirect(
-            selected,
-            error=f"Database updated, but error moving files: {e!s}. Manual cleanup needed.",
-            project_name=project_name,
-            version_name=version_name,
-        )
+        raise AnnounceError(f"Database updated, but error moving files: {e!s}. Manual cleanup needed.")
 
     await _hard_link_downloads(committee, finished_path, download_path_suffix)
-
-    routes_release_finished = routes_release.finished  # type: ignore[has-type]
-    return await session.redirect(
-        routes_release_finished,
-        success="Preview successfully announced",
-        project_name=project_name,
-    )
 
 
 async def _create_announce_form_instance(

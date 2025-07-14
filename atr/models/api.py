@@ -45,6 +45,16 @@ class Task(Pagination):
     status: str | None = None
 
 
+class Announce(schema.Strict):
+    project: str
+    version: str
+    revision: str
+    email_to: str
+    subject: str
+    body: str
+    path_suffix: str
+
+
 class AsfuidPat(schema.Strict):
     asfuid: str
     pat: str

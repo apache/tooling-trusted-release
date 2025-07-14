@@ -40,6 +40,7 @@ import atr.models as models
 import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
+import atr.routes.announce as announce
 import atr.routes.start as start
 import atr.routes.voting as voting
 import atr.tasks.vote as tasks_vote
@@ -52,6 +53,32 @@ import atr.util as util
 #        For now, just explicitly dump the model.
 
 # We implicitly have /api/openapi.json
+
+
+@api.BLUEPRINT.route("/announce", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.Announce)
+@quart_schema.validate_response(sql.Task, 201)
+async def announce_post(data: models.api.Announce) -> tuple[Mapping, int]:
+    asf_uid = _jwt_asf_uid()
+
+    try:
+        await announce.announce(
+            data.project,
+            data.version,
+            data.revision,
+            data.email_to,
+            data.subject,
+            data.body,
+            data.path_suffix,
+            asf_uid,
+            asf_uid,
+        )
+    except announce.AnnounceError as e:
+        raise exceptions.BadRequest(str(e))
+
+    return {"success": "Announcement sent"}, 200
 
 
 @api.BLUEPRINT.route("/checks/list/<project>/<version>")
