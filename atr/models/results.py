@@ -17,7 +17,7 @@
 
 from typing import Annotated, Literal
 
-from pydantic import TypeAdapter
+import pydantic
 
 from . import schema
 
@@ -70,4 +70,4 @@ Results = Annotated[
     schema.Field(discriminator="kind"),
 ]
 
-ResultsAdapter = TypeAdapter(Results)
+ResultsAdapter = pydantic.TypeAdapter(Results)

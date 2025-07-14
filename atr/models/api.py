@@ -16,8 +16,15 @@
 # under the License.
 
 import dataclasses
+from typing import Annotated, Any, Literal
+
+import pydantic
 
 from . import schema
+
+
+class ResultsTypeError(TypeError):
+    pass
 
 
 @dataclasses.dataclass
@@ -43,6 +50,11 @@ class AsfuidPat(schema.Strict):
     pat: str
 
 
+class Count(schema.Strict):
+    kind: Literal["count"] = schema.Field(alias="kind")
+    count: int
+
+
 class ProjectVersion(schema.Strict):
     project: str
     version: str
@@ -55,10 +67,6 @@ class ProjectVersionRelpathContent(schema.Strict):
     content: str
 
 
-class ResultCount(schema.Strict):
-    count: int
-
-
 class VoteStart(schema.Strict):
     project: str
     version: str
@@ -67,3 +75,18 @@ class VoteStart(schema.Strict):
     vote_duration: int
     subject: str
     body: str
+
+
+Results = Annotated[
+    Count,
+    schema.Field(discriminator="kind"),
+]
+
+ResultsAdapter = pydantic.TypeAdapter(Results)
+
+
+def validate_count(value: Any) -> Count:
+    count = ResultsAdapter.validate_python(value)
+    if not isinstance(count, Count):
+        raise ResultsTypeError(f"Invalid API response: {value}")
+    return count

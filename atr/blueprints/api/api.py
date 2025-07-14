@@ -91,7 +91,7 @@ async def checks_list_project_version_revision(project: str, version: str, revis
 
 @api.BLUEPRINT.route("/checks/ongoing/<project>/<version>")
 @api.BLUEPRINT.route("/checks/ongoing/<project>/<version>/<revision>")
-@quart_schema.validate_response(models.api.ResultCount, 200)
+@quart_schema.validate_response(models.api.Count, 200)
 async def checks_ongoing_project_version(
     project: str,
     version: str,
@@ -113,7 +113,7 @@ async def checks_ongoing_project_version(
     #     Iterator[bytes],
     #     Iterator[str],
     # ]
-    return models.api.ResultCount(count=ongoing_tasks_count).model_dump(), 200
+    return models.api.Count(kind="count", count=ongoing_tasks_count).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/committees")
