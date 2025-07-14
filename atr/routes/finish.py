@@ -31,7 +31,7 @@ import wtforms.fields as fields
 
 import atr.analysis as analysis
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.root as root
@@ -135,9 +135,7 @@ async def selected(
         return await session.redirect(selected, project_name=project_name, version_name=version_name)
 
     async with db.session() as data:
-        release = await session.release(
-            project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW, data=data
-        )
+        release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_PREVIEW, data=data)
         user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
 
     latest_revision_dir = util.release_directory(release)

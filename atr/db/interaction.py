@@ -34,8 +34,8 @@ import sqlmodel
 
 import atr.analysis as analysis
 import atr.db as db
-import atr.db.models as models
-import atr.schema as schema
+import atr.models.schema as schema
+import atr.models.sql as sql
 import atr.user as user
 import atr.util as util
 
@@ -59,10 +59,10 @@ class PublicKeyError(RuntimeError):
 
 class PathInfo(schema.Strict):
     artifacts: set[pathlib.Path] = schema.factory(set)
-    errors: dict[pathlib.Path, list[models.CheckResult]] = schema.factory(dict)
+    errors: dict[pathlib.Path, list[sql.CheckResult]] = schema.factory(dict)
     metadata: set[pathlib.Path] = schema.factory(set)
-    successes: dict[pathlib.Path, list[models.CheckResult]] = schema.factory(dict)
-    warnings: dict[pathlib.Path, list[models.CheckResult]] = schema.factory(dict)
+    successes: dict[pathlib.Path, list[sql.CheckResult]] = schema.factory(dict)
+    warnings: dict[pathlib.Path, list[sql.CheckResult]] = schema.factory(dict)
 
 
 def ensure_session(caller_data: db.Session | None) -> db.Session | contextlib.nullcontext[db.Session]:
@@ -78,17 +78,15 @@ async def ephemeral_gpg_home() -> AsyncGenerator[str]:
         yield str(temp_dir)
 
 
-async def has_failing_checks(
-    release: models.Release, revision_number: str, caller_data: db.Session | None = None
-) -> bool:
+async def has_failing_checks(release: sql.Release, revision_number: str, caller_data: db.Session | None = None) -> bool:
     async with ensure_session(caller_data) as data:
         query = (
             sqlmodel.select(sqlalchemy.func.count())
-            .select_from(models.CheckResult)
+            .select_from(sql.CheckResult)
             .where(
-                models.CheckResult.release_name == release.name,
-                models.CheckResult.revision_number == revision_number,
-                models.CheckResult.status == models.CheckResultStatus.FAILURE,
+                sql.CheckResult.release_name == release.name,
+                sql.CheckResult.revision_number == revision_number,
+                sql.CheckResult.status == sql.CheckResultStatus.FAILURE,
             )
         )
         result = await data.execute(query)
@@ -164,7 +162,7 @@ async def key_user_session_add(
         raise RuntimeError("Invalid key fingerprint")
     fingerprint = fingerprint.lower()
     uids = key.get("uids", [])
-    key_record: models.PublicSigningKey | None = None
+    key_record: sql.PublicSigningKey | None = None
 
     latest_self_signature = _key_latest_self_signature(key)
     created = datetime.datetime.fromtimestamp(int(key["date"]), tz=datetime.UTC)
@@ -201,7 +199,7 @@ async def key_user_session_add(
             # Key doesn't exist, create it
             logging.info(f"Adding new key {fingerprint.upper()}")
 
-            key_record = models.PublicSigningKey(
+            key_record = sql.PublicSigningKey(
                 fingerprint=fingerprint,
                 algorithm=int(key["algo"]),
                 length=int(key.get("length", "0")),
@@ -224,16 +222,16 @@ async def key_user_session_add(
             if committee and committee.name:
                 # Check whether the link already exists
                 link_exists = await data.execute(
-                    sqlmodel.select(models.KeyLink).where(
-                        models.KeyLink.committee_name == committee.name,
-                        models.KeyLink.key_fingerprint == key_record.fingerprint,
+                    sqlmodel.select(sql.KeyLink).where(
+                        sql.KeyLink.committee_name == committee.name,
+                        sql.KeyLink.key_fingerprint == key_record.fingerprint,
                     )
                 )
                 if link_exists.scalar_one_or_none() is None:
                     committee_statuses[committee_name] = "newly_linked"
                     # Link doesn't exist, create it
                     logging.debug(f"Linking key {fingerprint.upper()} to committee {committee_name}")
-                    link = models.KeyLink(committee_name=committee.name, key_fingerprint=key_record.fingerprint)
+                    link = sql.KeyLink(committee_name=committee.name, key_fingerprint=key_record.fingerprint)
                     data.add(link)
                 else:
                     committee_statuses[committee_name] = "already_linked"
@@ -259,14 +257,14 @@ async def key_user_session_add(
     }
 
 
-async def latest_revision(release: models.Release) -> models.Revision | None:
+async def latest_revision(release: sql.Release) -> sql.Revision | None:
     if release.latest_revision_number is None:
         return None
     async with db.session() as data:
         return await data.revision(release_name=release.name, number=release.latest_revision_number).get()
 
 
-async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathInfo | None:
+async def path_info(release: sql.Release, paths: list[pathlib.Path]) -> PathInfo | None:
     info = PathInfo()
     latest_revision_number = release.latest_revision_number
     if latest_revision_number is None:
@@ -285,7 +283,7 @@ async def path_info(release: models.Release, paths: list[pathlib.Path]) -> PathI
 
 
 async def release_delete(
-    release_name: str, phase: db.Opt[models.ReleasePhase] = db.NOT_SET, include_downloads: bool = True
+    release_name: str, phase: db.Opt[sql.ReleasePhase] = db.NOT_SET, include_downloads: bool = True
 ) -> None:
     """Handle the deletion of database records and filesystem data for a release."""
     async with db.session() as data:
@@ -320,13 +318,13 @@ async def tasks_ongoing(project_name: str, version_name: str, revision_number: s
     async with db.session() as data:
         query = (
             sqlmodel.select(sqlalchemy.func.count())
-            .select_from(models.Task)
+            .select_from(sql.Task)
             .where(
-                models.Task.project_name == project_name,
-                models.Task.version_name == version_name,
-                models.Task.revision_number == revision_number,
-                models.validate_instrumented_attribute(models.Task.status).in_(
-                    [models.TaskStatus.QUEUED, models.TaskStatus.ACTIVE]
+                sql.Task.project_name == project_name,
+                sql.Task.version_name == version_name,
+                sql.Task.revision_number == revision_number,
+                sql.validate_instrumented_attribute(sql.Task.status).in_(
+                    [sql.TaskStatus.QUEUED, sql.TaskStatus.ACTIVE]
                 ),
             )
         )
@@ -334,26 +332,26 @@ async def tasks_ongoing(project_name: str, version_name: str, revision_number: s
         return result.scalar_one()
 
 
-async def unfinished_releases(asfuid: str) -> dict[str, list[models.Release]]:
-    releases: dict[str, list[models.Release]] = {}
+async def unfinished_releases(asfuid: str) -> dict[str, list[sql.Release]]:
+    releases: dict[str, list[sql.Release]] = {}
     async with db.session() as data:
         user_projects = await user.projects(asfuid)
         user_projects.sort(key=lambda p: p.display_name)
 
         active_phases = [
-            models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
-            models.ReleasePhase.RELEASE_CANDIDATE,
-            models.ReleasePhase.RELEASE_PREVIEW,
+            sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+            sql.ReleasePhase.RELEASE_CANDIDATE,
+            sql.ReleasePhase.RELEASE_PREVIEW,
         ]
         for project in user_projects:
             stmt = (
-                sqlmodel.select(models.Release)
+                sqlmodel.select(sql.Release)
                 .where(
-                    models.Release.project_name == project.name,
-                    models.validate_instrumented_attribute(models.Release.phase).in_(active_phases),
+                    sql.Release.project_name == project.name,
+                    sql.validate_instrumented_attribute(sql.Release.phase).in_(active_phases),
                 )
-                .options(db.select_in_load(models.Release.project))
-                .order_by(models.validate_instrumented_attribute(models.Release.created).desc())
+                .options(db.select_in_load(sql.Release.project))
+                .order_by(sql.validate_instrumented_attribute(sql.Release.created).desc())
             )
             result = await data.execute(stmt)
             active_releases = list(result.scalars().all())
@@ -425,7 +423,7 @@ async def upload_keys_bytes(
     return results, success_count, error_count, submitted_committees
 
 
-async def _delete_release_data_downloads(release: models.Release) -> None:
+async def _delete_release_data_downloads(release: sql.Release) -> None:
     # Delete hard links from the downloads directory
     finished_dir = util.release_directory(release)
     if await aiofiles.os.path.isdir(finished_dir):
@@ -530,14 +528,14 @@ async def _key_user_add_validate_key_properties(public_key: str) -> list[dict]:
 
 
 async def _successes_errors_warnings(
-    data: db.Session, release: models.Release, latest_revision_number: str, info: PathInfo
+    data: db.Session, release: sql.Release, latest_revision_number: str, info: PathInfo
 ) -> None:
     # Get successes, warnings, and errors
     successes = await data.check_result(
         release_name=release.name,
         revision_number=latest_revision_number,
         member_rel_path=None,
-        status=models.CheckResultStatus.SUCCESS,
+        status=sql.CheckResultStatus.SUCCESS,
     ).all()
     for success in successes:
         if primary_rel_path := success.primary_rel_path:
@@ -547,7 +545,7 @@ async def _successes_errors_warnings(
         release_name=release.name,
         revision_number=latest_revision_number,
         member_rel_path=None,
-        status=models.CheckResultStatus.WARNING,
+        status=sql.CheckResultStatus.WARNING,
     ).all()
     for warning in warnings:
         if primary_rel_path := warning.primary_rel_path:
@@ -557,7 +555,7 @@ async def _successes_errors_warnings(
         release_name=release.name,
         revision_number=latest_revision_number,
         member_rel_path=None,
-        status=models.CheckResultStatus.FAILURE,
+        status=sql.CheckResultStatus.FAILURE,
     ).all()
     for error in errors:
         if primary_rel_path := error.primary_rel_path:
@@ -631,3 +629,55 @@ async def _upload_process_key_blocks(
     results_sorted = sorted(results, key=lambda x: (x.get("email", "").lower(), x.get("fingerprint", "")))
 
     return results_sorted
+
+
+async def releases_by_phase(project: sql.Project, phase: sql.ReleasePhase) -> list[sql.Release]:
+    """Get the releases for the project by phase."""
+
+    query = (
+        sqlmodel.select(sql.Release)
+        .where(
+            sql.Release.project_name == project.name,
+            sql.Release.phase == phase,
+        )
+        .order_by(sql.validate_instrumented_attribute(sql.Release.created).desc())
+    )
+
+    results = []
+    async with db.session() as data:
+        for result in (await data.execute(query)).all():
+            release = result[0]
+            results.append(release)
+
+    for release in results:
+        # Don't need to eager load and lose it when the session closes
+        release.project = project
+    return results
+
+
+async def candidate_drafts(project: sql.Project) -> list[sql.Release]:
+    """Get the candidate drafts for the project."""
+    return await releases_by_phase(project, sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT)
+
+
+async def candidates(project: sql.Project) -> list[sql.Release]:
+    """Get the candidate releases for the project."""
+    return await releases_by_phase(project, sql.ReleasePhase.RELEASE_CANDIDATE)
+
+
+async def previews(project: sql.Project) -> list[sql.Release]:
+    """Get the preview releases for the project."""
+    return await releases_by_phase(project, sql.ReleasePhase.RELEASE_PREVIEW)
+
+
+async def full_releases(project: sql.Project) -> list[sql.Release]:
+    """Get the full releases for the project."""
+    return await releases_by_phase(project, sql.ReleasePhase.RELEASE)
+
+
+async def releases_in_progress(project: sql.Project) -> list[sql.Release]:
+    """Get the releases in progress for the project."""
+    drafts = await candidate_drafts(project)
+    cands = await candidates(project)
+    prevs = await previews(project)
+    return drafts + cands + prevs

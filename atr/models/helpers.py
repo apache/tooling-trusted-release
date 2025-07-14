@@ -16,7 +16,7 @@
 # under the License.
 
 import dataclasses
-from collections.abc import Callable, Generator, ItemsView, Mapping
+from collections.abc import Generator, ItemsView, Mapping
 from typing import Annotated, Any, TypeVar
 
 import pydantic
@@ -58,39 +58,6 @@ class DictToList:
         )
 
 
-# For convenience
-Field = pydantic.Field
-
-
-class Strict(pydantic.BaseModel):
-    model_config = pydantic.ConfigDict(extra="forbid", strict=True, validate_assignment=True)
-
-
-def alias(alias_name: str) -> Any:
-    """Helper to create a Pydantic FieldInfo object with only an alias."""
-    return Field(alias=alias_name)
-
-
-def alias_opt(alias_name: str) -> Any:
-    """Helper to create a Pydantic FieldInfo object with only an alias."""
-    return Field(alias=alias_name, default=None)
-
-
-def default(default_value: Any) -> Any:
-    """Helper to create a Pydantic FieldInfo object with only a default value."""
-    return Field(default=default_value)
-
-
-def description(desc_text: str) -> Any:
-    """Helper to create a Pydantic FieldInfo object with only a description."""
-    return Field(description=desc_text)
-
-
-def factory(cls: Callable[[], Any]) -> Any:
-    """Helper to create a Pydantic FieldInfo object with only a description."""
-    return Field(default_factory=cls)
-
-
 def _get_dict_to_list_inner_type_adapter(source_type: Any, key: str) -> pydantic.TypeAdapter[dict[Any, Any]]:
     root_adapter = pydantic.TypeAdapter(source_type)
     schema = root_adapter.core_schema
@@ -112,7 +79,8 @@ def _get_dict_to_list_inner_type_adapter(source_type: Any, key: str) -> pydantic
     model_name = f"{cls.__name__}Inner"
 
     # Create proper field definitions for create_model
-    inner_model = pydantic.create_model(model_name, **{k: (v.annotation, v) for k, v in other_fields.items()})  # type: ignore
+    kargs = {k: (v.annotation, v) for k, v in other_fields.items()}
+    inner_model = pydantic.create_model(model_name, **kargs)  # type: ignore
     return pydantic.TypeAdapter(dict[Annotated[str, key_field], inner_model])  # type: ignore
 
 

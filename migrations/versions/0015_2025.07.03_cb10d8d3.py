@@ -10,7 +10,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-import atr.db.models
+import atr.models.sql as sql
 
 # Revision identifiers, used by Alembic
 revision: str = "0015_2025.07.03_cb10d8d3"
@@ -25,9 +25,9 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("asfuid", sa.String(), nullable=False),
         sa.Column("token_hash", sa.String(), nullable=False),
-        sa.Column("created", atr.db.models.UTCDateTime(timezone=True), nullable=True),
-        sa.Column("expires", atr.db.models.UTCDateTime(timezone=True), nullable=True),
-        sa.Column("last_used", atr.db.models.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("created", sql.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("expires", sql.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("last_used", sql.UTCDateTime(timezone=True), nullable=True),
         sa.Column("label", sa.String(), nullable=True),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_personalaccesstoken")),
         sa.UniqueConstraint("token_hash", name=op.f("uq_personalaccesstoken_token_hash")),

@@ -20,8 +20,8 @@ from typing import Any, Final
 
 import atr.db as db
 import atr.db.interaction as interaction
-import atr.db.models as models
-import atr.results as results
+import atr.models.results as results
+import atr.models.sql as sql
 import atr.tasks.checks.hashing as hashing
 import atr.tasks.checks.license as license
 import atr.tasks.checks.paths as paths
@@ -37,14 +37,14 @@ import atr.tasks.vote as vote
 import atr.util as util
 
 
-async def asc_checks(release: models.Release, revision: str, signature_path: str) -> list[models.Task]:
+async def asc_checks(release: sql.Release, revision: str, signature_path: str) -> list[sql.Task]:
     """Create signature check task for a .asc file."""
     tasks = []
 
     if release.committee:
         tasks.append(
             queued(
-                models.TaskType.SIGNATURE_CHECK,
+                sql.TaskType.SIGNATURE_CHECK,
                 release,
                 revision,
                 signature_path,
@@ -65,12 +65,12 @@ async def draft_checks(
     relative_paths = [path async for path in util.paths_recursive(revision_path)]
 
     async with interaction.ensure_session(caller_data) as data:
-        release = await data.release(name=models.release_name(project_name, release_version), _committee=True).demand(
+        release = await data.release(name=sql.release_name(project_name, release_version), _committee=True).demand(
             RuntimeError("Release not found")
         )
         for path in relative_paths:
             path_str = str(path)
-            task_function: Callable[[models.Release, str, str], Awaitable[list[models.Task]]] | None = None
+            task_function: Callable[[sql.Release, str, str], Awaitable[list[sql.Task]]] | None = None
             for suffix, func in TASK_FUNCTIONS.items():
                 if path.name.endswith(suffix):
                     task_function = func
@@ -85,7 +85,7 @@ async def draft_checks(
             if release.project.committee.is_podling:
                 is_podling = True
         path_check_task = queued(
-            models.TaskType.PATHS_CHECK, release, revision_number, extra_args={"is_podling": is_podling}
+            sql.TaskType.PATHS_CHECK, release, revision_number, extra_args={"is_podling": is_podling}
         )
         data.add(path_check_task)
         if caller_data is None:
@@ -100,9 +100,9 @@ async def keys_import_file(
     """Import a KEYS file from a draft release candidate revision."""
     async with interaction.ensure_session(caller_data) as data:
         data.add(
-            models.Task(
-                status=models.TaskStatus.QUEUED,
-                task_type=models.TaskType.KEYS_IMPORT_FILE,
+            sql.Task(
+                status=sql.TaskStatus.QUEUED,
+                task_type=sql.TaskType.KEYS_IMPORT_FILE,
                 task_args=keys.ImportFile(
                     release_name=release_name,
                     abs_keys_path=abs_keys_path,
@@ -115,14 +115,14 @@ async def keys_import_file(
 
 
 def queued(
-    task_type: models.TaskType,
-    release: models.Release,
+    task_type: sql.TaskType,
+    release: sql.Release,
     revision_number: str,
     primary_rel_path: str | None = None,
     extra_args: dict[str, Any] | None = None,
-) -> models.Task:
-    return models.Task(
-        status=models.TaskStatus.QUEUED,
+) -> sql.Task:
+    return sql.Task(
+        status=sql.TaskStatus.QUEUED,
         task_type=task_type,
         task_args=extra_args or {},
         project_name=release.project.name,
@@ -132,81 +132,81 @@ def queued(
     )
 
 
-def resolve(task_type: models.TaskType) -> Callable[..., Awaitable[results.Results | None]]:  # noqa: C901
+def resolve(task_type: sql.TaskType) -> Callable[..., Awaitable[results.Results | None]]:  # noqa: C901
     match task_type:
-        case models.TaskType.HASHING_CHECK:
+        case sql.TaskType.HASHING_CHECK:
             return hashing.check
-        case models.TaskType.KEYS_IMPORT_FILE:
+        case sql.TaskType.KEYS_IMPORT_FILE:
             return keys.import_file
-        case models.TaskType.LICENSE_FILES:
+        case sql.TaskType.LICENSE_FILES:
             return license.files
-        case models.TaskType.LICENSE_HEADERS:
+        case sql.TaskType.LICENSE_HEADERS:
             return license.headers
-        case models.TaskType.MESSAGE_SEND:
+        case sql.TaskType.MESSAGE_SEND:
             return message.send
-        case models.TaskType.PATHS_CHECK:
+        case sql.TaskType.PATHS_CHECK:
             return paths.check
-        case models.TaskType.RAT_CHECK:
+        case sql.TaskType.RAT_CHECK:
             return rat.check
-        case models.TaskType.SBOM_GENERATE_CYCLONEDX:
+        case sql.TaskType.SBOM_GENERATE_CYCLONEDX:
             return sbom.generate_cyclonedx
-        case models.TaskType.SIGNATURE_CHECK:
+        case sql.TaskType.SIGNATURE_CHECK:
             return signature.check
-        case models.TaskType.SVN_IMPORT_FILES:
+        case sql.TaskType.SVN_IMPORT_FILES:
             return svn.import_files
-        case models.TaskType.TARGZ_INTEGRITY:
+        case sql.TaskType.TARGZ_INTEGRITY:
             return targz.integrity
-        case models.TaskType.TARGZ_STRUCTURE:
+        case sql.TaskType.TARGZ_STRUCTURE:
             return targz.structure
-        case models.TaskType.VOTE_INITIATE:
+        case sql.TaskType.VOTE_INITIATE:
             return vote.initiate
-        case models.TaskType.ZIPFORMAT_INTEGRITY:
+        case sql.TaskType.ZIPFORMAT_INTEGRITY:
             return zipformat.integrity
-        case models.TaskType.ZIPFORMAT_STRUCTURE:
+        case sql.TaskType.ZIPFORMAT_STRUCTURE:
             return zipformat.structure
         # NOTE: Do NOT add "case _" here
         # Otherwise we lose exhaustiveness checking
 
 
-async def sha_checks(release: models.Release, revision: str, hash_file: str) -> list[models.Task]:
+async def sha_checks(release: sql.Release, revision: str, hash_file: str) -> list[sql.Task]:
     """Create hash check task for a .sha256 or .sha512 file."""
     tasks = []
 
-    tasks.append(queued(models.TaskType.HASHING_CHECK, release, revision, hash_file))
+    tasks.append(queued(sql.TaskType.HASHING_CHECK, release, revision, hash_file))
 
     return tasks
 
 
-async def tar_gz_checks(release: models.Release, revision: str, path: str) -> list[models.Task]:
+async def tar_gz_checks(release: sql.Release, revision: str, path: str) -> list[sql.Task]:
     """Create check tasks for a .tar.gz or .tgz file."""
     # This release has committee, as guaranteed in draft_checks
     is_podling = (release.project.committee is not None) and release.project.committee.is_podling
     tasks = [
-        queued(models.TaskType.LICENSE_FILES, release, revision, path, extra_args={"is_podling": is_podling}),
-        queued(models.TaskType.LICENSE_HEADERS, release, revision, path),
-        queued(models.TaskType.RAT_CHECK, release, revision, path),
-        queued(models.TaskType.TARGZ_INTEGRITY, release, revision, path),
-        queued(models.TaskType.TARGZ_STRUCTURE, release, revision, path),
+        queued(sql.TaskType.LICENSE_FILES, release, revision, path, extra_args={"is_podling": is_podling}),
+        queued(sql.TaskType.LICENSE_HEADERS, release, revision, path),
+        queued(sql.TaskType.RAT_CHECK, release, revision, path),
+        queued(sql.TaskType.TARGZ_INTEGRITY, release, revision, path),
+        queued(sql.TaskType.TARGZ_STRUCTURE, release, revision, path),
     ]
 
     return tasks
 
 
-async def zip_checks(release: models.Release, revision: str, path: str) -> list[models.Task]:
+async def zip_checks(release: sql.Release, revision: str, path: str) -> list[sql.Task]:
     """Create check tasks for a .zip file."""
     # This release has committee, as guaranteed in draft_checks
     is_podling = (release.project.committee is not None) and release.project.committee.is_podling
     tasks = [
-        queued(models.TaskType.LICENSE_FILES, release, revision, path, extra_args={"is_podling": is_podling}),
-        queued(models.TaskType.LICENSE_HEADERS, release, revision, path),
-        queued(models.TaskType.RAT_CHECK, release, revision, path),
-        queued(models.TaskType.ZIPFORMAT_INTEGRITY, release, revision, path),
-        queued(models.TaskType.ZIPFORMAT_STRUCTURE, release, revision, path),
+        queued(sql.TaskType.LICENSE_FILES, release, revision, path, extra_args={"is_podling": is_podling}),
+        queued(sql.TaskType.LICENSE_HEADERS, release, revision, path),
+        queued(sql.TaskType.RAT_CHECK, release, revision, path),
+        queued(sql.TaskType.ZIPFORMAT_INTEGRITY, release, revision, path),
+        queued(sql.TaskType.ZIPFORMAT_STRUCTURE, release, revision, path),
     ]
     return tasks
 
 
-TASK_FUNCTIONS: Final[dict[str, Callable[..., Coroutine[Any, Any, list[models.Task]]]]] = {
+TASK_FUNCTIONS: Final[dict[str, Callable[..., Coroutine[Any, Any, list[sql.Task]]]]] = {
     ".asc": asc_checks,
     ".sha256": sha_checks,
     ".sha512": sha_checks,

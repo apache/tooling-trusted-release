@@ -28,10 +28,10 @@ import sqlmodel
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    import atr.schema as schema
+    import atr.models.schema as schema
 
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.util as util
 
 
@@ -68,7 +68,7 @@ class Recorder:
         afresh: bool = True,
     ) -> None:
         self.checker = function_key(checker) if callable(checker) else checker
-        self.release_name = models.release_name(project_name, version_name)
+        self.release_name = sql.release_name(project_name, version_name)
         self.revision_number = revision_number
         self.primary_rel_path = primary_rel_path
         self.member_rel_path = member_rel_path
@@ -98,12 +98,12 @@ class Recorder:
 
     async def _add(
         self,
-        status: models.CheckResultStatus,
+        status: sql.CheckResultStatus,
         message: str,
         data: Any,
         primary_rel_path: str | None = None,
         member_rel_path: str | None = None,
-    ) -> models.CheckResult:
+    ) -> sql.CheckResult:
         if self.constructed is False:
             raise RuntimeError("Cannot add check result to a recorder that has not been constructed")
         if primary_rel_path is not None:
@@ -113,7 +113,7 @@ class Recorder:
             #     # Clear inner path only if it's specified
             #     await self.clear(primary_rel_path=primary_rel_path, member_rel_path=member_rel_path)
 
-        result = models.CheckResult(
+        result = sql.CheckResult(
             release_name=self.release_name,
             revision_number=self.revision_number,
             checker=self.checker,
@@ -149,7 +149,7 @@ class Recorder:
     def abs_path_base(self) -> pathlib.Path:
         return pathlib.Path(util.get_unfinished_dir(), self.project_name, self.version_name, self.revision_number)
 
-    async def project(self) -> models.Project:
+    async def project(self) -> sql.Project:
         # TODO: Cache project
         async with db.session() as data:
             return await data.project(name=self.project_name, _release_policy=True).demand(
@@ -182,21 +182,21 @@ class Recorder:
 
     async def clear(self, primary_rel_path: str | None = None, member_rel_path: str | None = None) -> None:
         async with db.session() as data:
-            stmt = sqlmodel.delete(models.CheckResult).where(
-                models.validate_instrumented_attribute(models.CheckResult.release_name) == self.release_name,
-                models.validate_instrumented_attribute(models.CheckResult.revision_number) == self.revision_number,
-                models.validate_instrumented_attribute(models.CheckResult.checker) == self.checker,
-                models.validate_instrumented_attribute(models.CheckResult.primary_rel_path) == primary_rel_path,
-                models.validate_instrumented_attribute(models.CheckResult.member_rel_path) == member_rel_path,
+            stmt = sqlmodel.delete(sql.CheckResult).where(
+                sql.validate_instrumented_attribute(sql.CheckResult.release_name) == self.release_name,
+                sql.validate_instrumented_attribute(sql.CheckResult.revision_number) == self.revision_number,
+                sql.validate_instrumented_attribute(sql.CheckResult.checker) == self.checker,
+                sql.validate_instrumented_attribute(sql.CheckResult.primary_rel_path) == primary_rel_path,
+                sql.validate_instrumented_attribute(sql.CheckResult.member_rel_path) == member_rel_path,
             )
             await data.execute(stmt)
             await data.commit()
 
     async def exception(
         self, message: str, data: Any, primary_rel_path: str | None = None, member_rel_path: str | None = None
-    ) -> models.CheckResult:
+    ) -> sql.CheckResult:
         return await self._add(
-            models.CheckResultStatus.EXCEPTION,
+            sql.CheckResultStatus.EXCEPTION,
             message,
             data,
             primary_rel_path=primary_rel_path,
@@ -205,9 +205,9 @@ class Recorder:
 
     async def failure(
         self, message: str, data: Any, primary_rel_path: str | None = None, member_rel_path: str | None = None
-    ) -> models.CheckResult:
+    ) -> sql.CheckResult:
         return await self._add(
-            models.CheckResultStatus.FAILURE,
+            sql.CheckResultStatus.FAILURE,
             message,
             data,
             primary_rel_path=primary_rel_path,
@@ -216,9 +216,9 @@ class Recorder:
 
     async def success(
         self, message: str, data: Any, primary_rel_path: str | None = None, member_rel_path: str | None = None
-    ) -> models.CheckResult:
+    ) -> sql.CheckResult:
         return await self._add(
-            models.CheckResultStatus.SUCCESS,
+            sql.CheckResultStatus.SUCCESS,
             message,
             data,
             primary_rel_path=primary_rel_path,
@@ -227,9 +227,9 @@ class Recorder:
 
     async def warning(
         self, message: str, data: Any, primary_rel_path: str | None = None, member_rel_path: str | None = None
-    ) -> models.CheckResult:
+    ) -> sql.CheckResult:
         return await self._add(
-            models.CheckResultStatus.WARNING,
+            sql.CheckResultStatus.WARNING,
             message,
             data,
             primary_rel_path=primary_rel_path,

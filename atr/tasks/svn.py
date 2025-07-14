@@ -23,9 +23,9 @@ from typing import Any, Final
 import aiofiles.os
 import aioshutil
 
-import atr.results as results
+import atr.models.results as results
+import atr.models.schema as schema
 import atr.revision as revision
-import atr.schema as schema
 import atr.tasks.checks as checks
 
 _LOGGER: Final = logging.getLogger(__name__)

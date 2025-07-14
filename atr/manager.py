@@ -31,7 +31,7 @@ from typing import Final
 import sqlmodel
 
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 
 _LOGGER: Final = logging.getLogger(__name__)
 
@@ -238,16 +238,14 @@ class WorkerManager:
         # Reset any tasks that were being processed by now inactive workers
         await self.reset_broken_tasks()
 
-    async def terminate_long_running_task(
-        self, task: models.Task, worker: WorkerProcess, task_id: int, pid: int
-    ) -> None:
+    async def terminate_long_running_task(self, task: sql.Task, worker: WorkerProcess, task_id: int, pid: int) -> None:
         """
         Terminate a task that has been running for too long.
         Updates the task status and terminates the worker process.
         """
         try:
             # Mark the task as failed
-            task.status = models.TaskStatus.FAILED
+            task.status = sql.TaskStatus.FAILED
             task.completed = datetime.datetime.now(datetime.UTC)
             task.error = f"Task terminated after exceeding time limit of {self.max_task_seconds} seconds"
 
@@ -266,7 +264,7 @@ class WorkerManager:
         """
         try:
             async with data.begin():
-                task = await data.task(pid=pid, status=models.TaskStatus.ACTIVE).get()
+                task = await data.task(pid=pid, status=sql.TaskStatus.ACTIVE).get()
                 if not task or not task.started:
                     return False
 
@@ -292,11 +290,11 @@ class WorkerManager:
 
     async def _log_tasks_held_by_unmanaged_pids(self, data: db.Session, active_worker_pids: list[int]) -> None:
         """Log tasks that are active and held by PIDs not managed by this worker manager."""
-        foreign_tasks_stmt = sqlmodel.select(models.Task.pid, models.Task.id).where(
+        foreign_tasks_stmt = sqlmodel.select(sql.Task.pid, sql.Task.id).where(
             sqlmodel.and_(
-                models.validate_instrumented_attribute(models.Task.pid).notin_(active_worker_pids),
-                models.Task.status == models.TaskStatus.ACTIVE,
-                models.validate_instrumented_attribute(models.Task.pid).isnot(None),
+                sql.validate_instrumented_attribute(sql.Task.pid).notin_(active_worker_pids),
+                sql.Task.status == sql.TaskStatus.ACTIVE,
+                sql.validate_instrumented_attribute(sql.Task.pid).isnot(None),
             )
         )
         foreign_tasks_result = await data.execute(foreign_tasks_stmt)
@@ -329,14 +327,14 @@ class WorkerManager:
                         ...
 
                     update_stmt = (
-                        sqlmodel.update(models.Task)
+                        sqlmodel.update(sql.Task)
                         .where(
                             sqlmodel.and_(
-                                models.validate_instrumented_attribute(models.Task.pid).notin_(active_worker_pids),
-                                models.Task.status == models.TaskStatus.ACTIVE,
+                                sql.validate_instrumented_attribute(sql.Task.pid).notin_(active_worker_pids),
+                                sql.Task.status == sql.TaskStatus.ACTIVE,
                             )
                         )
-                        .values(status=models.TaskStatus.QUEUED, started=None, pid=None)
+                        .values(status=sql.TaskStatus.QUEUED, started=None, pid=None)
                     )
 
                     result = await data.execute(update_stmt)

@@ -25,8 +25,8 @@ import aiofiles
 
 import atr.archives as archives
 import atr.config as config
-import atr.results as results
-import atr.schema as schema
+import atr.models.results as results
+import atr.models.schema as schema
 import atr.tasks.checks as checks
 import atr.tasks.checks.targz as targz
 import atr.util as util

@@ -10,7 +10,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-import atr.db.models
+import atr.models.sql as sql
 
 # Revision identifiers, used by Alembic
 revision: str = "0009_2025.06.12_d6037201"
@@ -21,7 +21,7 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     with op.batch_alter_table("publicsigningkey", schema=None) as batch_op:
-        batch_op.add_column(sa.Column("latest_self_signature", atr.db.models.UTCDateTime(timezone=True), nullable=True))
+        batch_op.add_column(sa.Column("latest_self_signature", sql.UTCDateTime(timezone=True), nullable=True))
 
 
 def downgrade() -> None:

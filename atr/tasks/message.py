@@ -19,8 +19,8 @@ import logging
 from typing import Final
 
 import atr.mail as mail
-import atr.results as results
-import atr.schema as schema
+import atr.models.results as results
+import atr.models.schema as schema
 import atr.tasks.checks as checks
 import atr.util as util
 

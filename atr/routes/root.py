@@ -23,7 +23,7 @@ import sqlmodel
 import werkzeug.wrappers.response as response
 
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.routes as routes
 import atr.template as template
 import atr.user as user
@@ -41,9 +41,9 @@ async def index() -> response.Response | str:
 
         phase_sequence = ["Compose", "Vote", "Finish"]
         phase_index_map = {
-            models.ReleasePhase.RELEASE_CANDIDATE_DRAFT: 0,
-            models.ReleasePhase.RELEASE_CANDIDATE: 1,
-            models.ReleasePhase.RELEASE_PREVIEW: 2,
+            sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT: 0,
+            sql.ReleasePhase.RELEASE_CANDIDATE: 1,
+            sql.ReleasePhase.RELEASE_PREVIEW: 2,
         }
 
         async with db.session() as data:
@@ -56,18 +56,18 @@ async def index() -> response.Response | str:
             active_phases = list(phase_index_map.keys())
             for project in user_projects:
                 stmt = (
-                    sqlmodel.select(models.Release)
+                    sqlmodel.select(sql.Release)
                     .where(
-                        models.Release.project_name == project.name,
-                        models.validate_instrumented_attribute(models.Release.phase).in_(active_phases),
+                        sql.Release.project_name == project.name,
+                        sql.validate_instrumented_attribute(sql.Release.phase).in_(active_phases),
                     )
-                    .options(orm.selectinload(models.validate_instrumented_attribute(models.Release.project)))
-                    .order_by(models.validate_instrumented_attribute(models.Release.created).desc())
+                    .options(orm.selectinload(sql.validate_instrumented_attribute(sql.Release.project)))
+                    .order_by(sql.validate_instrumented_attribute(sql.Release.created).desc())
                 )
                 result = await data.execute(stmt)
                 active_releases = result.scalars().all()
                 completed_releases = (
-                    len(await data.release(phase=models.ReleasePhase.RELEASE, project_name=project.name).all()) > 0
+                    len(await data.release(phase=sql.ReleasePhase.RELEASE, project_name=project.name).all()) > 0
                 )
 
                 if active_releases:
@@ -87,7 +87,7 @@ async def index() -> response.Response | str:
 
         def sort_key(item: dict) -> str:
             project = item["project"]
-            if not isinstance(project, models.Project):
+            if not isinstance(project, sql.Project):
                 return ""
             return project.display_name.lower()
 

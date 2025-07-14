@@ -22,7 +22,7 @@ from collections.abc import AsyncGenerator, Callable, Generator, Iterable, Seque
 from typing import NamedTuple, TypeVar
 
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.util as util
 
 
@@ -41,17 +41,17 @@ class AnnotatedDivergence(NamedTuple):
 Divergences = Generator[Divergence]
 AnnotatedDivergences = Generator[AnnotatedDivergence]
 AsyncAnnotatedDivergences = AsyncGenerator[AnnotatedDivergence]
-CommitteeDivergences = Callable[[models.Committee], Divergences]
-CommitteeAnnotatedDivergences = Callable[[models.Committee], AnnotatedDivergences]
-ProjectDivergences = Callable[[models.Project], Divergences]
-ProjectAnnotatedDivergences = Callable[[models.Project], AnnotatedDivergences]
-ReleaseDivergences = Callable[[models.Release], Divergences]
-ReleaseAnnotatedDivergences = Callable[[models.Release], AnnotatedDivergences]
+CommitteeDivergences = Callable[[sql.Committee], Divergences]
+CommitteeAnnotatedDivergences = Callable[[sql.Committee], AnnotatedDivergences]
+ProjectDivergences = Callable[[sql.Project], Divergences]
+ProjectAnnotatedDivergences = Callable[[sql.Project], AnnotatedDivergences]
+ReleaseDivergences = Callable[[sql.Release], Divergences]
+ReleaseAnnotatedDivergences = Callable[[sql.Release], AnnotatedDivergences]
 
 T = TypeVar("T")
 
 
-def committee(c: models.Committee) -> AnnotatedDivergences:
+def committee(c: sql.Committee) -> AnnotatedDivergences:
     """Check that a committee is valid."""
 
     yield from committee_child_committees(c)
@@ -64,7 +64,7 @@ def committee_components(
     """Wrap a Committee divergence generator to yield annotated divergences."""
 
     def wrap(original: CommitteeDivergences) -> CommitteeAnnotatedDivergences:
-        def replacement(c: models.Committee) -> AnnotatedDivergences:
+        def replacement(c: sql.Committee) -> AnnotatedDivergences:
             yield from divergences_with_annotations(
                 components,
                 original.__name__,
@@ -78,7 +78,7 @@ def committee_components(
 
 
 @committee_components("Committee.full_name")
-def committee_full_name(c: models.Committee) -> Divergences:
+def committee_full_name(c: sql.Committee) -> Divergences:
     """Validate the Committee.full_name value."""
 
     full_name = c.full_name
@@ -112,7 +112,7 @@ def committee_full_name(c: models.Committee) -> Divergences:
 
 
 @committee_components("Committee.child_committees")
-def committee_child_committees(c: models.Committee) -> Divergences:
+def committee_child_committees(c: sql.Committee) -> Divergences:
     """Check that a committee has no child_committees."""
 
     expected: list[object] = []
@@ -120,7 +120,7 @@ def committee_child_committees(c: models.Committee) -> Divergences:
     yield from divergences(expected, actual)
 
 
-def committees(cs: Iterable[models.Committee]) -> AnnotatedDivergences:
+def committees(cs: Iterable[sql.Committee]) -> AnnotatedDivergences:
     """Validate multiple committees."""
     for c in cs:
         yield from committee(c)
@@ -151,9 +151,9 @@ def divergences_with_annotations(
 
 async def everything(data: db.Session) -> AsyncAnnotatedDivergences:
     """Yield divergences for all projects and releases in the DB."""
-    committees_sorted = await data.committee(_child_committees=True).order_by(models.Committee.name).all()
-    projects_sorted = await data.project(_distribution_channels=True).order_by(models.Project.name).all()
-    releases_sorted = await data.release().order_by(models.Release.name).all()
+    committees_sorted = await data.committee(_child_committees=True).order_by(sql.Committee.name).all()
+    projects_sorted = await data.project(_distribution_channels=True).order_by(sql.Project.name).all()
+    releases_sorted = await data.release().order_by(sql.Release.name).all()
 
     for c in await asyncio.to_thread(committees, committees_sorted):
         yield c
@@ -165,7 +165,7 @@ async def everything(data: db.Session) -> AsyncAnnotatedDivergences:
         yield r
 
 
-def project(p: models.Project) -> AnnotatedDivergences:
+def project(p: sql.Project) -> AnnotatedDivergences:
     """Check that a project is valid."""
 
     yield from project_category(p)
@@ -183,7 +183,7 @@ def project_components(
     """Wrap a Project divergence generator to yield annotated divergences."""
 
     def wrap(original: ProjectDivergences) -> ProjectAnnotatedDivergences:
-        def replacement(p: models.Project) -> AnnotatedDivergences:
+        def replacement(p: sql.Project) -> AnnotatedDivergences:
             yield from divergences_with_annotations(
                 components,
                 original.__name__,
@@ -197,7 +197,7 @@ def project_components(
 
 
 @project_components("Project.category")
-def project_category(p: models.Project) -> Divergences:
+def project_category(p: sql.Project) -> Divergences:
     """Check that the category string uses 'label, label' syntax without colons."""
 
     def okay(cat: str | None) -> bool:
@@ -213,7 +213,7 @@ def project_category(p: models.Project) -> Divergences:
 
 
 @project_components("Project.committee_name")
-def project_committee(p: models.Project) -> Divergences:
+def project_committee(p: sql.Project) -> Divergences:
     """Check that the project is linked to a committee."""
 
     def okay(cn: str | None) -> bool:
@@ -224,7 +224,7 @@ def project_committee(p: models.Project) -> Divergences:
 
 
 @project_components("Project.created")
-def project_created(p: models.Project) -> Divergences:
+def project_created(p: sql.Project) -> Divergences:
     """Check that the project created timestamp is in the past."""
     now = datetime.datetime.now(datetime.UTC)
 
@@ -236,7 +236,7 @@ def project_created(p: models.Project) -> Divergences:
 
 
 @project_components("Project.distribution_channels")
-def project_distribution_channels(p: models.Project) -> Divergences:
+def project_distribution_channels(p: sql.Project) -> Divergences:
     """Check that distribution_channels is empty."""
     expected: list[object] = []
     actual = p.distribution_channels
@@ -244,7 +244,7 @@ def project_distribution_channels(p: models.Project) -> Divergences:
 
 
 @project_components("Project.full_name")
-def project_full_name(p: models.Project) -> Divergences:
+def project_full_name(p: sql.Project) -> Divergences:
     """Check that the project full_name is present and starts with 'Apache '."""
 
     def okay(fn: str | None) -> bool:
@@ -255,7 +255,7 @@ def project_full_name(p: models.Project) -> Divergences:
 
 
 @project_components("Project.programming_languages")
-def project_programming_languages(p: models.Project) -> Divergences:
+def project_programming_languages(p: sql.Project) -> Divergences:
     """Check that programming_languages uses 'label, label' syntax without colons."""
 
     def okay(pl: str | None) -> bool:
@@ -271,7 +271,7 @@ def project_programming_languages(p: models.Project) -> Divergences:
 
 
 @project_components("Project.release_policy")
-def project_release_policy(p: models.Project) -> Divergences:
+def project_release_policy(p: sql.Project) -> Divergences:
     """Ensure that release_policy is None."""
 
     expected = None
@@ -279,13 +279,13 @@ def project_release_policy(p: models.Project) -> Divergences:
     yield from divergences(expected, actual)
 
 
-def projects(ps: Iterable[models.Project]) -> AnnotatedDivergences:
+def projects(ps: Iterable[sql.Project]) -> AnnotatedDivergences:
     """Validate multiple projects."""
     for p in ps:
         yield from project(p)
 
 
-def release(r: models.Release) -> AnnotatedDivergences:
+def release(r: sql.Release) -> AnnotatedDivergences:
     """Check that a release is valid."""
     yield from release_created(r)
     yield from release_name(r)
@@ -303,7 +303,7 @@ def release_components(
     """Wrap a function that yields divergences to yield annotated divergences."""
 
     def wrap(original: ReleaseDivergences) -> ReleaseAnnotatedDivergences:
-        def replacement(r: models.Release) -> AnnotatedDivergences:
+        def replacement(r: sql.Release) -> AnnotatedDivergences:
             yield from divergences_with_annotations(
                 components,
                 original.__name__,
@@ -317,7 +317,7 @@ def release_components(
 
 
 @release_components("Release.created")
-def release_created(r: models.Release) -> Divergences:
+def release_created(r: sql.Release) -> Divergences:
     """Check that the release created date is in the past."""
     now = datetime.datetime.now(datetime.UTC)
 
@@ -329,15 +329,15 @@ def release_created(r: models.Release) -> Divergences:
 
 
 @release_components("Release.name")
-def release_name(r: models.Release) -> Divergences:
+def release_name(r: sql.Release) -> Divergences:
     """Check that the release name is valid."""
-    expected = models.release_name(r.project_name, r.version)
+    expected = sql.release_name(r.project_name, r.version)
     actual = r.name
     yield from divergences(expected, actual)
 
 
 @release_components("Release")
-def release_on_disk(r: models.Release) -> Divergences:
+def release_on_disk(r: sql.Release) -> Divergences:
     """Check that the release is on disk."""
     path = util.release_directory(r)
 
@@ -350,7 +350,7 @@ def release_on_disk(r: models.Release) -> Divergences:
 
 
 @release_components("Release.package_managers")
-def release_package_managers(r: models.Release) -> Divergences:
+def release_package_managers(r: sql.Release) -> Divergences:
     """Check that the release package managers are empty."""
     expected = []
     actual = r.package_managers
@@ -358,7 +358,7 @@ def release_package_managers(r: models.Release) -> Divergences:
 
 
 @release_components("Release.released")
-def release_released(r: models.Release) -> Divergences:
+def release_released(r: sql.Release) -> Divergences:
     """Check that the release released date is in the past or None."""
     now = datetime.datetime.now(datetime.UTC)
 
@@ -372,7 +372,7 @@ def release_released(r: models.Release) -> Divergences:
 
 
 @release_components("Release.sboms")
-def release_sboms(r: models.Release) -> Divergences:
+def release_sboms(r: sql.Release) -> Divergences:
     """Check that the release sboms are empty."""
     expected = []
     actual = r.sboms
@@ -380,7 +380,7 @@ def release_sboms(r: models.Release) -> Divergences:
 
 
 @release_components("Release.vote_started", "Release.vote_resolved")
-def release_vote_logic(r: models.Release) -> Divergences:
+def release_vote_logic(r: sql.Release) -> Divergences:
     """Check that the release vote logic is valid."""
 
     def okay(sr: tuple[datetime.datetime | None, datetime.datetime | None]) -> bool:
@@ -397,14 +397,14 @@ def release_vote_logic(r: models.Release) -> Divergences:
 
 
 @release_components("Release.votes")
-def release_votes(r: models.Release) -> Divergences:
+def release_votes(r: sql.Release) -> Divergences:
     """Check that the release votes are empty."""
     expected = []
     actual = r.votes
     yield from divergences(expected, actual)
 
 
-def releases(rs: Iterable[models.Release]) -> AnnotatedDivergences:
+def releases(rs: Iterable[sql.Release]) -> AnnotatedDivergences:
     """Check that the releases are valid."""
     for r in rs:
         yield from release(r)

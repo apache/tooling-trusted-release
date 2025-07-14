@@ -28,7 +28,7 @@ import wtforms
 
 import atr.construct as construct
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.root as root
 import atr.template as template
@@ -111,7 +111,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
     # Check that the user has access to the project
     async with db.session() as data:
-        project = await data.project(name=project_name, status=models.ProjectStatus.ACTIVE).get()
+        project = await data.project(name=project_name, status=sql.ProjectStatus.ACTIVE).get()
         if not project or not any(
             (
                 (c.name == project.committee_name)
@@ -143,7 +143,7 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     """View all the files in the rsync upload directory for a release."""
     await session.check_access(project_name)
 
-    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
+    release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_PREVIEW)
 
     # Convert async generator to list
     # There must be a revision on a preview
@@ -176,7 +176,7 @@ async def view_path(
     """View the content of a specific file in the release preview."""
     await session.check_access(project_name)
 
-    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
+    release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_PREVIEW)
     _max_view_size = 1 * 1024 * 1024
     full_path = util.release_directory(release) / file_path
     content_listing = await util.archive_listing(full_path)
@@ -203,7 +203,7 @@ async def _delete_preview(data: db.Session, release_name: str) -> None:
     release = await data.release(name=release_name, _project=True).get()
     if not release:
         raise routes.FlashError("Preview not found")
-    if release.phase != models.ReleasePhase.RELEASE_PREVIEW:
+    if release.phase != sql.ReleasePhase.RELEASE_PREVIEW:
         raise routes.FlashError("Release is not in the preview phase")
 
     # Delete the release record

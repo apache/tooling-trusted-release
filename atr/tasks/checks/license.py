@@ -24,9 +24,9 @@ import re
 from collections.abc import Iterator
 from typing import Any, Final
 
-import atr.db.models as models
-import atr.results as results
-import atr.schema as schema
+import atr.models.results as results
+import atr.models.schema as schema
+import atr.models.sql as sql
 import atr.static as static
 import atr.tarzip as tarzip
 import atr.tasks.checks as checks
@@ -91,7 +91,7 @@ class ArtifactData(schema.Strict):
 
 
 class ArtifactResult(schema.Strict):
-    status: models.CheckResultStatus
+    status: sql.CheckResultStatus
     message: str
     data: Any = schema.Field(default=None)
 
@@ -106,7 +106,7 @@ class ArtifactResult(schema.Strict):
 
 
 class MemberResult(schema.Strict):
-    status: models.CheckResultStatus
+    status: sql.CheckResultStatus
     path: str
     message: str
     data: Any = schema.Field(default=None)
@@ -232,7 +232,7 @@ def _files_check_core_logic(artifact_path: str, is_podling: bool) -> Iterator[Re
     yield from __notice_results(notice_results)
     if is_podling and (not disclaimer_found):
         yield ArtifactResult(
-            status=models.CheckResultStatus.FAILURE,
+            status=sql.CheckResultStatus.FAILURE,
             message="No DISCLAIMER or DISCLAIMER-WIP file found",
             data=None,
         )
@@ -299,7 +299,7 @@ def __license_results(
     license_files_size = len(license_results)
     if license_files_size == 0:
         yield ArtifactResult(
-            status=models.CheckResultStatus.FAILURE,
+            status=sql.CheckResultStatus.FAILURE,
             message="No LICENSE file found",
             data=None,
         )
@@ -307,7 +307,7 @@ def __license_results(
 
     if license_files_size > 1:
         yield ArtifactResult(
-            status=models.CheckResultStatus.FAILURE,
+            status=sql.CheckResultStatus.FAILURE,
             message="Multiple LICENSE files found",
             data=None,
         )
@@ -317,13 +317,13 @@ def __license_results(
         # Unpack the single result by iterating
         if license_diff is None:
             yield ArtifactResult(
-                status=models.CheckResultStatus.SUCCESS,
+                status=sql.CheckResultStatus.SUCCESS,
                 message=f"{filename} is valid",
                 data=None,
             )
         else:
             yield ArtifactResult(
-                status=models.CheckResultStatus.FAILURE,
+                status=sql.CheckResultStatus.FAILURE,
                 message=f"{filename} is invalid",
                 data={"diff": license_diff},
             )
@@ -336,7 +336,7 @@ def __notice_results(
     notice_files_size = len(notice_results)
     if notice_files_size == 0:
         yield ArtifactResult(
-            status=models.CheckResultStatus.FAILURE,
+            status=sql.CheckResultStatus.FAILURE,
             message="No NOTICE file found",
             data=None,
         )
@@ -344,7 +344,7 @@ def __notice_results(
 
     if notice_files_size > 1:
         yield ArtifactResult(
-            status=models.CheckResultStatus.FAILURE,
+            status=sql.CheckResultStatus.FAILURE,
             message="Multiple NOTICE files found",
             data=None,
         )
@@ -354,13 +354,13 @@ def __notice_results(
         # Unpack the single result by iterating
         if notice_ok:
             yield ArtifactResult(
-                status=models.CheckResultStatus.SUCCESS,
+                status=sql.CheckResultStatus.SUCCESS,
                 message=f"{filename} is valid",
                 data=None,
             )
         else:
             yield ArtifactResult(
-                status=models.CheckResultStatus.FAILURE,
+                status=sql.CheckResultStatus.FAILURE,
                 message=f"{filename} is invalid",
                 data={"issues": notice_issues, "preamble": notice_preamble},
             )
@@ -405,20 +405,20 @@ def _headers_check_core_logic(artifact_path: str) -> Iterator[Result]:
                 case ArtifactResult() | MemberResult() as result:
                     artifact_data.files_checked += 1
                     match result.status:
-                        case models.CheckResultStatus.SUCCESS:
+                        case sql.CheckResultStatus.SUCCESS:
                             artifact_data.files_with_valid_headers += 1
-                        case models.CheckResultStatus.FAILURE:
+                        case sql.CheckResultStatus.FAILURE:
                             artifact_data.files_with_invalid_headers += 1
-                        case models.CheckResultStatus.WARNING:
+                        case sql.CheckResultStatus.WARNING:
                             artifact_data.files_with_invalid_headers += 1
-                        case models.CheckResultStatus.EXCEPTION:
+                        case sql.CheckResultStatus.EXCEPTION:
                             artifact_data.files_with_invalid_headers += 1
                     yield result
                 case MemberSkippedResult():
                     artifact_data.files_skipped += 1
 
     yield ArtifactResult(
-        status=models.CheckResultStatus.SUCCESS,
+        status=sql.CheckResultStatus.SUCCESS,
         message=f"Checked {artifact_data.files_checked} files,"
         f" found {artifact_data.files_with_valid_headers} with valid headers,"
         f" {artifact_data.files_with_invalid_headers} with invalid headers,"
@@ -450,7 +450,7 @@ def _headers_check_core_logic_process_file(
         f = archive.extractfile(member)
         if f is None:
             return MemberResult(
-                status=models.CheckResultStatus.EXCEPTION,
+                status=sql.CheckResultStatus.EXCEPTION,
                 path=member.name,
                 message="Could not read file",
                 data=None,
@@ -462,21 +462,21 @@ def _headers_check_core_logic_process_file(
         is_valid, error = headers_validate(content, member.name)
         if is_valid:
             return MemberResult(
-                status=models.CheckResultStatus.SUCCESS,
+                status=sql.CheckResultStatus.SUCCESS,
                 path=member.name,
                 message="Valid license header",
                 data=None,
             )
         else:
             return MemberResult(
-                status=models.CheckResultStatus.FAILURE,
+                status=sql.CheckResultStatus.FAILURE,
                 path=member.name,
                 message=f"Invalid license header: {error}",
                 data=None,
             )
     except Exception as e:
         return MemberResult(
-            status=models.CheckResultStatus.EXCEPTION,
+            status=sql.CheckResultStatus.EXCEPTION,
             path=member.name,
             message=f"Error processing file: {e!s}",
             data=None,
@@ -499,23 +499,23 @@ def _headers_check_core_logic_should_check(filepath: str) -> bool:
 
 async def _record_artifact(recorder: checks.Recorder, result: ArtifactResult) -> None:
     match result.status:
-        case models.CheckResultStatus.SUCCESS:
+        case sql.CheckResultStatus.SUCCESS:
             await recorder.success(result.message, result.data)
-        case models.CheckResultStatus.WARNING:
+        case sql.CheckResultStatus.WARNING:
             await recorder.warning(result.message, result.data)
-        case models.CheckResultStatus.FAILURE:
+        case sql.CheckResultStatus.FAILURE:
             await recorder.failure(result.message, result.data)
-        case models.CheckResultStatus.EXCEPTION:
+        case sql.CheckResultStatus.EXCEPTION:
             await recorder.exception(result.message, result.data)
 
 
 async def _record_member(recorder: checks.Recorder, result: MemberResult) -> None:
     match result.status:
-        case models.CheckResultStatus.SUCCESS:
+        case sql.CheckResultStatus.SUCCESS:
             await recorder.success(result.message, result.data, member_rel_path=result.path)
-        case models.CheckResultStatus.WARNING:
+        case sql.CheckResultStatus.WARNING:
             await recorder.warning(result.message, result.data, member_rel_path=result.path)
-        case models.CheckResultStatus.FAILURE:
+        case sql.CheckResultStatus.FAILURE:
             await recorder.failure(result.message, result.data, member_rel_path=result.path)
-        case models.CheckResultStatus.EXCEPTION:
+        case sql.CheckResultStatus.EXCEPTION:
             await recorder.exception(result.message, result.data, member_rel_path=result.path)

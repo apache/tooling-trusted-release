@@ -29,7 +29,7 @@ import aioshutil
 
 import atr.db as db
 import atr.db.interaction as interaction
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.tasks as tasks
 import atr.util as util
 
@@ -40,9 +40,9 @@ class FailedError(Exception):
 
 @dataclasses.dataclass
 class Creating:
-    old: models.Revision | None
+    old: sql.Revision | None
     interim_path: pathlib.Path
-    new: models.Revision | None
+    new: sql.Revision | None
     failed: FailedError | None = None
 
 
@@ -75,7 +75,7 @@ async def create_and_manage(
 ) -> AsyncGenerator[Creating]:
     """Manage the creation and symlinking of a mutable release revision."""
     # Get the release
-    release_name = models.release_name(project_name, version_name)
+    release_name = sql.release_name(project_name, version_name)
     async with db.session() as data:
         release = await data.release(name=release_name).demand(
             RuntimeError("Release does not exist for new revision creation")
@@ -118,7 +118,7 @@ async def create_and_manage(
             # That makes models.populate_revision_sequence_and_name safe against races
             # Because that event is called when data.add is called below
             # And we have a write lock at that point through the use of data.begin_immediate
-            new_revision = models.Revision(
+            new_revision = sql.Revision(
                 release_name=release_name,
                 release=release,
                 asfuid=asf_uid,
@@ -162,14 +162,14 @@ async def create_and_manage(
             # We could also run this outside the data Session
             # But then it would create its own new Session
             # It does, however, need a transaction to be created using data.begin()
-            if release.phase == models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+            if release.phase == sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
                 # Must use caller_data here because we acquired the write lock
                 await tasks.draft_checks(project_name, version_name, new_revision.number, caller_data=data)
 
 
 async def latest_info(project_name: str, version_name: str) -> tuple[str, str, datetime.datetime] | None:
     """Get the name, editor, and timestamp of the latest revision."""
-    release_name = models.release_name(project_name, version_name)
+    release_name = sql.release_name(project_name, version_name)
     async with db.session() as data:
         # TODO: No need to get release here
         # Just use maximum seq from revisions

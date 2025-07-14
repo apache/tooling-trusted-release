@@ -43,8 +43,8 @@ import atr.config as config
 import atr.datasources.apache as apache
 import atr.db as db
 import atr.db.interaction as interaction
-import atr.db.models as models
 import atr.ldap as ldap
+import atr.models.sql as sql
 import atr.routes.keys as keys
 import atr.routes.mapping as mapping
 import atr.template as template
@@ -106,7 +106,7 @@ class LdapLookupForm(util.QuartFormTyped):
 async def admin_all_releases() -> str:
     """Display a list of all releases across all phases."""
     async with db.session() as data:
-        releases = await data.release(_project=True, _committee=True).order_by(models.Release.name).all()
+        releases = await data.release(_project=True, _committee=True).order_by(sql.Release.name).all()
     return await template.render("all-releases.html", releases=releases, release_as_url=mapping.release_as_url)
 
 
@@ -275,7 +275,7 @@ async def admin_data(model: str = "Committee") -> str:
 async def admin_delete_committee_keys() -> str | response.Response:
     form = await DeleteCommitteeKeysForm.create_form()
     async with db.session() as data:
-        all_committees = await data.committee(_public_signing_keys=True).order_by(models.Committee.name).all()
+        all_committees = await data.committee(_public_signing_keys=True).order_by(sql.Committee.name).all()
         committees_with_keys = [c for c in all_committees if c.public_signing_keys]
     form.committee_name.choices = [(c.name, c.display_name) for c in committees_with_keys]
 
@@ -283,10 +283,10 @@ async def admin_delete_committee_keys() -> str | response.Response:
         committee_name = form.committee_name.data
         async with db.session() as data:
             committee_query = data.committee(name=committee_name)
-            via = models.validate_instrumented_attribute
+            via = sql.validate_instrumented_attribute
             committee_query.query = committee_query.query.options(
-                orm.selectinload(via(models.Committee.public_signing_keys)).selectinload(
-                    via(models.PublicSigningKey.committees)
+                orm.selectinload(via(sql.Committee.public_signing_keys)).selectinload(
+                    via(sql.PublicSigningKey.committees)
                 )
             )
             committee = await committee_query.get()
@@ -370,7 +370,7 @@ async def admin_delete_release() -> str | response.Response:
 
     # For GET request or failed form validation
     async with db.session() as data:
-        releases = await data.release(_project=True).order_by(models.Release.name).all()
+        releases = await data.release(_project=True).order_by(sql.Release.name).all()
     return await template.render("delete-release.html", form=form, releases=releases, stats=None)
 
 
@@ -748,9 +748,9 @@ async def _process_undiscovered(data: db.Session) -> tuple[int, int]:
     added_count = 0
     updated_count = 0
 
-    via = models.validate_instrumented_attribute
+    via = sql.validate_instrumented_attribute
     committees_without_projects = await db.Query(
-        data, sqlmodel.select(models.Committee).where(~via(models.Committee.projects).any())
+        data, sqlmodel.select(sql.Committee).where(~via(sql.Committee.projects).any())
     ).all()
     # For all committees that have no associated projects
     for committee in committees_without_projects:
@@ -761,24 +761,22 @@ async def _process_undiscovered(data: db.Session) -> tuple[int, int]:
         # But ideally the fix should be in the upstream data source
         automatically_fix = False
         if automatically_fix is True:
-            project = models.Project(name=committee.name, full_name=committee.full_name, committee=committee)
+            project = sql.Project(name=committee.name, full_name=committee.full_name, committee=committee)
             data.add(project)
             added_count += 1
 
     return added_count, updated_count
 
 
-def _project_status(
-    pmc: models.Committee, project_name: str, project_status: apache.ProjectStatus
-) -> models.ProjectStatus:
+def _project_status(pmc: sql.Committee, project_name: str, project_status: apache.ProjectStatus) -> sql.ProjectStatus:
     if pmc.name == "attic":
         # This must come first, because attic is also a standing committee
-        return models.ProjectStatus.RETIRED
+        return sql.ProjectStatus.RETIRED
     elif ("_dormant_" in project_name) or project_status.name.endswith("(Dormant)"):
-        return models.ProjectStatus.DORMANT
+        return sql.ProjectStatus.DORMANT
     elif util.committee_is_standing(pmc.name):
-        return models.ProjectStatus.STANDING
-    return models.ProjectStatus.ACTIVE
+        return sql.ProjectStatus.STANDING
+    return sql.ProjectStatus.ACTIVE
 
 
 async def _regenerate_keys_all() -> tuple[int, list[str]]:
@@ -860,7 +858,7 @@ async def _update_committees(
         # Get or create PMC
         committee = await data.committee(name=name).get()
         if not committee:
-            committee = models.Committee(name=name)
+            committee = sql.Committee(name=name)
             data.add(committee)
             added_count += 1
         else:
@@ -960,7 +958,7 @@ async def _update_podlings(
         # Get or create PPMC
         ppmc = await data.committee(name=podling_name).get()
         if not ppmc:
-            ppmc = models.Committee(name=podling_name, is_podling=True)
+            ppmc = sql.Committee(name=podling_name, is_podling=True)
             data.add(ppmc)
             added_count += 1
         else:
@@ -979,7 +977,7 @@ async def _update_podlings(
         podling = await data.project(name=podling_name).get()
         if not podling:
             # Create the associated podling project
-            podling = models.Project(name=podling_name, full_name=podling_data.name, committee=ppmc)
+            podling = sql.Project(name=podling_name, full_name=podling_data.name, committee=ppmc)
             data.add(podling)
             added_count += 1
         else:
@@ -1025,7 +1023,7 @@ async def _update_projects(data: db.Session, projects: apache.ProjectsData) -> t
         # Check whether the project is retired, whether temporarily or otherwise
         status = _project_status(pmc, project_name, project_status)
         if not project_model:
-            project_model = models.Project(name=project_name, committee=pmc, status=status)
+            project_model = sql.Project(name=project_name, committee=pmc, status=status)
             data.add(project_model)
             added_count += 1
         else:
@@ -1048,9 +1046,9 @@ async def _update_tooling(data: db.Session) -> tuple[int, int]:
     # We add a special entry for Tooling, pretending to be a PMC, for debugging and testing
     tooling_committee = await data.committee(name="tooling").get()
     if not tooling_committee:
-        tooling_committee = models.Committee(name="tooling", full_name="Tooling")
+        tooling_committee = sql.Committee(name="tooling", full_name="Tooling")
         data.add(tooling_committee)
-        tooling_project = models.Project(name="tooling", full_name="Apache Tooling", committee=tooling_committee)
+        tooling_project = sql.Project(name="tooling", full_name="Apache Tooling", committee=tooling_committee)
         data.add(tooling_project)
         added_count += 1
     else:

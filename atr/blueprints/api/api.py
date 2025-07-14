@@ -17,7 +17,6 @@
 
 
 import base64
-import dataclasses
 import datetime
 import hashlib
 import pathlib
@@ -35,13 +34,13 @@ import werkzeug.exceptions as exceptions
 import atr.blueprints.api as api
 import atr.db as db
 import atr.db.interaction as interaction
-import atr.db.models as models
 import atr.jwtoken as jwtoken
+import atr.models as models
+import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.start as start
 import atr.routes.voting as voting
-import atr.schema as schema
 import atr.tasks.vote as tasks_vote
 import atr.user as user
 import atr.util as util
@@ -51,70 +50,21 @@ import atr.util as util
 #        it would work though, see https://github.com/pgjones/quart-schema/issues/91
 #        For now, just explicitly dump the model.
 
-
-@dataclasses.dataclass
-class Pagination:
-    offset: int = 0
-    limit: int = 20
-
-
-@dataclasses.dataclass
-class Releases(Pagination):
-    phase: str | None = None
-
-
-@dataclasses.dataclass
-class Task(Pagination):
-    status: str | None = None
-
-
-class FileUploadRequest(schema.Strict):
-    project_name: str
-    version: str
-    rel_path: str
-    content: str
-
-
-class PATJWTRequest(schema.Strict):
-    asfuid: str
-    pat: str
-
-
-class ReleaseCreateRequest(schema.Strict):
-    project_name: str
-    version: str
-
-
-class VoteStartRequest(schema.Strict):
-    project_name: str
-    version: str
-    revision: str
-    email_to: str
-    vote_duration: int
-    subject: str
-    body: str
-
-
-class DraftDeleteRequest(schema.Strict):
-    project_name: str
-    version: str
-
-
 # We implicitly have /api/openapi.json
 
 
 @api.BLUEPRINT.route("/checks/<project>/<version>")
-@quart_schema.validate_response(list[models.CheckResult], 200)
+@quart_schema.validate_response(list[sql.CheckResult], 200)
 async def checks_project_version(project: str, version: str) -> tuple[list[Mapping], int]:
     """List all check results for a given release."""
     async with db.session() as data:
-        release_name = models.release_name(project, version)
+        release_name = sql.release_name(project, version)
         check_results = await data.check_result(release_name=release_name).all()
         return [cr.model_dump() for cr in check_results], 200
 
 
 @api.BLUEPRINT.route("/checks/<project>/<version>/<revision>")
-@quart_schema.validate_response(list[models.CheckResult], 200)
+@quart_schema.validate_response(list[sql.CheckResult], 200)
 async def checks_project_version_revision(project: str, version: str, revision: str) -> tuple[list[Mapping], int]:
     """List all check results for a specific revision of a release."""
     async with db.session() as data:
@@ -122,7 +72,7 @@ async def checks_project_version_revision(project: str, version: str, revision: 
         if project_result is None:
             raise exceptions.NotFound(f"Project '{project}' does not exist")
 
-        release_name = models.release_name(project, version)
+        release_name = sql.release_name(project, version)
         release_result = await data.release(name=release_name).get()
         if release_result is None:
             raise exceptions.NotFound(f"Release '{project}-{version}' does not exist")
@@ -136,7 +86,7 @@ async def checks_project_version_revision(project: str, version: str, revision: 
 
 
 @api.BLUEPRINT.route("/committees")
-@quart_schema.validate_response(list[models.Committee], 200)
+@quart_schema.validate_response(list[sql.Committee], 200)
 async def committees() -> tuple[list[Mapping], int]:
     """List all committees in the database."""
     async with db.session() as data:
@@ -145,7 +95,7 @@ async def committees() -> tuple[list[Mapping], int]:
 
 
 @api.BLUEPRINT.route("/committees/<name>")
-@quart_schema.validate_response(models.Committee, 200)
+@quart_schema.validate_response(sql.Committee, 200)
 async def committees_name(name: str) -> tuple[Mapping, int]:
     """Get a specific committee by name."""
     async with db.session() as data:
@@ -154,7 +104,7 @@ async def committees_name(name: str) -> tuple[Mapping, int]:
 
 
 @api.BLUEPRINT.route("/committees/<name>/keys")
-@quart_schema.validate_response(list[models.PublicSigningKey], 200)
+@quart_schema.validate_response(list[sql.PublicSigningKey], 200)
 async def committees_name_keys(name: str) -> tuple[list[Mapping], int]:
     """List all public signing keys associated with a specific committee."""
     async with db.session() as data:
@@ -163,7 +113,7 @@ async def committees_name_keys(name: str) -> tuple[list[Mapping], int]:
 
 
 @api.BLUEPRINT.route("/committees/<name>/projects")
-@quart_schema.validate_response(list[models.Project], 200)
+@quart_schema.validate_response(list[sql.Project], 200)
 async def committees_name_projects(name: str) -> tuple[list[Mapping], int]:
     """List all projects for a specific committee."""
     async with db.session() as data:
@@ -177,13 +127,13 @@ async def committees_name_projects(name: str) -> tuple[list[Mapping], int]:
 @quart_schema.validate_response(dict[str, str], 200)
 async def draft_delete_project_version() -> tuple[dict[str, str], int]:
     payload = await _payload_get()
-    req = DraftDeleteRequest.model_validate(payload)
+    req = models.api.DraftDeleteRequest.model_validate(payload)
     asf_uid = _jwt_asf_uid()
 
     async with db.session() as data:
-        release_name = models.release_name(req.project_name, req.version)
+        release_name = sql.release_name(req.project_name, req.version)
         release = await data.release(
-            name=release_name, phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT, _committee=True
+            name=release_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, _committee=True
         ).demand(exceptions.NotFound())
         if not (user.is_committee_member(release.project.committee, asf_uid) or user.is_admin(asf_uid)):
             raise exceptions.Forbidden("You do not have permission to delete this draft")
@@ -194,7 +144,7 @@ async def draft_delete_project_version() -> tuple[dict[str, str], int]:
         # We pass the phase again to guard against races
         # But the removal is not actually locked
         await interaction.release_delete(
-            release_name, phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
+            release_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
         )
         await data.commit()
     return {"deleted": release_name}, 200
@@ -207,7 +157,7 @@ async def list_project_version(
     project: str, version: str, revision: str | None = None
 ) -> tuple[dict[str, list[str]], int]:
     async with db.session() as data:
-        release_name = models.release_name(project, version)
+        release_name = sql.release_name(project, version)
         release = await data.release(name=release_name).demand(exceptions.NotFound())
         if revision is None:
             dir_path = util.release_directory(release)
@@ -228,7 +178,7 @@ async def pat_jwt_post() -> quart.Response:
     # Returns {"asfuid": "uid", "jwt": "jwt-token"}
 
     payload = await _payload_get()
-    pat_request = PATJWTRequest.model_validate(payload)
+    pat_request = models.api.PATJWTRequest.model_validate(payload)
     token_hash = hashlib.sha3_256(pat_request.pat.encode()).hexdigest()
     pat_rec = await _get_pat(pat_request.asfuid, token_hash)
 
@@ -241,28 +191,28 @@ async def pat_jwt_post() -> quart.Response:
 
 
 @api.BLUEPRINT.route("/keys")
-@quart_schema.validate_querystring(Pagination)
-async def public_keys(query_args: Pagination) -> quart.Response:
+@quart_schema.validate_querystring(models.api.Pagination)
+async def public_keys(query_args: models.api.Pagination) -> quart.Response:
     """List all public signing keys with pagination support."""
     _pagination_args_validate(query_args)
-    via = models.validate_instrumented_attribute
+    via = sql.validate_instrumented_attribute
     async with db.session() as data:
         statement = (
-            sqlmodel.select(models.PublicSigningKey)
+            sqlmodel.select(sql.PublicSigningKey)
             .limit(query_args.limit)
             .offset(query_args.offset)
-            .order_by(via(models.PublicSigningKey.fingerprint).asc())
+            .order_by(via(sql.PublicSigningKey.fingerprint).asc())
         )
         paged_keys = (await data.execute(statement)).scalars().all()
         count = (
-            await data.execute(sqlalchemy.select(sqlalchemy.func.count(via(models.PublicSigningKey.fingerprint))))
+            await data.execute(sqlalchemy.select(sqlalchemy.func.count(via(sql.PublicSigningKey.fingerprint))))
         ).scalar_one()
         result = {"data": [key.model_dump() for key in paged_keys], "count": count}
         return quart.jsonify(result)
 
 
 @api.BLUEPRINT.route("/keys/<fingerprint>")
-@quart_schema.validate_response(models.PublicSigningKey, 200)
+@quart_schema.validate_response(sql.PublicSigningKey, 200)
 async def public_keys_fingerprint(fingerprint: str) -> tuple[Mapping, int]:
     """Return a single public signing key by fingerprint."""
     async with db.session() as data:
@@ -271,7 +221,7 @@ async def public_keys_fingerprint(fingerprint: str) -> tuple[Mapping, int]:
 
 
 @api.BLUEPRINT.route("/projects")
-@quart_schema.validate_response(list[models.Committee], 200)
+@quart_schema.validate_response(list[sql.Committee], 200)
 async def projects() -> tuple[list[Mapping], int]:
     """List all projects in the database."""
     async with db.session() as data:
@@ -280,7 +230,7 @@ async def projects() -> tuple[list[Mapping], int]:
 
 
 @api.BLUEPRINT.route("/projects/<name>")
-@quart_schema.validate_response(models.Committee, 200)
+@quart_schema.validate_response(sql.Committee, 200)
 async def projects_name(name: str) -> tuple[Mapping, int]:
     async with db.session() as data:
         committee = await data.committee(name=name).demand(exceptions.NotFound())
@@ -288,7 +238,7 @@ async def projects_name(name: str) -> tuple[Mapping, int]:
 
 
 @api.BLUEPRINT.route("/projects/<name>/releases")
-@quart_schema.validate_response(list[models.Release], 200)
+@quart_schema.validate_response(list[sql.Release], 200)
 async def projects_name_releases(name: str) -> tuple[list[Mapping], int]:
     """List all releases for a specific project."""
     async with db.session() as data:
@@ -297,32 +247,32 @@ async def projects_name_releases(name: str) -> tuple[list[Mapping], int]:
 
 
 @api.BLUEPRINT.route("/releases")
-@quart_schema.validate_querystring(Releases)
-async def releases(query_args: Releases) -> quart.Response:
+@quart_schema.validate_querystring(models.api.Releases)
+async def releases(query_args: models.api.Releases) -> quart.Response:
     """Paged list of releases with optional filtering by phase."""
     _pagination_args_validate(query_args)
-    via = models.validate_instrumented_attribute
+    via = sql.validate_instrumented_attribute
     async with db.session() as data:
-        statement = sqlmodel.select(models.Release)
+        statement = sqlmodel.select(sql.Release)
 
         if query_args.phase:
             try:
-                phase_value = models.ReleasePhase(query_args.phase)
+                phase_value = sql.ReleasePhase(query_args.phase)
             except ValueError:
                 raise exceptions.BadRequest(f"Invalid phase: {query_args.phase}")
-            statement = statement.where(models.Release.phase == phase_value)
+            statement = statement.where(sql.Release.phase == phase_value)
 
         statement = (
-            statement.order_by(via(models.Release.created).desc()).limit(query_args.limit).offset(query_args.offset)
+            statement.order_by(via(sql.Release.created).desc()).limit(query_args.limit).offset(query_args.offset)
         )
 
         paged_releases = (await data.execute(statement)).scalars().all()
 
-        count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(models.Release.name)))
+        count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(sql.Release.name)))
         if query_args.phase:
-            phase_value = models.ReleasePhase(query_args.phase) if query_args.phase else None
+            phase_value = sql.ReleasePhase(query_args.phase) if query_args.phase else None
             if phase_value is not None:
-                count_stmt = count_stmt.where(via(models.Release.phase) == phase_value)
+                count_stmt = count_stmt.where(via(sql.Release.phase) == phase_value)
 
         count = (await data.execute(count_stmt)).scalar_one()
 
@@ -333,12 +283,12 @@ async def releases(query_args: Releases) -> quart.Response:
 @api.BLUEPRINT.route("/releases/create", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_response(models.Release, 201)
+@quart_schema.validate_response(sql.Release, 201)
 async def releases_create() -> tuple[Mapping, int]:
     """Create a new release draft for a project via POSTed JSON."""
 
     payload = await _payload_get()
-    request_data = ReleaseCreateRequest.model_validate(payload)
+    request_data = models.api.ReleaseCreateRequest.model_validate(payload)
     asf_uid = _jwt_asf_uid()
 
     try:
@@ -354,8 +304,8 @@ async def releases_create() -> tuple[Mapping, int]:
 
 
 @api.BLUEPRINT.route("/releases/<project>")
-@quart_schema.validate_querystring(Pagination)
-async def releases_project(project: str, query_args: Pagination) -> quart.Response:
+@quart_schema.validate_querystring(models.api.Pagination)
+async def releases_project(project: str, query_args: models.api.Pagination) -> quart.Response:
     """List all releases for a specific project with pagination."""
     _pagination_args_validate(query_args)
     async with db.session() as data:
@@ -363,19 +313,19 @@ async def releases_project(project: str, query_args: Pagination) -> quart.Respon
         if project_result is None:
             raise exceptions.NotFound(f"Project '{project}' does not exist")
 
-        via = models.validate_instrumented_attribute
+        via = sql.validate_instrumented_attribute
         statement = (
-            sqlmodel.select(models.Release)
-            .where(models.Release.project_name == project)
-            .order_by(via(models.Release.created).desc())
+            sqlmodel.select(sql.Release)
+            .where(sql.Release.project_name == project)
+            .order_by(via(sql.Release.created).desc())
             .limit(query_args.limit)
             .offset(query_args.offset)
         )
 
         paged_releases = (await data.execute(statement)).scalars().all()
 
-        count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(models.Release.name))).where(
-            via(models.Release.project_name) == project
+        count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(sql.Release.name))).where(
+            via(sql.Release.project_name) == project
         )
         count = (await data.execute(count_stmt)).scalar_one()
 
@@ -384,31 +334,31 @@ async def releases_project(project: str, query_args: Pagination) -> quart.Respon
 
 
 @api.BLUEPRINT.route("/releases/<project>/<version>")
-@quart_schema.validate_response(models.Release, 200)
+@quart_schema.validate_response(sql.Release, 200)
 async def releases_project_version(project: str, version: str) -> tuple[Mapping, int]:
     """Return a single release by project and version."""
     async with db.session() as data:
-        release_name = models.release_name(project, version)
+        release_name = sql.release_name(project, version)
         release = await data.release(name=release_name).demand(exceptions.NotFound())
         return release.model_dump(), 200
 
 
 # TODO: Rename this to revisions? I.e. /revisions/<project>/<version>
 @api.BLUEPRINT.route("/releases/<project>/<version>/revisions")
-@quart_schema.validate_response(list[models.Revision], 200)
+@quart_schema.validate_response(list[sql.Revision], 200)
 async def releases_project_version_revisions(project: str, version: str) -> tuple[list[Mapping], int]:
     """List all revisions for a given release."""
     async with db.session() as data:
-        release_name = models.release_name(project, version)
+        release_name = sql.release_name(project, version)
         revisions = await data.revision(release_name=release_name).all()
         return [rev.model_dump() for rev in revisions], 200
 
 
 @api.BLUEPRINT.route("/revisions/<project>/<version>")
-@quart_schema.validate_response(dict[str, list[models.Revision]], 200)
-async def revisions_project_version(project: str, version: str) -> tuple[dict[str, list[models.Revision]], int]:
+@quart_schema.validate_response(dict[str, list[sql.Revision]], 200)
+async def revisions_project_version(project: str, version: str) -> tuple[dict[str, list[sql.Revision]], int]:
     async with db.session() as data:
-        release_name = models.release_name(project, version)
+        release_name = sql.release_name(project, version)
         await data.release(name=release_name).demand(exceptions.NotFound())
         revisions = await data.revision(release_name=release_name).all()
     if not isinstance(revisions, list):
@@ -427,21 +377,21 @@ async def revisions_project_version(project: str, version: str) -> tuple[dict[st
 
 
 @api.BLUEPRINT.route("/ssh-keys")
-@quart_schema.validate_querystring(Pagination)
-async def ssh_keys(query_args: Pagination) -> quart.Response:
+@quart_schema.validate_querystring(models.api.Pagination)
+async def ssh_keys(query_args: models.api.Pagination) -> quart.Response:
     """Paged list of developer SSH public keys."""
     _pagination_args_validate(query_args)
-    via = models.validate_instrumented_attribute
+    via = sql.validate_instrumented_attribute
     async with db.session() as data:
         statement = (
-            sqlmodel.select(models.SSHKey)
+            sqlmodel.select(sql.SSHKey)
             .limit(query_args.limit)
             .offset(query_args.offset)
-            .order_by(via(models.SSHKey.fingerprint).asc())
+            .order_by(via(sql.SSHKey.fingerprint).asc())
         )
         paged_keys = (await data.execute(statement)).scalars().all()
 
-        count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(models.SSHKey.fingerprint)))
+        count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(sql.SSHKey.fingerprint)))
         count = (await data.execute(count_stmt)).scalar_one()
 
         result = {"data": [key.model_dump() for key in paged_keys], "count": count}
@@ -449,21 +399,21 @@ async def ssh_keys(query_args: Pagination) -> quart.Response:
 
 
 @api.BLUEPRINT.route("/tasks")
-@quart_schema.validate_querystring(Task)
-async def tasks(query_args: Task) -> quart.Response:
+@quart_schema.validate_querystring(models.api.Task)
+async def tasks(query_args: models.api.Task) -> quart.Response:
     _pagination_args_validate(query_args)
-    via = models.validate_instrumented_attribute
+    via = sql.validate_instrumented_attribute
     async with db.session() as data:
-        statement = sqlmodel.select(models.Task).limit(query_args.limit).offset(query_args.offset)
+        statement = sqlmodel.select(sql.Task).limit(query_args.limit).offset(query_args.offset)
         if query_args.status:
-            if query_args.status not in models.TaskStatus:
+            if query_args.status not in sql.TaskStatus:
                 raise exceptions.BadRequest(f"Invalid status: {query_args.status}")
-            statement = statement.where(models.Task.status == query_args.status)
-        statement = statement.order_by(via(models.Task.id).desc())
+            statement = statement.where(sql.Task.status == query_args.status)
+        statement = statement.order_by(via(sql.Task.id).desc())
         paged_tasks = (await data.execute(statement)).scalars().all()
-        count_statement = sqlalchemy.select(sqlalchemy.func.count(via(models.Task.id)))
+        count_statement = sqlalchemy.select(sqlalchemy.func.count(via(sql.Task.id)))
         if query_args.status:
-            count_statement = count_statement.where(via(models.Task.status) == query_args.status)
+            count_statement = count_statement.where(via(sql.Task.status) == query_args.status)
         count = (await data.execute(count_statement)).scalar_one()
         result = {"data": [paged_task.model_dump(exclude={"result"}) for paged_task in paged_tasks], "count": count}
         return quart.jsonify(result)
@@ -472,10 +422,10 @@ async def tasks(query_args: Task) -> quart.Response:
 @api.BLUEPRINT.route("/vote/start", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_response(models.Task, 201)
+@quart_schema.validate_response(sql.Task, 201)
 async def vote_start() -> tuple[Mapping, int]:
     payload = await _payload_get()
-    req = VoteStartRequest.model_validate(payload)
+    req = models.api.VoteStartRequest.model_validate(payload)
     asf_uid = _jwt_asf_uid()
 
     permitted_recipients = util.permitted_recipients(asf_uid)
@@ -483,7 +433,7 @@ async def vote_start() -> tuple[Mapping, int]:
         raise exceptions.Forbidden("Invalid mailing list choice")
 
     async with db.session() as data:
-        release_name = models.release_name(req.project_name, req.version)
+        release_name = sql.release_name(req.project_name, req.version)
         release = await data.release(name=release_name, _project=True, _committee=True).demand(exceptions.NotFound())
 
         if not (user.is_committee_member(release.committee, asf_uid) or user.is_admin(asf_uid)):
@@ -498,9 +448,9 @@ async def vote_start() -> tuple[Mapping, int]:
             raise exceptions.BadRequest(error)
 
         # TODO: Move this into a function in routes/voting.py
-        task = models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type=models.TaskType.VOTE_INITIATE,
+        task = sql.Task(
+            status=sql.TaskStatus.QUEUED,
+            task_type=sql.TaskType.VOTE_INITIATE,
             task_args=tasks_vote.Initiate(
                 release_name=release_name,
                 email_to=req.email_to,
@@ -521,10 +471,10 @@ async def vote_start() -> tuple[Mapping, int]:
 @api.BLUEPRINT.route("/upload", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_response(models.Revision, 201)
+@quart_schema.validate_response(sql.Revision, 201)
 async def upload() -> tuple[Mapping, int]:
     payload = await _payload_get()
-    req = FileUploadRequest.model_validate(payload)
+    req = models.api.FileUploadRequest.model_validate(payload)
     asf_uid = _jwt_asf_uid()
 
     async with db.session() as data:
@@ -538,11 +488,11 @@ async def upload() -> tuple[Mapping, int]:
 
 
 @db.session_function
-async def _get_pat(data: db.Session, uid: str, token_hash: str) -> models.PersonalAccessToken | None:
+async def _get_pat(data: db.Session, uid: str, token_hash: str) -> sql.PersonalAccessToken | None:
     return await data.query_one_or_none(
-        sqlmodel.select(models.PersonalAccessToken).where(
-            models.PersonalAccessToken.asfuid == uid,
-            models.PersonalAccessToken.token_hash == token_hash,
+        sqlmodel.select(sql.PersonalAccessToken).where(
+            sql.PersonalAccessToken.asfuid == uid,
+            sql.PersonalAccessToken.token_hash == token_hash,
         )
     )
 
@@ -555,7 +505,7 @@ def _jwt_asf_uid() -> str:
     return asf_uid
 
 
-def _pagination_args_validate(query_args: Pagination) -> None:
+def _pagination_args_validate(query_args: models.api.Pagination) -> None:
     # Users could request any amount using limit=N with arbitrarily high N
     # We therefore limit the maximum limit to 1000
     if query_args.limit > 1000:
@@ -570,7 +520,7 @@ async def _payload_get() -> dict:
     return payload
 
 
-async def _upload_process_file(req: FileUploadRequest, asf_uid: str) -> models.Revision:
+async def _upload_process_file(req: models.api.FileUploadRequest, asf_uid: str) -> sql.Revision:
     file_bytes = base64.b64decode(req.content, validate=True)
     file_path = req.rel_path.lstrip("/")
     description = f"Upload via API: {file_path}"
@@ -582,5 +532,5 @@ async def _upload_process_file(req: FileUploadRequest, asf_uid: str) -> models.R
     if creating.new is None:
         raise exceptions.InternalServerError("Failed to create revision")
     async with db.session() as data:
-        release_name = models.release_name(req.project_name, req.version)
+        release_name = sql.release_name(req.project_name, req.version)
         return await data.revision(release_name=release_name, number=creating.new.number).demand(exceptions.NotFound())

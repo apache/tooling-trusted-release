@@ -29,7 +29,7 @@ import wtforms
 import atr.construct as construct
 import atr.db as db
 import atr.db.interaction as interaction
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.root as root
@@ -195,7 +195,7 @@ async def promote_release(
 
     # Verify that it's in the correct phase
     # The atomic update below will also check this
-    if release_for_pre_checks.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+    if release_for_pre_checks.phase != sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
         return "This release is not in the candidate draft phase"
 
     # Check that the revision number is the latest
@@ -211,16 +211,16 @@ async def promote_release(
     # Promote it to RELEASE_CANDIDATE
     # NOTE: We previously allowed skipping phases, but removed that functionality
     # We don't need a lock here because we use an atomic update
-    via = models.validate_instrumented_attribute
+    via = sql.validate_instrumented_attribute
     stmt = (
-        sqlmodel.update(models.Release)
+        sqlmodel.update(sql.Release)
         .where(
-            via(models.Release.name) == release_name,
-            via(models.Release.phase) == models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
-            models.latest_revision_number_query() == selected_revision_number,
+            via(sql.Release.name) == release_name,
+            via(sql.Release.phase) == sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+            sql.latest_revision_number_query() == selected_revision_number,
         )
         .values(
-            phase=models.ReleasePhase.RELEASE_CANDIDATE,
+            phase=sql.ReleasePhase.RELEASE_CANDIDATE,
             vote_started=datetime.datetime.now(datetime.UTC),
             vote_manual=vote_manual,
         )
@@ -245,7 +245,7 @@ async def start_vote(
     subject_data: str,
     body_data: str,
     data: db.Session,
-    release: models.Release,
+    release: sql.Release,
     promote: bool = True,
 ):
     if email_to not in permitted_recipients:
@@ -266,9 +266,9 @@ async def start_vote(
     # ReleasePolicy.min_hours can also be 0, though
 
     # Create a task for vote initiation
-    task = models.Task(
-        status=models.TaskStatus.QUEUED,
-        task_type=models.TaskType.VOTE_INITIATE,
+    task = sql.Task(
+        status=sql.TaskStatus.QUEUED,
+        task_type=sql.TaskType.VOTE_INITIATE,
         task_args=tasks_vote.Initiate(
             release_name=release.name,
             email_to=email_to,
@@ -296,7 +296,7 @@ async def start_vote(
 
 
 async def start_vote_manual(
-    release: models.Release,
+    release: sql.Release,
     selected_revision_number: str,
     session: routes.CommitterSession,
     data: db.Session,
@@ -314,7 +314,7 @@ async def start_vote_manual(
 
 
 async def _form(
-    release: models.Release,
+    release: sql.Release,
     form_data: typing.FormData | None,
     project_name: str,
     version_name: str,
@@ -374,7 +374,7 @@ async def _form(
 
 
 async def _keys_warning(
-    release: models.Release,
+    release: sql.Release,
 ) -> bool:
     """Return a warning about keys if there are any issues."""
     if release.committee is None:

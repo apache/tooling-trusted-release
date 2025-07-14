@@ -22,9 +22,9 @@ import aiofiles
 
 import atr.db as db
 import atr.db.interaction as interaction
-import atr.db.models as models
-import atr.results as results
-import atr.schema as schema
+import atr.models.results as results
+import atr.models.schema as schema
+import atr.models.sql as sql
 import atr.tasks.checks as checks
 import atr.util as util
 
@@ -45,7 +45,7 @@ async def import_file(args: ImportFile) -> results.Results | None:
         release = await data.release(name=args.release_name).demand(
             RuntimeError(f"Release {args.release_name} not found")
         )
-        if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+        if release.phase != sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
             raise RuntimeError(f"Release {args.release_name} is not in the DRAFT phase")
 
     async with aiofiles.open(args.abs_keys_path, "rb") as keys_file:

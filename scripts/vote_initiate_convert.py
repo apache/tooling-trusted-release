@@ -30,8 +30,8 @@ import sqlalchemy
 import sqlmodel
 
 import atr.db as db
-import atr.db.models as models
-import atr.results as results
+import atr.models.results as results
+import atr.models.sql as sql
 
 _LOG_PREFIX: Final = "[vote_convert]"
 
@@ -112,7 +112,7 @@ async def audit_vote_initiate_results() -> None:
     await db.init_database_for_worker()
 
     async with db.session() as data:
-        stmt = sqlmodel.select(models.Task).where(models.Task.task_type == models.TaskType.VOTE_INITIATE)
+        stmt = sqlmodel.select(sql.Task).where(sql.Task.task_type == sql.TaskType.VOTE_INITIATE)
         result = await data.execute(stmt)
         tasks = result.scalars().all()
 

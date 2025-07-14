@@ -24,7 +24,8 @@ from typing import Annotated, Any, Final
 
 import aiohttp
 
-import atr.schema as schema
+import atr.models.helpers as helpers
+import atr.models.schema as schema
 
 _WHIMSY_COMMITTEE_INFO_URL: Final[str] = "https://whimsy.apache.org/public/committee-info.json"
 _WHIMSY_COMMITTEE_RETIRED_URL: Final[str] = "https://whimsy.apache.org/public/committee-retired.json"
@@ -43,7 +44,7 @@ class LDAPProjectsData(schema.Strict):
     last_timestamp: str = schema.alias("lastTimestamp")
     project_count: int
     roster_counts: dict[str, RosterCountDetails]
-    projects: Annotated[list[LDAPProject], schema.DictToList(key="name")]
+    projects: Annotated[list[LDAPProject], helpers.DictToList(key="name")]
 
     @property
     def last_time(self) -> datetime.datetime:
@@ -76,9 +77,9 @@ class Committee(schema.Strict):
     mail_list: str
     established: str | None
     report: list[str]
-    chair: Annotated[list[User], schema.DictToList(key="id")]
+    chair: Annotated[list[User], helpers.DictToList(key="id")]
     roster_count: int
-    roster: Annotated[list[User], schema.DictToList(key="id")]
+    roster: Annotated[list[User], helpers.DictToList(key="id")]
     pmc: bool
 
 
@@ -89,7 +90,7 @@ class CommitteeData(schema.Strict):
     roster_counts: dict[str, int] = schema.factory(dict)
     officers: dict[str, Any] = schema.factory(dict)
     board: dict[str, Any] = schema.factory(dict)
-    committees: Annotated[list[Committee], schema.DictToList(key="name")]
+    committees: Annotated[list[Committee], helpers.DictToList(key="name")]
 
 
 class RetiredCommittee(schema.Strict):
@@ -102,7 +103,7 @@ class RetiredCommittee(schema.Strict):
 class RetiredCommitteeData(schema.Strict):
     last_updated: str
     retired_count: int
-    retired: Annotated[list[RetiredCommittee], schema.DictToList(key="name")]
+    retired: Annotated[list[RetiredCommittee], helpers.DictToList(key="name")]
 
 
 class PodlingStatus(schema.Strict):
@@ -117,11 +118,11 @@ class PodlingStatus(schema.Strict):
     resolution: str | None = None
 
 
-class PodlingsData(schema.DictRoot[PodlingStatus]):
+class PodlingsData(helpers.DictRoot[PodlingStatus]):
     pass
 
 
-class GroupsData(schema.DictRoot[list[str]]):
+class GroupsData(helpers.DictRoot[list[str]]):
     pass
 
 
@@ -208,7 +209,7 @@ class ProjectStatus(schema.Strict):
     platform: str | None = None
 
 
-class ProjectsData(schema.DictRoot[ProjectStatus]):
+class ProjectsData(helpers.DictRoot[ProjectStatus]):
     pass
 
 

@@ -24,7 +24,7 @@ import asfquart.base as base
 import werkzeug.wrappers.response as response
 
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.root as root
 import atr.template as template
@@ -47,7 +47,7 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
 
     # Check that the release exists
     async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name), _project=True).demand(
+        release = await data.release(name=sql.release_name(project_name, version_name), _project=True).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
 
@@ -82,7 +82,7 @@ async def view_path(
     """View the content of a specific file in the release candidate."""
     await session.check_access(project_name)
 
-    release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE)
+    release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE)
     _max_view_size = 1 * 1024 * 1024
     full_path = util.release_directory(release) / file_path
     content_listing = await util.archive_listing(full_path)

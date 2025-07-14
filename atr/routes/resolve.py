@@ -23,8 +23,8 @@ import wtforms
 
 import atr.construct as construct
 import atr.db as db
-import atr.db.models as models
-import atr.results as results
+import atr.models.results as results
+import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
@@ -62,18 +62,18 @@ class ResolveVoteManualForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Resolve vote")
 
 
-async def release_latest_vote_task(release: models.Release) -> models.Task | None:
+async def release_latest_vote_task(release: sql.Release) -> sql.Task | None:
     """Find the most recent VOTE_INITIATE task for this release."""
-    via = models.validate_instrumented_attribute
+    via = sql.validate_instrumented_attribute
     async with db.session() as data:
         query = (
-            sqlmodel.select(models.Task)
-            .where(models.Task.project_name == release.project_name)
-            .where(models.Task.version_name == release.version)
-            .where(models.Task.task_type == models.TaskType.VOTE_INITIATE)
-            .where(via(models.Task.status).notin_([models.TaskStatus.QUEUED, models.TaskStatus.ACTIVE]))
-            .where(via(models.Task.result).is_not(None))
-            .order_by(via(models.Task.added).desc())
+            sqlmodel.select(sql.Task)
+            .where(sql.Task.project_name == release.project_name)
+            .where(sql.Task.version_name == release.version)
+            .where(sql.Task.task_type == sql.TaskType.VOTE_INITIATE)
+            .where(via(sql.Task.status).notin_([sql.TaskStatus.QUEUED, sql.TaskStatus.ACTIVE]))
+            .where(via(sql.Task.result).is_not(None))
+            .order_by(via(sql.Task.added).desc())
             .limit(1)
         )
         task = (await data.execute(query)).scalar_one_or_none()
@@ -88,7 +88,7 @@ async def manual_selected(session: routes.CommitterSession, project_name: str, v
     release = await session.release(
         project_name,
         version_name,
-        phase=models.ReleasePhase.RELEASE_CANDIDATE,
+        phase=sql.ReleasePhase.RELEASE_CANDIDATE,
         with_release_policy=True,
         with_project_release_policy=True,
     )
@@ -111,7 +111,7 @@ async def manual_selected_post(
     release = await session.release(
         project_name,
         version_name,
-        phase=models.ReleasePhase.RELEASE_CANDIDATE,
+        phase=sql.ReleasePhase.RELEASE_CANDIDATE,
         with_release_policy=True,
         with_project_release_policy=True,
     )
@@ -134,7 +134,7 @@ async def manual_selected_post(
         async with data.begin():
             release = await data.merge(release)
             if vote_result == "passed":
-                release.phase = models.ReleasePhase.RELEASE_PREVIEW
+                release.phase = sql.ReleasePhase.RELEASE_PREVIEW
                 success_message = "Vote marked as passed"
                 description = "Create a preview revision from the last candidate draft"
                 async with revision.create_and_manage(
@@ -142,7 +142,7 @@ async def manual_selected_post(
                 ) as _creating:
                     pass
             else:
-                release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+                release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
                 success_message = "Vote marked as failed"
     if vote_result == "passed":
         destination = finish.selected
@@ -166,7 +166,7 @@ async def submit_selected(
         version_name,
         with_project=True,
         with_committee=True,
-        phase=models.ReleasePhase.RELEASE_CANDIDATE,
+        phase=sql.ReleasePhase.RELEASE_CANDIDATE,
     )
 
     is_podling = False
@@ -223,7 +223,7 @@ async def tabulated_selected_post(session: routes.CommitterSession, project_name
     release = await session.release(
         project_name,
         version_name,
-        phase=models.ReleasePhase.RELEASE_CANDIDATE,
+        phase=sql.ReleasePhase.RELEASE_CANDIDATE,
         with_release_policy=True,
         with_project_release_policy=True,
     )
@@ -281,7 +281,7 @@ async def tabulated_selected_post(session: routes.CommitterSession, project_name
     )
 
 
-def task_mid_get(latest_vote_task: models.Task) -> str | None:
+def task_mid_get(latest_vote_task: sql.Task) -> str | None:
     if util.is_dev_environment():
         return vote.TEST_MID
     # TODO: Improve this
@@ -329,10 +329,10 @@ async def _resolve_vote(
     project_name: str,
     vote_result: str,
     resolution_body: str,
-    latest_vote_task: models.Task,
-    release: models.Release,
+    latest_vote_task: sql.Task,
+    release: sql.Release,
     voting_round: int | None,
-) -> tuple[models.Release, str]:
+) -> tuple[sql.Release, str]:
     # Check that the user has access to the project
     await session.check_access(project_name)
 
@@ -379,7 +379,7 @@ async def _resolve_vote(
                 )
                 success_message = "Project PPMC vote marked as passed, and Incubator PMC vote automatically started"
             elif vote_result == "passed":
-                release.phase = models.ReleasePhase.RELEASE_PREVIEW
+                release.phase = sql.ReleasePhase.RELEASE_PREVIEW
                 success_message = "Vote marked as passed"
 
                 description = "Create a preview revision from the last candidate draft"
@@ -393,7 +393,7 @@ async def _resolve_vote(
                     )
                     extra_destination = (round_one_email_address, round_one_message_id)
             else:
-                release.phase = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+                release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
                 success_message = "Vote marked as failed"
 
     error_message = await _send_resolution(
@@ -406,7 +406,7 @@ async def _resolve_vote(
 
 async def _send_resolution(
     session: routes.CommitterSession,
-    release: models.Release,
+    release: sql.Release,
     resolution: str,
     body: str,
     extra_destination: tuple[str, str] | None = None,
@@ -429,9 +429,9 @@ async def _send_resolution(
     body = f"{body}\n\n-- \n{session.fullname} ({session.uid})"
     in_reply_to = vote_thread_mid
 
-    task = models.Task(
-        status=models.TaskStatus.QUEUED,
-        task_type=models.TaskType.MESSAGE_SEND,
+    task = sql.Task(
+        status=sql.TaskStatus.QUEUED,
+        task_type=sql.TaskType.MESSAGE_SEND,
         task_args=message.Send(
             email_sender=email_sender,
             email_recipient=email_recipient,
@@ -444,9 +444,9 @@ async def _send_resolution(
     )
     tasks = [task]
     if extra_destination is not None:
-        task = models.Task(
-            status=models.TaskStatus.QUEUED,
-            task_type=models.TaskType.MESSAGE_SEND,
+        task = sql.Task(
+            status=sql.TaskStatus.QUEUED,
+            task_type=sql.TaskType.MESSAGE_SEND,
             task_args=message.Send(
                 email_sender=email_sender,
                 email_recipient=extra_destination[0],

@@ -33,7 +33,7 @@ import quart
 
 import atr.config as config
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.user as user
 import atr.util as util
 
@@ -167,7 +167,7 @@ class CommitterSession:
     """Session with extra information about committers."""
 
     def __init__(self, web_session: session.ClientSession) -> None:
-        self._projects: list[models.Project] | None = None
+        self._projects: list[sql.Project] | None = None
         self._session = web_session
 
     def __getattr__(self, name: str) -> Any:
@@ -210,7 +210,7 @@ class CommitterSession:
                 return domain
         return request_host
 
-    def only_user_releases(self, releases: Sequence[models.Release]) -> list[models.Release]:
+    def only_user_releases(self, releases: Sequence[sql.Release]) -> list[sql.Release]:
         return util.user_releases(self.uid, releases)
 
     async def redirect(
@@ -227,7 +227,7 @@ class CommitterSession:
         self,
         project_name: str,
         version_name: str,
-        phase: models.ReleasePhase | db.NotSet | None = db.NOT_SET,
+        phase: sql.ReleasePhase | db.NotSet | None = db.NOT_SET,
         latest_revision_number: str | db.NotSet | None = db.NOT_SET,
         data: db.Session | None = None,
         with_committee: bool = True,
@@ -235,16 +235,16 @@ class CommitterSession:
         with_release_policy: bool = False,
         with_project_release_policy: bool = False,
         with_revisions: bool = False,
-    ) -> models.Release:
+    ) -> sql.Release:
         # We reuse db.NOT_SET as an entirely different sentinel
         # TODO: We probably shouldn't do that, or should make it clearer
         if phase is None:
             phase_value = db.NOT_SET
         elif phase is db.NOT_SET:
-            phase_value = models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+            phase_value = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
         else:
             phase_value = phase
-        release_name = models.release_name(project_name, version_name)
+        release_name = sql.release_name(project_name, version_name)
         if data is None:
             async with db.session() as data:
                 release = await data.release(
@@ -271,7 +271,7 @@ class CommitterSession:
         return release
 
     @property
-    async def user_candidate_drafts(self) -> list[models.Release]:
+    async def user_candidate_drafts(self) -> list[sql.Release]:
         return await user.candidate_drafts(self.uid, user_projects=self._projects)
 
     # @property
@@ -279,7 +279,7 @@ class CommitterSession:
     #     return ...
 
     @property
-    async def user_projects(self) -> list[models.Project]:
+    async def user_projects(self) -> list[sql.Project]:
         if self._projects is None:
             self._projects = await user.projects(self.uid)
         return self._projects

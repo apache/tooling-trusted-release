@@ -35,8 +35,8 @@ from typing import Any, Final
 import sqlmodel
 
 import atr.db as db
-import atr.db.models as models
-import atr.results as results
+import atr.models.results as results
+import atr.models.sql as sql
 import atr.tasks as tasks
 import atr.tasks.checks as checks
 import atr.tasks.task as task
@@ -115,9 +115,9 @@ async def _task_next_claim() -> tuple[int, str, list[str] | dict[str, Any]] | No
         async with data.begin():
             # Get the ID of the oldest queued task
             oldest_queued_task = (
-                sqlmodel.select(models.Task.id)
-                .where(models.Task.status == task.QUEUED)
-                .order_by(models.validate_instrumented_attribute(models.Task.added).asc())
+                sqlmodel.select(sql.Task.id)
+                .where(sql.Task.status == task.QUEUED)
+                .order_by(sql.validate_instrumented_attribute(sql.Task.added).asc())
                 .limit(1)
             )
 
@@ -125,13 +125,13 @@ async def _task_next_claim() -> tuple[int, str, list[str] | dict[str, Any]] | No
             # This ensures that only one worker can claim a specific task
             now = datetime.datetime.now(datetime.UTC)
             update_stmt = (
-                sqlmodel.update(models.Task)
-                .where(sqlmodel.and_(models.Task.id == oldest_queued_task, models.Task.status == task.QUEUED))
+                sqlmodel.update(sql.Task)
+                .where(sqlmodel.and_(sql.Task.id == oldest_queued_task, sql.Task.status == task.QUEUED))
                 .values(status=task.ACTIVE, started=now, pid=os.getpid())
                 .returning(
-                    models.validate_instrumented_attribute(models.Task.id),
-                    models.validate_instrumented_attribute(models.Task.task_type),
-                    models.validate_instrumented_attribute(models.Task.task_args),
+                    sql.validate_instrumented_attribute(sql.Task.id),
+                    sql.validate_instrumented_attribute(sql.Task.task_type),
+                    sql.validate_instrumented_attribute(sql.Task.task_args),
                 )
             )
 
@@ -150,7 +150,7 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
     """Process a claimed task."""
     _LOGGER.info(f"Processing task {task_id} ({task_type}) with raw args {task_args}")
     try:
-        task_type_member = models.TaskType(task_type)
+        task_type_member = sql.TaskType(task_type)
     except ValueError as e:
         _LOGGER.error(f"Invalid task type: {task_type}")
         await _task_result_process(task_id, None, task.FAILED, str(e))
@@ -220,7 +220,7 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
 
 
 async def _task_result_process(
-    task_id: int, task_results: results.Results | None, status: models.TaskStatus, error: str | None = None
+    task_id: int, task_results: results.Results | None, status: sql.TaskStatus, error: str | None = None
 ) -> None:
     """Process and store task results in the database."""
     async with db.session() as data:

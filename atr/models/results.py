@@ -19,7 +19,7 @@ from typing import Annotated, Literal
 
 from pydantic import TypeAdapter
 
-import atr.schema as schema
+from . import schema
 
 # TODO: If we put this in atr.tasks.results, we get a circular import error
 

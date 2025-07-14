@@ -25,7 +25,7 @@ if project_root not in sys.path:
 import atr.config
 
 # Populate SQLModel.metadata as a side effect of importing the models
-import atr.db.models
+import atr.models.sql
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

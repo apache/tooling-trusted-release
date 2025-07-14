@@ -21,8 +21,8 @@ import time
 from collections.abc import Generator
 
 import atr.db as db
-import atr.db.models as models
-import atr.schema as schema
+import atr.models.schema as schema
+import atr.models.sql as sql
 import atr.util as util
 
 
@@ -51,7 +51,7 @@ class VoteEmail(schema.Strict):
     updated: bool
 
 
-async def votes(committee: models.Committee | None, thread_id: str) -> tuple[int | None, dict[str, VoteEmail]]:
+async def votes(committee: sql.Committee | None, thread_id: str) -> tuple[int | None, dict[str, VoteEmail]]:
     """Tabulate votes."""
     start = time.perf_counter_ns()
     email_to_uid = await util.email_to_uid_map()
@@ -117,7 +117,7 @@ async def votes(committee: models.Committee | None, thread_id: str) -> tuple[int
     return start_unixtime, tabulated_votes
 
 
-async def vote_committee(thread_id: str, release: models.Release) -> models.Committee | None:
+async def vote_committee(thread_id: str, release: sql.Release) -> sql.Committee | None:
     committee = None
     if release.project is not None:
         committee = release.project.committee
@@ -132,7 +132,7 @@ async def vote_committee(thread_id: str, release: models.Release) -> models.Comm
 
 
 def vote_outcome(
-    release: models.Release, start_unixtime: int | None, tabulated_votes: dict[str, VoteEmail]
+    release: sql.Release, start_unixtime: int | None, tabulated_votes: dict[str, VoteEmail]
 ) -> tuple[bool, str]:
     now = int(time.time())
     duration_hours = 0
@@ -161,8 +161,8 @@ def vote_outcome(
 
 
 def vote_resolution(
-    committee: models.Committee,
-    release: models.Release,
+    committee: sql.Committee,
+    release: sql.Release,
     tabulated_votes: dict[str, VoteEmail],
     summary: dict[str, int],
     passed: bool,
@@ -308,8 +308,8 @@ def _vote_outcome_format(
 
 
 def _vote_resolution_body(
-    committee: models.Committee,
-    release: models.Release,
+    committee: sql.Committee,
+    release: sql.Release,
     tabulated_votes: dict[str, VoteEmail],
     summary: dict[str, int],
     passed: bool,
@@ -392,7 +392,7 @@ def _vote_resolution_votes(tabulated_votes: dict[str, VoteEmail], statuses: set[
         yield ""
 
 
-async def _vote_status(asf_uid: str, list_raw: str, committee: models.Committee | None) -> VoteStatus:
+async def _vote_status(asf_uid: str, list_raw: str, committee: sql.Committee | None) -> VoteStatus:
     status = VoteStatus.UNKNOWN
 
     if util.is_dev_environment():

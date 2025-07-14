@@ -31,7 +31,7 @@ import wtforms
 import atr.config as config
 import atr.construct as construct
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.routes as routes
 
 # TODO: Improve upon the routes_release pattern
@@ -81,7 +81,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     await session.check_access(project_name)
 
     release = await session.release(
-        project_name, version_name, with_committee=True, phase=models.ReleasePhase.RELEASE_PREVIEW
+        project_name, version_name, with_committee=True, phase=sql.ReleasePhase.RELEASE_PREVIEW
     )
     announce_form = await _create_announce_form_instance(util.permitted_recipients(session.uid))
     # Hidden fields
@@ -136,8 +136,8 @@ async def selected_post(
             error_message = f"{error_message}: {error_details}"
 
         # Render the page again, with errors
-        release: models.Release = await session.release(
-            project_name, version_name, with_committee=True, phase=models.ReleasePhase.RELEASE_PREVIEW
+        release: sql.Release = await session.release(
+            project_name, version_name, with_committee=True, phase=sql.ReleasePhase.RELEASE_PREVIEW
         )
         await quart.flash(error_message, "error")
         return await template.render("announce-selected.html", release=release, announce_form=announce_form)
@@ -155,7 +155,7 @@ async def selected_post(
             release = await session.release(
                 project_name,
                 version_name,
-                phase=models.ReleasePhase.RELEASE_PREVIEW,
+                phase=sql.ReleasePhase.RELEASE_PREVIEW,
                 latest_revision_number=preview_revision_number,
                 with_revisions=True,
                 data=data,
@@ -182,9 +182,9 @@ async def selected_post(
                     version_name=version_name,
                 ),
             )
-            task = models.Task(
-                status=models.TaskStatus.QUEUED,
-                task_type=models.TaskType.MESSAGE_SEND,
+            task = sql.Task(
+                status=sql.TaskStatus.QUEUED,
+                task_type=sql.TaskType.MESSAGE_SEND,
                 task_args=message.Send(
                     email_sender=f"{session.uid}@apache.org",
                     email_recipient=recipient,
@@ -301,7 +301,7 @@ def _download_path_suffix_validated(announce_form: AnnounceFormProtocol) -> str:
 
 
 async def _hard_link_downloads(
-    committee: models.Committee, unfinished_path: pathlib.Path, download_path_suffix: str
+    committee: sql.Committee, unfinished_path: pathlib.Path, download_path_suffix: str
 ) -> None:
     """Hard link the release files to the downloads directory."""
     # TODO: Rename *_dir functions to _path functions
@@ -310,19 +310,19 @@ async def _hard_link_downloads(
     await util.create_hard_link_clone(unfinished_path, downloads_path, exist_ok=True)
 
 
-async def _promote_in_database(release: models.Release, data: db.Session, preview_revision_number: str) -> None:
+async def _promote_in_database(release: sql.Release, data: db.Session, preview_revision_number: str) -> None:
     """Promote a release preview to a release and delete its old revisions."""
-    via = models.validate_instrumented_attribute
+    via = sql.validate_instrumented_attribute
 
     update_stmt = (
-        sqlmodel.update(models.Release)
+        sqlmodel.update(sql.Release)
         .where(
-            via(models.Release.name) == release.name,
-            via(models.Release.phase) == models.ReleasePhase.RELEASE_PREVIEW,
-            models.latest_revision_number_query() == preview_revision_number,
+            via(sql.Release.name) == release.name,
+            via(sql.Release.phase) == sql.ReleasePhase.RELEASE_PREVIEW,
+            sql.latest_revision_number_query() == preview_revision_number,
         )
         .values(
-            phase=models.ReleasePhase.RELEASE,
+            phase=sql.ReleasePhase.RELEASE,
             released=datetime.datetime.now(datetime.UTC),
         )
     )
@@ -333,5 +333,5 @@ async def _promote_in_database(release: models.Release, data: db.Session, previe
     if rowcount != 1:
         raise RuntimeError("A newer revision appeared, please refresh and try again.")
 
-    delete_revisions_stmt = sqlmodel.delete(models.Revision).where(via(models.Revision.release_name) == release.name)
+    delete_revisions_stmt = sqlmodel.delete(sql.Revision).where(via(sql.Revision.release_name) == release.name)
     await data.execute_query(delete_revisions_stmt)

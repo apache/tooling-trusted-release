@@ -29,7 +29,7 @@ import zipstream
 
 import atr.config as config
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.mapping as mapping
 import atr.routes.root as root
@@ -172,7 +172,7 @@ async def _download_or_list(project_name: str, version_name: str, file_path: str
     )
 
 
-async def _generate_file_url_list(release: models.Release) -> str:
+async def _generate_file_url_list(release: sql.Release) -> str:
     base_dir = util.release_directory(release)
     urls = []
     async for rel_path in util.paths_recursive(base_dir):

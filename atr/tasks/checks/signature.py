@@ -25,8 +25,8 @@ import gnupg
 import sqlmodel
 
 import atr.db as db
-import atr.db.models as models
-import atr.results as results
+import atr.models.results as results
+import atr.models.sql as sql
 import atr.tasks.checks as checks
 import atr.util as util
 
@@ -82,10 +82,10 @@ async def _check_core_logic(committee_name: str, artifact_path: str, signature_p
     _LOGGER.info(f"Attempting to fetch keys for committee_name: '{committee_name}'")
     async with db.session() as session:
         statement = (
-            sqlmodel.select(models.PublicSigningKey)
-            .join(models.KeyLink)
-            .join(models.Committee)
-            .where(models.validate_instrumented_attribute(models.Committee.name) == committee_name)
+            sqlmodel.select(sql.PublicSigningKey)
+            .join(sql.KeyLink)
+            .join(sql.Committee)
+            .where(sql.validate_instrumented_attribute(sql.Committee.name) == committee_name)
         )
         result = await session.execute(statement)
         db_public_keys = result.scalars().all()

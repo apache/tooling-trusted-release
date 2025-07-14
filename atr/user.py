@@ -21,15 +21,18 @@ import functools
 
 import atr.config as config
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 
 
-async def candidate_drafts(uid: str, user_projects: list[models.Project] | None = None) -> list[models.Release]:
+async def candidate_drafts(uid: str, user_projects: list[sql.Project] | None = None) -> list[sql.Release]:
+    # Must be imported here, to avoid a circular import
+    import atr.db.interaction as interaction
+
     if user_projects is None:
         user_projects = await projects(uid)
-    user_candidate_drafts: list[models.Release] = []
+    user_candidate_drafts: list[sql.Release] = []
     for p in user_projects:
-        releases = await p.candidate_drafts
+        releases = await interaction.candidate_drafts(p)
         user_candidate_drafts.extend(releases)
     return user_candidate_drafts
 
@@ -46,24 +49,24 @@ def is_admin(user_id: str | None) -> bool:
     return user_id in get_admin_users()
 
 
-def is_committee_member(committee: models.Committee | None, uid: str) -> bool:
+def is_committee_member(committee: sql.Committee | None, uid: str) -> bool:
     if committee is None:
         return False
     return any((member_uid == uid) for member_uid in committee.committee_members)
 
 
-def is_committer(committee: models.Committee | None, uid: str) -> bool:
+def is_committer(committee: sql.Committee | None, uid: str) -> bool:
     if committee is None:
         return False
     return any((committer_uid == uid) for committer_uid in committee.committers)
 
 
-async def projects(uid: str, committee_only: bool = False, super_project: bool = False) -> list[models.Project]:
-    user_projects: list[models.Project] = []
+async def projects(uid: str, committee_only: bool = False, super_project: bool = False) -> list[sql.Project]:
+    user_projects: list[sql.Project] = []
     async with db.session() as data:
         # Must have releases, because this is used in candidate_drafts
         projects = await data.project(
-            status=models.ProjectStatus.ACTIVE, _committee=True, _releases=True, _super_project=super_project
+            status=sql.ProjectStatus.ACTIVE, _committee=True, _releases=True, _super_project=super_project
         ).all()
         for p in projects:
             if p.committee is None:

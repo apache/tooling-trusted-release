@@ -27,10 +27,10 @@ import sqlmodel
 import werkzeug.wrappers.response as response
 
 import atr.db as db
-import atr.db.models as models
+import atr.models.schema as schema
+import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
-import atr.schema as schema
 import atr.template as template
 import atr.util as util
 
@@ -44,7 +44,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         release = await session.release(project_name, version_name)
         phase_key = "draft"
     except base.ASFQuartException:
-        release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_PREVIEW)
+        release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_PREVIEW)
         phase_key = "preview"
     release_dir = util.release_directory_base(release)
 
@@ -57,13 +57,13 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     # Oldest to newest, to build diffs relative to previous revision
     async with db.session() as data_for_revisions:
         revisions_stmt = (
-            sqlmodel.select(models.Revision)
-            .where(models.Revision.release_name == release.name)
-            .order_by(models.validate_instrumented_attribute(models.Revision.seq))
-            .options(orm.selectinload(models.validate_instrumented_attribute(models.Revision.parent)))
+            sqlmodel.select(sql.Revision)
+            .where(sql.Revision.release_name == release.name)
+            .order_by(sql.validate_instrumented_attribute(sql.Revision.seq))
+            .options(orm.selectinload(sql.validate_instrumented_attribute(sql.Revision.parent)))
         )
         revisions_result = await data_for_revisions.execute(revisions_stmt)
-        revisions_list: list[models.Revision] = list(revisions_result.scalars().all())
+        revisions_list: list[sql.Revision] = list(revisions_result.scalars().all())
 
     revision_history = []
     loop_prev_revision_files: set[pathlib.Path] | None = None
@@ -106,14 +106,14 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
     async with db.session() as data:
         release = await session.release(project_name, version_name, phase=None, data=data)
         selected_revision_dir = util.release_directory_base(release) / selected_revision_number
-        if release.phase not in {models.ReleasePhase.RELEASE_CANDIDATE_DRAFT, models.ReleasePhase.RELEASE_PREVIEW}:
+        if release.phase not in {sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, sql.ReleasePhase.RELEASE_PREVIEW}:
             raise base.ASFQuartException("Cannot set revision for non-draft or preview release", errorcode=400)
 
         selected_revision = await data.revision(release_name=release.name, number=selected_revision_number).demand(
             base.ASFQuartException(f"Revision {selected_revision_number} not found", errorcode=404)
         )
-        if (release.phase == models.ReleasePhase.RELEASE_PREVIEW) and (
-            selected_revision.phase != models.ReleasePhase.RELEASE_PREVIEW
+        if (release.phase == sql.ReleasePhase.RELEASE_PREVIEW) and (
+            selected_revision.phase != sql.ReleasePhase.RELEASE_PREVIEW
         ):
             raise base.ASFQuartException(
                 f"Revision {selected_revision_number} is not a preview revision", errorcode=400

@@ -49,8 +49,8 @@ import wtforms
 # NOTE: The atr.db module imports this module
 # Therefore, this module must not import atr.db
 import atr.config as config
-import atr.db.models as models
 import atr.ldap as ldap
+import atr.models.sql as sql
 import atr.user as user
 
 F = TypeVar("F", bound="QuartFormTyped")
@@ -458,7 +458,7 @@ def get_finished_dir() -> pathlib.Path:
     return pathlib.Path(config.get().FINISHED_STORAGE_DIR)
 
 
-async def get_release_stats(release: models.Release) -> tuple[int, int, str]:
+async def get_release_stats(release: sql.Release) -> tuple[int, int, str]:
     """Calculate file count, total byte size, and formatted size for a release."""
     base_dir = release_directory(release)
     count = 0
@@ -512,7 +512,7 @@ async def get_urls_as_completed(urls: Sequence[str]) -> AsyncGenerator[tuple[str
             yield await future
 
 
-async def has_files(release: models.Release) -> bool:
+async def has_files(release: sql.Release) -> bool:
     """Check if a release has any files."""
     base_dir = release_directory(release)
     try:
@@ -555,7 +555,7 @@ def is_user_viewing_as_admin(uid: str | None) -> bool:
         return True
 
 
-async def number_of_release_files(release: models.Release) -> int:
+async def number_of_release_files(release: sql.Release) -> int:
     """Return the number of files in a release."""
     if (path := release_directory_revision(release)) is None:
         return 0
@@ -693,7 +693,7 @@ async def read_file_for_viewer(full_path: pathlib.Path, max_size: int) -> tuple[
     return content, is_text, is_truncated, error_message
 
 
-def release_directory(release: models.Release) -> pathlib.Path:
+def release_directory(release: sql.Release) -> pathlib.Path:
     """Return the absolute path to the directory containing the active files for a given release phase."""
     latest_revision_number = release.latest_revision_number
     if latest_revision_number is None:
@@ -701,7 +701,7 @@ def release_directory(release: models.Release) -> pathlib.Path:
     return release_directory_base(release) / latest_revision_number
 
 
-def release_directory_base(release: models.Release) -> pathlib.Path:
+def release_directory_base(release: sql.Release) -> pathlib.Path:
     """Determine the filesystem directory for a given release based on its phase."""
     phase = release.phase
     project_name = release.project.name
@@ -709,13 +709,13 @@ def release_directory_base(release: models.Release) -> pathlib.Path:
 
     base_dir: pathlib.Path | None = None
     match phase:
-        case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+        case sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
             base_dir = get_unfinished_dir()
-        case models.ReleasePhase.RELEASE_CANDIDATE:
+        case sql.ReleasePhase.RELEASE_CANDIDATE:
             base_dir = get_unfinished_dir()
-        case models.ReleasePhase.RELEASE_PREVIEW:
+        case sql.ReleasePhase.RELEASE_PREVIEW:
             base_dir = get_unfinished_dir()
-        case models.ReleasePhase.RELEASE:
+        case sql.ReleasePhase.RELEASE:
             base_dir = get_finished_dir()
         # Do not add "case _" here
     return base_dir / project_name / version_name
@@ -728,37 +728,37 @@ def release_directory_base(release: models.Release) -> pathlib.Path:
 #     return get_finished_dir() / path_project / path_version
 
 
-def release_directory_revision(release: models.Release) -> pathlib.Path | None:
+def release_directory_revision(release: sql.Release) -> pathlib.Path | None:
     """Return the path to the directory containing the active files for a given release phase."""
     path_project = release.project.name
     path_version = release.version
     match release.phase:
         case (
-            models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
-            | models.ReleasePhase.RELEASE_CANDIDATE
-            | models.ReleasePhase.RELEASE_PREVIEW
+            sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+            | sql.ReleasePhase.RELEASE_CANDIDATE
+            | sql.ReleasePhase.RELEASE_PREVIEW
         ):
             if (path_revision := release.latest_revision_number) is None:
                 return None
             path = get_unfinished_dir() / path_project / path_version / path_revision
-        case models.ReleasePhase.RELEASE:
+        case sql.ReleasePhase.RELEASE:
             path = get_finished_dir() / path_project / path_version
         # Do not add "case _" here
     return path
 
 
-def release_directory_version(release: models.Release) -> pathlib.Path:
+def release_directory_version(release: sql.Release) -> pathlib.Path:
     """Return the path to the directory containing the active files for a given release phase."""
     path_project = release.project.name
     path_version = release.version
     match release.phase:
         case (
-            models.ReleasePhase.RELEASE_CANDIDATE_DRAFT
-            | models.ReleasePhase.RELEASE_CANDIDATE
-            | models.ReleasePhase.RELEASE_PREVIEW
+            sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+            | sql.ReleasePhase.RELEASE_CANDIDATE
+            | sql.ReleasePhase.RELEASE_PREVIEW
         ):
             path = get_unfinished_dir() / path_project / path_version
-        case models.ReleasePhase.RELEASE:
+        case sql.ReleasePhase.RELEASE:
             path = get_finished_dir() / path_project / path_version
         # Do not add "case _" here
     return path
@@ -871,7 +871,7 @@ async def update_atomic_symlink(link_path: pathlib.Path, target_path: pathlib.Pa
         raise
 
 
-def user_releases(asf_uid: str, releases: Sequence[models.Release]) -> list[models.Release]:
+def user_releases(asf_uid: str, releases: Sequence[sql.Release]) -> list[sql.Release]:
     """Return a list of releases for which the user is a committee member or committer."""
     # TODO: This should probably be a session method instead
     user_releases = []

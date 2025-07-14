@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.routes.compose as compose
 import atr.routes.finish as finish
 import atr.routes.release as routes_release
@@ -23,14 +23,14 @@ import atr.routes.vote as vote
 import atr.util as util
 
 
-def release_as_url(release: models.Release) -> str:
+def release_as_url(release: sql.Release) -> str:
     match release.phase:
-        case models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+        case sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
             return util.as_url(compose.selected, project_name=release.project.name, version_name=release.version)
-        case models.ReleasePhase.RELEASE_CANDIDATE:
+        case sql.ReleasePhase.RELEASE_CANDIDATE:
             return util.as_url(vote.selected, project_name=release.project.name, version_name=release.version)
-        case models.ReleasePhase.RELEASE_PREVIEW:
+        case sql.ReleasePhase.RELEASE_PREVIEW:
             return util.as_url(finish.selected, project_name=release.project.name, version_name=release.version)
-        case models.ReleasePhase.RELEASE:
+        case sql.ReleasePhase.RELEASE:
             finished = routes_release.finished  # type: ignore[has-type]
             return util.as_url(finished, project_name=release.project.name)

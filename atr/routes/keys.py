@@ -40,7 +40,7 @@ import wtforms
 
 import atr.db as db
 import atr.db.interaction as interaction
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
@@ -459,7 +459,7 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
         else:
             async with db.session() as data:
                 async with data.begin():
-                    data.add(models.SSHKey(fingerprint=fingerprint, key=key, asf_uid=session.uid))
+                    data.add(sql.SSHKey(fingerprint=fingerprint, key=key, asf_uid=session.uid))
             return await session.redirect(keys, success=f"SSH key added successfully: {fingerprint}")
 
     return await template.render(
@@ -523,7 +523,7 @@ async def upload(session: routes.CommitterSession) -> str:
     async def render(
         error: str | None = None,
         submitted_committees_list: list[str] | None = None,
-        all_user_committees: Sequence[models.Committee] | None = None,
+        all_user_committees: Sequence[sql.Committee] | None = None,
     ) -> str:
         # For easier happy pathing
         if error is not None:
@@ -648,7 +648,7 @@ async def _get_keys_text(keys_url: str, render: Callable[[str], Awaitable[str]])
 
 async def _key_and_is_owner(
     data: db.Session, session: routes.CommitterSession, fingerprint: str
-) -> tuple[models.PublicSigningKey, bool]:
+) -> tuple[sql.PublicSigningKey, bool]:
     key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
     if not key:
         quart.abort(404, description="OpenPGP key not found")

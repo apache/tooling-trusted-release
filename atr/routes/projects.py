@@ -28,7 +28,8 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
-import atr.db.models as models
+import atr.db.interaction as interaction
+import atr.models.sql as sql
 import atr.routes as routes
 import atr.template as template
 import atr.user as user
@@ -217,7 +218,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
     async with db.session() as data:
         project = await data.project(
-            name=project_name, status=models.ProjectStatus.ACTIVE, _releases=True, _distribution_channels=True
+            name=project_name, status=sql.ProjectStatus.ACTIVE, _releases=True, _distribution_channels=True
         ).get()
 
         if not project:
@@ -253,7 +254,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 async def projects() -> str:
     """Main project directory page."""
     async with db.session() as data:
-        projects = await data.project(_committee=True).order_by(models.Project.full_name).all()
+        projects = await data.project(_committee=True).order_by(sql.Project.full_name).all()
         return await template.render("projects.html", projects=projects, empty_form=await util.EmptyForm.create_form())
 
 
@@ -264,7 +265,7 @@ async def select(session: routes.CommitterSession) -> str:
     if session.uid:
         async with db.session() as data:
             # TODO: Move this filtering logic somewhere else
-            all_projects = await data.project(status=models.ProjectStatus.ACTIVE, _committee=True).all()
+            all_projects = await data.project(status=sql.ProjectStatus.ACTIVE, _committee=True).all()
             user_projects = [
                 p
                 for p in all_projects
@@ -310,15 +311,19 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
             metadata_form = await ProjectMetadataForm.create_form(data={"project_name": project.name})
         if policy_form is None:
             policy_form = await _policy_form_create(project)
+        candidate_drafts = await interaction.candidate_drafts(project)
+        candidates = await interaction.candidates(project)
+        previews = await interaction.previews(project)
+        full_releases = await interaction.full_releases(project)
 
     return await template.render(
         "project-view.html",
         project=project,
         algorithms=routes.algorithms,
-        candidate_drafts=await project.candidate_drafts,
-        candidates=await project.candidates,
-        previews=await project.previews,
-        full_releases=await project.full_releases,
+        candidate_drafts=candidate_drafts,
+        candidates=candidates,
+        previews=previews,
+        full_releases=full_releases,
         number_of_release_files=util.number_of_release_files,
         now=datetime.datetime.now(datetime.UTC),
         empty_form=await util.EmptyForm.create_form(),
@@ -352,7 +357,7 @@ def _form_clear(obj: wtforms.Field) -> None:
 
 async def _metadata_category_edit(
     metadata_form: ProjectMetadataForm,
-    project: models.Project,
+    project: sql.Project,
     action_type: str,
     action_value: str,
     current_categories: list[str],
@@ -383,7 +388,7 @@ async def _metadata_category_edit(
 
 
 async def _metadata_category_edit_add(
-    metadata_form: ProjectMetadataForm, project: models.Project, current_categories: list[str]
+    metadata_form: ProjectMetadataForm, project: sql.Project, current_categories: list[str]
 ) -> bool:
     new_cat = util.unwrap(metadata_form.category_to_add.data).strip()
     if new_cat and (new_cat not in current_categories):
@@ -400,7 +405,7 @@ async def _metadata_category_edit_add(
 
 
 async def _metadata_category_edit_remove(
-    action_value: str, project: models.Project, current_categories: list[str]
+    action_value: str, project: sql.Project, current_categories: list[str]
 ) -> bool:
     if action_value in _FORBIDDEN_CATEGORIES:
         raise ValueError(f"Category '{action_value}' may not be added or removed")
@@ -411,7 +416,7 @@ async def _metadata_category_edit_remove(
 
 
 async def _metadata_edit(
-    data: db.Session, project: models.Project, form_data: dict[str, str]
+    data: db.Session, project: sql.Project, form_data: dict[str, str]
 ) -> tuple[bool, ProjectMetadataForm]:
     metadata_form = await ProjectMetadataForm.create_form(data=form_data)
 
@@ -457,13 +462,13 @@ def _parse_artifact_paths(artifact_paths: str) -> list[str]:
 
 
 async def _policy_edit(
-    data: db.Session, project: models.Project, form_data: dict[str, str]
+    data: db.Session, project: sql.Project, form_data: dict[str, str]
 ) -> tuple[bool, ReleasePolicyForm]:
     policy_form = await ReleasePolicyForm.create_form(data=form_data)
     if await policy_form.validate_on_submit():
         release_policy = project.release_policy
         if release_policy is None:
-            release_policy = models.ReleasePolicy(project=project)
+            release_policy = sql.ReleasePolicy(project=project)
             project.release_policy = release_policy
             data.add(release_policy)
 
@@ -502,7 +507,7 @@ async def _policy_edit(
     return False, policy_form
 
 
-async def _policy_form_create(project: models.Project) -> ReleasePolicyForm:
+async def _policy_form_create(project: sql.Project) -> ReleasePolicyForm:
     # TODO: Use form order for all of these fields
     policy_form = await ReleasePolicyForm.create_form()
     policy_form.project_name.data = project.name
@@ -554,10 +559,10 @@ async def _project_add(form: AddFormProtocol, asf_id: str) -> response.Response:
             return quart.redirect(util.as_url(add_project, committee_name=committee_name))
 
         # TODO: Fix the potential race condition here
-        project = models.Project(
+        project = sql.Project(
             name=label,
             full_name=display_name,
-            status=models.ProjectStatus.ACTIVE,
+            status=sql.ProjectStatus.ACTIVE,
             super_project_name=super_project.name if super_project else None,
             description=super_project.description if super_project else None,
             category=super_project.category if super_project else None,
@@ -649,7 +654,7 @@ async def _project_add_validate_display_name(display_name: str) -> bool:
 
 
 def _set_default_announce_release_template(
-    form: ReleasePolicyForm, project: models.Project, release_policy: models.ReleasePolicy
+    form: ReleasePolicyForm, project: sql.Project, release_policy: sql.ReleasePolicy
 ) -> None:
     submitted_announce_template = str(util.unwrap(form.announce_release_template.data))
     submitted_announce_template = submitted_announce_template.replace("\r\n", "\n")
@@ -666,9 +671,7 @@ def _set_default_announce_release_template(
         release_policy.announce_release_template = submitted_announce_template
 
 
-def _set_default_min_hours(
-    form: ReleasePolicyForm, project: models.Project, release_policy: models.ReleasePolicy
-) -> None:
+def _set_default_min_hours(form: ReleasePolicyForm, project: sql.Project, release_policy: sql.ReleasePolicy) -> None:
     submitted_min_hours = int(util.unwrap(form.min_hours.data) or 0)
     default_value_seen_on_page_min_hours = int(util.unwrap(form.default_min_hours_value_at_render.data))
     current_system_default_min_hours = project.policy_default_min_hours
@@ -683,7 +686,7 @@ def _set_default_min_hours(
 
 
 def _set_default_start_vote_template(
-    form: ReleasePolicyForm, project: models.Project, release_policy: models.ReleasePolicy
+    form: ReleasePolicyForm, project: sql.Project, release_policy: sql.ReleasePolicy
 ) -> None:
     submitted_start_template = str(util.unwrap(form.start_vote_template.data))
     submitted_start_template = submitted_start_template.replace("\r\n", "\n")

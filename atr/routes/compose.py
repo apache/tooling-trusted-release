@@ -22,8 +22,8 @@ import wtforms
 
 import atr.db as db
 import atr.db.interaction as interaction
-import atr.db.models as models
-import atr.results as results
+import atr.models.results as results
+import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.draft as draft
@@ -36,12 +36,12 @@ if TYPE_CHECKING:
 
 async def check(
     session: routes.CommitterSession,
-    release: models.Release,
+    release: sql.Release,
     task_mid: str | None = None,
     form: wtforms.Form | None = None,
     hidden_form: wtforms.Form | None = None,
     archive_url: str | None = None,
-    vote_task: models.Task | None = None,
+    vote_task: sql.Task | None = None,
 ) -> response.Response | str:
     base_path = util.release_directory(release)
 
@@ -52,7 +52,7 @@ async def check(
 
     info = await interaction.path_info(release, paths)
 
-    user_ssh_keys: Sequence[models.SSHKey] = []
+    user_ssh_keys: Sequence[sql.SSHKey] = []
     async with db.session() as data:
         user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
 
@@ -99,7 +99,7 @@ async def check(
         server_domain=session.app_host,
         user_ssh_keys=user_ssh_keys,
         format_datetime=util.format_datetime,
-        models=models,
+        models=sql,
         task_mid=task_mid,
         form=form,
         vote_task=vote_task,
@@ -121,7 +121,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     return await check(session, release)
 
 
-def _warnings_from_vote_result(vote_task: models.Task | None) -> list[str]:
+def _warnings_from_vote_result(vote_task: sql.Task | None) -> list[str]:
     # TODO: Replace this with a schema.Strict model
     # But we'd still need to do some of this parsing and validation
     # We should probably rethink how to send data through tasks

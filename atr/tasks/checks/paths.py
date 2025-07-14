@@ -23,7 +23,7 @@ from typing import Final
 import aiofiles.os
 
 import atr.analysis as analysis
-import atr.results as results
+import atr.models.results as results
 import atr.tasks.checks as checks
 import atr.util as util
 

@@ -22,7 +22,7 @@ import aiofiles.os
 import asfquart.base as base
 
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.routes as routes
 import atr.template as template
 import atr.util as util
@@ -37,7 +37,7 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
     try:
         release = await session.release(project_name, version_name)
     except base.ASFQuartException:
-        release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE)
+        release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE)
 
     # TODO: When we do more than one thing in a dir, we should use the revision directory directly
     abs_path = util.release_directory(release) / rel_path
@@ -58,14 +58,14 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
             revision_number=release.latest_revision_number,
             primary_rel_path=str(rel_path),
         ).order_by(
-            models.validate_instrumented_attribute(models.CheckResult.checker).asc(),
-            models.validate_instrumented_attribute(models.CheckResult.created).desc(),
+            sql.validate_instrumented_attribute(sql.CheckResult.checker).asc(),
+            sql.validate_instrumented_attribute(sql.CheckResult.created).desc(),
         )
         all_results = await query.all()
 
     # Filter to separate the primary and member results
     primary_results_list = []
-    member_results_list: dict[str, list[models.CheckResult]] = {}
+    member_results_list: dict[str, list[sql.CheckResult]] = {}
     for result in all_results:
         if result.member_rel_path is None:
             primary_results_list.append(result)

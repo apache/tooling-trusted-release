@@ -33,8 +33,7 @@ import sqlalchemy.orm as orm
 import sqlalchemy.sql.expression as expression
 import sqlmodel
 
-import atr.results as results
-import atr.schema as schema
+from . import results, schema
 
 sqlmodel.SQLModel.metadata = sqlalchemy.MetaData(
     naming_convention={
@@ -124,6 +123,8 @@ class VoteEntry(schema.Strict):
 
 
 # Type decorators
+# TODO: Possibly move these to a separate module
+# That way, we can more easily track Alembic's dependence on them
 
 
 class UTCDateTime(sqlalchemy.types.TypeDecorator):
@@ -386,58 +387,6 @@ class Project(sqlmodel.SQLModel, table=True):
     def short_display_name(self) -> str:
         """Get the short display name for the Project."""
         return self.display_name.removeprefix("Apache ")
-
-    async def releases_by_phase(self, phase: ReleasePhase) -> list["Release"]:
-        """Get the releases for the project by phase."""
-        import atr.db as db
-
-        query = (
-            sqlmodel.select(Release)
-            .where(
-                Release.project_name == self.name,
-                Release.phase == phase,
-            )
-            .order_by(validate_instrumented_attribute(Release.created).desc())
-        )
-
-        results = []
-        # TODO: Use inspect(self).session, if available
-        async with db.session() as data:
-            for result in (await data.execute(query)).all():
-                release = result[0]
-                results.append(release)
-        for release in results:
-            # Don't need to eager load and lose it when the session closes
-            release.project = self
-        return results
-
-    @property
-    async def candidate_drafts(self) -> list["Release"]:
-        """Get the candidate drafts for the project."""
-        return await self.releases_by_phase(ReleasePhase.RELEASE_CANDIDATE_DRAFT)
-
-    @property
-    async def candidates(self) -> list["Release"]:
-        """Get the candidate releases for the project."""
-        return await self.releases_by_phase(ReleasePhase.RELEASE_CANDIDATE)
-
-    @property
-    async def previews(self) -> list["Release"]:
-        """Get the preview releases for the project."""
-        return await self.releases_by_phase(ReleasePhase.RELEASE_PREVIEW)
-
-    @property
-    async def full_releases(self) -> list["Release"]:
-        """Get the full releases for the project."""
-        return await self.releases_by_phase(ReleasePhase.RELEASE)
-
-    @property
-    async def releases_in_progress(self) -> list["Release"]:
-        """Get the releases in progress for the project."""
-        drafts = await self.candidate_drafts
-        candidates = await self.candidates
-        previews = await self.previews
-        return drafts + candidates + previews
 
     @property
     def policy_announce_release_default(self) -> str:

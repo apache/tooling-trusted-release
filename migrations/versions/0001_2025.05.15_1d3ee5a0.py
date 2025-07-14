@@ -10,7 +10,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-import atr.db.models
+import atr.models.sql as sql
 
 # Revision identifiers, used by Alembic
 revision: str = "0001_2025.05.15_1d3ee5a0"
@@ -40,8 +40,8 @@ def upgrade() -> None:
         sa.Column("fingerprint", sa.String(), nullable=False),
         sa.Column("algorithm", sa.Integer(), nullable=False),
         sa.Column("length", sa.Integer(), nullable=False),
-        sa.Column("created", atr.db.models.UTCDateTime(timezone=True), nullable=True),
-        sa.Column("expires", atr.db.models.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("created", sql.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("expires", sql.UTCDateTime(timezone=True), nullable=True),
         sa.Column("declared_uid", sa.String(), nullable=True),
         sa.Column("apache_uid", sa.String(), nullable=False),
         sa.Column("ascii_armored_key", sa.String(), nullable=False),
@@ -102,7 +102,7 @@ def upgrade() -> None:
         sa.Column("programming_languages", sa.String(), nullable=True),
         sa.Column("committee_name", sa.String(), nullable=True),
         sa.Column("release_policy_id", sa.Integer(), nullable=True),
-        sa.Column("created", atr.db.models.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("created", sql.UTCDateTime(timezone=True), nullable=True),
         sa.Column("created_by", sa.String(), nullable=True),
         sa.ForeignKeyConstraint(
             ["committee_name"], ["committee.name"], name=op.f("fk_project_committee_name_committee")
@@ -145,16 +145,16 @@ def upgrade() -> None:
             sa.Enum("RELEASE_CANDIDATE_DRAFT", "RELEASE_CANDIDATE", "RELEASE_PREVIEW", "RELEASE", name="releasephase"),
             nullable=False,
         ),
-        sa.Column("created", atr.db.models.UTCDateTime(timezone=True), nullable=True),
-        sa.Column("released", atr.db.models.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("created", sql.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("released", sql.UTCDateTime(timezone=True), nullable=True),
         sa.Column("project_name", sa.String(), nullable=False),
         sa.Column("package_managers", sa.JSON(), nullable=True),
         sa.Column("version", sa.String(), nullable=False),
         sa.Column("sboms", sa.JSON(), nullable=True),
         sa.Column("release_policy_id", sa.Integer(), nullable=True),
         sa.Column("votes", sa.JSON(), nullable=True),
-        sa.Column("vote_started", atr.db.models.UTCDateTime(timezone=True), nullable=True),
-        sa.Column("vote_resolved", atr.db.models.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("vote_started", sql.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("vote_resolved", sql.UTCDateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["project_name"], ["project.name"], name=op.f("fk_release_project_name_project")),
         sa.ForeignKeyConstraint(
             ["release_policy_id"], ["releasepolicy.id"], name=op.f("fk_release_release_policy_id_releasepolicy")
@@ -171,7 +171,7 @@ def upgrade() -> None:
         sa.Column("checker", sa.String(), nullable=False),
         sa.Column("primary_rel_path", sa.String(), nullable=True),
         sa.Column("member_rel_path", sa.String(), nullable=True),
-        sa.Column("created", atr.db.models.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("created", sql.UTCDateTime(timezone=True), nullable=True),
         sa.Column(
             "status", sa.Enum("EXCEPTION", "FAILURE", "SUCCESS", "WARNING", name="checkresultstatus"), nullable=False
         ),
@@ -190,7 +190,7 @@ def upgrade() -> None:
         sa.Column("seq", sa.Integer(), nullable=False),
         sa.Column("number", sa.String(), nullable=False),
         sa.Column("asfuid", sa.String(), nullable=False),
-        sa.Column("created", atr.db.models.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("created", sql.UTCDateTime(timezone=True), nullable=True),
         sa.Column(
             "phase",
             sa.Enum("RELEASE_CANDIDATE_DRAFT", "RELEASE_CANDIDATE", "RELEASE_PREVIEW", "RELEASE", name="releasephase"),
@@ -232,10 +232,10 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("task_args", sa.JSON(), nullable=True),
-        sa.Column("added", atr.db.models.UTCDateTime(timezone=True), nullable=True),
-        sa.Column("started", atr.db.models.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("added", sql.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("started", sql.UTCDateTime(timezone=True), nullable=True),
         sa.Column("pid", sa.Integer(), nullable=True),
-        sa.Column("completed", atr.db.models.UTCDateTime(timezone=True), nullable=True),
+        sa.Column("completed", sql.UTCDateTime(timezone=True), nullable=True),
         sa.Column("result", sa.JSON(), nullable=True),
         sa.Column("error", sa.String(), nullable=True),
         sa.Column("release_name", sa.String(), nullable=True),

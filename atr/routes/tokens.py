@@ -33,8 +33,8 @@ import wtforms.fields.core as core
 from htpy import Element, code, div, form, h1, h2, p, pre, strong, table, tbody, td, th, thead, tr
 
 import atr.db as db
-import atr.db.models as models
 import atr.jwtoken as jwtoken
+import atr.models.sql as sql
 import atr.routes as routes
 import atr.template as templates
 import atr.util as util
@@ -172,7 +172,7 @@ def _build_issue_jwt_form_element(j_form: IssueJWTForm) -> markupsafe.Markup:
     return _as_markup(elem)
 
 
-def _build_tokens_table(tokens_list: list[models.PersonalAccessToken]) -> markupsafe.Markup:
+def _build_tokens_table(tokens_list: list[sql.PersonalAccessToken]) -> markupsafe.Markup:
     if not tokens_list:
         return _as_markup(p["No tokens found."])
 
@@ -210,7 +210,7 @@ async def _create_token(uid: str, label: str | None) -> str:
 
     async with db.session() as data:
         async with data.begin():
-            pat = models.PersonalAccessToken(
+            pat = sql.PersonalAccessToken(
                 asfuid=uid,
                 token_hash=token_hash,
                 created=created,
@@ -224,9 +224,9 @@ async def _create_token(uid: str, label: str | None) -> str:
 @db.session_commit_function
 async def _delete_token(data: db.Session, uid: str, token_id: int) -> None:
     pat = await data.query_one_or_none(
-        sqlmodel.select(models.PersonalAccessToken).where(
-            models.PersonalAccessToken.id == token_id,
-            models.PersonalAccessToken.asfuid == uid,
+        sqlmodel.select(sql.PersonalAccessToken).where(
+            sql.PersonalAccessToken.id == token_id,
+            sql.PersonalAccessToken.asfuid == uid,
         )
     )
     if pat:
@@ -234,12 +234,12 @@ async def _delete_token(data: db.Session, uid: str, token_id: int) -> None:
 
 
 @db.session_function
-async def _fetch_tokens(data: db.Session, uid: str) -> list[models.PersonalAccessToken]:
-    via = models.validate_instrumented_attribute
+async def _fetch_tokens(data: db.Session, uid: str) -> list[sql.PersonalAccessToken]:
+    via = sql.validate_instrumented_attribute
     stmt = (
-        sqlmodel.select(models.PersonalAccessToken)
-        .where(models.PersonalAccessToken.asfuid == uid)
-        .order_by(via(models.PersonalAccessToken.created))
+        sqlmodel.select(sql.PersonalAccessToken)
+        .where(sql.PersonalAccessToken.asfuid == uid)
+        .order_by(via(sql.PersonalAccessToken.created))
     )
     return await data.query_all(stmt)
 

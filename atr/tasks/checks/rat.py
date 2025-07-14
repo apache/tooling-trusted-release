@@ -26,7 +26,7 @@ from typing import Any, Final
 
 import atr.archives as archives
 import atr.config as config
-import atr.results as results
+import atr.models.results as results
 import atr.tasks.checks as checks
 import atr.util as util
 

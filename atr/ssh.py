@@ -31,7 +31,7 @@ import asyncssh
 
 import atr.config as config
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.revision as revision
 import atr.user as user
 import atr.util as util
@@ -190,7 +190,7 @@ async def _step_02_handle_safely(process: asyncssh.SSHServerProcess) -> None:
     #######################################
     project_name, version_name, release_obj = await _step_04_command_validate(process, argv, is_read_request)
     # The release object is only present for read requests
-    release_name = models.release_name(project_name, version_name)
+    release_name = sql.release_name(project_name, version_name)
 
     if release_obj is not None:
         _LOGGER.info(f"Processing READ request for {release_name}")
@@ -251,7 +251,7 @@ def _step_03_command_simple_validate(argv: list[str]) -> bool:
 
 async def _step_04_command_validate(
     process: asyncssh.SSHServerProcess, argv: list[str], is_read_request: bool
-) -> tuple[str, str, models.Release | None]:
+) -> tuple[str, str, sql.Release | None]:
     """Validate the path and user permissions for read or write."""
     ############################################
     ### Calls _step_05_command_path_validate ###
@@ -261,7 +261,7 @@ async def _step_04_command_validate(
     ssh_uid = process.get_extra_info("username")
 
     async with db.session() as data:
-        project = await data.project(name=path_project, status=models.ProjectStatus.ACTIVE, _committee=True).get()
+        project = await data.project(name=path_project, status=sql.ProjectStatus.ACTIVE, _committee=True).get()
         if project is None:
             # Projects are public, so existence information is public
             raise RsyncArgsError(f"Project '{path_project}' does not exist")
@@ -328,19 +328,19 @@ def _step_05_command_path_validate(path: str) -> tuple[str, str]:
 
 async def _step_06a_validate_read_permissions(
     ssh_uid: str,
-    project: models.Project,
-    release: models.Release | None,
+    project: sql.Project,
+    release: sql.Release | None,
     path_project: str,
     path_version: str,
-) -> models.Release | None:
+) -> sql.Release | None:
     """Validate permissions for a read request."""
     if release is None:
         raise RsyncArgsError(f"Release '{path_project}-{path_version}' does not exist")
 
     allowed_read_phases = {
-        models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
-        models.ReleasePhase.RELEASE_CANDIDATE,
-        models.ReleasePhase.RELEASE_PREVIEW,
+        sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+        sql.ReleasePhase.RELEASE_CANDIDATE,
+        sql.ReleasePhase.RELEASE_PREVIEW,
     }
     if release.phase not in allowed_read_phases:
         raise RsyncArgsError(f"Release '{release.name}' is not in a readable phase ({release.phase.value})")
@@ -354,8 +354,8 @@ async def _step_06a_validate_read_permissions(
 
 async def _step_06b_validate_write_permissions(
     ssh_uid: str,
-    project: models.Project,
-    release: models.Release | None,
+    project: sql.Project,
+    release: sql.Release | None,
 ) -> None:
     """Validate permissions for a write request."""
     if release is None:
@@ -364,7 +364,7 @@ async def _step_06b_validate_write_permissions(
             raise RsyncArgsError(f"You must be a member of project '{project.name}' committee to create a release")
     else:
         # Uploading to existing release, requires DRAFT and participant status
-        if release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+        if release.phase != sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
             raise RsyncArgsError(
                 f"Cannot upload: Release '{release.name}' is no longer in draft phase ({release.phase.value})"
             )
@@ -378,7 +378,7 @@ async def _step_06b_validate_write_permissions(
 async def _step_07a_process_validated_rsync_read(
     process: asyncssh.SSHServerProcess,
     argv: list[str],
-    release: models.Release,
+    release: sql.Release,
 ) -> None:
     """Handle a validated rsync read request."""
     exit_status = 1
@@ -426,7 +426,7 @@ async def _step_07b_process_validated_rsync_write(
     """Handle a validated rsync write request."""
     asf_uid = process.get_extra_info("username")
     exit_status = 0
-    release_name = models.release_name(project_name, version_name)
+    release_name = sql.release_name(project_name, version_name)
 
     # Ensure the release object exists or is created
     # This must happen before creating the revision directory
@@ -477,11 +477,11 @@ async def _step_07b_process_validated_rsync_write(
 
 async def _step_07c_ensure_release_object_for_write(project_name: str, version_name: str) -> None:
     """Ensure the release object exists or create it for a write operation."""
-    release_name = models.release_name(project_name, version_name)
+    release_name = sql.release_name(project_name, version_name)
     async with db.session() as data:
-        release = await data.release(name=models.release_name(project_name, version_name), _committee=True).get()
+        release = await data.release(name=sql.release_name(project_name, version_name), _committee=True).get()
         if release is None:
-            project = await data.project(name=project_name, status=models.ProjectStatus.ACTIVE, _committee=True).demand(
+            project = await data.project(name=project_name, status=sql.ProjectStatus.ACTIVE, _committee=True).demand(
                 RuntimeError("Project not found after validation")
             )
             if version_name_error := util.version_name_error(version_name):
@@ -489,15 +489,15 @@ async def _step_07c_ensure_release_object_for_write(project_name: str, version_n
                 raise RuntimeError(f'Invalid version name "{version_name}": {version_name_error}')
             # Create a new release object
             _LOGGER.info(f"Creating new release object for {release_name}")
-            release = models.Release(
+            release = sql.Release(
                 project_name=project.name,
                 project=project,
                 version=version_name,
-                phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+                phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
                 created=datetime.datetime.now(datetime.UTC),
             )
             data.add(release)
-        elif release.phase != models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+        elif release.phase != sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
             raise RsyncArgsError(f"Release '{release.name}' is no longer in draft phase ({release.phase.value})")
         await data.commit()
 

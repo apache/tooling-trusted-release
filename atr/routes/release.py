@@ -26,7 +26,8 @@ import asfquart.base as base
 import werkzeug.wrappers.response as response
 
 import atr.db as db
-import atr.db.models as models
+import atr.db.interaction as interaction
+import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.root as root
 import atr.template as template
@@ -64,24 +65,24 @@ async def bulk_status(session: routes.CommitterSession, task_id: int) -> str | r
                 ):
                     return await session.redirect(root.index, error="You don't have permission to view this task.")
 
-    return await template.render("release-bulk.html", task=task, release=release, TaskStatus=models.TaskStatus)
+    return await template.render("release-bulk.html", task=task, release=release, TaskStatus=sql.TaskStatus)
 
 
 @routes.public("/releases/finished/<project_name>")
 async def finished(project_name: str) -> str:
     """View all finished releases for a project."""
     async with db.session() as data:
-        project = await data.project(name=project_name, status=models.ProjectStatus.ACTIVE).demand(
+        project = await data.project(name=project_name, status=sql.ProjectStatus.ACTIVE).demand(
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
         )
 
         releases = await data.release(
             project_name=project.name,
-            phase=models.ReleasePhase.RELEASE,
+            phase=sql.ReleasePhase.RELEASE,
             _committee=True,
         ).all()
 
-    def sort_releases(release: models.Release) -> datetime.datetime:
+    def sort_releases(release: sql.Release) -> datetime.datetime:
         return release.released or release.created
 
     releases = sorted(releases, key=sort_releases, reverse=True)
@@ -97,7 +98,7 @@ async def releases() -> str:
     # Releases are public, so we don't need to filter by user
     async with db.session() as data:
         releases = await data.release(
-            phase=models.ReleasePhase.RELEASE,
+            phase=sql.ReleasePhase.RELEASE,
             _committee=True,
             _project=True,
         ).all()
@@ -122,10 +123,10 @@ async def select(session: routes.CommitterSession, project_name: str) -> str:
     await session.check_access(project_name)
 
     async with db.session() as data:
-        project = await data.project(name=project_name, status=models.ProjectStatus.ACTIVE, _releases=True).demand(
+        project = await data.project(name=project_name, status=sql.ProjectStatus.ACTIVE, _releases=True).demand(
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
         )
-        releases = await project.releases_in_progress
+        releases = await interaction.releases_in_progress(project)
         return await template.render(
             "release-select.html", project=project, releases=releases, format_datetime=util.format_datetime
         )
@@ -135,7 +136,7 @@ async def select(session: routes.CommitterSession, project_name: str) -> str:
 async def view(project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
     async with db.session() as data:
-        release_name = models.release_name(project_name, version_name)
+        release_name = sql.release_name(project_name, version_name)
         release = await data.release(name=release_name, _project=True).demand(
             base.ASFQuartException(f"Release {version_name} not found", errorcode=404)
         )
@@ -162,7 +163,7 @@ async def view(project_name: str, version_name: str) -> response.Response | str:
 async def view_path(project_name: str, version_name: str, file_path: str) -> response.Response | str:
     """View the content of a specific file in the final release."""
     async with db.session() as data:
-        release_name = models.release_name(project_name, version_name)
+        release_name = sql.release_name(project_name, version_name)
         release = await data.release(name=release_name, _project=True).demand(
             base.ASFQuartException(f"Release {version_name} not found", errorcode=404)
         )

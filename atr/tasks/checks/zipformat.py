@@ -21,7 +21,7 @@ import os
 import zipfile
 from typing import Any, Final
 
-import atr.results as results
+import atr.models.results as results
 import atr.tasks.checks as checks
 
 _LOGGER: Final = logging.getLogger(__name__)

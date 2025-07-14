@@ -23,7 +23,7 @@ import http.client
 import wtforms
 
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.routes as routes
 import atr.template as template
 import atr.util as util
@@ -33,7 +33,7 @@ import atr.util as util
 async def directory() -> str:
     """Main committee directory page."""
     async with db.session() as data:
-        committees = await data.committee(_projects=True).order_by(models.Committee.name).all()
+        committees = await data.committee(_projects=True).order_by(sql.Committee.name).all()
         return await template.render(
             "committee-directory.html",
             committees=committees,

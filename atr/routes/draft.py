@@ -36,7 +36,7 @@ import atr.analysis as analysis
 import atr.construct as construct
 import atr.db as db
 import atr.db.interaction as interaction
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
@@ -114,7 +114,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         async with data.begin():
             try:
                 await interaction.release_delete(
-                    release_name, phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
+                    release_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
                 )
             except Exception as e:
                 logging.exception("Error deleting candidate draft:")
@@ -312,14 +312,14 @@ async def sbomgen(
         # Create and queue the task, using paths within the new revision
         async with db.session() as data:
             # We still need release.name for the task metadata
-            sbom_task = models.Task(
-                task_type=models.TaskType.SBOM_GENERATE_CYCLONEDX,
+            sbom_task = sql.Task(
+                task_type=sql.TaskType.SBOM_GENERATE_CYCLONEDX,
                 task_args=sbom.GenerateCycloneDX(
                     artifact_path=str(path_in_new_revision.resolve()),
                     output_path=str(sbom_path_in_new_revision.resolve()),
                 ).model_dump(),
                 added=datetime.datetime.now(datetime.UTC),
-                status=models.TaskStatus.QUEUED,
+                status=sql.TaskStatus.QUEUED,
                 project_name=project_name,
                 version_name=version_name,
                 revision_number=creating.new.number,
@@ -331,7 +331,7 @@ async def sbomgen(
             # Maximum wait time is 60 * 100ms = 6000ms
             for _attempt in range(60):
                 await data.refresh(sbom_task)
-                if sbom_task.status != models.TaskStatus.QUEUED:
+                if sbom_task.status != sql.TaskStatus.QUEUED:
                     break
                 # Wait 100ms before checking again
                 await asyncio.sleep(0.1)
@@ -375,11 +375,11 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
             "asf_uid": session.uid,
         }
         async with db.session() as data:
-            svn_import_task = models.Task(
-                task_type=models.TaskType.SVN_IMPORT_FILES,
+            svn_import_task = sql.Task(
+                task_type=sql.TaskType.SVN_IMPORT_FILES,
                 task_args=task_args,
                 added=datetime.datetime.now(datetime.UTC),
-                status=models.TaskStatus.QUEUED,
+                status=sql.TaskStatus.QUEUED,
                 project_name=project_name,
                 version_name=version_name,
             )

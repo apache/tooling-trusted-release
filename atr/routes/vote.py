@@ -24,8 +24,8 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
-import atr.db.models as models
-import atr.results as results
+import atr.models.results as results
+import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.resolve as resolve
@@ -68,7 +68,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         project_name,
         version_name,
         with_committee=True,
-        phase=models.ReleasePhase.RELEASE_CANDIDATE,
+        phase=sql.ReleasePhase.RELEASE_CANDIDATE,
         with_project_release_policy=True,
     )
     latest_vote_task = await resolve.release_latest_vote_task(release)
@@ -78,7 +78,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     if latest_vote_task is not None:
         if util.is_dev_environment():
             logging.warning("Setting vote task to completed in dev environment")
-            latest_vote_task.status = models.TaskStatus.COMPLETED
+            latest_vote_task.status = sql.TaskStatus.COMPLETED
             latest_vote_task.result = results.VoteInitiate(
                 kind="vote_initiate",
                 message="Vote announcement email sent successfully",
@@ -117,7 +117,7 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
 
     if await form.validate_on_submit():
         # Ensure the release exists and is in the correct phase
-        release = await session.release(project_name, version_name, phase=models.ReleasePhase.RELEASE_CANDIDATE)
+        release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE)
 
         vote = str(form.vote_value.data)
         comment = str(form.vote_comment.data)
@@ -172,7 +172,7 @@ async def task_archive_url_cached(task_mid: str | None) -> str | None:
 
 async def _send_vote(
     session: routes.CommitterSession,
-    release: models.Release,
+    release: sql.Release,
     vote: str,
     comment: str,
 ) -> tuple[str, str]:
@@ -199,9 +199,9 @@ async def _send_vote(
     body_text = "\n\n".join(body)
     in_reply_to = vote_thread_mid
 
-    task = models.Task(
-        status=models.TaskStatus.QUEUED,
-        task_type=models.TaskType.MESSAGE_SEND,
+    task = sql.Task(
+        status=sql.TaskStatus.QUEUED,
+        task_type=sql.TaskType.MESSAGE_SEND,
         task_args=message.Send(
             email_sender=email_sender,
             email_recipient=email_recipient,

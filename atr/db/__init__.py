@@ -30,13 +30,13 @@ import sqlalchemy
 import sqlalchemy.dialects.sqlite
 import sqlalchemy.ext.asyncio
 import sqlalchemy.orm as orm
-import sqlalchemy.sql as sql
+import sqlalchemy.sql
 import sqlmodel
 import sqlmodel.sql.expression as expression
 
 import atr.config as config
-import atr.db.models as models
-import atr.schema as schema
+import atr.models.schema as schema
+import atr.models.sql as sql
 import atr.util as util
 
 if TYPE_CHECKING:
@@ -153,7 +153,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
     # TODO: Need to type all of these arguments correctly
 
     async def begin_immediate(self) -> None:
-        await self.execute(sql.text("BEGIN IMMEDIATE"))
+        await self.execute(sqlalchemy.text("BEGIN IMMEDIATE"))
 
     def check_result(
         self,
@@ -164,36 +164,36 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         primary_rel_path: Opt[str | None] = NOT_SET,
         member_rel_path: Opt[str | None] = NOT_SET,
         created: Opt[datetime.datetime] = NOT_SET,
-        status: Opt[models.CheckResultStatus] = NOT_SET,
+        status: Opt[sql.CheckResultStatus] = NOT_SET,
         message: Opt[str] = NOT_SET,
         data: Opt[Any] = NOT_SET,
         _release: bool = False,
-    ) -> Query[models.CheckResult]:
-        query = sqlmodel.select(models.CheckResult)
+    ) -> Query[sql.CheckResult]:
+        query = sqlmodel.select(sql.CheckResult)
 
         if is_defined(id):
-            query = query.where(models.CheckResult.id == id)
+            query = query.where(sql.CheckResult.id == id)
         if is_defined(release_name):
-            query = query.where(models.CheckResult.release_name == release_name)
+            query = query.where(sql.CheckResult.release_name == release_name)
         if is_defined(revision_number):
-            query = query.where(models.CheckResult.revision_number == revision_number)
+            query = query.where(sql.CheckResult.revision_number == revision_number)
         if is_defined(checker):
-            query = query.where(models.CheckResult.checker == checker)
+            query = query.where(sql.CheckResult.checker == checker)
         if is_defined(primary_rel_path):
-            query = query.where(models.CheckResult.primary_rel_path == primary_rel_path)
+            query = query.where(sql.CheckResult.primary_rel_path == primary_rel_path)
         if is_defined(member_rel_path):
-            query = query.where(models.CheckResult.member_rel_path == member_rel_path)
+            query = query.where(sql.CheckResult.member_rel_path == member_rel_path)
         if is_defined(created):
-            query = query.where(models.CheckResult.created == created)
+            query = query.where(sql.CheckResult.created == created)
         if is_defined(status):
-            query = query.where(models.CheckResult.status == status)
+            query = query.where(sql.CheckResult.status == status)
         if is_defined(message):
-            query = query.where(models.CheckResult.message == message)
+            query = query.where(sql.CheckResult.message == message)
         if is_defined(data):
-            query = query.where(models.CheckResult.data == data)
+            query = query.where(sql.CheckResult.data == data)
 
         if _release:
-            query = query.options(joined_load(models.CheckResult.release))
+            query = query.options(joined_load(sql.CheckResult.release))
 
         return Query(self, query)
 
@@ -210,34 +210,34 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         _child_committees: bool = False,
         _projects: bool = False,
         _public_signing_keys: bool = False,
-    ) -> Query[models.Committee]:
-        query = sqlmodel.select(models.Committee)
+    ) -> Query[sql.Committee]:
+        query = sqlmodel.select(sql.Committee)
 
         if is_defined(name):
-            query = query.where(models.Committee.name == name)
+            query = query.where(sql.Committee.name == name)
         if is_defined(full_name):
-            query = query.where(models.Committee.full_name == full_name)
+            query = query.where(sql.Committee.full_name == full_name)
         if is_defined(is_podling):
-            query = query.where(models.Committee.is_podling == is_podling)
+            query = query.where(sql.Committee.is_podling == is_podling)
         if is_defined(parent_committee_name):
-            query = query.where(models.Committee.parent_committee_name == parent_committee_name)
+            query = query.where(sql.Committee.parent_committee_name == parent_committee_name)
         if is_defined(committee_members):
-            query = query.where(models.Committee.committee_members == committee_members)
+            query = query.where(sql.Committee.committee_members == committee_members)
         if is_defined(committers):
-            query = query.where(models.Committee.committers == committers)
+            query = query.where(sql.Committee.committers == committers)
         if is_defined(release_managers):
-            query = query.where(models.Committee.release_managers == release_managers)
+            query = query.where(sql.Committee.release_managers == release_managers)
 
         if is_defined(name_in):
-            models_committee_name = models.validate_instrumented_attribute(models.Committee.name)
+            models_committee_name = sql.validate_instrumented_attribute(sql.Committee.name)
             query = query.where(models_committee_name.in_(name_in))
 
         if _child_committees:
-            query = query.options(select_in_load(models.Committee.child_committees))
+            query = query.options(select_in_load(sql.Committee.child_committees))
         if _projects:
-            query = query.options(select_in_load(models.Committee.projects))
+            query = query.options(select_in_load(sql.Committee.projects))
         if _public_signing_keys:
-            query = query.options(select_in_load(models.Committee.public_signing_keys))
+            query = query.options(select_in_load(sql.Committee.public_signing_keys))
 
         return Query(self, query)
 
@@ -253,40 +253,38 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         return execution_result
 
     async def ns_text_del(self, ns: str, key: str, commit: bool = True) -> None:
-        stmt = sql.delete(models.TextValue).where(
-            models.validate_instrumented_attribute(models.TextValue.ns) == ns,
-            models.validate_instrumented_attribute(models.TextValue.key) == key,
+        stmt = sqlalchemy.delete(sql.TextValue).where(
+            sql.validate_instrumented_attribute(sql.TextValue.ns) == ns,
+            sql.validate_instrumented_attribute(sql.TextValue.key) == key,
         )
         await self.execute(stmt)
         if commit is True:
             await self.commit()
 
     async def ns_text_del_all(self, ns: str, commit: bool = True) -> None:
-        stmt = sql.delete(models.TextValue).where(
-            models.validate_instrumented_attribute(models.TextValue.ns) == ns,
+        stmt = sqlalchemy.delete(sql.TextValue).where(
+            sql.validate_instrumented_attribute(sql.TextValue.ns) == ns,
         )
         await self.execute(stmt)
         if commit is True:
             await self.commit()
 
     async def ns_text_get(self, ns: str, key: str) -> str | None:
-        stmt = sql.select(models.TextValue).where(
-            models.validate_instrumented_attribute(models.TextValue.ns) == ns,
-            models.validate_instrumented_attribute(models.TextValue.key) == key,
+        stmt = sqlalchemy.select(sql.TextValue).where(
+            sql.validate_instrumented_attribute(sql.TextValue.ns) == ns,
+            sql.validate_instrumented_attribute(sql.TextValue.key) == key,
         )
         result = await self.execute(stmt)
         match result.scalar_one_or_none():
-            case models.TextValue(value=value):
+            case sql.TextValue(value=value):
                 return value
             case None:
                 return None
 
     async def ns_text_set(self, ns: str, key: str, value: str, commit: bool = True) -> None:
         # Don't use sql.insert(), it won't give on_conflict_do_update()
-        stmt = sqlalchemy.dialects.sqlite.insert(models.TextValue).values((ns, key, value))
-        stmt = stmt.on_conflict_do_update(
-            index_elements=[models.TextValue.ns, models.TextValue.key], set_=dict(value=value)
-        )
+        stmt = sqlalchemy.dialects.sqlite.insert(sql.TextValue).values((ns, key, value))
+        stmt = stmt.on_conflict_do_update(index_elements=[sql.TextValue.ns, sql.TextValue.key], set_=dict(value=value))
         await self.execute(stmt)
         if commit is True:
             await self.commit()
@@ -297,45 +295,45 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         full_name: Opt[str] = NOT_SET,
         committee_name: Opt[str] = NOT_SET,
         release_policy_id: Opt[int] = NOT_SET,
-        status: Opt[models.ProjectStatus] = NOT_SET,
+        status: Opt[sql.ProjectStatus] = NOT_SET,
         _committee: bool = True,
         _releases: bool = False,
         _distribution_channels: bool = False,
         _super_project: bool = False,
         _release_policy: bool = False,
         _committee_public_signing_keys: bool = False,
-    ) -> Query[models.Project]:
-        query = sqlmodel.select(models.Project)
+    ) -> Query[sql.Project]:
+        query = sqlmodel.select(sql.Project)
 
         if is_defined(name):
-            query = query.where(models.Project.name == name)
+            query = query.where(sql.Project.name == name)
         if is_defined(full_name):
-            query = query.where(models.Project.full_name == full_name)
+            query = query.where(sql.Project.full_name == full_name)
         if is_defined(committee_name):
-            query = query.where(models.Project.committee_name == committee_name)
+            query = query.where(sql.Project.committee_name == committee_name)
         if is_defined(release_policy_id):
-            query = query.where(models.Project.release_policy_id == release_policy_id)
+            query = query.where(sql.Project.release_policy_id == release_policy_id)
         if is_defined(status):
-            query = query.where(models.Project.status == status)
+            query = query.where(sql.Project.status == status)
 
         # Avoid multiple loaders for Project.committee on the same path
         if _committee_public_signing_keys:
             query = query.options(
-                joined_load(models.Project.committee).selectinload(
-                    models.validate_instrumented_attribute(models.Committee.public_signing_keys)
+                joined_load(sql.Project.committee).selectinload(
+                    sql.validate_instrumented_attribute(sql.Committee.public_signing_keys)
                 )
             )
         elif _committee:
-            query = query.options(joined_load(models.Project.committee))
+            query = query.options(joined_load(sql.Project.committee))
 
         if _releases:
-            query = query.options(select_in_load(models.Project.releases))
+            query = query.options(select_in_load(sql.Project.releases))
         if _distribution_channels:
-            query = query.options(select_in_load(models.Project.distribution_channels))
+            query = query.options(select_in_load(sql.Project.distribution_channels))
         if _super_project:
-            query = query.options(joined_load(models.Project.super_project))
+            query = query.options(joined_load(sql.Project.super_project))
         if _release_policy:
-            query = query.options(joined_load(models.Project.release_policy))
+            query = query.options(joined_load(sql.Project.release_policy))
 
         return Query(self, query)
 
@@ -351,105 +349,105 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         apache_uid: Opt[str | None] = NOT_SET,
         ascii_armored_key: Opt[str] = NOT_SET,
         _committees: bool = False,
-    ) -> Query[models.PublicSigningKey]:
-        query = sqlmodel.select(models.PublicSigningKey)
+    ) -> Query[sql.PublicSigningKey]:
+        query = sqlmodel.select(sql.PublicSigningKey)
 
         if is_defined(fingerprint):
-            query = query.where(models.PublicSigningKey.fingerprint == fingerprint)
+            query = query.where(sql.PublicSigningKey.fingerprint == fingerprint)
         if is_defined(algorithm):
-            query = query.where(models.PublicSigningKey.algorithm == algorithm)
+            query = query.where(sql.PublicSigningKey.algorithm == algorithm)
         if is_defined(length):
-            query = query.where(models.PublicSigningKey.length == length)
+            query = query.where(sql.PublicSigningKey.length == length)
         if is_defined(created):
-            query = query.where(models.PublicSigningKey.created == created)
+            query = query.where(sql.PublicSigningKey.created == created)
         if is_defined(expires):
-            query = query.where(models.PublicSigningKey.expires == expires)
+            query = query.where(sql.PublicSigningKey.expires == expires)
         if is_defined(primary_declared_uid):
-            query = query.where(models.PublicSigningKey.primary_declared_uid == primary_declared_uid)
+            query = query.where(sql.PublicSigningKey.primary_declared_uid == primary_declared_uid)
         if is_defined(secondary_declared_uids):
-            query = query.where(models.PublicSigningKey.secondary_declared_uids == secondary_declared_uids)
+            query = query.where(sql.PublicSigningKey.secondary_declared_uids == secondary_declared_uids)
         if is_defined(apache_uid):
-            query = query.where(models.PublicSigningKey.apache_uid == apache_uid)
+            query = query.where(sql.PublicSigningKey.apache_uid == apache_uid)
         if is_defined(ascii_armored_key):
-            query = query.where(models.PublicSigningKey.ascii_armored_key == ascii_armored_key)
+            query = query.where(sql.PublicSigningKey.ascii_armored_key == ascii_armored_key)
 
         if _committees:
-            query = query.options(select_in_load(models.PublicSigningKey.committees))
+            query = query.options(select_in_load(sql.PublicSigningKey.committees))
 
         return Query(self, query)
 
-    async def query_all(self, stmt: sql.Select[Any]) -> list[Any]:
+    async def query_all(self, stmt: sqlalchemy.Select[Any]) -> list[Any]:
         result = await self.execute(stmt)
         return list(result.scalars().all())
 
-    async def query_first(self, stmt: sql.Select[Any]) -> Any | None:
+    async def query_first(self, stmt: sqlalchemy.Select[Any]) -> Any | None:
         result = await self.execute(stmt)
         return result.scalars().first()
 
-    async def query_one(self, stmt: sql.Select[Any]) -> Any:
+    async def query_one(self, stmt: sqlalchemy.Select[Any]) -> Any:
         result = await self.execute(stmt)
         return result.scalars().one()
 
-    async def query_one_or_none(self, stmt: sql.Select[Any]) -> Any | None:
+    async def query_one_or_none(self, stmt: sqlalchemy.Select[Any]) -> Any | None:
         result = await self.execute(stmt)
         return result.scalars().one_or_none()
 
     def release(
         self,
         name: Opt[str] = NOT_SET,
-        phase: Opt[models.ReleasePhase] = NOT_SET,
+        phase: Opt[sql.ReleasePhase] = NOT_SET,
         created: Opt[datetime.datetime] = NOT_SET,
         project_name: Opt[str] = NOT_SET,
         package_managers: Opt[list[str]] = NOT_SET,
         version: Opt[str] = NOT_SET,
         sboms: Opt[list[str]] = NOT_SET,
         release_policy_id: Opt[int] = NOT_SET,
-        votes: Opt[list[models.VoteEntry]] = NOT_SET,
+        votes: Opt[list[sql.VoteEntry]] = NOT_SET,
         latest_revision_number: Opt[str | None] = NOT_SET,
         _project: bool = True,
         _committee: bool = True,
         _release_policy: bool = False,
         _project_release_policy: bool = False,
         _revisions: bool = False,
-    ) -> Query[models.Release]:
-        query = sqlmodel.select(models.Release)
+    ) -> Query[sql.Release]:
+        query = sqlmodel.select(sql.Release)
 
         if is_defined(name):
-            query = query.where(models.Release.name == name)
+            query = query.where(sql.Release.name == name)
         if is_defined(phase):
-            query = query.where(models.Release.phase == phase)
+            query = query.where(sql.Release.phase == phase)
         if is_defined(created):
-            query = query.where(models.Release.created == created)
+            query = query.where(sql.Release.created == created)
         if is_defined(project_name):
-            query = query.where(models.Release.project_name == project_name)
+            query = query.where(sql.Release.project_name == project_name)
         if is_defined(package_managers):
-            query = query.where(models.Release.package_managers == package_managers)
+            query = query.where(sql.Release.package_managers == package_managers)
         if is_defined(version):
-            query = query.where(models.Release.version == version)
+            query = query.where(sql.Release.version == version)
         if is_defined(sboms):
-            query = query.where(models.Release.sboms == sboms)
+            query = query.where(sql.Release.sboms == sboms)
         if is_defined(release_policy_id):
-            query = query.where(models.Release.release_policy_id == release_policy_id)
+            query = query.where(sql.Release.release_policy_id == release_policy_id)
         if is_defined(votes):
-            query = query.where(models.Release.votes == votes)
+            query = query.where(sql.Release.votes == votes)
         if is_defined(latest_revision_number):
             # Must define the subquery explicitly, mirroring the column_property
             # In other words, this doesn't work:
             # query = query.where(models.Release.latest_revision_number == latest_revision_number)
-            query = query.where(models.latest_revision_number_query() == latest_revision_number)
+            query = query.where(sql.latest_revision_number_query() == latest_revision_number)
 
         # Avoid multiple loaders for Release.project on the same path
         if _committee:
-            query = query.options(joined_load_nested(models.Release.project, models.Project.committee))
+            query = query.options(joined_load_nested(sql.Release.project, sql.Project.committee))
         elif _project:
-            query = query.options(joined_load(models.Release.project))
+            query = query.options(joined_load(sql.Release.project))
 
         if _release_policy:
-            query = query.options(joined_load(models.Release.release_policy))
+            query = query.options(joined_load(sql.Release.release_policy))
         if _project_release_policy:
-            query = query.options(joined_load_nested(models.Release.project, models.Project.release_policy))
+            query = query.options(joined_load_nested(sql.Release.project, sql.Project.release_policy))
         if _revisions:
-            query = query.options(select_in_load(models.Release.revisions))
+            query = query.options(select_in_load(sql.Release.revisions))
 
         return Query(self, query)
 
@@ -462,24 +460,24 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         release_checklist: Opt[str] = NOT_SET,
         pause_for_rm: Opt[bool] = NOT_SET,
         _project: bool = False,
-    ) -> Query[models.ReleasePolicy]:
-        query = sqlmodel.select(models.ReleasePolicy)
+    ) -> Query[sql.ReleasePolicy]:
+        query = sqlmodel.select(sql.ReleasePolicy)
 
         if is_defined(id):
-            query = query.where(models.ReleasePolicy.id == id)
+            query = query.where(sql.ReleasePolicy.id == id)
         if is_defined(mailto_addresses):
-            query = query.where(models.ReleasePolicy.mailto_addresses == mailto_addresses)
+            query = query.where(sql.ReleasePolicy.mailto_addresses == mailto_addresses)
         if is_defined(manual_vote):
-            query = query.where(models.ReleasePolicy.manual_vote == manual_vote)
+            query = query.where(sql.ReleasePolicy.manual_vote == manual_vote)
         if is_defined(min_hours):
-            query = query.where(models.ReleasePolicy.min_hours == min_hours)
+            query = query.where(sql.ReleasePolicy.min_hours == min_hours)
         if is_defined(release_checklist):
-            query = query.where(models.ReleasePolicy.release_checklist == release_checklist)
+            query = query.where(sql.ReleasePolicy.release_checklist == release_checklist)
         if is_defined(pause_for_rm):
-            query = query.where(models.ReleasePolicy.pause_for_rm == pause_for_rm)
+            query = query.where(sql.ReleasePolicy.pause_for_rm == pause_for_rm)
 
         if _project:
-            query = query.options(joined_load(models.ReleasePolicy.project))
+            query = query.options(joined_load(sql.ReleasePolicy.project))
 
         return Query(self, query)
 
@@ -491,40 +489,40 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         number: Opt[str] = NOT_SET,
         asfuid: Opt[str] = NOT_SET,
         created: Opt[datetime.datetime] = NOT_SET,
-        phase: Opt[models.ReleasePhase] = NOT_SET,
+        phase: Opt[sql.ReleasePhase] = NOT_SET,
         parent_name: Opt[str | None] = NOT_SET,
         description: Opt[str | None] = NOT_SET,
         _release: bool = False,
         _parent: bool = False,
         _child: bool = False,
-    ) -> Query[models.Revision]:
-        query = sqlmodel.select(models.Revision)
+    ) -> Query[sql.Revision]:
+        query = sqlmodel.select(sql.Revision)
 
         if is_defined(name):
-            query = query.where(models.Revision.name == name)
+            query = query.where(sql.Revision.name == name)
         if is_defined(release_name):
-            query = query.where(models.Revision.release_name == release_name)
+            query = query.where(sql.Revision.release_name == release_name)
         if is_defined(seq):
-            query = query.where(models.Revision.seq == seq)
+            query = query.where(sql.Revision.seq == seq)
         if is_defined(number):
-            query = query.where(models.Revision.number == number)
+            query = query.where(sql.Revision.number == number)
         if is_defined(asfuid):
-            query = query.where(models.Revision.asfuid == asfuid)
+            query = query.where(sql.Revision.asfuid == asfuid)
         if is_defined(created):
-            query = query.where(models.Revision.created == created)
+            query = query.where(sql.Revision.created == created)
         if is_defined(phase):
-            query = query.where(models.Revision.phase == phase)
+            query = query.where(sql.Revision.phase == phase)
         if is_defined(parent_name):
-            query = query.where(models.Revision.parent_name == parent_name)
+            query = query.where(sql.Revision.parent_name == parent_name)
         if is_defined(description):
-            query = query.where(models.Revision.description == description)
+            query = query.where(sql.Revision.description == description)
 
         if _release:
-            query = query.options(joined_load(models.Revision.release))
+            query = query.options(joined_load(sql.Revision.release))
         if _parent:
-            query = query.options(joined_load(models.Revision.parent))
+            query = query.options(joined_load(sql.Revision.parent))
         if _child:
-            query = query.options(joined_load(models.Revision.child))
+            query = query.options(joined_load(sql.Revision.child))
 
         return Query(self, query)
 
@@ -533,22 +531,22 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         fingerprint: Opt[str] = NOT_SET,
         key: Opt[str] = NOT_SET,
         asf_uid: Opt[str] = NOT_SET,
-    ) -> Query[models.SSHKey]:
-        query = sqlmodel.select(models.SSHKey)
+    ) -> Query[sql.SSHKey]:
+        query = sqlmodel.select(sql.SSHKey)
 
         if is_defined(fingerprint):
-            query = query.where(models.SSHKey.fingerprint == fingerprint)
+            query = query.where(sql.SSHKey.fingerprint == fingerprint)
         if is_defined(key):
-            query = query.where(models.SSHKey.key == key)
+            query = query.where(sql.SSHKey.key == key)
         if is_defined(asf_uid):
-            query = query.where(models.SSHKey.asf_uid == asf_uid)
+            query = query.where(sql.SSHKey.asf_uid == asf_uid)
 
         return Query(self, query)
 
     def task(
         self,
         id: Opt[int] = NOT_SET,
-        status: Opt[models.TaskStatus] = NOT_SET,
+        status: Opt[sql.TaskStatus] = NOT_SET,
         task_type: Opt[str] = NOT_SET,
         task_args: Opt[Any] = NOT_SET,
         added: Opt[datetime.datetime] = NOT_SET,
@@ -561,37 +559,37 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         version_name: Opt[str | None] = NOT_SET,
         revision_number: Opt[str | None] = NOT_SET,
         primary_rel_path: Opt[str | None] = NOT_SET,
-    ) -> Query[models.Task]:
-        query = sqlmodel.select(models.Task)
+    ) -> Query[sql.Task]:
+        query = sqlmodel.select(sql.Task)
 
         if is_defined(id):
-            query = query.where(models.Task.id == id)
+            query = query.where(sql.Task.id == id)
         if is_defined(status):
-            query = query.where(models.Task.status == status)
+            query = query.where(sql.Task.status == status)
         if is_defined(task_type):
-            query = query.where(models.Task.task_type == task_type)
+            query = query.where(sql.Task.task_type == task_type)
         if is_defined(task_args):
-            query = query.where(models.Task.task_args == task_args)
+            query = query.where(sql.Task.task_args == task_args)
         if is_defined(added):
-            query = query.where(models.Task.added == added)
+            query = query.where(sql.Task.added == added)
         if is_defined(started):
-            query = query.where(models.Task.started == started)
+            query = query.where(sql.Task.started == started)
         if is_defined(pid):
-            query = query.where(models.Task.pid == pid)
+            query = query.where(sql.Task.pid == pid)
         if is_defined(completed):
-            query = query.where(models.Task.completed == completed)
+            query = query.where(sql.Task.completed == completed)
         if is_defined(result):
-            query = query.where(models.Task.result == result)
+            query = query.where(sql.Task.result == result)
         if is_defined(error):
-            query = query.where(models.Task.error == error)
+            query = query.where(sql.Task.error == error)
         if is_defined(project_name):
-            query = query.where(models.Task.project_name == project_name)
+            query = query.where(sql.Task.project_name == project_name)
         if is_defined(version_name):
-            query = query.where(models.Task.version_name == version_name)
+            query = query.where(sql.Task.version_name == version_name)
         if is_defined(revision_number):
-            query = query.where(models.Task.revision_number == revision_number)
+            query = query.where(sql.Task.revision_number == revision_number)
         if is_defined(primary_rel_path):
-            query = query.where(models.Task.primary_rel_path == primary_rel_path)
+            query = query.where(sql.Task.primary_rel_path == primary_rel_path)
 
         return Query(self, query)
 
@@ -600,15 +598,15 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         ns: Opt[str] = NOT_SET,
         key: Opt[str] = NOT_SET,
         value: Opt[str] = NOT_SET,
-    ) -> Query[models.TextValue]:
-        query = sqlmodel.select(models.TextValue)
+    ) -> Query[sql.TextValue]:
+        query = sqlmodel.select(sql.TextValue)
 
         if is_defined(ns):
-            query = query.where(models.TextValue.ns == ns)
+            query = query.where(sql.TextValue.ns == ns)
         if is_defined(key):
-            query = query.where(models.TextValue.key == key)
+            query = query.where(sql.TextValue.key == key)
         if is_defined(value):
-            query = query.where(models.TextValue.value == value)
+            query = query.where(sql.TextValue.value == value)
 
         return Query(self, query)
 
@@ -629,19 +627,19 @@ async def create_async_engine(app_config: type[config.AppConfig]) -> sqlalchemy.
     # Set SQLite pragmas for better performance
     # Use 64 MB for the cache_size, and 5000ms for busy_timeout
     async with engine.begin() as conn:
-        await conn.execute(sql.text("PRAGMA journal_mode=WAL"))
-        await conn.execute(sql.text("PRAGMA synchronous=NORMAL"))
-        await conn.execute(sql.text("PRAGMA cache_size=-64000"))
-        await conn.execute(sql.text("PRAGMA foreign_keys=ON"))
-        await conn.execute(sql.text("PRAGMA busy_timeout=5000"))
-        await conn.execute(sql.text("PRAGMA strict=ON"))
+        await conn.execute(sqlalchemy.text("PRAGMA journal_mode=WAL"))
+        await conn.execute(sqlalchemy.text("PRAGMA synchronous=NORMAL"))
+        await conn.execute(sqlalchemy.text("PRAGMA cache_size=-64000"))
+        await conn.execute(sqlalchemy.text("PRAGMA foreign_keys=ON"))
+        await conn.execute(sqlalchemy.text("PRAGMA busy_timeout=5000"))
+        await conn.execute(sqlalchemy.text("PRAGMA strict=ON"))
 
     return engine
 
 
-async def get_project_release_policy(data: Session, project_name: str) -> models.ReleasePolicy | None:
+async def get_project_release_policy(data: Session, project_name: str) -> sql.ReleasePolicy | None:
     """Fetch the ReleasePolicy for a project."""
-    project = await data.project(name=project_name, status=models.ProjectStatus.ACTIVE, _release_policy=True).demand(
+    project = await data.project(name=project_name, status=sql.ProjectStatus.ACTIVE, _release_policy=True).demand(
         RuntimeError(f"Project {project_name} not found")
     )
     return project.release_policy

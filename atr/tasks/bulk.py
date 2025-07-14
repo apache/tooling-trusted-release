@@ -30,7 +30,7 @@ import sqlalchemy
 import sqlalchemy.ext.asyncio
 
 import atr.config as config
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.tasks.task as task
 
 # Configure detailed logging
@@ -445,7 +445,7 @@ async def database_task_update_execute(task_id: int, msg: str, progress_pct: int
         _LOGGER.exception(f"Error updating task {task_id} in database: {e}")
 
 
-async def download(args: dict[str, Any]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
+async def download(args: dict[str, Any]) -> tuple[sql.TaskStatus, str | None, tuple[Any, ...]]:
     """Download bulk package from URL."""
     # Returns (status, error, result)
     # This is the main task entry point, called by worker.py
@@ -462,7 +462,7 @@ async def download(args: dict[str, Any]) -> tuple[models.TaskStatus, str | None,
         return task.FAILED, str(e), ({"message": f"Error: {e}", "progress": 0},)
 
 
-async def download_core(args_dict: dict[str, Any]) -> tuple[models.TaskStatus, str | None, tuple[Any, ...]]:
+async def download_core(args_dict: dict[str, Any]) -> tuple[sql.TaskStatus, str | None, tuple[Any, ...]]:
     """Download bulk package from URL."""
     _LOGGER.info("Starting download_core")
     try:

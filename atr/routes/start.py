@@ -23,7 +23,7 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
-import atr.db.models as models
+import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
@@ -45,12 +45,12 @@ class StartReleaseForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Start new release")
 
 
-async def create_release_draft(project_name: str, version: str, asf_uid: str) -> tuple[models.Release, models.Project]:
+async def create_release_draft(project_name: str, version: str, asf_uid: str) -> tuple[sql.Release, sql.Project]:
     """Creates the initial release draft record and revision directory."""
     # Get the project from the project name
     async with db.session() as data:
         async with data.begin():
-            project = await data.project(name=project_name, status=models.ProjectStatus.ACTIVE, _committee=True).get()
+            project = await data.project(name=project_name, status=sql.ProjectStatus.ACTIVE, _committee=True).get()
             if not project:
                 raise routes.FlashError(f"Project {project_name} not found")
 
@@ -69,7 +69,7 @@ async def create_release_draft(project_name: str, version: str, asf_uid: str) ->
         async with data.begin():
             # Check whether the release already exists
             if release := await data.release(project_name=project.name, version=version).get():
-                if release.phase == models.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+                if release.phase == sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
                     raise routes.FlashError(f"A draft for {project_name} {version} already exists.")
                 else:
                     raise routes.FlashError(
@@ -81,8 +81,8 @@ async def create_release_draft(project_name: str, version: str, asf_uid: str) ->
             if version_name_error := util.version_name_error(version):
                 raise routes.FlashError(f'Invalid version name "{version}": {version_name_error}')
 
-            release = models.Release(
-                phase=models.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+            release = sql.Release(
+                phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
                 project_name=project.name,
                 project=project,
                 version=version,
@@ -104,7 +104,7 @@ async def selected(session: routes.CommitterSession, project_name: str) -> respo
     await session.check_access(project_name)
 
     async with db.session() as data:
-        project = await data.project(name=project_name, status=models.ProjectStatus.ACTIVE).demand(
+        project = await data.project(name=project_name, status=sql.ProjectStatus.ACTIVE).demand(
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
         )
 
