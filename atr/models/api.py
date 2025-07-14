@@ -38,34 +38,29 @@ class Task(Pagination):
     status: str | None = None
 
 
-class DraftDeleteRequest(schema.Strict):
-    project_name: str
-    version: str
-
-
-class FileUploadRequest(schema.Strict):
-    project_name: str
-    version: str
-    rel_path: str
-    content: str
-
-
-class PATJWTRequest(schema.Strict):
+class AsfuidPat(schema.Strict):
     asfuid: str
     pat: str
 
 
-class ReleaseCreateRequest(schema.Strict):
-    project_name: str
+class ProjectVersion(schema.Strict):
+    project: str
     version: str
+
+
+class ProjectVersionRelpathContent(schema.Strict):
+    project: str
+    version: str
+    relpath: str
+    content: str
 
 
 class ResultCount(schema.Strict):
     count: int
 
 
-class VoteStartRequest(schema.Strict):
-    project_name: str
+class VoteStart(schema.Strict):
+    project: str
     version: str
     revision: str
     email_to: str

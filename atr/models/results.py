@@ -21,8 +21,6 @@ from pydantic import TypeAdapter
 
 from . import schema
 
-# TODO: If we put this in atr.tasks.results, we get a circular import error
-
 
 class HashingCheck(schema.Strict):
     """Result of the task to check the hash of a file."""

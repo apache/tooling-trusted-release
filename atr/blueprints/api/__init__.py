@@ -16,10 +16,13 @@
 # under the License.
 
 import sys
+from typing import Any
 
 import asfquart.base as base
+import pydantic
 import quart
 import quart.blueprints as blueprints
+import quart_schema
 import werkzeug.exceptions as exceptions
 
 BLUEPRINT = quart.Blueprint("api_blueprint", __name__, url_prefix="/api")
@@ -52,7 +55,17 @@ async def _handle_not_found(err: exceptions.NotFound) -> tuple[quart.Response, i
     return _json_error(err.description or err.name, 404)
 
 
-def _json_error(message: str, status_code: int | None) -> tuple[quart.Response, int]:
+@BLUEPRINT.errorhandler(quart_schema.RequestSchemaValidationError)
+async def _handle_request_validation(err: quart_schema.RequestSchemaValidationError) -> tuple[quart.Response, int]:
+    if not isinstance(err.validation_error, pydantic.ValidationError):
+        raise err.validation_error
+    verr: pydantic.ValidationError = err.validation_error
+    return _json_error("Input validation failed", 400, {"validation_details": verr.errors()})
+
+
+def _json_error(
+    message: str, status_code: int | None, extra: dict[str, Any] | None = None
+) -> tuple[quart.Response, int]:
     payload = {"error": message}
     show_traceback = False
     if show_traceback:
@@ -60,6 +73,8 @@ def _json_error(message: str, status_code: int | None) -> tuple[quart.Response, 
 
         traceback_str = "".join(traceback.format_exception(*sys.exc_info()))
         payload["traceback"] = traceback_str
+    if extra is not None:
+        payload.update(extra)
     return quart.jsonify(payload), status_code or 500
 
 
