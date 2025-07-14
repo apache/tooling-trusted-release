@@ -58,6 +58,7 @@ import atr.util as util
 @quart_schema.validate_response(list[sql.CheckResult], 200)
 async def checks_list_project_version(project: str, version: str) -> tuple[list[Mapping], int]:
     """List all check results for a given release."""
+    _simple_check(project, version)
     # TODO: Merge with checks_list_project_version_revision
     async with db.session() as data:
         release_name = sql.release_name(project, version)
@@ -69,6 +70,7 @@ async def checks_list_project_version(project: str, version: str) -> tuple[list[
 @quart_schema.validate_response(list[sql.CheckResult], 200)
 async def checks_list_project_version_revision(project: str, version: str, revision: str) -> tuple[list[Mapping], int]:
     """List all check results for a specific revision of a release."""
+    _simple_check(project, version, revision)
     async with db.session() as data:
         project_result = await data.project(name=project).get()
         if project_result is None:
@@ -96,7 +98,8 @@ async def checks_ongoing_project_version(
     revision: str | None = None,
 ) -> tuple[Mapping[str, Any], int]:
     """Return a count of all unfinished check results for a given release."""
-    ongoing_tasks_count = await interaction.tasks_ongoing(project, version, revision)
+    _simple_check(project, version, revision)
+    ongoing_tasks_count, latest_revision = await interaction.tasks_ongoing_revision(project, version, revision)
     # TODO: Is there a way to return just an int?
     # The ResponseReturnValue type in quart does not allow int
     # And if we use quart.jsonify, we must return quart.Response which quart_schema tries to validate
@@ -126,6 +129,7 @@ async def committees() -> tuple[list[Mapping], int]:
 @quart_schema.validate_response(sql.Committee, 200)
 async def committees_name(name: str) -> tuple[Mapping, int]:
     """Get a specific committee by name."""
+    _simple_check(name)
     async with db.session() as data:
         committee = await data.committee(name=name).demand(exceptions.NotFound())
         return committee.model_dump(), 200
@@ -135,6 +139,7 @@ async def committees_name(name: str) -> tuple[Mapping, int]:
 @quart_schema.validate_response(list[sql.PublicSigningKey], 200)
 async def committees_name_keys(name: str) -> tuple[list[Mapping], int]:
     """List all public signing keys associated with a specific committee."""
+    _simple_check(name)
     async with db.session() as data:
         committee = await data.committee(name=name, _public_signing_keys=True).demand(exceptions.NotFound())
         return [key.model_dump() for key in committee.public_signing_keys], 200
@@ -144,6 +149,7 @@ async def committees_name_keys(name: str) -> tuple[list[Mapping], int]:
 @quart_schema.validate_response(list[sql.Project], 200)
 async def committees_name_projects(name: str) -> tuple[list[Mapping], int]:
     """List all projects for a specific committee."""
+    _simple_check(name)
     async with db.session() as data:
         committee = await data.committee(name=name, _projects=True).demand(exceptions.NotFound())
         return [project.model_dump() for project in committee.projects], 200
@@ -184,6 +190,7 @@ async def draft_delete_project_version() -> tuple[dict[str, str], int]:
 async def list_project_version(
     project: str, version: str, revision: str | None = None
 ) -> tuple[dict[str, list[str]], int]:
+    _simple_check(project, version, revision)
     async with db.session() as data:
         release_name = sql.release_name(project, version)
         release = await data.release(name=release_name).demand(exceptions.NotFound())
@@ -243,6 +250,7 @@ async def public_keys(query_args: models.api.Pagination) -> quart.Response:
 @quart_schema.validate_response(sql.PublicSigningKey, 200)
 async def public_keys_fingerprint(fingerprint: str) -> tuple[Mapping, int]:
     """Return a single public signing key by fingerprint."""
+    _simple_check(fingerprint)
     async with db.session() as data:
         key = await data.public_signing_key(fingerprint=fingerprint.lower()).demand(exceptions.NotFound())
         return key.model_dump(), 200
@@ -260,6 +268,7 @@ async def projects() -> tuple[list[Mapping], int]:
 @api.BLUEPRINT.route("/projects/<name>")
 @quart_schema.validate_response(sql.Committee, 200)
 async def projects_name(name: str) -> tuple[Mapping, int]:
+    _simple_check(name)
     async with db.session() as data:
         committee = await data.committee(name=name).demand(exceptions.NotFound())
         return committee.model_dump(), 200
@@ -269,6 +278,7 @@ async def projects_name(name: str) -> tuple[Mapping, int]:
 @quart_schema.validate_response(list[sql.Release], 200)
 async def projects_name_releases(name: str) -> tuple[list[Mapping], int]:
     """List all releases for a specific project."""
+    _simple_check(name)
     async with db.session() as data:
         releases = await data.release(project_name=name).all()
         return [release.model_dump() for release in releases], 200
@@ -335,6 +345,7 @@ async def releases_create() -> tuple[Mapping, int]:
 @quart_schema.validate_querystring(models.api.Pagination)
 async def releases_project(project: str, query_args: models.api.Pagination) -> quart.Response:
     """List all releases for a specific project with pagination."""
+    _simple_check(project)
     _pagination_args_validate(query_args)
     async with db.session() as data:
         project_result = await data.project(name=project).get()
@@ -362,9 +373,11 @@ async def releases_project(project: str, query_args: models.api.Pagination) -> q
 
 
 @api.BLUEPRINT.route("/releases/<project>/<version>")
-@quart_schema.validate_response(sql.Release, 200)
+# TODO: If we validate as sql.Release, quart_schema silently corrupts latest_revision_number to None
+# @quart_schema.validate_response(sql.Release, 200)
 async def releases_project_version(project: str, version: str) -> tuple[Mapping, int]:
     """Return a single release by project and version."""
+    _simple_check(project, version)
     async with db.session() as data:
         release_name = sql.release_name(project, version)
         release = await data.release(name=release_name).demand(exceptions.NotFound())
@@ -376,6 +389,7 @@ async def releases_project_version(project: str, version: str) -> tuple[Mapping,
 @quart_schema.validate_response(list[sql.Revision], 200)
 async def releases_project_version_revisions(project: str, version: str) -> tuple[list[Mapping], int]:
     """List all revisions for a given release."""
+    _simple_check(project, version)
     async with db.session() as data:
         release_name = sql.release_name(project, version)
         revisions = await data.revision(release_name=release_name).all()
@@ -385,6 +399,7 @@ async def releases_project_version_revisions(project: str, version: str) -> tupl
 @api.BLUEPRINT.route("/revisions/<project>/<version>")
 @quart_schema.validate_response(dict[str, list[sql.Revision]], 200)
 async def revisions_project_version(project: str, version: str) -> tuple[dict[str, list[sql.Revision]], int]:
+    _simple_check(project, version)
     async with db.session() as data:
         release_name = sql.release_name(project, version)
         await data.release(name=release_name).demand(exceptions.NotFound())
@@ -546,6 +561,12 @@ async def _payload_get() -> dict:
     if not isinstance(payload, dict):
         raise exceptions.BadRequest("Invalid JSON")
     return payload
+
+
+def _simple_check(*args: str | None) -> None:
+    for arg in args:
+        if arg == "None":
+            raise exceptions.BadRequest("Argument cannot be the string 'None'")
 
 
 async def _upload_process_file(req: models.api.FileUploadRequest, asf_uid: str) -> sql.Revision:

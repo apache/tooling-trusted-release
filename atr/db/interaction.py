@@ -328,6 +328,44 @@ async def tasks_ongoing(project_name: str, version_name: str, revision_number: s
         return result.scalar_one()
 
 
+async def tasks_ongoing_revision(
+    project_name: str,
+    version_name: str,
+    revision_number: str | None = None,
+) -> tuple[int, str]:
+    via = sql.validate_instrumented_attribute
+    subquery = (
+        sqlalchemy.select(via(sql.Revision.number))
+        .where(
+            via(sql.Revision.release_name) == sql.release_name(project_name, version_name),
+        )
+        .order_by(via(sql.Revision.seq).desc())
+        .limit(1)
+        .scalar_subquery()
+        .label("latest_revision")
+    )
+
+    query = (
+        sqlmodel.select(
+            sqlalchemy.func.count().label("task_count"),
+            subquery,
+        )
+        .select_from(sql.Task)
+        .where(
+            sql.Task.project_name == project_name,
+            sql.Task.version_name == version_name,
+            sql.Task.revision_number == (subquery if revision_number is None else revision_number),
+            sql.validate_instrumented_attribute(sql.Task.status).in_(
+                [sql.TaskStatus.QUEUED, sql.TaskStatus.ACTIVE],
+            ),
+        )
+    )
+
+    async with db.session() as session:
+        task_count, latest_revision = (await session.execute(query)).one()
+        return task_count, latest_revision
+
+
 async def unfinished_releases(asfuid: str) -> dict[str, list[sql.Release]]:
     releases: dict[str, list[sql.Release]] = {}
     async with db.session() as data:
