@@ -314,19 +314,15 @@ async def release_delete(
     await _delete_release_data_filesystem(release_dir, release_name)
 
 
-async def tasks_ongoing(project_name: str, version_name: str, revision_number: str) -> int:
+async def tasks_ongoing(project_name: str, version_name: str, revision_number: str | None = None) -> int:
+    tasks = sqlmodel.select(sqlalchemy.func.count()).select_from(sql.Task)
     async with db.session() as data:
-        query = (
-            sqlmodel.select(sqlalchemy.func.count())
-            .select_from(sql.Task)
-            .where(
-                sql.Task.project_name == project_name,
-                sql.Task.version_name == version_name,
-                sql.Task.revision_number == revision_number,
-                sql.validate_instrumented_attribute(sql.Task.status).in_(
-                    [sql.TaskStatus.QUEUED, sql.TaskStatus.ACTIVE]
-                ),
-            )
+        query = tasks.where(
+            sql.Task.project_name == project_name,
+            sql.Task.version_name == version_name,
+            sql.Task.revision_number
+            == (sql.RELEASE_LATEST_REVISION_NUMBER if (revision_number is None) else revision_number),
+            sql.validate_instrumented_attribute(sql.Task.status).in_([sql.TaskStatus.QUEUED, sql.TaskStatus.ACTIVE]),
         )
         result = await data.execute(query)
         return result.scalar_one()

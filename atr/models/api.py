@@ -60,6 +60,10 @@ class ReleaseCreateRequest(schema.Strict):
     version: str
 
 
+class ResultCount(schema.Strict):
+    count: int
+
+
 class VoteStartRequest(schema.Strict):
     project_name: str
     version: str

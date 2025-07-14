@@ -24,7 +24,7 @@
 
 import datetime
 import enum
-from typing import Any, Optional
+from typing import Any, Final, Optional
 
 import pydantic
 import sqlalchemy
@@ -834,8 +834,7 @@ def validate_instrumented_attribute(obj: Any) -> orm.InstrumentedAttribute:
     return obj
 
 
-# https://github.com/fastapi/sqlmodel/issues/240#issuecomment-2074161775
-Release._latest_revision_number = orm.column_property(
+RELEASE_LATEST_REVISION_NUMBER: Final = orm.column_property(
     sqlalchemy.select(validate_instrumented_attribute(Revision.number))
     .where(validate_instrumented_attribute(Revision.release_name) == Release.name)
     .order_by(validate_instrumented_attribute(Revision.seq).desc())
@@ -843,3 +842,6 @@ Release._latest_revision_number = orm.column_property(
     .correlate_except(Revision)
     .scalar_subquery(),
 )
+
+# https://github.com/fastapi/sqlmodel/issues/240#issuecomment-2074161775
+Release._latest_revision_number = RELEASE_LATEST_REVISION_NUMBER

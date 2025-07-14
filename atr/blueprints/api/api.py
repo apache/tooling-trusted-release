@@ -21,6 +21,7 @@ import datetime
 import hashlib
 import pathlib
 from collections.abc import Mapping
+from typing import Any
 
 import aiofiles.os
 import asfquart.base as base
@@ -53,19 +54,20 @@ import atr.util as util
 # We implicitly have /api/openapi.json
 
 
-@api.BLUEPRINT.route("/checks/<project>/<version>")
+@api.BLUEPRINT.route("/checks/list/<project>/<version>")
 @quart_schema.validate_response(list[sql.CheckResult], 200)
-async def checks_project_version(project: str, version: str) -> tuple[list[Mapping], int]:
+async def checks_list_project_version(project: str, version: str) -> tuple[list[Mapping], int]:
     """List all check results for a given release."""
+    # TODO: Merge with checks_list_project_version_revision
     async with db.session() as data:
         release_name = sql.release_name(project, version)
         check_results = await data.check_result(release_name=release_name).all()
         return [cr.model_dump() for cr in check_results], 200
 
 
-@api.BLUEPRINT.route("/checks/<project>/<version>/<revision>")
+@api.BLUEPRINT.route("/checks/list/<project>/<version>/<revision>")
 @quart_schema.validate_response(list[sql.CheckResult], 200)
-async def checks_project_version_revision(project: str, version: str, revision: str) -> tuple[list[Mapping], int]:
+async def checks_list_project_version_revision(project: str, version: str, revision: str) -> tuple[list[Mapping], int]:
     """List all check results for a specific revision of a release."""
     async with db.session() as data:
         project_result = await data.project(name=project).get()
@@ -83,6 +85,32 @@ async def checks_project_version_revision(project: str, version: str, revision: 
 
         check_results = await data.check_result(release_name=release_name, revision_number=revision).all()
         return [cr.model_dump() for cr in check_results], 200
+
+
+@api.BLUEPRINT.route("/checks/ongoing/<project>/<version>")
+@api.BLUEPRINT.route("/checks/ongoing/<project>/<version>/<revision>")
+@quart_schema.validate_response(models.api.ResultCount, 200)
+async def checks_ongoing_project_version(
+    project: str,
+    version: str,
+    revision: str | None = None,
+) -> tuple[Mapping[str, Any], int]:
+    """Return a count of all unfinished check results for a given release."""
+    ongoing_tasks_count = await interaction.tasks_ongoing(project, version, revision)
+    # TODO: Is there a way to return just an int?
+    # The ResponseReturnValue type in quart does not allow int
+    # And if we use quart.jsonify, we must return quart.Response which quart_schema tries to validate
+    # ResponseValue = Union[
+    #     "Response",
+    #     "WerkzeugResponse",
+    #     bytes,
+    #     str,
+    #     Mapping[str, Any],  # any jsonify-able dict
+    #     list[Any],  # any jsonify-able list
+    #     Iterator[bytes],
+    #     Iterator[str],
+    # ]
+    return models.api.ResultCount(count=ongoing_tasks_count).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/committees")
