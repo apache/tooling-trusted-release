@@ -168,8 +168,9 @@ async def draft_delete_project_version(data: models.api.ProjectVersion) -> tuple
         release = await db_data.release(
             name=release_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, _committee=True
         ).demand(exceptions.NotFound())
-        if not (user.is_committee_member(release.project.committee, asf_uid) or user.is_admin(asf_uid)):
-            raise exceptions.Forbidden("You do not have permission to delete this draft")
+        if release.project.committee is None:
+            raise exceptions.NotFound("Project has no committee")
+        _committee_member_or_admin(release.project.committee, asf_uid)
 
         # TODO: This causes "A transaction is already begun on this Session"
         # async with data.begin():
@@ -460,10 +461,33 @@ async def tasks(query_args: models.api.Task) -> quart.Response:
 @api.BLUEPRINT.route("/vote/resolve", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.VoteStart)
-@quart_schema.validate_response(sql.Task, 201)
-async def vote_resolve(req: models.api.VoteStart) -> tuple[Mapping, int]:
-    return {}, 200
+@quart_schema.validate_request(models.api.ProjectVersionResolution)
+@quart_schema.validate_response(dict[str, str], 200)
+async def vote_resolve(data: models.api.ProjectVersionResolution) -> tuple[Mapping, int]:
+    asf_uid = _jwt_asf_uid()
+
+    async with db.session() as db_data:
+        release_name = sql.release_name(data.project, data.version)
+        release = await db_data.release(name=release_name, _project=True, _committee=True).demand(exceptions.NotFound())
+        if release.project.committee is None:
+            raise exceptions.NotFound("Project has no committee")
+        _committee_member_or_admin(release.project.committee, asf_uid)
+
+        release = await db_data.merge(release)
+        match data.resolution:
+            case "passed":
+                release.phase = sql.ReleasePhase.RELEASE_PREVIEW
+                success_message = "Vote marked as passed"
+                description = "Create a preview revision from the last candidate draft"
+                async with revision.create_and_manage(
+                    data.project, release.version, asf_uid, description=description
+                ) as _creating:
+                    pass
+            case "failed":
+                release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+                success_message = "Vote marked as failed"
+        await db_data.commit()
+    return {"success": success_message}, 200
 
 
 @api.BLUEPRINT.route("/vote/start", methods=["POST"])
@@ -471,25 +495,25 @@ async def vote_resolve(req: models.api.VoteStart) -> tuple[Mapping, int]:
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.VoteStart)
 @quart_schema.validate_response(sql.Task, 201)
-async def vote_start(req: models.api.VoteStart) -> tuple[Mapping, int]:
+async def vote_start(data: models.api.VoteStart) -> tuple[Mapping, int]:
     asf_uid = _jwt_asf_uid()
 
     permitted_recipients = util.permitted_recipients(asf_uid)
-    if req.email_to not in permitted_recipients:
+    if data.email_to not in permitted_recipients:
         raise exceptions.Forbidden("Invalid mailing list choice")
 
-    async with db.session() as data:
-        release_name = sql.release_name(req.project, req.version)
-        release = await data.release(name=release_name, _project=True, _committee=True).demand(exceptions.NotFound())
+    async with db.session() as db_data:
+        release_name = sql.release_name(data.project, data.version)
+        release = await db_data.release(name=release_name, _project=True, _committee=True).demand(exceptions.NotFound())
+        if release.project.committee is None:
+            raise exceptions.NotFound("Project has no committee")
+        _committee_member_or_admin(release.project.committee, asf_uid)
 
-        if not (user.is_committee_member(release.committee, asf_uid) or user.is_admin(asf_uid)):
-            raise exceptions.Forbidden("You do not have permission to start a vote for this project")
-
-        revision_exists = await data.revision(release_name=release_name, number=req.revision).get()
+        revision_exists = await db_data.revision(release_name=release_name, number=data.revision).get()
         if revision_exists is None:
-            raise exceptions.NotFound(f"Revision '{req.revision}' does not exist")
+            raise exceptions.NotFound(f"Revision '{data.revision}' does not exist")
 
-        error = await voting.promote_release(data, release_name, req.revision, vote_manual=False)
+        error = await voting.promote_release(db_data, release_name, data.revision, vote_manual=False)
         if error:
             raise exceptions.BadRequest(error)
 
@@ -499,18 +523,18 @@ async def vote_start(req: models.api.VoteStart) -> tuple[Mapping, int]:
             task_type=sql.TaskType.VOTE_INITIATE,
             task_args=tasks_vote.Initiate(
                 release_name=release_name,
-                email_to=req.email_to,
-                vote_duration=req.vote_duration,
+                email_to=data.email_to,
+                vote_duration=data.vote_duration,
                 initiator_id=asf_uid,
                 initiator_fullname=asf_uid,
-                subject=req.subject,
-                body=req.body,
+                subject=data.subject,
+                body=data.body,
             ).model_dump(),
-            project_name=req.project,
-            version_name=req.version,
+            project_name=data.project,
+            version_name=data.version,
         )
-        data.add(task)
-        await data.commit()
+        db_data.add(task)
+        await db_data.commit()
         return task.model_dump(exclude={"result"}), 201
 
 
@@ -530,6 +554,11 @@ async def upload(data: models.api.ProjectVersionRelpathContent) -> tuple[Mapping
 
     revision = await _upload_process_file(data, asf_uid)
     return revision.model_dump(), 201
+
+
+def _committee_member_or_admin(committee: sql.Committee, asf_uid: str) -> None:
+    if not (user.is_committee_member(committee, asf_uid) or user.is_admin(asf_uid)):
+        raise exceptions.Forbidden("You do not have permission to perform this action")
 
 
 @db.session_function

@@ -67,6 +67,12 @@ class ProjectVersionRelpathContent(schema.Strict):
     content: str
 
 
+class ProjectVersionResolution(schema.Strict):
+    project: str
+    version: str
+    resolution: Literal["passed", "failed"]
+
+
 class VoteStart(schema.Strict):
     project: str
     version: str
