@@ -337,6 +337,24 @@ async def releases_create(data: models.api.ProjectVersion) -> tuple[Mapping, int
     return release.model_dump(), 201
 
 
+@api.BLUEPRINT.route("/releases/delete", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.ProjectVersion)
+@quart_schema.validate_response(dict[str, str], 200)
+async def releases_delete(data: models.api.ProjectVersion) -> tuple[Mapping, int]:
+    """Delete a release draft for a project via POSTed JSON."""
+    asf_uid = _jwt_asf_uid()
+    if not user.is_admin(asf_uid):
+        raise exceptions.Forbidden("You do not have permission to create a release")
+
+    async with db.session() as db_data:
+        release_name = sql.release_name(data.project, data.version)
+        await interaction.release_delete(release_name, include_downloads=True)
+        await db_data.commit()
+    return {"deleted": release_name}, 200
+
+
 @api.BLUEPRINT.route("/releases/<project>")
 @quart_schema.validate_querystring(models.api.Pagination)
 async def releases_project(project: str, query_args: models.api.Pagination) -> quart.Response:
