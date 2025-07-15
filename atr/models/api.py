@@ -229,11 +229,6 @@ class ReleasesProjectResults(schema.Strict):
     data: Sequence[sql.Release]
     count: int
 
-    @pydantic.field_validator("data", mode="before")
-    @classmethod
-    def coerce_release(cls, v: Sequence[dict[str, Any]]) -> Sequence[sql.Release]:
-        return [sql.Release.model_validate(item) if isinstance(item, dict) else item for item in v]
-
 
 class ReleasesVersionResults(schema.Strict):
     endpoint: Literal["/releases/version"] = schema.Field(alias="endpoint")
