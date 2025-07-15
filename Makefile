@@ -71,7 +71,7 @@ serve-local:
 	  --keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
 
 sync:
-	uv sync
+	uv sync --no-dev
 
 update-deps:
 	uv lock --upgrade
