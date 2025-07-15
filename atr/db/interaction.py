@@ -305,6 +305,12 @@ async def release_delete(
             await data.delete(check)
         _LOGGER.debug("Deleted %d check results for %s", len(checks_to_delete), release_name)
 
+        # TODO: Ensure that revisions are not deleted
+        # But this makes testing difficult
+        # Perhaps delete revisions if associated with test accounts only
+        # But we want to test actual mechanisms, not special case tests
+        # We could create uniquely named releases in tests
+        # Currently part of the discussion in #171, but should be its own issue
         await data.delete(release)
         _LOGGER.info("Deleted release record: %s", release_name)
         await data.commit()

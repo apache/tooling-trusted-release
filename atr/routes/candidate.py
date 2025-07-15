@@ -37,6 +37,7 @@ if asfquart.APP is ...:
 @routes.committer("/candidate/delete", methods=["POST"])
 async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a release candidate."""
+    # TODO: We need to never retire revisions, if allowing release deletion
     return await session.redirect(root.index, error="Not yet implemented")
 
 
