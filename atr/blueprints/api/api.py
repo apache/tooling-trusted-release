@@ -41,6 +41,7 @@ import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.announce as announce
+import atr.routes.keys as keys
 import atr.routes.start as start
 import atr.routes.voting as voting
 import atr.tasks.vote as tasks_vote
@@ -211,6 +212,7 @@ async def draft_delete_project_version(data: models.api.ProjectVersion) -> tuple
     return {"deleted": release_name}, 200
 
 
+# TODO: Call this release/paths
 @api.BLUEPRINT.route("/list/<project>/<version>")
 @api.BLUEPRINT.route("/list/<project>/<version>/<revision>")
 @quart_schema.validate_response(dict[str, list[str]], 200)
@@ -279,6 +281,21 @@ async def public_keys_fingerprint(fingerprint: str) -> tuple[Mapping, int]:
     async with db.session() as data:
         key = await data.public_signing_key(fingerprint=fingerprint.lower()).demand(exceptions.NotFound())
         return key.model_dump(), 200
+
+
+@api.BLUEPRINT.route("/keys/ssh/add", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.Text)
+@quart_schema.validate_response(models.api.Fingerprint, 201)
+async def keys_ssh_add(data: models.api.Text) -> tuple[Mapping, int]:
+    """Add an SSH key for a user."""
+    asf_uid = _jwt_asf_uid()
+    fingerprint = await keys.ssh_key_add(data.text, asf_uid)
+    return models.api.Fingerprint(
+        kind="fingerprint",
+        fingerprint=fingerprint,
+    ).model_dump(), 201
 
 
 @api.BLUEPRINT.route("/projects")

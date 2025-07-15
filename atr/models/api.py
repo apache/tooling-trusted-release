@@ -65,6 +65,11 @@ class Count(schema.Strict):
     count: int
 
 
+class Fingerprint(schema.Strict):
+    kind: Literal["fingerprint"] = schema.Field(alias="kind")
+    fingerprint: str
+
+
 class ProjectVersion(schema.Strict):
     project: str
     version: str
@@ -83,6 +88,10 @@ class ProjectVersionResolution(schema.Strict):
     resolution: Literal["passed", "failed"]
 
 
+class Text(schema.Strict):
+    text: str
+
+
 class VoteStart(schema.Strict):
     project: str
     version: str
@@ -94,7 +103,7 @@ class VoteStart(schema.Strict):
 
 
 Results = Annotated[
-    Count,
+    Count | Fingerprint,
     schema.Field(discriminator="kind"),
 ]
 
@@ -106,3 +115,10 @@ def validate_count(value: Any) -> Count:
     if not isinstance(count, Count):
         raise ResultsTypeError(f"Invalid API response: {value}")
     return count
+
+
+def validate_fingerprint(value: Any) -> Fingerprint:
+    fingerprint = ResultsAdapter.validate_python(value)
+    if not isinstance(fingerprint, Fingerprint):
+        raise ResultsTypeError(f"Invalid API response: {value}")
+    return fingerprint

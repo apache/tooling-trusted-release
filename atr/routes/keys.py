@@ -66,6 +66,10 @@ class DeleteKeyForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Delete key")
 
 
+class SshFingerprintError(ValueError):
+    pass
+
+
 class UpdateCommitteeKeysForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Regenerate KEYS file")
 
@@ -450,17 +454,15 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
     if await form.validate_on_submit():
         key: str = util.unwrap(form.key.data)
         try:
-            fingerprint = await asyncio.to_thread(key_ssh_fingerprint, key)
-        except ValueError as e:
+            fingerprint = await ssh_key_add(key, session.uid)
+        except SshFingerprintError as e:
             if isinstance(form.key.errors, list):
                 form.key.errors.append(str(e))
             else:
                 form.key.errors = [str(e)]
         else:
-            async with db.session() as data:
-                async with data.begin():
-                    data.add(sql.SSHKey(fingerprint=fingerprint, key=key, asf_uid=session.uid))
-            return await session.redirect(keys, success=f"SSH key added successfully: {fingerprint}")
+            success_message = f"SSH key added successfully: {fingerprint}"
+            return await session.redirect(keys, success=success_message)
 
     return await template.render(
         "keys-ssh-add.html",
@@ -468,6 +470,17 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
         form=form,
         fingerprint=fingerprint,
     )
+
+
+async def ssh_key_add(key: str, asf_uid: str) -> str:
+    try:
+        fingerprint = await asyncio.to_thread(key_ssh_fingerprint, key)
+    except Exception as e:
+        raise SshFingerprintError(str(e)) from e
+    async with db.session() as data:
+        data.add(sql.SSHKey(fingerprint=fingerprint, key=key, asf_uid=asf_uid))
+        await data.commit()
+    return fingerprint
 
 
 @routes.committer("/keys/update-committee-keys/<committee_name>", methods=["POST"])
