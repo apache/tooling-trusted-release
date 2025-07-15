@@ -1,6 +1,6 @@
 .PHONY: build build-alpine build-playwright build-ts build-ubuntu certs \
   check check-extra check-light commit docs generate-version run-playwright \
-  run-playwright-slow serve serve-local sync
+  run-playwright-slow serve serve-local sync update-deps
 
 BIND ?= 127.0.0.1:8080
 IMAGE ?= tooling-trusted-release
@@ -69,6 +69,9 @@ serve-local:
 	APP_HOST=127.0.0.1:8080 LOCAL_DEBUG=1 SECRET_KEY=insecure-local-key \
 	  SSH_HOST=127.0.0.1 uv run hypercorn --bind $(BIND) \
 	  --keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
+
+sync:
+	uv sync
 
 update-deps:
 	uv lock --upgrade
