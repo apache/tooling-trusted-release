@@ -93,14 +93,71 @@ class CommitteesProjectsResults(schema.Strict):
     projects: Sequence[sql.Project]
 
 
-class AsfuidPat(schema.Strict):
+class DraftDeleteArgs(schema.Strict):
+    project: str
+    version: str
+
+
+class DraftDeleteResults(schema.Strict):
+    endpoint: Literal["/draft/delete"] = schema.Field(alias="endpoint")
+    success: str
+
+
+class ListResults(schema.Strict):
+    endpoint: Literal["/list"] = schema.Field(alias="endpoint")
+    rel_paths: Sequence[str]
+
+
+class JwtArgs(schema.Strict):
     asfuid: str
     pat: str
 
 
-class Fingerprint(schema.Strict):
+class JwtResults(schema.Strict):
+    endpoint: Literal["/jwt"] = schema.Field(alias="endpoint")
+    asfuid: str
+    jwt: str
+
+
+class KeyResults(schema.Strict):
+    endpoint: Literal["/key"] = schema.Field(alias="endpoint")
+    key: sql.PublicSigningKey
+
+
+@dataclasses.dataclass
+class KeysQuery:
+    offset: int = 0
+    limit: int = 20
+
+
+class KeysResults(schema.Strict):
+    endpoint: Literal["/keys"] = schema.Field(alias="endpoint")
+    data: Sequence[sql.PublicSigningKey]
+    count: int
+
+
+class KeysSshAddArgs(schema.Strict):
+    text: str
+
+
+class KeysSshAddResults(schema.Strict):
     endpoint: Literal["/keys/ssh/add"] = schema.Field(alias="endpoint")
     fingerprint: str
+
+
+class ProjectResults(schema.Strict):
+    endpoint: Literal["/project"] = schema.Field(alias="endpoint")
+    project: sql.Project
+
+
+class ProjectReleasesResults(schema.Strict):
+    endpoint: Literal["/project/releases"] = schema.Field(alias="endpoint")
+    releases: Sequence[sql.Release]
+
+
+class ProjectsResults(schema.Strict):
+    endpoint: Literal["/projects"] = schema.Field(alias="endpoint")
+    projects: Sequence[sql.Project]
 
 
 class ProjectVersion(schema.Strict):
@@ -143,7 +200,15 @@ Results = Annotated[
     | CommitteesKeysResults
     | CommitteesListResults
     | CommitteesProjectsResults
-    | Fingerprint,
+    | DraftDeleteResults
+    | JwtResults
+    | KeyResults
+    | KeysResults
+    | KeysSshAddResults
+    | ListResults
+    | ProjectResults
+    | ProjectReleasesResults
+    | ProjectsResults,
     schema.Field(discriminator="endpoint"),
 ]
 
@@ -167,4 +232,12 @@ validate_committees = validator(CommitteesResults)
 validate_committees_keys = validator(CommitteesKeysResults)
 validate_committees_list = validator(CommitteesListResults)
 validate_committees_projects = validator(CommitteesProjectsResults)
-validate_fingerprint = validator(Fingerprint)
+validate_draft_delete = validator(DraftDeleteResults)
+validate_jwt = validator(JwtResults)
+validate_key = validator(KeyResults)
+validate_keys = validator(KeysResults)
+validate_keys_ssh_add = validator(KeysSshAddResults)
+validate_list = validator(ListResults)
+validate_project = validator(ProjectResults)
+validate_project_releases = validator(ProjectReleasesResults)
+validate_projects = validator(ProjectsResults)
