@@ -597,6 +597,16 @@ class Release(sqlmodel.SQLModel, table=True):
             raise ValueError("Latest revision number is not a str or None")
         return number
 
+    @pydantic.field_validator("created", mode="before")
+    @classmethod
+    def parse_created(cls, v: str | datetime.datetime):
+        return datetime.datetime.fromisoformat(v.rstrip("Z")) if isinstance(v, str) else v
+
+    @pydantic.field_validator("phase", mode="before")
+    @classmethod
+    def parse_phase(cls, v: str | ReleasePhase):
+        return ReleasePhase(v) if isinstance(v, str) else v
+
     # NOTE: This does not work
     # But it we set it with Release.latest_revision_number_query = ..., it might work
     # Not clear that we'd want to do that, though

@@ -36,12 +36,6 @@ class Pagination:
     limit: int = 20
 
 
-# TODO: ReleasesPagination?
-@dataclasses.dataclass
-class Releases(Pagination):
-    phase: str | None = None
-
-
 # TODO: TaskPagination?
 @dataclasses.dataclass
 class Task(Pagination):
@@ -145,6 +139,17 @@ class KeysSshAddResults(schema.Strict):
     fingerprint: str
 
 
+class KeysSshListQuery(Pagination):
+    offset: int = 0
+    limit: int = 20
+
+
+class KeysSshListResults(schema.Strict):
+    endpoint: Literal["/keys/ssh/list"] = schema.Field(alias="endpoint")
+    data: Sequence[sql.SSHKey]
+    count: int
+
+
 class ProjectResults(schema.Strict):
     endpoint: Literal["/project"] = schema.Field(alias="endpoint")
     project: sql.Project
@@ -178,6 +183,68 @@ class ProjectVersionResolution(schema.Strict):
     resolution: Literal["passed", "failed"]
 
 
+@dataclasses.dataclass
+class ReleasesQuery:
+    offset: int = 0
+    limit: int = 20
+    phase: str | None = None
+
+
+class ReleasesResults(schema.Strict):
+    endpoint: Literal["/releases"] = schema.Field(alias="endpoint")
+    data: Sequence[sql.Release]
+    count: int
+
+
+class ReleasesCreateArgs(schema.Strict):
+    project: str
+    version: str
+
+
+class ReleasesCreateResults(schema.Strict):
+    endpoint: Literal["/releases/create"] = schema.Field(alias="endpoint")
+    release: sql.Release
+
+
+class ReleasesDeleteArgs(schema.Strict):
+    project: str
+    version: str
+
+
+class ReleasesDeleteResults(schema.Strict):
+    endpoint: Literal["/releases/delete"] = schema.Field(alias="endpoint")
+    deleted: str
+
+
+@dataclasses.dataclass
+class ReleasesProjectQuery:
+    limit: int = 20
+    offset: int = 0
+    # project: str
+    # version: str
+
+
+class ReleasesProjectResults(schema.Strict):
+    endpoint: Literal["/releases/project"] = schema.Field(alias="endpoint")
+    data: Sequence[sql.Release]
+    count: int
+
+    @pydantic.field_validator("data", mode="before")
+    @classmethod
+    def coerce_release(cls, v: Sequence[dict[str, Any]]) -> Sequence[sql.Release]:
+        return [sql.Release.model_validate(item) if isinstance(item, dict) else item for item in v]
+
+
+class ReleasesVersionResults(schema.Strict):
+    endpoint: Literal["/releases/version"] = schema.Field(alias="endpoint")
+    release: sql.Release
+
+
+class ReleasesRevisionsResults(schema.Strict):
+    endpoint: Literal["/releases/revisions"] = schema.Field(alias="endpoint")
+    revisions: Sequence[sql.Revision]
+
+
 class Text(schema.Strict):
     text: str
 
@@ -192,6 +259,8 @@ class VoteStart(schema.Strict):
     body: str
 
 
+# This is for *Results classes only
+# We do NOT put *Args classes here
 Results = Annotated[
     AnnounceResults
     | ChecksListResults
@@ -205,10 +274,17 @@ Results = Annotated[
     | KeyResults
     | KeysResults
     | KeysSshAddResults
+    | KeysSshListResults
     | ListResults
     | ProjectResults
     | ProjectReleasesResults
-    | ProjectsResults,
+    | ProjectsResults
+    | ReleasesResults
+    | ReleasesCreateResults
+    | ReleasesDeleteResults
+    | ReleasesProjectResults
+    | ReleasesVersionResults
+    | ReleasesRevisionsResults,
     schema.Field(discriminator="endpoint"),
 ]
 
@@ -237,7 +313,14 @@ validate_jwt = validator(JwtResults)
 validate_key = validator(KeyResults)
 validate_keys = validator(KeysResults)
 validate_keys_ssh_add = validator(KeysSshAddResults)
+validate_keys_ssh_list = validator(KeysSshListResults)
 validate_list = validator(ListResults)
 validate_project = validator(ProjectResults)
 validate_project_releases = validator(ProjectReleasesResults)
 validate_projects = validator(ProjectsResults)
+validate_releases = validator(ReleasesResults)
+validate_releases_create = validator(ReleasesCreateResults)
+validate_releases_delete = validator(ReleasesDeleteResults)
+validate_releases_project = validator(ReleasesProjectResults)
+validate_releases_version = validator(ReleasesVersionResults)
+validate_releases_revisions = validator(ReleasesRevisionsResults)
