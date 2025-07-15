@@ -244,6 +244,22 @@ class Task(sqlmodel.SQLModel, table=True):
     revision_number: str | None = sqlmodel.Field(default=None, index=True)
     primary_rel_path: str | None = sqlmodel.Field(default=None, index=True)
 
+    def model_post_init(self, _context):
+        if isinstance(self.task_type, str):
+            self.task_type = TaskType(self.task_type)
+
+        if isinstance(self.status, str):
+            self.status = TaskStatus(self.status)
+
+        if isinstance(self.added, str):
+            self.added = datetime.datetime.fromisoformat(self.added.rstrip("Z"))
+
+        if isinstance(self.started, str):
+            self.started = datetime.datetime.fromisoformat(self.started.rstrip("Z"))
+
+        if isinstance(self.completed, str):
+            self.completed = datetime.datetime.fromisoformat(self.completed.rstrip("Z"))
+
     # Create an index on status and added for efficient task claiming
     __table_args__ = (
         sqlalchemy.Index("ix_task_status_added", "status", "added"),
@@ -754,6 +770,13 @@ class Revision(sqlmodel.SQLModel, table=True):
     child: Optional["Revision"] = sqlmodel.Relationship(back_populates="parent")
 
     description: str | None = sqlmodel.Field(default=None)
+
+    def model_post_init(self, _context):
+        if isinstance(self.created, str):
+            self.created = datetime.datetime.fromisoformat(self.created.rstrip("Z"))
+
+        if isinstance(self.phase, str):
+            self.phase = ReleasePhase(self.phase)
 
     __table_args__ = (
         sqlmodel.UniqueConstraint("release_name", "seq", name="uq_revision_release_seq"),

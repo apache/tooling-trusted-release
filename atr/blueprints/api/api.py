@@ -20,7 +20,6 @@ import base64
 import datetime
 import hashlib
 import pathlib
-from collections.abc import Mapping
 from typing import Any
 
 import aiofiles.os
@@ -552,8 +551,8 @@ async def releases_project_version_revisions(project: str, version: str) -> Dict
 
 
 @api.BLUEPRINT.route("/revisions/<project>/<version>")
-@quart_schema.validate_response(dict[str, list[sql.Revision]], 200)
-async def revisions_project_version(project: str, version: str) -> tuple[dict[str, list[sql.Revision]], int]:
+@quart_schema.validate_response(models.api.RevisionsResults, 200)
+async def revisions_project_version(project: str, version: str) -> DictResponse:
     _simple_check(project, version)
     async with db.session() as data:
         release_name = sql.release_name(project, version)
@@ -562,21 +561,15 @@ async def revisions_project_version(project: str, version: str) -> tuple[dict[st
     if not isinstance(revisions, list):
         revisions = list(revisions)
     revisions.sort(key=lambda rev: rev.number)
-    return {"revisions": revisions}, 200
-
-
-# @api.BLUEPRINT.route("/secret")
-# @jwtoken.require
-# @quart_schema.security_scheme([{"BearerAuth": []}])
-# @quart_schema.validate_response(dict[str, str], 200)
-# async def secret() -> tuple[Mapping, int]:
-#     """Return a secret."""
-#     return {"secret": "*******"}, 200
+    return models.api.RevisionsResults(
+        endpoint="/revisions",
+        revisions=revisions,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/tasks")
-@quart_schema.validate_querystring(models.api.Task)
-async def tasks(query_args: models.api.Task) -> quart.Response:
+@quart_schema.validate_querystring(models.api.TasksQuery)
+async def tasks(query_args: models.api.TasksQuery) -> DictResponse:
     _pagination_args_validate(query_args)
     via = sql.validate_instrumented_attribute
     async with db.session() as data:
@@ -591,16 +584,19 @@ async def tasks(query_args: models.api.Task) -> quart.Response:
         if query_args.status:
             count_statement = count_statement.where(via(sql.Task.status) == query_args.status)
         count = (await data.execute(count_statement)).scalar_one()
-        result = {"data": [paged_task.model_dump(exclude={"result"}) for paged_task in paged_tasks], "count": count}
-        return quart.jsonify(result)
+        return models.api.TasksResults(
+            endpoint="/tasks",
+            data=paged_tasks,
+            count=count,
+        ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/vote/resolve", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.ProjectVersionResolution)
-@quart_schema.validate_response(dict[str, str], 200)
-async def vote_resolve(data: models.api.ProjectVersionResolution) -> tuple[Mapping, int]:
+@quart_schema.validate_request(models.api.VoteResolveArgs)
+@quart_schema.validate_response(models.api.VoteResolveResults, 200)
+async def vote_resolve(data: models.api.VoteResolveArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
 
     async with db.session() as db_data:
@@ -624,15 +620,18 @@ async def vote_resolve(data: models.api.ProjectVersionResolution) -> tuple[Mappi
                 release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
                 success_message = "Vote marked as failed"
         await db_data.commit()
-    return {"success": success_message}, 200
+    return models.api.VoteResolveResults(
+        endpoint="/vote/resolve",
+        success=success_message,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/vote/start", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.VoteStart)
-@quart_schema.validate_response(sql.Task, 201)
-async def vote_start(data: models.api.VoteStart) -> tuple[Mapping, int]:
+@quart_schema.validate_request(models.api.VoteStartArgs)
+@quart_schema.validate_response(models.api.VoteStartResults, 201)
+async def vote_start(data: models.api.VoteStartArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
 
     permitted_recipients = util.permitted_recipients(asf_uid)
@@ -672,15 +671,18 @@ async def vote_start(data: models.api.VoteStart) -> tuple[Mapping, int]:
         )
         db_data.add(task)
         await db_data.commit()
-        return task.model_dump(exclude={"result"}), 201
+        return models.api.VoteStartResults(
+            endpoint="/vote/start",
+            task=task,
+        ).model_dump(), 201
 
 
 @api.BLUEPRINT.route("/upload", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.ProjectVersionRelpathContent)
-@quart_schema.validate_response(sql.Revision, 201)
-async def upload(data: models.api.ProjectVersionRelpathContent) -> tuple[Mapping, int]:
+@quart_schema.validate_request(models.api.UploadArgs)
+@quart_schema.validate_response(models.api.UploadResults, 201)
+async def upload(data: models.api.UploadArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
 
     async with db.session() as db_data:
@@ -690,7 +692,10 @@ async def upload(data: models.api.ProjectVersionRelpathContent) -> tuple[Mapping
             raise exceptions.Forbidden("You do not have permission to upload to this project")
 
     revision = await _upload_process_file(data, asf_uid)
-    return revision.model_dump(), 201
+    return models.api.UploadResults(
+        endpoint="/upload",
+        revision=revision,
+    ).model_dump(), 201
 
 
 def _committee_member_or_admin(committee: sql.Committee, asf_uid: str) -> None:
@@ -730,7 +735,7 @@ def _simple_check(*args: str | None) -> None:
             raise exceptions.BadRequest("Argument cannot be the string 'None'")
 
 
-async def _upload_process_file(args: models.api.ProjectVersionRelpathContent, asf_uid: str) -> sql.Revision:
+async def _upload_process_file(args: models.api.UploadArgs, asf_uid: str) -> sql.Revision:
     file_bytes = base64.b64decode(args.content, validate=True)
     file_path = args.relpath.lstrip("/")
     description = f"Upload via API: {file_path}"

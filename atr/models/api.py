@@ -30,18 +30,6 @@ class ResultsTypeError(TypeError):
     pass
 
 
-@dataclasses.dataclass
-class Pagination:
-    offset: int = 0
-    limit: int = 20
-
-
-# TODO: TaskPagination?
-@dataclasses.dataclass
-class Task(Pagination):
-    status: str | None = None
-
-
 class AnnounceArgs(schema.Strict):
     project: str
     version: str
@@ -139,7 +127,7 @@ class KeysSshAddResults(schema.Strict):
     fingerprint: str
 
 
-class KeysSshListQuery(Pagination):
+class KeysSshListQuery:
     offset: int = 0
     limit: int = 20
 
@@ -163,24 +151,6 @@ class ProjectReleasesResults(schema.Strict):
 class ProjectsResults(schema.Strict):
     endpoint: Literal["/projects"] = schema.Field(alias="endpoint")
     projects: Sequence[sql.Project]
-
-
-class ProjectVersion(schema.Strict):
-    project: str
-    version: str
-
-
-class ProjectVersionRelpathContent(schema.Strict):
-    project: str
-    version: str
-    relpath: str
-    content: str
-
-
-class ProjectVersionResolution(schema.Strict):
-    project: str
-    version: str
-    resolution: Literal["passed", "failed"]
 
 
 @dataclasses.dataclass
@@ -240,11 +210,36 @@ class ReleasesRevisionsResults(schema.Strict):
     revisions: Sequence[sql.Revision]
 
 
-class Text(schema.Strict):
-    text: str
+class RevisionsResults(schema.Strict):
+    endpoint: Literal["/revisions"] = schema.Field(alias="endpoint")
+    revisions: Sequence[sql.Revision]
 
 
-class VoteStart(schema.Strict):
+@dataclasses.dataclass
+class TasksQuery:
+    limit: int = 20
+    offset: int = 0
+    status: str | None = None
+
+
+class TasksResults(schema.Strict):
+    endpoint: Literal["/tasks"] = schema.Field(alias="endpoint")
+    data: Sequence[sql.Task]
+    count: int
+
+
+class VoteResolveArgs(schema.Strict):
+    project: str
+    version: str
+    resolution: Literal["passed", "failed"]
+
+
+class VoteResolveResults(schema.Strict):
+    endpoint: Literal["/vote/resolve"] = schema.Field(alias="endpoint")
+    success: str
+
+
+class VoteStartArgs(schema.Strict):
     project: str
     version: str
     revision: str
@@ -252,6 +247,23 @@ class VoteStart(schema.Strict):
     vote_duration: int
     subject: str
     body: str
+
+
+class VoteStartResults(schema.Strict):
+    endpoint: Literal["/vote/start"] = schema.Field(alias="endpoint")
+    task: sql.Task
+
+
+class UploadArgs(schema.Strict):
+    project: str
+    version: str
+    relpath: str
+    content: str
+
+
+class UploadResults(schema.Strict):
+    endpoint: Literal["/upload"] = schema.Field(alias="endpoint")
+    revision: sql.Revision
 
 
 # This is for *Results classes only
@@ -279,7 +291,12 @@ Results = Annotated[
     | ReleasesDeleteResults
     | ReleasesProjectResults
     | ReleasesVersionResults
-    | ReleasesRevisionsResults,
+    | ReleasesRevisionsResults
+    | RevisionsResults
+    | TasksResults
+    | VoteResolveResults
+    | VoteStartResults
+    | UploadResults,
     schema.Field(discriminator="endpoint"),
 ]
 
@@ -319,3 +336,8 @@ validate_releases_delete = validator(ReleasesDeleteResults)
 validate_releases_project = validator(ReleasesProjectResults)
 validate_releases_version = validator(ReleasesVersionResults)
 validate_releases_revisions = validator(ReleasesRevisionsResults)
+validate_revisions = validator(RevisionsResults)
+validate_tasks = validator(TasksResults)
+validate_vote_resolve = validator(VoteResolveResults)
+validate_vote_start = validator(VoteStartResults)
+validate_upload = validator(UploadResults)
