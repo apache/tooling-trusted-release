@@ -35,6 +35,7 @@ import asfquart as asfquart
 import asfquart.base as base
 import quart
 import werkzeug.datastructures as datastructures
+import werkzeug.exceptions as exceptions
 import werkzeug.wrappers.response as response
 import wtforms
 
@@ -481,6 +482,13 @@ async def ssh_key_add(key: str, asf_uid: str) -> str:
         data.add(sql.SSHKey(fingerprint=fingerprint, key=key, asf_uid=asf_uid))
         await data.commit()
     return fingerprint
+
+
+async def ssh_key_delete(fingerprint: str, asf_uid: str) -> None:
+    async with db.session() as data:
+        ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=asf_uid).demand(exceptions.NotFound())
+        await data.delete(ssh_key)
+        await data.commit()
 
 
 @routes.committer("/keys/update-committee-keys/<committee_name>", methods=["POST"])

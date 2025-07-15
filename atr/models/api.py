@@ -118,26 +118,6 @@ class KeysResults(schema.Strict):
     count: int
 
 
-class KeysSshAddArgs(schema.Strict):
-    text: str
-
-
-class KeysSshAddResults(schema.Strict):
-    endpoint: Literal["/keys/ssh/add"] = schema.Field(alias="endpoint")
-    fingerprint: str
-
-
-class KeysSshListQuery:
-    offset: int = 0
-    limit: int = 20
-
-
-class KeysSshListResults(schema.Strict):
-    endpoint: Literal["/keys/ssh/list"] = schema.Field(alias="endpoint")
-    data: Sequence[sql.SSHKey]
-    count: int
-
-
 class ProjectResults(schema.Strict):
     endpoint: Literal["/project"] = schema.Field(alias="endpoint")
     project: sql.Project
@@ -215,6 +195,36 @@ class RevisionsResults(schema.Strict):
     revisions: Sequence[sql.Revision]
 
 
+class SshAddArgs(schema.Strict):
+    text: str
+
+
+class SshAddResults(schema.Strict):
+    endpoint: Literal["/ssh/add"] = schema.Field(alias="endpoint")
+    fingerprint: str
+
+
+class SshDeleteArgs(schema.Strict):
+    fingerprint: str
+
+
+class SshDeleteResults(schema.Strict):
+    endpoint: Literal["/ssh/delete"] = schema.Field(alias="endpoint")
+    success: str
+
+
+@dataclasses.dataclass
+class SshListQuery:
+    offset: int = 0
+    limit: int = 20
+
+
+class SshListResults(schema.Strict):
+    endpoint: Literal["/ssh/list"] = schema.Field(alias="endpoint")
+    data: Sequence[sql.SSHKey]
+    count: int
+
+
 @dataclasses.dataclass
 class TasksQuery:
     limit: int = 20
@@ -280,8 +290,6 @@ Results = Annotated[
     | JwtResults
     | KeyResults
     | KeysResults
-    | KeysSshAddResults
-    | KeysSshListResults
     | ListResults
     | ProjectResults
     | ProjectReleasesResults
@@ -293,6 +301,9 @@ Results = Annotated[
     | ReleasesVersionResults
     | ReleasesRevisionsResults
     | RevisionsResults
+    | SshAddResults
+    | SshDeleteResults
+    | SshListResults
     | TasksResults
     | VoteResolveResults
     | VoteStartResults
@@ -324,8 +335,6 @@ validate_draft_delete = validator(DraftDeleteResults)
 validate_jwt = validator(JwtResults)
 validate_key = validator(KeyResults)
 validate_keys = validator(KeysResults)
-validate_keys_ssh_add = validator(KeysSshAddResults)
-validate_keys_ssh_list = validator(KeysSshListResults)
 validate_list = validator(ListResults)
 validate_project = validator(ProjectResults)
 validate_project_releases = validator(ProjectReleasesResults)
@@ -337,6 +346,9 @@ validate_releases_project = validator(ReleasesProjectResults)
 validate_releases_version = validator(ReleasesVersionResults)
 validate_releases_revisions = validator(ReleasesRevisionsResults)
 validate_revisions = validator(RevisionsResults)
+validate_ssh_add = validator(SshAddResults)
+validate_ssh_delete = validator(SshDeleteResults)
+validate_ssh_list = validator(SshListResults)
 validate_tasks = validator(TasksResults)
 validate_vote_resolve = validator(VoteResolveResults)
 validate_vote_start = validator(VoteStartResults)

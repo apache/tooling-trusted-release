@@ -300,46 +300,6 @@ async def public_keys(query_args: models.api.KeysQuery) -> DictResponse:
         ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/keys/ssh/add", methods=["POST"])
-@jwtoken.require
-@quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.KeysSshAddArgs)
-@quart_schema.validate_response(models.api.KeysSshAddResults, 201)
-async def keys_ssh_add(data: models.api.KeysSshAddArgs) -> DictResponse:
-    """Add an SSH key for a user."""
-    asf_uid = _jwt_asf_uid()
-    fingerprint = await keys.ssh_key_add(data.text, asf_uid)
-    return models.api.KeysSshAddResults(
-        endpoint="/keys/ssh/add",
-        fingerprint=fingerprint,
-    ).model_dump(), 201
-
-
-@api.BLUEPRINT.route("/keys/ssh/list")
-@quart_schema.validate_querystring(models.api.KeysSshListQuery)
-async def keys_ssh_list(query_args: models.api.KeysSshListQuery) -> DictResponse:
-    """Paged list of developer SSH public keys."""
-    _pagination_args_validate(query_args)
-    via = sql.validate_instrumented_attribute
-    async with db.session() as data:
-        statement = (
-            sqlmodel.select(sql.SSHKey)
-            .limit(query_args.limit)
-            .offset(query_args.offset)
-            .order_by(via(sql.SSHKey.fingerprint).asc())
-        )
-        paged_keys = (await data.execute(statement)).scalars().all()
-
-        count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(sql.SSHKey.fingerprint)))
-        count = (await data.execute(count_stmt)).scalar_one()
-
-        return models.api.KeysSshListResults(
-            endpoint="/keys/ssh/list",
-            data=paged_keys,
-            count=count,
-        ).model_dump(), 200
-
-
 # TODO: Call this release/paths
 @api.BLUEPRINT.route("/list/<project>/<version>")
 @api.BLUEPRINT.route("/list/<project>/<version>/<revision>")
@@ -565,6 +525,63 @@ async def revisions_project_version(project: str, version: str) -> DictResponse:
         endpoint="/revisions",
         revisions=revisions,
     ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/ssh/add", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.SshAddArgs)
+@quart_schema.validate_response(models.api.SshAddResults, 201)
+async def ssh_add(data: models.api.SshAddArgs) -> DictResponse:
+    """Add an SSH key for a user."""
+    asf_uid = _jwt_asf_uid()
+    fingerprint = await keys.ssh_key_add(data.text, asf_uid)
+    return models.api.SshAddResults(
+        endpoint="/ssh/add",
+        fingerprint=fingerprint,
+    ).model_dump(), 201
+
+
+@api.BLUEPRINT.route("/ssh/delete", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.SshDeleteArgs)
+@quart_schema.validate_response(models.api.SshDeleteResults, 201)
+async def ssh_delete(data: models.api.SshDeleteArgs) -> DictResponse:
+    """Delete an SSH key for a user."""
+    asf_uid = _jwt_asf_uid()
+    await keys.ssh_key_delete(data.fingerprint, asf_uid)
+    return models.api.SshDeleteResults(
+        endpoint="/ssh/delete",
+        success="SSH key deleted",
+    ).model_dump(), 201
+
+
+@api.BLUEPRINT.route("/ssh/list/<asf_uid>")
+@quart_schema.validate_querystring(models.api.SshListQuery)
+async def ssh_list(asf_uid: str, query_args: models.api.SshListQuery) -> DictResponse:
+    """List of developer SSH public keys."""
+    _simple_check(asf_uid)
+    _pagination_args_validate(query_args)
+    via = sql.validate_instrumented_attribute
+    async with db.session() as data:
+        statement = (
+            sqlmodel.select(sql.SSHKey)
+            .where(sql.SSHKey.asf_uid == asf_uid)
+            .limit(query_args.limit)
+            .offset(query_args.offset)
+            .order_by(via(sql.SSHKey.fingerprint).asc())
+        )
+        paged_keys = (await data.execute(statement)).scalars().all()
+
+        count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(sql.SSHKey.fingerprint)))
+        count = (await data.execute(count_stmt)).scalar_one()
+
+        return models.api.SshListResults(
+            endpoint="/ssh/list",
+            data=paged_keys,
+            count=count,
+        ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/tasks")
