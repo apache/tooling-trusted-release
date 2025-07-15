@@ -44,7 +44,6 @@ dependencies = [
 dev = [
   "decouple-types>=1.0",
   "djlint>=1.36.4",
-  "mypy>=1.15.0",
   "pre-commit>=2.20.0",
   "pyright>=1.1.393",
   "ruff>=0.9.4",
@@ -58,6 +57,20 @@ test = [
 ]
 
 # Additional tools
+
+[tool.djlint]
+profile = "jinja"
+extension = "html"
+indent = 2
+blank_line_after_tag = "load,extends,include,html"
+close_void_tags = true
+format_css = true
+format_js = true
+max_line_length = 120
+use_gitignore = true
+preserve_blank_lines = true
+ignore = "H006,H031"
+include = "atr/templates"
 
 [tool.pyright]
 include = ["atr", "playwright"]
@@ -76,6 +89,11 @@ pythonVersion = "3.13"
 executionEnvironments = [
   { root = ".", pythonVersion = "3.13" }
 ]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths  = ["tests"]
+asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 120
@@ -104,52 +122,3 @@ select = [
 "atr/routes/modules.py" = ["F401"]
 "migrations/env.py" = ["E402"]
 "scripts/release_path_parse.py" = ["C901", "RUF001"]
-
-[tool.mypy]
-python_version = "3.13"
-exclude = ["node_modules", "tests"]
-plugins = ["pydantic.mypy"]
-mypy_path = "typestubs"
-check_untyped_defs = false
-disallow_incomplete_defs = true
-disallow_untyped_decorators = true
-disallow_untyped_defs = true
-ignore_missing_imports = true
-no_implicit_optional = true
-strict_optional = true
-warn_redundant_casts = true
-warn_return_any = true
-# warn_unreachable = true
-warn_unused_ignores = true
-
-[tool.pydantic-mypy]
-init_forbid_extra = true
-init_typed = true
-warn_required_dynamic_aliases = true
-
-[[tool.mypy.overrides]]
-module = "asfquart.*"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-ignore_errors = true
-
-[tool.djlint]
-profile = "jinja"
-extension = "html"
-indent = 2
-blank_line_after_tag = "load,extends,include,html"
-close_void_tags = true
-format_css = true
-format_js = true
-max_line_length = 120
-use_gitignore = true
-preserve_blank_lines = true
-ignore = "H006,H031"
-include = "atr/templates"
-
-[tool.pytest.ini_options]
-minversion = "8.0"
-testpaths  = ["tests"]
-asyncio_mode = "auto"

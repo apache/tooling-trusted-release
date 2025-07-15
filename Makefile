@@ -70,5 +70,6 @@ serve-local:
 	  SSH_HOST=127.0.0.1 uv run hypercorn --bind $(BIND) \
 	  --keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
 
-sync:
-	uv sync
+update-deps:
+	uv lock --upgrade
+	uv sync --group test
