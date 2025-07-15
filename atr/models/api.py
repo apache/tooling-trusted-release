@@ -16,11 +16,14 @@
 # under the License.
 
 import dataclasses
-from typing import Annotated, Any, Literal
+from collections.abc import Callable, Sequence
+from typing import Annotated, Any, Literal, TypeVar
 
 import pydantic
 
-from . import schema
+from . import schema, sql
+
+T = TypeVar("T")
 
 
 class ResultsTypeError(TypeError):
@@ -45,7 +48,7 @@ class Task(Pagination):
     status: str | None = None
 
 
-class Announce(schema.Strict):
+class AnnounceArgs(schema.Strict):
     project: str
     version: str
     revision: str
@@ -55,18 +58,48 @@ class Announce(schema.Strict):
     path_suffix: str
 
 
+class AnnounceResults(schema.Strict):
+    endpoint: Literal["/announce"] = schema.Field(alias="endpoint")
+    success: str
+
+
+class ChecksListResults(schema.Strict):
+    endpoint: Literal["/checks/list"] = schema.Field(alias="endpoint")
+    checks: Sequence[sql.CheckResult]
+
+
+class ChecksOngoingResults(schema.Strict):
+    endpoint: Literal["/checks/ongoing"] = schema.Field(alias="endpoint")
+    ongoing: int
+
+
+class CommitteesResults(schema.Strict):
+    endpoint: Literal["/committees"] = schema.Field(alias="endpoint")
+    committee: sql.Committee
+
+
+class CommitteesKeysResults(schema.Strict):
+    endpoint: Literal["/committees/keys"] = schema.Field(alias="endpoint")
+    keys: Sequence[sql.PublicSigningKey]
+
+
+class CommitteesListResults(schema.Strict):
+    endpoint: Literal["/committees/list"] = schema.Field(alias="endpoint")
+    committees: Sequence[sql.Committee]
+
+
+class CommitteesProjectsResults(schema.Strict):
+    endpoint: Literal["/committees/projects"] = schema.Field(alias="endpoint")
+    projects: Sequence[sql.Project]
+
+
 class AsfuidPat(schema.Strict):
     asfuid: str
     pat: str
 
 
-class Count(schema.Strict):
-    kind: Literal["count"] = schema.Field(alias="kind")
-    count: int
-
-
 class Fingerprint(schema.Strict):
-    kind: Literal["fingerprint"] = schema.Field(alias="kind")
+    endpoint: Literal["/keys/ssh/add"] = schema.Field(alias="endpoint")
     fingerprint: str
 
 
@@ -103,22 +136,35 @@ class VoteStart(schema.Strict):
 
 
 Results = Annotated[
-    Count | Fingerprint,
-    schema.Field(discriminator="kind"),
+    AnnounceResults
+    | ChecksListResults
+    | ChecksOngoingResults
+    | CommitteesResults
+    | CommitteesKeysResults
+    | CommitteesListResults
+    | CommitteesProjectsResults
+    | Fingerprint,
+    schema.Field(discriminator="endpoint"),
 ]
 
 ResultsAdapter = pydantic.TypeAdapter(Results)
 
 
-def validate_count(value: Any) -> Count:
-    count = ResultsAdapter.validate_python(value)
-    if not isinstance(count, Count):
-        raise ResultsTypeError(f"Invalid API response: {value}")
-    return count
+def validator[T](t: type[T]) -> Callable[[Any], T]:
+    def validate(value: Any) -> T:
+        obj = ResultsAdapter.validate_python(value)
+        if not isinstance(obj, t):
+            raise ResultsTypeError(f"Invalid API response: {value}")
+        return obj
+
+    return validate
 
 
-def validate_fingerprint(value: Any) -> Fingerprint:
-    fingerprint = ResultsAdapter.validate_python(value)
-    if not isinstance(fingerprint, Fingerprint):
-        raise ResultsTypeError(f"Invalid API response: {value}")
-    return fingerprint
+validate_announce = validator(AnnounceResults)
+validate_checks_list = validator(ChecksListResults)
+validate_checks_ongoing = validator(ChecksOngoingResults)
+validate_committees = validator(CommitteesResults)
+validate_committees_keys = validator(CommitteesKeysResults)
+validate_committees_list = validator(CommitteesListResults)
+validate_committees_projects = validator(CommitteesProjectsResults)
+validate_fingerprint = validator(Fingerprint)

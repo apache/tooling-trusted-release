@@ -55,13 +55,15 @@ import atr.util as util
 
 # We implicitly have /api/openapi.json
 
+DictResponse = tuple[dict[str, Any], int]
+
 
 @api.BLUEPRINT.route("/announce", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.Announce)
-@quart_schema.validate_response(sql.Task, 201)
-async def announce_post(data: models.api.Announce) -> tuple[Mapping, int]:
+@quart_schema.validate_request(models.api.AnnounceArgs)
+@quart_schema.validate_response(models.api.AnnounceResults, 201)
+async def announce_post(data: models.api.AnnounceArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
 
     try:
@@ -79,24 +81,30 @@ async def announce_post(data: models.api.Announce) -> tuple[Mapping, int]:
     except announce.AnnounceError as e:
         raise exceptions.BadRequest(str(e))
 
-    return {"success": "Announcement sent"}, 200
+    return models.api.AnnounceResults(
+        endpoint="/announce",
+        success="Announcement sent",
+    ).model_dump(), 201
 
 
 @api.BLUEPRINT.route("/checks/list/<project>/<version>")
-@quart_schema.validate_response(list[sql.CheckResult], 200)
-async def checks_list_project_version(project: str, version: str) -> tuple[list[Mapping], int]:
+@quart_schema.validate_response(models.api.ChecksListResults, 200)
+async def checks_list_project_version(project: str, version: str) -> DictResponse:
     """List all check results for a given release."""
     _simple_check(project, version)
     # TODO: Merge with checks_list_project_version_revision
     async with db.session() as data:
         release_name = sql.release_name(project, version)
         check_results = await data.check_result(release_name=release_name).all()
-        return [cr.model_dump() for cr in check_results], 200
+        return models.api.ChecksListResults(
+            endpoint="/checks/list",
+            checks=check_results,
+        ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/checks/list/<project>/<version>/<revision>")
-@quart_schema.validate_response(list[sql.CheckResult], 200)
-async def checks_list_project_version_revision(project: str, version: str, revision: str) -> tuple[list[Mapping], int]:
+@quart_schema.validate_response(models.api.ChecksListResults, 200)
+async def checks_list_project_version_revision(project: str, version: str, revision: str) -> DictResponse:
     """List all check results for a specific revision of a release."""
     _simple_check(project, version, revision)
     async with db.session() as data:
@@ -114,17 +122,20 @@ async def checks_list_project_version_revision(project: str, version: str, revis
             raise exceptions.NotFound(f"Revision '{revision}' does not exist for release '{project}-{version}'")
 
         check_results = await data.check_result(release_name=release_name, revision_number=revision).all()
-        return [cr.model_dump() for cr in check_results], 200
+        return models.api.ChecksListResults(
+            endpoint="/checks/list",
+            checks=check_results,
+        ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/checks/ongoing/<project>/<version>")
 @api.BLUEPRINT.route("/checks/ongoing/<project>/<version>/<revision>")
-@quart_schema.validate_response(models.api.Count, 200)
+@quart_schema.validate_response(models.api.ChecksOngoingResults, 200)
 async def checks_ongoing_project_version(
     project: str,
     version: str,
     revision: str | None = None,
-) -> tuple[Mapping[str, Any], int]:
+) -> DictResponse:
     """Return a count of all unfinished check results for a given release."""
     _simple_check(project, version, revision)
     ongoing_tasks_count, _latest_revision = await interaction.tasks_ongoing_revision(project, version, revision)
@@ -141,46 +152,62 @@ async def checks_ongoing_project_version(
     #     Iterator[bytes],
     #     Iterator[str],
     # ]
-    return models.api.Count(kind="count", count=ongoing_tasks_count).model_dump(), 200
+    return models.api.ChecksOngoingResults(
+        endpoint="/checks/ongoing",
+        ongoing=ongoing_tasks_count,
+    ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/committees")
-@quart_schema.validate_response(list[sql.Committee], 200)
-async def committees() -> tuple[list[Mapping], int]:
-    """List all committees in the database."""
-    async with db.session() as data:
-        committees = await data.committee().all()
-        return [committee.model_dump() for committee in committees], 200
-
-
+# TODO: Rename all paths to avoid clashes
 @api.BLUEPRINT.route("/committees/<name>")
-@quart_schema.validate_response(sql.Committee, 200)
-async def committees_name(name: str) -> tuple[Mapping, int]:
+@quart_schema.validate_response(models.api.CommitteesResults, 200)
+async def committees_name(name: str) -> DictResponse:
     """Get a specific committee by name."""
     _simple_check(name)
     async with db.session() as data:
         committee = await data.committee(name=name).demand(exceptions.NotFound())
-        return committee.model_dump(), 200
+        return models.api.CommitteesResults(
+            endpoint="/committees",
+            committee=committee,
+        ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/committees/<name>/keys")
-@quart_schema.validate_response(list[sql.PublicSigningKey], 200)
-async def committees_name_keys(name: str) -> tuple[list[Mapping], int]:
+@api.BLUEPRINT.route("/committees/keys/<name>")
+@quart_schema.validate_response(models.api.CommitteesKeysResults, 200)
+async def committees_keys(name: str) -> DictResponse:
     """List all public signing keys associated with a specific committee."""
     _simple_check(name)
     async with db.session() as data:
         committee = await data.committee(name=name, _public_signing_keys=True).demand(exceptions.NotFound())
-        return [key.model_dump() for key in committee.public_signing_keys], 200
+        return models.api.CommitteesKeysResults(
+            endpoint="/committees/keys",
+            keys=committee.public_signing_keys,
+        ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/committees/<name>/projects")
-@quart_schema.validate_response(list[sql.Project], 200)
-async def committees_name_projects(name: str) -> tuple[list[Mapping], int]:
+@api.BLUEPRINT.route("/committees/list")
+@quart_schema.validate_response(models.api.CommitteesListResults, 200)
+async def committees_list() -> DictResponse:
+    """List all committees in the database."""
+    async with db.session() as data:
+        committees = await data.committee().all()
+        return models.api.CommitteesListResults(
+            endpoint="/committees/list",
+            committees=committees,
+        ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/committees/projects/<name>")
+@quart_schema.validate_response(models.api.CommitteesProjectsResults, 200)
+async def committees_projects(name: str) -> DictResponse:
     """List all projects for a specific committee."""
     _simple_check(name)
     async with db.session() as data:
         committee = await data.committee(name=name, _projects=True).demand(exceptions.NotFound())
-        return [project.model_dump() for project in committee.projects], 200
+        return models.api.CommitteesProjectsResults(
+            endpoint="/committees/projects",
+            projects=committee.projects,
+        ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/draft/delete", methods=["POST"])
@@ -293,7 +320,7 @@ async def keys_ssh_add(data: models.api.Text) -> tuple[Mapping, int]:
     asf_uid = _jwt_asf_uid()
     fingerprint = await keys.ssh_key_add(data.text, asf_uid)
     return models.api.Fingerprint(
-        kind="fingerprint",
+        endpoint="/keys/ssh/add",
         fingerprint=fingerprint,
     ).model_dump(), 201
 

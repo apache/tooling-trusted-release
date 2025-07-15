@@ -75,4 +75,4 @@ sync:
 
 update-deps:
 	uv lock --upgrade
-	uv sync --group test
+	uv sync --all-groups
