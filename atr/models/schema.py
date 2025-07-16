@@ -24,6 +24,10 @@ import pydantic
 Field = pydantic.Field
 
 
+class Lax(pydantic.BaseModel):
+    model_config = pydantic.ConfigDict(extra="allow", strict=False, validate_assignment=True)
+
+
 class Strict(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra="forbid", strict=True, validate_assignment=True)
 

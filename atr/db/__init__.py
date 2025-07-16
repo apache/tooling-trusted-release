@@ -241,7 +241,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         if is_defined(has_participant):
             query = query.where(
                 via(sql.Committee.committee_members).contains(has_participant)
-                or via(sql.Committee.committers).contains(has_participant)
+                | via(sql.Committee.committers).contains(has_participant)
             )
 
         if _child_committees:

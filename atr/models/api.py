@@ -116,7 +116,7 @@ class KeysResults(schema.Strict):
 class KeysAddArgs(schema.Strict):
     asfuid: str
     key: str
-    committees: str
+    committees: list[str]
 
 
 class KeysAddResults(schema.Strict):
@@ -142,6 +142,27 @@ class KeysDeleteResults(schema.Strict):
 class KeysGetResults(schema.Strict):
     endpoint: Literal["/keys/get"] = schema.Field(alias="endpoint")
     key: sql.PublicSigningKey
+
+
+class KeysUploadArgs(schema.Strict):
+    filetext: str
+    committees: list[str]
+
+
+class KeysUploadSubset(schema.Lax):
+    status: Literal["success", "error"]
+    key_id: str
+    fingerprint: str
+    user_id: str
+    email: str
+
+
+class KeysUploadResults(schema.Strict):
+    endpoint: Literal["/keys/upload"] = schema.Field(alias="endpoint")
+    results: Sequence[KeysUploadSubset]
+    success_count: int
+    error_count: int
+    submitted_committees: list[str]
 
 
 class KeysUserResults(schema.Strict):
@@ -329,6 +350,7 @@ Results = Annotated[
     | KeysDeleteResults
     | KeysGetResults
     | KeysCommitteeResults
+    | KeysUploadResults
     | KeysUserResults
     | ListResults
     | ProjectResults
@@ -379,6 +401,7 @@ validate_keys_add = validator(KeysAddResults)
 validate_keys_committee = validator(KeysCommitteeResults)
 validate_keys_delete = validator(KeysDeleteResults)
 validate_keys_get = validator(KeysGetResults)
+validate_keys_upload = validator(KeysUploadResults)
 validate_keys_user = validator(KeysUserResults)
 validate_list = validator(ListResults)
 validate_project = validator(ProjectResults)

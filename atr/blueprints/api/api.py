@@ -298,16 +298,14 @@ async def keys_endpoint(query_args: models.api.KeysQuery) -> DictResponse:
 @quart_schema.validate_response(models.api.KeysAddResults, 200)
 async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
-    selected_committee_names = []
-    if data.committees:
-        selected_committee_names[:] = data.committees.split(",")
+    selected_committee_names = data.committees
 
     async with db.session() as db_data:
-        member_of_committees = await interaction.user_committees_member(asf_uid, caller_data=db_data)
+        participant_of_committees = await interaction.user_committees_member(asf_uid, caller_data=db_data)
         selected_committees = await db_data.committee(name_in=selected_committee_names).all()
         committee_is_podling = {c.name: c.is_podling for c in selected_committees}
         for committee in selected_committees:
-            if committee not in member_of_committees:
+            if committee not in participant_of_committees:
                 raise exceptions.BadRequest(f"You are not a member of committee {committee.name}")
         added_keys = await interaction.key_user_add(asf_uid, data.key, selected_committee_names)
         fingerprints = []
@@ -337,9 +335,9 @@ async def keys_delete(data: models.api.KeysDeleteArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
     fingerprint = data.fingerprint.lower()
     async with db.session() as db_data:
-        key = await db_data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid, _committees=True).demand(
-            exceptions.NotFound()
-        )
+        key = await db_data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid, _committees=True).get()
+        if key is None:
+            raise ValueError(f"Key {fingerprint} not found")
         await db_data.delete(key)
         for committee in key.committees:
             await keys.autogenerate_keys_file(committee.name, committee.is_podling)
@@ -376,6 +374,43 @@ async def keys_get(fingerprint: str) -> DictResponse:
             endpoint="/keys/get",
             key=key,
         ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/keys/upload", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.KeysUploadArgs)
+@quart_schema.validate_response(models.api.KeysUploadResults, 200)
+async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
+    asf_uid = _jwt_asf_uid()
+    filetext = data.filetext
+    selected_committee_names = data.committees
+    async with db.session() as db_data:
+        participant_of_committees = await interaction.user_committees_participant(asf_uid, caller_data=db_data)
+        participant_of_committee_names = [c.name for c in participant_of_committees]
+        for committee_name in selected_committee_names:
+            if committee_name not in participant_of_committee_names:
+                raise exceptions.BadRequest(f"You are not a participant of committee {committee_name}")
+        # TODO: Does this export KEYS files?
+        # Appearently it does not
+        # This needs fixing in keys.py too
+        results, success_count, error_count, submitted_committees = await interaction.upload_keys(
+            participant_of_committee_names, filetext, selected_committee_names
+        )
+
+    # TODO: Should push this much further upstream
+    import logging
+
+    for result in results:
+        logging.info(result)
+    results = [models.api.KeysUploadSubset(**result) for result in results]
+    return models.api.KeysUploadResults(
+        endpoint="/keys/upload",
+        results=results,
+        success_count=success_count,
+        error_count=error_count,
+        submitted_committees=submitted_committees,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/keys/user/<asf_uid>")
