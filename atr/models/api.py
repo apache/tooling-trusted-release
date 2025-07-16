@@ -101,18 +101,6 @@ class JwtResults(schema.Strict):
     jwt: str
 
 
-class KeysAddArgs(schema.Strict):
-    asfuid: str
-    key: str
-    committees: str
-
-
-class KeysAddResults(schema.Strict):
-    endpoint: Literal["/keys/add"] = schema.Field(alias="endpoint")
-    success: str
-    fingerprints: list[str]
-
-
 @dataclasses.dataclass
 class KeysQuery:
     offset: int = 0
@@ -125,9 +113,30 @@ class KeysResults(schema.Strict):
     count: int
 
 
+class KeysAddArgs(schema.Strict):
+    asfuid: str
+    key: str
+    committees: str
+
+
+class KeysAddResults(schema.Strict):
+    endpoint: Literal["/keys/add"] = schema.Field(alias="endpoint")
+    success: str
+    fingerprints: list[str]
+
+
 class KeysCommitteeResults(schema.Strict):
     endpoint: Literal["/keys/committee"] = schema.Field(alias="endpoint")
     keys: Sequence[sql.PublicSigningKey]
+
+
+class KeysDeleteArgs(schema.Strict):
+    fingerprint: str
+
+
+class KeysDeleteResults(schema.Strict):
+    endpoint: Literal["/keys/delete"] = schema.Field(alias="endpoint")
+    success: str
 
 
 class KeysGetResults(schema.Strict):
@@ -317,6 +326,7 @@ Results = Annotated[
     | JwtResults
     | KeysResults
     | KeysAddResults
+    | KeysDeleteResults
     | KeysGetResults
     | KeysCommitteeResults
     | KeysUserResults
@@ -367,6 +377,7 @@ validate_jwt = validator(JwtResults)
 validate_keys = validator(KeysResults)
 validate_keys_add = validator(KeysAddResults)
 validate_keys_committee = validator(KeysCommitteeResults)
+validate_keys_delete = validator(KeysDeleteResults)
 validate_keys_get = validator(KeysGetResults)
 validate_keys_user = validator(KeysUserResults)
 validate_list = validator(ListResults)

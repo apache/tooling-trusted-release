@@ -328,6 +328,29 @@ async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
     ).model_dump(), 200
 
 
+@api.BLUEPRINT.route("/keys/delete", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.KeysDeleteArgs)
+@quart_schema.validate_response(models.api.KeysDeleteResults, 200)
+async def keys_delete(data: models.api.KeysDeleteArgs) -> DictResponse:
+    asf_uid = _jwt_asf_uid()
+    fingerprint = data.fingerprint.lower()
+    async with db.session() as db_data:
+        key = await db_data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid, _committees=True).demand(
+            exceptions.NotFound()
+        )
+        await db_data.delete(key)
+        for committee in key.committees:
+            await keys.autogenerate_keys_file(committee.name, committee.is_podling)
+        await db_data.commit()
+
+    return models.api.KeysDeleteResults(
+        endpoint="/keys/delete",
+        success="Key deleted",
+    ).model_dump(), 200
+
+
 @api.BLUEPRINT.route("/keys/committee/<committee>")
 @quart_schema.validate_response(models.api.KeysUserResults, 200)
 async def keys_committee(committee: str) -> DictResponse:
