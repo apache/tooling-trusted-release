@@ -101,11 +101,6 @@ class JwtResults(schema.Strict):
     jwt: str
 
 
-class KeyResults(schema.Strict):
-    endpoint: Literal["/key"] = schema.Field(alias="endpoint")
-    key: sql.PublicSigningKey
-
-
 @dataclasses.dataclass
 class KeysQuery:
     offset: int = 0
@@ -116,6 +111,21 @@ class KeysResults(schema.Strict):
     endpoint: Literal["/keys"] = schema.Field(alias="endpoint")
     data: Sequence[sql.PublicSigningKey]
     count: int
+
+
+class KeysCommitteeResults(schema.Strict):
+    endpoint: Literal["/keys/committee"] = schema.Field(alias="endpoint")
+    keys: Sequence[sql.PublicSigningKey]
+
+
+class KeysGetResults(schema.Strict):
+    endpoint: Literal["/keys/get"] = schema.Field(alias="endpoint")
+    key: sql.PublicSigningKey
+
+
+class KeysUserResults(schema.Strict):
+    endpoint: Literal["/keys/user"] = schema.Field(alias="endpoint")
+    keys: Sequence[sql.PublicSigningKey]
 
 
 class ProjectResults(schema.Strict):
@@ -238,6 +248,11 @@ class TasksResults(schema.Strict):
     count: int
 
 
+class UsersListResults(schema.Strict):
+    endpoint: Literal["/users/list"] = schema.Field(alias="endpoint")
+    users: Sequence[str]
+
+
 class VoteResolveArgs(schema.Strict):
     project: str
     version: str
@@ -288,8 +303,10 @@ Results = Annotated[
     | CommitteesProjectsResults
     | DraftDeleteResults
     | JwtResults
-    | KeyResults
     | KeysResults
+    | KeysGetResults
+    | KeysCommitteeResults
+    | KeysUserResults
     | ListResults
     | ProjectResults
     | ProjectReleasesResults
@@ -305,6 +322,7 @@ Results = Annotated[
     | SshDeleteResults
     | SshListResults
     | TasksResults
+    | UsersListResults
     | VoteResolveResults
     | VoteStartResults
     | UploadResults,
@@ -333,8 +351,10 @@ validate_committees_list = validator(CommitteesListResults)
 validate_committees_projects = validator(CommitteesProjectsResults)
 validate_draft_delete = validator(DraftDeleteResults)
 validate_jwt = validator(JwtResults)
-validate_key = validator(KeyResults)
 validate_keys = validator(KeysResults)
+validate_keys_committee = validator(KeysCommitteeResults)
+validate_keys_get = validator(KeysGetResults)
+validate_keys_user = validator(KeysUserResults)
 validate_list = validator(ListResults)
 validate_project = validator(ProjectResults)
 validate_project_releases = validator(ProjectReleasesResults)
@@ -350,6 +370,7 @@ validate_ssh_add = validator(SshAddResults)
 validate_ssh_delete = validator(SshDeleteResults)
 validate_ssh_list = validator(SshListResults)
 validate_tasks = validator(TasksResults)
+validate_users_list = validator(UsersListResults)
 validate_vote_resolve = validator(VoteResolveResults)
 validate_vote_start = validator(VoteStartResults)
 validate_upload = validator(UploadResults)

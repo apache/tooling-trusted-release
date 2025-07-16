@@ -88,7 +88,7 @@ async def announce_post(data: models.api.AnnounceArgs) -> DictResponse:
 
 @api.BLUEPRINT.route("/checks/list/<project>/<version>")
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
-async def checks_list_project_version(project: str, version: str) -> DictResponse:
+async def checks_list(project: str, version: str) -> DictResponse:
     """List all check results for a given release."""
     _simple_check(project, version)
     # TODO: Merge with checks_list_project_version_revision
@@ -103,7 +103,7 @@ async def checks_list_project_version(project: str, version: str) -> DictRespons
 
 @api.BLUEPRINT.route("/checks/list/<project>/<version>/<revision>")
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
-async def checks_list_project_version_revision(project: str, version: str, revision: str) -> DictResponse:
+async def checks_list_revision(project: str, version: str, revision: str) -> DictResponse:
     """List all check results for a specific revision of a release."""
     _simple_check(project, version, revision)
     async with db.session() as data:
@@ -130,7 +130,7 @@ async def checks_list_project_version_revision(project: str, version: str, revis
 @api.BLUEPRINT.route("/checks/ongoing/<project>/<version>")
 @api.BLUEPRINT.route("/checks/ongoing/<project>/<version>/<revision>")
 @quart_schema.validate_response(models.api.ChecksOngoingResults, 200)
-async def checks_ongoing_project_version(
+async def checks_ongoing(
     project: str,
     version: str,
     revision: str | None = None,
@@ -160,7 +160,7 @@ async def checks_ongoing_project_version(
 # TODO: Rename all paths to avoid clashes
 @api.BLUEPRINT.route("/committees/<name>")
 @quart_schema.validate_response(models.api.CommitteesResults, 200)
-async def committees_name(name: str) -> DictResponse:
+async def committees(name: str) -> DictResponse:
     """Get a specific committee by name."""
     _simple_check(name)
     async with db.session() as data:
@@ -243,7 +243,7 @@ async def draft_delete(data: models.api.DraftDeleteArgs) -> DictResponse:
 
 @api.BLUEPRINT.route("/jwt", methods=["POST"])
 @quart_schema.validate_request(models.api.JwtArgs)
-async def jwt_post(data: models.api.JwtArgs) -> DictResponse:
+async def jwt(data: models.api.JwtArgs) -> DictResponse:
     """Generate a JWT from a valid PAT."""
     # Expects {"asfuid": "uid", "pat": "pat-token"}
     # Returns {"asfuid": "uid", "jwt": "jwt-token"}
@@ -262,24 +262,14 @@ async def jwt_post(data: models.api.JwtArgs) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/key/<fingerprint>")
-@quart_schema.validate_response(models.api.KeyResults, 200)
-async def key(fingerprint: str) -> DictResponse:
-    """Return a single public signing key by fingerprint."""
-    _simple_check(fingerprint)
-    async with db.session() as data:
-        key = await data.public_signing_key(fingerprint=fingerprint.lower()).demand(exceptions.NotFound())
-        return models.api.KeyResults(
-            endpoint="/key",
-            key=key,
-        ).model_dump(), 200
-
-
 @api.BLUEPRINT.route("/keys")
 @quart_schema.validate_querystring(models.api.KeysQuery)
 @quart_schema.validate_response(models.api.KeysResults, 200)
-async def public_keys(query_args: models.api.KeysQuery) -> DictResponse:
+async def keys_endpoint(query_args: models.api.KeysQuery) -> DictResponse:
     """List all public signing keys with pagination support."""
+    # TODO: Rather than pagination, let's support keys by committee and by user
+    # That way, consumers can scroll through committees or users
+    # Which performs logical pagination, rather than arbitrary window pagination
     _pagination_args_validate(query_args)
     via = sql.validate_instrumented_attribute
     async with db.session() as data:
@@ -300,11 +290,51 @@ async def public_keys(query_args: models.api.KeysQuery) -> DictResponse:
         ).model_dump(), 200
 
 
+@api.BLUEPRINT.route("/keys/committee/<committee>")
+@quart_schema.validate_response(models.api.KeysUserResults, 200)
+async def keys_committee(committee: str) -> DictResponse:
+    """Return all public signing keys for a specific committee."""
+    _simple_check(committee)
+    async with db.session() as data:
+        committee_object = await data.committee(name=committee, _public_signing_keys=True).demand(exceptions.NotFound())
+        keys = committee_object.public_signing_keys
+        return models.api.KeysCommitteeResults(
+            endpoint="/keys/committee",
+            keys=keys,
+        ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/keys/get/<fingerprint>")
+@quart_schema.validate_response(models.api.KeysGetResults, 200)
+async def keys_get(fingerprint: str) -> DictResponse:
+    """Return a single public signing key by fingerprint."""
+    _simple_check(fingerprint)
+    async with db.session() as data:
+        key = await data.public_signing_key(fingerprint=fingerprint.lower()).demand(exceptions.NotFound())
+        return models.api.KeysGetResults(
+            endpoint="/keys/get",
+            key=key,
+        ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/keys/user/<asf_uid>")
+@quart_schema.validate_response(models.api.KeysUserResults, 200)
+async def keys_user(asf_uid: str) -> DictResponse:
+    """Return all public signing keys for a specific user."""
+    _simple_check(asf_uid)
+    async with db.session() as data:
+        keys = await data.public_signing_key(apache_uid=asf_uid).all()
+        return models.api.KeysUserResults(
+            endpoint="/keys/user",
+            keys=keys,
+        ).model_dump(), 200
+
+
 # TODO: Call this release/paths
 @api.BLUEPRINT.route("/list/<project>/<version>")
 @api.BLUEPRINT.route("/list/<project>/<version>/<revision>")
 @quart_schema.validate_response(models.api.ListResults, 200)
-async def list_project_version(project: str, version: str, revision: str | None = None) -> DictResponse:
+async def list_endpoint(project: str, version: str, revision: str | None = None) -> DictResponse:
     _simple_check(project, version, revision)
     async with db.session() as data:
         release_name = sql.release_name(project, version)
@@ -483,7 +513,7 @@ async def releases_project(project: str, query_args: models.api.ReleasesProjectQ
 # @quart_schema.validate_response(sql.Release, 200)
 @api.BLUEPRINT.route("/releases/version/<project>/<version>")
 @quart_schema.validate_response(models.api.ReleasesVersionResults, 200)
-async def releases_project_version(project: str, version: str) -> DictResponse:
+async def releases_version(project: str, version: str) -> DictResponse:
     """Return a single release by project and version."""
     _simple_check(project, version)
     async with db.session() as data:
@@ -498,7 +528,7 @@ async def releases_project_version(project: str, version: str) -> DictResponse:
 # TODO: Rename this to revisions? I.e. /revisions/<project>/<version>
 @api.BLUEPRINT.route("/releases/revisions/<project>/<version>")
 @quart_schema.validate_response(models.api.ReleasesRevisionsResults, 200)
-async def releases_project_version_revisions(project: str, version: str) -> DictResponse:
+async def releases_revisions(project: str, version: str) -> DictResponse:
     """List all revisions for a given release."""
     _simple_check(project, version)
     async with db.session() as data:
@@ -512,7 +542,7 @@ async def releases_project_version_revisions(project: str, version: str) -> Dict
 
 @api.BLUEPRINT.route("/revisions/<project>/<version>")
 @quart_schema.validate_response(models.api.RevisionsResults, 200)
-async def revisions_project_version(project: str, version: str) -> DictResponse:
+async def revisions(project: str, version: str) -> DictResponse:
     _simple_check(project, version)
     async with db.session() as data:
         release_name = sql.release_name(project, version)
@@ -605,6 +635,40 @@ async def tasks(query_args: models.api.TasksQuery) -> DictResponse:
             endpoint="/tasks",
             data=paged_tasks,
             count=count,
+        ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/users/list")
+@quart_schema.validate_response(models.api.UsersListResults, 200)
+async def users_list() -> DictResponse:
+    """List all known users."""
+    # This is not a list of all ASF users, but only those known to ATR
+    # It is not even a list of users who have logged in to ATR
+    # Only those who has stored certain kinds of data:
+    # PersonalAccessToken.asfuid
+    # SSHKey.asf_uid
+    # PublicSigningKey.apache_uid
+    # Revision.asfuid
+    async with db.session() as data:
+        # TODO: Combine these queries
+        via = sql.validate_instrumented_attribute
+        result = await data.execute(sqlalchemy.select(via(sql.PersonalAccessToken.asfuid)).distinct())
+        pat_uids = set(result.scalars().all())
+
+        result = await data.execute(sqlalchemy.select(via(sql.SSHKey.asf_uid)).distinct())
+        ssh_uids = set(result.scalars().all())
+
+        result = await data.execute(sqlalchemy.select(via(sql.PublicSigningKey.apache_uid)).distinct())
+        public_signing_uids = set(result.scalars().all())
+
+        result = await data.execute(sqlalchemy.select(via(sql.Revision.asfuid)).distinct())
+        revision_uids = set(result.scalars().all())
+
+        users = pat_uids | ssh_uids | public_signing_uids | revision_uids
+        users -= {None}
+        return models.api.UsersListResults(
+            endpoint="/users/list",
+            users=sorted(users),
         ).model_dump(), 200
 
 

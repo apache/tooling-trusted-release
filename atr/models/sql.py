@@ -705,6 +705,16 @@ class PublicSigningKey(sqlmodel.SQLModel, table=True):
     # M-M: Committee -> [PublicSigningKey]
     committees: list[Committee] = sqlmodel.Relationship(back_populates="public_signing_keys", link_model=KeyLink)
 
+    def model_post_init(self, _context):
+        if isinstance(self.created, str):
+            self.created = datetime.datetime.fromisoformat(self.created.rstrip("Z"))
+
+        if isinstance(self.latest_self_signature, str):
+            self.latest_self_signature = datetime.datetime.fromisoformat(self.latest_self_signature.rstrip("Z"))
+
+        if isinstance(self.expires, str):
+            self.expires = datetime.datetime.fromisoformat(self.expires.rstrip("Z"))
+
 
 # ReleasePolicy: Project
 class ReleasePolicy(sqlmodel.SQLModel, table=True):
