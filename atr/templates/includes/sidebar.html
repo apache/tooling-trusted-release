@@ -68,11 +68,15 @@
       </li>
     </ul>
     {% if current_user %}
-      <h3>Public keys</h3>
+      <h3>Keys and tokens</h3>
       <ul>
         <li>
           <i class="bi bi-key"></i>
           <a href="{{ as_url(routes.keys.keys) }}">Manage keys</a>
+        </li>
+        <li>
+          <i class="bi bi-key"></i>
+          <a href="{{ as_url(routes.tokens.tokens) }}">Manage tokens</a>
         </li>
       </ul>
 
