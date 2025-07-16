@@ -22,7 +22,7 @@ import logging
 import pathlib
 import pprint
 import re
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from typing import Final
 
 import aiofiles.os
@@ -65,12 +65,6 @@ class PathInfo(schema.Strict):
     warnings: dict[pathlib.Path, list[sql.CheckResult]] = schema.factory(dict)
 
 
-def ensure_session(caller_data: db.Session | None) -> db.Session | contextlib.nullcontext[db.Session]:
-    if caller_data is None:
-        return db.session()
-    return contextlib.nullcontext(caller_data)
-
-
 @contextlib.asynccontextmanager
 async def ephemeral_gpg_home() -> AsyncGenerator[str]:
     """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
@@ -79,7 +73,7 @@ async def ephemeral_gpg_home() -> AsyncGenerator[str]:
 
 
 async def has_failing_checks(release: sql.Release, revision_number: str, caller_data: db.Session | None = None) -> bool:
-    async with ensure_session(caller_data) as data:
+    async with db.ensure_session(caller_data) as data:
         query = (
             sqlmodel.select(sqlalchemy.func.count())
             .select_from(sql.CheckResult)
@@ -461,6 +455,24 @@ async def upload_keys_bytes(
     error_count = len(results) - success_count
 
     return results, success_count, error_count, submitted_committees
+
+
+# This function cannot go in user.py because it causes a circular import
+async def user_committees_committer(asf_uid: str, caller_data: db.Session | None = None) -> Sequence[sql.Committee]:
+    async with db.ensure_session(caller_data) as data:
+        return await data.committee(has_committer=asf_uid).all()
+
+
+# This function cannot go in user.py because it causes a circular import
+async def user_committees_member(asf_uid: str, caller_data: db.Session | None = None) -> Sequence[sql.Committee]:
+    async with db.ensure_session(caller_data) as data:
+        return await data.committee(has_member=asf_uid).all()
+
+
+# This function cannot go in user.py because it causes a circular import
+async def user_committees_participant(asf_uid: str, caller_data: db.Session | None = None) -> Sequence[sql.Committee]:
+    async with db.ensure_session(caller_data) as data:
+        return await data.committee(has_participant=asf_uid).all()
 
 
 async def _delete_release_data_downloads(release: sql.Release) -> None:

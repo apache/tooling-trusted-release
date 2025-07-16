@@ -241,6 +241,7 @@ async def draft_delete(data: models.api.DraftDeleteArgs) -> DictResponse:
     ).model_dump(), 200
 
 
+# This is the only POST endpoint that does not require a JWT
 @api.BLUEPRINT.route("/jwt", methods=["POST"])
 @quart_schema.validate_request(models.api.JwtArgs)
 async def jwt(data: models.api.JwtArgs) -> DictResponse:
@@ -288,6 +289,43 @@ async def keys_endpoint(query_args: models.api.KeysQuery) -> DictResponse:
             data=paged_keys,
             count=count,
         ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/keys/add", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.KeysAddArgs)
+@quart_schema.validate_response(models.api.KeysAddResults, 200)
+async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
+    asf_uid = _jwt_asf_uid()
+    selected_committee_names = []
+    if data.committees:
+        selected_committee_names[:] = data.committees.split(",")
+
+    async with db.session() as db_data:
+        member_of_committees = await interaction.user_committees_member(asf_uid, caller_data=db_data)
+        selected_committees = await db_data.committee(name_in=selected_committee_names).all()
+        committee_is_podling = {c.name: c.is_podling for c in selected_committees}
+        for committee in selected_committees:
+            if committee not in member_of_committees:
+                raise exceptions.BadRequest(f"You are not a member of committee {committee.name}")
+        added_keys = await interaction.key_user_add(asf_uid, data.key, selected_committee_names)
+        fingerprints = []
+        for key_info in added_keys:
+            if key_info:
+                fingerprint = key_info.get("fingerprint", "").upper()
+                fingerprints.append(fingerprint)
+                for committee_name in selected_committee_names:
+                    is_podling = committee_is_podling[committee_name]
+                    await keys.autogenerate_keys_file(committee_name, is_podling)
+
+        if not added_keys:
+            raise exceptions.BadRequest("No keys were added.")
+    return models.api.KeysAddResults(
+        endpoint="/keys/add",
+        success="Key added",
+        fingerprints=fingerprints,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/keys/committee/<committee>")

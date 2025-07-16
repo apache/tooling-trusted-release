@@ -101,6 +101,18 @@ class JwtResults(schema.Strict):
     jwt: str
 
 
+class KeysAddArgs(schema.Strict):
+    asfuid: str
+    key: str
+    committees: str
+
+
+class KeysAddResults(schema.Strict):
+    endpoint: Literal["/keys/add"] = schema.Field(alias="endpoint")
+    success: str
+    fingerprints: list[str]
+
+
 @dataclasses.dataclass
 class KeysQuery:
     offset: int = 0
@@ -304,6 +316,7 @@ Results = Annotated[
     | DraftDeleteResults
     | JwtResults
     | KeysResults
+    | KeysAddResults
     | KeysGetResults
     | KeysCommitteeResults
     | KeysUserResults
@@ -352,6 +365,7 @@ validate_committees_projects = validator(CommitteesProjectsResults)
 validate_draft_delete = validator(DraftDeleteResults)
 validate_jwt = validator(JwtResults)
 validate_keys = validator(KeysResults)
+validate_keys_add = validator(KeysAddResults)
 validate_keys_committee = validator(KeysCommitteeResults)
 validate_keys_get = validator(KeysGetResults)
 validate_keys_user = validator(KeysUserResults)

@@ -207,10 +207,14 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         committers: Opt[list[str]] = NOT_SET,
         release_managers: Opt[list[str]] = NOT_SET,
         name_in: Opt[list[str]] = NOT_SET,
+        has_member: Opt[str] = NOT_SET,
+        has_committer: Opt[str] = NOT_SET,
+        has_participant: Opt[str] = NOT_SET,
         _child_committees: bool = False,
         _projects: bool = False,
         _public_signing_keys: bool = False,
     ) -> Query[sql.Committee]:
+        via = sql.validate_instrumented_attribute
         query = sqlmodel.select(sql.Committee)
 
         if is_defined(name):
@@ -229,8 +233,16 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(sql.Committee.release_managers == release_managers)
 
         if is_defined(name_in):
-            models_committee_name = sql.validate_instrumented_attribute(sql.Committee.name)
-            query = query.where(models_committee_name.in_(name_in))
+            query = query.where(via(sql.Committee.name).in_(name_in))
+        if is_defined(has_member):
+            query = query.where(via(sql.Committee.committee_members).contains(has_member))
+        if is_defined(has_committer):
+            query = query.where(via(sql.Committee.committers).contains(has_committer))
+        if is_defined(has_participant):
+            query = query.where(
+                via(sql.Committee.committee_members).contains(has_participant)
+                or via(sql.Committee.committers).contains(has_participant)
+            )
 
         if _child_committees:
             query = query.options(select_in_load(sql.Committee.child_committees))
@@ -635,6 +647,12 @@ async def create_async_engine(app_config: type[config.AppConfig]) -> sqlalchemy.
         await conn.execute(sqlalchemy.text("PRAGMA strict=ON"))
 
     return engine
+
+
+def ensure_session(caller_data: Session | None) -> Session | contextlib.nullcontext[Session]:
+    if caller_data is None:
+        return session()
+    return contextlib.nullcontext(caller_data)
 
 
 async def get_project_release_policy(data: Session, project_name: str) -> sql.ReleasePolicy | None:

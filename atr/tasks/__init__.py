@@ -19,7 +19,6 @@ from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, Final
 
 import atr.db as db
-import atr.db.interaction as interaction
 import atr.models.results as results
 import atr.models.sql as sql
 import atr.tasks.checks.hashing as hashing
@@ -64,7 +63,7 @@ async def draft_checks(
     revision_path = util.get_unfinished_dir() / project_name / release_version / revision_number
     relative_paths = [path async for path in util.paths_recursive(revision_path)]
 
-    async with interaction.ensure_session(caller_data) as data:
+    async with db.ensure_session(caller_data) as data:
         release = await data.release(name=sql.release_name(project_name, release_version), _committee=True).demand(
             RuntimeError("Release not found")
         )
@@ -98,7 +97,7 @@ async def keys_import_file(
     release_name: str, revision_number: str, abs_keys_path: str, caller_data: db.Session | None = None
 ) -> None:
     """Import a KEYS file from a draft release candidate revision."""
-    async with interaction.ensure_session(caller_data) as data:
+    async with db.ensure_session(caller_data) as data:
         data.add(
             sql.Task(
                 status=sql.TaskStatus.QUEUED,
