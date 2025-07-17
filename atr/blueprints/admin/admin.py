@@ -640,6 +640,32 @@ async def admin_task_times(
     return quart.Response("\n".join(values), mimetype="text/plain")
 
 
+@admin.BLUEPRINT.route("/test", methods=["GET"])
+async def admin_test() -> quart.wrappers.response.Response:
+    """Test the storage layer."""
+    import atr.storage as storage
+
+    async with aiohttp.ClientSession() as aiohttp_client_session:
+        url = "https://downloads.apache.org/pulsar/KEYS"
+        async with aiohttp_client_session.get(url) as response:
+            keys_file_text = await response.text()
+            # logging.info(f"Keys file text: {keys_file_text}")
+
+    web_session = await session.read()
+    if web_session is None:
+        raise base.ASFQuartException("Not authenticated", 401)
+    asf_uid = web_session.uid
+    if asf_uid is None:
+        raise base.ASFQuartException("Invalid session, uid is None", 500)
+    async with storage.write(asf_uid) as write:
+        wacm = write.as_committee_member("tooling").writer_or_raise()
+        start = time.perf_counter_ns()
+        fingerprints = list(wacm.keys.upload(keys_file_text))
+        end = time.perf_counter_ns()
+        logging.info(f"Upload of {len(fingerprints)} keys took {end - start} ns")
+    return quart.Response(str(wacm), mimetype="text/plain")
+
+
 @admin.BLUEPRINT.route("/toggle-view", methods=["GET"])
 async def admin_toggle_admin_view_page() -> str:
     """Display the page with a button to toggle between admin and user views."""

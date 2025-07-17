@@ -851,6 +851,16 @@ wheels = [
 ]
 
 [[package]]
+name = "pgpy"
+version = "0.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "pyasn1" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f8/68/5e285ba9465550a48e837b08b27fa99ef238618f6085a1464afaa4dc8426/PGPy-0.6.0.tar.gz", hash = "sha256:279c2e353f4c3a319f00bd9bd582456e420f8a3ac6de2b4e9731444746828383", size = 603002 }
+
+[[package]]
 name = "platformdirs"
 version = "4.3.8"
 source = { registry = "https://pypi.org/simple" }
@@ -1367,6 +1377,15 @@ wheels = [
 ]
 
 [[package]]
+name = "standard-imghdr"
+version = "3.13.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1a/8d/ab2620fbe2e348483c9cb776c3b7b3cc407899291a041d7fa026469b7cd1/standard_imghdr-3.13.0.tar.gz", hash = "sha256:8d9c68058d882f6fc3542a8d39ef9ff94d2187dc90bd0c851e0902776b7b7a42", size = 5511 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/df/cb/e1da7e340586a078404c7e4328bfefc930867ace8a9a55916fd220cf9547/standard_imghdr-3.13.0-py3-none-any.whl", hash = "sha256:30a1bff5465605bb496f842a6ac3cc1f2131bf3025b0da28d4877d6d4b7cc8e9", size = 4639 },
+]
+
+[[package]]
 name = "tooling-trusted-release"
 version = "0.0.1"
 source = { virtual = "." }
@@ -1391,6 +1410,7 @@ dependencies = [
     { name = "htpy" },
     { name = "hypercorn" },
     { name = "ldap3" },
+    { name = "pgpy" },
     { name = "pydantic-xml" },
     { name = "pyjwt" },
     { name = "python-decouple" },
@@ -1399,6 +1419,7 @@ dependencies = [
     { name = "quart-wtforms" },
     { name = "rich" },
     { name = "sqlmodel" },
+    { name = "standard-imghdr" },
 ]
 
 [package.dev-dependencies]
@@ -1439,6 +1460,7 @@ requires-dist = [
     { name = "htpy", specifier = ">=25.7.0,<26.0.0" },
     { name = "hypercorn", specifier = "~=0.17" },
     { name = "ldap3", specifier = "==2.10.2rc2" },
+    { name = "pgpy", specifier = ">=0.6.0" },
     { name = "pydantic-xml", specifier = ">=2.17.2,<3.0.0" },
     { name = "pyjwt", specifier = ">=2.10.1,<3.0.0" },
     { name = "python-decouple", specifier = "~=3.8" },
@@ -1447,6 +1469,7 @@ requires-dist = [
     { name = "quart-wtforms", specifier = "~=1.0.3" },
     { name = "rich", specifier = "~=14.0.0" },
     { name = "sqlmodel", specifier = "~=0.0.24" },
+    { name = "standard-imghdr", specifier = ">=3.13.0" },
 ]
 
 [package.metadata.requires-dev]
