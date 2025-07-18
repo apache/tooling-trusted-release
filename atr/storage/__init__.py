@@ -15,9 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import annotations
+
 import contextlib
-from collections.abc import AsyncGenerator
-from typing import Final, TypeVar
+from typing import TYPE_CHECKING, Final, NoReturn, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Callable, Sequence
 
 import atr.db as db
 import atr.storage.writers as writers
@@ -212,6 +216,187 @@ class Write:
         except Exception as e:
             return AccessOutcomeWrite(e)
         return AccessOutcomeWrite(wacm)
+
+
+# Outcome
+
+E = TypeVar("E", bound=Exception)
+T = TypeVar("T", bound=object)
+
+
+class OutcomeCore[T]:
+    @property
+    def ok(self) -> bool:
+        raise NotImplementedError("ok is not implemented")
+
+    @property
+    def name(self) -> str | None:
+        raise NotImplementedError("name is not implemented")
+
+    def result_or_none(self) -> T | None:
+        raise NotImplementedError("result_or_none is not implemented")
+
+    def result_or_raise(self, exception_class: type[E] | None = None) -> T:
+        raise NotImplementedError("result_or_raise is not implemented")
+
+    def exception_or_none(self) -> Exception | None:
+        raise NotImplementedError("exception_or_none is not implemented")
+
+    def exception_type_or_none(self) -> type[Exception] | None:
+        raise NotImplementedError("exception_type_or_none is not implemented")
+
+
+class OutcomeResult[T](OutcomeCore[T]):
+    __result: T
+
+    def __init__(self, result: T, name: str | None = None):
+        self.__result = result
+        self.__name = name
+
+    @property
+    def ok(self) -> bool:
+        return True
+
+    @property
+    def name(self) -> str | None:
+        return self.__name
+
+    def result_or_none(self) -> T | None:
+        return self.__result
+
+    def result_or_raise(self, exception_class: type[Exception] | None = None) -> T:
+        return self.__result
+
+    def exception_or_none(self) -> Exception | None:
+        return None
+
+    def exception_type_or_none(self) -> type[Exception] | None:
+        return None
+
+
+class OutcomeError[T, E: Exception](OutcomeCore[T]):
+    __exception: E
+
+    def __init__(self, exception: E, name: str | None = None):
+        self.__exception = exception
+        self.__name = name
+
+    @property
+    def ok(self) -> bool:
+        return False
+
+    @property
+    def name(self) -> str | None:
+        return self.__name
+
+    def result_or_none(self) -> T | None:
+        return None
+
+    def result_or_raise(self, exception_class: type[Exception] | None = None) -> NoReturn:
+        if exception_class is not None:
+            raise exception_class(str(self.__exception)) from self.__exception
+        raise self.__exception
+
+    def exception_or_none(self) -> Exception | None:
+        return self.__exception
+
+    def exception_type_or_none(self) -> type[Exception] | None:
+        return type(self.__exception)
+
+
+class Outcomes[T]:
+    __outcomes: list[OutcomeResult[T] | OutcomeError[T, Exception]]
+
+    def __init__(self, *outcomes: OutcomeResult[T] | OutcomeError[T, Exception]):
+        self.__outcomes = list(outcomes)
+
+    @property
+    def any_ok(self) -> bool:
+        return any(outcome.ok for outcome in self.__outcomes)
+
+    @property
+    def all_ok(self) -> bool:
+        return all(outcome.ok for outcome in self.__outcomes)
+
+    def append(self, result_or_error: T | Exception, name: str | None = None) -> None:
+        if isinstance(result_or_error, Exception):
+            self.__outcomes.append(OutcomeError(result_or_error, name))
+        else:
+            self.__outcomes.append(OutcomeResult(result_or_error, name))
+
+    def extend(self, result_or_error_list: Sequence[T | Exception]) -> None:
+        for result_or_error in result_or_error_list:
+            self.append(result_or_error)
+
+    @property
+    def exception_count(self) -> int:
+        return sum(1 for outcome in self.__outcomes if isinstance(outcome, OutcomeError))
+
+    def exceptions(self) -> list[Exception]:
+        exceptions_list = []
+        for outcome in self.__outcomes:
+            if isinstance(outcome, OutcomeError):
+                exception_or_none = outcome.exception_or_none()
+                if exception_or_none is not None:
+                    exceptions_list.append(exception_or_none)
+        return exceptions_list
+
+    def named_results(self) -> dict[str, T]:
+        named = {}
+        for outcome in self.__outcomes:
+            if (outcome.name is not None) and outcome.ok:
+                named[outcome.name] = outcome.result_or_raise()
+        return named
+
+    def names(self) -> list[str | None]:
+        return [outcome.name for outcome in self.__outcomes if (outcome.name is not None)]
+
+    def results_or_raise(self, exception_class: type[Exception] | None = None) -> list[T]:
+        return [outcome.result_or_raise(exception_class) for outcome in self.__outcomes]
+
+    def results(self) -> list[T]:
+        return [outcome.result_or_raise() for outcome in self.__outcomes if outcome.ok]
+
+    @property
+    def ok_count(self) -> int:
+        return sum(1 for outcome in self.__outcomes if outcome.ok)
+
+    def outcomes(self) -> list[OutcomeResult[T] | OutcomeError[T, Exception]]:
+        return self.__outcomes
+
+    def update_results(self, f: Callable[[T], T]) -> None:
+        for i, outcome in enumerate(self.__outcomes):
+            if isinstance(outcome, OutcomeResult):
+                try:
+                    result = f(outcome.result_or_raise())
+                except Exception as e:
+                    self.__outcomes[i] = OutcomeError(e, outcome.name)
+                else:
+                    self.__outcomes[i] = OutcomeResult(result, outcome.name)
+
+    # def update_results_batch(self, f: Callable[[Sequence[T]], Sequence[T]]) -> None:
+    #     results = self.collect_results()
+    #     new_results = iter(f(results))
+    #     new_outcomes = []
+    #     for outcome in self.__outcomes:
+    #         match outcome:
+    #             case OutcomeResult():
+    #                 new_outcomes.append(OutcomeResult(next(new_results), outcome.name))
+    #             case OutcomeError():
+    #                 new_outcomes.append(OutcomeError(outcome.exception_or_none(), outcome.name))
+    #     self.__outcomes[:] = new_outcomes
+
+    # def update_results_stream(self, f: Callable[[Sequence[T]], Generator[T | Exception]]) -> None:
+    #     results = self.collect_results()
+    #     new_results = f(results)
+    #     new_outcomes = []
+    #     for outcome in self.__outcomes:
+    #         match outcome:
+    #             case OutcomeResult():
+    #                 new_outcomes.append(OutcomeResult(next(new_results), outcome.name))
+    #             case OutcomeError():
+    #                 new_outcomes.append(OutcomeError(outcome.exception_or_none(), outcome.name))
+    #     self.__outcomes[:] = new_outcomes
 
 
 # Context managers
