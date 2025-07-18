@@ -121,22 +121,33 @@ class CommitteeMember:
             await self.__data.begin_immediate()
             committee = await self.committee()
 
-            persisted_fingerprints: set[str] = set()
-            for model in key_models:
-                merged_key: sql.PublicSigningKey = await self.__data.merge(model)
-                persisted_fingerprints.add(merged_key.fingerprint)
+            key_values = [m.model_dump(exclude={"committees"}) for m in key_models]
+            key_insert_result = await self.__data.execute(
+                sqlite.insert(sql.PublicSigningKey)
+                .values(key_values)
+                .on_conflict_do_nothing(index_elements=["fingerprint"])
+            )
+            key_insert_count = key_insert_result.rowcount
+            logging.info(f"Inserted {key_insert_count} keys")
+
+            persisted_fingerprints = {v["fingerprint"] for v in key_values}
             await self.__data.flush()
 
             existing_fingerprints = {k.fingerprint for k in committee.public_signing_keys}
             new_fingerprints = persisted_fingerprints - existing_fingerprints
-
             if new_fingerprints:
-                insert_values = [
+                link_values = [
                     {"committee_name": self.__committee_name, "key_fingerprint": fp} for fp in new_fingerprints
                 ]
-                stmt = sqlite.insert(sql.KeyLink).values(insert_values)
-                stmt = stmt.on_conflict_do_nothing(index_elements=["committee_name", "key_fingerprint"])
-                await self.__data.execute(stmt)
+                link_insert_result = await self.__data.execute(
+                    sqlite.insert(sql.KeyLink)
+                    .values(link_values)
+                    .on_conflict_do_nothing(index_elements=["committee_name", "key_fingerprint"])
+                )
+                link_insert_count = link_insert_result.rowcount
+            else:
+                link_insert_count = 0
+            logging.info(f"Inserted {link_insert_count} key links")
 
             await self.__data.commit()
         except Exception as e:

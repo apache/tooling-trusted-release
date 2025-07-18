@@ -646,7 +646,7 @@ async def admin_test() -> quart.wrappers.response.Response:
     import atr.storage as storage
 
     async with aiohttp.ClientSession() as aiohttp_client_session:
-        url = "https://downloads.apache.org/pulsar/KEYS"
+        url = "https://downloads.apache.org/beam/KEYS"
         async with aiohttp_client_session.get(url) as response:
             keys_file_text = await response.text()
             # logging.info(f"Keys file text: {keys_file_text}")
