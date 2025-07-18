@@ -324,10 +324,6 @@ class Outcomes[T]:
         else:
             self.__outcomes.append(OutcomeResult(result_or_error, name))
 
-    def extend(self, result_or_error_list: Sequence[T | Exception]) -> None:
-        for result_or_error in result_or_error_list:
-            self.append(result_or_error)
-
     @property
     def exception_count(self) -> int:
         return sum(1 for outcome in self.__outcomes if isinstance(outcome, OutcomeError))
@@ -341,6 +337,10 @@ class Outcomes[T]:
                     exceptions_list.append(exception_or_none)
         return exceptions_list
 
+    def extend(self, result_or_error_list: Sequence[T | Exception]) -> None:
+        for result_or_error in result_or_error_list:
+            self.append(result_or_error)
+
     def named_results(self) -> dict[str, T]:
         named = {}
         for outcome in self.__outcomes:
@@ -351,6 +351,12 @@ class Outcomes[T]:
     def names(self) -> list[str | None]:
         return [outcome.name for outcome in self.__outcomes if (outcome.name is not None)]
 
+    # def replace(self, a: T, b: T) -> None:
+    #     for i, outcome in enumerate(self.__outcomes):
+    #         if isinstance(outcome, OutcomeResult):
+    #             if outcome.result_or_raise() == a:
+    #                 self.__outcomes[i] = OutcomeResult(b, outcome.name)
+
     def results_or_raise(self, exception_class: type[Exception] | None = None) -> list[T]:
         return [outcome.result_or_raise(exception_class) for outcome in self.__outcomes]
 
@@ -358,11 +364,18 @@ class Outcomes[T]:
         return [outcome.result_or_raise() for outcome in self.__outcomes if outcome.ok]
 
     @property
-    def ok_count(self) -> int:
+    def result_count(self) -> int:
         return sum(1 for outcome in self.__outcomes if outcome.ok)
 
     def outcomes(self) -> list[OutcomeResult[T] | OutcomeError[T, Exception]]:
         return self.__outcomes
+
+    def result_predicate_count(self, predicate: Callable[[T], bool]) -> int:
+        return sum(
+            1
+            for outcome in self.__outcomes
+            if isinstance(outcome, OutcomeResult) and predicate(outcome.result_or_raise())
+        )
 
     def update_results(self, f: Callable[[T], T]) -> None:
         for i, outcome in enumerate(self.__outcomes):

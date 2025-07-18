@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import asyncio
+import enum
 import logging
 import tempfile
 import time
@@ -29,6 +30,7 @@ import pgpy.constants as constants
 import sqlalchemy.dialects.sqlite as sqlite
 
 import atr.db as db
+import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.storage as storage
 import atr.user as user
@@ -87,6 +89,18 @@ def performance_async(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable
     return wrapper
 
 
+class KeyStatus(enum.Flag):
+    PARSED = 0
+    INSERTED = enum.auto()
+    LINKED = enum.auto()
+    INSERTED_AND_LINKED = INSERTED | LINKED
+
+
+class Key(schema.Strict):
+    status: KeyStatus
+    key_model: sql.PublicSigningKey
+
+
 class CommitteeMember:
     def __init__(
         self, credentials: storage.WriteAsCommitteeMember, data: db.Session, asf_uid: str, committee_name: str
@@ -106,9 +120,17 @@ class CommitteeMember:
             storage.AccessError(f"Committee not found: {self.__committee_name}")
         )
 
+    # @property
+    # def key_type(self) -> type[Key]:
+    #     return Key
+
+    @property
+    def key_status(self) -> type[KeyStatus]:
+        return KeyStatus
+
     @performance_async
-    async def upload(self, keys_file_text: str) -> KeyOutcomes:
-        outcomes = storage.Outcomes[sql.PublicSigningKey]()
+    async def upload(self, keys_file_text: str) -> storage.Outcomes[Key]:
+        outcomes = storage.Outcomes[Key]()
         try:
             ldap_data = await util.email_to_uid_map()
             key_blocks = util.parse_key_blocks(keys_file_text)
@@ -130,7 +152,7 @@ class CommitteeMember:
         return outcomes
 
     @performance
-    def __block_models(self, key_block: str, ldap_data: dict[str, str]) -> list[sql.PublicSigningKey | Exception]:
+    def __block_models(self, key_block: str, ldap_data: dict[str, str]) -> list[Key | Exception]:
         # This cache is only held for the session
         if key_block in self.__key_block_models_cache:
             return self.__key_block_models_cache[key_block]
@@ -140,66 +162,93 @@ class CommitteeMember:
             tmpfile.flush()
             keyring = pgpy.PGPKeyring()
             fingerprints = keyring.load(tmpfile.name)
-            models = []
+            key_list = []
             for fingerprint in fingerprints:
                 try:
-                    model = self.__keyring_fingerprint_model(keyring, fingerprint, ldap_data)
-                    if model is None:
+                    key_model = self.__keyring_fingerprint_model(keyring, fingerprint, ldap_data)
+                    if key_model is None:
                         # Was not a primary key, so skip it
                         continue
-                    models.append(model)
+                    key = Key(status=KeyStatus.PARSED, key_model=key_model)
+                    key_list.append(key)
                 except Exception as e:
-                    models.append(e)
-            self.__key_block_models_cache[key_block] = models
-            return models
+                    key_list.append(e)
+            self.__key_block_models_cache[key_block] = key_list
+            return key_list
 
     @performance_async
-    async def __database_add_models(self, outcomes: KeyOutcomes) -> KeyOutcomes:
+    async def __database_add_models(self, outcomes: storage.Outcomes[Key]) -> storage.Outcomes[Key]:
         # Try to upsert all models and link to the committee in one transaction
         try:
-            key_models = outcomes.results()
-
-            await self.__data.begin_immediate()
-            committee = await self.committee()
-
-            key_values = [m.model_dump(exclude={"committees"}) for m in key_models]
-            key_insert_result = await self.__data.execute(
-                sqlite.insert(sql.PublicSigningKey)
-                .values(key_values)
-                .on_conflict_do_nothing(index_elements=["fingerprint"])
-            )
-            key_insert_count = key_insert_result.rowcount
-            logging.info(f"Inserted {key_insert_count} keys")
-
-            persisted_fingerprints = {v["fingerprint"] for v in key_values}
-            await self.__data.flush()
-
-            existing_fingerprints = {k.fingerprint for k in committee.public_signing_keys}
-            new_fingerprints = persisted_fingerprints - existing_fingerprints
-            if new_fingerprints:
-                link_values = [
-                    {"committee_name": self.__committee_name, "key_fingerprint": fp} for fp in new_fingerprints
-                ]
-                link_insert_result = await self.__data.execute(
-                    sqlite.insert(sql.KeyLink)
-                    .values(link_values)
-                    .on_conflict_do_nothing(index_elements=["committee_name", "key_fingerprint"])
-                )
-                link_insert_count = link_insert_result.rowcount
-            else:
-                link_insert_count = 0
-            logging.info(f"Inserted {link_insert_count} key links")
-
-            await self.__data.commit()
+            outcomes = await self.__database_add_models_core(outcomes)
         except Exception as e:
             # This logging is just so that ruff does not erase e
             logging.info(f"Post-parse error: {e}")
 
-            def raise_post_parse_error(model: sql.PublicSigningKey) -> NoReturn:
+            def raise_post_parse_error(key: Key) -> NoReturn:
                 nonlocal e
-                raise PostParseError(model, e)
+                raise PostParseError(key.key_model, e)
 
             outcomes.update_results(raise_post_parse_error)
+        return outcomes
+
+    @performance_async
+    async def __database_add_models_core(self, outcomes: storage.Outcomes[Key]) -> storage.Outcomes[Key]:
+        via = sql.validate_instrumented_attribute
+        key_list = outcomes.results()
+
+        await self.__data.begin_immediate()
+        committee = await self.committee()
+
+        key_values = [key.key_model.model_dump(exclude={"committees"}) for key in key_list]
+        key_insert_result = await self.__data.execute(
+            sqlite.insert(sql.PublicSigningKey)
+            .values(key_values)
+            .on_conflict_do_nothing(index_elements=["fingerprint"])
+            .returning(via(sql.PublicSigningKey.fingerprint))
+        )
+        key_inserts = {row.fingerprint for row in key_insert_result}
+        logging.info(f"Inserted {len(key_inserts)} keys")
+
+        def replace_with_inserted(key: Key) -> Key:
+            if key.key_model.fingerprint in key_inserts:
+                key.status = KeyStatus.INSERTED
+            return key
+
+        outcomes.update_results(replace_with_inserted)
+
+        persisted_fingerprints = {v["fingerprint"] for v in key_values}
+        await self.__data.flush()
+
+        existing_fingerprints = {k.fingerprint for k in committee.public_signing_keys}
+        new_fingerprints = persisted_fingerprints - existing_fingerprints
+        if new_fingerprints:
+            link_values = [{"committee_name": self.__committee_name, "key_fingerprint": fp} for fp in new_fingerprints]
+            link_insert_result = await self.__data.execute(
+                sqlite.insert(sql.KeyLink)
+                .values(link_values)
+                .on_conflict_do_nothing(index_elements=["committee_name", "key_fingerprint"])
+                .returning(via(sql.KeyLink.key_fingerprint))
+            )
+            link_inserts = {row.key_fingerprint for row in link_insert_result}
+            logging.info(f"Inserted {len(link_inserts)} key links")
+
+            def replace_with_linked(key: Key) -> Key:
+                nonlocal link_inserts
+                match key:
+                    case Key(status=KeyStatus.INSERTED):
+                        if key.key_model.fingerprint in link_inserts:
+                            key.status = KeyStatus.INSERTED_AND_LINKED
+                    case Key(status=KeyStatus.PARSED):
+                        if key.key_model.fingerprint in link_inserts:
+                            key.status = KeyStatus.LINKED
+                return key
+
+            outcomes.update_results(replace_with_linked)
+        else:
+            logging.info("Inserted 0 key links (none to insert)")
+
+        await self.__data.commit()
         return outcomes
 
     @performance
@@ -211,6 +260,8 @@ class CommitteeMember:
                 return None
             uids = [uid.userid for uid in key.userids]
             asf_uid = self.__uids_asf_uid(uids, ldap_data)
+
+            # TODO: Improve this
             key_size = key.key_size
             length = 0
             if isinstance(key_size, constants.EllipticCurveOID):
@@ -222,6 +273,7 @@ class CommitteeMember:
                 length = key_size
             else:
                 raise ValueError(f"Key size is not an integer: {type(key_size)}, {key_size}")
+
             return sql.PublicSigningKey(
                 fingerprint=str(key.fingerprint).lower(),
                 algorithm=key.key_algorithm.value,

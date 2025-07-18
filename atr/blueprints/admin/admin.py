@@ -646,7 +646,7 @@ async def admin_test() -> quart.wrappers.response.Response:
     import atr.storage as storage
 
     async with aiohttp.ClientSession() as aiohttp_client_session:
-        url = "https://downloads.apache.org/beam/KEYS"
+        url = "https://downloads.apache.org/zeppelin/KEYS"
         async with aiohttp_client_session.get(url) as response:
             keys_file_text = await response.text()
             # logging.info(f"Keys file text: {keys_file_text}")
@@ -662,9 +662,21 @@ async def admin_test() -> quart.wrappers.response.Response:
         start = time.perf_counter_ns()
         outcomes = await wacm.keys.upload(keys_file_text)
         end = time.perf_counter_ns()
-        logging.info(f"Upload of {outcomes.ok_count} keys took {end - start} ns")
-    for oe in outcomes.exceptions():
-        logging.error(f"Error uploading key: {oe}")
+        logging.info(f"Upload of {outcomes.result_count} keys took {end - start} ns")
+    for ocr in outcomes.results():
+        logging.info(f"Uploaded key: {type(ocr)} {ocr.key_model.fingerprint}")
+    for oce in outcomes.exceptions():
+        logging.error(f"Error uploading key: {type(oce)} {oce}")
+    parsed_count = outcomes.result_predicate_count(lambda k: k.status == wacm.keys.key_status.PARSED)
+    inserted_count = outcomes.result_predicate_count(lambda k: k.status == wacm.keys.key_status.INSERTED)
+    linked_count = outcomes.result_predicate_count(lambda k: k.status == wacm.keys.key_status.LINKED)
+    inserted_and_linked_count = outcomes.result_predicate_count(
+        lambda k: k.status == wacm.keys.key_status.INSERTED_AND_LINKED
+    )
+    logging.info(f"Parsed: {parsed_count}")
+    logging.info(f"Inserted: {inserted_count}")
+    logging.info(f"Linked: {linked_count}")
+    logging.info(f"InsertedAndLinked: {inserted_and_linked_count}")
     return quart.Response(str(wacm), mimetype="text/plain")
 
 
