@@ -45,16 +45,28 @@ PERFORMANCES: Final[dict[int, tuple[str, int]]] = {}
 _MEASURE_PERFORMANCE: Final[bool] = False
 
 
-class PostParseError(Exception):
-    def __init__(self, key: sql.PublicSigningKey, original_error: Exception):
+class KeyStatus(enum.Flag):
+    PARSED = 0
+    INSERTED = enum.auto()
+    LINKED = enum.auto()
+    INSERTED_AND_LINKED = INSERTED | LINKED
+
+
+class Key(schema.Strict):
+    status: KeyStatus
+    key_model: sql.PublicSigningKey
+
+
+class PublicKeyError(Exception):
+    def __init__(self, key: Key, original_error: Exception):
         self.__key = key
         self.__original_error = original_error
 
     def __str__(self) -> str:
-        return f"PostParseError: {self.__original_error}"
+        return f"PublicKeyError: {self.__original_error}"
 
     @property
-    def key(self) -> sql.PublicSigningKey:
+    def key(self) -> Key:
         return self.__key
 
     @property
@@ -89,19 +101,11 @@ def performance_async(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable
     return wrapper
 
 
-class KeyStatus(enum.Flag):
-    PARSED = 0
-    INSERTED = enum.auto()
-    LINKED = enum.auto()
-    INSERTED_AND_LINKED = INSERTED | LINKED
-
-
-class Key(schema.Strict):
-    status: KeyStatus
-    key_model: sql.PublicSigningKey
-
-
 class CommitteeMember:
+    Key = Key
+    KeyStatus = KeyStatus
+    PublicKeyError = PublicKeyError
+
     def __init__(
         self, credentials: storage.WriteAsCommitteeMember, data: db.Session, asf_uid: str, committee_name: str
     ):
@@ -120,17 +124,9 @@ class CommitteeMember:
             storage.AccessError(f"Committee not found: {self.__committee_name}")
         )
 
-    # @property
-    # def key_type(self) -> type[Key]:
-    #     return Key
-
-    @property
-    def key_status(self) -> type[KeyStatus]:
-        return KeyStatus
-
     @performance_async
-    async def upload(self, keys_file_text: str) -> storage.Outcomes[Key]:
-        outcomes = storage.Outcomes[Key]()
+    async def upload(self, keys_file_text: str) -> storage.Outcomes[CommitteeMember.Key]:
+        outcomes = storage.Outcomes[CommitteeMember.Key]()
         try:
             ldap_data = await util.email_to_uid_map()
             key_blocks = util.parse_key_blocks(keys_file_text)
@@ -152,7 +148,7 @@ class CommitteeMember:
         return outcomes
 
     @performance
-    def __block_models(self, key_block: str, ldap_data: dict[str, str]) -> list[Key | Exception]:
+    def __block_models(self, key_block: str, ldap_data: dict[str, str]) -> list[CommitteeMember.Key | Exception]:
         # This cache is only held for the session
         if key_block in self.__key_block_models_cache:
             return self.__key_block_models_cache[key_block]
@@ -169,7 +165,7 @@ class CommitteeMember:
                     if key_model is None:
                         # Was not a primary key, so skip it
                         continue
-                    key = Key(status=KeyStatus.PARSED, key_model=key_model)
+                    key = CommitteeMember.Key(status=CommitteeMember.KeyStatus.PARSED, key_model=key_model)
                     key_list.append(key)
                 except Exception as e:
                     key_list.append(e)
@@ -177,7 +173,9 @@ class CommitteeMember:
             return key_list
 
     @performance_async
-    async def __database_add_models(self, outcomes: storage.Outcomes[Key]) -> storage.Outcomes[Key]:
+    async def __database_add_models(
+        self, outcomes: storage.Outcomes[CommitteeMember.Key]
+    ) -> storage.Outcomes[CommitteeMember.Key]:
         # Try to upsert all models and link to the committee in one transaction
         try:
             outcomes = await self.__database_add_models_core(outcomes)
@@ -185,15 +183,19 @@ class CommitteeMember:
             # This logging is just so that ruff does not erase e
             logging.info(f"Post-parse error: {e}")
 
-            def raise_post_parse_error(key: Key) -> NoReturn:
+            def raise_post_parse_error(key: CommitteeMember.Key) -> NoReturn:
                 nonlocal e
-                raise PostParseError(key.key_model, e)
+                # We assume here that the transaction was rolled back correctly
+                key = CommitteeMember.Key(status=CommitteeMember.KeyStatus.PARSED, key_model=key.key_model)
+                raise PublicKeyError(key, e)
 
             outcomes.update_results(raise_post_parse_error)
         return outcomes
 
     @performance_async
-    async def __database_add_models_core(self, outcomes: storage.Outcomes[Key]) -> storage.Outcomes[Key]:
+    async def __database_add_models_core(
+        self, outcomes: storage.Outcomes[CommitteeMember.Key]
+    ) -> storage.Outcomes[CommitteeMember.Key]:
         via = sql.validate_instrumented_attribute
         key_list = outcomes.results()
 
@@ -210,9 +212,9 @@ class CommitteeMember:
         key_inserts = {row.fingerprint for row in key_insert_result}
         logging.info(f"Inserted {len(key_inserts)} keys")
 
-        def replace_with_inserted(key: Key) -> Key:
+        def replace_with_inserted(key: CommitteeMember.Key) -> CommitteeMember.Key:
             if key.key_model.fingerprint in key_inserts:
-                key.status = KeyStatus.INSERTED
+                key.status = CommitteeMember.KeyStatus.INSERTED
             return key
 
         outcomes.update_results(replace_with_inserted)
@@ -233,15 +235,15 @@ class CommitteeMember:
             link_inserts = {row.key_fingerprint for row in link_insert_result}
             logging.info(f"Inserted {len(link_inserts)} key links")
 
-            def replace_with_linked(key: Key) -> Key:
+            def replace_with_linked(key: CommitteeMember.Key) -> CommitteeMember.Key:
                 nonlocal link_inserts
                 match key:
-                    case Key(status=KeyStatus.INSERTED):
+                    case CommitteeMember.Key(status=CommitteeMember.KeyStatus.INSERTED):
                         if key.key_model.fingerprint in link_inserts:
-                            key.status = KeyStatus.INSERTED_AND_LINKED
-                    case Key(status=KeyStatus.PARSED):
+                            key.status = CommitteeMember.KeyStatus.INSERTED_AND_LINKED
+                    case CommitteeMember.Key(status=CommitteeMember.KeyStatus.PARSED):
                         if key.key_model.fingerprint in link_inserts:
-                            key.status = KeyStatus.LINKED
+                            key.status = CommitteeMember.KeyStatus.LINKED
                 return key
 
             outcomes.update_results(replace_with_linked)

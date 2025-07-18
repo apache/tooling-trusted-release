@@ -667,11 +667,11 @@ async def admin_test() -> quart.wrappers.response.Response:
         logging.info(f"Uploaded key: {type(ocr)} {ocr.key_model.fingerprint}")
     for oce in outcomes.exceptions():
         logging.error(f"Error uploading key: {type(oce)} {oce}")
-    parsed_count = outcomes.result_predicate_count(lambda k: k.status == wacm.keys.key_status.PARSED)
-    inserted_count = outcomes.result_predicate_count(lambda k: k.status == wacm.keys.key_status.INSERTED)
-    linked_count = outcomes.result_predicate_count(lambda k: k.status == wacm.keys.key_status.LINKED)
+    parsed_count = outcomes.result_predicate_count(lambda k: k.status == wacm.keys.KeyStatus.PARSED)
+    inserted_count = outcomes.result_predicate_count(lambda k: k.status == wacm.keys.KeyStatus.INSERTED)
+    linked_count = outcomes.result_predicate_count(lambda k: k.status == wacm.keys.KeyStatus.LINKED)
     inserted_and_linked_count = outcomes.result_predicate_count(
-        lambda k: k.status == wacm.keys.key_status.INSERTED_AND_LINKED
+        lambda k: k.status == wacm.keys.KeyStatus.INSERTED_AND_LINKED
     )
     logging.info(f"Parsed: {parsed_count}")
     logging.info(f"Inserted: {inserted_count}")
