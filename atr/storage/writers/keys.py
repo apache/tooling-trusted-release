@@ -21,7 +21,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import tempfile
-from typing import TYPE_CHECKING, NoReturn
+import time
+from typing import TYPE_CHECKING, Any, Final, NoReturn
 
 import pgpy
 import pgpy.constants as constants
@@ -34,7 +35,12 @@ import atr.user as user
 import atr.util as util
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
+
     KeyOutcomes = storage.Outcomes[sql.PublicSigningKey]
+
+PERFORMANCES: Final[dict[int, tuple[str, int]]] = {}
+_MEASURE_PERFORMANCE: Final[bool] = False
 
 
 class PostParseError(Exception):
@@ -54,6 +60,33 @@ class PostParseError(Exception):
         return self.__original_error
 
 
+def performance(func: Callable[..., Any]) -> Callable[..., Any]:
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        if not _MEASURE_PERFORMANCE:
+            return func(*args, **kwargs)
+
+        start = time.perf_counter_ns()
+        result = func(*args, **kwargs)
+        end = time.perf_counter_ns()
+        PERFORMANCES[time.time_ns()] = (func.__name__, end - start)
+        return result
+
+    return wrapper
+
+
+def performance_async(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable[..., Coroutine[Any, Any, Any]]:
+    async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        if not _MEASURE_PERFORMANCE:
+            return await func(*args, **kwargs)
+        start = time.perf_counter_ns()
+        result = await func(*args, **kwargs)
+        end = time.perf_counter_ns()
+        PERFORMANCES[time.time_ns()] = (func.__name__, end - start)
+        return result
+
+    return wrapper
+
+
 class CommitteeMember:
     def __init__(
         self, credentials: storage.WriteAsCommitteeMember, data: db.Session, asf_uid: str, committee_name: str
@@ -67,11 +100,13 @@ class CommitteeMember:
         self.__committee_name = committee_name
         self.__key_block_models_cache = {}
 
+    @performance_async
     async def committee(self) -> sql.Committee:
         return await self.__data.committee(name=self.__committee_name, _public_signing_keys=True).demand(
             storage.AccessError(f"Committee not found: {self.__committee_name}")
         )
 
+    @performance_async
     async def upload(self, keys_file_text: str) -> KeyOutcomes:
         outcomes = storage.Outcomes[sql.PublicSigningKey]()
         try:
@@ -88,8 +123,13 @@ class CommitteeMember:
                 outcomes.append(e)
         # Try adding the keys to the database
         # If not, all keys will be replaced with a PostParseError
-        return await self.__database_add_models(outcomes)
+        outcomes = await self.__database_add_models(outcomes)
+        if _MEASURE_PERFORMANCE:
+            for key, value in PERFORMANCES.items():
+                logging.info(f"{key}: {value}")
+        return outcomes
 
+    @performance
     def __block_models(self, key_block: str, ldap_data: dict[str, str]) -> list[sql.PublicSigningKey | Exception]:
         # This cache is only held for the session
         if key_block in self.__key_block_models_cache:
@@ -113,6 +153,7 @@ class CommitteeMember:
             self.__key_block_models_cache[key_block] = models
             return models
 
+    @performance_async
     async def __database_add_models(self, outcomes: KeyOutcomes) -> KeyOutcomes:
         # Try to upsert all models and link to the committee in one transaction
         try:
@@ -161,6 +202,7 @@ class CommitteeMember:
             outcomes.update_results(raise_post_parse_error)
         return outcomes
 
+    @performance
     def __keyring_fingerprint_model(
         self, keyring: pgpy.PGPKeyring, fingerprint: str, ldap_data: dict[str, str]
     ) -> sql.PublicSigningKey | None:
@@ -193,6 +235,7 @@ class CommitteeMember:
                 ascii_armored_key=str(key),
             )
 
+    @performance
     def __uids_asf_uid(self, uids: list[str], ldap_data: dict[str, str]) -> str | None:
         # Test data
         test_key_uids = [
