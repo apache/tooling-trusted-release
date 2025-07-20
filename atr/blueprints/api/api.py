@@ -265,6 +265,7 @@ async def jwt(data: models.api.JwtArgs) -> DictResponse:
     ).model_dump(), 200
 
 
+# TODO: Deprecate this endpoint
 @api.BLUEPRINT.route("/keys")
 @quart_schema.validate_querystring(models.api.KeysQuery)
 @quart_schema.validate_response(models.api.KeysResults, 200)
@@ -302,29 +303,22 @@ async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
     selected_committee_names = data.committees
 
-    async with db.session() as db_data:
-        participant_of_committees = await interaction.user_committees_member(asf_uid, caller_data=db_data)
-        selected_committees = await db_data.committee(name_in=selected_committee_names).all()
-        committee_is_podling = {c.name: c.is_podling for c in selected_committees}
-        for committee in selected_committees:
-            if committee not in participant_of_committees:
-                raise exceptions.BadRequest(f"You are not a member of committee {committee.name}")
-        added_keys = await interaction.key_user_add(asf_uid, data.key, selected_committee_names)
-        fingerprints = []
-        for key_info in added_keys:
-            if key_info:
-                fingerprint = key_info.get("fingerprint", "").upper()
-                fingerprints.append(fingerprint)
-                for committee_name in selected_committee_names:
-                    is_podling = committee_is_podling[committee_name]
-                    await keys.autogenerate_keys_file(committee_name, is_podling)
+    async with storage.write(asf_uid) as write:
+        wafm = write.as_foundation_member().writer_or_raise()
+        ocr: types.KeyOutcome = await wafm.keys.ensure_stored_one(data.key)
+        key = ocr.result_or_raise()
 
-        if not added_keys:
-            raise exceptions.BadRequest("No keys were added.")
+        # outcomes = types.LinkedCommitteeOutcomes()
+        for selected_committee_name in selected_committee_names:
+            wacm = write.as_committee_member(selected_committee_name).writer_or_raise()
+            outcome: types.LinkedCommitteeOutcome = await wacm.keys.associate_fingerprint(key.key_model.fingerprint)
+            outcome.result_or_raise()
+            # outcomes.append(outcome)
+
     return models.api.KeysAddResults(
         endpoint="/keys/add",
         success="Key added",
-        fingerprints=fingerprints,
+        fingerprint=key.key_model.fingerprint.upper(),
     ).model_dump(), 200
 
 
@@ -337,6 +331,7 @@ async def keys_delete(data: models.api.KeysDeleteArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
     fingerprint = data.fingerprint.lower()
     async with db.session() as db_data:
+        # TODO: Migrate to the storage interface
         key = await db_data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid, _committees=True).get()
         if key is None:
             raise ValueError(f"Key {fingerprint} not found")

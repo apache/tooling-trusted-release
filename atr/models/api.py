@@ -122,7 +122,7 @@ class KeysAddArgs(schema.Strict):
 class KeysAddResults(schema.Strict):
     endpoint: Literal["/keys/add"] = schema.Field(alias="endpoint")
     success: str
-    fingerprints: list[str]
+    fingerprint: str
 
 
 class KeysCommitteeResults(schema.Strict):

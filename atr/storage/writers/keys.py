@@ -69,22 +69,168 @@ def performance_async(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable
     return wrapper
 
 
-class CommitteeMember:
-    def __init__(
-        self, credentials: storage.WriteAsCommitteeMember, data: db.Session, asf_uid: str, committee_name: str
-    ):
+class FoundationMember:
+    def __init__(self, credentials: storage.WriteAsFoundationMember, data: db.Session, asf_uid: str):
         if credentials.validate_at_runtime:
             if credentials.authenticated is not True:
                 raise storage.AccessError("Writer is not authenticated")
         self.__credentials = credentials
         self.__data = data
         self.__asf_uid = asf_uid
-        self.__committee_name = committee_name
         self.__key_block_models_cache = {}
 
     @performance_async
-    async def associate(self, outcomes: storage.Outcomes[types.Key]) -> storage.Outcomes[types.Key]:
-        raise NotImplementedError("Not implemented")
+    async def ensure_stored_one(self, key_file_text: str) -> types.KeyOutcome:
+        return await self.__ensure_one(key_file_text, associate=False)
+
+    @performance
+    def __block_model(self, key_block: str, ldap_data: dict[str, str]) -> types.Key | Exception:
+        # This cache is only held for the session
+        if key_block in self.__key_block_models_cache:
+            cached_key_models = self.__key_block_models_cache[key_block]
+            if len(cached_key_models) == 1:
+                return cached_key_models[0]
+            else:
+                return ValueError("Expected one key block, got none or multiple")
+
+        with tempfile.NamedTemporaryFile(delete=True) as tmpfile:
+            tmpfile.write(key_block.encode())
+            tmpfile.flush()
+            keyring = pgpy.PGPKeyring()
+            fingerprints = keyring.load(tmpfile.name)
+            key = None
+            for fingerprint in fingerprints:
+                try:
+                    key_model = self.__keyring_fingerprint_model(keyring, fingerprint, ldap_data)
+                    if key_model is None:
+                        # Was not a primary key, so skip it
+                        continue
+                    if key is not None:
+                        return ValueError("Expected one key block, got multiple")
+                    key = types.Key(status=types.KeyStatus.PARSED, key_model=key_model)
+                except Exception as e:
+                    return e
+        if key is None:
+            return ValueError("Expected a key, got none")
+        self.__key_block_models_cache[key_block] = [key]
+        return key
+
+    @performance_async
+    async def __ensure_one(self, key_file_text: str, associate: bool = True) -> types.KeyOutcome:
+        try:
+            key_blocks = util.parse_key_blocks(key_file_text)
+        except Exception as e:
+            return storage.OutcomeException(e)
+        if len(key_blocks) != 1:
+            return storage.OutcomeException(ValueError("Expected one key block, got none or multiple"))
+        key_block = key_blocks[0]
+        try:
+            ldap_data = await util.email_to_uid_map()
+            key_model = await asyncio.to_thread(self.__block_model, key_block, ldap_data)
+            return storage.OutcomeResult(key_model)
+        except Exception as e:
+            return storage.OutcomeException(e)
+
+    @performance
+    def __keyring_fingerprint_model(
+        self, keyring: pgpy.PGPKeyring, fingerprint: str, ldap_data: dict[str, str]
+    ) -> sql.PublicSigningKey | None:
+        with keyring.key(fingerprint) as key:
+            if not key.is_primary:
+                return None
+            uids = [uid.userid for uid in key.userids]
+            asf_uid = self.__uids_asf_uid(uids, ldap_data)
+
+            # TODO: Improve this
+            key_size = key.key_size
+            length = 0
+            if isinstance(key_size, constants.EllipticCurveOID):
+                if isinstance(key_size.key_size, int):
+                    length = key_size.key_size
+                else:
+                    raise ValueError(f"Key size is not an integer: {type(key_size.key_size)}, {key_size.key_size}")
+            elif isinstance(key_size, int):
+                length = key_size
+            else:
+                raise ValueError(f"Key size is not an integer: {type(key_size)}, {key_size}")
+
+            return sql.PublicSigningKey(
+                fingerprint=str(key.fingerprint).lower(),
+                algorithm=key.key_algorithm.value,
+                length=length,
+                created=key.created,
+                latest_self_signature=key.expires_at,
+                expires=key.expires_at,
+                primary_declared_uid=uids[0],
+                secondary_declared_uids=uids[1:],
+                apache_uid=asf_uid,
+                ascii_armored_key=str(key),
+            )
+
+    @performance
+    def __uids_asf_uid(self, uids: list[str], ldap_data: dict[str, str]) -> str | None:
+        # Test data
+        test_key_uids = [
+            "Apache Tooling (For test use only) <apache-tooling@example.invalid>",
+        ]
+        is_admin = user.is_admin(self.__asf_uid)
+        if (uids == test_key_uids) and is_admin:
+            # Allow the test key
+            # TODO: We should fix the test key, not add an exception for it
+            # But the admin check probably makes this safe enough
+            return self.__asf_uid
+
+        # Regular data
+        emails = []
+        for uid in uids:
+            # This returns a lower case email address, whatever the case of the input
+            if email := util.email_from_uid(uid):
+                if email.endswith("@apache.org"):
+                    return email.removesuffix("@apache.org")
+                emails.append(email)
+        # We did not find a direct @apache.org email address
+        # Therefore, search cached LDAP data
+        for email in emails:
+            if email in ldap_data:
+                return ldap_data[email]
+        return None
+
+
+class CommitteeParticipant(FoundationMember):
+    def __init__(
+        self, credentials: storage.WriteAsCommitteeParticipant, data: db.Session, asf_uid: str, committee_name: str
+    ):
+        super().__init__(credentials, data, asf_uid)
+        self.__committee_name = committee_name
+
+
+class CommitteeMember(CommitteeParticipant):
+    def __init__(
+        self, credentials: storage.WriteAsCommitteeMember, data: db.Session, asf_uid: str, committee_name: str
+    ):
+        super().__init__(credentials, data, asf_uid, committee_name)
+        self.__committee_name = committee_name
+
+    @performance_async
+    async def associate_fingerprint(self, fingerprint: str) -> types.LinkedCommitteeOutcome:
+        via = sql.validate_instrumented_attribute
+        link_values = [{"committee_name": self.__committee_name, "key_fingerprint": fingerprint}]
+        try:
+            link_insert_result = await self.__data.execute(
+                sqlite.insert(sql.KeyLink)
+                .values(link_values)
+                .on_conflict_do_nothing(index_elements=["committee_name", "key_fingerprint"])
+                .returning(via(sql.KeyLink.key_fingerprint))
+            )
+            if link_insert_result.one_or_none() is None:
+                return storage.OutcomeException(storage.AccessError(f"Key not found: {fingerprint}"))
+        except Exception as e:
+            return storage.OutcomeException(e)
+        return storage.OutcomeResult(
+            types.LinkedCommittee(
+                name=self.__committee_name,
+            )
+        )
 
     @performance_async
     async def committee(self) -> sql.Committee:
@@ -94,6 +240,7 @@ class CommitteeMember:
 
     @performance_async
     async def ensure_associated(self, keys_file_text: str) -> storage.Outcomes[types.Key]:
+        # TODO: Autogenerate KEYS file
         return await self.__ensure(keys_file_text, associate=True)
 
     @performance_async
@@ -122,8 +269,8 @@ class CommitteeMember:
                     key_list.append(key)
                 except Exception as e:
                     key_list.append(e)
-            self.__key_block_models_cache[key_block] = key_list
-            return key_list
+        self.__key_block_models_cache[key_block] = key_list
+        return key_list
 
     @performance_async
     async def __database_add_models(
@@ -230,67 +377,3 @@ class CommitteeMember:
             for key, value in PERFORMANCES.items():
                 logging.info(f"{key}: {value}")
         return outcomes
-
-    @performance
-    def __keyring_fingerprint_model(
-        self, keyring: pgpy.PGPKeyring, fingerprint: str, ldap_data: dict[str, str]
-    ) -> sql.PublicSigningKey | None:
-        with keyring.key(fingerprint) as key:
-            if not key.is_primary:
-                return None
-            uids = [uid.userid for uid in key.userids]
-            asf_uid = self.__uids_asf_uid(uids, ldap_data)
-
-            # TODO: Improve this
-            key_size = key.key_size
-            length = 0
-            if isinstance(key_size, constants.EllipticCurveOID):
-                if isinstance(key_size.key_size, int):
-                    length = key_size.key_size
-                else:
-                    raise ValueError(f"Key size is not an integer: {type(key_size.key_size)}, {key_size.key_size}")
-            elif isinstance(key_size, int):
-                length = key_size
-            else:
-                raise ValueError(f"Key size is not an integer: {type(key_size)}, {key_size}")
-
-            return sql.PublicSigningKey(
-                fingerprint=str(key.fingerprint).lower(),
-                algorithm=key.key_algorithm.value,
-                length=length,
-                created=key.created,
-                latest_self_signature=key.expires_at,
-                expires=key.expires_at,
-                primary_declared_uid=uids[0],
-                secondary_declared_uids=uids[1:],
-                apache_uid=asf_uid,
-                ascii_armored_key=str(key),
-            )
-
-    @performance
-    def __uids_asf_uid(self, uids: list[str], ldap_data: dict[str, str]) -> str | None:
-        # Test data
-        test_key_uids = [
-            "Apache Tooling (For test use only) <apache-tooling@example.invalid>",
-        ]
-        is_admin = user.is_admin(self.__asf_uid)
-        if (uids == test_key_uids) and is_admin:
-            # Allow the test key
-            # TODO: We should fix the test key, not add an exception for it
-            # But the admin check probably makes this safe enough
-            return self.__asf_uid
-
-        # Regular data
-        emails = []
-        for uid in uids:
-            # This returns a lower case email address, whatever the case of the input
-            if email := util.email_from_uid(uid):
-                if email.endswith("@apache.org"):
-                    return email.removesuffix("@apache.org")
-                emails.append(email)
-        # We did not find a direct @apache.org email address
-        # Therefore, search cached LDAP data
-        for email in emails:
-            if email in ldap_data:
-                return ldap_data[email]
-        return None

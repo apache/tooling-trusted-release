@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import dataclasses
 import enum
 
 import atr.models.schema as schema
@@ -34,6 +35,11 @@ class Key(schema.Strict):
     key_model: sql.PublicSigningKey
 
 
+@dataclasses.dataclass
+class LinkedCommittee:
+    name: str
+
+
 class PublicKeyError(Exception):
     def __init__(self, key: Key, original_error: Exception):
         self.__key = key
@@ -51,6 +57,14 @@ class PublicKeyError(Exception):
         return self.__original_error
 
 
+type KeyOutcomeResult = storage.OutcomeResult[Key]
+type KeyOutcomeException = storage.OutcomeException[Key, Exception]
+type KeyOutcome = KeyOutcomeResult | KeyOutcomeException
+
 type KeyOutcomes = storage.Outcomes[Key]
-# type KeyOutcomeResult = storage.OutcomeResult[Key]
-# type KeyOutcomeError = storage.OutcomeError[Key, Exception]
+
+type LinkedCommitteeOutcomeResult = storage.OutcomeResult[LinkedCommittee]
+type LinkedCommitteeOutcomeException = storage.OutcomeException[LinkedCommittee, Exception]
+type LinkedCommitteeOutcome = LinkedCommitteeOutcomeResult | LinkedCommitteeOutcomeException
+
+type LinkedCommitteeOutcomes = storage.Outcomes[LinkedCommittee]

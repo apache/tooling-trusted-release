@@ -56,6 +56,7 @@ class AccessError(RuntimeError): ...
 ## Access outcome
 
 
+# TODO: Use actual outcomes here
 class AccessOutcome[A]:
     pass
 
@@ -110,17 +111,75 @@ class Read:
 # Write
 
 
-class WriteAsCommitteeMember(AccessCredentialsWrite):
-    def __init__(self, data: db.Session, asf_uid: str, committee_name: str):
-        self.__authenticated = False
-        self.__validate_at_runtime = VALIDATE_AT_RUNTIME
-        if self.__validate_at_runtime:
+class WriteAsFoundationParticipant(AccessCredentialsWrite):
+    def __init__(self, data: db.Session):
+        self.__data = data
+        self.__asf_uid = None
+        self.__authenticated = True
+
+    @property
+    def authenticated(self) -> bool:
+        return self.__authenticated
+
+    @property
+    def validate_at_runtime(self) -> bool:
+        return VALIDATE_AT_RUNTIME
+
+
+class WriteAsFoundationMember(WriteAsFoundationParticipant):
+    def __init__(self, data: db.Session, asf_uid: str):
+        if self.validate_at_runtime:
             if not isinstance(asf_uid, str):
                 raise AccessError("ASF UID must be a string")
+        self.__data = data
+        self.__asf_uid = asf_uid
+        self.__authenticated = True
+        # TODO: We need a definitive list of ASF UIDs
+        self.keys = writers.keys.FoundationMember(
+            self,
+            self.__data,
+            self.__asf_uid,
+        )
+
+    @property
+    def authenticated(self) -> bool:
+        return self.__authenticated
+
+    @property
+    def validate_at_runtime(self) -> bool:
+        return VALIDATE_AT_RUNTIME
+
+
+class WriteAsCommitteeParticipant(WriteAsFoundationMember):
+    def __init__(self, data: db.Session, asf_uid: str, committee_name: str):
+        if self.validate_at_runtime:
             if not isinstance(committee_name, str):
                 raise AccessError("Committee name must be a string")
         self.__data = data
         self.__asf_uid = asf_uid
+        self.__committee_name = committee_name
+        self.__authenticated = True
+        self.keys = writers.keys.CommitteeParticipant(
+            self,
+            self.__data,
+            self.__asf_uid,
+            self.__committee_name,
+        )
+
+    @property
+    def authenticated(self) -> bool:
+        return self.__authenticated
+
+    @property
+    def validate_at_runtime(self) -> bool:
+        return VALIDATE_AT_RUNTIME
+
+
+class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
+    def __init__(self, data: db.Session, asf_uid: str, committee_name: str):
+        self.__data = data
+        self.__asf_uid = asf_uid
+        self.__committee_name = committee_name
         self.__authenticated = True
         self.keys = writers.keys.CommitteeMember(
             self,
@@ -135,71 +194,7 @@ class WriteAsCommitteeMember(AccessCredentialsWrite):
 
     @property
     def validate_at_runtime(self) -> bool:
-        return self.__validate_at_runtime
-
-
-class WriteAsCommitteeParticipant(AccessCredentialsWrite):
-    def __init__(self, data: db.Session, asf_uid: str, committee_name: str):
-        self.__authenticated = False
-        self.__validate_at_runtime = VALIDATE_AT_RUNTIME
-        if self.__validate_at_runtime:
-            if not isinstance(asf_uid, str):
-                raise AccessError("ASF UID must be a string")
-            if not isinstance(committee_name, str):
-                raise AccessError("Committee name must be a string")
-        self.__data = data
-        self.__asf_uid = asf_uid
-        ...
-        self.__authenticated = True
-
-    @property
-    def authenticated(self) -> bool:
-        return self.__authenticated
-
-    @property
-    def validate_at_runtime(self) -> bool:
-        return self.__validate_at_runtime
-
-
-class WriteAsFoundationMember(AccessCredentialsWrite):
-    def __init__(self, data: db.Session, asf_uid: str):
-        self.__authenticated = False
-        self.__validate_at_runtime = VALIDATE_AT_RUNTIME
-        if self.__validate_at_runtime:
-            if not isinstance(asf_uid, str):
-                raise AccessError("ASF UID must be a string")
-        self.__data = data
-        self.__asf_uid = asf_uid
-        # TODO: We need a definitive list of ASF UIDs
-        self.__authenticated = True
-
-    @property
-    def authenticated(self) -> bool:
-        return self.__authenticated
-
-    @property
-    def validate_at_runtime(self) -> bool:
-        return self.__validate_at_runtime
-
-
-class WriteAsFoundationParticipant(AccessCredentialsWrite):
-    def __init__(self, data: db.Session, asf_uid: str | None = None):
-        self.__authenticated = False
-        self.__validate_at_runtime = VALIDATE_AT_RUNTIME
-        if self.__validate_at_runtime:
-            if not isinstance(asf_uid, str | None):
-                raise AccessError("ASF UID must be a string or None")
-        self.__data = data
-        self.__asf_uid = asf_uid
-        self.__authenticated = True
-
-    @property
-    def authenticated(self) -> bool:
-        return self.__authenticated
-
-    @property
-    def validate_at_runtime(self) -> bool:
-        return self.__validate_at_runtime
+        return VALIDATE_AT_RUNTIME
 
 
 class Write:
@@ -216,6 +211,15 @@ class Write:
         except Exception as e:
             return AccessOutcomeWrite(e)
         return AccessOutcomeWrite(wacm)
+
+    def as_foundation_member(self) -> AccessOutcomeWrite[WriteAsFoundationMember]:
+        if self.__asf_uid is None:
+            return AccessOutcomeWrite(AccessError("No ASF UID"))
+        try:
+            wafm = WriteAsFoundationMember(self.__data, self.__asf_uid)
+        except Exception as e:
+            return AccessOutcomeWrite(e)
+        return AccessOutcomeWrite(wafm)
 
 
 # Outcome
@@ -386,30 +390,6 @@ class Outcomes[T]:
                     self.__outcomes[i] = OutcomeException(e, outcome.name)
                 else:
                     self.__outcomes[i] = OutcomeResult(result, outcome.name)
-
-    # def update_results_batch(self, f: Callable[[Sequence[T]], Sequence[T]]) -> None:
-    #     results = self.collect_results()
-    #     new_results = iter(f(results))
-    #     new_outcomes = []
-    #     for outcome in self.__outcomes:
-    #         match outcome:
-    #             case OutcomeResult():
-    #                 new_outcomes.append(OutcomeResult(next(new_results), outcome.name))
-    #             case OutcomeError():
-    #                 new_outcomes.append(OutcomeError(outcome.exception_or_none(), outcome.name))
-    #     self.__outcomes[:] = new_outcomes
-
-    # def update_results_stream(self, f: Callable[[Sequence[T]], Generator[T | Exception]]) -> None:
-    #     results = self.collect_results()
-    #     new_results = f(results)
-    #     new_outcomes = []
-    #     for outcome in self.__outcomes:
-    #         match outcome:
-    #             case OutcomeResult():
-    #                 new_outcomes.append(OutcomeResult(next(new_results), outcome.name))
-    #             case OutcomeError():
-    #                 new_outcomes.append(OutcomeError(outcome.exception_or_none(), outcome.name))
-    #     self.__outcomes[:] = new_outcomes
 
 
 def outcomes_merge[T](*outcomes: Outcomes[T]) -> Outcomes[T]:
