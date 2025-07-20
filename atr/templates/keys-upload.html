@@ -105,22 +105,33 @@
           </tr>
         </thead>
         <tbody>
-          {% for key_info in results %}
+          {% for outcome in results.outcomes() %}
+            {% if outcome.ok %}
+              {% set key_obj = outcome.result_or_none() %}
+              {% set fingerprint = key_obj.key_model.fingerprint %}
+              {% set email_addr = key_obj.key_model.primary_declared_uid or "" %}
+              {% set added_flag = key_obj.status.value > 0 %}
+              {% set error_flag = False %}
+            {% else %}
+              {% set err = outcome.exception_or_none() %}
+              {% set key_obj = err.key if (err is not none and err.key is defined) else None %}
+              {% set fingerprint = key_obj.key_model.fingerprint if key_obj is not none else "UNKNOWN" %}
+              {% set email_addr = key_obj.key_model.primary_declared_uid if key_obj is not none else "" %}
+              {% set added_flag = False %}
+              {% set error_flag = True %}
+            {% endif %}
             <tr>
               <td class="page-key-details px-2">
-                <code>{{ key_info.fingerprint[-16:]|upper }}</code>
+                <code>{{ fingerprint[-16:]|upper }}</code>
               </td>
-              <td class="page-key-details px-2">{{ key_info.email }}</td>
+              <td class="page-key-details px-2">{{ email_addr }}</td>
               {% for committee_name in submitted_committees %}
-                {% set status = key_info.committee_statuses.get(committee_name) %}
-                {% set cell_class = 'page-status-cell-error' if key_info.status == 'error'
-                                  else 'page-status-cell-new' if status == 'newly_linked'
-                                  else 'page-status-cell-existing' if status == 'already_linked'
-                                else 'page-status-cell-unknown' %}
-                {% set title_text = 'Error processing key' if key_info.status == 'error'
-                                  else 'Newly linked' if status == 'newly_linked'
-                                  else 'Already linked' if status == 'already_linked'
-                                else 'Unknown status' %}
+                {% set cell_class = 'page-status-cell-error' if error_flag
+                                  else 'page-status-cell-new' if added_flag
+                                else 'page-status-cell-existing' %}
+                {% set title_text = 'Error processing key' if error_flag
+                                  else 'Newly linked' if added_flag
+                                else 'Already linked' %}
                 <td class="text-center align-middle page-status-cell-container">
                   <span class="page-status-square {{ cell_class }}" title="{{ title_text }}"></span>
                 </td>
@@ -131,13 +142,12 @@
       </table>
     </div>
 
-    {% set processing_errors = results | selectattr('status', 'equalto', 'error') | list %}
+    {% set processing_errors = results.outcomes() | selectattr('ok', 'equalto', False) | list %}
     {% if processing_errors %}
       <h3 class="text-danger mt-4">Processing errors</h3>
-      {% for error_info in processing_errors %}
-        <div class="alert alert-danger p-2 mb-3">
-          <strong>{{ error_info.key_id }} / {{ error_info.fingerprint }}</strong>: {{ error_info.message }}
-        </div>
+      {% for outcome in processing_errors %}
+        {% set err = outcome.exception_or_none() %}
+        <div class="alert alert-danger p-2 mb-3">{{ err }}</div>
       {% endfor %}
     {% endif %}
 
@@ -202,10 +212,10 @@
 
       {% if user_committees %}
         <div class="row mb-3 pb-3 border-bottom">
-          {{ forms.label(form.selected_committees, col="md2") }}
+          {{ forms.label(form.selected_committee, col="md2") }}
           <div class="col-md-9">
             <div class="row">
-              {% for subfield in form.selected_committees %}
+              {% for subfield in form.selected_committee %}
                 <div class="col-sm-12 col-md-6 col-lg-4">
                   <div class="form-check mb-2">
                     {{ forms.widget(subfield, classes="form-check-input") }}
@@ -216,8 +226,8 @@
                 <p class="text-muted fst-italic">No committees available for association.</p>
               {% endfor %}
             </div>
-            {{ forms.errors(form.selected_committees, classes="invalid-feedback d-block") }}
-            {{ forms.description(form.selected_committees, classes="form-text text-muted mt-2") }}
+            {{ forms.errors(form.selected_committee, classes="invalid-feedback d-block") }}
+            {{ forms.description(form.selected_committee, classes="form-text text-muted mt-2") }}
           </div>
         </div>
       {% else %}

@@ -45,6 +45,8 @@ import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
+import atr.storage as storage
+import atr.storage.types as types
 import atr.template as template
 import atr.user as user
 import atr.util as util
@@ -92,15 +94,15 @@ class UploadKeyFormBase(util.QuartFormTyped):
         description="Enter a URL to a KEYS file. This will be fetched by the server.",
     )
     submit = wtforms.SubmitField("Upload KEYS file")
-    selected_committees = wtforms.SelectMultipleField(
+    selected_committee = wtforms.SelectField(
         "Associate keys with committees",
         choices=[(c.name, c.display_name) for c in [] if (not util.committee_is_standing(c.name))],
         coerce=str,
-        option_widget=wtforms.widgets.CheckboxInput(),
+        option_widget=wtforms.widgets.RadioInput(),
         widget=wtforms.widgets.ListWidget(prefix_label=False),
         validators=[wtforms.validators.InputRequired("You must select at least one committee")],
         description=(
-            "Select the committees with which to associate these keys. You must be a member of the selected committees."
+            "Select the committee with which to associate these keys. You must be a member of the selected committee."
         ),
     )
 
@@ -524,7 +526,7 @@ async def upload(session: routes.CommitterSession) -> str:
         user_committees = await data.committee(name_in=project_list).all()
 
     class UploadKeyForm(UploadKeyFormBase):
-        selected_committees = wtforms.SelectMultipleField(
+        selected_committee = wtforms.SelectField(
             "Associate keys with committee",
             choices=[(c.name, c.display_name) for c in user_committees if (not util.committee_is_standing(c.name))],
             coerce=str,
@@ -538,12 +540,11 @@ async def upload(session: routes.CommitterSession) -> str:
         )
 
     form = await UploadKeyForm.create_form()
-    results: list[dict] = []
-    submitted_committees: list[str] | None = None
+    results: types.KeyOutcomes | None = None
 
     async def render(
         error: str | None = None,
-        submitted_committees_list: list[str] | None = None,
+        submitted_committees: list[str] | None = None,
         all_user_committees: Sequence[sql.Committee] | None = None,
     ) -> str:
         # For easier happy pathing
@@ -562,7 +563,7 @@ async def upload(session: routes.CommitterSession) -> str:
             form=form,
             results=results,
             algorithms=routes.algorithms,
-            submitted_committees=submitted_committees_list,
+            submitted_committees=submitted_committees,
         )
 
     if await form.validate_on_submit():
@@ -580,27 +581,22 @@ async def upload(session: routes.CommitterSession) -> str:
             return await render(error="No KEYS data found.")
 
         # Get selected committee list from the form
-        selected_committees = form.selected_committees.data
-        if not selected_committees:
+        selected_committee = form.selected_committee.data
+        if not selected_committee:
             return await render(error="You must select at least one committee")
-        # This is a KEYS file of multiple OpenPGP keys
-        # We need to parse it and add each key to the user's account
-        try:
-            upload_results, success_count, error_count, submitted_committees = await interaction.upload_keys(
-                project_list, keys_text, selected_committees
-            )
-        except interaction.InteractionError as e:
-            return await render(error=str(e))
-        # We use results in a closure
-        # So we have to mutate it, not replace it
-        results[:] = upload_results
+
+        outcomes = await _upload_keys(session.uid, keys_text, selected_committee)
+        results = outcomes
+        success_count = outcomes.result_count
+        error_count = outcomes.exception_count
+        total_count = success_count + error_count
 
         await quart.flash(
-            f"Processed {len(results)} keys: {success_count} successful, {error_count} failed",
+            f"Processed {total_count} keys: {success_count} successful, {error_count} failed",
             "success" if success_count > 0 else "error",
         )
         return await render(
-            submitted_committees_list=submitted_committees,
+            submitted_committees=[selected_committee],
             all_user_committees=user_committees,
         )
 
@@ -746,6 +742,17 @@ async def _keys_formatter(committee_name: str, data: db.Session) -> str:
         key_count_for_header=key_count_for_header,
         key_blocks_str=key_blocks_str,
     )
+
+
+async def _upload_keys(
+    asf_uid: str,
+    filetext: str,
+    selected_committee: str,
+) -> types.KeyOutcomes:
+    async with storage.write(asf_uid) as write:
+        wacm = write.as_committee_member(selected_committee).writer_or_raise()
+        outcomes: types.KeyOutcomes = await wacm.keys.ensure_associated(filetext)
+    return outcomes
 
 
 async def _write_keys_file(

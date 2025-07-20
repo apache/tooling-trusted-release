@@ -16,7 +16,6 @@
 # under the License.
 
 import enum
-from typing import TYPE_CHECKING
 
 import atr.models.schema as schema
 import atr.models.sql as sql
@@ -52,7 +51,6 @@ class PublicKeyError(Exception):
         return self.__original_error
 
 
-if TYPE_CHECKING:
-    KeyOutcomes = storage.Outcomes[Key]
-    # KeyOutcomeResult = storage.OutcomeResult[Key]
-    # KeyOutcomeError = storage.OutcomeError[Key, Exception]
+type KeyOutcomes = storage.Outcomes[Key]
+# type KeyOutcomeResult = storage.OutcomeResult[Key]
+# type KeyOutcomeError = storage.OutcomeError[Key, Exception]

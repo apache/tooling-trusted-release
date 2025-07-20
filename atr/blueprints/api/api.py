@@ -387,16 +387,14 @@ async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
     filetext = data.filetext
     selected_committee_name = data.committee
-    outcomes_list = []
     async with storage.write(asf_uid) as write:
         wacm = write.as_committee_member(selected_committee_name).writer_or_raise()
-        associated: types.KeyOutcomes = await wacm.keys.ensure_associated(filetext)
-        outcomes_list.append(associated)
+        outcomes: types.KeyOutcomes = await wacm.keys.ensure_associated(filetext)
 
         # TODO: It would be nice to serialise the actual outcomes
         api_outcomes = []
-        merged_outcomes = storage.outcomes_merge(*outcomes_list)
-        for outcome in merged_outcomes.outcomes():
+        for outcome in outcomes.outcomes():
+            api_outcome: models.api.KeysUploadOutcome | None = None
             match outcome:
                 case storage.OutcomeResult() as ocr:
                     result: types.Key = ocr.result_or_raise()
@@ -421,12 +419,13 @@ async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
                                 error=str(e),
                                 error_type=type(e).__name__,
                             )
-            api_outcomes.append(api_outcome)
+            if api_outcome is not None:
+                api_outcomes.append(api_outcome)
     return models.api.KeysUploadResults(
         endpoint="/keys/upload",
         results=api_outcomes,
-        success_count=merged_outcomes.result_count,
-        error_count=merged_outcomes.exception_count,
+        success_count=outcomes.result_count,
+        error_count=outcomes.exception_count,
         submitted_committee=selected_committee_name,
     ).model_dump(), 200
 
