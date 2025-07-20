@@ -47,6 +47,7 @@ import atr.ldap as ldap
 import atr.models.sql as sql
 import atr.routes.keys as keys
 import atr.routes.mapping as mapping
+import atr.storage.types as types
 import atr.template as template
 import atr.util as util
 import atr.validate as validate
@@ -660,18 +661,18 @@ async def admin_test() -> quart.wrappers.response.Response:
     async with storage.write(asf_uid) as write:
         wacm = write.as_committee_member("tooling").writer_or_raise()
         start = time.perf_counter_ns()
-        outcomes = await wacm.keys.upload(keys_file_text)
+        outcomes: types.KeyOutcomes = await wacm.keys.ensure_stored(keys_file_text)
         end = time.perf_counter_ns()
         logging.info(f"Upload of {outcomes.result_count} keys took {end - start} ns")
     for ocr in outcomes.results():
         logging.info(f"Uploaded key: {type(ocr)} {ocr.key_model.fingerprint}")
     for oce in outcomes.exceptions():
         logging.error(f"Error uploading key: {type(oce)} {oce}")
-    parsed_count = outcomes.result_predicate_count(lambda k: k.status == wacm.keys.KeyStatus.PARSED)
-    inserted_count = outcomes.result_predicate_count(lambda k: k.status == wacm.keys.KeyStatus.INSERTED)
-    linked_count = outcomes.result_predicate_count(lambda k: k.status == wacm.keys.KeyStatus.LINKED)
+    parsed_count = outcomes.result_predicate_count(lambda k: k.status == types.KeyStatus.PARSED)
+    inserted_count = outcomes.result_predicate_count(lambda k: k.status == types.KeyStatus.INSERTED)
+    linked_count = outcomes.result_predicate_count(lambda k: k.status == types.KeyStatus.LINKED)
     inserted_and_linked_count = outcomes.result_predicate_count(
-        lambda k: k.status == wacm.keys.KeyStatus.INSERTED_AND_LINKED
+        lambda k: k.status == types.KeyStatus.INSERTED_AND_LINKED
     )
     logging.info(f"Parsed: {parsed_count}")
     logging.info(f"Inserted: {inserted_count}")

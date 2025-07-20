@@ -274,7 +274,7 @@ class OutcomeResult[T](OutcomeCore[T]):
         return None
 
 
-class OutcomeError[T, E: Exception](OutcomeCore[T]):
+class OutcomeException[T, E: Exception](OutcomeCore[T]):
     __exception: E
 
     def __init__(self, exception: E, name: str | None = None):
@@ -305,9 +305,9 @@ class OutcomeError[T, E: Exception](OutcomeCore[T]):
 
 
 class Outcomes[T]:
-    __outcomes: list[OutcomeResult[T] | OutcomeError[T, Exception]]
+    __outcomes: list[OutcomeResult[T] | OutcomeException[T, Exception]]
 
-    def __init__(self, *outcomes: OutcomeResult[T] | OutcomeError[T, Exception]):
+    def __init__(self, *outcomes: OutcomeResult[T] | OutcomeException[T, Exception]):
         self.__outcomes = list(outcomes)
 
     @property
@@ -320,18 +320,18 @@ class Outcomes[T]:
 
     def append(self, result_or_error: T | Exception, name: str | None = None) -> None:
         if isinstance(result_or_error, Exception):
-            self.__outcomes.append(OutcomeError(result_or_error, name))
+            self.__outcomes.append(OutcomeException(result_or_error, name))
         else:
             self.__outcomes.append(OutcomeResult(result_or_error, name))
 
     @property
     def exception_count(self) -> int:
-        return sum(1 for outcome in self.__outcomes if isinstance(outcome, OutcomeError))
+        return sum(1 for outcome in self.__outcomes if isinstance(outcome, OutcomeException))
 
     def exceptions(self) -> list[Exception]:
         exceptions_list = []
         for outcome in self.__outcomes:
-            if isinstance(outcome, OutcomeError):
+            if isinstance(outcome, OutcomeException):
                 exception_or_none = outcome.exception_or_none()
                 if exception_or_none is not None:
                     exceptions_list.append(exception_or_none)
@@ -367,7 +367,7 @@ class Outcomes[T]:
     def result_count(self) -> int:
         return sum(1 for outcome in self.__outcomes if outcome.ok)
 
-    def outcomes(self) -> list[OutcomeResult[T] | OutcomeError[T, Exception]]:
+    def outcomes(self) -> list[OutcomeResult[T] | OutcomeException[T, Exception]]:
         return self.__outcomes
 
     def result_predicate_count(self, predicate: Callable[[T], bool]) -> int:
@@ -383,7 +383,7 @@ class Outcomes[T]:
                 try:
                     result = f(outcome.result_or_raise())
                 except Exception as e:
-                    self.__outcomes[i] = OutcomeError(e, outcome.name)
+                    self.__outcomes[i] = OutcomeException(e, outcome.name)
                 else:
                     self.__outcomes[i] = OutcomeResult(result, outcome.name)
 
@@ -410,6 +410,10 @@ class Outcomes[T]:
     #             case OutcomeError():
     #                 new_outcomes.append(OutcomeError(outcome.exception_or_none(), outcome.name))
     #     self.__outcomes[:] = new_outcomes
+
+
+def outcomes_merge[T](*outcomes: Outcomes[T]) -> Outcomes[T]:
+    return Outcomes(*[outcome for outcome in outcomes for outcome in outcome.outcomes()])
 
 
 # Context managers

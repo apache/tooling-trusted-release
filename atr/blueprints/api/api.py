@@ -43,6 +43,8 @@ import atr.routes.announce as announce
 import atr.routes.keys as keys
 import atr.routes.start as start
 import atr.routes.voting as voting
+import atr.storage as storage
+import atr.storage.types as types
 import atr.tasks.vote as tasks_vote
 import atr.user as user
 import atr.util as util
@@ -384,32 +386,48 @@ async def keys_get(fingerprint: str) -> DictResponse:
 async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
     filetext = data.filetext
-    selected_committee_names = data.committees
-    async with db.session() as db_data:
-        participant_of_committees = await interaction.user_committees_participant(asf_uid, caller_data=db_data)
-        participant_of_committee_names = [c.name for c in participant_of_committees]
-        for committee_name in selected_committee_names:
-            if committee_name not in participant_of_committee_names:
-                raise exceptions.BadRequest(f"You are not a participant of committee {committee_name}")
-        # TODO: Does this export KEYS files?
-        # Appearently it does not
-        # This needs fixing in keys.py too
-        results, success_count, error_count, submitted_committees = await interaction.upload_keys(
-            participant_of_committee_names, filetext, selected_committee_names
-        )
+    selected_committee_name = data.committee
+    outcomes_list = []
+    async with storage.write(asf_uid) as write:
+        wacm = write.as_committee_member(selected_committee_name).writer_or_raise()
+        associated: types.KeyOutcomes = await wacm.keys.ensure_associated(filetext)
+        outcomes_list.append(associated)
 
-    # TODO: Should push this much further upstream
-    import logging
-
-    for result in results:
-        logging.info(result)
-    results = [models.api.KeysUploadSubset(**result) for result in results]
+        # TODO: It would be nice to serialise the actual outcomes
+        api_outcomes = []
+        merged_outcomes = storage.outcomes_merge(*outcomes_list)
+        for outcome in merged_outcomes.outcomes():
+            match outcome:
+                case storage.OutcomeResult() as ocr:
+                    result: types.Key = ocr.result_or_raise()
+                    api_outcome = models.api.KeysUploadResult(
+                        status="success",
+                        key=result.key_model,
+                    )
+                case storage.OutcomeException() as oce:
+                    # TODO: This branch means we must improve the return type
+                    match oce.exception_or_none():
+                        case types.PublicKeyError() as pke:
+                            api_outcome = models.api.KeysUploadException(
+                                status="error",
+                                key=pke.key.key_model,
+                                error=str(pke),
+                                error_type=type(pke).__name__,
+                            )
+                        case _ as e:
+                            api_outcome = models.api.KeysUploadException(
+                                status="error",
+                                key=None,
+                                error=str(e),
+                                error_type=type(e).__name__,
+                            )
+            api_outcomes.append(api_outcome)
     return models.api.KeysUploadResults(
         endpoint="/keys/upload",
-        results=results,
-        success_count=success_count,
-        error_count=error_count,
-        submitted_committees=submitted_committees,
+        results=api_outcomes,
+        success_count=merged_outcomes.result_count,
+        error_count=merged_outcomes.exception_count,
+        submitted_committee=selected_committee_name,
     ).model_dump(), 200
 
 

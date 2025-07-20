@@ -19,7 +19,6 @@
 from __future__ import annotations
 
 import asyncio
-import enum
 import logging
 import tempfile
 import time
@@ -30,48 +29,17 @@ import pgpy.constants as constants
 import sqlalchemy.dialects.sqlite as sqlite
 
 import atr.db as db
-import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.storage as storage
+import atr.storage.types as types
 import atr.user as user
 import atr.util as util
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
 
-    KeyOutcomes = storage.Outcomes[sql.PublicSigningKey]
-
 PERFORMANCES: Final[dict[int, tuple[str, int]]] = {}
 _MEASURE_PERFORMANCE: Final[bool] = False
-
-
-class KeyStatus(enum.Flag):
-    PARSED = 0
-    INSERTED = enum.auto()
-    LINKED = enum.auto()
-    INSERTED_AND_LINKED = INSERTED | LINKED
-
-
-class Key(schema.Strict):
-    status: KeyStatus
-    key_model: sql.PublicSigningKey
-
-
-class PublicKeyError(Exception):
-    def __init__(self, key: Key, original_error: Exception):
-        self.__key = key
-        self.__original_error = original_error
-
-    def __str__(self) -> str:
-        return f"PublicKeyError: {self.__original_error}"
-
-    @property
-    def key(self) -> Key:
-        return self.__key
-
-    @property
-    def original_error(self) -> Exception:
-        return self.__original_error
 
 
 def performance(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -102,10 +70,6 @@ def performance_async(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable
 
 
 class CommitteeMember:
-    Key = Key
-    KeyStatus = KeyStatus
-    PublicKeyError = PublicKeyError
-
     def __init__(
         self, credentials: storage.WriteAsCommitteeMember, data: db.Session, asf_uid: str, committee_name: str
     ):
@@ -119,36 +83,25 @@ class CommitteeMember:
         self.__key_block_models_cache = {}
 
     @performance_async
+    async def associate(self, outcomes: storage.Outcomes[types.Key]) -> storage.Outcomes[types.Key]:
+        raise NotImplementedError("Not implemented")
+
+    @performance_async
     async def committee(self) -> sql.Committee:
         return await self.__data.committee(name=self.__committee_name, _public_signing_keys=True).demand(
             storage.AccessError(f"Committee not found: {self.__committee_name}")
         )
 
     @performance_async
-    async def upload(self, keys_file_text: str) -> storage.Outcomes[CommitteeMember.Key]:
-        outcomes = storage.Outcomes[CommitteeMember.Key]()
-        try:
-            ldap_data = await util.email_to_uid_map()
-            key_blocks = util.parse_key_blocks(keys_file_text)
-        except Exception as e:
-            outcomes.append(e)
-            return outcomes
-        for key_block in key_blocks:
-            try:
-                key_models = await asyncio.to_thread(self.__block_models, key_block, ldap_data)
-                outcomes.extend(key_models)
-            except Exception as e:
-                outcomes.append(e)
-        # Try adding the keys to the database
-        # If not, all keys will be replaced with a PostParseError
-        outcomes = await self.__database_add_models(outcomes)
-        if _MEASURE_PERFORMANCE:
-            for key, value in PERFORMANCES.items():
-                logging.info(f"{key}: {value}")
-        return outcomes
+    async def ensure_associated(self, keys_file_text: str) -> storage.Outcomes[types.Key]:
+        return await self.__ensure(keys_file_text, associate=True)
+
+    @performance_async
+    async def ensure_stored(self, keys_file_text: str) -> storage.Outcomes[types.Key]:
+        return await self.__ensure(keys_file_text, associate=False)
 
     @performance
-    def __block_models(self, key_block: str, ldap_data: dict[str, str]) -> list[CommitteeMember.Key | Exception]:
+    def __block_models(self, key_block: str, ldap_data: dict[str, str]) -> list[types.Key | Exception]:
         # This cache is only held for the session
         if key_block in self.__key_block_models_cache:
             return self.__key_block_models_cache[key_block]
@@ -165,7 +118,7 @@ class CommitteeMember:
                     if key_model is None:
                         # Was not a primary key, so skip it
                         continue
-                    key = CommitteeMember.Key(status=CommitteeMember.KeyStatus.PARSED, key_model=key_model)
+                    key = types.Key(status=types.KeyStatus.PARSED, key_model=key_model)
                     key_list.append(key)
                 except Exception as e:
                     key_list.append(e)
@@ -174,28 +127,30 @@ class CommitteeMember:
 
     @performance_async
     async def __database_add_models(
-        self, outcomes: storage.Outcomes[CommitteeMember.Key]
-    ) -> storage.Outcomes[CommitteeMember.Key]:
+        self, outcomes: storage.Outcomes[types.Key], associate: bool = True
+    ) -> storage.Outcomes[types.Key]:
         # Try to upsert all models and link to the committee in one transaction
         try:
-            outcomes = await self.__database_add_models_core(outcomes)
+            outcomes = await self.__database_add_models_core(outcomes, associate=associate)
         except Exception as e:
             # This logging is just so that ruff does not erase e
             logging.info(f"Post-parse error: {e}")
 
-            def raise_post_parse_error(key: CommitteeMember.Key) -> NoReturn:
+            def raise_post_parse_error(key: types.Key) -> NoReturn:
                 nonlocal e
                 # We assume here that the transaction was rolled back correctly
-                key = CommitteeMember.Key(status=CommitteeMember.KeyStatus.PARSED, key_model=key.key_model)
-                raise PublicKeyError(key, e)
+                key = types.Key(status=types.KeyStatus.PARSED, key_model=key.key_model)
+                raise types.PublicKeyError(key, e)
 
             outcomes.update_results(raise_post_parse_error)
         return outcomes
 
     @performance_async
     async def __database_add_models_core(
-        self, outcomes: storage.Outcomes[CommitteeMember.Key]
-    ) -> storage.Outcomes[CommitteeMember.Key]:
+        self,
+        outcomes: storage.Outcomes[types.Key],
+        associate: bool = True,
+    ) -> storage.Outcomes[types.Key]:
         via = sql.validate_instrumented_attribute
         key_list = outcomes.results()
 
@@ -212,9 +167,9 @@ class CommitteeMember:
         key_inserts = {row.fingerprint for row in key_insert_result}
         logging.info(f"Inserted {len(key_inserts)} keys")
 
-        def replace_with_inserted(key: CommitteeMember.Key) -> CommitteeMember.Key:
+        def replace_with_inserted(key: types.Key) -> types.Key:
             if key.key_model.fingerprint in key_inserts:
-                key.status = CommitteeMember.KeyStatus.INSERTED
+                key.status = types.KeyStatus.INSERTED
             return key
 
         outcomes.update_results(replace_with_inserted)
@@ -224,7 +179,7 @@ class CommitteeMember:
 
         existing_fingerprints = {k.fingerprint for k in committee.public_signing_keys}
         new_fingerprints = persisted_fingerprints - existing_fingerprints
-        if new_fingerprints:
+        if new_fingerprints and associate:
             link_values = [{"committee_name": self.__committee_name, "key_fingerprint": fp} for fp in new_fingerprints]
             link_insert_result = await self.__data.execute(
                 sqlite.insert(sql.KeyLink)
@@ -235,15 +190,15 @@ class CommitteeMember:
             link_inserts = {row.key_fingerprint for row in link_insert_result}
             logging.info(f"Inserted {len(link_inserts)} key links")
 
-            def replace_with_linked(key: CommitteeMember.Key) -> CommitteeMember.Key:
+            def replace_with_linked(key: types.Key) -> types.Key:
                 nonlocal link_inserts
                 match key:
-                    case CommitteeMember.Key(status=CommitteeMember.KeyStatus.INSERTED):
+                    case types.Key(status=types.KeyStatus.INSERTED):
                         if key.key_model.fingerprint in link_inserts:
-                            key.status = CommitteeMember.KeyStatus.INSERTED_AND_LINKED
-                    case CommitteeMember.Key(status=CommitteeMember.KeyStatus.PARSED):
+                            key.status = types.KeyStatus.INSERTED_AND_LINKED
+                    case types.Key(status=types.KeyStatus.PARSED):
                         if key.key_model.fingerprint in link_inserts:
-                            key.status = CommitteeMember.KeyStatus.LINKED
+                            key.status = types.KeyStatus.LINKED
                 return key
 
             outcomes.update_results(replace_with_linked)
@@ -251,6 +206,29 @@ class CommitteeMember:
             logging.info("Inserted 0 key links (none to insert)")
 
         await self.__data.commit()
+        return outcomes
+
+    @performance_async
+    async def __ensure(self, keys_file_text: str, associate: bool = True) -> storage.Outcomes[types.Key]:
+        outcomes = storage.Outcomes[types.Key]()
+        try:
+            ldap_data = await util.email_to_uid_map()
+            key_blocks = util.parse_key_blocks(keys_file_text)
+        except Exception as e:
+            outcomes.append(e)
+            return outcomes
+        for key_block in key_blocks:
+            try:
+                key_models = await asyncio.to_thread(self.__block_models, key_block, ldap_data)
+                outcomes.extend(key_models)
+            except Exception as e:
+                outcomes.append(e)
+        # Try adding the keys to the database
+        # If not, all keys will be replaced with a PostParseError
+        outcomes = await self.__database_add_models(outcomes, associate=associate)
+        if _MEASURE_PERFORMANCE:
+            for key, value in PERFORMANCES.items():
+                logging.info(f"{key}: {value}")
         return outcomes
 
     @performance

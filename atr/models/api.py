@@ -146,23 +146,42 @@ class KeysGetResults(schema.Strict):
 
 class KeysUploadArgs(schema.Strict):
     filetext: str
-    committees: list[str]
+    committee: str
 
 
-class KeysUploadSubset(schema.Lax):
-    status: Literal["success", "error"]
-    key_id: str
-    fingerprint: str
-    user_id: str
-    email: str
+class KeysUploadException(schema.Strict):
+    status: Literal["error"] = schema.Field(alias="status")
+    key: sql.PublicSigningKey | None
+    error: str
+    error_type: str
+
+
+class KeysUploadResult(schema.Strict):
+    status: Literal["success"] = schema.Field(alias="status")
+    key: sql.PublicSigningKey
+
+
+KeysUploadOutcome = Annotated[
+    KeysUploadResult | KeysUploadException,
+    schema.Field(discriminator="status"),
+]
+
+KeysUploadOutcomeAdapter = pydantic.TypeAdapter(KeysUploadOutcome)
+
+
+# def validate_keys_upload_outcome(value: Any) -> KeysUploadOutcome:
+#     obj = KeysUploadOutcomeAdapter.validate_python(value)
+#     if not isinstance(obj, KeysUploadOutcome):
+#         raise ResultsTypeError(f"Invalid API response: {value}")
+#     return obj
 
 
 class KeysUploadResults(schema.Strict):
     endpoint: Literal["/keys/upload"] = schema.Field(alias="endpoint")
-    results: Sequence[KeysUploadSubset]
+    results: Sequence[KeysUploadResult | KeysUploadException]
     success_count: int
     error_count: int
-    submitted_committees: list[str]
+    submitted_committee: str
 
 
 class KeysUserResults(schema.Strict):
