@@ -216,11 +216,6 @@
                 <p class="text-muted fst-italic">No committees available for association.</p>
               {% endfor %}
             </div>
-            <div class="mt-2 mb-2">
-              <button type="button"
-                      id="toggleCommitteesBtn"
-                      class="btn btn-sm btn-outline-secondary">Select all</button>
-            </div>
             {{ forms.errors(form.selected_committees, classes="invalid-feedback d-block") }}
             {{ forms.description(form.selected_committees, classes="form-text text-muted mt-2") }}
           </div>
@@ -244,38 +239,4 @@
 
 {% block javascripts %}
   {{ super() }}
-  <script>
-      document.addEventListener("DOMContentLoaded", () => {
-          const btn = document.getElementById("toggleCommitteesBtn");
-          const checkboxes = document.querySelectorAll("input[name='selected_committees']");
-
-          if (!btn || checkboxes.length === 0) return;
-
-          function updateButtonText() {
-              let allChecked = true;
-              checkboxes.forEach(cb => {
-                  if (!cb.checked) allChecked = false;
-              });
-              btn.textContent = allChecked ? "Select none" : "Select all";
-          }
-
-          btn.addEventListener("click", () => {
-              let allChecked = true;
-              checkboxes.forEach(cb => {
-                  if (!cb.checked) allChecked = false;
-              });
-              const shouldCheck = !allChecked;
-              checkboxes.forEach(cb => {
-                  cb.checked = shouldCheck;
-              });
-              updateButtonText();
-          });
-
-          checkboxes.forEach(cb => {
-              cb.addEventListener("change", updateButtonText);
-          });
-
-          updateButtonText();
-      });
-  </script>
 {% endblock javascripts %}

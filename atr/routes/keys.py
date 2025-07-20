@@ -525,15 +525,15 @@ async def upload(session: routes.CommitterSession) -> str:
 
     class UploadKeyForm(UploadKeyFormBase):
         selected_committees = wtforms.SelectMultipleField(
-            "Associate keys with committees",
+            "Associate keys with committee",
             choices=[(c.name, c.display_name) for c in user_committees if (not util.committee_is_standing(c.name))],
             coerce=str,
-            option_widget=wtforms.widgets.CheckboxInput(),
+            option_widget=wtforms.widgets.RadioInput(),
             widget=wtforms.widgets.ListWidget(prefix_label=False),
             validators=[wtforms.validators.InputRequired("You must select at least one committee")],
             description=(
-                "Select the committees with which to associate these keys."
-                " You must be a member of the selected committees."
+                "Select the committee with which to associate these keys."
+                " You must be a member of the selected committee."
             ),
         )
 
