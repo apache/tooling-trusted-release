@@ -32,7 +32,7 @@ In this case we decide to raise as soon as there is any error. We could also cho
 
 The first few lines in the context session show the classic three step approach. Here they are again with comments:
 
-```
+```python
     # 1. Request permissions
     wafm = write.as_foundation_member().writer_or_raise()
 
@@ -49,7 +49,7 @@ Add all the functionality to classes in modules in the `atr/storage/writers` dir
 
 Classes in modules in the `atr/storage/writers` directory must be named as follows:
 
-```
+```python
 class FoundationParticipant:
     ...
 
