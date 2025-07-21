@@ -392,6 +392,7 @@ class Outcomes[T]:
                     self.__outcomes[i] = OutcomeResult(result, outcome.name)
 
 
+# TODO: Could use + and += instead, or in addition
 def outcomes_merge[T](*outcomes: Outcomes[T]) -> Outcomes[T]:
     return Outcomes(*[outcome for outcome in outcomes for outcome in outcome.outcomes()])
 

@@ -137,7 +137,6 @@ async def add(session: routes.CommitterSession) -> str:
         project_list = session.committees + session.projects
         user_committees = await data.committee(name_in=project_list).all()
 
-    committee_is_podling = {c.name: c.is_podling for c in user_committees}
     committee_choices = [(c.name, c.display_name or c.name) for c in user_committees]
 
     class AddOpenPGPKeyForm(util.QuartFormTyped):
@@ -165,28 +164,23 @@ async def add(session: routes.CommitterSession) -> str:
 
     if await form.validate_on_submit():
         try:
-            public_key_data: str = util.unwrap(form.public_key.data)
-            selected_committees_data: list[str] = util.unwrap(form.selected_committees.data)
+            asf_uid = session.uid
+            key_text: str = util.unwrap(form.public_key.data)
+            selected_committee_names: list[str] = util.unwrap(form.selected_committees.data)
 
-            invalid_committees = [
-                committee
-                for committee in selected_committees_data
-                if (committee not in session.committees) and (committee not in session.projects)
-            ]
-            if invalid_committees:
-                raise routes.FlashError(f"Invalid PMC selection: {', '.join(invalid_committees)}")
+            async with storage.write(asf_uid) as write:
+                wafm = write.as_foundation_member().writer_or_raise()
+                ocr: types.KeyOutcome = await wafm.keys.ensure_stored_one(key_text)
+                key = ocr.result_or_raise()
 
-            added_keys = await interaction.key_user_add(session.uid, public_key_data, selected_committees_data)
-            for key_info in added_keys:
-                if key_info:
-                    await quart.flash(
-                        f"OpenPGP key {key_info.get('fingerprint', '').upper()} added successfully.", "success"
+                for selected_committee_name in selected_committee_names:
+                    wacm = write.as_committee_member(selected_committee_name).writer_or_raise()
+                    outcome: types.LinkedCommitteeOutcome = await wacm.keys.associate_fingerprint(
+                        key.key_model.fingerprint
                     )
-                    for committee_name in selected_committees_data:
-                        is_podling = committee_is_podling[committee_name]
-                        await autogenerate_keys_file(committee_name, is_podling)
-            if not added_keys:
-                await quart.flash("No keys were added.", "error")
+                    outcome.result_or_raise()
+
+                await quart.flash(f"OpenPGP key {key.key_model.fingerprint.upper()} added successfully.", "success")
             # Clear form data on success by creating a new empty form instance
             form = await AddOpenPGPKeyForm.create_form()
 
@@ -194,7 +188,7 @@ async def add(session: routes.CommitterSession) -> str:
             logging.warning("FlashError adding OpenPGP key: %s", e)
             await quart.flash(str(e), "error")
         except Exception as e:
-            logging.exception("Exception adding OpenPGP key:")
+            logging.exception("Error adding OpenPGP key:")
             await quart.flash(f"An unexpected error occurred: {e!s}", "error")
 
     return await template.render(
@@ -207,6 +201,7 @@ async def add(session: routes.CommitterSession) -> str:
     )
 
 
+# TODO: Check callers, and migrate to storage
 async def autogenerate_keys_file(
     committee_name: str, is_podling: bool, caller_data: db.Session | None = None
 ) -> str | None:

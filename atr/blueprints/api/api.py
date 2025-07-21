@@ -308,12 +308,10 @@ async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
         ocr: types.KeyOutcome = await wafm.keys.ensure_stored_one(data.key)
         key = ocr.result_or_raise()
 
-        # outcomes = types.LinkedCommitteeOutcomes()
         for selected_committee_name in selected_committee_names:
             wacm = write.as_committee_member(selected_committee_name).writer_or_raise()
             outcome: types.LinkedCommitteeOutcome = await wacm.keys.associate_fingerprint(key.key_model.fingerprint)
             outcome.result_or_raise()
-            # outcomes.append(outcome)
 
     return models.api.KeysAddResults(
         endpoint="/keys/add",
