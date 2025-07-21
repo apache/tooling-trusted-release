@@ -661,7 +661,7 @@ async def admin_test() -> quart.wrappers.response.Response:
     async with storage.write(asf_uid) as write:
         wacm = write.as_committee_member("tooling").writer_or_raise()
         start = time.perf_counter_ns()
-        outcomes: types.KeyOutcomes = await wacm.keys.ensure_stored(keys_file_text)
+        outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_stored(keys_file_text)
         end = time.perf_counter_ns()
         logging.info(f"Upload of {outcomes.result_count} keys took {end - start} ns")
     for ocr in outcomes.results():

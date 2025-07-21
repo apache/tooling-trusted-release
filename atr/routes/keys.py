@@ -170,12 +170,12 @@ async def add(session: routes.CommitterSession) -> str:
 
             async with storage.write(asf_uid) as write:
                 wafm = write.as_foundation_member().writer_or_raise()
-                ocr: types.KeyOutcome = await wafm.keys.ensure_stored_one(key_text)
+                ocr: types.Outcome[types.Key] = await wafm.keys.ensure_stored_one(key_text)
                 key = ocr.result_or_raise()
 
                 for selected_committee_name in selected_committee_names:
                     wacm = write.as_committee_member(selected_committee_name).writer_or_raise()
-                    outcome: types.LinkedCommitteeOutcome = await wacm.keys.associate_fingerprint(
+                    outcome: types.Outcome[types.LinkedCommittee] = await wacm.keys.associate_fingerprint(
                         key.key_model.fingerprint
                     )
                     outcome.result_or_raise()
@@ -535,7 +535,7 @@ async def upload(session: routes.CommitterSession) -> str:
         )
 
     form = await UploadKeyForm.create_form()
-    results: types.KeyOutcomes | None = None
+    results: types.Outcomes[types.Key] | None = None
 
     async def render(
         error: str | None = None,
@@ -743,10 +743,10 @@ async def _upload_keys(
     asf_uid: str,
     filetext: str,
     selected_committee: str,
-) -> types.KeyOutcomes:
+) -> types.Outcomes[types.Key]:
     async with storage.write(asf_uid) as write:
         wacm = write.as_committee_member(selected_committee).writer_or_raise()
-        outcomes: types.KeyOutcomes = await wacm.keys.ensure_associated(filetext)
+        outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_associated(filetext)
     return outcomes
 
 
