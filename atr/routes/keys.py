@@ -498,16 +498,15 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
     if committee_name not in (session.committees + session.projects):
         quart.abort(403, description=f"You are not authorised to update the KEYS file for {committee_name}")
 
-    async with db.session() as data:
-        committee = await data.committee(name=committee_name).demand(
-            base.ASFQuartException(f"Committee {committee_name} not found", errorcode=404)
-        )
-        error_msg = await autogenerate_keys_file(committee_name, committee.is_podling, caller_data=data)
-
-    if error_msg:
-        await quart.flash(error_msg, "error")
-    else:
-        await quart.flash(f'Successfully regenerated the KEYS file for the "{committee_name}" committee.', "success")
+    async with storage.write(session.uid) as write:
+        wacm = write.as_committee_member(committee_name).result_or_raise()
+        match await wacm.keys.autogenerate_keys_file():
+            case types.OutcomeResult():
+                await quart.flash(
+                    f'Successfully regenerated the KEYS file for the "{committee_name}" committee.', "success"
+                )
+            case types.OutcomeException():
+                await quart.flash(f"Error regenerating the KEYS file for the {committee_name} committee.", "error")
 
     return await session.redirect(keys)
 
