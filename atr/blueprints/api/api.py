@@ -391,6 +391,9 @@ async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
         outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_associated(filetext)
 
         # TODO: It would be nice to serialise the actual outcomes
+        # Or, perhaps better yet, to have a standard datatype mapping
+        # This would be specified in models.api, then imported into storage.types
+        # Or perhaps it should go in models.storage or models.outcomes
         api_outcomes = []
         for outcome in outcomes.outcomes():
             api_outcome: models.api.KeysUploadOutcome | None = None

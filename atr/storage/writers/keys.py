@@ -307,20 +307,6 @@ class CommitteeMember(CommitteeParticipant):
         )
 
     @performance_async
-    async def committee(self) -> sql.Committee:
-        return await self.__data.committee(name=self.__committee_name, _public_signing_keys=True).demand(
-            storage.AccessError(f"Committee not found: {self.__committee_name}")
-        )
-
-    @performance_async
-    async def ensure_associated(self, keys_file_text: str) -> types.Outcomes[types.Key]:
-        # TODO: Autogenerate KEYS file
-        return await self.__ensure(keys_file_text, associate=True)
-
-    @performance_async
-    async def ensure_stored(self, keys_file_text: str) -> types.Outcomes[types.Key]:
-        return await self.__ensure(keys_file_text, associate=False)
-
     async def autogenerate_keys_file(
         self,
     ) -> types.Outcome[str]:
@@ -351,6 +337,26 @@ class CommitteeMember(CommitteeParticipant):
             logging.exception(e)
             return types.OutcomeException(storage.AccessError(error_msg))
         return types.OutcomeResult(str(committee_keys_path))
+
+    @performance_async
+    async def committee(self) -> sql.Committee:
+        return await self.__data.committee(name=self.__committee_name, _public_signing_keys=True).demand(
+            storage.AccessError(f"Committee not found: {self.__committee_name}")
+        )
+
+    @performance_async
+    async def ensure_associated(self, keys_file_text: str) -> types.Outcomes[types.Key]:
+        outcomes: types.Outcomes[types.Key] = await self.__ensure(keys_file_text, associate=True)
+        if outcomes.any_ok:
+            await self.autogenerate_keys_file()
+        return outcomes
+
+    @performance_async
+    async def ensure_stored(self, keys_file_text: str) -> types.Outcomes[types.Key]:
+        outcomes: types.Outcomes[types.Key] = await self.__ensure(keys_file_text, associate=False)
+        if outcomes.any_ok:
+            await self.autogenerate_keys_file()
+        return outcomes
 
     @performance
     def __block_models(self, key_block: str, ldap_data: dict[str, str]) -> list[types.Key | Exception]:

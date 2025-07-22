@@ -40,7 +40,6 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
-import atr.db.interaction as interaction
 import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
@@ -355,17 +354,16 @@ async def import_selected_revision(
         keys_text = await f.read()
     if release.committee is None:
         raise routes.FlashError("No committee found for release")
-    selected_committees = [release.committee.name]
-    try:
-        _upload_results, success_count, error_count, submitted_committees = await interaction.upload_keys(
-            session.committees + session.projects, keys_text, selected_committees
-        )
-    except interaction.InteractionError as e:
-        return await session.redirect(compose.selected, error=str(e))
-    await autogenerate_keys_file(release.committee.name, release.committee.is_podling)
+
+    async with storage.write(session.uid) as write:
+        wacm = write.as_committee_member(release.committee.name).result_or_raise()
+        outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_associated(keys_text)
+        success_count = outcomes.result_count
+        error_count = outcomes.exception_count
+
     message = f"Uploaded {success_count} keys,"
     if error_count > 0:
-        message += f" failed to upload {error_count} keys for {', '.join(submitted_committees)}"
+        message += f" failed to upload {error_count} keys for {release.committee.name}"
     # Remove the KEYS file if 100% imported
     if (success_count > 0) and (error_count == 0):
         description = "Removed KEYS file after successful import through web interface"
