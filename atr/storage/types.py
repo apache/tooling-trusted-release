@@ -102,14 +102,14 @@ class OutcomeException[T, E: Exception = Exception](OutcomeCore[T]):
             raise exception_class(str(self.__exception)) from self.__exception
         raise self.__exception
 
-    def exception_or_none(self) -> Exception | None:
+    def exception_or_none(self) -> E | None:
         return self.__exception
 
-    def exception_type_or_none(self) -> type[Exception] | None:
+    def exception_type_or_none(self) -> type[E] | None:
         return type(self.__exception)
 
 
-type Outcome[T] = OutcomeResult[T] | OutcomeException[T, Exception]
+type Outcome[T, E: Exception = Exception] = OutcomeResult[T] | OutcomeException[T, E]
 
 
 class Outcomes[T]:
