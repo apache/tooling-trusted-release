@@ -132,11 +132,19 @@ class Outcomes[T, E: Exception = Exception]:
         self.__outcomes = list(outcomes)
 
     @property
-    def any_ok(self) -> bool:
+    def any_exception(self) -> bool:
+        return any((not outcome.ok) for outcome in self.__outcomes)
+
+    @property
+    def any_result(self) -> bool:
         return any(outcome.ok for outcome in self.__outcomes)
 
     @property
-    def all_ok(self) -> bool:
+    def all_exceptions(self) -> bool:
+        return all((not outcome.ok) for outcome in self.__outcomes)
+
+    @property
+    def all_results(self) -> bool:
         return all(outcome.ok for outcome in self.__outcomes)
 
     def append(self, outcome: Outcome[T, E]) -> None:

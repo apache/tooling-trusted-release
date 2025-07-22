@@ -445,14 +445,14 @@ class CommitteeMember(CommitteeParticipant):
     @performance_async
     async def ensure_associated(self, keys_file_text: str) -> types.Outcomes[types.Key]:
         outcomes: types.Outcomes[types.Key] = await self.__ensure(keys_file_text, associate=True)
-        if outcomes.any_ok:
+        if outcomes.any_result:
             await self.autogenerate_keys_file()
         return outcomes
 
     @performance_async
     async def ensure_stored(self, keys_file_text: str) -> types.Outcomes[types.Key]:
         outcomes: types.Outcomes[types.Key] = await self.__ensure(keys_file_text, associate=False)
-        if outcomes.any_ok:
+        if outcomes.any_result:
             await self.autogenerate_keys_file()
         return outcomes
 

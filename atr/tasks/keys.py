@@ -15,45 +15,28 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import logging
-from typing import Final
-
-import aiofiles
-
-import atr.db as db
-import atr.db.interaction as interaction
 import atr.models.results as results
 import atr.models.schema as schema
-import atr.models.sql as sql
+import atr.storage as storage
 import atr.tasks.checks as checks
-import atr.util as util
-
-_LOGGER: Final = logging.getLogger(__name__)
 
 
 class ImportFile(schema.Strict):
     """Import a KEYS file from a draft release candidate revision."""
 
-    release_name: str
-    abs_keys_path: str
+    asf_uid: str
+    project_name: str
+    version_name: str
 
 
 @checks.with_model(ImportFile)
 async def import_file(args: ImportFile) -> results.Results | None:
     """Import a KEYS file from a draft release candidate revision."""
-    async with db.session() as data:
-        release = await data.release(name=args.release_name).demand(
-            RuntimeError(f"Release {args.release_name} not found")
-        )
-        if release.phase != sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-            raise RuntimeError(f"Release {args.release_name} is not in the DRAFT phase")
-
-    async with aiofiles.open(args.abs_keys_path, "rb") as keys_file:
-        keys_text = await keys_file.read()
-    key_blocks = util.parse_key_blocks(keys_text.decode("utf-8"))
-    if release.committee is None:
-        raise RuntimeError(f"Release {args.release_name} has no committee")
-    for key_block in key_blocks:
-        added_keys = await interaction.key_user_add(None, key_block, [release.committee.name])
-        _LOGGER.info(f"Added key block to user: {added_keys}")
+    async with storage.write(args.asf_uid) as write:
+        access_outcome = await write.as_project_committee_member(args.project_name)
+        wacm = access_outcome.result_or_raise()
+        outcomes = await wacm.keys.import_keys_file(args.project_name, args.version_name)
+        if outcomes.any_exception:
+            # TODO: Log this? This code is unused anyway
+            pass
     return None

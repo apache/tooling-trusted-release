@@ -94,7 +94,7 @@ async def draft_checks(
 
 
 async def keys_import_file(
-    release_name: str, revision_number: str, abs_keys_path: str, caller_data: db.Session | None = None
+    asf_uid: str, project_name: str, version_name: str, revision_number: str, caller_data: db.Session | None = None
 ) -> None:
     """Import a KEYS file from a draft release candidate revision."""
     async with db.ensure_session(caller_data) as data:
@@ -103,8 +103,9 @@ async def keys_import_file(
                 status=sql.TaskStatus.QUEUED,
                 task_type=sql.TaskType.KEYS_IMPORT_FILE,
                 task_args=keys.ImportFile(
-                    release_name=release_name,
-                    abs_keys_path=abs_keys_path,
+                    asf_uid=asf_uid,
+                    project_name=project_name,
+                    version_name=version_name,
                 ).model_dump(),
                 revision_number=revision_number,
                 primary_rel_path=None,
