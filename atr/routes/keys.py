@@ -24,8 +24,6 @@ import datetime
 import hashlib
 import logging
 import logging.handlers
-import pathlib
-import textwrap
 from collections.abc import Awaitable, Callable, Sequence
 
 import aiofiles.os
@@ -307,13 +305,11 @@ async def details(session: routes.CommitterSession, fingerprint: str) -> str | r
 @routes.committer("/keys/export/<committee_name>")
 async def export(session: routes.CommitterSession, committee_name: str) -> quart.Response:
     """Export a KEYS file for a specific committee."""
-    if committee_name not in (session.committees + session.projects):
-        quart.abort(403, description=f"You are not authorised to update the KEYS file for {committee_name}")
+    async with storage.write(session.uid) as write:
+        wafm = write.as_foundation_member().result_or_raise()
+        keys_file_text = await wafm.keys.keys_file_text(committee_name)
 
-    async with db.session() as data:
-        full_keys_file_content = await _keys_formatter(committee_name, data)
-
-    return quart.Response(full_keys_file_content, mimetype="text/plain")
+    return quart.Response(keys_file_text, mimetype="text/plain")
 
 
 @routes.committer("/keys/import/<project_name>/<version_name>", methods=["POST"])
@@ -551,7 +547,9 @@ async def upload(session: routes.CommitterSession) -> str:
         if not selected_committee:
             return await render(error="You must select at least one committee")
 
-        outcomes = await _upload_keys(session.uid, keys_text, selected_committee)
+        async with storage.write(session.uid) as write:
+            wacm = write.as_committee_member(selected_committee).result_or_raise()
+            outcomes = await wacm.keys.ensure_associated(keys_text)
         results = outcomes
         success_count = outcomes.result_count
         error_count = outcomes.exception_count
@@ -567,54 +565,6 @@ async def upload(session: routes.CommitterSession) -> str:
         )
 
     return await render()
-
-
-async def _format_keys_file(
-    committee_name_for_header: str,
-    key_count_for_header: int,
-    key_blocks_str: str,
-) -> str:
-    timestamp_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
-    purpose_text = (
-        f"This file contains the {key_count_for_header} OpenPGP public keys used by "
-        f"committers of the Apache {committee_name_for_header} projects to sign official "
-        f"release artifacts. Verifying the signature on a downloaded artifact using one "
-        f"of the keys in this file provides confidence that the artifact is authentic "
-        f"and was published by the committee."
-    )
-    wrapped_purpose = "\n".join(
-        textwrap.wrap(
-            purpose_text,
-            width=62,
-            initial_indent="# ",
-            subsequent_indent="# ",
-            break_long_words=False,
-            replace_whitespace=False,
-        )
-    )
-
-    header_content = (
-        f"""\
-# Apache Software Foundation (ASF)
-# Signing keys for the {committee_name_for_header} committee
-# Generated on {timestamp_str} UTC
-#
-{wrapped_purpose}
-#
-# 1. Import these keys into your GPG keyring:
-#    gpg --import KEYS
-#
-# 2. Verify the signature file against the release artifact:
-#    gpg --verify "${{ARTIFACT}}.asc" "${{ARTIFACT}}"
-#
-# For details on Apache release signing and verification, see:
-# https://infra.apache.org/release-signing.html
-"""
-        + "\n\n"
-    )
-
-    full_keys_file_content = header_content + key_blocks_str
-    return full_keys_file_content
 
 
 async def _get_keys_text(keys_url: str, render: Callable[[str], Awaitable[str]]) -> str:
@@ -656,87 +606,3 @@ async def _key_and_is_owner(
         quart.abort(403, description="You are not authorised to view this key")
 
     return key, is_owner
-
-
-async def _keys_formatter(committee_name: str, data: db.Session) -> str:
-    committee = await data.committee(name=committee_name, _public_signing_keys=True, _projects=True).demand(
-        base.ASFQuartException(f"Committee {committee_name} not found", errorcode=404)
-    )
-
-    if not committee.public_signing_keys:
-        raise base.ASFQuartException(
-            f"No keys found for committee {committee_name} to generate KEYS file.", errorcode=404
-        )
-
-    if (not committee.projects) and (committee.name != "incubator"):
-        raise base.ASFQuartException(f"No projects found associated with committee {committee_name}.", errorcode=404)
-
-    sorted_keys = sorted(committee.public_signing_keys, key=lambda k: k.fingerprint)
-
-    keys_content_list = []
-    for key in sorted_keys:
-        apache_uid = key.apache_uid.lower() if key.apache_uid else None
-        # TODO: What if there is no email?
-        email = util.email_from_uid(key.primary_declared_uid or "") or ""
-        comments = []
-        comments.append(f"Comment: {key.fingerprint.upper()}")
-        if (apache_uid is None) or (email == f"{apache_uid}@apache.org"):
-            comments.append(f"Comment: {email}")
-        else:
-            comments.append(f"Comment: {email} ({apache_uid})")
-        comment_lines = "\n".join(comments)
-        armored_key = key.ascii_armored_key
-        # Use the Sequoia format
-        # -----BEGIN PGP PUBLIC KEY BLOCK-----
-        # Comment: C46D 6658 489D DE09 CE93  8AF8 7B6A 6401 BF99 B4A3
-        # Comment: Redacted Name (CODE SIGNING KEY) <redacted@apache.org>
-        #
-        # [...]
-        if isinstance(armored_key, bytes):
-            # TODO: This should not happen, but it does
-            armored_key = armored_key.decode("utf-8", errors="replace")
-        armored_key = armored_key.replace("BLOCK-----", "BLOCK-----\n" + comment_lines, 1)
-        keys_content_list.append(armored_key)
-
-    key_blocks_str = "\n\n\n".join(keys_content_list) + "\n"
-
-    committee_name_for_header = committee.display_name or committee.name
-    key_count_for_header = len(committee.public_signing_keys)
-
-    return await _format_keys_file(
-        committee_name_for_header=committee_name_for_header,
-        key_count_for_header=key_count_for_header,
-        key_blocks_str=key_blocks_str,
-    )
-
-
-async def _upload_keys(
-    asf_uid: str,
-    filetext: str,
-    selected_committee: str,
-) -> types.Outcomes[types.Key]:
-    async with storage.write(asf_uid) as write:
-        wacm = write.as_committee_member(selected_committee).result_or_raise()
-        outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_associated(filetext)
-    return outcomes
-
-
-async def _write_keys_file(
-    committee_keys_dir: pathlib.Path,
-    full_keys_file_content: str,
-    committee_keys_path: pathlib.Path,
-    committee_name: str,
-) -> str | None:
-    try:
-        await asyncio.to_thread(committee_keys_dir.mkdir, parents=True, exist_ok=True)
-        await asyncio.to_thread(util.chmod_directories, committee_keys_dir, permissions=0o755)
-        await asyncio.to_thread(committee_keys_path.write_text, full_keys_file_content, encoding="utf-8")
-    except OSError as e:
-        error_msg = f"Failed to write KEYS file for committee {committee_name}: {e}"
-        logging.exception(error_msg)
-        return error_msg
-    except Exception as e:
-        error_msg = f"An unexpected error occurred writing KEYS for committee {committee_name}: {e}"
-        logging.exception(error_msg)
-        return error_msg
-    return None

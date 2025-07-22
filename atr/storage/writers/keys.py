@@ -110,6 +110,50 @@ class FoundationMember:
     async def ensure_stored_one(self, key_file_text: str) -> types.Outcome[types.Key]:
         return await self.__ensure_one(key_file_text, associate=False)
 
+    @performance_async
+    async def keys_file_text(self, committee_name: str) -> str:
+        committee = await self.__data.committee(name=committee_name, _public_signing_keys=True).demand(
+            storage.AccessError(f"Committee not found: {committee_name}")
+        )
+        if not committee.public_signing_keys:
+            raise storage.AccessError(f"No keys found for committee {committee_name} to generate KEYS file.")
+
+        sorted_keys = sorted(committee.public_signing_keys, key=lambda k: k.fingerprint)
+
+        keys_content_list = []
+        for key in sorted_keys:
+            apache_uid = key.apache_uid.lower() if key.apache_uid else None
+            # TODO: What if there is no email?
+            email = util.email_from_uid(key.primary_declared_uid or "") or ""
+            comments = []
+            comments.append(f"Comment: {key.fingerprint.upper()}")
+            if (apache_uid is None) or (email == f"{apache_uid}@apache.org"):
+                comments.append(f"Comment: {email}")
+            else:
+                comments.append(f"Comment: {email} ({apache_uid})")
+            comment_lines = "\n".join(comments)
+            armored_key = key.ascii_armored_key
+            # Use the Sequoia format
+            # -----BEGIN PGP PUBLIC KEY BLOCK-----
+            # Comment: C46D 6658 489D DE09 CE93  8AF8 7B6A 6401 BF99 B4A3
+            # Comment: Redacted Name (CODE SIGNING KEY) <redacted@apache.org>
+            #
+            # [...]
+            if isinstance(armored_key, bytes):
+                # TODO: This should not happen, but it does
+                armored_key = armored_key.decode("utf-8", errors="replace")
+            armored_key = armored_key.replace("BLOCK-----", "BLOCK-----\n" + comment_lines, 1)
+            keys_content_list.append(armored_key)
+
+        key_blocks_str = "\n\n\n".join(keys_content_list) + "\n"
+        key_count_for_header = len(committee.public_signing_keys)
+
+        return await self.__keys_file_format(
+            committee_name=committee_name,
+            key_count_for_header=key_count_for_header,
+            key_blocks_str=key_blocks_str,
+        )
+
     @performance
     def __block_model(self, key_block: str, ldap_data: dict[str, str]) -> types.Key:
         # This cache is only held for the session
@@ -183,6 +227,54 @@ class FoundationMember:
             return types.OutcomeException(e)
         outcome = await self.__database_add_model(key)
         return outcome
+
+    @performance_async
+    async def __keys_file_format(
+        self,
+        committee_name: str,
+        key_count_for_header: int,
+        key_blocks_str: str,
+    ) -> str:
+        timestamp_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+        purpose_text = f"""\
+This file contains the {key_count_for_header} OpenPGP public keys used by \
+committers of the Apache {committee_name} projects to sign official \
+release artifacts. Verifying the signature on a downloaded artifact using one \
+of the keys in this file provides confidence that the artifact is authentic \
+and was published by the committee.\
+"""
+        wrapped_purpose = "\n".join(
+            textwrap.wrap(
+                purpose_text,
+                width=62,
+                initial_indent="# ",
+                subsequent_indent="# ",
+                break_long_words=False,
+                replace_whitespace=False,
+            )
+        )
+
+        header_content = f"""\
+# Apache Software Foundation (ASF)
+# Signing keys for the {committee_name} committee
+# Generated at {timestamp_str} UTC
+#
+{wrapped_purpose}
+#
+# 1. Import these keys into your GPG keyring:
+#    gpg --import KEYS
+#
+# 2. Verify the signature file against the release artifact:
+#    gpg --verify "${{ARTIFACT}}.asc" "${{ARTIFACT}}"
+#
+# For details on Apache release signing and verification, see:
+# https://infra.apache.org/release-signing.html
+
+
+"""
+
+        full_keys_file_content = header_content + key_blocks_str
+        return full_keys_file_content
 
     @performance
     def __keyring_fingerprint_model(
@@ -316,7 +408,7 @@ class CommitteeMember(CommitteeParticipant):
             committee = await self.committee()
             is_podling = committee.is_podling
 
-            full_keys_file_content = await self.__keys_formatter()
+            full_keys_file_content = await self.keys_file_text()
             if is_podling:
                 committee_keys_dir = base_downloads_dir / "incubator" / self.__committee_name
             else:
@@ -488,95 +580,6 @@ class CommitteeMember(CommitteeParticipant):
             for key, value in PERFORMANCES.items():
                 logging.info(f"{key}: {value}")
         return outcomes
-
-    async def __keys_file_format(
-        self,
-        key_count_for_header: int,
-        key_blocks_str: str,
-    ) -> str:
-        timestamp_str = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
-        purpose_text = f"""\
-This file contains the {key_count_for_header} OpenPGP public keys used by \
-committers of the Apache {self.__committee_name} projects to sign official \
-release artifacts. Verifying the signature on a downloaded artifact using one \
-of the keys in this file provides confidence that the artifact is authentic \
-and was published by the committee.\
-"""
-        wrapped_purpose = "\n".join(
-            textwrap.wrap(
-                purpose_text,
-                width=62,
-                initial_indent="# ",
-                subsequent_indent="# ",
-                break_long_words=False,
-                replace_whitespace=False,
-            )
-        )
-
-        header_content = f"""\
-# Apache Software Foundation (ASF)
-# Signing keys for the {self.__committee_name} committee
-# Generated on {timestamp_str} UTC
-#
-{wrapped_purpose}
-#
-# 1. Import these keys into your GPG keyring:
-#    gpg --import KEYS
-#
-# 2. Verify the signature file against the release artifact:
-#    gpg --verify "${{ARTIFACT}}.asc" "${{ARTIFACT}}"
-#
-# For details on Apache release signing and verification, see:
-# https://infra.apache.org/release-signing.html
-
-
-"""
-
-        full_keys_file_content = header_content + key_blocks_str
-        return full_keys_file_content
-
-    async def __keys_formatter(self) -> str:
-        committee = await self.committee()
-        if not committee.public_signing_keys:
-            raise storage.AccessError(f"No keys found for committee {self.__committee_name} to generate KEYS file.")
-
-        # if (not committee.projects) and (committee.name != "incubator"):
-        #     raise storage.AccessError(f"No projects found associated with committee {self.__committee_name}.")
-
-        sorted_keys = sorted(committee.public_signing_keys, key=lambda k: k.fingerprint)
-
-        keys_content_list = []
-        for key in sorted_keys:
-            apache_uid = key.apache_uid.lower() if key.apache_uid else None
-            # TODO: What if there is no email?
-            email = util.email_from_uid(key.primary_declared_uid or "") or ""
-            comments = []
-            comments.append(f"Comment: {key.fingerprint.upper()}")
-            if (apache_uid is None) or (email == f"{apache_uid}@apache.org"):
-                comments.append(f"Comment: {email}")
-            else:
-                comments.append(f"Comment: {email} ({apache_uid})")
-            comment_lines = "\n".join(comments)
-            armored_key = key.ascii_armored_key
-            # Use the Sequoia format
-            # -----BEGIN PGP PUBLIC KEY BLOCK-----
-            # Comment: C46D 6658 489D DE09 CE93  8AF8 7B6A 6401 BF99 B4A3
-            # Comment: Redacted Name (CODE SIGNING KEY) <redacted@apache.org>
-            #
-            # [...]
-            if isinstance(armored_key, bytes):
-                # TODO: This should not happen, but it does
-                armored_key = armored_key.decode("utf-8", errors="replace")
-            armored_key = armored_key.replace("BLOCK-----", "BLOCK-----\n" + comment_lines, 1)
-            keys_content_list.append(armored_key)
-
-        key_blocks_str = "\n\n\n".join(keys_content_list) + "\n"
-        key_count_for_header = len(committee.public_signing_keys)
-
-        return await self.__keys_file_format(
-            key_count_for_header=key_count_for_header,
-            key_blocks_str=key_blocks_str,
-        )
 
 
 # class FoundationAdmin(FoundationMember):
