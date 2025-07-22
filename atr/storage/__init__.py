@@ -143,6 +143,10 @@ class WriteAsCommitteeParticipant(WriteAsFoundationMember):
         return self.__authenticated
 
     @property
+    def committee_name(self) -> str:
+        return self.__committee_name
+
+    @property
     def validate_at_runtime(self) -> bool:
         return VALIDATE_AT_RUNTIME
 
@@ -165,6 +169,10 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
     @property
     def authenticated(self) -> bool:
         return self.__authenticated
+
+    @property
+    def committee_name(self) -> str:
+        return self.__committee_name
 
     @property
     def validate_at_runtime(self) -> bool:
@@ -204,6 +212,20 @@ class Write:
             return types.OutcomeException(AccessError("No ASF UID"))
         try:
             wacm = WriteAsCommitteeMember(self, self.__data, self.__asf_uid, committee_name)
+        except Exception as e:
+            return types.OutcomeException(e)
+        return types.OutcomeResult(wacm)
+
+    async def as_project_committee_member(self, project_name: str) -> types.Outcome[WriteAsCommitteeMember]:
+        project = await self.__data.project(project_name, _committee=True).demand(
+            AccessError(f"Project not found: {project_name}")
+        )
+        if project.committee is None:
+            return types.OutcomeException(AccessError("No committee found for project"))
+        if self.__asf_uid is None:
+            return types.OutcomeException(AccessError("No ASF UID"))
+        try:
+            wacm = WriteAsCommitteeMember(self, self.__data, self.__asf_uid, project.committee.name)
         except Exception as e:
             return types.OutcomeException(e)
         return types.OutcomeResult(wacm)

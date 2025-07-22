@@ -26,7 +26,6 @@ import logging
 import logging.handlers
 from collections.abc import Awaitable, Callable, Sequence
 
-import aiofiles.os
 import aiohttp
 import asfquart as asfquart
 import asfquart.base as base
@@ -38,7 +37,6 @@ import wtforms
 
 import atr.db as db
 import atr.models.sql as sql
-import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.storage as storage
@@ -316,33 +314,16 @@ async def export(session: routes.CommitterSession, committee_name: str) -> quart
 async def import_selected_revision(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> response.Response:
-    await session.check_access(project_name)
-
     await util.validate_empty_form()
-    release = await session.release(project_name, version_name, with_committee=True)
-    keys_path = util.release_directory(release) / "KEYS"
-    async with aiofiles.open(keys_path, encoding="utf-8") as f:
-        keys_text = await f.read()
-    if release.committee is None:
-        raise routes.FlashError("No committee found for release")
 
     async with storage.write(session.uid) as write:
-        wacm = write.as_committee_member(release.committee.name).result_or_raise()
-        outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_associated(keys_text)
-        success_count = outcomes.result_count
-        error_count = outcomes.exception_count
+        access_outcome = await write.as_project_committee_member(project_name)
+        wacm = access_outcome.result_or_raise()
+        outcomes: types.Outcomes[types.Key] = await wacm.keys.import_keys_file(project_name, version_name)
 
-    message = f"Uploaded {success_count} keys,"
-    if error_count > 0:
-        message += f" failed to upload {error_count} keys for {release.committee.name}"
-    # Remove the KEYS file if 100% imported
-    if (success_count > 0) and (error_count == 0):
-        description = "Removed KEYS file after successful import through web interface"
-        async with revision.create_and_manage(
-            project_name, version_name, session.uid, description=description
-        ) as creating:
-            path_in_new_revision = creating.interim_path / "KEYS"
-            await aiofiles.os.remove(path_in_new_revision)
+    message = f"Uploaded {outcomes.result_count} keys,"
+    if outcomes.exception_count > 0:
+        message += f" failed to upload {outcomes.exception_count} keys for {wacm.committee_name}"
     return await session.redirect(
         compose.selected,
         success=message,

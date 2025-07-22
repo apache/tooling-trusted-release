@@ -29,6 +29,8 @@ import textwrap
 import time
 from typing import TYPE_CHECKING, Any, Final, NoReturn
 
+import aiofiles
+import aiofiles.os
 import pgpy
 import pgpy.constants as constants
 import sqlalchemy.dialects.sqlite as sqlite
@@ -436,6 +438,10 @@ class CommitteeMember(CommitteeParticipant):
             storage.AccessError(f"Committee not found: {self.__committee_name}")
         )
 
+    @property
+    def committee_name(self) -> str:
+        return self.__committee_name
+
     @performance_async
     async def ensure_associated(self, keys_file_text: str) -> types.Outcomes[types.Key]:
         outcomes: types.Outcomes[types.Key] = await self.__ensure(keys_file_text, associate=True)
@@ -448,6 +454,36 @@ class CommitteeMember(CommitteeParticipant):
         outcomes: types.Outcomes[types.Key] = await self.__ensure(keys_file_text, associate=False)
         if outcomes.any_ok:
             await self.autogenerate_keys_file()
+        return outcomes
+
+    @performance_async
+    async def import_keys_file(self, project_name: str, version_name: str) -> types.Outcomes[types.Key]:
+        import atr.revision as revision
+
+        release = await self.__data.release(
+            project_name=project_name,
+            version=version_name,
+            _committee=True,
+        ).demand(storage.AccessError(f"Release not found: {project_name} {version_name}"))
+        keys_path = util.release_directory(release) / "KEYS"
+        async with aiofiles.open(keys_path, encoding="utf-8") as f:
+            keys_file_text = await f.read()
+        if release.committee is None:
+            raise storage.AccessError("No committee found for release")
+        if release.committee.name != self.__committee_name:
+            raise storage.AccessError(
+                f"Release {project_name} {version_name} is not associated with committee {self.__committee_name}"
+            )
+
+        outcomes = await self.ensure_associated(keys_file_text)
+        # Remove the KEYS file if 100% imported
+        if (outcomes.result_count > 0) and (outcomes.exception_count == 0):
+            description = "Removed KEYS file after successful import through web interface"
+            async with revision.create_and_manage(
+                project_name, version_name, self.__asf_uid, description=description
+            ) as creating:
+                path_in_new_revision = creating.interim_path / "KEYS"
+                await aiofiles.os.remove(path_in_new_revision)
         return outcomes
 
     @performance
