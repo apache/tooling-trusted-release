@@ -112,10 +112,10 @@ class OutcomeException[T, E: Exception = Exception](OutcomeCore[T]):
 type Outcome[T, E: Exception = Exception] = OutcomeResult[T] | OutcomeException[T, E]
 
 
-class Outcomes[T]:
-    __outcomes: list[OutcomeResult[T] | OutcomeException[T, Exception]]
+class Outcomes[T, E: Exception = Exception]:
+    __outcomes: list[Outcome[T, E]]
 
-    def __init__(self, *outcomes: OutcomeResult[T] | OutcomeException[T, Exception]):
+    def __init__(self, *outcomes: Outcome[T, E]):
         self.__outcomes = list(outcomes)
 
     @property
@@ -126,12 +126,20 @@ class Outcomes[T]:
     def all_ok(self) -> bool:
         return all(outcome.ok for outcome in self.__outcomes)
 
-    def append(self, outcome: OutcomeResult[T] | OutcomeException[T, Exception]) -> None:
+    def append(self, outcome: Outcome[T, E]) -> None:
         self.__outcomes.append(outcome)
 
-    def append_roe(self, roe: T | Exception, name: str | None = None) -> None:
-        if isinstance(roe, Exception):
-            self.__outcomes.append(OutcomeException[T, Exception](roe, name))
+    def append_exception(self, exception: E, name: str | None = None) -> None:
+        self.__outcomes.append(OutcomeException[T, E](exception, name))
+
+    def append_result(self, result: T, name: str | None = None) -> None:
+        self.__outcomes.append(OutcomeResult[T](result, name))
+
+    def append_roe(self, exception_type: type[E], roe: T | E, name: str | None = None) -> None:
+        if isinstance(roe, exception_type):
+            self.__outcomes.append(OutcomeException[T, E](roe, name))
+        elif isinstance(roe, Exception):
+            self.__outcomes.append(OutcomeException[T, E](exception_type(str(roe)), name))
         else:
             self.__outcomes.append(OutcomeResult[T](roe, name))
 
@@ -139,7 +147,7 @@ class Outcomes[T]:
     def exception_count(self) -> int:
         return sum(1 for outcome in self.__outcomes if isinstance(outcome, OutcomeException))
 
-    def exceptions(self) -> list[Exception]:
+    def exceptions(self) -> list[E]:
         exceptions_list = []
         for outcome in self.__outcomes:
             if isinstance(outcome, OutcomeException):
@@ -148,9 +156,17 @@ class Outcomes[T]:
                     exceptions_list.append(exception_or_none)
         return exceptions_list
 
-    def extend(self, roes: Sequence[T | Exception]) -> None:
+    def extend_exceptions(self, exceptions: Sequence[E]) -> None:
+        for exception in exceptions:
+            self.append_exception(exception)
+
+    def extend_results(self, results: Sequence[T]) -> None:
+        for result in results:
+            self.append_result(result)
+
+    def extend_roes(self, exception_type: type[E], roes: Sequence[T | E]) -> None:
         for roe in roes:
-            self.append_roe(roe)
+            self.append_roe(exception_type, roe)
 
     def named_results(self) -> dict[str, T]:
         named = {}
@@ -178,7 +194,7 @@ class Outcomes[T]:
     def result_count(self) -> int:
         return sum(1 for outcome in self.__outcomes if outcome.ok)
 
-    def outcomes(self) -> list[OutcomeResult[T] | OutcomeException[T, Exception]]:
+    def outcomes(self) -> list[Outcome[T, E]]:
         return self.__outcomes
 
     def result_predicate_count(self, predicate: Callable[[T], bool]) -> int:
@@ -188,15 +204,15 @@ class Outcomes[T]:
             if isinstance(outcome, OutcomeResult) and predicate(outcome.result_or_raise())
         )
 
-    def update_results(self, f: Callable[[T], T]) -> None:
+    def update_roes(self, exception_type: type[E], f: Callable[[T], T]) -> None:
         for i, outcome in enumerate(self.__outcomes):
             if isinstance(outcome, OutcomeResult):
                 try:
                     result = f(outcome.result_or_raise())
-                except Exception as e:
-                    self.__outcomes[i] = OutcomeException(e, outcome.name)
+                except exception_type as e:
+                    self.__outcomes[i] = OutcomeException[T, E](e, outcome.name)
                 else:
-                    self.__outcomes[i] = OutcomeResult(result, outcome.name)
+                    self.__outcomes[i] = OutcomeResult[T](result, outcome.name)
 
 
 class KeyStatus(enum.Flag):
@@ -232,8 +248,3 @@ class PublicKeyError(Exception):
     @property
     def original_error(self) -> Exception:
         return self.__original_error
-
-
-# TODO: Could use + and += instead, or in addition
-def outcomes_merge[T](*outcomes: Outcomes[T]) -> Outcomes[T]:
-    return Outcomes(*[outcome for outcome in outcomes for outcome in outcome.outcomes()])

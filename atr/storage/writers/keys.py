@@ -361,7 +361,7 @@ class CommitteeMember(CommitteeParticipant):
                 key = types.Key(status=types.KeyStatus.PARSED, key_model=key.key_model)
                 raise types.PublicKeyError(key, e)
 
-            outcomes.update_results(raise_post_parse_error)
+            outcomes.update_roes(Exception, raise_post_parse_error)
         return outcomes
 
     @performance_async
@@ -391,7 +391,7 @@ class CommitteeMember(CommitteeParticipant):
                 key.status = types.KeyStatus.INSERTED
             return key
 
-        outcomes.update_results(replace_with_inserted)
+        outcomes.update_roes(Exception, replace_with_inserted)
 
         persisted_fingerprints = {v["fingerprint"] for v in key_values}
         await self.__data.flush()
@@ -420,7 +420,7 @@ class CommitteeMember(CommitteeParticipant):
                             key.status = types.KeyStatus.LINKED
                 return key
 
-            outcomes.update_results(replace_with_linked)
+            outcomes.update_roes(Exception, replace_with_linked)
         else:
             logging.info("Inserted 0 key links (none to insert)")
 
@@ -434,14 +434,14 @@ class CommitteeMember(CommitteeParticipant):
             ldap_data = await util.email_to_uid_map()
             key_blocks = util.parse_key_blocks(keys_file_text)
         except Exception as e:
-            outcomes.append_roe(e)
+            outcomes.append_exception(e)
             return outcomes
         for key_block in key_blocks:
             try:
                 key_models = await asyncio.to_thread(self.__block_models, key_block, ldap_data)
-                outcomes.extend(key_models)
+                outcomes.extend_results(key_models)
             except Exception as e:
-                outcomes.append_roe(e)
+                outcomes.append_exception(e)
         # Try adding the keys to the database
         # If not, all keys will be replaced with a PostParseError
         outcomes = await self.__database_add_models(outcomes, associate=associate)
