@@ -79,7 +79,7 @@ class OutcomeResult[T](OutcomeCore[T]):
         return None
 
 
-class OutcomeException[T, E: Exception](OutcomeCore[T]):
+class OutcomeException[T, E: Exception = Exception](OutcomeCore[T]):
     __exception: E
 
     def __init__(self, exception: E, name: str | None = None):
@@ -109,6 +109,9 @@ class OutcomeException[T, E: Exception](OutcomeCore[T]):
         return type(self.__exception)
 
 
+type Outcome[T] = OutcomeResult[T] | OutcomeException[T, Exception]
+
+
 class Outcomes[T]:
     __outcomes: list[OutcomeResult[T] | OutcomeException[T, Exception]]
 
@@ -123,11 +126,14 @@ class Outcomes[T]:
     def all_ok(self) -> bool:
         return all(outcome.ok for outcome in self.__outcomes)
 
-    def append(self, result_or_error: T | Exception, name: str | None = None) -> None:
-        if isinstance(result_or_error, Exception):
-            self.__outcomes.append(OutcomeException(result_or_error, name))
+    def append(self, outcome: OutcomeResult[T] | OutcomeException[T, Exception]) -> None:
+        self.__outcomes.append(outcome)
+
+    def append_roe(self, roe: T | Exception, name: str | None = None) -> None:
+        if isinstance(roe, Exception):
+            self.__outcomes.append(OutcomeException[T, Exception](roe, name))
         else:
-            self.__outcomes.append(OutcomeResult(result_or_error, name))
+            self.__outcomes.append(OutcomeResult[T](roe, name))
 
     @property
     def exception_count(self) -> int:
@@ -142,9 +148,9 @@ class Outcomes[T]:
                     exceptions_list.append(exception_or_none)
         return exceptions_list
 
-    def extend(self, result_or_error_list: Sequence[T | Exception]) -> None:
-        for result_or_error in result_or_error_list:
-            self.append(result_or_error)
+    def extend(self, roes: Sequence[T | Exception]) -> None:
+        for roe in roes:
+            self.append_roe(roe)
 
     def named_results(self) -> dict[str, T]:
         named = {}
@@ -191,9 +197,6 @@ class Outcomes[T]:
                     self.__outcomes[i] = OutcomeException(e, outcome.name)
                 else:
                     self.__outcomes[i] = OutcomeResult(result, outcome.name)
-
-
-type Outcome[T] = OutcomeResult[T] | OutcomeException[T, Exception]
 
 
 class KeyStatus(enum.Flag):

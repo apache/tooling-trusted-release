@@ -197,6 +197,26 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
         return VALIDATE_AT_RUNTIME
 
 
+# class WriteAsFoundationAdmin(WriteAsFoundationMember):
+#     def __init__(self, data: db.Session, asf_uid: str):
+#         self.__data = data
+#         self.__asf_uid = asf_uid
+#         self.__authenticated = True
+#         self.keys = writers.keys.FoundationAdmin(
+#             self,
+#             self.__data,
+#             self.__asf_uid,
+#         )
+
+#     @property
+#     def authenticated(self) -> bool:
+#         return self.__authenticated
+
+#     @property
+#     def validate_at_runtime(self) -> bool:
+#         return VALIDATE_AT_RUNTIME
+
+
 class Write:
     # Read and Write have authenticator methods which return access outcomes
     def __init__(self, data: db.Session, asf_uid: str | None = None):

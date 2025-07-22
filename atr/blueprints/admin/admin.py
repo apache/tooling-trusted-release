@@ -47,6 +47,7 @@ import atr.ldap as ldap
 import atr.models.sql as sql
 import atr.routes.keys as keys
 import atr.routes.mapping as mapping
+import atr.storage as storage
 import atr.storage.types as types
 import atr.template as template
 import atr.util as util
@@ -422,15 +423,29 @@ async def admin_keys_regenerate_all() -> quart.Response:
             mimetype="text/html",
         )
 
-    try:
-        okay, failures = await _regenerate_keys_all()
-        msg = f"KEYS file regeneration results: {okay} okay, {len(failures)} failed"
-        if failures:
-            msg += f"\nFailures:\n{'\n'.join(failures)}"
-        return quart.Response(msg, mimetype="text/plain")
-    except Exception as e:
-        _LOGGER.exception("Exception during KEYS file regeneration:")
-        return quart.Response(f"Exception during KEYS file regeneration: {e!s}", mimetype="text/plain")
+    async with db.session() as data:
+        committee_names = [c.name for c in await data.committee().all()]
+
+    web_session = await session.read()
+    if web_session is None:
+        raise base.ASFQuartException("Not authenticated", 401)
+    asf_uid = web_session.uid
+    if asf_uid is None:
+        raise base.ASFQuartException("Invalid session, uid is None", 500)
+
+    outcomes = types.Outcomes[str]()
+    async with storage.write(asf_uid) as write:
+        for committee_name in committee_names:
+            wacm = write.as_committee_member(committee_name).writer_or_raise()
+            outcomes.append(await wacm.keys.autogenerate_keys_file())
+
+    response_lines = []
+    for ocr in outcomes.results():
+        response_lines.append(f"Regenerated: {ocr}")
+    for oce in outcomes.exceptions():
+        response_lines.append(f"Error regenerating: {type(oce).__name__} {oce}")
+
+    return quart.Response("\n".join(response_lines), mimetype="text/plain")
 
 
 @admin.BLUEPRINT.route("/keys/update", methods=["GET", "POST"])
