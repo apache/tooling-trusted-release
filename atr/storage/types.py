@@ -29,29 +29,32 @@ E = TypeVar("E", bound=Exception)
 T = TypeVar("T", bound=object)
 
 
-class OutcomeCore[T]:
-    @property
-    def ok(self) -> bool:
-        raise NotImplementedError("ok is not implemented")
+# class OutcomeCore[T]:
+#     @property
+#     def ok(self) -> bool:
+#         raise NotImplementedError("ok is not implemented")
 
-    @property
-    def name(self) -> str | None:
-        raise NotImplementedError("name is not implemented")
+#     @property
+#     def name(self) -> str | None:
+#         raise NotImplementedError("name is not implemented")
 
-    def result_or_none(self) -> T | None:
-        raise NotImplementedError("result_or_none is not implemented")
+#     def result_or_none(self) -> T | None:
+#         raise NotImplementedError("result_or_none is not implemented")
 
-    def result_or_raise(self, exception_class: type[E] | None = None) -> T:
-        raise NotImplementedError("result_or_raise is not implemented")
+#     def result_or_raise(self, exception_class: type[E] | None = None) -> T:
+#         raise NotImplementedError("result_or_raise is not implemented")
 
-    def exception_or_none(self) -> Exception | None:
-        raise NotImplementedError("exception_or_none is not implemented")
+#     def exception_or_none(self) -> Exception | None:
+#         raise NotImplementedError("exception_or_none is not implemented")
 
-    def exception_type_or_none(self) -> type[Exception] | None:
-        raise NotImplementedError("exception_type_or_none is not implemented")
+#     def exception_or_raise(self, exception_class: type[E] | None = None) -> NoReturn:
+#         raise NotImplementedError("exception_or_raise is not implemented")
+
+#     def exception_type_or_none(self) -> type[Exception] | None:
+#         raise NotImplementedError("exception_type_or_none is not implemented")
 
 
-class OutcomeResult[T](OutcomeCore[T]):
+class OutcomeResult[T]:
     __result: T
 
     def __init__(self, result: T, name: str | None = None):
@@ -75,11 +78,16 @@ class OutcomeResult[T](OutcomeCore[T]):
     def exception_or_none(self) -> Exception | None:
         return None
 
+    def exception_or_raise(self, exception_class: type[Exception] | None = None) -> NoReturn:
+        if exception_class is not None:
+            raise exception_class(f"Asked for exception on a result: {self.__result}")
+        raise RuntimeError(f"Asked for exception on a result: {self.__result}")
+
     def exception_type_or_none(self) -> type[Exception] | None:
         return None
 
 
-class OutcomeException[T, E: Exception = Exception](OutcomeCore[T]):
+class OutcomeException[T, E: Exception = Exception]:
     __exception: E
 
     def __init__(self, exception: E, name: str | None = None):
@@ -104,6 +112,11 @@ class OutcomeException[T, E: Exception = Exception](OutcomeCore[T]):
 
     def exception_or_none(self) -> E | None:
         return self.__exception
+
+    def exception_or_raise(self, exception_class: type[E] | None = None) -> NoReturn:
+        if exception_class is not None:
+            raise exception_class(str(self.__exception)) from self.__exception
+        raise self.__exception
 
     def exception_type_or_none(self) -> type[E] | None:
         return type(self.__exception)

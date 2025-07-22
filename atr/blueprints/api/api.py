@@ -304,12 +304,12 @@ async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
     selected_committee_names = data.committees
 
     async with storage.write(asf_uid) as write:
-        wafm = write.as_foundation_member().writer_or_raise()
+        wafm = write.as_foundation_member().result_or_raise()
         ocr: types.Outcome[types.Key] = await wafm.keys.ensure_stored_one(data.key)
         key = ocr.result_or_raise()
 
         for selected_committee_name in selected_committee_names:
-            wacm = write.as_committee_member(selected_committee_name).writer_or_raise()
+            wacm = write.as_committee_member(selected_committee_name).result_or_raise()
             outcome: types.Outcome[types.LinkedCommittee] = await wacm.keys.associate_fingerprint(
                 key.key_model.fingerprint
             )
@@ -330,15 +330,19 @@ async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
 async def keys_delete(data: models.api.KeysDeleteArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
     fingerprint = data.fingerprint.lower()
-    async with db.session() as db_data:
-        # TODO: Migrate to the storage interface
-        key = await db_data.public_signing_key(fingerprint=fingerprint, apache_uid=asf_uid, _committees=True).get()
-        if key is None:
-            raise ValueError(f"Key {fingerprint} not found")
-        await db_data.delete(key)
+
+    outcomes = types.Outcomes[str]()
+    async with storage.write(asf_uid) as write:
+        wafm = write.as_foundation_member().result_or_raise()
+        outcome: types.Outcome[sql.PublicSigningKey] = await wafm.keys.delete_key(fingerprint)
+        key = outcome.result_or_raise()
+
         for committee in key.committees:
-            await keys.autogenerate_keys_file(committee.name, committee.is_podling)
-        await db_data.commit()
+            wacm = write.as_committee_member(committee.name).result_or_none()
+            if wacm is None:
+                continue
+            outcomes.append(await wacm.keys.autogenerate_keys_file())
+    # TODO: Add error outcomes as warnings to the response
 
     return models.api.KeysDeleteResults(
         endpoint="/keys/delete",
@@ -383,7 +387,7 @@ async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
     filetext = data.filetext
     selected_committee_name = data.committee
     async with storage.write(asf_uid) as write:
-        wacm = write.as_committee_member(selected_committee_name).writer_or_raise()
+        wacm = write.as_committee_member(selected_committee_name).result_or_raise()
         outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_associated(filetext)
 
         # TODO: It would be nice to serialise the actual outcomes

@@ -75,14 +75,36 @@ def performance_async(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable
 
 
 class FoundationMember:
-    def __init__(self, credentials: storage.WriteAsFoundationMember, data: db.Session, asf_uid: str):
+    def __init__(
+        self, credentials: storage.WriteAsFoundationMember, write: storage.Write, data: db.Session, asf_uid: str
+    ):
         if credentials.validate_at_runtime:
             if credentials.authenticated is not True:
                 raise storage.AccessError("Writer is not authenticated")
         self.__credentials = credentials
+        self.__write = write
         self.__data = data
         self.__asf_uid = asf_uid
         self.__key_block_models_cache = {}
+
+    @performance_async
+    async def delete_key(self, fingerprint: str) -> types.Outcome[sql.PublicSigningKey]:
+        try:
+            key = await self.__data.public_signing_key(
+                fingerprint=fingerprint,
+                apache_uid=self.__asf_uid,
+                _committees=True,
+            ).demand(storage.AccessError(f"Key not found: {fingerprint}"))
+            await self.__data.delete(key)
+            await self.__data.commit()
+            for committee in key.committees:
+                wacm = self.__write.as_committee_member(committee.name).result_or_none()
+                if wacm is None:
+                    continue
+                await wacm.keys.autogenerate_keys_file()
+            return types.OutcomeResult(key)
+        except Exception as e:
+            return types.OutcomeException(e)
 
     @performance_async
     async def ensure_stored_one(self, key_file_text: str) -> types.Outcome[types.Key]:
@@ -229,18 +251,29 @@ class FoundationMember:
 
 class CommitteeParticipant(FoundationMember):
     def __init__(
-        self, credentials: storage.WriteAsCommitteeParticipant, data: db.Session, asf_uid: str, committee_name: str
+        self,
+        credentials: storage.WriteAsCommitteeParticipant,
+        write: storage.Write,
+        data: db.Session,
+        asf_uid: str,
+        committee_name: str,
     ):
-        super().__init__(credentials, data, asf_uid)
+        super().__init__(credentials, write, data, asf_uid)
         self.__committee_name = committee_name
 
 
 class CommitteeMember(CommitteeParticipant):
     def __init__(
-        self, credentials: storage.WriteAsCommitteeMember, data: db.Session, asf_uid: str, committee_name: str
+        self,
+        credentials: storage.WriteAsCommitteeMember,
+        write: storage.Write,
+        data: db.Session,
+        asf_uid: str,
+        committee_name: str,
     ):
-        self.__data = data
         self.__credentials = credentials
+        self.__write = write
+        self.__data = data
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
 
@@ -542,10 +575,11 @@ and was published by the committee.\
 
 # class FoundationAdmin(FoundationMember):
 #     def __init__(
-#         self, credentials: storage.WriteAsFoundationAdmin, data: db.Session, asf_uid: str
+#         self, credentials: storage.WriteAsFoundationAdmin, write: storage.Write, data: db.Session, asf_uid: str
 #     ):
-#         self.__data = data
 #         self.__credentials = credentials
+#         self.__write = write
+#         self.__data = data
 #         self.__asf_uid = asf_uid
 
 #     @performance_async

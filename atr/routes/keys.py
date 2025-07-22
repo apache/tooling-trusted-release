@@ -169,12 +169,12 @@ async def add(session: routes.CommitterSession) -> str:
             selected_committee_names: list[str] = util.unwrap(form.selected_committees.data)
 
             async with storage.write(asf_uid) as write:
-                wafm = write.as_foundation_member().writer_or_raise()
+                wafm = write.as_foundation_member().result_or_raise()
                 ocr: types.Outcome[types.Key] = await wafm.keys.ensure_stored_one(key_text)
                 key = ocr.result_or_raise()
 
                 for selected_committee_name in selected_committee_names:
-                    wacm = write.as_committee_member(selected_committee_name).writer_or_raise()
+                    wacm = write.as_committee_member(selected_committee_name).result_or_raise()
                     outcome: types.Outcome[types.LinkedCommittee] = await wacm.keys.associate_fingerprint(
                         key.key_model.fingerprint
                     )
@@ -240,26 +240,28 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     if not fingerprint:
         return await session.redirect(keys, error="Missing key fingerprint for deletion.")
 
+    # Try to delete an SSH key first
     async with db.session() as data:
-        async with data.begin():
-            # Try to get an OpenPGP key first
-            key = await data.public_signing_key(fingerprint=fingerprint, apache_uid=session.uid.lower()).get()
-            if key:
-                # Delete the OpenPGP key
-                await data.delete(key)
-                for committee in key.committees:
-                    await autogenerate_keys_file(committee.name, committee.is_podling, caller_data=data)
-                return await session.redirect(keys, success="OpenPGP key deleted successfully")
+        ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=session.uid).get()
+        if ssh_key:
+            # Delete the SSH key
+            await data.delete(ssh_key)
+            await data.commit()
+            return await session.redirect(keys, success="SSH key deleted successfully")
 
-            # If not an OpenPGP key, try to get an SSH key
-            ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=session.uid).get()
-            if ssh_key:
-                # Delete the SSH key
-                await data.delete(ssh_key)
-                return await session.redirect(keys, success="SSH key deleted successfully")
-
-            # No key was found
+    # Otherwise, delete an OpenPGP key
+    async with storage.write(session.uid) as write:
+        wafm = write.as_foundation_member().result_or_none()
+        if wafm is None:
             return await session.redirect(keys, error="Key not found or not owned by you")
+        outcome: types.Outcome[sql.PublicSigningKey] = await wafm.keys.delete_key(fingerprint)
+        match outcome:
+            case types.OutcomeResult():
+                return await session.redirect(keys, success="Key deleted successfully")
+            case types.OutcomeException():
+                return await session.redirect(keys, error=f"Error deleting key: {outcome.exception_or_raise()}")
+
+    return await session.redirect(keys, error="Key not found or not owned by you")
 
 
 @routes.committer("/keys/details/<fingerprint>", methods=["GET", "POST"])
@@ -745,7 +747,7 @@ async def _upload_keys(
     selected_committee: str,
 ) -> types.Outcomes[types.Key]:
     async with storage.write(asf_uid) as write:
-        wacm = write.as_committee_member(selected_committee).writer_or_raise()
+        wacm = write.as_committee_member(selected_committee).result_or_raise()
         outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_associated(filetext)
     return outcomes
 

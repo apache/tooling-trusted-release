@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 import atr.db as db
+import atr.storage.types as types
 import atr.storage.writers as writers
 
 VALIDATE_AT_RUNTIME: Final[bool] = True
@@ -53,40 +54,6 @@ W = TypeVar("W", bound=AccessCredentialsWrite)
 class AccessError(RuntimeError): ...
 
 
-## Access outcome
-
-
-# TODO: Use actual outcomes here
-class AccessOutcome[A]:
-    pass
-
-
-class AccessOutcomeRead(AccessOutcome[R]):
-    def __init__(self, accessor_or_exception: R | Exception):
-        self.__accessor_or_exception = accessor_or_exception
-
-    def reader_or_raise(self) -> R:
-        match self.__accessor_or_exception:
-            case AccessCredentialsRead():
-                return self.__accessor_or_exception
-            case Exception():
-                raise self.__accessor_or_exception
-        raise AssertionError("Unreachable")
-
-
-class AccessOutcomeWrite(AccessOutcome[W]):
-    def __init__(self, accessor_or_exception: W | Exception):
-        self.__accessor_or_exception = accessor_or_exception
-
-    def writer_or_raise(self) -> W:
-        match self.__accessor_or_exception:
-            case AccessCredentialsWrite():
-                return self.__accessor_or_exception
-            case Exception():
-                raise self.__accessor_or_exception
-        raise AssertionError("Unreachable")
-
-
 # Read
 
 
@@ -112,7 +79,8 @@ class Read:
 
 
 class WriteAsFoundationParticipant(AccessCredentialsWrite):
-    def __init__(self, data: db.Session):
+    def __init__(self, write: Write, data: db.Session):
+        self.__write = write
         self.__data = data
         self.__asf_uid = None
         self.__authenticated = True
@@ -127,16 +95,18 @@ class WriteAsFoundationParticipant(AccessCredentialsWrite):
 
 
 class WriteAsFoundationMember(WriteAsFoundationParticipant):
-    def __init__(self, data: db.Session, asf_uid: str):
+    def __init__(self, write: Write, data: db.Session, asf_uid: str):
         if self.validate_at_runtime:
             if not isinstance(asf_uid, str):
                 raise AccessError("ASF UID must be a string")
+        self.__write = write
         self.__data = data
         self.__asf_uid = asf_uid
         self.__authenticated = True
         # TODO: We need a definitive list of ASF UIDs
         self.keys = writers.keys.FoundationMember(
             self,
+            self.__write,
             self.__data,
             self.__asf_uid,
         )
@@ -151,16 +121,18 @@ class WriteAsFoundationMember(WriteAsFoundationParticipant):
 
 
 class WriteAsCommitteeParticipant(WriteAsFoundationMember):
-    def __init__(self, data: db.Session, asf_uid: str, committee_name: str):
+    def __init__(self, write: Write, data: db.Session, asf_uid: str, committee_name: str):
         if self.validate_at_runtime:
             if not isinstance(committee_name, str):
                 raise AccessError("Committee name must be a string")
+        self.__write = write
         self.__data = data
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
         self.__authenticated = True
         self.keys = writers.keys.CommitteeParticipant(
             self,
+            self.__write,
             self.__data,
             self.__asf_uid,
             self.__committee_name,
@@ -176,13 +148,15 @@ class WriteAsCommitteeParticipant(WriteAsFoundationMember):
 
 
 class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
-    def __init__(self, data: db.Session, asf_uid: str, committee_name: str):
+    def __init__(self, write: Write, data: db.Session, asf_uid: str, committee_name: str):
+        self.__write = write
         self.__data = data
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
         self.__authenticated = True
         self.keys = writers.keys.CommitteeMember(
             self,
+            self.__write,
             self.__data,
             self.__asf_uid,
             committee_name,
@@ -198,12 +172,14 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
 
 
 # class WriteAsFoundationAdmin(WriteAsFoundationMember):
-#     def __init__(self, data: db.Session, asf_uid: str):
+#     def __init__(self, write: Write, data: db.Session, asf_uid: str):
+#         self.__write = write
 #         self.__data = data
 #         self.__asf_uid = asf_uid
 #         self.__authenticated = True
 #         self.keys = writers.keys.FoundationAdmin(
 #             self,
+#             self.__write,
 #             self.__data,
 #             self.__asf_uid,
 #         )
@@ -223,23 +199,23 @@ class Write:
         self.__data = data
         self.__asf_uid = asf_uid
 
-    def as_committee_member(self, committee_name: str) -> AccessOutcomeWrite[WriteAsCommitteeMember]:
+    def as_committee_member(self, committee_name: str) -> types.Outcome[WriteAsCommitteeMember]:
         if self.__asf_uid is None:
-            return AccessOutcomeWrite(AccessError("No ASF UID"))
+            return types.OutcomeException(AccessError("No ASF UID"))
         try:
-            wacm = WriteAsCommitteeMember(self.__data, self.__asf_uid, committee_name)
+            wacm = WriteAsCommitteeMember(self, self.__data, self.__asf_uid, committee_name)
         except Exception as e:
-            return AccessOutcomeWrite(e)
-        return AccessOutcomeWrite(wacm)
+            return types.OutcomeException(e)
+        return types.OutcomeResult(wacm)
 
-    def as_foundation_member(self) -> AccessOutcomeWrite[WriteAsFoundationMember]:
+    def as_foundation_member(self) -> types.Outcome[WriteAsFoundationMember]:
         if self.__asf_uid is None:
-            return AccessOutcomeWrite(AccessError("No ASF UID"))
+            return types.OutcomeException(AccessError("No ASF UID"))
         try:
-            wafm = WriteAsFoundationMember(self.__data, self.__asf_uid)
+            wafm = WriteAsFoundationMember(self, self.__data, self.__asf_uid)
         except Exception as e:
-            return AccessOutcomeWrite(e)
-        return AccessOutcomeWrite(wafm)
+            return types.OutcomeException(e)
+        return types.OutcomeResult(wafm)
 
 
 # Context managers

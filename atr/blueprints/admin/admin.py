@@ -28,7 +28,6 @@ from typing import Any, Final
 
 import aiofiles.os
 import aiohttp
-import aioshutil
 import asfquart
 import asfquart.base as base
 import asfquart.session as session
@@ -45,7 +44,6 @@ import atr.db as db
 import atr.db.interaction as interaction
 import atr.ldap as ldap
 import atr.models.sql as sql
-import atr.routes.keys as keys
 import atr.routes.mapping as mapping
 import atr.storage as storage
 import atr.storage.types as types
@@ -436,7 +434,9 @@ async def admin_keys_regenerate_all() -> quart.Response:
     outcomes = types.Outcomes[str]()
     async with storage.write(asf_uid) as write:
         for committee_name in committee_names:
-            wacm = write.as_committee_member(committee_name).writer_or_raise()
+            wacm = write.as_committee_member(committee_name).result_or_none()
+            if wacm is None:
+                continue
             outcomes.append(await wacm.keys.autogenerate_keys_file())
 
     response_lines = []
@@ -674,7 +674,7 @@ async def admin_test() -> quart.wrappers.response.Response:
     if asf_uid is None:
         raise base.ASFQuartException("Invalid session, uid is None", 500)
     async with storage.write(asf_uid) as write:
-        wacm = write.as_committee_member("tooling").writer_or_raise()
+        wacm = write.as_committee_member("tooling").result_or_raise()
         start = time.perf_counter_ns()
         outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_stored(keys_file_text)
         end = time.perf_counter_ns()
@@ -833,29 +833,6 @@ def _project_status(pmc: sql.Committee, project_name: str, project_status: apach
     elif util.committee_is_standing(pmc.name):
         return sql.ProjectStatus.STANDING
     return sql.ProjectStatus.ACTIVE
-
-
-async def _regenerate_keys_all() -> tuple[int, list[str]]:
-    okay = 0
-    failures = []
-    downloads_dir = util.get_downloads_dir()
-    async with db.session() as data:
-        committees = await data.committee().all()
-        for committee in committees:
-            try:
-                error_msg = await keys.autogenerate_keys_file(committee.name, committee.is_podling, caller_data=data)
-            except Exception as e:
-                failures.append(f"Caller error regenerating KEYS file for committee {committee.name}: {e!s}")
-                continue
-            if error_msg:
-                failures.append(error_msg)
-            else:
-                okay += 1
-            if committee.is_podling:
-                if await aiofiles.os.path.isdir(downloads_dir / committee.name):
-                    # Accidental top level directory, so remove it
-                    await aioshutil.rmtree(downloads_dir / committee.name)
-    return okay, failures
 
 
 def _session_data(
