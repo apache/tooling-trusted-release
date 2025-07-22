@@ -20,7 +20,6 @@
 import asyncio
 import base64
 import binascii
-import contextlib
 import datetime
 import hashlib
 import logging
@@ -200,33 +199,6 @@ async def add(session: routes.CommitterSession) -> str:
     )
 
 
-# TODO: Check callers, and migrate to storage
-async def autogenerate_keys_file(
-    committee_name: str, is_podling: bool, caller_data: db.Session | None = None
-) -> str | None:
-    base_downloads_dir = util.get_downloads_dir()
-
-    if caller_data is None:
-        manager = db.session()
-    else:
-        manager = contextlib.nullcontext(caller_data)
-
-    async with manager as data:
-        full_keys_file_content = await _keys_formatter(committee_name, data)
-        if is_podling:
-            committee_keys_dir = base_downloads_dir / "incubator" / committee_name
-        else:
-            committee_keys_dir = base_downloads_dir / committee_name
-        committee_keys_path = committee_keys_dir / "KEYS"
-        error_msg = await _write_keys_file(
-            committee_keys_dir=committee_keys_dir,
-            full_keys_file_content=full_keys_file_content,
-            committee_keys_path=committee_keys_path,
-            committee_name=committee_name,
-        )
-    return error_msg
-
-
 @routes.committer("/keys/delete", methods=["POST"])
 async def delete(session: routes.CommitterSession) -> response.Response:
     """Delete a public signing key or SSH key from the user's account."""
@@ -295,23 +267,26 @@ async def details(session: routes.CommitterSession, fingerprint: str) -> str | r
 
     if form and await form.validate_on_submit():
         async with db.session() as data:
-            async with data.begin():
-                key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
-                if not key:
-                    quart.abort(404, description="OpenPGP key not found")
+            key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
+            if not key:
+                quart.abort(404, description="OpenPGP key not found")
 
-                selected_committee_names = form.selected_committees.data or []
-                old_committee_names = {c.name for c in key.committees}
+            selected_committee_names = form.selected_committees.data or []
+            old_committee_names = {c.name for c in key.committees}
 
-                new_committees = await data.committee(name_in=selected_committee_names).all()
-                key.committees = list(new_committees)
-                data.add(key)
+            new_committees = await data.committee(name_in=selected_committee_names).all()
+            key.committees = list(new_committees)
+            data.add(key)
+            await data.commit()
 
-                affected_committee_names = old_committee_names.union(set(selected_committee_names))
-                if affected_committee_names:
-                    affected_committees = await data.committee(name_in=list(affected_committee_names)).all()
-                    for committee in affected_committees:
-                        await autogenerate_keys_file(committee.name, committee.is_podling, caller_data=data)
+            affected_committee_names = old_committee_names.union(set(selected_committee_names))
+            if affected_committee_names:
+                async with storage.write(session.uid) as write:
+                    for affected_committee_name in affected_committee_names:
+                        wacm = write.as_committee_member(affected_committee_name).result_or_none()
+                        if wacm is None:
+                            continue
+                        await wacm.keys.autogenerate_keys_file()
 
             await quart.flash("Key committee associations updated successfully.", "success")
             return await session.redirect(details, fingerprint=fingerprint)
@@ -331,7 +306,7 @@ async def details(session: routes.CommitterSession, fingerprint: str) -> str | r
 
 @routes.committer("/keys/export/<committee_name>")
 async def export(session: routes.CommitterSession, committee_name: str) -> quart.Response:
-    """Generate a KEYS file for a specific committee."""
+    """Export a KEYS file for a specific committee."""
     if committee_name not in (session.committees + session.projects):
         quart.abort(403, description=f"You are not authorised to update the KEYS file for {committee_name}")
 
@@ -494,9 +469,6 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
     form = await UpdateCommitteeKeysForm.create_form()
     if not await form.validate_on_submit():
         return await session.redirect(keys, error="Invalid request to update KEYS file.")
-
-    if committee_name not in (session.committees + session.projects):
-        quart.abort(403, description=f"You are not authorised to update the KEYS file for {committee_name}")
 
     async with storage.write(session.uid) as write:
         wacm = write.as_committee_member(committee_name).result_or_raise()
