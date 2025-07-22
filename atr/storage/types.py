@@ -165,6 +165,12 @@ class Outcomes[T, E: Exception = Exception]:
             self.append_result(result)
 
     def extend_roes(self, exception_type: type[E], roes: Sequence[T | E]) -> None:
+        # The name "roe" is short for "result or exception"
+        # It looks opaque and jargonistic, but it has an advantage when forming plurals
+        # The long form plural is "result or exceptions", which is ambiguous
+        # I.e. we mean Seq[Result | Exception], but it also looks like Result | Seq[Exception]
+        # The short form, however, encapsulates it so that ROE = Result | Exception
+        # Then clearly the short form plural, "roes", means Seq[ROE]
         for roe in roes:
             self.append_roe(exception_type, roe)
 
