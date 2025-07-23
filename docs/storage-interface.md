@@ -14,8 +14,8 @@ Here is an actual example from our API code:
 
 ```python
 async with storage.write(asf_uid) as write:
-    wafm = write.as_foundation_member().writer_or_raise()
-    ocr: types.Outcome[types.Key] = await wafm.keys.ensure_stored_one(data.key)
+    wafc = write.as_foundation_committer().writer_or_raise()
+    ocr: types.Outcome[types.Key] = await wafc.keys.ensure_stored_one(data.key)
     key = ocr.result_or_raise()
 
     for selected_committee_name in selected_committee_names:
@@ -34,10 +34,10 @@ The first few lines in the context session show the classic three step approach.
 
 ```python
     # 1. Request permissions
-    wafm = write.as_foundation_member().writer_or_raise()
+    wafc = write.as_foundation_committer().writer_or_raise()
 
     # 2. Use the exposed functionality
-    ocr: types.Outcome[types.Key] = await wafm.keys.ensure_stored_one(data.key)
+    ocr: types.Outcome[types.Key] = await wafc.keys.ensure_stored_one(data.key)
 
     # 3. Handle the outcome
     key = ocr.result_or_raise()
@@ -50,20 +50,20 @@ Add all the functionality to classes in modules in the `atr/storage/writers` dir
 Classes in modules in the `atr/storage/writers` directory must be named as follows:
 
 ```python
-class FoundationParticipant:
+class GeneralPublic:
     ...
 
-class FoundationMember(FoundationParticipant):
+class FoundationCommitter(GeneralPublic):
     ...
 
-class CommitteeParticipant(FoundationMember):
+class CommitteeParticipant(FoundationCommitter):
     ...
 
 class CommitteeMember(CommitteeParticipant):
     ...
 ```
 
-This creates a hierarchy, `FoundationParticipant` → `FoundationMember` → `CommitteeParticipant` → `CommitteeMember`. We can add other permissions levels if necessary.
+This creates a hierarchy, `GeneralPublic` → `FoundationCommitter` → `CommitteeParticipant` → `CommitteeMember`. We can add other permissions levels if necessary.
 
 Use `__private_methods` for code specific to one permission level which is not exposed in the interface, e.g. helpers. Use `public_methods` for code appropriate to expose when users meet the appropriate permission level. Consider returning outcomes, as explained in the next section.
 

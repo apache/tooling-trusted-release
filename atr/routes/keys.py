@@ -131,7 +131,9 @@ async def add(session: routes.CommitterSession) -> str:
         project_list = session.committees + session.projects
         user_committees = await data.committee(name_in=project_list).all()
 
-    committee_choices = [(c.name, c.display_name or c.name) for c in user_committees]
+    committee_choices = [
+        (c.name, c.display_name or c.name) for c in user_committees if (not util.committee_is_standing(c.name))
+    ]
 
     class AddOpenPGPKeyForm(util.QuartFormTyped):
         public_key = wtforms.TextAreaField(
@@ -163,13 +165,15 @@ async def add(session: routes.CommitterSession) -> str:
             selected_committee_names: list[str] = util.unwrap(form.selected_committees.data)
 
             async with storage.write(asf_uid) as write:
-                wafm = write.as_foundation_member().result_or_raise()
-                ocr: types.Outcome[types.Key] = await wafm.keys.ensure_stored_one(key_text)
+                wafc = write.as_foundation_committer().result_or_raise()
+                ocr: types.Outcome[types.Key] = await wafc.keys.ensure_stored_one(key_text)
                 key = ocr.result_or_raise()
 
                 for selected_committee_name in selected_committee_names:
-                    wacm = write.as_committee_member(selected_committee_name).result_or_raise()
-                    outcome: types.Outcome[types.LinkedCommittee] = await wacm.keys.associate_fingerprint(
+                    # TODO: Should this be committee member or committee participant?
+                    # Also, should we emit warnings and continue here?
+                    wacp = write.as_committee_participant(selected_committee_name).result_or_raise()
+                    outcome: types.Outcome[types.LinkedCommittee] = await wacp.keys.associate_fingerprint(
                         key.key_model.fingerprint
                     )
                     outcome.result_or_raise()
@@ -218,10 +222,10 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
     # Otherwise, delete an OpenPGP key
     async with storage.write(session.uid) as write:
-        wafm = write.as_foundation_member().result_or_none()
-        if wafm is None:
+        wafc = write.as_foundation_committer().result_or_none()
+        if wafc is None:
             return await session.redirect(keys, error="Key not found or not owned by you")
-        outcome: types.Outcome[sql.PublicSigningKey] = await wafm.keys.delete_key(fingerprint)
+        outcome: types.Outcome[sql.PublicSigningKey] = await wafc.keys.delete_key(fingerprint)
         match outcome:
             case types.OutcomeResult():
                 return await session.redirect(keys, success="Key deleted successfully")
@@ -304,8 +308,8 @@ async def details(session: routes.CommitterSession, fingerprint: str) -> str | r
 async def export(session: routes.CommitterSession, committee_name: str) -> quart.Response:
     """Export a KEYS file for a specific committee."""
     async with storage.write(session.uid) as write:
-        wafm = write.as_foundation_member().result_or_raise()
-        keys_file_text = await wafm.keys.keys_file_text(committee_name)
+        wafc = write.as_foundation_committer().result_or_raise()
+        keys_file_text = await wafc.keys.keys_file_text(committee_name)
 
     return quart.Response(keys_file_text, mimetype="text/plain")
 

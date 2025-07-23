@@ -396,35 +396,6 @@ async def unfinished_releases(asfuid: str) -> dict[str, list[sql.Release]]:
     return releases
 
 
-async def upload_keys(
-    user_committees: list[str],
-    keys_text: str,
-    selected_committees: list[str],
-    ldap_data: dict[str, str] | None = None,
-) -> tuple[list[dict], int, int, list[str]]:
-    key_blocks = util.parse_key_blocks(keys_text)
-    if not key_blocks:
-        raise InteractionError("No valid OpenPGP keys found in the uploaded file")
-
-    # Ensure that the selected committees are ones of which the user is actually a member
-    invalid_committees = [committee for committee in selected_committees if (committee not in user_committees)]
-    if invalid_committees:
-        raise InteractionError(f"Invalid committee selection: {', '.join(invalid_committees)}")
-
-    # TODO: Do we modify this? Store a copy just in case, for the template to use
-    submitted_committees = selected_committees[:]
-
-    # Process each key block
-    results = await _upload_process_key_blocks(key_blocks, selected_committees, ldap_data=ldap_data)
-    # if not results:
-    #     raise InteractionError("No keys were added")
-
-    success_count = sum(1 for result in results if result["status"] == "success")
-    error_count = len(results) - success_count
-
-    return results, success_count, error_count, submitted_committees
-
-
 async def upload_keys_bytes(
     user_committees: list[str],
     keys_bytes: bytes,

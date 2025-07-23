@@ -76,9 +76,9 @@ def performance_async(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable
     return wrapper
 
 
-class FoundationMember:
+class FoundationCommitter:
     def __init__(
-        self, credentials: storage.WriteAsFoundationMember, write: storage.Write, data: db.Session, asf_uid: str
+        self, credentials: storage.WriteAsFoundationCommitter, write: storage.Write, data: db.Session, asf_uid: str
     ):
         if credentials.validate_at_runtime:
             if credentials.authenticated is not True:
@@ -343,23 +343,10 @@ and was published by the committee.\
         return None
 
 
-class CommitteeParticipant(FoundationMember):
+class CommitteeParticipant(FoundationCommitter):
     def __init__(
         self,
         credentials: storage.WriteAsCommitteeParticipant,
-        write: storage.Write,
-        data: db.Session,
-        asf_uid: str,
-        committee_name: str,
-    ):
-        super().__init__(credentials, write, data, asf_uid)
-        self.__committee_name = committee_name
-
-
-class CommitteeMember(CommitteeParticipant):
-    def __init__(
-        self,
-        credentials: storage.WriteAsCommitteeMember,
         write: storage.Write,
         data: db.Session,
         asf_uid: str,
@@ -618,7 +605,23 @@ class CommitteeMember(CommitteeParticipant):
         return outcomes
 
 
-# class FoundationAdmin(FoundationMember):
+class CommitteeMember(CommitteeParticipant):
+    def __init__(
+        self,
+        credentials: storage.WriteAsCommitteeMember,
+        write: storage.Write,
+        data: db.Session,
+        asf_uid: str,
+        committee_name: str,
+    ):
+        self.__credentials = credentials
+        self.__write = write
+        self.__data = data
+        self.__asf_uid = asf_uid
+        self.__committee_name = committee_name
+
+
+# class FoundationAdmin(FoundationCommitter):
 #     def __init__(
 #         self, credentials: storage.WriteAsFoundationAdmin, write: storage.Write, data: db.Session, asf_uid: str
 #     ):

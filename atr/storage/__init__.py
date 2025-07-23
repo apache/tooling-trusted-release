@@ -18,7 +18,9 @@
 from __future__ import annotations
 
 import contextlib
-from typing import TYPE_CHECKING, Final, TypeVar
+import logging
+import time
+from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -44,9 +46,9 @@ class AccessCredentialsRead(AccessCredentials): ...
 class AccessCredentialsWrite(AccessCredentials): ...
 
 
-A = TypeVar("A", bound=AccessCredentials)
-R = TypeVar("R", bound=AccessCredentialsRead)
-W = TypeVar("W", bound=AccessCredentialsWrite)
+# A = TypeVar("A", bound=AccessCredentials)
+# R = TypeVar("R", bound=AccessCredentialsRead)
+# W = TypeVar("W", bound=AccessCredentialsWrite)
 
 ## Access error
 
@@ -63,22 +65,24 @@ class ReadAsCommitteeMember(AccessCredentialsRead): ...
 class ReadAsCommitteeParticipant(AccessCredentialsRead): ...
 
 
-class ReadAsFoundationMember(AccessCredentialsRead): ...
+class ReadAsFoundationCommitter(AccessCredentialsRead): ...
 
 
-class ReadAsFoundationParticipant(AccessCredentialsRead): ...
+class ReadAsGeneralPublic(AccessCredentialsRead): ...
 
 
 class Read:
-    def __init__(self, data: db.Session, asf_uid: str | None = None):
+    def __init__(self, data: db.Session, asf_uid: str | None, member_of: set[str], participant_of: set[str]):
         self.__data = data
         self.__asf_uid = asf_uid
+        self.__member_of = member_of
+        self.__participant_of = participant_of
 
 
 # Write
 
 
-class WriteAsFoundationParticipant(AccessCredentialsWrite):
+class WriteAsGeneralPublic(AccessCredentialsWrite):
     def __init__(self, write: Write, data: db.Session):
         self.__write = write
         self.__data = data
@@ -94,7 +98,7 @@ class WriteAsFoundationParticipant(AccessCredentialsWrite):
         return VALIDATE_AT_RUNTIME
 
 
-class WriteAsFoundationMember(WriteAsFoundationParticipant):
+class WriteAsFoundationCommitter(WriteAsGeneralPublic):
     def __init__(self, write: Write, data: db.Session, asf_uid: str):
         if self.validate_at_runtime:
             if not isinstance(asf_uid, str):
@@ -104,7 +108,7 @@ class WriteAsFoundationMember(WriteAsFoundationParticipant):
         self.__asf_uid = asf_uid
         self.__authenticated = True
         # TODO: We need a definitive list of ASF UIDs
-        self.keys = writers.keys.FoundationMember(
+        self.keys = writers.keys.FoundationCommitter(
             self,
             self.__write,
             self.__data,
@@ -120,7 +124,7 @@ class WriteAsFoundationMember(WriteAsFoundationParticipant):
         return VALIDATE_AT_RUNTIME
 
 
-class WriteAsCommitteeParticipant(WriteAsFoundationMember):
+class WriteAsCommitteeParticipant(WriteAsFoundationCommitter):
     def __init__(self, write: Write, data: db.Session, asf_uid: str, committee_name: str):
         if self.validate_at_runtime:
             if not isinstance(committee_name, str):
@@ -179,7 +183,7 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
         return VALIDATE_AT_RUNTIME
 
 
-# class WriteAsFoundationAdmin(WriteAsFoundationMember):
+# class WriteAsFoundationAdmin(WriteAsFoundationCommitter):
 #     def __init__(self, write: Write, data: db.Session, asf_uid: str):
 #         self.__write = write
 #         self.__data = data
@@ -203,18 +207,51 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
 
 class Write:
     # Read and Write have authenticator methods which return access outcomes
-    def __init__(self, data: db.Session, asf_uid: str | None = None):
+    def __init__(self, data: db.Session, asf_uid: str | None, member_of: set[str], participant_of: set[str]):
         self.__data = data
         self.__asf_uid = asf_uid
+        self.__member_of = member_of
+        self.__participant_of = participant_of
+
+    # def as_committee_admin(self, committee_name: str) -> types.Outcome[WriteAsCommitteeMember]:
+    #     if self.__asf_uid is None:
+    #         return types.OutcomeException(AccessError("No ASF UID"))
+    #     try:
+    #         wacm = WriteAsCommitteeMember(self, self.__data, self.__asf_uid, committee_name)
+    #     except Exception as e:
+    #         return types.OutcomeException(e)
+    #     return types.OutcomeResult(wacm)
 
     def as_committee_member(self, committee_name: str) -> types.Outcome[WriteAsCommitteeMember]:
         if self.__asf_uid is None:
             return types.OutcomeException(AccessError("No ASF UID"))
+        if committee_name not in self.__member_of:
+            return types.OutcomeException(AccessError(f"Not a member of {committee_name}"))
         try:
             wacm = WriteAsCommitteeMember(self, self.__data, self.__asf_uid, committee_name)
         except Exception as e:
             return types.OutcomeException(e)
         return types.OutcomeResult(wacm)
+
+    def as_committee_participant(self, committee_name: str) -> types.Outcome[WriteAsCommitteeParticipant]:
+        if self.__asf_uid is None:
+            return types.OutcomeException(AccessError("No ASF UID"))
+        if committee_name not in self.__participant_of:
+            return types.OutcomeException(AccessError(f"Not a participant of {committee_name}"))
+        try:
+            wacp = WriteAsCommitteeParticipant(self, self.__data, self.__asf_uid, committee_name)
+        except Exception as e:
+            return types.OutcomeException(e)
+        return types.OutcomeResult(wacp)
+
+    def as_foundation_committer(self) -> types.Outcome[WriteAsFoundationCommitter]:
+        if self.__asf_uid is None:
+            return types.OutcomeException(AccessError("No ASF UID"))
+        try:
+            wafm = WriteAsFoundationCommitter(self, self.__data, self.__asf_uid)
+        except Exception as e:
+            return types.OutcomeException(e)
+        return types.OutcomeResult(wafm)
 
     async def as_project_committee_member(self, project_name: str) -> types.Outcome[WriteAsCommitteeMember]:
         project = await self.__data.project(project_name, _committee=True).demand(
@@ -224,41 +261,103 @@ class Write:
             return types.OutcomeException(AccessError("No committee found for project"))
         if self.__asf_uid is None:
             return types.OutcomeException(AccessError("No ASF UID"))
+        if project.committee.name not in self.__member_of:
+            return types.OutcomeException(AccessError(f"Not a member of {project.committee.name}"))
         try:
             wacm = WriteAsCommitteeMember(self, self.__data, self.__asf_uid, project.committee.name)
         except Exception as e:
             return types.OutcomeException(e)
         return types.OutcomeResult(wacm)
 
-    def as_foundation_member(self) -> types.Outcome[WriteAsFoundationMember]:
-        if self.__asf_uid is None:
-            return types.OutcomeException(AccessError("No ASF UID"))
-        try:
-            wafm = WriteAsFoundationMember(self, self.__data, self.__asf_uid)
-        except Exception as e:
-            return types.OutcomeException(e)
-        return types.OutcomeResult(wafm)
-
 
 # Context managers
 
 
-@contextlib.asynccontextmanager
-async def read(asf_uid: str | None = None) -> AsyncGenerator[Read]:
-    async with db.session() as data:
-        # TODO: Replace data with a DatabaseReader instance
-        yield Read(data, asf_uid)
+class ContextManagers:
+    def __init__(self, cache_for_at_most_seconds: int = 600):
+        self.__cache_for_at_most_seconds = cache_for_at_most_seconds
+        self.__member_of: dict[str, set[str]] = {}
+        self.__participant_of: dict[str, set[str]] = {}
+        self.__last_refreshed = None
+
+    def __outdated(self) -> bool:
+        if self.__last_refreshed is None:
+            return True
+        now = int(time.time())
+        since_last_refresh = now - self.__last_refreshed
+        return since_last_refresh > self.__cache_for_at_most_seconds
+
+    async def __refresh(self, data: db.Session) -> None:
+        start = time.perf_counter_ns()
+        committees = await data.committee().all()
+        for committee in committees:
+            for member in committee.committee_members:
+                if member not in self.__member_of:
+                    self.__member_of[member] = set()
+                self.__member_of[member].add(committee.name)
+            for participant in committee.committers:
+                if participant not in self.__participant_of:
+                    self.__participant_of[participant] = set()
+                self.__participant_of[participant].add(committee.name)
+        self.__last_refreshed = int(time.time())
+        finish = time.perf_counter_ns()
+        logging.info(f"ContextManagers.__refresh took {finish - start:,} ns")
+
+    async def member_of(self, data: db.Session, asf_uid: str | None = None) -> set[str]:
+        start = time.perf_counter_ns()
+        if asf_uid is None:
+            return set()
+        if self.__outdated():
+            # This races, but it doesn't matter
+            await self.__refresh(data)
+        committee_names_set = self.__member_of[asf_uid]
+        finish = time.perf_counter_ns()
+        logging.info(f"ContextManagers.member_of took {finish - start:,} ns")
+        return committee_names_set
+
+    async def participant_of(self, data: db.Session, asf_uid: str | None = None) -> set[str]:
+        start = time.perf_counter_ns()
+        if asf_uid is None:
+            return set()
+        if self.__outdated():
+            # This races, but it doesn't matter
+            await self.__refresh(data)
+        committee_names_set = self.__participant_of[asf_uid]
+        finish = time.perf_counter_ns()
+        logging.info(f"ContextManagers.participant_of took {finish - start:,} ns")
+        return committee_names_set
+
+    @contextlib.asynccontextmanager
+    async def read(self, asf_uid: str | None = None) -> AsyncGenerator[Read]:
+        async with db.session() as data:
+            # TODO: Replace data with a DatabaseReader instance
+            member_of = await self.member_of(data, asf_uid)
+            participant_of = await self.participant_of(data, asf_uid)
+            r = Read(data, asf_uid, member_of, participant_of)
+            yield r
+
+    @contextlib.asynccontextmanager
+    async def read_and_write(self, asf_uid: str | None = None) -> AsyncGenerator[tuple[Read, Write]]:
+        async with db.session() as data:
+            # TODO: Replace data with DatabaseReader and DatabaseWriter instances
+            member_of = await self.member_of(data, asf_uid)
+            participant_of = await self.participant_of(data, asf_uid)
+            r = Read(data, asf_uid, member_of, participant_of)
+            w = Write(data, asf_uid, member_of, participant_of)
+            yield r, w
+
+    @contextlib.asynccontextmanager
+    async def write(self, asf_uid: str | None = None) -> AsyncGenerator[Write]:
+        async with db.session() as data:
+            # TODO: Replace data with a DatabaseWriter instance
+            member_of = await self.member_of(data, asf_uid)
+            participant_of = await self.participant_of(data, asf_uid)
+            w = Write(data, asf_uid, member_of, participant_of)
+            yield w
 
 
-@contextlib.asynccontextmanager
-async def read_and_write(asf_uid: str | None = None) -> AsyncGenerator[tuple[Read, Write]]:
-    async with db.session() as data:
-        # TODO: Replace data with DatabaseReader and DatabaseWriter instances
-        yield Read(data, asf_uid), Write(data, asf_uid)
+_MANAGERS: Final[ContextManagers] = ContextManagers()
 
-
-@contextlib.asynccontextmanager
-async def write(asf_uid: str | None = None) -> AsyncGenerator[Write]:
-    async with db.session() as data:
-        # TODO: Replace data with a DatabaseWriter instance
-        yield Write(data, asf_uid)
+read = _MANAGERS.read
+read_and_write = _MANAGERS.read_and_write
+write = _MANAGERS.write

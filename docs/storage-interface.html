@@ -9,8 +9,8 @@
 </ol>
 <p>Here is an actual example from our API code:</p>
 <pre><code class="language-python">async with storage.write(asf_uid) as write:
-    wafm = write.as_foundation_member().writer_or_raise()
-    ocr: types.Outcome[types.Key] = await wafm.keys.ensure_stored_one(data.key)
+    wafc = write.as_foundation_committer().writer_or_raise()
+    ocr: types.Outcome[types.Key] = await wafc.keys.ensure_stored_one(data.key)
     key = ocr.result_or_raise()
 
     for selected_committee_name in selected_committee_names:
@@ -24,10 +24,10 @@
 <p>In this case we decide to raise as soon as there is any error. We could also choose instead to display a warning, ignore the error, etc.</p>
 <p>The first few lines in the context session show the classic three step approach. Here they are again with comments:</p>
 <pre><code class="language-python">    # 1. Request permissions
-    wafm = write.as_foundation_member().writer_or_raise()
+    wafc = write.as_foundation_committer().writer_or_raise()
 
     # 2. Use the exposed functionality
-    ocr: types.Outcome[types.Key] = await wafm.keys.ensure_stored_one(data.key)
+    ocr: types.Outcome[types.Key] = await wafc.keys.ensure_stored_one(data.key)
 
     # 3. Handle the outcome
     key = ocr.result_or_raise()
@@ -35,19 +35,19 @@
 <h2>How do we add functionality to the storage interface?</h2>
 <p>Add all the functionality to classes in modules in the <code>atr/storage/writers</code> directory. Code to write public keys to storage, for example, goes in <code>atr/storage/writers/keys.py</code>.</p>
 <p>Classes in modules in the <code>atr/storage/writers</code> directory must be named as follows:</p>
-<pre><code class="language-python">class FoundationParticipant:
+<pre><code class="language-python">class GeneralPublic:
     ...
 
-class FoundationMember(FoundationParticipant):
+class FoundationCommitter(GeneralPublic):
     ...
 
-class CommitteeParticipant(FoundationMember):
+class CommitteeParticipant(FoundationCommitter):
     ...
 
 class CommitteeMember(CommitteeParticipant):
     ...
 </code></pre>
-<p>This creates a hierarchy, <code>FoundationParticipant</code> → <code>FoundationMember</code> → <code>CommitteeParticipant</code> → <code>CommitteeMember</code>. We can add other permissions levels if necessary.</p>
+<p>This creates a hierarchy, <code>GeneralPublic</code> → <code>FoundationCommitter</code> → <code>CommitteeParticipant</code> → <code>CommitteeMember</code>. We can add other permissions levels if necessary.</p>
 <p>Use <code>__private_methods</code> for code specific to one permission level which is not exposed in the interface, e.g. helpers. Use <code>public_methods</code> for code appropriate to expose when users meet the appropriate permission level. Consider returning outcomes, as explained in the next section.</p>
 <h2>Returning outcomes</h2>
 <p>Consider using the <strong>outcome types</strong> in <code>atr.storage.types</code> when returning results from writer module methods. The outcome types <em>solve many problems</em>, but here is an example:</p>

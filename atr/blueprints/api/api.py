@@ -304,8 +304,8 @@ async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
     selected_committee_names = data.committees
 
     async with storage.write(asf_uid) as write:
-        wafm = write.as_foundation_member().result_or_raise()
-        ocr: types.Outcome[types.Key] = await wafm.keys.ensure_stored_one(data.key)
+        wafc = write.as_foundation_committer().result_or_raise()
+        ocr: types.Outcome[types.Key] = await wafc.keys.ensure_stored_one(data.key)
         key = ocr.result_or_raise()
 
         for selected_committee_name in selected_committee_names:
@@ -333,8 +333,8 @@ async def keys_delete(data: models.api.KeysDeleteArgs) -> DictResponse:
 
     outcomes = types.Outcomes[str]()
     async with storage.write(asf_uid) as write:
-        wafm = write.as_foundation_member().result_or_raise()
-        outcome: types.Outcome[sql.PublicSigningKey] = await wafm.keys.delete_key(fingerprint)
+        wafc = write.as_foundation_committer().result_or_raise()
+        outcome: types.Outcome[sql.PublicSigningKey] = await wafc.keys.delete_key(fingerprint)
         key = outcome.result_or_raise()
 
         for committee in key.committees:
