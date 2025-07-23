@@ -14,12 +14,12 @@ Here is an actual example from our API code:
 
 ```python
 async with storage.write(asf_uid) as write:
-    wafc = write.as_foundation_committer().writer_or_raise()
+    wafc = write.as_foundation_committer()
     ocr: types.Outcome[types.Key] = await wafc.keys.ensure_stored_one(data.key)
     key = ocr.result_or_raise()
 
     for selected_committee_name in selected_committee_names:
-        wacm = write.as_committee_member(selected_committee_name).writer_or_raise()
+        wacm = write.as_committee_member(selected_committee_name)
         outcome: types.Outcome[types.LinkedCommittee] = await wacm.keys.associate_fingerprint(
             key.key_model.fingerprint
         )
@@ -34,7 +34,7 @@ The first few lines in the context session show the classic three step approach.
 
 ```python
     # 1. Request permissions
-    wafc = write.as_foundation_committer().writer_or_raise()
+    wafc = write.as_foundation_committer()
 
     # 2. Use the exposed functionality
     ocr: types.Outcome[types.Key] = await wafc.keys.ensure_stored_one(data.key)

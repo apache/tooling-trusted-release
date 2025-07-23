@@ -434,7 +434,7 @@ async def admin_keys_regenerate_all() -> quart.Response:
     outcomes = types.Outcomes[str]()
     async with storage.write(asf_uid) as write:
         for committee_name in committee_names:
-            wacm = write.as_committee_member(committee_name).result_or_none()
+            wacm = write.as_committee_member(committee_name)
             if wacm is None:
                 continue
             outcomes.append(await wacm.keys.autogenerate_keys_file())
@@ -674,7 +674,7 @@ async def admin_test() -> quart.wrappers.response.Response:
     if asf_uid is None:
         raise base.ASFQuartException("Invalid session, uid is None", 500)
     async with storage.write(asf_uid) as write:
-        wacm = write.as_committee_member("tooling").result_or_raise()
+        wacm = write.as_committee_member("tooling")
         start = time.perf_counter_ns()
         outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_stored(keys_file_text)
         end = time.perf_counter_ns()

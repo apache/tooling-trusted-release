@@ -304,12 +304,12 @@ async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
     selected_committee_names = data.committees
 
     async with storage.write(asf_uid) as write:
-        wafc = write.as_foundation_committer().result_or_raise()
+        wafc = write.as_foundation_committer()
         ocr: types.Outcome[types.Key] = await wafc.keys.ensure_stored_one(data.key)
         key = ocr.result_or_raise()
 
         for selected_committee_name in selected_committee_names:
-            wacm = write.as_committee_member(selected_committee_name).result_or_raise()
+            wacm = write.as_committee_member(selected_committee_name)
             outcome: types.Outcome[types.LinkedCommittee] = await wacm.keys.associate_fingerprint(
                 key.key_model.fingerprint
             )
@@ -333,12 +333,12 @@ async def keys_delete(data: models.api.KeysDeleteArgs) -> DictResponse:
 
     outcomes = types.Outcomes[str]()
     async with storage.write(asf_uid) as write:
-        wafc = write.as_foundation_committer().result_or_raise()
+        wafc = write.as_foundation_committer()
         outcome: types.Outcome[sql.PublicSigningKey] = await wafc.keys.delete_key(fingerprint)
         key = outcome.result_or_raise()
 
         for committee in key.committees:
-            wacm = write.as_committee_member(committee.name).result_or_none()
+            wacm = write.as_committee_member_outcome(committee.name).result_or_none()
             if wacm is None:
                 continue
             outcomes.append(await wacm.keys.autogenerate_keys_file())
@@ -387,7 +387,7 @@ async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
     filetext = data.filetext
     selected_committee_name = data.committee
     async with storage.write(asf_uid) as write:
-        wacm = write.as_committee_member(selected_committee_name).result_or_raise()
+        wacm = write.as_committee_member(selected_committee_name)
         outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_associated(filetext)
 
         # TODO: It would be nice to serialise the actual outcomes

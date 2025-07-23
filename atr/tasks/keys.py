@@ -33,8 +33,7 @@ class ImportFile(schema.Strict):
 async def import_file(args: ImportFile) -> results.Results | None:
     """Import a KEYS file from a draft release candidate revision."""
     async with storage.write(args.asf_uid) as write:
-        access_outcome = await write.as_project_committee_member(args.project_name)
-        wacm = access_outcome.result_or_raise()
+        wacm = await write.as_project_committee_member(args.project_name)
         outcomes = await wacm.keys.import_keys_file(args.project_name, args.version_name)
         if outcomes.any_exception:
             # TODO: Log this? This code is unused anyway

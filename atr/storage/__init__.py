@@ -225,7 +225,10 @@ class Write:
     #         return types.OutcomeException(e)
     #     return types.OutcomeResult(wacm)
 
-    def as_committee_member(self, committee_name: str) -> types.Outcome[WriteAsCommitteeMember]:
+    def as_committee_member(self, committee_name: str) -> WriteAsCommitteeMember:
+        return self.as_committee_member_outcome(committee_name).result_or_raise()
+
+    def as_committee_member_outcome(self, committee_name: str) -> types.Outcome[WriteAsCommitteeMember]:
         if self.__asf_uid is None:
             return types.OutcomeException(AccessError("No ASF UID"))
         if committee_name not in self.__member_of:
@@ -236,7 +239,10 @@ class Write:
             return types.OutcomeException(e)
         return types.OutcomeResult(wacm)
 
-    def as_committee_participant(self, committee_name: str) -> types.Outcome[WriteAsCommitteeParticipant]:
+    def as_committee_participant(self, committee_name: str) -> WriteAsCommitteeParticipant:
+        return self.as_committee_participant_outcome(committee_name).result_or_raise()
+
+    def as_committee_participant_outcome(self, committee_name: str) -> types.Outcome[WriteAsCommitteeParticipant]:
         if self.__asf_uid is None:
             return types.OutcomeException(AccessError("No ASF UID"))
         if committee_name not in self.__participant_of:
@@ -247,7 +253,10 @@ class Write:
             return types.OutcomeException(e)
         return types.OutcomeResult(wacp)
 
-    def as_foundation_committer(self) -> types.Outcome[WriteAsFoundationCommitter]:
+    def as_foundation_committer(self) -> WriteAsFoundationCommitter:
+        return self.as_foundation_committer_outcome().result_or_raise()
+
+    def as_foundation_committer_outcome(self) -> types.Outcome[WriteAsFoundationCommitter]:
         if self.__asf_uid is None:
             return types.OutcomeException(AccessError("No ASF UID"))
         try:
@@ -259,7 +268,11 @@ class Write:
     # async def as_key_owner(self) -> types.Outcome[WriteAsKeyOwner]:
     #     ...
 
-    async def as_project_committee_member(self, project_name: str) -> types.Outcome[WriteAsCommitteeMember]:
+    async def as_project_committee_member(self, project_name: str) -> WriteAsCommitteeMember:
+        write_as_outcome = await self.as_project_committee_member_outcome(project_name)
+        return write_as_outcome.result_or_raise()
+
+    async def as_project_committee_member_outcome(self, project_name: str) -> types.Outcome[WriteAsCommitteeMember]:
         project = await self.__data.project(project_name, _committee=True).demand(
             AccessError(f"Project not found: {project_name}")
         )
@@ -361,16 +374,6 @@ class ContextManagers:
             yield r
 
     @contextlib.asynccontextmanager
-    async def read_and_write(self, asf_uid: str | None = None) -> AsyncGenerator[tuple[Read, Write]]:
-        async with db.session() as data:
-            # TODO: Replace data with DatabaseReader and DatabaseWriter instances
-            member_of = await self.member_of(data, asf_uid)
-            participant_of = await self.participant_of(data, asf_uid)
-            r = Read(data, asf_uid, member_of, participant_of)
-            w = Write(data, asf_uid, member_of, participant_of)
-            yield r, w
-
-    @contextlib.asynccontextmanager
     async def write(self, asf_uid: str | None = None) -> AsyncGenerator[Write]:
         async with db.session() as data:
             # TODO: Replace data with a DatabaseWriter instance
@@ -383,5 +386,4 @@ class ContextManagers:
 _MANAGERS: Final[ContextManagers] = ContextManagers()
 
 read = _MANAGERS.read
-read_and_write = _MANAGERS.read_and_write
 write = _MANAGERS.write

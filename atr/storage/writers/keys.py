@@ -100,7 +100,7 @@ class FoundationCommitter:
             await self.__data.delete(key)
             await self.__data.commit()
             for committee in key.committees:
-                wacm = self.__write.as_committee_member(committee.name).result_or_none()
+                wacm = self.__write.as_committee_member_outcome(committee.name).result_or_none()
                 if wacm is None:
                     continue
                 await wacm.keys.autogenerate_keys_file()
