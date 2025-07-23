@@ -463,15 +463,13 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
 @routes.committer("/keys/upload", methods=["GET", "POST"])
 async def upload(session: routes.CommitterSession) -> str:
     """Upload a KEYS file containing multiple OpenPGP keys."""
-    # Get committees for all projects the user is a member of
-    async with db.session() as data:
-        project_list = session.committees + session.projects
-        user_committees = await data.committee(name_in=project_list).all()
+    async with storage.write(session.uid) as write:
+        participant_of_committees = await write.participant_of_committees()
 
     class UploadKeyForm(UploadKeyFormBase):
         selected_committee = wtforms.SelectField(
             "Associate keys with committee",
-            choices=[(c.name, c.display_name) for c in user_committees if (not util.committee_is_standing(c.name))],
+            choices=[(c.name, c.display_name) for c in participant_of_committees],
             coerce=str,
             option_widget=wtforms.widgets.RadioInput(),
             widget=wtforms.widgets.ListWidget(prefix_label=False),
@@ -495,7 +493,7 @@ async def upload(session: routes.CommitterSession) -> str:
             await quart.flash(error, "error")
 
         # Determine which committee list to use
-        current_committees = all_user_committees if (all_user_committees is not None) else user_committees
+        current_committees = all_user_committees if (all_user_committees is not None) else participant_of_committees
         committee_map = {c.name: c.display_name for c in current_committees}
 
         return await template.render(
@@ -542,7 +540,7 @@ async def upload(session: routes.CommitterSession) -> str:
         )
         return await render(
             submitted_committees=[selected_committee],
-            all_user_committees=user_committees,
+            all_user_committees=participant_of_committees,
         )
 
     return await render()

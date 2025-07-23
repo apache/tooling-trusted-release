@@ -209,6 +209,7 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
 
 class Write:
     # Read and Write have authenticator methods which return access outcomes
+    # TODO: Still need to send some runtime credentials guarantee to the WriteAs* classes
     def __init__(self, data: db.Session, asf_uid: str | None, member_of: set[str], participant_of: set[str]):
         self.__data = data
         self.__asf_uid = asf_uid
@@ -254,6 +255,9 @@ class Write:
         except Exception as e:
             return types.OutcomeException(e)
         return types.OutcomeResult(wafm)
+
+    # async def as_key_owner(self) -> types.Outcome[WriteAsKeyOwner]:
+    #     ...
 
     async def as_project_committee_member(self, project_name: str) -> types.Outcome[WriteAsCommitteeMember]:
         project = await self.__data.project(project_name, _committee=True).demand(
