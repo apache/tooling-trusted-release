@@ -18,9 +18,12 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import time
 from typing import TYPE_CHECKING, Final
+
+import asfquart.session
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -313,8 +316,8 @@ class Write:
 class ContextManagers:
     def __init__(self, cache_for_at_most_seconds: int = 600):
         self.__cache_for_at_most_seconds = cache_for_at_most_seconds
-        self.__member_of: dict[str, set[str]] = {}
-        self.__participant_of: dict[str, set[str]] = {}
+        self.__member_of_cache: dict[str, set[str]] = {}
+        self.__participant_of_cache: dict[str, set[str]] = {}
         self.__last_refreshed = None
 
     def __outdated(self) -> bool:
@@ -324,63 +327,55 @@ class ContextManagers:
         since_last_refresh = now - self.__last_refreshed
         return since_last_refresh > self.__cache_for_at_most_seconds
 
-    async def __refresh(self, data: db.Session) -> None:
+    async def __member_and_participant(self, data: db.Session, asf_uid: str | None) -> tuple[set[str], set[str]]:
+        if asf_uid is not None:
+            if not self.__outdated():
+                return self.__member_of_cache[asf_uid], self.__participant_of_cache[asf_uid]
+
         start = time.perf_counter_ns()
-        committees = await data.committee().all()
-        for committee in committees:
-            for member in committee.committee_members:
-                if member not in self.__member_of:
-                    self.__member_of[member] = set()
-                self.__member_of[member].add(committee.name)
-            for participant in committee.committers:
-                if participant not in self.__participant_of:
-                    self.__participant_of[participant] = set()
-                self.__participant_of[participant].add(committee.name)
+        try:
+            asfquart_session = await asfquart.session.read()
+        except Exception:
+            if asf_uid is None:
+                raise AccessError("No ASF UID, and not in an ASFQuart session")
+            asfquart_session_json = await data.ns_text_get("asfquart_session", asf_uid)
+            if asfquart_session_json is None:
+                raise AccessError("No cached ASFQuart session")
+            asfquart_session = json.loads(asfquart_session_json)
+
+        if asfquart_session is None:
+            raise AccessError("No ASFQuart session")
+        if asf_uid is None:
+            asf_uid = asfquart_session.uid
+            if asf_uid is None:
+                raise AccessError("No ASF UID, and not set in the ASFQuart session")
+        elif asfquart_session.uid != asf_uid:
+            raise AccessError("ASF UID mismatch")
+
+        # TODO: Use our own LDAP calls instead of using sqlite as a cache
+        await data.ns_text_set("asfquart_session", asf_uid, json.dumps(asfquart_session))
+        self.__member_of_cache[asf_uid] = set(asfquart_session.committees)
+        self.__participant_of_cache[asf_uid] = set(asfquart_session.projects)
         self.__last_refreshed = int(time.time())
-        finish = time.perf_counter_ns()
-        logging.info(f"ContextManagers.__refresh took {finish - start:,} ns")
 
-    async def member_of(self, data: db.Session, asf_uid: str | None = None) -> set[str]:
-        start = time.perf_counter_ns()
-        if asf_uid is None:
-            return set()
-        if self.__outdated():
-            # This races, but it doesn't matter
-            await self.__refresh(data)
-        committee_names_set = self.__member_of[asf_uid]
         finish = time.perf_counter_ns()
-        logging.info(f"ContextManagers.member_of took {finish - start:,} ns")
-        return committee_names_set
+        logging.info(f"ContextManagers.__member_and_participant took {finish - start:,} ns")
 
-    async def participant_of(self, data: db.Session, asf_uid: str | None = None) -> set[str]:
-        start = time.perf_counter_ns()
-        if asf_uid is None:
-            return set()
-        if self.__outdated():
-            # This races, but it doesn't matter
-            await self.__refresh(data)
-        committee_names_set = self.__participant_of[asf_uid]
-        finish = time.perf_counter_ns()
-        logging.info(f"ContextManagers.participant_of took {finish - start:,} ns")
-        return committee_names_set
+        return self.__member_of_cache[asf_uid], self.__participant_of_cache[asf_uid]
 
     @contextlib.asynccontextmanager
     async def read(self, asf_uid: str | None = None) -> AsyncGenerator[Read]:
         async with db.session() as data:
             # TODO: Replace data with a DatabaseReader instance
-            member_of = await self.member_of(data, asf_uid)
-            participant_of = await self.participant_of(data, asf_uid)
-            r = Read(data, asf_uid, member_of, participant_of)
-            yield r
+            member_of, participant_of = await self.__member_and_participant(data, asf_uid)
+            yield Read(data, asf_uid, member_of, participant_of)
 
     @contextlib.asynccontextmanager
     async def write(self, asf_uid: str | None = None) -> AsyncGenerator[Write]:
         async with db.session() as data:
             # TODO: Replace data with a DatabaseWriter instance
-            member_of = await self.member_of(data, asf_uid)
-            participant_of = await self.participant_of(data, asf_uid)
-            w = Write(data, asf_uid, member_of, participant_of)
-            yield w
+            member_of, participant_of = await self.__member_and_participant(data, asf_uid)
+            yield Write(data, asf_uid, member_of, participant_of)
 
 
 _MANAGERS: Final[ContextManagers] = ContextManagers()
