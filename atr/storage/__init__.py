@@ -26,8 +26,10 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 import atr.db as db
+import atr.models.sql as sql
 import atr.storage.types as types
 import atr.storage.writers as writers
+import atr.util as util
 
 VALIDATE_AT_RUNTIME: Final[bool] = True
 
@@ -268,6 +270,24 @@ class Write:
         except Exception as e:
             return types.OutcomeException(e)
         return types.OutcomeResult(wacm)
+
+    @property
+    def member_of(self) -> set[str]:
+        return self.__member_of.copy()
+
+    async def member_of_committees(self) -> list[sql.Committee]:
+        committees = list(await self.__data.committee(name_in=list(self.__member_of)).all())
+        committees.sort(key=lambda c: c.name)
+        return [c for c in committees if (not util.committee_is_standing(c.name))]
+
+    @property
+    def participant_of(self) -> set[str]:
+        return self.__participant_of.copy()
+
+    async def participant_of_committees(self) -> list[sql.Committee]:
+        committees = list(await self.__data.committee(name_in=list(self.__participant_of)).all())
+        committees.sort(key=lambda c: c.name)
+        return [c for c in committees if (not util.committee_is_standing(c.name))]
 
 
 # Context managers

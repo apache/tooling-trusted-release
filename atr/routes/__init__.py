@@ -282,7 +282,7 @@ class CommitterSession:
     async def user_projects(self) -> list[sql.Project]:
         if self._projects is None:
             self._projects = await user.projects(self.uid)
-        return self._projects
+        return self._projects[:]
 
 
 class FlashError(RuntimeError): ...

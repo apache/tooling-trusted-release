@@ -126,14 +126,10 @@ async def add(session: routes.CommitterSession) -> str:
     """Add a new public signing key to the user's account."""
     key_info = None
 
-    # Get committees for all projects the user is a member of
-    async with db.session() as data:
-        project_list = session.committees + session.projects
-        user_committees = await data.committee(name_in=project_list).all()
+    async with storage.write(session.uid) as write:
+        participant_of_committees = await write.participant_of_committees()
 
-    committee_choices = [
-        (c.name, c.display_name or c.name) for c in user_committees if (not util.committee_is_standing(c.name))
-    ]
+    committee_choices = [(c.name, c.display_name or c.name) for c in participant_of_committees]
 
     class AddOpenPGPKeyForm(util.QuartFormTyped):
         public_key = wtforms.TextAreaField(
@@ -192,7 +188,7 @@ async def add(session: routes.CommitterSession) -> str:
     return await template.render(
         "keys-add.html",
         asf_id=session.uid,
-        user_committees=user_committees,
+        user_committees=participant_of_committees,
         form=form,
         key_info=key_info,
         algorithms=routes.algorithms,
