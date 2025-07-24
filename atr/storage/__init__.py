@@ -18,7 +18,6 @@
 from __future__ import annotations
 
 import contextlib
-import json
 import time
 from typing import TYPE_CHECKING, Final
 
@@ -27,6 +26,7 @@ import asfquart.session
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+import atr.committer as committer
 import atr.db as db
 import atr.log as log
 import atr.models.sql as sql
@@ -357,28 +357,31 @@ class ContextManagers:
         start = time.perf_counter_ns()
         try:
             asfquart_session = await asfquart.session.read()
+            if asfquart_session:
+                if asf_uid is None:
+                    asf_uid = asfquart_session.get("uid")
+                elif asfquart_session.get("uid") != asf_uid:
+                    raise AccessError("ASF UID mismatch")
+
+                if asf_uid:
+                    self.__member_of_cache[asf_uid] = set(asfquart_session.get("pmcs", []))
+                    self.__participant_of_cache[asf_uid] = set(asfquart_session.get("projects", []))
+                    self.__last_refreshed = int(time.time())
+                    return self.__member_of_cache[asf_uid], self.__participant_of_cache[asf_uid]
         except Exception:
-            if asf_uid is None:
-                raise AccessError("No ASF UID, and not in an ASFQuart session")
-            asfquart_session_json = await data.ns_text_get("asfquart_session", asf_uid)
-            if asfquart_session_json is None:
-                raise AccessError("No cached ASFQuart session")
-            asfquart_session = json.loads(asfquart_session_json)
+            pass
 
-        if asfquart_session is None:
-            raise AccessError("No ASFQuart session")
         if asf_uid is None:
-            asf_uid = asfquart_session["uid"]
-            if asf_uid is None:
-                raise AccessError("No ASF UID, and not set in the ASFQuart session")
-        elif asfquart_session["uid"] != asf_uid:
-            raise AccessError("ASF UID mismatch")
+            raise AccessError("No ASF UID available from session or arguments")
 
-        # TODO: Use our own LDAP calls instead of using sqlite as a cache
-        await data.ns_text_set("asfquart_session", asf_uid, json.dumps(asfquart_session))
-        self.__member_of_cache[asf_uid] = set(asfquart_session["committees"])
-        self.__participant_of_cache[asf_uid] = set(asfquart_session["projects"])
-        self.__last_refreshed = int(time.time())
+        try:
+            c = committer.Committer(asf_uid)
+            c.verify()
+            self.__member_of_cache[asf_uid] = set(c.pmcs)
+            self.__participant_of_cache[asf_uid] = set(c.projects)
+            self.__last_refreshed = int(time.time())
+        except committer.CommitterError as e:
+            raise AccessError(f"Failed to verify committer: {e}") from e
 
         finish = time.perf_counter_ns()
         log.info(f"ContextManagers.__member_and_participant took {finish - start:,} ns")

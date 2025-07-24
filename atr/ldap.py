@@ -17,7 +17,7 @@
 
 import collections
 import dataclasses
-from typing import Final
+from typing import Any, Final, Literal
 
 import ldap3
 import ldap3.utils.conv as conv
@@ -65,6 +65,42 @@ def search(params: SearchParameters) -> None:
                 ...
 
 
+def search_single(
+    ldap_bind_dn: str,
+    ldap_bind_password: str,
+    ldap_base: str,
+    ldap_scope: Literal["BASE", "LEVEL", "SUBTREE"],
+    ldap_query: str = "(objectClass=*)",
+    ldap_attrs: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    server = ldap3.Server(LDAP_SERVER_HOST, use_ssl=True)
+    conn = None
+    try:
+        conn = ldap3.Connection(
+            server,
+            user=ldap_bind_dn,
+            password=ldap_bind_password,
+            auto_bind=True,
+            check_names=False,
+        )
+        attributes = ldap_attrs if ldap_attrs else ldap3.ALL_ATTRIBUTES
+        conn.search(
+            search_base=ldap_base,
+            search_filter=ldap_query,
+            search_scope=ldap_scope,
+            attributes=attributes,
+        )
+        results = []
+        for entry in conn.entries:
+            result_item: dict[str, str | list[str]] = {"dn": entry.entry_dn}
+            result_item.update(entry.entry_attributes_as_dict)
+            results.append(result_item)
+        return results
+    finally:
+        if conn and conn.bound:
+            conn.unbind()
+
+
 def _search_core(params: SearchParameters) -> None:
     params.results_list = []
     params.err_msg = None
@@ -77,10 +113,14 @@ def _search_core(params: SearchParameters) -> None:
 
     if params.bind_dn_from_config and params.bind_password_from_config:
         params.connection = ldap3.Connection(
-            server, user=params.bind_dn_from_config, password=params.bind_password_from_config, auto_bind=True
+            server,
+            user=params.bind_dn_from_config,
+            password=params.bind_password_from_config,
+            auto_bind=True,
+            check_names=False,
         )
     else:
-        params.connection = ldap3.Connection(server, auto_bind=True)
+        params.connection = ldap3.Connection(server, auto_bind=True, check_names=False)
 
     filters: list[str] = []
     if params.uid_query:
