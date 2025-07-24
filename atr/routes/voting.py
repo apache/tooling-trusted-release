@@ -278,6 +278,7 @@ async def start_vote(
             subject=subject_data,
             body=body_data,
         ).model_dump(),
+        asf_uid=util.unwrap(session.uid),
         project_name=project_name,
         version_name=version_name,
     )

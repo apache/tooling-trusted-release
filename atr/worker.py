@@ -195,6 +195,7 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
 
             function_arguments = checks.FunctionArguments(
                 recorder=recorder_factory,
+                asf_uid=task_obj.asf_uid,
                 project_name=task_obj.project_name or "",
                 version_name=task_obj.version_name or "",
                 revision_number=task_obj.revision_number,

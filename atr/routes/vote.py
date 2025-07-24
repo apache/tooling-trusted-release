@@ -209,6 +209,7 @@ async def _send_vote(
             body=body_text,
             in_reply_to=in_reply_to,
         ).model_dump(),
+        asf_uid=util.unwrap(session.uid),
         project_name=release.project.name,
         version_name=release.version,
     )

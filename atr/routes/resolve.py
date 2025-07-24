@@ -439,6 +439,7 @@ async def _send_resolution(
             body=body,
             in_reply_to=in_reply_to,
         ).model_dump(),
+        asf_uid=util.unwrap(session.uid),
         project_name=release.project.name,
         version_name=release.version,
     )
@@ -454,6 +455,7 @@ async def _send_resolution(
                 body=body,
                 in_reply_to=extra_destination[1],
             ).model_dump(),
+            asf_uid=util.unwrap(session.uid),
             project_name=release.project.name,
             version_name=release.version,
         )

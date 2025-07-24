@@ -9,7 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlmodel
-import atr.db.models
+import atr.models.sql
 ${imports if imports else ""}
 
 # Revision identifiers, used by Alembic

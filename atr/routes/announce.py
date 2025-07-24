@@ -185,10 +185,10 @@ async def announce(
     subject: str,
     body: str,
     download_path_suffix: str,
-    uid: str,
+    asf_uid: str,
     fullname: str,
 ) -> None:
-    if recipient not in util.permitted_recipients(uid):
+    if recipient not in util.permitted_recipients(asf_uid):
         raise AnnounceError(f"You are not permitted to send announcements to {recipient}")
 
     unfinished_dir: str = ""
@@ -209,7 +209,7 @@ async def announce(
             body = await construct.announce_release_body(
                 body,
                 options=construct.AnnounceReleaseOptions(
-                    asfuid=uid,
+                    asfuid=asf_uid,
                     fullname=fullname,
                     project_name=project_name,
                     version_name=version_name,
@@ -219,12 +219,13 @@ async def announce(
                 status=sql.TaskStatus.QUEUED,
                 task_type=sql.TaskType.MESSAGE_SEND,
                 task_args=message.Send(
-                    email_sender=f"{uid}@apache.org",
+                    email_sender=f"{asf_uid}@apache.org",
                     email_recipient=recipient,
                     subject=subject,
                     body=body,
                     in_reply_to=None,
                 ).model_dump(),
+                asf_uid=asf_uid,
                 project_name=project_name,
                 version_name=version_name,
             )

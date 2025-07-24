@@ -25,6 +25,7 @@ import atr.analysis as analysis
 import atr.log as log
 import atr.models.results as results
 import atr.tasks.checks as checks
+import atr.user as user
 import atr.util as util
 
 _ALLOWED_TOP_LEVEL = {"CHANGES", "LICENSE", "NOTICE", "README"}
@@ -79,6 +80,7 @@ async def check(args: checks.FunctionArguments) -> results.Results | None:
     for relative_path in relative_paths:
         # Delegate processing of each path to the helper function
         await _check_path_process_single(
+            args.asf_uid,
             base_path,
             relative_path,
             recorder_errors,
@@ -155,6 +157,7 @@ async def _check_metadata_rules(
 
 
 async def _check_path_process_single(
+    asf_uid: str,
     base_path: pathlib.Path,
     relative_path: pathlib.Path,
     recorder_errors: checks.Recorder,
@@ -168,8 +171,7 @@ async def _check_path_process_single(
     relative_path_str = str(relative_path)
 
     # For debugging and testing
-    # TODO: Scope this to admin users
-    if full_path.name == "deliberately_slow_ATR_task_filename.txt":
+    if user.is_admin(asf_uid) and (full_path.name == "deliberately_slow_ATR_task_filename.txt"):
         await asyncio.sleep(20)
 
     errors: list[str] = []

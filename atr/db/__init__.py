@@ -559,6 +559,7 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         status: Opt[sql.TaskStatus] = NOT_SET,
         task_type: Opt[str] = NOT_SET,
         task_args: Opt[Any] = NOT_SET,
+        asf_uid: Opt[str] = NOT_SET,
         added: Opt[datetime.datetime] = NOT_SET,
         started: Opt[datetime.datetime | None] = NOT_SET,
         pid: Opt[int | None] = NOT_SET,
@@ -580,6 +581,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(sql.Task.task_type == task_type)
         if is_defined(task_args):
             query = query.where(sql.Task.task_args == task_args)
+        if is_defined(asf_uid):
+            query = query.where(sql.Task.asf_uid == asf_uid)
         if is_defined(added):
             query = query.where(sql.Task.added == added)
         if is_defined(started):

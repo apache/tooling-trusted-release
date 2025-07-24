@@ -862,6 +862,7 @@ async def vote_start(data: models.api.VoteStartArgs) -> DictResponse:
                 subject=data.subject,
                 body=data.body,
             ).model_dump(),
+            asf_uid=asf_uid,
             project_name=data.project,
             version_name=data.version,
         )

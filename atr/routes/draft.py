@@ -316,6 +316,7 @@ async def sbomgen(
                     artifact_path=str(path_in_new_revision.resolve()),
                     output_path=str(sbom_path_in_new_revision.resolve()),
                 ).model_dump(),
+                asf_uid=util.unwrap(session.uid),
                 added=datetime.datetime.now(datetime.UTC),
                 status=sql.TaskStatus.QUEUED,
                 project_name=project_name,
@@ -376,6 +377,7 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
             svn_import_task = sql.Task(
                 task_type=sql.TaskType.SVN_IMPORT_FILES,
                 task_args=task_args,
+                asf_uid=util.unwrap(session.uid),
                 added=datetime.datetime.now(datetime.UTC),
                 status=sql.TaskStatus.QUEUED,
                 project_name=project_name,

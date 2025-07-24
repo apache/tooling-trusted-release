@@ -36,13 +36,14 @@ import atr.tasks.vote as vote
 import atr.util as util
 
 
-async def asc_checks(release: sql.Release, revision: str, signature_path: str) -> list[sql.Task]:
+async def asc_checks(asf_uid: str, release: sql.Release, revision: str, signature_path: str) -> list[sql.Task]:
     """Create signature check task for a .asc file."""
     tasks = []
 
     if release.committee:
         tasks.append(
             queued(
+                asf_uid,
                 sql.TaskType.SIGNATURE_CHECK,
                 release,
                 revision,
@@ -55,7 +56,7 @@ async def asc_checks(release: sql.Release, revision: str, signature_path: str) -
 
 
 async def draft_checks(
-    project_name: str, release_version: str, revision_number: str, caller_data: db.Session | None = None
+    asf_uid: str, project_name: str, release_version: str, revision_number: str, caller_data: db.Session | None = None
 ) -> int:
     """Core logic to analyse a draft revision and queue checks."""
     # Construct path to the specific revision
@@ -69,13 +70,13 @@ async def draft_checks(
         )
         for path in relative_paths:
             path_str = str(path)
-            task_function: Callable[[sql.Release, str, str], Awaitable[list[sql.Task]]] | None = None
+            task_function: Callable[[str, sql.Release, str, str], Awaitable[list[sql.Task]]] | None = None
             for suffix, func in TASK_FUNCTIONS.items():
                 if path.name.endswith(suffix):
                     task_function = func
                     break
             if task_function:
-                for task in await task_function(release, revision_number, path_str):
+                for task in await task_function(asf_uid, release, revision_number, path_str):
                     task.revision_number = revision_number
                     data.add(task)
 
@@ -84,7 +85,7 @@ async def draft_checks(
             if release.project.committee.is_podling:
                 is_podling = True
         path_check_task = queued(
-            sql.TaskType.PATHS_CHECK, release, revision_number, extra_args={"is_podling": is_podling}
+            asf_uid, sql.TaskType.PATHS_CHECK, release, revision_number, extra_args={"is_podling": is_podling}
         )
         data.add(path_check_task)
         if caller_data is None:
@@ -107,6 +108,7 @@ async def keys_import_file(
                     project_name=project_name,
                     version_name=version_name,
                 ).model_dump(),
+                asf_uid=asf_uid,
                 revision_number=revision_number,
                 primary_rel_path=None,
             )
@@ -115,6 +117,7 @@ async def keys_import_file(
 
 
 def queued(
+    asf_uid: str,
     task_type: sql.TaskType,
     release: sql.Release,
     revision_number: str,
@@ -125,6 +128,7 @@ def queued(
         status=sql.TaskStatus.QUEUED,
         task_type=task_type,
         task_args=extra_args or {},
+        asf_uid=asf_uid,
         project_name=release.project.name,
         version_name=release.version,
         revision_number=revision_number,
@@ -168,40 +172,40 @@ def resolve(task_type: sql.TaskType) -> Callable[..., Awaitable[results.Results 
         # Otherwise we lose exhaustiveness checking
 
 
-async def sha_checks(release: sql.Release, revision: str, hash_file: str) -> list[sql.Task]:
+async def sha_checks(asf_uid: str, release: sql.Release, revision: str, hash_file: str) -> list[sql.Task]:
     """Create hash check task for a .sha256 or .sha512 file."""
     tasks = []
 
-    tasks.append(queued(sql.TaskType.HASHING_CHECK, release, revision, hash_file))
+    tasks.append(queued(asf_uid, sql.TaskType.HASHING_CHECK, release, revision, hash_file))
 
     return tasks
 
 
-async def tar_gz_checks(release: sql.Release, revision: str, path: str) -> list[sql.Task]:
+async def tar_gz_checks(asf_uid: str, release: sql.Release, revision: str, path: str) -> list[sql.Task]:
     """Create check tasks for a .tar.gz or .tgz file."""
     # This release has committee, as guaranteed in draft_checks
     is_podling = (release.project.committee is not None) and release.project.committee.is_podling
     tasks = [
-        queued(sql.TaskType.LICENSE_FILES, release, revision, path, extra_args={"is_podling": is_podling}),
-        queued(sql.TaskType.LICENSE_HEADERS, release, revision, path),
-        queued(sql.TaskType.RAT_CHECK, release, revision, path),
-        queued(sql.TaskType.TARGZ_INTEGRITY, release, revision, path),
-        queued(sql.TaskType.TARGZ_STRUCTURE, release, revision, path),
+        queued(asf_uid, sql.TaskType.LICENSE_FILES, release, revision, path, extra_args={"is_podling": is_podling}),
+        queued(asf_uid, sql.TaskType.LICENSE_HEADERS, release, revision, path),
+        queued(asf_uid, sql.TaskType.RAT_CHECK, release, revision, path),
+        queued(asf_uid, sql.TaskType.TARGZ_INTEGRITY, release, revision, path),
+        queued(asf_uid, sql.TaskType.TARGZ_STRUCTURE, release, revision, path),
     ]
 
     return tasks
 
 
-async def zip_checks(release: sql.Release, revision: str, path: str) -> list[sql.Task]:
+async def zip_checks(asf_uid: str, release: sql.Release, revision: str, path: str) -> list[sql.Task]:
     """Create check tasks for a .zip file."""
     # This release has committee, as guaranteed in draft_checks
     is_podling = (release.project.committee is not None) and release.project.committee.is_podling
     tasks = [
-        queued(sql.TaskType.LICENSE_FILES, release, revision, path, extra_args={"is_podling": is_podling}),
-        queued(sql.TaskType.LICENSE_HEADERS, release, revision, path),
-        queued(sql.TaskType.RAT_CHECK, release, revision, path),
-        queued(sql.TaskType.ZIPFORMAT_INTEGRITY, release, revision, path),
-        queued(sql.TaskType.ZIPFORMAT_STRUCTURE, release, revision, path),
+        queued(asf_uid, sql.TaskType.LICENSE_FILES, release, revision, path, extra_args={"is_podling": is_podling}),
+        queued(asf_uid, sql.TaskType.LICENSE_HEADERS, release, revision, path),
+        queued(asf_uid, sql.TaskType.RAT_CHECK, release, revision, path),
+        queued(asf_uid, sql.TaskType.ZIPFORMAT_INTEGRITY, release, revision, path),
+        queued(asf_uid, sql.TaskType.ZIPFORMAT_STRUCTURE, release, revision, path),
     ]
     return tasks
 

@@ -164,7 +164,7 @@ async def create_and_manage(
             # It does, however, need a transaction to be created using data.begin()
             if release.phase == sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
                 # Must use caller_data here because we acquired the write lock
-                await tasks.draft_checks(project_name, version_name, new_revision.number, caller_data=data)
+                await tasks.draft_checks(asf_uid, project_name, version_name, new_revision.number, caller_data=data)
 
 
 async def latest_info(project_name: str, version_name: str) -> tuple[str, str, datetime.datetime] | None:

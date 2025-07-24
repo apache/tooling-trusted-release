@@ -40,6 +40,7 @@ import atr.util as util
 @dataclasses.dataclass
 class FunctionArguments:
     recorder: Callable[[], Awaitable[Recorder]]
+    asf_uid: str
     project_name: str
     version_name: str
     revision_number: str
