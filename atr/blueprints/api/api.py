@@ -41,10 +41,13 @@ import atr.revision as revision
 import atr.routes as routes
 import atr.routes.announce as announce
 import atr.routes.keys as keys
+import atr.routes.resolve as resolve
 import atr.routes.start as start
+import atr.routes.vote as vote
 import atr.routes.voting as voting
 import atr.storage as storage
 import atr.storage.types as types
+import atr.tabulate as tabulate
 import atr.tasks.vote as tasks_vote
 import atr.user as user
 import atr.util as util
@@ -97,10 +100,10 @@ async def checks_list(project: str, version: str) -> DictResponse:
     async with db.session() as data:
         release_name = sql.release_name(project, version)
         check_results = await data.check_result(release_name=release_name).all()
-        return models.api.ChecksListResults(
-            endpoint="/checks/list",
-            checks=check_results,
-        ).model_dump(), 200
+    return models.api.ChecksListResults(
+        endpoint="/checks/list",
+        checks=check_results,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/checks/list/<project>/<version>/<revision>")
@@ -123,10 +126,10 @@ async def checks_list_revision(project: str, version: str, revision: str) -> Dic
             raise exceptions.NotFound(f"Revision '{revision}' does not exist for release '{project}-{version}'")
 
         check_results = await data.check_result(release_name=release_name, revision_number=revision).all()
-        return models.api.ChecksListResults(
-            endpoint="/checks/list",
-            checks=check_results,
-        ).model_dump(), 200
+    return models.api.ChecksListResults(
+        endpoint="/checks/list",
+        checks=check_results,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/checks/ongoing/<project>/<version>")
@@ -167,10 +170,10 @@ async def committees(name: str) -> DictResponse:
     _simple_check(name)
     async with db.session() as data:
         committee = await data.committee(name=name).demand(exceptions.NotFound())
-        return models.api.CommitteesResults(
-            endpoint="/committees",
-            committee=committee,
-        ).model_dump(), 200
+    return models.api.CommitteesResults(
+        endpoint="/committees",
+        committee=committee,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/committees/keys/<name>")
@@ -180,10 +183,10 @@ async def committees_keys(name: str) -> DictResponse:
     _simple_check(name)
     async with db.session() as data:
         committee = await data.committee(name=name, _public_signing_keys=True).demand(exceptions.NotFound())
-        return models.api.CommitteesKeysResults(
-            endpoint="/committees/keys",
-            keys=committee.public_signing_keys,
-        ).model_dump(), 200
+    return models.api.CommitteesKeysResults(
+        endpoint="/committees/keys",
+        keys=committee.public_signing_keys,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/committees/list")
@@ -192,10 +195,10 @@ async def committees_list() -> DictResponse:
     """List all committees in the database."""
     async with db.session() as data:
         committees = await data.committee().all()
-        return models.api.CommitteesListResults(
-            endpoint="/committees/list",
-            committees=committees,
-        ).model_dump(), 200
+    return models.api.CommitteesListResults(
+        endpoint="/committees/list",
+        committees=committees,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/committees/projects/<name>")
@@ -205,10 +208,10 @@ async def committees_projects(name: str) -> DictResponse:
     _simple_check(name)
     async with db.session() as data:
         committee = await data.committee(name=name, _projects=True).demand(exceptions.NotFound())
-        return models.api.CommitteesProjectsResults(
-            endpoint="/committees/projects",
-            projects=committee.projects,
-        ).model_dump(), 200
+    return models.api.CommitteesProjectsResults(
+        endpoint="/committees/projects",
+        projects=committee.projects,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/draft/delete", methods=["POST"])
@@ -287,11 +290,11 @@ async def keys_endpoint(query_args: models.api.KeysQuery) -> DictResponse:
         count = (
             await data.execute(sqlalchemy.select(sqlalchemy.func.count(via(sql.PublicSigningKey.fingerprint))))
         ).scalar_one()
-        return models.api.KeysResults(
-            endpoint="/keys",
-            data=paged_keys,
-            count=count,
-        ).model_dump(), 200
+    return models.api.KeysResults(
+        endpoint="/keys",
+        data=paged_keys,
+        count=count,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/keys/add", methods=["POST"])
@@ -358,10 +361,10 @@ async def keys_committee(committee: str) -> DictResponse:
     async with db.session() as data:
         committee_object = await data.committee(name=committee, _public_signing_keys=True).demand(exceptions.NotFound())
         keys = committee_object.public_signing_keys
-        return models.api.KeysCommitteeResults(
-            endpoint="/keys/committee",
-            keys=keys,
-        ).model_dump(), 200
+    return models.api.KeysCommitteeResults(
+        endpoint="/keys/committee",
+        keys=keys,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/keys/get/<fingerprint>")
@@ -371,10 +374,10 @@ async def keys_get(fingerprint: str) -> DictResponse:
     _simple_check(fingerprint)
     async with db.session() as data:
         key = await data.public_signing_key(fingerprint=fingerprint.lower()).demand(exceptions.NotFound())
-        return models.api.KeysGetResults(
-            endpoint="/keys/get",
-            key=key,
-        ).model_dump(), 200
+    return models.api.KeysGetResults(
+        endpoint="/keys/get",
+        key=key,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/keys/upload", methods=["POST"])
@@ -439,10 +442,10 @@ async def keys_user(asf_uid: str) -> DictResponse:
     _simple_check(asf_uid)
     async with db.session() as data:
         keys = await data.public_signing_key(apache_uid=asf_uid).all()
-        return models.api.KeysUserResults(
-            endpoint="/keys/user",
-            keys=keys,
-        ).model_dump(), 200
+    return models.api.KeysUserResults(
+        endpoint="/keys/user",
+        keys=keys,
+    ).model_dump(), 200
 
 
 # TODO: Call this release/paths
@@ -475,10 +478,10 @@ async def project(name: str) -> DictResponse:
     _simple_check(name)
     async with db.session() as data:
         project = await data.project(name=name).demand(exceptions.NotFound())
-        return models.api.ProjectResults(
-            endpoint="/project",
-            project=project,
-        ).model_dump(), 200
+    return models.api.ProjectResults(
+        endpoint="/project",
+        project=project,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/project/releases/<name>")
@@ -488,10 +491,10 @@ async def project_releases(name: str) -> DictResponse:
     _simple_check(name)
     async with db.session() as data:
         releases = await data.release(project_name=name).all()
-        return models.api.ProjectReleasesResults(
-            endpoint="/project/releases",
-            releases=releases,
-        ).model_dump(), 200
+    return models.api.ProjectReleasesResults(
+        endpoint="/project/releases",
+        releases=releases,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/projects")
@@ -501,10 +504,10 @@ async def projects() -> DictResponse:
     # TODO: Add pagination?
     async with db.session() as data:
         projects = await data.project().all()
-        return models.api.ProjectsResults(
-            endpoint="/projects",
-            projects=projects,
-        ).model_dump(), 200
+    return models.api.ProjectsResults(
+        endpoint="/projects",
+        projects=projects,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/releases")
@@ -538,11 +541,11 @@ async def releases(query_args: models.api.ReleasesQuery) -> DictResponse:
 
         count = (await data.execute(count_stmt)).scalar_one()
 
-        return models.api.ReleasesResults(
-            endpoint="/releases",
-            data=paged_releases,
-            count=count,
-        ).model_dump(), 200
+    return models.api.ReleasesResults(
+        endpoint="/releases",
+        data=paged_releases,
+        count=count,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/releases/create", methods=["POST"])
@@ -617,11 +620,11 @@ async def releases_project(project: str, query_args: models.api.ReleasesProjectQ
         )
         count = (await data.execute(count_stmt)).scalar_one()
 
-        return models.api.ReleasesProjectResults(
-            endpoint="/releases/project",
-            data=paged_releases,
-            count=count,
-        ).model_dump(), 200
+    return models.api.ReleasesProjectResults(
+        endpoint="/releases/project",
+        data=paged_releases,
+        count=count,
+    ).model_dump(), 200
 
 
 # TODO: If we validate as sql.Release, quart_schema silently corrupts latest_revision_number to None
@@ -634,10 +637,10 @@ async def releases_version(project: str, version: str) -> DictResponse:
     async with db.session() as data:
         release_name = sql.release_name(project, version)
         release = await data.release(name=release_name).demand(exceptions.NotFound())
-        return models.api.ReleasesVersionResults(
-            endpoint="/releases/version",
-            release=release,
-        ).model_dump(), 200
+    return models.api.ReleasesVersionResults(
+        endpoint="/releases/version",
+        release=release,
+    ).model_dump(), 200
 
 
 # TODO: Rename this to revisions? I.e. /revisions/<project>/<version>
@@ -649,10 +652,10 @@ async def releases_revisions(project: str, version: str) -> DictResponse:
     async with db.session() as data:
         release_name = sql.release_name(project, version)
         revisions = await data.revision(release_name=release_name).all()
-        return models.api.ReleasesRevisionsResults(
-            endpoint="/releases/revisions",
-            revisions=revisions,
-        ).model_dump(), 200
+    return models.api.ReleasesRevisionsResults(
+        endpoint="/releases/revisions",
+        revisions=revisions,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/revisions/<project>/<version>")
@@ -722,11 +725,11 @@ async def ssh_list(asf_uid: str, query_args: models.api.SshListQuery) -> DictRes
         count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(sql.SSHKey.fingerprint)))
         count = (await data.execute(count_stmt)).scalar_one()
 
-        return models.api.SshListResults(
-            endpoint="/ssh/list",
-            data=paged_keys,
-            count=count,
-        ).model_dump(), 200
+    return models.api.SshListResults(
+        endpoint="/ssh/list",
+        data=paged_keys,
+        count=count,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/tasks")
@@ -746,11 +749,11 @@ async def tasks(query_args: models.api.TasksQuery) -> DictResponse:
         if query_args.status:
             count_statement = count_statement.where(via(sql.Task.status) == query_args.status)
         count = (await data.execute(count_statement)).scalar_one()
-        return models.api.TasksResults(
-            endpoint="/tasks",
-            data=paged_tasks,
-            count=count,
-        ).model_dump(), 200
+    return models.api.TasksResults(
+        endpoint="/tasks",
+        data=paged_tasks,
+        count=count,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/users/list")
@@ -781,10 +784,10 @@ async def users_list() -> DictResponse:
 
         users = pat_uids | ssh_uids | public_signing_uids | revision_uids
         users -= {None}
-        return models.api.UsersListResults(
-            endpoint="/users/list",
-            users=sorted(users),
-        ).model_dump(), 200
+    return models.api.UsersListResults(
+        endpoint="/users/list",
+        users=sorted(users),
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/vote/resolve", methods=["POST"])
@@ -868,10 +871,39 @@ async def vote_start(data: models.api.VoteStartArgs) -> DictResponse:
         )
         db_data.add(task)
         await db_data.commit()
-        return models.api.VoteStartResults(
-            endpoint="/vote/start",
-            task=task,
-        ).model_dump(), 201
+    return models.api.VoteStartResults(
+        endpoint="/vote/start",
+        task=task,
+    ).model_dump(), 201
+
+
+@api.BLUEPRINT.route("/vote/tabulate", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.VoteTabulateArgs)
+@quart_schema.validate_response(models.api.VoteTabulateResults, 200)
+async def vote_tabulate(data: models.api.VoteTabulateArgs) -> DictResponse:
+    # asf_uid = _jwt_asf_uid()
+    async with db.session() as db_data:
+        release_name = sql.release_name(data.project, data.version)
+        release = await db_data.release(name=release_name, _project_release_policy=True).demand(
+            exceptions.NotFound(f"Release {release_name} not found"),
+        )
+
+    latest_vote_task = await resolve.release_latest_vote_task(release)
+    if latest_vote_task is None:
+        raise exceptions.NotFound("No vote task found")
+    task_mid = resolve.task_mid_get(latest_vote_task)
+    archive_url = await vote.task_archive_url_cached(task_mid)
+    if archive_url is None:
+        raise exceptions.NotFound("No archive URL found")
+    thread_id = archive_url.split("/")[-1]
+    committee = await tabulate.vote_committee(thread_id, release)
+    details = await tabulate.vote_details(committee, thread_id, release)
+    return models.api.VoteTabulateResults(
+        endpoint="/vote/tabulate",
+        details=details,
+    ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/upload", methods=["POST"])

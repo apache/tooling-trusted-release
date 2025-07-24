@@ -15,43 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import enum
 import time
 from collections.abc import Generator
 
 import atr.db as db
 import atr.log as log
-import atr.models.schema as schema
-import atr.models.sql as sql
+import atr.models as models
 import atr.util as util
 
 
-class Vote(enum.Enum):
-    YES = "Yes"
-    NO = "No"
-    ABSTAIN = "-"
-    UNKNOWN = "?"
-
-
-class VoteStatus(enum.Enum):
-    BINDING = "Binding"
-    COMMITTER = "Committer"
-    CONTRIBUTOR = "Contributor"
-    UNKNOWN = "Unknown"
-
-
-class VoteEmail(schema.Strict):
-    asf_uid_or_email: str
-    from_email: str
-    status: VoteStatus
-    asf_eid: str
-    iso_datetime: str
-    vote: Vote
-    quotation: str
-    updated: bool
-
-
-async def votes(committee: sql.Committee | None, thread_id: str) -> tuple[int | None, dict[str, VoteEmail]]:
+async def votes(
+    committee: models.sql.Committee | None, thread_id: str
+) -> tuple[int | None, dict[str, models.tabulate.VoteEmail]]:
     """Tabulate votes."""
     start = time.perf_counter_ns()
     email_to_uid = await util.email_to_uid_map()
@@ -74,7 +49,7 @@ async def votes(committee: sql.Committee | None, thread_id: str) -> tuple[int | 
             status = await _vote_status(asf_uid, list_raw, committee)
         else:
             asf_uid_or_email = from_email_lower
-            status = VoteStatus.UNKNOWN
+            status = models.tabulate.VoteStatus.UNKNOWN
 
         if start_unixtime is None:
             epoch = msg.get("epoch", "")
@@ -96,10 +71,10 @@ async def votes(committee: sql.Committee | None, thread_id: str) -> tuple[int | 
         if len(castings) == 1:
             vote_cast = castings[0][0]
         else:
-            vote_cast = Vote.UNKNOWN
+            vote_cast = models.tabulate.Vote.UNKNOWN
         quotation = " // ".join([c[1] for c in castings])
 
-        vote_email = VoteEmail(
+        vote_email = models.tabulate.VoteEmail(
             asf_uid_or_email=asf_uid_or_email,
             from_email=from_email_lower,
             status=status,
@@ -117,7 +92,7 @@ async def votes(committee: sql.Committee | None, thread_id: str) -> tuple[int | 
     return start_unixtime, tabulated_votes
 
 
-async def vote_committee(thread_id: str, release: sql.Release) -> sql.Committee | None:
+async def vote_committee(thread_id: str, release: models.sql.Release) -> models.sql.Committee | None:
     committee = None
     if release.project is not None:
         committee = release.project.committee
@@ -131,8 +106,23 @@ async def vote_committee(thread_id: str, release: sql.Release) -> sql.Committee 
     return committee
 
 
+async def vote_details(
+    committee: models.sql.Committee | None, thread_id: str, release: models.sql.Release
+) -> models.tabulate.VoteDetails:
+    start_unixtime, tabulated_votes = await votes(committee, thread_id)
+    summary = vote_summary(tabulated_votes)
+    passed, outcome = vote_outcome(release, start_unixtime, tabulated_votes)
+    return models.tabulate.VoteDetails(
+        start_unixtime=start_unixtime,
+        votes=tabulated_votes,
+        summary=summary,
+        passed=passed,
+        outcome=outcome,
+    )
+
+
 def vote_outcome(
-    release: sql.Release, start_unixtime: int | None, tabulated_votes: dict[str, VoteEmail]
+    release: models.sql.Release, start_unixtime: int | None, tabulated_votes: dict[str, models.tabulate.VoteEmail]
 ) -> tuple[bool, str]:
     now = int(time.time())
     duration_hours = 0
@@ -150,20 +140,20 @@ def vote_outcome(
     binding_plus_one = 0
     binding_minus_one = 0
     for vote_email in tabulated_votes.values():
-        if vote_email.status != VoteStatus.BINDING:
+        if vote_email.status != models.tabulate.VoteStatus.BINDING:
             continue
-        if vote_email.vote == Vote.YES:
+        if vote_email.vote == models.tabulate.Vote.YES:
             binding_plus_one += 1
-        elif vote_email.vote == Vote.NO:
+        elif vote_email.vote == models.tabulate.Vote.NO:
             binding_minus_one += 1
 
     return _vote_outcome_format(duration_hours_remaining, binding_plus_one, binding_minus_one)
 
 
 def vote_resolution(
-    committee: sql.Committee,
-    release: sql.Release,
-    tabulated_votes: dict[str, VoteEmail],
+    committee: models.sql.Committee,
+    release: models.sql.Release,
+    tabulated_votes: dict[str, models.tabulate.VoteEmail],
     summary: dict[str, int],
     passed: bool,
     outcome: str,
@@ -179,7 +169,7 @@ def vote_resolution(
     )
 
 
-def vote_summary(tabulated_votes: dict[str, VoteEmail]) -> dict[str, int]:
+def vote_summary(tabulated_votes: dict[str, models.tabulate.VoteEmail]) -> dict[str, int]:
     result = {
         "binding_votes": 0,
         "binding_votes_yes": 0,
@@ -196,12 +186,12 @@ def vote_summary(tabulated_votes: dict[str, VoteEmail]) -> dict[str, int]:
     }
 
     for vote_email in tabulated_votes.values():
-        if vote_email.status == VoteStatus.BINDING:
+        if vote_email.status == models.tabulate.VoteStatus.BINDING:
             result["binding_votes"] += 1
             result["binding_votes_yes"] += 1 if (vote_email.vote.value == "Yes") else 0
             result["binding_votes_no"] += 1 if (vote_email.vote.value == "No") else 0
             result["binding_votes_abstain"] += 1 if (vote_email.vote.value == "Abstain") else 0
-        elif vote_email.status in {VoteStatus.COMMITTER, VoteStatus.CONTRIBUTOR}:
+        elif vote_email.status in {models.tabulate.VoteStatus.COMMITTER, models.tabulate.VoteStatus.CONTRIBUTOR}:
             result["non_binding_votes"] += 1
             result["non_binding_votes_yes"] += 1 if (vote_email.vote.value == "Yes") else 0
             result["non_binding_votes_no"] += 1 if (vote_email.vote.value == "No") else 0
@@ -231,7 +221,7 @@ def _vote_break(line: str) -> bool:
     return False
 
 
-def _vote_castings(body: str) -> list[tuple[Vote, str]]:
+def _vote_castings(body: str) -> list[tuple[models.tabulate.Vote, str]]:
     castings = []
     for line in body.split("\n"):
         if _vote_continue(line):
@@ -247,11 +237,11 @@ def _vote_castings(body: str) -> list[tuple[Vote, str]]:
             # Confusing result
             continue
         if plus_one:
-            castings.append((Vote.YES, line))
+            castings.append((models.tabulate.Vote.YES, line))
         elif minus_one:
-            castings.append((Vote.NO, line))
+            castings.append((models.tabulate.Vote.NO, line))
         elif zero:
-            castings.append((Vote.ABSTAIN, line))
+            castings.append((models.tabulate.Vote.ABSTAIN, line))
     return castings
 
 
@@ -308,9 +298,9 @@ def _vote_outcome_format(
 
 
 def _vote_resolution_body(
-    committee: sql.Committee,
-    release: sql.Release,
-    tabulated_votes: dict[str, VoteEmail],
+    committee: models.sql.Committee,
+    release: models.sql.Release,
+    tabulated_votes: dict[str, models.tabulate.VoteEmail],
     summary: dict[str, int],
     passed: bool,
     outcome: str,
@@ -346,8 +336,10 @@ def _vote_resolution_body(
     yield f"{full_name} ({asf_uid})"
 
 
-def _vote_resolution_body_votes(tabulated_votes: dict[str, VoteEmail], summary: dict[str, int]) -> Generator[str]:
-    yield from _vote_resolution_votes(tabulated_votes, {VoteStatus.BINDING})
+def _vote_resolution_body_votes(
+    tabulated_votes: dict[str, models.tabulate.VoteEmail], summary: dict[str, int]
+) -> Generator[str]:
+    yield from _vote_resolution_votes(tabulated_votes, {models.tabulate.VoteStatus.BINDING})
 
     binding_total = summary["binding_votes"]
     were_word = "was" if (binding_total == 1) else "were"
@@ -361,11 +353,15 @@ def _vote_resolution_body_votes(tabulated_votes: dict[str, VoteEmail], summary: 
     yield f"Of these binding votes, {binding_yes} were +1, {binding_no} were -1, and {binding_abstain} were 0."
     yield ""
 
-    yield from _vote_resolution_votes(tabulated_votes, {VoteStatus.COMMITTER})
-    yield from _vote_resolution_votes(tabulated_votes, {VoteStatus.CONTRIBUTOR, VoteStatus.UNKNOWN})
+    yield from _vote_resolution_votes(tabulated_votes, {models.tabulate.VoteStatus.COMMITTER})
+    yield from _vote_resolution_votes(
+        tabulated_votes, {models.tabulate.VoteStatus.CONTRIBUTOR, models.tabulate.VoteStatus.UNKNOWN}
+    )
 
 
-def _vote_resolution_votes(tabulated_votes: dict[str, VoteEmail], statuses: set[VoteStatus]) -> Generator[str]:
+def _vote_resolution_votes(
+    tabulated_votes: dict[str, models.tabulate.VoteEmail], statuses: set[models.tabulate.VoteStatus]
+) -> Generator[str]:
     header: str | None = f"The {' and '.join(status.value.lower() for status in statuses)} votes were cast as follows:"
     for vote_email in tabulated_votes.values():
         if vote_email.status not in statuses:
@@ -375,13 +371,13 @@ def _vote_resolution_votes(tabulated_votes: dict[str, VoteEmail], statuses: set[
             yield ""
             header = None
         match vote_email.vote:
-            case Vote.YES:
+            case models.tabulate.Vote.YES:
                 symbol = "+1"
-            case Vote.NO:
+            case models.tabulate.Vote.NO:
                 symbol = "-1"
-            case Vote.ABSTAIN:
+            case models.tabulate.Vote.ABSTAIN:
                 symbol = "0"
-            case Vote.UNKNOWN:
+            case models.tabulate.Vote.UNKNOWN:
                 symbol = "?"
         user_info = vote_email.asf_uid_or_email
         status = vote_email.status.value.lower()
@@ -392,8 +388,10 @@ def _vote_resolution_votes(tabulated_votes: dict[str, VoteEmail], statuses: set[
         yield ""
 
 
-async def _vote_status(asf_uid: str, list_raw: str, committee: sql.Committee | None) -> VoteStatus:
-    status = VoteStatus.UNKNOWN
+async def _vote_status(
+    asf_uid: str, list_raw: str, committee: models.sql.Committee | None
+) -> models.tabulate.VoteStatus:
+    status = models.tabulate.VoteStatus.UNKNOWN
 
     if util.is_dev_environment():
         committee_label = list_raw.split(".apache.org", 1)[0].split(".", 1)[-1]
@@ -401,9 +399,9 @@ async def _vote_status(asf_uid: str, list_raw: str, committee: sql.Committee | N
             committee = await data.committee(name=committee_label).get()
     if committee is not None:
         if asf_uid in committee.committee_members:
-            status = VoteStatus.BINDING
+            status = models.tabulate.VoteStatus.BINDING
         elif asf_uid in committee.committers:
-            status = VoteStatus.COMMITTER
+            status = models.tabulate.VoteStatus.COMMITTER
         else:
-            status = VoteStatus.CONTRIBUTOR
+            status = models.tabulate.VoteStatus.CONTRIBUTOR
     return status

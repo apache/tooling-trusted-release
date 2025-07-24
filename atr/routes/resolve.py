@@ -231,10 +231,7 @@ async def tabulated_selected_post(session: routes.CommitterSession, project_name
         raise RuntimeError("This page is for tabulated votes only")
 
     hidden_form = await util.HiddenFieldForm.create_form()
-    tabulated_votes = None
-    summary = None
-    passed = None
-    outcome = None
+    details = None
     committee = None
     thread_id = None
     archive_url = None
@@ -249,32 +246,39 @@ async def tabulated_selected_post(session: routes.CommitterSession, project_name
             except util.FetchError as e:
                 fetch_error = f"Failed to fetch thread metadata: {e}"
             else:
-                start_unixtime, tabulated_votes = await tabulate.votes(committee, thread_id)
-                summary = tabulate.vote_summary(tabulated_votes)
-                passed, outcome = tabulate.vote_outcome(release, start_unixtime, tabulated_votes)
+                details = await tabulate.vote_details(committee, thread_id, release)
         else:
             fetch_error = "The vote thread could not yet be found."
     resolve_form = await ResolveVoteForm.create_form()
     if (
         (committee is None)
-        or (tabulated_votes is None)
-        or (summary is None)
-        or (passed is None)
-        or (outcome is None)
+        or (details is None)
+        or (details.votes is None)
+        or (details.summary is None)
+        or (details.passed is None)
+        or (details.outcome is None)
         or (thread_id is None)
     ):
         resolve_form.email_body.render_kw = {"rows": 12}
     else:
         resolve_form.email_body.data = tabulate.vote_resolution(
-            committee, release, tabulated_votes, summary, passed, outcome, full_name, asf_uid, thread_id
+            committee,
+            release,
+            details.votes,
+            details.summary,
+            details.passed,
+            details.outcome,
+            full_name,
+            asf_uid,
+            thread_id,
         )
-        resolve_form.vote_result.data = "passed" if passed else "failed"
+        resolve_form.vote_result.data = "passed" if details.passed else "failed"
     return await template.render(
         "resolve-tabulated.html",
         release=release,
-        tabulated_votes=tabulated_votes,
-        summary=summary,
-        outcome=outcome,
+        tabulated_votes=details.votes if details is not None else {},
+        summary=details.summary if details is not None else {},
+        outcome=details.outcome if details is not None else "",
         resolve_form=resolve_form,
         fetch_error=fetch_error,
         archive_url=archive_url,

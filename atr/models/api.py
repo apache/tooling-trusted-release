@@ -21,7 +21,7 @@ from typing import Annotated, Any, Literal, TypeVar
 
 import pydantic
 
-from . import schema, sql
+from . import schema, sql, tabulate
 
 T = TypeVar("T")
 
@@ -340,6 +340,16 @@ class VoteStartResults(schema.Strict):
     task: sql.Task
 
 
+class VoteTabulateArgs(schema.Strict):
+    project: str
+    version: str
+
+
+class VoteTabulateResults(schema.Strict):
+    endpoint: Literal["/vote/tabulate"] = schema.Field(alias="endpoint")
+    details: tabulate.VoteDetails
+
+
 class UploadArgs(schema.Strict):
     project: str
     version: str
@@ -389,6 +399,7 @@ Results = Annotated[
     | UsersListResults
     | VoteResolveResults
     | VoteStartResults
+    | VoteTabulateResults
     | UploadResults,
     schema.Field(discriminator="endpoint"),
 ]
@@ -440,4 +451,5 @@ validate_tasks = validator(TasksResults)
 validate_users_list = validator(UsersListResults)
 validate_vote_resolve = validator(VoteResolveResults)
 validate_vote_start = validator(VoteStartResults)
+validate_vote_tabulate = validator(VoteTabulateResults)
 validate_upload = validator(UploadResults)
