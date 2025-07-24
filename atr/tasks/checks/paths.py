@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asyncio
 import pathlib
 import re
 
@@ -165,6 +166,11 @@ async def _check_path_process_single(
     """Process and check a single path within the release directory."""
     full_path = base_path / relative_path
     relative_path_str = str(relative_path)
+
+    # For debugging and testing
+    # TODO: Scope this to admin users
+    if full_path.name == "deliberately_slow_ATR_task_filename.txt":
+        await asyncio.sleep(20)
 
     errors: list[str] = []
     warnings: list[str] = []
