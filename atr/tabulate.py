@@ -16,11 +16,11 @@
 # under the License.
 
 import enum
-import logging
 import time
 from collections.abc import Generator
 
 import atr.db as db
+import atr.log as log
 import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.util as util
@@ -56,8 +56,8 @@ async def votes(committee: sql.Committee | None, thread_id: str) -> tuple[int | 
     start = time.perf_counter_ns()
     email_to_uid = await util.email_to_uid_map()
     end = time.perf_counter_ns()
-    logging.info(f"LDAP search took {(end - start) / 1000000} ms")
-    logging.info(f"Email addresses from LDAP: {len(email_to_uid)}")
+    log.info(f"LDAP search took {(end - start) / 1000000} ms")
+    log.info(f"Email addresses from LDAP: {len(email_to_uid)}")
 
     start = time.perf_counter_ns()
     tabulated_votes = {}
@@ -111,8 +111,8 @@ async def votes(committee: sql.Committee | None, thread_id: str) -> tuple[int | 
         )
         tabulated_votes[asf_uid_or_email] = vote_email
     end = time.perf_counter_ns()
-    logging.info(f"Tabulated votes: {len(tabulated_votes)}")
-    logging.info(f"Tabulation took {(end - start) / 1000000} ms")
+    log.info(f"Tabulated votes: {len(tabulated_votes)}")
+    log.info(f"Tabulation took {(end - start) / 1000000} ms")
 
     return start_unixtime, tabulated_votes
 

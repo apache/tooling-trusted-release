@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import logging
 import os
 import pathlib
 import urllib.parse
@@ -23,12 +22,12 @@ from typing import TYPE_CHECKING, Final
 
 import asfpy.pubsub
 
+import atr.log as log
 import atr.svn as svn
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-_LOGGER: Final[logging.Logger] = logging.getLogger(__name__)
 # TODO: Check that these prefixes are correct
 _WATCHED_PREFIXES: Final[tuple[str, ...]] = (
     "/svn/dist/dev",
@@ -55,7 +54,7 @@ class SVNListener:
         """Run forever, processing PubSub payloads as they arrive."""
         # TODO: Add reconnection logic here?
         # Or does asfpy.pubsub.listen() already do this?
-        _LOGGER.info("SVNListener.start() called")
+        log.info("SVNListener.start() called")
         async for payload in asfpy.pubsub.listen(
             # TODO: Upstream this change to BAT
             urllib.parse.urljoin(self.url, self.topics),
@@ -70,9 +69,9 @@ class SVNListener:
                 # Ignore commits outside dist/dev or dist/release
                 continue
 
-            _LOGGER.debug("PubSub payload: %s", payload)
+            log.debug("PubSub payload: %s", payload)
             await self._process_payload(payload)
-        _LOGGER.info("SVNListener.start() finished")
+        log.info("SVNListener.start() finished")
 
     async def _process_payload(self, payload: dict) -> None:
         """
@@ -94,6 +93,6 @@ class SVNListener:
             local_path = self.working_copy_root / repo_path[len(prefix) :].lstrip("/")
             try:
                 await svn.update(local_path)
-                _LOGGER.info("svn updated %s", local_path)
+                log.info("svn updated %s", local_path)
             except Exception as exc:
-                _LOGGER.warning("failed svn update %s: %s", local_path, exc)
+                log.warning("failed svn update %s: %s", local_path, exc)

@@ -17,8 +17,6 @@
 
 """preview.py"""
 
-import logging
-
 import aiofiles.os
 import aioshutil
 import asfquart
@@ -28,6 +26,7 @@ import wtforms
 
 import atr.construct as construct
 import atr.db as db
+import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.root as root
@@ -88,7 +87,7 @@ async def announce_preview(
         return quart.Response(preview_body, mimetype="text/plain")
 
     except Exception as e:
-        logging.exception("Error generating announcement preview:")
+        log.exception("Error generating announcement preview:")
         return quart.Response(f"Error generating preview: {e!s}", status=500, mimetype="text/plain")
 
 
@@ -126,7 +125,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
             try:
                 await _delete_preview(data, release_name)
             except Exception as e:
-                logging.exception("Error deleting preview:")
+                log.exception("Error deleting preview:")
                 return await session.redirect(root.index, error=f"Error deleting preview: {e!s}")
 
     # Delete the files on disk, including all revisions

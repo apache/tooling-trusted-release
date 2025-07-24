@@ -16,7 +16,6 @@
 # under the License.
 
 import asyncio
-import logging
 import pathlib
 from collections.abc import Sequence
 
@@ -27,6 +26,7 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
+import atr.log as log
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
@@ -100,7 +100,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
                 version_name=version_name,
             )
         except Exception as e:
-            logging.exception("Error adding file:")
+            log.exception("Error adding file:")
             await quart.flash(f"Error adding file: {e!s}", "error")
 
     svn_form = await SvnImportForm.create_form()

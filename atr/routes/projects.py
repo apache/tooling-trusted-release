@@ -29,6 +29,7 @@ import wtforms
 
 import atr.db as db
 import atr.db.interaction as interaction
+import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.template as template
@@ -501,9 +502,7 @@ async def _policy_edit(
         await quart.flash("Release policy updated successfully.", "success")
         return True, policy_form
     else:
-        import logging
-
-        logging.info(f"policy_form.errors: {policy_form.errors}")
+        log.info(f"policy_form.errors: {policy_form.errors}")
     return False, policy_form
 
 

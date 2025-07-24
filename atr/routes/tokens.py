@@ -18,7 +18,6 @@
 
 import datetime
 import hashlib
-import logging
 import secrets
 import time
 from typing import Final
@@ -34,13 +33,13 @@ from htpy import Element, code, div, form, h1, h2, p, pre, strong, table, tbody,
 
 import atr.db as db
 import atr.jwtoken as jwtoken
+import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.template as templates
 import atr.util as util
 
 _EXPIRY_DAYS: Final[int] = 180
-_LOGGER: Final[logging.Logger] = logging.getLogger(__name__)
 
 
 type Fragment = Element | core.Field | str
@@ -87,7 +86,7 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
     start = time.perf_counter_ns()
     tokens_list = await _fetch_tokens(session.uid)
     end = time.perf_counter_ns()
-    _LOGGER.info("Tokens list fetched in %dms", (end - start) / 1_000_000)
+    log.info("Tokens list fetched in %dms", (end - start) / 1_000_000)
 
     start = time.perf_counter_ns()
     add_form_elem = _build_add_form_element(add_form)
@@ -121,7 +120,7 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
         issue_jwt_elem,
     ]
     end = time.perf_counter_ns()
-    _LOGGER.info("Content elem built in %dms", (end - start) / 1_000_000)
+    log.info("Content elem built in %dms", (end - start) / 1_000_000)
 
     start = time.perf_counter_ns()
     rendered = await templates.render(
@@ -132,7 +131,7 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
         javascripts=[util.static_path("js", "create-a-jwt.js")],
     )
     end = time.perf_counter_ns()
-    _LOGGER.info("Rendered in %dms", (end - start) / 1_000_000)
+    log.info("Rendered in %dms", (end - start) / 1_000_000)
 
     return rendered
 

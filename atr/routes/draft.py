@@ -22,7 +22,6 @@ from __future__ import annotations
 import asyncio
 import datetime
 import hashlib
-import logging
 import pathlib
 from typing import TYPE_CHECKING, Protocol, TypeVar
 
@@ -36,6 +35,7 @@ import atr.analysis as analysis
 import atr.construct as construct
 import atr.db as db
 import atr.db.interaction as interaction
+import atr.log as log
 import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
@@ -48,8 +48,6 @@ import atr.util as util
 
 if TYPE_CHECKING:
     import werkzeug.wrappers.response as response
-
-# _LOGGER: Final = logging.getLogger(__name__)
 
 
 T = TypeVar("T")
@@ -117,7 +115,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
                     release_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
                 )
             except Exception as e:
-                logging.exception("Error deleting candidate draft:")
+                log.exception("Error deleting candidate draft:")
                 return await session.redirect(root.index, error=f"Error deleting candidate draft: {e!s}")
 
     # Delete the files on disk, including all revisions
@@ -157,7 +155,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
             # Check that the file exists in the new revision
             if not await aiofiles.os.path.exists(path_in_new_revision):
                 # This indicates a potential severe issue with hard linking or logic
-                logging.error(f"SEVERE ERROR! File {rel_path_to_delete} not found in new revision before deletion")
+                log.error(f"SEVERE ERROR! File {rel_path_to_delete} not found in new revision before deletion")
                 raise routes.FlashError("File to delete was not found in the new revision")
 
             # Check whether the file is an artifact
@@ -174,7 +172,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
             await aiofiles.os.remove(path_in_new_revision)
 
     except Exception as e:
-        logging.exception("Error deleting file:")
+        log.exception("Error deleting file:")
         await quart.flash(f"Error deleting file: {e!s}", "error")
         return await session.redirect(compose.selected, project_name=project_name, version_name=version_name)
 
@@ -242,7 +240,7 @@ async def hashgen(
 
             # Check that the source file exists in the new revision
             if not await aiofiles.os.path.exists(path_in_new_revision):
-                logging.error(f"Source file {rel_path} not found in new revision for hash generation.")
+                log.error(f"Source file {rel_path} not found in new revision for hash generation.")
                 raise routes.FlashError("Source file not found in the new revision.")
 
             # Check that the hash file does not already exist in the new revision
@@ -261,7 +259,7 @@ async def hashgen(
                 await f.write(f"{hash_value}  {rel_path.name}\n")
 
     except Exception as e:
-        logging.exception("Error generating hash file:")
+        log.exception("Error generating hash file:")
         await quart.flash(f"Error generating hash file: {e!s}", "error")
         return await session.redirect(compose.selected, project_name=project_name, version_name=version_name)
 
@@ -299,7 +297,7 @@ async def sbomgen(
 
             # Check that the source file exists in the new revision
             if not await aiofiles.os.path.exists(path_in_new_revision):
-                logging.error(f"Source file {rel_path} not found in new revision for SBOM generation.")
+                log.error(f"Source file {rel_path} not found in new revision for SBOM generation.")
                 raise routes.FlashError("Source artifact file not found in the new revision.")
 
             # Check that the SBOM file does not already exist in the new revision
@@ -337,7 +335,7 @@ async def sbomgen(
                 await asyncio.sleep(0.1)
 
     except Exception as e:
-        logging.exception("Error generating SBOM:")
+        log.exception("Error generating SBOM:")
         await quart.flash(f"Error generating SBOM: {e!s}", "error")
         return await session.redirect(compose.selected, project_name=project_name, version_name=version_name)
 
@@ -387,7 +385,7 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
             await data.commit()
 
     except Exception:
-        logging.exception("Error queueing SVN import task:")
+        log.exception("Error queueing SVN import task:")
         return await session.redirect(
             upload.selected,
             error="Error queueing SVN import task",

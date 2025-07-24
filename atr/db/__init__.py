@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import contextlib
 import functools
-import logging
 import os
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, Concatenate, Final, TypeGuard, TypeVar
@@ -35,6 +34,7 @@ import sqlmodel
 import sqlmodel.sql.expression as expression
 
 import atr.config as config
+import atr.log as log
 import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.util as util
@@ -44,8 +44,6 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Iterator, Sequence
 
     import asfquart.base as base
-
-_LOGGER: Final = logging.getLogger(__name__)
 
 global_log_query: bool = False
 _global_atr_engine: sqlalchemy.ext.asyncio.AsyncEngine | None = None
@@ -97,9 +95,9 @@ class Query[T]:
             return
         try:
             compiled_query = self.query.compile(self.session.bind, compile_kwargs={"literal_binds": True})
-            _LOGGER.info(f"Executing query ({method_name}): {compiled_query}")
+            log.info(f"Executing query ({method_name}): {compiled_query}")
         except Exception as e:
-            _LOGGER.error(f"Error compiling query for logging ({method_name}): {e}")
+            log.error(f"Error compiling query for logging ({method_name}): {e}")
 
     async def get(self, log_query: bool = False) -> T | None:
         self.log_query("get", log_query)
@@ -258,9 +256,9 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             try:
                 dialect = self.bind.dialect if self.bind else sqlalchemy.dialects.sqlite.dialect()
                 compiled_query = query.compile(dialect=dialect, compile_kwargs={"literal_binds": True})
-                _LOGGER.info(f"Executing query (execute_query): {compiled_query}")
+                log.info(f"Executing query (execute_query): {compiled_query}")
             except Exception as e:
-                _LOGGER.error(f"Error compiling query for logging: {e}")
+                log.error(f"Error compiling query for logging: {e}")
         execution_result: sqlalchemy.engine.Result = await self.execute(query)
         return execution_result
 
@@ -684,42 +682,42 @@ def init_database(app: base.QuartApp) -> None:
         )
 
         # Run any pending migrations on startup
-        _LOGGER.info("Applying database migrations via init_database...")
+        log.info("Applying database migrations via init_database...")
         alembic_ini_path = os.path.join(app_config.PROJECT_ROOT, "alembic.ini")
         alembic_cfg = alembic_config.Config(alembic_ini_path)
 
         # Construct synchronous URLs
         absolute_db_path = os.path.join(app_config.STATE_DIR, app_config.SQLITE_DB_PATH)
         sync_sqlalchemy_url = f"sqlite:///{absolute_db_path}"
-        _LOGGER.info(f"Setting Alembic URL for command: {sync_sqlalchemy_url}")
+        log.info(f"Setting Alembic URL for command: {sync_sqlalchemy_url}")
         alembic_cfg.set_main_option("sqlalchemy.url", sync_sqlalchemy_url)
 
         # Ensure that Alembic finds the migrations directory relative to project root
         migrations_dir_path = os.path.join(app_config.PROJECT_ROOT, "migrations")
-        _LOGGER.info(f"Setting Alembic script_location for command: {migrations_dir_path}")
+        log.info(f"Setting Alembic script_location for command: {migrations_dir_path}")
         alembic_cfg.set_main_option("script_location", migrations_dir_path)
 
         try:
-            _LOGGER.info("Running alembic upgrade head...")
+            log.info("Running alembic upgrade head...")
             command.upgrade(alembic_cfg, "head")
-            _LOGGER.info("Database migrations applied successfully")
+            log.info("Database migrations applied successfully")
         except Exception:
-            _LOGGER.exception("Failed to apply database migrations during startup")
+            log.exception("Failed to apply database migrations during startup")
             raise
 
         try:
-            _LOGGER.info("Running alembic check...")
+            log.info("Running alembic check...")
             command.check(alembic_cfg)
-            _LOGGER.info("Alembic check passed: DB schema matches models")
+            log.info("Alembic check passed: DB schema matches models")
         except Exception:
-            _LOGGER.exception("Failed to check database migrations during startup")
+            log.exception("Failed to check database migrations during startup")
             raise
 
 
 async def init_database_for_worker() -> None:
     global _global_atr_engine, _global_atr_sessionmaker
 
-    _LOGGER.info(f"Creating database for worker {os.getpid()}")
+    log.info(f"Creating database for worker {os.getpid()}")
     engine = await create_async_engine(config.get())
     _global_atr_engine = engine
     _global_atr_sessionmaker = sqlalchemy.ext.asyncio.async_sessionmaker(
@@ -860,7 +858,7 @@ def session_function[**P, R](
 
 async def shutdown_database() -> None:
     if _global_atr_engine:
-        _LOGGER.info("Closing database")
+        log.info("Closing database")
         await _global_atr_engine.dispose()
     else:
-        _LOGGER.info("No database to close")
+        log.info("No database to close")

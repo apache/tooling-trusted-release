@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import contextlib
 import json
-import logging
 import time
 from typing import TYPE_CHECKING, Final
 
@@ -29,6 +28,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 import atr.db as db
+import atr.log as log
 import atr.models.sql as sql
 import atr.storage.types as types
 import atr.storage.writers as writers
@@ -359,7 +359,7 @@ class ContextManagers:
         self.__last_refreshed = int(time.time())
 
         finish = time.perf_counter_ns()
-        logging.info(f"ContextManagers.__member_and_participant took {finish - start:,} ns")
+        log.info(f"ContextManagers.__member_and_participant took {finish - start:,} ns")
 
         return self.__member_of_cache[asf_uid], self.__participant_of_cache[asf_uid]
 

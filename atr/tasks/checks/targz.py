@@ -16,15 +16,13 @@
 # under the License.
 
 import asyncio
-import logging
 import tarfile
 from typing import Final
 
 import atr.archives as archives
+import atr.log as log
 import atr.models.results as results
 import atr.tasks.checks as checks
-
-_LOGGER: Final = logging.getLogger(__name__)
 
 
 class RootDirectoryError(Exception):
@@ -39,7 +37,7 @@ async def integrity(args: checks.FunctionArguments) -> results.Results | None:
     if not (artifact_abs_path := await recorder.abs_path()):
         return None
 
-    _LOGGER.info(f"Checking integrity for {artifact_abs_path} (rel: {args.primary_rel_path})")
+    log.info(f"Checking integrity for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     chunk_size = 4096
     try:
@@ -85,7 +83,7 @@ async def structure(args: checks.FunctionArguments) -> results.Results | None:
     expected_root: Final[str] = (
         filename.removesuffix(".tar.gz") if filename.endswith(".tar.gz") else filename.removesuffix(".tgz")
     )
-    _LOGGER.info(
+    log.info(
         f"Checking structure for {artifact_abs_path} (expected root: {expected_root}) (rel: {args.primary_rel_path})"
     )
 

@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import asyncio
 import datetime
-import logging
 import tempfile
 import textwrap
 import time
@@ -36,6 +35,7 @@ import pgpy.constants as constants
 import sqlalchemy.dialects.sqlite as sqlite
 
 import atr.db as db
+import atr.log as log
 import atr.models.sql as sql
 import atr.storage as storage
 import atr.storage.types as types
@@ -207,7 +207,7 @@ class FoundationCommitter:
         if key_insert_result.one_or_none() is None:
             # raise storage.AccessError(f"Key not inserted: {key.key_model.fingerprint}")
             pass
-        logging.info(f"Inserted key {key.key_model.fingerprint}")
+        log.info(f"Inserted key {key.key_model.fingerprint}")
 
         await self.__data.commit()
         # TODO: PARSED now acts as "ALREADY_ADDED"
@@ -415,7 +415,7 @@ class CommitteeParticipant(FoundationCommitter):
             return types.OutcomeException(storage.AccessError(error_msg))
         except Exception as e:
             error_msg = f"An unexpected error occurred writing KEYS for committee {self.__committee_name}: {e}"
-            logging.exception(e)
+            log.exception(f"An unexpected error occurred writing KEYS for committee {self.__committee_name}: {e}")
             return types.OutcomeException(storage.AccessError(error_msg))
         return types.OutcomeResult(str(committee_keys_path))
 
@@ -507,7 +507,7 @@ class CommitteeParticipant(FoundationCommitter):
             outcomes = await self.__database_add_models_core(outcomes, associate=associate)
         except Exception as e:
             # This logging is just so that ruff does not erase e
-            logging.info(f"Post-parse error: {e}")
+            log.info(f"Post-parse error: {e}")
 
             def raise_post_parse_error(key: types.Key) -> NoReturn:
                 nonlocal e
@@ -538,7 +538,7 @@ class CommitteeParticipant(FoundationCommitter):
             .returning(via(sql.PublicSigningKey.fingerprint))
         )
         key_inserts = {row.fingerprint for row in key_insert_result}
-        logging.info(f"Inserted {len(key_inserts)} keys")
+        log.info(f"Inserted {len(key_inserts)} keys")
 
         def replace_with_inserted(key: types.Key) -> types.Key:
             if key.key_model.fingerprint in key_inserts:
@@ -561,7 +561,7 @@ class CommitteeParticipant(FoundationCommitter):
                 .returning(via(sql.KeyLink.key_fingerprint))
             )
             link_inserts = {row.key_fingerprint for row in link_insert_result}
-            logging.info(f"Inserted {len(link_inserts)} key links")
+            log.info(f"Inserted {len(link_inserts)} key links")
 
             def replace_with_linked(key: types.Key) -> types.Key:
                 nonlocal link_inserts
@@ -576,7 +576,7 @@ class CommitteeParticipant(FoundationCommitter):
 
             outcomes.update_roes(Exception, replace_with_linked)
         else:
-            logging.info("Inserted 0 key links (none to insert)")
+            log.info("Inserted 0 key links (none to insert)")
 
         await self.__data.commit()
         return outcomes
@@ -601,7 +601,7 @@ class CommitteeParticipant(FoundationCommitter):
         outcomes = await self.__database_add_models(outcomes, associate=associate)
         if _MEASURE_PERFORMANCE:
             for key, value in PERFORMANCES.items():
-                logging.info(f"{key}: {value}")
+                log.info(f"{key}: {value}")
         return outcomes
 
 

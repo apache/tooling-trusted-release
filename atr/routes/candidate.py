@@ -17,13 +17,12 @@
 
 """candidate.py"""
 
-import logging
-
 import asfquart
 import asfquart.base as base
 import werkzeug.wrappers.response as response
 
 import atr.db as db
+import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.root as root
@@ -61,7 +60,7 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     ]
     # Sort the files by FileStat.path
     file_stats.sort(key=lambda fs: fs.path)
-    logging.debug(f"File stats: {file_stats}")
+    log.debug(f"File stats: {file_stats}")
 
     return await template.render(
         # TODO: Move to somewhere appropriate

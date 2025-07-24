@@ -19,7 +19,6 @@
 
 import asyncio
 import contextlib
-import logging
 import os
 from collections.abc import Iterable
 from types import ModuleType
@@ -42,6 +41,7 @@ import atr.config as config
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.filters as filters
+import atr.log as log
 import atr.manager as manager
 import atr.preload as preload
 import atr.ssh as ssh
@@ -156,7 +156,7 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
         pubsub_password = conf.PUBSUB_PASSWORD
 
         if pubsub_url and pubsub_user and pubsub_password:
-            app.logger.info("Starting PubSub SVN listener")
+            log.info("Starting PubSub SVN listener")
             listener = pubsub.SVNListener(
                 working_copy_root=conf.SVN_STORAGE_DIR,
                 url=pubsub_url,
@@ -165,9 +165,9 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
             )
             task = asyncio.create_task(listener.start())
             app.extensions["svn_listener"] = task
-            app.logger.info("PubSub SVN listener task created")
+            log.info("PubSub SVN listener task created")
         else:
-            app.logger.info(
+            log.info(
                 "PubSub SVN listener not started: pubsub_url=%s pubsub_user=%s pubsub_password=%s",
                 bool(pubsub_url),
                 bool(pubsub_user),
@@ -200,9 +200,10 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
 
 def app_setup_logging(app: base.QuartApp, config_mode: config.Mode, app_config: type[config.AppConfig]) -> None:
     """Setup application logging."""
+    import logging
 
     logging.basicConfig(
-        format="[%(asctime)s.%(msecs)03d  ] [%(process)d] %(message)s",
+        format="[ %(asctime)s.%(msecs)03d ] %(process)d <%(name)s> %(message)s",
         level=logging.INFO,
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[rich_logging.RichHandler(rich_tracebacks=True, show_time=False)],
@@ -216,9 +217,9 @@ def app_setup_logging(app: base.QuartApp, config_mode: config.Mode, app_config: 
     @app.before_serving
     async def log_debug_info() -> None:
         if config_mode == config.Mode.Debug or config_mode == config.Mode.Profiling:
-            app.logger.info(f"DEBUG        = {config_mode == config.Mode.Debug}")
-            app.logger.info(f"ENVIRONMENT  = {config_mode.value}")
-            app.logger.info(f"STATE_DIR    = {app_config.STATE_DIR}")
+            log.info(f"DEBUG        = {config_mode == config.Mode.Debug}")
+            log.info(f"ENVIRONMENT  = {config_mode.value}")
+            log.info(f"STATE_DIR    = {app_config.STATE_DIR}")
 
 
 def create_app(app_config: type[config.AppConfig]) -> base.QuartApp:
@@ -250,14 +251,14 @@ def create_app(app_config: type[config.AppConfig]) -> base.QuartApp:
         app.extensions["blockbuster"] = bb
         if bb is not None:
             bb.activate()
-            app.logger.info("Blockbuster activated to detect blocking calls")
+            log.info("Blockbuster activated to detect blocking calls")
 
     @app.after_serving
     async def stop_blockbuster() -> None:
         bb = app.extensions.get("blockbuster")
         if bb is not None:
             bb.deactivate()
-            app.logger.info("Blockbuster deactivated")
+            log.info("Blockbuster deactivated")
 
     return app
 
@@ -286,7 +287,7 @@ def register_routes(app: base.QuartApp) -> ModuleType:
 
         # Required to give to the error.html template
         tb = traceback.format_exc()
-        app.logger.exception("Unhandled exception")
+        log.exception("Unhandled exception")
         return await template.render("error.html", error=str(error), traceback=tb, status_code=500), 500
 
     @app.errorhandler(base.ASFQuartException)

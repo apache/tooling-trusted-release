@@ -22,7 +22,6 @@ import dataclasses
 import datetime
 import hashlib
 import json
-import logging
 import os
 import pathlib
 import re
@@ -50,13 +49,13 @@ import wtforms
 # Therefore, this module must not import atr.db
 import atr.config as config
 import atr.ldap as ldap
+import atr.log as log
 import atr.models.sql as sql
 import atr.user as user
 
 F = TypeVar("F", bound="QuartFormTyped")
 T = TypeVar("T")
 
-_LOGGER: Final = logging.getLogger(__name__)
 # TODO: Move to committee data
 _STANDING_COMMITTEES: Final[set[str]] = {
     "attic",
@@ -146,12 +145,12 @@ async def archive_listing(file_path: pathlib.Path) -> list[str] | None:
 def as_url(func: Callable, **kwargs: Any) -> str:
     """Return the URL for a function."""
     if isinstance(func, jinja2.runtime.Undefined):
-        _LOGGER.exception("Undefined route in the calling template")
+        log.exception("Undefined route in the calling template")
         raise RuntimeError("Undefined route in the calling template")
     try:
         annotations = func.__annotations__
     except AttributeError as e:
-        _LOGGER.error(f"Cannot get annotations for {func} (type: {type(func)})")
+        log.error(f"Cannot get annotations for {func} (type: {type(func)})")
         raise RuntimeError(f"Cannot get annotations for {func} (type: {type(func)})") from e
     return quart.url_for(annotations["endpoint"], **kwargs)
 
@@ -282,7 +281,7 @@ async def create_hard_link_clone(
                     await aiofiles.os.link(source_entry_path, dest_entry_path)
                 # Ignore other types like symlinks for now
             except OSError as e:
-                _LOGGER.error(f"Error cloning {source_entry_path} to {dest_entry_path}: {e}")
+                log.error(f"Error cloning {source_entry_path} to {dest_entry_path}: {e}")
                 raise
 
     await _clone_recursive(source_dir, dest_dir)
@@ -543,7 +542,7 @@ def is_user_viewing_as_admin(uid: str | None) -> bool:
     try:
         app = asfquart.APP
         if not hasattr(app, "app_id") or not isinstance(app.app_id, str):
-            _LOGGER.error("Cannot get valid app_id to read session for admin view check")
+            log.error("Cannot get valid app_id to read session for admin view check")
             return True
 
         cookie_id = app.app_id
@@ -551,7 +550,7 @@ def is_user_viewing_as_admin(uid: str | None) -> bool:
         is_downgraded = session_dict.get("downgrade_admin_to_user", False)
         return not is_downgraded
     except Exception:
-        _LOGGER.exception(f"Error checking admin downgrade session status for {uid}")
+        log.exception(f"Error checking admin downgrade session status for {uid}")
         return True
 
 
@@ -801,13 +800,13 @@ async def thread_messages(
 
     async for url, status, content in get_urls_as_completed(email_urls):
         if status != 200 or not content:
-            _LOGGER.warning("Failed to fetch email data from %s: %s", url, status)
+            log.warning("Failed to fetch email data from %s: %s", url, status)
             continue
         try:
             msg_json = json.loads(content.decode())
             messages.append(msg_json)
         except Exception as exc:
-            _LOGGER.warning("Failed to parse email JSON from %s: %s", url, exc)
+            log.warning("Failed to parse email JSON from %s: %s", url, exc)
 
     messages.sort(key=lambda m: m.get("epoch", 0))
 
@@ -858,10 +857,10 @@ async def update_atomic_symlink(link_path: pathlib.Path, target_path: pathlib.Pa
         # Atomically rename the temporary link to the final link path
         # This overwrites link_path if it exists
         await aiofiles.os.rename(temp_link_path, link_path)
-        _LOGGER.info(f"Atomically updated symlink {link_path} -> {target_str}")
+        log.info(f"Atomically updated symlink {link_path} -> {target_str}")
     except Exception as e:
-        # Don't bother with _LOGGER.exception here
-        _LOGGER.error(f"Failed to update atomic symlink {link_path} -> {target_str}: {e}")
+        # Don't bother with log.exception here
+        log.error(f"Failed to update atomic symlink {link_path} -> {target_str}: {e}")
         # Clean up temporary link if rename failed
         try:
             await aiofiles.os.remove(temp_link_path)

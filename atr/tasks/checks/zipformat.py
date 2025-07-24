@@ -16,15 +16,13 @@
 # under the License.
 
 import asyncio
-import logging
 import os
 import zipfile
-from typing import Any, Final
+from typing import Any
 
+import atr.log as log
 import atr.models.results as results
 import atr.tasks.checks as checks
-
-_LOGGER: Final = logging.getLogger(__name__)
 
 
 async def integrity(args: checks.FunctionArguments) -> results.Results | None:
@@ -33,7 +31,7 @@ async def integrity(args: checks.FunctionArguments) -> results.Results | None:
     if not (artifact_abs_path := await recorder.abs_path()):
         return None
 
-    _LOGGER.info(f"Checking zip integrity for {artifact_abs_path} (rel: {args.primary_rel_path})")
+    log.info(f"Checking zip integrity for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
         result_data = await asyncio.to_thread(_integrity_check_core_logic, str(artifact_abs_path))
@@ -55,7 +53,7 @@ async def structure(args: checks.FunctionArguments) -> results.Results | None:
     if await recorder.primary_path_is_binary():
         return None
 
-    _LOGGER.info(f"Checking zip structure for {artifact_abs_path} (rel: {args.primary_rel_path})")
+    log.info(f"Checking zip structure for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
         result_data = await asyncio.to_thread(_structure_check_core_logic, str(artifact_abs_path))

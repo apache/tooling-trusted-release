@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import logging
 from typing import Final
 
 import aiohttp
@@ -24,6 +23,7 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
+import atr.log as log
 import atr.models.results as results
 import atr.models.sql as sql
 import atr.routes as routes
@@ -77,7 +77,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
 
     if latest_vote_task is not None:
         if util.is_dev_environment():
-            logging.warning("Setting vote task to completed in dev environment")
+            log.warning("Setting vote task to completed in dev environment")
             latest_vote_task.status = sql.TaskStatus.COMPLETED
             latest_vote_task.result = results.VoteInitiate(
                 kind="vote_initiate",
@@ -238,5 +238,5 @@ async def _task_archive_url(task_mid: str) -> str | None:
             return None
         return "https://lists.apache.org/thread/" + mid
     except Exception:
-        logging.exception("Failed to get archive URL for task %s", task_mid)
+        log.exception("Failed to get archive URL for task %s", task_mid)
         return None

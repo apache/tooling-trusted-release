@@ -22,18 +22,15 @@ from __future__ import annotations
 import asyncio
 import datetime
 import io
-import logging
 import os
 import signal
 import sys
-from typing import Final
 
 import sqlmodel
 
 import atr.db as db
+import atr.log as log
 import atr.models.sql as sql
-
-_LOGGER: Final = logging.getLogger(__name__)
 
 # Global debug flag to control worker process output capturing
 global_worker_debug: bool = False
@@ -67,7 +64,7 @@ class WorkerManager:
             return
 
         self.running = True
-        _LOGGER.info("Starting worker manager in %s", os.getcwd())
+        log.info("Starting worker manager in %s", os.getcwd())
 
         # Start initial workers
         for _ in range(self.min_workers):
@@ -82,7 +79,7 @@ class WorkerManager:
             return
 
         self.running = False
-        _LOGGER.info("Stopping worker manager")
+        log.info("Stopping worker manager")
 
         # Cancel monitoring task
         if self.check_task:
@@ -105,7 +102,7 @@ class WorkerManager:
                     # The process may have already exited
                     ...
                 except Exception as e:
-                    _LOGGER.error(f"Error stopping worker {worker.pid}: {e}")
+                    log.error(f"Error stopping worker {worker.pid}: {e}")
 
         # Wait for processes to exit
         for worker in list(self.workers.values()):
@@ -119,7 +116,7 @@ class WorkerManager:
                         # The process may have already exited
                         ...
                     except Exception as e:
-                        _LOGGER.error(f"Error force killing worker {worker.pid}: {e}")
+                        log.error(f"Error force killing worker {worker.pid}: {e}")
 
         self.workers.clear()
 
@@ -156,7 +153,7 @@ class WorkerManager:
                 log_file = await asyncio.to_thread(open, log_file_path, "w")
                 stdout_target = log_file
                 stderr_target = log_file
-                _LOGGER.info(f"Worker output will be logged to {log_file_path}")
+                log.info(f"Worker output will be logged to {log_file_path}")
 
             # Start worker process with the updated environment
             # Use preexec_fn to create new process group
@@ -172,15 +169,15 @@ class WorkerManager:
             worker = WorkerProcess(process, datetime.datetime.now(datetime.UTC))
             if worker.pid:
                 self.workers[worker.pid] = worker
-                _LOGGER.info(f"Started worker process {worker.pid}")
+                log.info(f"Started worker process {worker.pid}")
                 if global_worker_debug and log_file_path:
-                    _LOGGER.info(f"Worker {worker.pid} logs: {log_file_path}")
+                    log.info(f"Worker {worker.pid} logs: {log_file_path}")
             else:
-                _LOGGER.error("Failed to start worker process: No PID assigned")
+                log.error("Failed to start worker process: No PID assigned")
                 if global_worker_debug and isinstance(stdout_target, io.TextIOWrapper):
                     await asyncio.to_thread(stdout_target.close)
         except Exception as e:
-            _LOGGER.error(f"Error spawning worker: {e}")
+            log.error(f"Error spawning worker: {e}")
 
     async def monitor_workers(self) -> None:
         """Monitor worker processes and restart them if needed."""
@@ -191,7 +188,7 @@ class WorkerManager:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                _LOGGER.error(f"Error in worker monitor: {e}", exc_info=e)
+                log.error(f"Error in worker monitor: {e}", exc_info=e)
                 # TODO: How long should we wait before trying again?
                 await asyncio.sleep(1.0)
 
@@ -205,7 +202,7 @@ class WorkerManager:
                 # Check if process is running
                 if not await worker.is_running():
                     exited_workers.append(pid)
-                    _LOGGER.info(f"Worker {pid} has exited")
+                    log.info(f"Worker {pid} has exited")
                     continue
 
                 # Check if worker has been processing its task for too long
@@ -228,9 +225,9 @@ class WorkerManager:
         #             """)
         #         )
         #         queued_count = result.scalar()
-        #         logger.info(f"Found {queued_count} queued tasks waiting for workers")
+        #         log.info(f"Found {queued_count} queued tasks waiting for workers")
         # except Exception as e:
-        #     logger.error(f"Error checking queued tasks: {e}")
+        #     log.error(f"Error checking queued tasks: {e}")
 
         # Spawn new workers if needed
         await self.maintain_worker_pool()
@@ -251,11 +248,11 @@ class WorkerManager:
 
             if worker.pid:
                 os.kill(worker.pid, signal.SIGTERM)
-                _LOGGER.info(f"Worker {pid} terminated after processing task {task_id} for > {self.max_task_seconds}s")
+                log.info(f"Worker {pid} terminated after processing task {task_id} for > {self.max_task_seconds}s")
         except ProcessLookupError:
             return
         except Exception as e:
-            _LOGGER.error(f"Error stopping long-running worker {pid}: {e}")
+            log.error(f"Error stopping long-running worker {pid}: {e}")
 
     async def check_task_duration(self, data: db.Session, pid: int, worker: WorkerProcess) -> bool:
         """
@@ -275,7 +272,7 @@ class WorkerManager:
 
                 return False
         except Exception as e:
-            _LOGGER.error(f"Error checking task duration for worker {pid}: {e}")
+            log.error(f"Error checking task duration for worker {pid}: {e}")
             # TODO: Return False here to avoid over-reporting errors
             return False
 
@@ -283,10 +280,10 @@ class WorkerManager:
         """Ensure we maintain the minimum number of workers."""
         current_count = len(self.workers)
         if current_count < self.min_workers:
-            _LOGGER.info(f"Worker pool below minimum ({current_count} < {self.min_workers}), spawning new workers")
+            log.info(f"Worker pool below minimum ({current_count} < {self.min_workers}), spawning new workers")
             while len(self.workers) < self.min_workers:
                 await self.spawn_worker()
-            _LOGGER.info(f"Worker pool restored to {len(self.workers)} workers")
+            log.info(f"Worker pool restored to {len(self.workers)} workers")
 
     async def _log_tasks_held_by_unmanaged_pids(self, data: db.Session, active_worker_pids: list[int]) -> None:
         """Log tasks that are active and held by PIDs not managed by this worker manager."""
@@ -305,15 +302,15 @@ class WorkerManager:
         if not foreign_pids_with_tasks:
             return
 
-        _LOGGER.debug(f"Found tasks potentially claimed by non-managed PIDs: {foreign_pids_with_tasks}")
+        log.debug(f"Found tasks potentially claimed by non-managed PIDs: {foreign_pids_with_tasks}")
         for foreign_pid, task_id_held in foreign_pids_with_tasks.items():
             try:
                 os.kill(foreign_pid, 0)
-                _LOGGER.warning(f"Task {task_id_held} is held by an active, unmanaged process (PID: {foreign_pid})")
+                log.warning(f"Task {task_id_held} is held by an active, unmanaged process (PID: {foreign_pid})")
             except ProcessLookupError:
-                _LOGGER.info(f"Task {task_id_held} was held by PID {foreign_pid}, which is no longer running")
+                log.info(f"Task {task_id_held} was held by PID {foreign_pid}, which is no longer running")
             except Exception as e:
-                _LOGGER.error(f"Unexpected error: {foreign_pid} holding task {task_id_held}: {e}")
+                log.error(f"Unexpected error: {foreign_pid} holding task {task_id_held}: {e}")
 
     async def reset_broken_tasks(self) -> None:
         """Reset any tasks that were being processed by exited or unmanaged workers."""
@@ -339,10 +336,10 @@ class WorkerManager:
 
                     result = await data.execute(update_stmt)
                     if result.rowcount > 0:
-                        _LOGGER.info(f"Reset {result.rowcount} tasks to state 'QUEUED' due to worker issues")
+                        log.info(f"Reset {result.rowcount} tasks to state 'QUEUED' due to worker issues")
 
         except Exception as e:
-            _LOGGER.error(f"Error resetting broken tasks: {e}")
+            log.error(f"Error resetting broken tasks: {e}")
 
 
 class WorkerProcess:
@@ -377,7 +374,7 @@ class WorkerProcess:
         except PermissionError:
             # Process exists, but we don't have permission to signal it
             # This shouldn't happen in our case since we own the process
-            _LOGGER.warning(f"Permission error checking process {self.pid}")
+            log.warning(f"Permission error checking process {self.pid}")
             return False
 
 

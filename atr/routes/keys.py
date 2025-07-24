@@ -22,8 +22,6 @@ import base64
 import binascii
 import datetime
 import hashlib
-import logging
-import logging.handlers
 from collections.abc import Awaitable, Callable, Sequence
 
 import aiohttp
@@ -36,6 +34,7 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
+import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.compose as compose
@@ -179,10 +178,10 @@ async def add(session: routes.CommitterSession) -> str:
             form = await AddOpenPGPKeyForm.create_form()
 
         except routes.FlashError as e:
-            logging.warning("FlashError adding OpenPGP key: %s", e)
+            log.warning("FlashError adding OpenPGP key: %s", e)
             await quart.flash(str(e), "error")
         except Exception as e:
-            logging.exception("Error adding OpenPGP key:")
+            log.exception("Error adding OpenPGP key:")
             await quart.flash(f"An unexpected error occurred: {e!s}", "error")
 
     return await template.render(

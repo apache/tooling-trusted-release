@@ -15,20 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import logging
 import pathlib
 import re
-from typing import Final
 
 import aiofiles.os
 
 import atr.analysis as analysis
+import atr.log as log
 import atr.models.results as results
 import atr.tasks.checks as checks
 import atr.util as util
 
 _ALLOWED_TOP_LEVEL = {"CHANGES", "LICENSE", "NOTICE", "README"}
-_LOGGER: Final = logging.getLogger(__name__)
 
 
 async def check(args: checks.FunctionArguments) -> results.Results | None:
@@ -71,7 +69,7 @@ async def check(args: checks.FunctionArguments) -> results.Results | None:
         return
 
     if not await aiofiles.os.path.isdir(base_path):
-        _LOGGER.error("Base release directory does not exist or is not a directory: %s", base_path)
+        log.error("Base release directory does not exist or is not a directory: %s", base_path)
         return
 
     is_podling = args.extra_args.get("is_podling", False)
@@ -188,13 +186,13 @@ async def _check_path_process_single(
 
     allowed_top_level = _ALLOWED_TOP_LEVEL
     if ext_artifact:
-        _LOGGER.info("Checking artifact rules for %s", full_path)
+        log.info("Checking artifact rules for %s", full_path)
         await _check_artifact_rules(base_path, relative_path, relative_paths, errors, is_podling)
     elif ext_metadata:
-        _LOGGER.info("Checking metadata rules for %s", full_path)
+        log.info("Checking metadata rules for %s", full_path)
         await _check_metadata_rules(base_path, relative_path, relative_paths, ext_metadata, errors, warnings)
     else:
-        _LOGGER.info("Checking general rules for %s", full_path)
+        log.info("Checking general rules for %s", full_path)
         if (relative_path.parent == pathlib.Path(".")) and (relative_path.name not in allowed_top_level):
             warnings.append(f"Unknown top level file: {relative_path.name}")
 

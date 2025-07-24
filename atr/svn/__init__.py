@@ -17,7 +17,6 @@
 
 import asyncio
 import datetime
-import logging
 import pathlib
 from typing import Final, Self
 
@@ -25,9 +24,9 @@ import pydantic
 import pydantic_xml
 
 import atr.config as config
+import atr.log as log
 
 _ASF_TOOL: Final[str] = "atr"
-_LOGGER: Final[logging.Logger] = logging.getLogger(__name__)
 
 
 class CommandExecutionError(RuntimeError):
@@ -101,17 +100,17 @@ async def _run_svn_command(sub_cmd: str, path: str, *args: str) -> str:
 
 
 async def _run_svn_info(path_or_url: str) -> str:
-    _LOGGER.debug(f"fetching svn info for '{path_or_url}'")
+    log.debug(f"fetching svn info for '{path_or_url}'")
     return await _run_svn_command("info", path_or_url)
 
 
 async def update(path: pathlib.Path) -> str:
-    _LOGGER.debug(f"running svn update for '{path}'")
+    log.debug(f"running svn update for '{path}'")
     return await _run_svn_command("update", str(path), "--parents")
 
 
 async def get_log(path: pathlib.Path) -> SvnLog:
-    _LOGGER.debug(f"running svn log for '{path}'")
+    log.debug(f"running svn log for '{path}'")
     svn_token = config.get().SVN_TOKEN
     if svn_token is None:
         raise ValueError("SVN_TOKEN must be set")
@@ -121,7 +120,7 @@ async def get_log(path: pathlib.Path) -> SvnLog:
 
 
 async def get_diff(path: pathlib.Path, revision: int) -> str:
-    _LOGGER.debug(f"running svn diff for '{path}': r{revision}")
+    log.debug(f"running svn diff for '{path}': r{revision}")
     svn_token = config.get().SVN_TOKEN
     if svn_token is None:
         raise ValueError("SVN_TOKEN must be set")
@@ -132,7 +131,7 @@ async def get_diff(path: pathlib.Path, revision: int) -> str:
 
 
 async def commit(path: pathlib.Path, url: str, username: str, revision: str, message: str) -> str:
-    _LOGGER.debug(f"running svn commit for user '{username}' to '{url}'")
+    log.debug(f"running svn commit for user '{username}' to '{url}'")
     # The username here is the ASF UID of the committer
     svn_token = config.get().SVN_TOKEN
     if svn_token is None:

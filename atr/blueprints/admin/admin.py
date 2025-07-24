@@ -17,14 +17,13 @@
 
 import asyncio
 import collections
-import logging
 import os
 import pathlib
 import statistics
 import sys
 import time
 from collections.abc import Callable, Mapping
-from typing import Any, Final
+from typing import Any
 
 import aiofiles.os
 import aiohttp
@@ -43,6 +42,7 @@ import atr.datasources.apache as apache
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.ldap as ldap
+import atr.log as log
 import atr.models.sql as sql
 import atr.routes.mapping as mapping
 import atr.storage as storage
@@ -50,8 +50,6 @@ import atr.storage.types as types
 import atr.template as template
 import atr.util as util
 import atr.validate as validate
-
-_LOGGER: Final = logging.getLogger(__name__)
 
 
 class BrowseAsUserForm(util.QuartFormTyped):
@@ -140,9 +138,9 @@ async def admin_browse_as() -> str | response.Response:
     ldap_projects_data = await apache.get_ldap_projects_data()
     committee_data = await apache.get_active_committee_data()
     ldap_data = ldap_params.results_list[0]
-    _LOGGER.info("Current session data: %s", current_session)
+    log.info("Current session data: %s", current_session)
     new_session_data = _session_data(ldap_data, new_uid, current_session, ldap_projects_data, committee_data)
-    _LOGGER.info("New session data: %s", new_session_data)
+    log.info("New session data: %s", new_session_data)
     session.write(new_session_data)
 
     await quart.flash(
@@ -346,11 +344,11 @@ async def admin_delete_release() -> str | response.Response:
                     await interaction.release_delete(release_name)
                     success_count += 1
                 except base.ASFQuartException as e:
-                    _LOGGER.error("Error deleting release %s: %s", release_name, e)
+                    log.error("Error deleting release %s: %s", release_name, e)
                     fail_count += 1
                     error_messages.append(f"{release_name}: {e}")
                 except Exception as e:
-                    _LOGGER.exception("Unexpected error deleting release %s:", release_name)
+                    log.exception("Unexpected error deleting release %s:", release_name)
                     fail_count += 1
                     error_messages.append(f"{release_name}: Unexpected error ({e})")
 
@@ -402,7 +400,7 @@ async def admin_keys_check() -> quart.Response:
         result = await _check_keys()
         return quart.Response(result, mimetype="text/plain")
     except Exception as e:
-        _LOGGER.exception("Exception during key check:")
+        log.exception("Exception during key check:")
         return quart.Response(f"Exception during key check: {e!s}", mimetype="text/plain")
 
 
@@ -469,7 +467,7 @@ async def admin_keys_update() -> str | response.Response | tuple[Mapping[str, An
             "category": "success",
         }, 200
     except Exception as e:
-        _LOGGER.exception("Failed to start key update process")
+        log.exception("Failed to start key update process")
         return {
             "message": f"Failed to update keys: {e!s}",
             "category": "error",
@@ -503,7 +501,7 @@ async def admin_ldap() -> str:
         )
         await asyncio.to_thread(ldap.search, ldap_params)
         end = time.perf_counter_ns()
-        _LOGGER.info("LDAP search took %d ms", (end - start) / 1000000)
+        log.info("LDAP search took %d ms", (end - start) / 1000000)
 
     return await template.render(
         "ldap-lookup.html",
@@ -521,7 +519,7 @@ async def admin_ongoing_tasks(project_name: str, version_name: str, revision: st
         ongoing = await interaction.tasks_ongoing(project_name, version_name, revision)
         return quart.Response(str(ongoing), mimetype="text/plain")
     except Exception:
-        _LOGGER.exception(f"Error fetching ongoing task count for {project_name} {version_name} rev {revision}:")
+        log.exception(f"Error fetching ongoing task count for {project_name} {version_name} rev {revision}:")
         return quart.Response("", mimetype="text/plain")
 
 
@@ -562,7 +560,7 @@ async def admin_performance() -> str:
                     }
                 )
             except (ValueError, IndexError):
-                app.logger.error("Error parsing line: %s", line)
+                log.error("Error parsing line: %s", line)
                 continue
 
     # Calculate summary statistics for each route
@@ -665,7 +663,6 @@ async def admin_test() -> quart.wrappers.response.Response:
         url = "https://downloads.apache.org/zeppelin/KEYS"
         async with aiohttp_client_session.get(url) as response:
             keys_file_text = await response.text()
-            # logging.info(f"Keys file text: {keys_file_text}")
 
     web_session = await session.read()
     if web_session is None:
@@ -678,21 +675,21 @@ async def admin_test() -> quart.wrappers.response.Response:
         start = time.perf_counter_ns()
         outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_stored(keys_file_text)
         end = time.perf_counter_ns()
-        logging.info(f"Upload of {outcomes.result_count} keys took {end - start} ns")
+        log.info(f"Upload of {outcomes.result_count} keys took {end - start} ns")
     for ocr in outcomes.results():
-        logging.info(f"Uploaded key: {type(ocr)} {ocr.key_model.fingerprint}")
+        log.info(f"Uploaded key: {type(ocr)} {ocr.key_model.fingerprint}")
     for oce in outcomes.exceptions():
-        logging.error(f"Error uploading key: {type(oce)} {oce}")
+        log.error(f"Error uploading key: {type(oce)} {oce}")
     parsed_count = outcomes.result_predicate_count(lambda k: k.status == types.KeyStatus.PARSED)
     inserted_count = outcomes.result_predicate_count(lambda k: k.status == types.KeyStatus.INSERTED)
     linked_count = outcomes.result_predicate_count(lambda k: k.status == types.KeyStatus.LINKED)
     inserted_and_linked_count = outcomes.result_predicate_count(
         lambda k: k.status == types.KeyStatus.INSERTED_AND_LINKED
     )
-    logging.info(f"Parsed: {parsed_count}")
-    logging.info(f"Inserted: {inserted_count}")
-    logging.info(f"Linked: {linked_count}")
-    logging.info(f"InsertedAndLinked: {inserted_and_linked_count}")
+    log.info(f"Parsed: {parsed_count}")
+    log.info(f"Inserted: {inserted_count}")
+    log.info(f"Linked: {linked_count}")
+    log.info(f"InsertedAndLinked: {inserted_and_linked_count}")
     return quart.Response(str(wacm), mimetype="text/plain")
 
 
@@ -812,7 +809,7 @@ async def _process_undiscovered(data: db.Session) -> tuple[int, int]:
     for committee in committees_without_projects:
         if committee.name == "incubator":
             continue
-        _LOGGER.warning(f"Missing top level project for committee {committee.name}")
+        log.warning(f"Missing top level project for committee {committee.name}")
         # If a committee is missing, the following code can be activated to fix it
         # But ideally the fix should be in the upstream data source
         automatically_fix = False
@@ -915,11 +912,11 @@ async def _update_keys() -> int:
         try:
             stdout, stderr = await process.communicate()
             if stdout:
-                _LOGGER.info(f"keys_import.py stdout:\n{stdout.decode('utf-8')[:1000]}")
+                log.info(f"keys_import.py stdout:\n{stdout.decode('utf-8')[:1000]}")
             if stderr:
-                _LOGGER.error(f"keys_import.py stderr:\n{stderr.decode('utf-8')[:1000]}")
+                log.error(f"keys_import.py stderr:\n{stderr.decode('utf-8')[:1000]}")
         except Exception:
-            _LOGGER.exception("Error reading from subprocess for keys_import.py")
+            log.exception("Error reading from subprocess for keys_import.py")
 
     app = asfquart.APP
     if not hasattr(app, "background_tasks"):
@@ -1005,7 +1002,7 @@ async def _update_podlings(
             ppmc.committee_members = podling_project.owners
             ppmc.committers = podling_project.members
         else:
-            _LOGGER.warning(f"could not find ldap data for podling {podling_name}")
+            log.warning(f"could not find ldap data for podling {podling_name}")
 
         podling = await data.project(name=podling_name).get()
         if not podling:
@@ -1049,7 +1046,7 @@ async def _update_projects(data: db.Session, projects: apache.ProjectsData) -> t
 
         pmc = await data.committee(name=project_status.pmc).get()
         if not pmc:
-            _LOGGER.warning(f"could not find PMC for project {project_name}: {project_status.pmc}")
+            log.warning(f"could not find PMC for project {project_name}: {project_status.pmc}")
             continue
 
         project_model = await data.project(name=project_name).get()

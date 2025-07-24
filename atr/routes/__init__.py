@@ -53,7 +53,6 @@ T = TypeVar("T")
 # TODO: Should get this from config, checking debug there
 _MEASURE_PERFORMANCE: Final[bool] = True
 
-# _LOGGER: Final = logging.getLogger(__name__)
 
 # |         1 | RSA (Encrypt or Sign) [HAC]                        |
 # |         2 | RSA Encrypt-Only [HAC]                             |

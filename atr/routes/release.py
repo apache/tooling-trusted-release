@@ -18,8 +18,6 @@
 """release.py"""
 
 import datetime
-import logging
-import logging.handlers
 
 import asfquart
 import asfquart.base as base
@@ -27,6 +25,7 @@ import werkzeug.wrappers.response as response
 
 import atr.db as db
 import atr.db.interaction as interaction
+import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.root as root
@@ -53,7 +52,7 @@ async def bulk_status(session: routes.CommitterSession, task_id: int) -> str | r
         # Get the release associated with this task if available
         release = None
         # Debug print the task.task_args using the logger
-        logging.debug(f"Task args: {task.task_args}")
+        log.debug(f"Task args: {task.task_args}")
         if task.task_args and isinstance(task.task_args, dict) and ("release_name" in task.task_args):
             release = await data.release(name=task.task_args["release_name"], _committee=True).get()
 

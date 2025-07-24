@@ -25,7 +25,6 @@
 import asyncio
 import datetime
 import inspect
-import logging
 import os
 import resource
 import signal
@@ -35,13 +34,12 @@ from typing import Any, Final
 import sqlmodel
 
 import atr.db as db
+import atr.log as log
 import atr.models.results as results
 import atr.models.sql as sql
 import atr.tasks as tasks
 import atr.tasks.checks as checks
 import atr.tasks.task as task
-
-_LOGGER: Final = logging.getLogger(__name__)
 
 # Resource limits, 5 minutes and 1GB
 # _CPU_LIMIT_SECONDS: Final = 300
@@ -61,21 +59,21 @@ def main() -> None:
 
     _setup_logging()
 
-    _LOGGER.info(f"Starting worker process with pid {os.getpid()}")
+    log.info(f"Starting worker process with pid {os.getpid()}")
 
     tasks: list[asyncio.Task] = []
 
     async def _handle_signal(signum: int) -> None:
-        _LOGGER.info(f"Received signal {signum}, shutting down...")
+        log.info(f"Received signal {signum}, shutting down...")
 
         await db.shutdown_database()
 
         for t in tasks:
             t.cancel()
 
-        _LOGGER.debug("Cancelled all running tasks")
+        log.debug("Cancelled all running tasks")
         asyncio.get_event_loop().stop()
-        _LOGGER.debug("Stopped event loop")
+        log.debug("Stopped event loop")
 
     for s in (signal.SIGTERM, signal.SIGINT):
         signal.signal(s, lambda signum, frame: asyncio.create_task(_handle_signal(signum)))
@@ -91,10 +89,12 @@ def main() -> None:
 
     # If the worker decides to stop running (see #230 in _worker_loop_run()), shutdown the database gracefully
     asyncio.run(db.shutdown_database())
-    _LOGGER.info("Exiting worker process")
+    log.info("Exiting worker process")
 
 
 def _setup_logging() -> None:
+    import logging
+
     # Configure logging
     log_format = "[%(asctime)s.%(msecs)03d] [%(process)d] [%(levelname)s] %(message)s"
     date_format = "%Y-%m-%d %H:%M:%S"
@@ -140,7 +140,7 @@ async def _task_next_claim() -> tuple[int, str, list[str] | dict[str, Any]] | No
 
             if claimed_task:
                 task_id, task_type, task_args = claimed_task
-                _LOGGER.info(f"Claimed task {task_id} ({task_type}) with args {task_args}")
+                log.info(f"Claimed task {task_id} ({task_type}) with args {task_args}")
                 return task_id, task_type, task_args
 
             return None
@@ -148,11 +148,11 @@ async def _task_next_claim() -> tuple[int, str, list[str] | dict[str, Any]] | No
 
 async def _task_process(task_id: int, task_type: str, task_args: list[str] | dict[str, Any]) -> None:
     """Process a claimed task."""
-    _LOGGER.info(f"Processing task {task_id} ({task_type}) with raw args {task_args}")
+    log.info(f"Processing task {task_id} ({task_type}) with raw args {task_args}")
     try:
         task_type_member = sql.TaskType(task_type)
     except ValueError as e:
-        _LOGGER.error(f"Invalid task type: {task_type}")
+        log.error(f"Invalid task type: {task_type}")
         await _task_result_process(task_id, None, task.FAILED, str(e))
         return
 
@@ -164,7 +164,7 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
 
         # Check whether the handler is a check handler
         if (len(params) == 1) and (params[0].annotation == checks.FunctionArguments):
-            _LOGGER.debug(f"Handler {handler.__name__} expects checks.FunctionArguments, fetching full task details")
+            log.debug(f"Handler {handler.__name__} expects checks.FunctionArguments, fetching full task details")
             async with db.session() as data:
                 task_obj = await data.task(id=task_id).demand(
                     ValueError(f"Task {task_id} disappeared during processing")
@@ -201,7 +201,7 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
                 primary_rel_path=task_obj.primary_rel_path,
                 extra_args=task_args,
             )
-            _LOGGER.debug(f"Calling {handler.__name__} with structured arguments: {function_arguments}")
+            log.debug(f"Calling {handler.__name__} with structured arguments: {function_arguments}")
             handler_result = await handler(function_arguments)
         else:
             # Otherwise, it's not a check handler
@@ -214,7 +214,7 @@ async def _task_process(task_id: int, task_type: str, task_args: list[str] | dic
         task_results = None
         status = task.FAILED
         error_details = traceback.format_exc()
-        _LOGGER.error(f"Task {task_id} failed processing: {error_details}")
+        log.error(f"Task {task_id} failed processing: {error_details}")
         error = str(e)
     await _task_result_process(task_id, task_results, status, error)
 
@@ -261,7 +261,7 @@ async def _worker_loop_run() -> None:
                 await asyncio.sleep(0.1)
         except Exception:
             # TODO: Should probably be more robust about this
-            _LOGGER.exception("Worker loop error")
+            log.exception("Worker loop error")
             await asyncio.sleep(1)
 
 
@@ -270,20 +270,20 @@ def _worker_resources_limit_set() -> None:
     # # Set CPU time limit
     # try:
     #     resource.setrlimit(resource.RLIMIT_CPU, (CPU_LIMIT_SECONDS, CPU_LIMIT_SECONDS))
-    #     _LOGGER.info(f"Set CPU time limit to {CPU_LIMIT_SECONDS} seconds")
+    #     log.info(f"Set CPU time limit to {CPU_LIMIT_SECONDS} seconds")
     # except ValueError as e:
-    #     _LOGGER.warning(f"Could not set CPU time limit: {e}")
+    #     log.warning(f"Could not set CPU time limit: {e}")
 
     # Set memory limit
     try:
         resource.setrlimit(resource.RLIMIT_AS, (_MEMORY_LIMIT_BYTES, _MEMORY_LIMIT_BYTES))
-        _LOGGER.info(f"Set memory limit to {_MEMORY_LIMIT_BYTES} bytes")
+        log.info(f"Set memory limit to {_MEMORY_LIMIT_BYTES} bytes")
     except ValueError as e:
-        _LOGGER.warning(f"Could not set memory limit: {e}")
+        log.warning(f"Could not set memory limit: {e}")
 
 
 if __name__ == "__main__":
-    _LOGGER.info("Starting ATR worker...")
+    log.info("Starting ATR worker...")
     try:
         main()
     except Exception as e:

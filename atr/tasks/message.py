@@ -15,18 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import logging
-from typing import Final
-
+import atr.log as log
 import atr.mail as mail
 import atr.models.results as results
 import atr.models.schema as schema
 import atr.tasks.checks as checks
 import atr.util as util
-
-# Configure detailed logging
-_LOGGER: Final = logging.getLogger(__name__)
-_LOGGER.setLevel(logging.DEBUG)
 
 
 class Send(schema.Strict):
@@ -60,9 +54,9 @@ async def send(args: Send) -> results.Results | None:
     await mail.set_secret_key_default()
     mid, mail_errors = await mail.send(message)
     if mail_errors:
-        _LOGGER.warning(f"Mail sending to {args.email_recipient} for subject '{args.subject}' encountered errors:")
+        log.warning(f"Mail sending to {args.email_recipient} for subject '{args.subject}' encountered errors:")
         for error in mail_errors:
-            _LOGGER.warning(f"- {error}")
+            log.warning(f"- {error}")
 
     # TODO: Record the vote in the database?
     # We'd need to sync with manual votes too

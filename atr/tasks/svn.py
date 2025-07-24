@@ -16,19 +16,17 @@
 # under the License.
 
 import asyncio
-import logging
 import pathlib
-from typing import Any, Final
+from typing import Any
 
 import aiofiles.os
 import aioshutil
 
+import atr.log as log
 import atr.models.results as results
 import atr.models.schema as schema
 import atr.revision as revision
 import atr.tasks.checks as checks
-
-_LOGGER: Final = logging.getLogger(__name__)
 
 
 class SvnImport(schema.Strict):
@@ -60,16 +58,16 @@ async def import_files(args: SvnImport) -> results.Results | None:
             msg=result_message,
         )
     except SvnImportError as e:
-        _LOGGER.error(f"SVN import failed: {e.details}")
+        log.error(f"SVN import failed: {e.details}")
         raise
     except Exception:
-        _LOGGER.exception("Unexpected error during SVN import task")
+        log.exception("Unexpected error during SVN import task")
         raise
 
 
 async def _import_files_core(args: SvnImport) -> str:
     """Core logic to perform the SVN export."""
-    _LOGGER.info(f"Starting SVN import for {args.project_name}-{args.version_name}")
+    log.info(f"Starting SVN import for {args.project_name}-{args.version_name}")
     # We have to use a temporary directory otherwise SVN thinks it's a pegged revision
     temp_export_dir_name = ".svn-export.tmp"
 
@@ -78,7 +76,7 @@ async def _import_files_core(args: SvnImport) -> str:
         args.project_name, args.version_name, args.asf_uid, description=description
     ) as creating:
         # Uses creating.new after this block
-        _LOGGER.debug(f"Created revision directory: {creating.interim_path}")
+        log.debug(f"Created revision directory: {creating.interim_path}")
 
         final_target_path = creating.interim_path
         if args.target_subdirectory:
@@ -109,18 +107,18 @@ async def _import_files_core(args: SvnImport) -> str:
 
         # Move files from temp export path to final target path
         # We only have to do this to avoid the SVN pegged revision issue
-        _LOGGER.info(f"Moving exported files from {temp_export_path} to {final_target_path}")
+        log.info(f"Moving exported files from {temp_export_path} to {final_target_path}")
         for item_name in await aiofiles.os.listdir(temp_export_path):
             source_item = temp_export_path / item_name
             destination_item = final_target_path / item_name
             try:
                 await aioshutil.move(str(source_item), str(destination_item))
             except FileExistsError:
-                _LOGGER.warning(f"Item {destination_item} already exists, skipping move for {item_name}")
+                log.warning(f"Item {destination_item} already exists, skipping move for {item_name}")
             except Exception as move_err:
-                _LOGGER.error(f"Error moving {source_item} to {destination_item}: {move_err}")
+                log.error(f"Error moving {source_item} to {destination_item}: {move_err}")
         await aiofiles.os.rmdir(temp_export_path)
-        _LOGGER.info(f"Removed temporary export directory: {temp_export_path}")
+        log.info(f"Removed temporary export directory: {temp_export_path}")
 
     if creating.new is None:
         raise SvnImportError("Internal error: New revision not found")
@@ -129,7 +127,7 @@ async def _import_files_core(args: SvnImport) -> str:
 
 async def _import_files_core_run_svn_export(svn_command: list[str], temp_export_path: pathlib.Path) -> None:
     """Execute the svn export command and handle errors."""
-    _LOGGER.info(f"Executing SVN command: {' '.join(svn_command)}")
+    log.info(f"Executing SVN command: {' '.join(svn_command)}")
 
     timeout_seconds = 600
     try:
@@ -144,26 +142,26 @@ async def _import_files_core_run_svn_export(svn_command: list[str], temp_export_
         stderr_str = stderr.decode("utf-8", errors="ignore").strip() if stderr else ""
 
         if process.returncode != 0:
-            _LOGGER.error(f"SVN export failed with code {process.returncode}")
-            _LOGGER.error(f"SVN stderr: {stderr_str}")
-            _LOGGER.error(f"SVN stdout: {stdout_str[:1000]}")
+            log.error(f"SVN export failed with code {process.returncode}")
+            log.error(f"SVN stderr: {stderr_str}")
+            log.error(f"SVN stdout: {stdout_str[:1000]}")
             raise SvnImportError(
                 f"SVN export failed with code {process.returncode}",
                 details={"returncode": process.returncode, "stderr": stderr_str, "stdout": stdout_str[:1000]},
             )
 
-        _LOGGER.info("SVN export to temporary directory successful")
+        log.info("SVN export to temporary directory successful")
         if stdout_str:
-            _LOGGER.debug(f"SVN stdout: {stdout_str}")
+            log.debug(f"SVN stdout: {stdout_str}")
         if stderr_str:
-            _LOGGER.warning(f"SVN stderr: {stderr_str}")
+            log.warning(f"SVN stderr: {stderr_str}")
 
     except TimeoutError:
-        _LOGGER.error("SVN export command timed out after %d seconds", timeout_seconds)
+        log.error("SVN export command timed out after %d seconds", timeout_seconds)
         raise SvnImportError("SVN export command timed out")
     except FileNotFoundError:
-        _LOGGER.error("svn command not found. Is it installed and in PATH?")
+        log.error("svn command not found. Is it installed and in PATH?")
         raise SvnImportError("svn command not found")
     except Exception as e:
-        _LOGGER.exception("Unexpected error during SVN export subprocess execution")
+        log.exception("Unexpected error during SVN export subprocess execution")
         raise SvnImportError(f"Unexpected error during SVN export: {e}")

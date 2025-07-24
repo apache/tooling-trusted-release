@@ -16,7 +16,6 @@
 # under the License.
 
 import asyncio
-import logging
 import os
 import pathlib
 import subprocess
@@ -26,6 +25,7 @@ from typing import Any, Final
 
 import atr.archives as archives
 import atr.config as config
+import atr.log as log
 import atr.models.results as results
 import atr.tasks.checks as checks
 import atr.util as util
@@ -41,7 +41,6 @@ _JAVA_MEMORY_ARGS: Final[list[str]] = []
 #     "-XX:MaxRAM=256m",
 #     "-XX:CompressedClassSpaceSize=16m"
 # ]
-_LOGGER: Final = logging.getLogger(__name__)
 _RAT_EXCLUDES_FILENAMES: Final[set[str]] = {".rat-excludes", "rat-excludes.txt"}
 
 
@@ -51,10 +50,10 @@ async def check(args: checks.FunctionArguments) -> results.Results | None:
     if not (artifact_abs_path := await recorder.abs_path()):
         return None
     if await recorder.primary_path_is_binary():
-        _LOGGER.info(f"Skipping RAT check for binary artifact {artifact_abs_path} (rel: {args.primary_rel_path})")
+        log.info(f"Skipping RAT check for binary artifact {artifact_abs_path} (rel: {args.primary_rel_path})")
         return None
 
-    _LOGGER.info(f"Checking RAT licenses for {artifact_abs_path} (rel: {args.primary_rel_path})")
+    log.info(f"Checking RAT licenses for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
         result_data = await asyncio.to_thread(
@@ -91,8 +90,8 @@ def _check_core_logic(
     chunk_size: int = _CONFIG.EXTRACT_CHUNK_SIZE,
 ) -> dict[str, Any]:
     """Verify license headers using Apache RAT."""
-    _LOGGER.info(f"Verifying licenses with Apache RAT for {artifact_path}")
-    _LOGGER.info(f"PATH environment variable: {os.environ.get('PATH', 'PATH not found')}")
+    log.info(f"Verifying licenses with Apache RAT for {artifact_path}")
+    log.info(f"PATH environment variable: {os.environ.get('PATH', 'PATH not found')}")
 
     java_check = _check_java_installed()
     if java_check is not None:
@@ -107,14 +106,14 @@ def _check_core_logic(
         # Create a temporary directory for extraction
         # TODO: We could extract to somewhere in "state/" instead
         with tempfile.TemporaryDirectory(prefix="rat_verify_") as temp_dir:
-            _LOGGER.info(f"Created temporary directory: {temp_dir}")
+            log.info(f"Created temporary directory: {temp_dir}")
 
             # # Find and validate the root directory
             # try:
             #     root_dir = targz.root_directory(artifact_path)
             # except targz.RootDirectoryError as e:
             #     error_msg = str(e)
-            #     _LOGGER.error(f"Archive root directory issue: {error_msg}")
+            #     log.error(f"Archive root directory issue: {error_msg}")
             #     return {
             #         "valid": False,
             #         "message": "No root directory found",
@@ -131,7 +130,7 @@ def _check_core_logic(
             # extract_dir = os.path.join(temp_dir, root_dir)
 
             # Extract the archive to the temporary directory
-            _LOGGER.info(f"Extracting {artifact_path} to {temp_dir}")
+            log.info(f"Extracting {artifact_path} to {temp_dir}")
             extracted_size, extracted_paths = archives.extract(
                 artifact_path,
                 temp_dir,
@@ -139,18 +138,18 @@ def _check_core_logic(
                 chunk_size=chunk_size,
                 track_files=_RAT_EXCLUDES_FILENAMES,
             )
-            _LOGGER.info(f"Extracted {extracted_size} bytes")
+            log.info(f"Extracted {extracted_size} bytes")
 
             # Find the root directory
             if (extract_dir := _extracted_dir(temp_dir)) is None:
-                _LOGGER.error("No root directory found in archive")
+                log.error("No root directory found in archive")
                 return {
                     "valid": False,
                     "message": "No root directory found in archive",
                     "errors": [],
                 }
 
-            _LOGGER.info(f"Using root directory: {extract_dir}")
+            log.info(f"Using root directory: {extract_dir}")
 
             # Execute RAT and get results or error
             error_result, xml_output_path = _check_core_logic_execute_rat(
@@ -160,19 +159,19 @@ def _check_core_logic(
                 return error_result
 
             # Parse the XML output
-            _LOGGER.info(f"Parsing RAT XML output: {xml_output_path}")
+            log.info(f"Parsing RAT XML output: {xml_output_path}")
             # Make sure xml_output_path is not None before parsing
             if xml_output_path is None:
                 raise ValueError("XML output path is None")
 
             results = _check_core_logic_parse_output(xml_output_path, extract_dir)
-            _LOGGER.info(f"Successfully parsed RAT output with {results.get('total_files', 0)} files")
+            log.info(f"Successfully parsed RAT output with {results.get('total_files', 0)} files")
             return results
 
     except Exception as e:
         import traceback
 
-        _LOGGER.exception("Error running Apache RAT")
+        log.exception("Error running Apache RAT")
         return {
             "valid": False,
             "message": f"Failed to run Apache RAT: {e!s}",
@@ -192,7 +191,7 @@ def _check_core_logic_execute_rat(
     """Execute Apache RAT and process its output."""
     # Define output file path
     xml_output_path = os.path.join(temp_dir, "rat-report.xml")
-    _LOGGER.info(f"XML output will be written to: {xml_output_path}")
+    log.info(f"XML output will be written to: {xml_output_path}")
 
     # Run Apache RAT on the extracted directory
     # Use -x flag for XML output and -o to specify the output file
@@ -212,18 +211,18 @@ def _check_core_logic_execute_rat(
     ]
     if excluded_paths:
         _rat_apply_exclusions(extract_dir, excluded_paths, temp_dir)
-    _LOGGER.info(f"Running Apache RAT: {' '.join(command)}")
+    log.info(f"Running Apache RAT: {' '.join(command)}")
 
     # Change working directory to extract_dir when running the process
     current_dir = os.getcwd()
     os.chdir(extract_dir)
 
-    _LOGGER.info(f"Executing Apache RAT from directory: {os.getcwd()}")
+    log.info(f"Executing Apache RAT from directory: {os.getcwd()}")
 
     try:
         # # First make sure we can run Java
         # java_check = subprocess.run(["java", "-version"], capture_output=True, timeout=10)
-        # _LOGGER.info(f"Java check completed with return code {java_check.returncode}")
+        # log.info(f"Java check completed with return code {java_check.returncode}")
 
         # Run the actual RAT command
         # We do check=False because we'll handle errors below
@@ -237,9 +236,9 @@ def _check_core_logic_execute_rat(
         )
 
         if process.returncode != 0:
-            _LOGGER.error(f"Apache RAT failed with return code {process.returncode}")
-            _LOGGER.error(f"STDOUT: {process.stdout}")
-            _LOGGER.error(f"STDERR: {process.stderr}")
+            log.error(f"Apache RAT failed with return code {process.returncode}")
+            log.error(f"STDOUT: {process.stdout}")
+            log.error(f"STDERR: {process.stderr}")
             os.chdir(current_dir)
             error_dict = {
                 "valid": False,
@@ -258,11 +257,11 @@ def _check_core_logic_execute_rat(
             }
             return error_dict, None
 
-        _LOGGER.info(f"Apache RAT completed successfully with return code {process.returncode}")
-        _LOGGER.info(f"stdout: {process.stdout[:200]}...")
+        log.info(f"Apache RAT completed successfully with return code {process.returncode}")
+        log.info(f"stdout: {process.stdout[:200]}...")
     except subprocess.TimeoutExpired as e:
         os.chdir(current_dir)
-        _LOGGER.error(f"Apache RAT process timed out: {e}")
+        log.error(f"Apache RAT process timed out: {e}")
         return {
             "valid": False,
             "message": "Apache RAT process timed out",
@@ -277,7 +276,7 @@ def _check_core_logic_execute_rat(
     except Exception as e:
         # Change back to the original directory before raising
         os.chdir(current_dir)
-        _LOGGER.error(f"Exception running Apache RAT: {e}")
+        log.error(f"Exception running Apache RAT: {e}")
         return {
             "valid": False,
             "message": f"Apache RAT process failed: {e}",
@@ -295,11 +294,11 @@ def _check_core_logic_execute_rat(
 
     # Check that the output file exists
     if not os.path.exists(xml_output_path):
-        _LOGGER.error(f"XML output file not found at: {xml_output_path}")
+        log.error(f"XML output file not found at: {xml_output_path}")
         # List files in the temporary directory
-        _LOGGER.info(f"Files in {temp_dir}: {os.listdir(temp_dir)}")
+        log.info(f"Files in {temp_dir}: {os.listdir(temp_dir)}")
         # Look in the current directory too
-        _LOGGER.info(f"Files in current directory: {os.listdir('.')}")
+        log.info(f"Files in current directory: {os.listdir('.')}")
         return {
             "valid": False,
             "message": f"RAT output XML file not found: {xml_output_path}",
@@ -313,7 +312,7 @@ def _check_core_logic_execute_rat(
         }, None
 
     # The XML was found correctly
-    _LOGGER.info(f"Found XML output at: {xml_output_path} (size: {os.path.getsize(xml_output_path)} bytes)")
+    log.info(f"Found XML output at: {xml_output_path} (size: {os.path.getsize(xml_output_path)} bytes)")
     return None, xml_output_path
 
 
@@ -321,7 +320,7 @@ def _check_core_logic_jar_exists(rat_jar_path: str) -> tuple[str, dict[str, Any]
     """Verify that the Apache RAT JAR file exists and is accessible."""
     # Check that the RAT JAR exists
     if not os.path.exists(rat_jar_path):
-        _LOGGER.error(f"Apache RAT JAR not found at: {rat_jar_path}")
+        log.error(f"Apache RAT JAR not found at: {rat_jar_path}")
         # Try a few common locations:
         # ./rat.jar
         # ./state/rat.jar
@@ -338,17 +337,17 @@ def _check_core_logic_jar_exists(rat_jar_path: str) -> tuple[str, dict[str, Any]
 
         for alt_path in alternative_paths:
             if os.path.exists(alt_path):
-                _LOGGER.info(f"Found alternative RAT JAR at: {alt_path}")
+                log.info(f"Found alternative RAT JAR at: {alt_path}")
                 rat_jar_path = alt_path
                 break
 
         # Double check whether we found the JAR
         if not os.path.exists(rat_jar_path):
-            _LOGGER.error("Tried alternative paths but Apache RAT JAR still not found")
-            _LOGGER.error(f"Current directory: {os.getcwd()}")
-            _LOGGER.error(f"Directory contents: {os.listdir(os.getcwd())}")
+            log.error("Tried alternative paths but Apache RAT JAR still not found")
+            log.error(f"Current directory: {os.getcwd()}")
+            log.error(f"Directory contents: {os.listdir(os.getcwd())}")
             if os.path.exists("state"):
-                _LOGGER.error(f"State directory contents: {os.listdir('state')}")
+                log.error(f"State directory contents: {os.listdir('state')}")
 
             return rat_jar_path, {
                 "valid": False,
@@ -362,7 +361,7 @@ def _check_core_logic_jar_exists(rat_jar_path: str) -> tuple[str, dict[str, Any]
                 "errors": [f"Missing JAR: {rat_jar_path}"],
             }
     else:
-        _LOGGER.info(f"Found Apache RAT JAR at: {rat_jar_path}")
+        log.info(f"Found Apache RAT JAR at: {rat_jar_path}")
 
     return rat_jar_path, None
 
@@ -372,7 +371,7 @@ def _check_core_logic_parse_output(xml_file: str, base_dir: str) -> dict[str, An
     try:
         return _check_core_logic_parse_output_core(xml_file, base_dir)
     except Exception as e:
-        _LOGGER.error(f"Error parsing RAT output: {e}")
+        log.error(f"Error parsing RAT output: {e}")
         return {
             "valid": False,
             "message": f"Failed to parse Apache RAT output: {e!s}",
@@ -455,9 +454,9 @@ def _check_java_installed() -> dict[str, Any] | None:
         java_version = subprocess.check_output(
             ["java", *_JAVA_MEMORY_ARGS, "-version"], stderr=subprocess.STDOUT, text=True
         )
-        _LOGGER.info(f"Java version: {java_version.splitlines()[0]}")
+        log.info(f"Java version: {java_version.splitlines()[0]}")
     except (subprocess.SubprocessError, FileNotFoundError) as e:
-        _LOGGER.error(f"Java is not properly installed or not in PATH: {e}")
+        log.error(f"Java is not properly installed or not in PATH: {e}")
 
         # Try to get some output even if the command failed
         try:
@@ -469,15 +468,15 @@ def _check_java_installed() -> dict[str, Any] | None:
                 text=True,
                 check=False,
             )
-            _LOGGER.info(f"Java command return code: {java_result.returncode}")
-            _LOGGER.info(f"Java command output: {java_result.stdout or java_result.stderr}")
+            log.info(f"Java command return code: {java_result.returncode}")
+            log.info(f"Java command output: {java_result.stdout or java_result.stderr}")
 
             # Try to find where Java might be located
             which_java = subprocess.run(["which", "java"], capture_output=True, text=True, check=False)
             which_java_result = which_java.stdout.strip() if (which_java.returncode == 0) else "not found"
-            _LOGGER.info(f"Result for which java: {which_java_result}")
+            log.info(f"Result for which java: {which_java_result}")
         except Exception as inner_e:
-            _LOGGER.error(f"Additional error while trying to debug java: {inner_e}")
+            log.error(f"Additional error while trying to debug java: {inner_e}")
 
         return {
             "valid": False,
@@ -495,7 +494,7 @@ def _check_java_installed() -> dict[str, Any] | None:
 def _extracted_dir(temp_dir: str) -> str | None:
     # Loop through all the dirs in temp_dir
     extract_dir = None
-    _LOGGER.info(f"Checking directories in {temp_dir}: {os.listdir(temp_dir)}")
+    log.info(f"Checking directories in {temp_dir}: {os.listdir(temp_dir)}")
     for dir_name in os.listdir(temp_dir):
         if dir_name.startswith("."):
             continue
@@ -523,10 +522,10 @@ def _rat_apply_exclusions(extract_dir: str, excluded_paths: list[str], temp_dir:
     for excluded_path in excluded_paths:
         abs_excluded_path = os.path.join(temp_dir, excluded_path)
         if not os.path.exists(abs_excluded_path):
-            _LOGGER.error(f"Exclusion file not found: {abs_excluded_path}")
+            log.error(f"Exclusion file not found: {abs_excluded_path}")
             continue
         if not os.path.isfile(abs_excluded_path):
-            _LOGGER.error(f"Exclusion file is not a file: {abs_excluded_path}")
+            log.error(f"Exclusion file is not a file: {abs_excluded_path}")
             continue
         with open(abs_excluded_path, encoding="utf-8") as f:
             exclusion_lines.extend(f.readlines())
@@ -537,7 +536,7 @@ def _rat_apply_exclusions(extract_dir: str, excluded_paths: list[str], temp_dir:
         for file in files:
             abs_path = os.path.join(root, file)
             if matcher(abs_path):
-                _LOGGER.info(f"Removing {abs_path} because it matches the exclusion")
+                log.info(f"Removing {abs_path} because it matches the exclusion")
                 os.remove(abs_path)
 
 

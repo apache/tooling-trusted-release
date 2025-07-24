@@ -18,12 +18,10 @@
 import asyncio
 import contextlib
 import datetime
-import logging
 import pathlib
 import pprint
 import re
 from collections.abc import AsyncGenerator, Sequence
-from typing import Final
 
 import aiofiles.os
 import aioshutil
@@ -34,12 +32,11 @@ import sqlmodel
 
 import atr.analysis as analysis
 import atr.db as db
+import atr.log as log
 import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.user as user
 import atr.util as util
-
-_LOGGER: Final = logging.getLogger(__name__)
 
 
 class ApacheUserMissingError(RuntimeError):
@@ -124,7 +121,7 @@ async def key_user_add(
             if added:
                 added_keys.append(added)
             else:
-                _LOGGER.warning(f"Failed to add key {key} to user {asf_uid}")
+                log.warning(f"Failed to add key {key} to user {asf_uid}")
     return added_keys
 
 
@@ -185,13 +182,13 @@ async def key_user_session_add(
                 existing.ascii_armored_key = (
                     public_key.decode("utf-8", errors="replace") if isinstance(public_key, bytes) else public_key
                 )
-                logging.info(f"Found existing key {fingerprint.upper()}, updating associations")
+                log.info(f"Found existing key {fingerprint.upper()}, updating associations")
             else:
-                logging.info(f"Found existing key {fingerprint.upper()}, no update needed")
+                log.info(f"Found existing key {fingerprint.upper()}, no update needed")
             key_record = existing
         else:
             # Key doesn't exist, create it
-            logging.info(f"Adding new key {fingerprint.upper()}")
+            log.info(f"Adding new key {fingerprint.upper()}")
 
             key_record = sql.PublicSigningKey(
                 fingerprint=fingerprint,
@@ -224,14 +221,14 @@ async def key_user_session_add(
                 if link_exists.scalar_one_or_none() is None:
                     committee_statuses[committee_name] = "newly_linked"
                     # Link doesn't exist, create it
-                    logging.debug(f"Linking key {fingerprint.upper()} to committee {committee_name}")
+                    log.debug(f"Linking key {fingerprint.upper()} to committee {committee_name}")
                     link = sql.KeyLink(committee_name=committee.name, key_fingerprint=key_record.fingerprint)
                     data.add(link)
                 else:
                     committee_statuses[committee_name] = "already_linked"
-                    logging.debug(f"Link already exists for key {fingerprint.upper()} and committee {committee_name}")
+                    log.debug(f"Link already exists for key {fingerprint.upper()} and committee {committee_name}")
             else:
-                logging.warning(f"Could not find committee {committee_name} to link key {fingerprint.upper()}")
+                log.warning(f"Could not find committee {committee_name} to link key {fingerprint.upper()}")
                 continue
 
     # TODO: What if there is no email?
@@ -287,17 +284,17 @@ async def release_delete(
         release_dir = util.release_directory_base(release)
 
         # Delete from the database
-        _LOGGER.info("Deleting database records for release: %s", release_name)
+        log.info("Deleting database records for release: %s", release_name)
         # Cascade should handle this, but we delete manually anyway
         tasks_to_delete = await data.task(project_name=release.project.name, version_name=release.version).all()
         for task in tasks_to_delete:
             await data.delete(task)
-        _LOGGER.debug("Deleted %d tasks for %s", len(tasks_to_delete), release_name)
+        log.debug("Deleted %d tasks for %s", len(tasks_to_delete), release_name)
 
         checks_to_delete = await data.check_result(release_name=release_name).all()
         for check in checks_to_delete:
             await data.delete(check)
-        _LOGGER.debug("Deleted %d check results for %s", len(checks_to_delete), release_name)
+        log.debug("Deleted %d check results for %s", len(checks_to_delete), release_name)
 
         # TODO: Ensure that revisions are not deleted
         # But this makes testing difficult
@@ -306,7 +303,7 @@ async def release_delete(
         # We could create uniquely named releases in tests
         # Currently part of the discussion in #171, but should be its own issue
         await data.delete(release)
-        _LOGGER.info("Deleted release record: %s", release_name)
+        log.info("Deleted release record: %s", release_name)
         await data.commit()
 
     if include_downloads:
@@ -466,7 +463,7 @@ async def _delete_release_data_downloads(release: sql.Release) -> None:
                     link_stat = await aiofiles.os.stat(full_link_path)
                     if link_stat.st_ino in release_inodes:
                         await aiofiles.os.remove(full_link_path)
-                        _LOGGER.info(f"Deleted hard link: {full_link_path}")
+                        log.info(f"Deleted hard link: {full_link_path}")
                 except FileNotFoundError:
                     continue
 
@@ -475,15 +472,15 @@ async def _delete_release_data_filesystem(release_dir: pathlib.Path, release_nam
     # Delete from the filesystem
     try:
         if await aiofiles.os.path.isdir(release_dir):
-            _LOGGER.info("Deleting filesystem directory: %s", release_dir)
+            log.info("Deleting filesystem directory: %s", release_dir)
             # Believe this to be another bug in mypy Protocol handling
             # TODO: Confirm that this is a bug, and report upstream
             await aioshutil.rmtree(release_dir)  # type: ignore[call-arg]
-            _LOGGER.info("Successfully deleted directory: %s", release_dir)
+            log.info("Successfully deleted directory: %s", release_dir)
         else:
-            _LOGGER.warning("Filesystem directory not found, skipping deletion: %s", release_dir)
+            log.warning("Filesystem directory not found, skipping deletion: %s", release_dir)
     except Exception as e:
-        _LOGGER.exception("Error deleting filesystem directory %s:", release_dir)
+        log.exception("Error deleting filesystem directory %s:", release_dir)
         await quart.flash(
             f"Database records for '{release_name}' deleted, but failed to delete filesystem directory: {e!s}",
             "warning",
@@ -530,14 +527,14 @@ async def _key_user_add_validate_key_properties(public_key: str) -> list[dict]:
             if key.get("fingerprint") is None:
                 continue
     if not keys:
-        _LOGGER.warning(f"No keys found in {public_key}")
+        log.warning(f"No keys found in {public_key}")
         return []
 
     # Find the specific key details from the list using the fingerprint
     results = []
     for key in keys:
         if key.get("fingerprint") is None:
-            _LOGGER.warning(f"Key {key} has no fingerprint")
+            log.warning(f"Key {key} has no fingerprint")
             continue
 
         # Validate key algorithm and length
@@ -618,7 +615,6 @@ async def _upload_process_key_blocks(
                     }
                 )
         except (InteractionError, PublicKeyError) as e:
-            # logging.warning(f"InteractionError processing key #{i + 1}: {e}")
             results.append(
                 {
                     "status": "error",
@@ -631,7 +627,7 @@ async def _upload_process_key_blocks(
                 }
             )
         except Exception as e:
-            logging.exception(f"Exception processing key #{i + 1}:")
+            log.exception(f"Exception processing key #{i + 1}:")
             fingerprint, user_id = "Unknown", "None"
             if isinstance(e, ApacheUserMissingError):
                 fingerprint = e.fingerprint or "Unknown"

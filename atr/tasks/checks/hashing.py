@@ -16,16 +16,13 @@
 # under the License.
 
 import hashlib
-import logging
 import secrets
-from typing import Final
 
 import aiofiles
 
+import atr.log as log
 import atr.models.results as results
 import atr.tasks.checks as checks
-
-_LOGGER: Final = logging.getLogger(__name__)
 
 
 async def check(args: checks.FunctionArguments) -> results.Results | None:
@@ -47,7 +44,7 @@ async def check(args: checks.FunctionArguments) -> results.Results | None:
     # PosixPath('a/b/c.d.e.f')
     artifact_abs_path = hash_abs_path.with_suffix("")
 
-    _LOGGER.info(
+    log.info(
         f"Checking hash ({algorithm}) for {artifact_abs_path} against {hash_abs_path} (rel: {args.primary_rel_path})"
     )
 

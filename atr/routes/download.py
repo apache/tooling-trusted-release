@@ -152,7 +152,6 @@ async def _download_or_list(project_name: str, version_name: str, file_path: str
         release = await session.release(project_name=project_name, version=version_name).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
-    # logging.warning(f"Downloading {file_path} from {release}")
     full_path = util.release_directory(release) / file_path
 
     if await aiofiles.os.path.isdir(full_path):

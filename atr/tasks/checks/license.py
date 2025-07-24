@@ -18,21 +18,18 @@
 import asyncio
 import difflib
 import hashlib
-import logging
 import os
 import re
 from collections.abc import Iterator
 from typing import Any, Final
 
+import atr.log as log
 import atr.models.results as results
 import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.static as static
 import atr.tarzip as tarzip
 import atr.tasks.checks as checks
-
-_LOGGER: Final = logging.getLogger(__name__)
-
 
 # Constant that must be present in the Apache License header
 HTTP_APACHE_LICENSE_HEADER: Final[bytes] = (
@@ -130,7 +127,7 @@ async def files(args: checks.FunctionArguments) -> results.Results | None:
     if await recorder.primary_path_is_binary():
         return None
 
-    _LOGGER.info(f"Checking license files for {artifact_abs_path} (rel: {args.primary_rel_path})")
+    log.info(f"Checking license files for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
         is_podling = args.extra_args.get("is_podling", False)
@@ -144,7 +141,7 @@ async def files(args: checks.FunctionArguments) -> results.Results | None:
                     pass
 
     except Exception as e:
-        _LOGGER.exception("Error during license file check execution:")
+        log.exception("Error during license file check execution:")
         await recorder.exception("Error during license file check execution", {"error": str(e)})
 
     return None
@@ -158,7 +155,7 @@ async def headers(args: checks.FunctionArguments) -> results.Results | None:
     if await recorder.primary_path_is_binary():
         return None
 
-    _LOGGER.info(f"Checking license headers for {artifact_abs_path} (rel: {args.primary_rel_path})")
+    log.info(f"Checking license headers for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
         for result in await asyncio.to_thread(_headers_check_core_logic, str(artifact_abs_path)):
@@ -249,7 +246,7 @@ def _files_check_core_logic_license(archive: tarzip.Archive, member: tarzip.Memb
     sha3_expected = sha3e.hexdigest()
 
     if sha3_expected != "5efa4839f385df309ffc022ca5ce9763c4bc709dab862ca77d9a894db6598456":
-        _LOGGER.error("SHA3 expected value is incorrect, please update the static.LICENSE constant")
+        log.error("SHA3 expected value is incorrect, please update the static.LICENSE constant")
 
     # It is common for the license to be used without the leading blank line
     apache_license_2_0 = static.APACHE_LICENSE_2_0.removeprefix("\n")

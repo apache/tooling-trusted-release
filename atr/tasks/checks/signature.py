@@ -16,7 +16,6 @@
 # under the License.
 
 import asyncio
-import logging
 import tempfile
 import time
 from typing import Any, Final
@@ -25,12 +24,11 @@ import gnupg
 import sqlmodel
 
 import atr.db as db
+import atr.log as log
 import atr.models.results as results
 import atr.models.sql as sql
 import atr.tasks.checks as checks
 import atr.util as util
-
-_LOGGER: Final = logging.getLogger(__name__)
 
 
 async def check(args: checks.FunctionArguments) -> results.Results | None:
@@ -52,7 +50,7 @@ async def check(args: checks.FunctionArguments) -> results.Results | None:
         await recorder.failure("Committee name is required", {"committee_name": committee_name})
         return None
 
-    _LOGGER.info(
+    log.info(
         f"Checking signature {primary_abs_path} for {artifact_abs_path}"
         f" using {committee_name} keys (rel: {primary_rel_path})"
     )
@@ -79,7 +77,7 @@ async def check(args: checks.FunctionArguments) -> results.Results | None:
 
 async def _check_core_logic(committee_name: str, artifact_path: str, signature_path: str) -> dict[str, Any]:
     """Verify a signature file using the committee's public signing keys."""
-    _LOGGER.info(f"Attempting to fetch keys for committee_name: '{committee_name}'")
+    log.info(f"Attempting to fetch keys for committee_name: '{committee_name}'")
     async with db.session() as session:
         statement = (
             sqlmodel.select(sql.PublicSigningKey)
@@ -89,7 +87,7 @@ async def _check_core_logic(committee_name: str, artifact_path: str, signature_p
         )
         result = await session.execute(statement)
         db_public_keys = result.scalars().all()
-    _LOGGER.info(f"Found {len(db_public_keys)} public keys for committee_name: '{committee_name}'")
+    log.info(f"Found {len(db_public_keys)} public keys for committee_name: '{committee_name}'")
     apache_uid_map = {}
     for key in db_public_keys:
         if key.fingerprint:
@@ -100,7 +98,7 @@ async def _check_core_logic(committee_name: str, artifact_path: str, signature_p
                 if email := util.email_from_uid(key.primary_declared_uid):
                     # Allow uploaded keys of the form private@<committee_name>.apache.org
                     allowed_github_key_email = f"private@{committee_name}.apache.org"
-                    _LOGGER.info(
+                    log.info(
                         f"Comparing {key.fingerprint.upper()} with email {email} to allowed {allowed_github_key_email}"
                     )
                     if email == allowed_github_key_email:
@@ -137,9 +135,9 @@ def _check_core_logic_verify_signature(
         # TODO: Will this fail if one key doesn't work?
         import_result = gpg.import_keys("\n\n".join(ascii_armored_keys))
         if not import_result.fingerprints:
-            _LOGGER.warning("No fingerprints found after importing keys")
+            log.warning("No fingerprints found after importing keys")
         end = time.perf_counter_ns()
-        _LOGGER.info(f"Import {len(ascii_armored_keys)} keys took {(end - start) / 1000000} ms")
+        log.info(f"Import {len(ascii_armored_keys)} keys took {(end - start) / 1000000} ms")
         verified = gpg.verify_file(sig_file, str(artifact_path))
 
     key_fp = verified.pubkey_fingerprint.lower() if verified.pubkey_fingerprint else None

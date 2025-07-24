@@ -16,7 +16,6 @@
 # under the License.
 
 import dataclasses
-import logging
 import pathlib
 from collections.abc import Awaitable, Callable
 from typing import Any, Final
@@ -31,6 +30,7 @@ import wtforms.fields as fields
 
 import atr.analysis as analysis
 import atr.db as db
+import atr.log as log
 import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
@@ -39,8 +39,6 @@ import atr.template as template
 import atr.util as util
 
 SPECIAL_SUFFIXES: Final[frozenset[str]] = frozenset({".asc", ".sha256", ".sha512"})
-
-_LOGGER: Final = logging.getLogger(__name__)
 
 
 Respond = Callable[[int, str], Awaitable[tuple[quart_response.Response, int] | response.Response]]
@@ -277,7 +275,7 @@ async def _delete_empty_directory(
             await aiofiles.os.rmdir(path_to_remove)
 
     except Exception:
-        _LOGGER.exception(f"Unexpected error deleting directory {dir_to_delete_rel} for {project_name}/{version_name}")
+        log.exception(f"Unexpected error deleting directory {dir_to_delete_rel} for {project_name}/{version_name}")
         return await respond(500, "An unexpected error occurred.")
 
     if creating.failed is not None:
@@ -327,13 +325,13 @@ async def _move_file_to_revision(
         return await respond(200, ". ".join(response_messages) + ".")
 
     except FileNotFoundError:
-        _LOGGER.exception("File not found during move operation in new revision")
+        log.exception("File not found during move operation in new revision")
         return await respond(400, "Error: Source file not found during move operation.")
     except OSError as e:
-        _LOGGER.exception("Error moving file in new revision")
+        log.exception("Error moving file in new revision")
         return await respond(500, f"Error moving file: {e}")
     except Exception as e:
-        _LOGGER.exception("Unexpected error during file move")
+        log.exception("Unexpected error during file move")
         return await respond(500, f"ERROR: {e!s}")
 
 

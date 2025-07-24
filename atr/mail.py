@@ -17,7 +17,6 @@
 
 import dataclasses
 import email.utils as utils
-import logging
 import os.path
 import ssl
 import time
@@ -28,7 +27,7 @@ import aiofiles
 import aiosmtplib
 import dkim
 
-_LOGGER: Final = logging.getLogger(__name__)
+import atr.log as log
 
 # TODO: We should choose a pattern for globals
 # We could e.g. use uppercase instead of global_
@@ -56,7 +55,7 @@ class Message:
 
 async def send(message: Message) -> tuple[str, list[str]]:
     """Send an email notification about an artifact or a vote."""
-    _LOGGER.info(f"Sending email for event: {message}")
+    log.info(f"Sending email for event: {message}")
     from_addr = message.email_sender
     if not from_addr.endswith(f"@{global_dkim_domain}"):
         raise ValueError(f"from_addr must end with @{global_dkim_domain}, got {from_addr}")
@@ -88,17 +87,17 @@ async def send(message: Message) -> tuple[str, list[str]]:
     msg_text = "\r\n".join(headers) + "\r\n\r\n" + body
 
     start = time.perf_counter()
-    _LOGGER.info(f"sending message: {msg_text}")
+    log.info(f"sending message: {msg_text}")
 
     errors = await _send_many(from_addr, [to_addr], msg_text)
 
     if not errors:
-        _LOGGER.info(f"Sent to {to_addr} successfully")
+        log.info(f"Sent to {to_addr} successfully")
     else:
-        _LOGGER.warning(f"Errors sending to {to_addr}: {errors}")
+        log.warning(f"Errors sending to {to_addr}: {errors}")
 
     elapsed = time.perf_counter() - start
-    _LOGGER.info(f"Time taken to _send_many: {elapsed:.3f}s")
+    log.info(f"Time taken to _send_many: {elapsed:.3f}s")
 
     return mid, errors
 
@@ -117,7 +116,7 @@ async def set_secret_key_default() -> None:
     async with aiofiles.open(dkim_path) as f:
         dkim_key = await f.read()
         set_secret_key(dkim_key.strip())
-        _LOGGER.info("DKIM key loaded and set successfully")
+        log.info("DKIM key loaded and set successfully")
 
 
 async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> list[str]:
@@ -144,14 +143,14 @@ async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> list
     # Prepend the DKIM signature to the message
     dkim_msg = sig + message_bytes
 
-    _LOGGER.info("email_send_many")
+    log.info("email_send_many")
 
     errors = []
     for addr in to_addrs:
         try:
             await _send_via_relay(from_addr, addr, dkim_msg)
         except Exception as e:
-            _LOGGER.exception(f"Failed to send to {addr}:")
+            log.exception(f"Failed to send to {addr}:")
             errors.append(f"failed to send to {addr}: {e}")
 
     return errors
@@ -169,13 +168,13 @@ async def _send_via_relay(from_addr: str, to_addr: str, dkim_msg_bytes: bytes) -
     # Due to the divergence, we should probably not contribute upstream
     # In effect, these are two different "packages" of functionality
     # We can't even sign it first and pass it to asfpy, due to its different design
-    _LOGGER.info(f"Connecting async to {_MAIL_RELAY}:{_SMTP_PORT}")
+    log.info(f"Connecting async to {_MAIL_RELAY}:{_SMTP_PORT}")
     context = ssl.create_default_context()
     context.minimum_version = ssl.TLSVersion.TLSv1_2
 
     smtp = aiosmtplib.SMTP(hostname=_MAIL_RELAY, port=_SMTP_PORT, timeout=_SMTP_TIMEOUT, tls_context=context)
     await smtp.connect()
-    _LOGGER.info(f"Connected to {smtp.hostname}:{smtp.port}")
+    log.info(f"Connected to {smtp.hostname}:{smtp.port}")
     await smtp.ehlo()
     await smtp.sendmail(from_addr, [to_addr], dkim_msg_bytes)
     await smtp.quit()
@@ -194,5 +193,5 @@ def _validate_recipient(to_addr: str) -> None:
     _, domain = _split_address(to_addr)
     if domain not in ("apache.org", "tooling.apache.org"):
         error_msg = f"Email recipient must be @apache.org or @tooling.apache.org, got {to_addr}"
-        _LOGGER.error(error_msg)
+        log.error(error_msg)
         raise ValueError(error_msg)

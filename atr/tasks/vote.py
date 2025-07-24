@@ -16,21 +16,16 @@
 # under the License.
 
 import datetime
-import logging
-from typing import Final
 
 import atr.construct as construct
 import atr.db as db
 import atr.db.interaction as interaction
+import atr.log as log
 import atr.mail as mail
 import atr.models.results as results
 import atr.models.schema as schema
 import atr.tasks.checks as checks
 import atr.util as util
-
-# Configure detailed logging
-_LOGGER: Final = logging.getLogger(__name__)
-_LOGGER.setLevel(logging.DEBUG)
 
 
 class Initiate(schema.Strict):
@@ -55,20 +50,20 @@ async def initiate(args: Initiate) -> results.Results | None:
         return await _initiate_core_logic(args)
 
     except VoteInitiationError as e:
-        _LOGGER.error(f"Vote initiation failed: {e}")
+        log.error(f"Vote initiation failed: {e}")
         raise
     except Exception as e:
-        _LOGGER.exception(f"Unexpected error during vote initiation: {e}")
+        log.exception(f"Unexpected error during vote initiation: {e}")
         raise
 
 
 async def _initiate_core_logic(args: Initiate) -> results.Results | None:
     """Get arguments, create an email, and then send it to the recipient."""
-    _LOGGER.info("Starting initiate_core")
+    log.info("Starting initiate_core")
 
     # Validate arguments
     if not (args.email_to.endswith("@apache.org") or args.email_to.endswith(".apache.org")):
-        _LOGGER.error(f"Invalid destination email address: {args.email_to}")
+        log.error(f"Invalid destination email address: {args.email_to}")
         raise VoteInitiationError("Invalid destination email address")
 
     async with db.session() as data:
@@ -96,13 +91,13 @@ async def _initiate_core_logic(args: Initiate) -> results.Results | None:
         await mail.set_secret_key_default()
     except Exception as e:
         error_msg = f"Failed to load DKIM key: {e}"
-        _LOGGER.error(error_msg)
+        log.error(error_msg)
         raise VoteInitiationError(error_msg)
 
     # Get PMC and project details
     if release.committee is None:
         error_msg = "Release has no associated committee"
-        _LOGGER.error(error_msg)
+        log.error(error_msg)
         raise VoteInitiationError(error_msg)
 
     # Construct email
@@ -147,7 +142,7 @@ async def _initiate_core_logic(args: Initiate) -> results.Results | None:
     )
 
     if mail_errors:
-        _LOGGER.warning(f"Start vote for {args.release_name}: sending to {args.email_to}  gave errors: {mail_errors}")
+        log.warning(f"Start vote for {args.release_name}: sending to {args.email_to}  gave errors: {mail_errors}")
     else:
-        _LOGGER.info(f"Vote email sent successfully to {args.email_to}")
+        log.info(f"Vote email sent successfully to {args.email_to}")
     return result

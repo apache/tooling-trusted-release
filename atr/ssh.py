@@ -20,7 +20,6 @@
 import asyncio
 import asyncio.subprocess
 import datetime
-import logging
 import os
 import string
 from typing import Final, TypeVar
@@ -31,12 +30,12 @@ import asyncssh
 
 import atr.config as config
 import atr.db as db
+import atr.log as log
 import atr.models.sql as sql
 import atr.revision as revision
 import atr.user as user
 import atr.util as util
 
-_LOGGER: Final = logging.getLogger(__name__)
 _CONFIG: Final = config.get()
 
 T = TypeVar("T")
@@ -56,18 +55,18 @@ class SSHServer(asyncssh.SSHServer):
         # Store connection for use in begin_auth
         self._conn = conn
         peer_addr = conn.get_extra_info("peername")[0]
-        _LOGGER.info(f"SSH connection received from {peer_addr}")
+        log.info(f"SSH connection received from {peer_addr}")
 
     def connection_lost(self, exc: Exception | None) -> None:
         """Called when a connection is lost or closed."""
         if exc:
-            _LOGGER.error(f"SSH connection error: {exc}")
+            log.error(f"SSH connection error: {exc}")
         else:
-            _LOGGER.info("SSH connection closed")
+            log.info("SSH connection closed")
 
     async def begin_auth(self, username: str) -> bool:
         """Begin authentication for the specified user."""
-        _LOGGER.info(f"Beginning auth for user {username}")
+        log.info(f"Beginning auth for user {username}")
 
         try:
             # Load SSH keys for this user from the database
@@ -75,7 +74,7 @@ class SSHServer(asyncssh.SSHServer):
                 user_keys = await data.ssh_key(asf_uid=username).all()
 
                 if not user_keys:
-                    _LOGGER.warning(f"No SSH keys found for user: {username}")
+                    log.warning(f"No SSH keys found for user: {username}")
                     # Still require authentication, but it will fail
                     return True
 
@@ -85,18 +84,18 @@ class SSHServer(asyncssh.SSHServer):
                     auth_keys_lines.append(user_key.key)
 
                 auth_keys_data = "\n".join(auth_keys_lines)
-                _LOGGER.info(f"Loaded {len(user_keys)} SSH keys for user {username}")
+                log.info(f"Loaded {len(user_keys)} SSH keys for user {username}")
 
                 # Set the authorized keys in the connection
                 try:
                     authorized_keys = asyncssh.import_authorized_keys(auth_keys_data)
                     self._conn.set_authorized_keys(authorized_keys)
-                    _LOGGER.info(f"Successfully set authorized keys for {username}")
+                    log.info(f"Successfully set authorized keys for {username}")
                 except Exception as e:
-                    _LOGGER.error(f"Error setting authorized keys: {e}")
+                    log.error(f"Error setting authorized keys: {e}")
 
         except Exception as e:
-            _LOGGER.error(f"Database error loading SSH keys: {e}")
+            log.error(f"Database error loading SSH keys: {e}")
 
         # Always require authentication
         return True
@@ -116,7 +115,7 @@ async def server_start() -> asyncssh.SSHAcceptor:
     if not await aiofiles.os.path.exists(key_path):
         private_key = asyncssh.generate_private_key("ssh-rsa")
         private_key.write_private_key(key_path)
-        _LOGGER.info(f"Generated SSH host key at {key_path}")
+        log.info(f"Generated SSH host key at {key_path}")
 
     server = await asyncssh.create_server(
         SSHServer,
@@ -127,7 +126,7 @@ async def server_start() -> asyncssh.SSHAcceptor:
         encoding=None,
     )
 
-    _LOGGER.info(f"SSH server started on {_CONFIG.SSH_HOST}:{_CONFIG.SSH_PORT}")
+    log.info(f"SSH server started on {_CONFIG.SSH_HOST}:{_CONFIG.SSH_PORT}")
     return server
 
 
@@ -135,7 +134,7 @@ async def server_stop(server: asyncssh.SSHAcceptor) -> None:
     """Stop the SSH server."""
     server.close()
     await server.wait_closed()
-    _LOGGER.info("SSH server stopped")
+    log.info("SSH server stopped")
 
 
 def _fail[T](process: asyncssh.SSHServerProcess, message: str, return_value: T) -> T:
@@ -148,14 +147,14 @@ def _fail[T](process: asyncssh.SSHServerProcess, message: str, return_value: T) 
 def _output_stderr(process: asyncssh.SSHServerProcess, message: str) -> None:
     """Output a message to the client's stderr."""
     message = f"ATR SSH: {message}"
-    _LOGGER.error(message)
+    log.error(message)
     encoded_message = f"{message}\n".encode()
     try:
         process.stderr.write(encoded_message)
     except BrokenPipeError:
-        _LOGGER.warning("Failed to write error to client stderr: broken pipe")
+        log.warning("Failed to write error to client stderr: broken pipe")
     except Exception as e:
-        _LOGGER.exception(f"Error writing to client stderr: {e}")
+        log.exception(f"Error writing to client stderr: {e}")
 
 
 async def _step_01_handle_client(process: asyncssh.SSHServerProcess) -> None:
@@ -165,13 +164,13 @@ async def _step_01_handle_client(process: asyncssh.SSHServerProcess) -> None:
     except RsyncArgsError as e:
         return _fail(process, f"Error: {e}", None)
     except Exception as e:
-        _LOGGER.exception(f"Error during client command processing: {e}")
+        log.exception(f"Error during client command processing: {e}")
         return _fail(process, f"Exception: {e}", None)
 
 
 async def _step_02_handle_safely(process: asyncssh.SSHServerProcess) -> None:
     asf_uid = process.get_extra_info("username")
-    _LOGGER.info(f"Handling command for authenticated user: {asf_uid}")
+    log.info(f"Handling command for authenticated user: {asf_uid}")
 
     if not process.command:
         raise RsyncArgsError("No command specified")
@@ -193,13 +192,13 @@ async def _step_02_handle_safely(process: asyncssh.SSHServerProcess) -> None:
     release_name = sql.release_name(project_name, version_name)
 
     if release_obj is not None:
-        _LOGGER.info(f"Processing READ request for {release_name}")
+        log.info(f"Processing READ request for {release_name}")
         ####################################################
         ### Calls _step_07a_process_validated_rsync_read ###
         ####################################################
         await _step_07a_process_validated_rsync_read(process, argv, release_obj)
     else:
-        _LOGGER.info(f"Processing WRITE request for {release_name}")
+        log.info(f"Processing WRITE request for {release_name}")
         #####################################################
         ### Calls _step_07b_process_validated_rsync_write ###
         #####################################################
@@ -385,7 +384,7 @@ async def _step_07a_process_validated_rsync_read(
     try:
         # Determine the source directory based on the release phase and revision
         source_dir = util.release_directory(release)
-        _LOGGER.info(
+        log.info(
             f"Identified source directory for read: {source_dir} for release "
             f"{release.name} (phase {release.phase.value})"
         )
@@ -404,7 +403,7 @@ async def _step_07a_process_validated_rsync_read(
         ###################################################
         exit_status = await _step_08_execute_rsync(process, argv)
         if exit_status != 0:
-            _LOGGER.error(
+            log.error(
                 f"rsync --sender failed with exit status {exit_status} for release {release.name}. "
                 f"Command: {process.command} (run as {' '.join(argv)})"
             )
@@ -413,7 +412,7 @@ async def _step_07a_process_validated_rsync_read(
             process.exit(exit_status)
 
     except Exception as e:
-        _LOGGER.exception(f"Error during rsync read processing for {release.name}")
+        log.exception(f"Error during rsync read processing for {release.name}")
         raise RsyncArgsError(f"Internal error processing read request: {e}")
 
 
@@ -440,7 +439,7 @@ async def _step_07b_process_validated_rsync_write(
     async with revision.create_and_manage(project_name, version_name, asf_uid, description=description) as creating:
         # Uses new_revision_number for logging only
         if creating.old is not None:
-            _LOGGER.info(f"Using old revision {creating.old.number} and interim path {creating.interim_path}")
+            log.info(f"Using old revision {creating.old.number} and interim path {creating.interim_path}")
         # Update the rsync command path to the new revision directory
         argv[-1] = str(creating.interim_path)
 
@@ -453,14 +452,14 @@ async def _step_07b_process_validated_rsync_write(
                 for_revision = f"successor of revision {creating.old.number}"
             else:
                 for_revision = f"initial revision for release {release_name}"
-            _LOGGER.error(
+            log.error(
                 f"rsync upload failed with exit status {exit_status} for {for_revision}. "
                 f"Command: {process.command} (run as {' '.join(argv)})"
             )
             raise revision.FailedError(f"rsync upload failed with exit status {exit_status} for {for_revision}")
 
     if creating.new is not None:
-        _LOGGER.info(f"rsync upload successful for revision {creating.new.number}")
+        log.info(f"rsync upload successful for revision {creating.new.number}")
         host = config.get().APP_HOST
         message = f"\nATR: Created revision {creating.new.number} of {project_name} {version_name}\n"
         message += f"ATR: https://{host}/compose/{project_name}/{version_name}\n"
@@ -468,7 +467,7 @@ async def _step_07b_process_validated_rsync_write(
             process.stderr.write(message.encode())
             await process.stderr.drain()
     else:
-        _LOGGER.info(f"rsync upload unsuccessful for release {release_name}")
+        log.info(f"rsync upload unsuccessful for release {release_name}")
 
     # If we got here, there was no exception
     if not process.is_closing():
@@ -488,7 +487,7 @@ async def _step_07c_ensure_release_object_for_write(project_name: str, version_n
                 # This should ideally be caught by path validation, but double check
                 raise RuntimeError(f'Invalid version name "{version_name}": {version_name_error}')
             # Create a new release object
-            _LOGGER.info(f"Creating new release object for {release_name}")
+            log.info(f"Creating new release object for {release_name}")
             release = sql.Release(
                 project_name=project.name,
                 project=project,
@@ -504,7 +503,7 @@ async def _step_07c_ensure_release_object_for_write(project_name: str, version_n
 
 async def _step_08_execute_rsync(process: asyncssh.SSHServerProcess, argv: list[str]) -> int:
     """Execute the modified rsync command."""
-    _LOGGER.info(f"Executing modified rsync command: {' '.join(argv)}")
+    log.info(f"Executing modified rsync command: {' '.join(argv)}")
     proc = await asyncio.create_subprocess_shell(
         " ".join(argv),
         stdin=asyncio.subprocess.PIPE,
@@ -516,5 +515,5 @@ async def _step_08_execute_rsync(process: asyncssh.SSHServerProcess, argv: list[
     await process.redirect(stdin=proc.stdin, stdout=proc.stdout, stderr=proc.stderr, send_eof=False)
     # Wait for rsync to finish and get its exit status
     exit_status = await proc.wait()
-    _LOGGER.info(f"Rsync finished with exit status {exit_status}")
+    log.info(f"Rsync finished with exit status {exit_status}")
     return exit_status

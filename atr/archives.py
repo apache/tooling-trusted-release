@@ -15,16 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import logging
 import os
 import os.path
 import tarfile
 import zipfile
-from typing import Final
 
+import atr.log as log
 import atr.tarzip as tarzip
-
-_LOGGER: Final = logging.getLogger(__name__)
 
 
 class ExtractionError(Exception):
@@ -38,7 +35,7 @@ def extract(
     chunk_size: int,
     track_files: bool | set[str] = False,
 ) -> tuple[int, list[str]]:
-    _LOGGER.info(f"Extracting {archive_path} to {extract_dir}")
+    log.info(f"Extracting {archive_path} to {extract_dir}")
 
     total_extracted = 0
     extracted_paths = []
@@ -96,7 +93,7 @@ def _archive_extract_safe_process_file(
     """Process a single file member during safe archive extraction."""
     target_path = os.path.join(extract_dir, member.name)
     if not os.path.abspath(target_path).startswith(os.path.abspath(extract_dir)):
-        _LOGGER.warning(f"Skipping potentially unsafe path: {member.name}")
+        log.warning(f"Skipping potentially unsafe path: {member.name}")
         return 0
 
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
@@ -104,7 +101,7 @@ def _archive_extract_safe_process_file(
     source = tf.extractfile(member)
     if source is None:
         # Should not happen if member.isreg() is true
-        _LOGGER.warning(f"Could not extract file object for member: {member.name}")
+        log.warning(f"Could not extract file object for member: {member.name}")
         return 0
 
     extracted_file_size = 0
@@ -163,7 +160,7 @@ def _archive_extract_member(
         # Ensure the path is safe before extracting
         target_path = os.path.join(extract_dir, member.name)
         if not os.path.abspath(target_path).startswith(os.path.abspath(extract_dir)):
-            _LOGGER.warning(f"Skipping potentially unsafe path: {member.name}")
+            log.warning(f"Skipping potentially unsafe path: {member.name}")
             return 0, extracted_paths
         tf.extract(member, extract_dir, numeric_owner=True)
 
@@ -186,13 +183,13 @@ def _archive_extract_safe_process_hardlink(member: tarfile.TarInfo, extract_dir:
     """Safely create a hard link from the TarInfo entry."""
     target_path = _safe_path(extract_dir, member.name)
     if target_path is None:
-        _LOGGER.warning(f"Skipping potentially unsafe hard link path: {member.name}")
+        log.warning(f"Skipping potentially unsafe hard link path: {member.name}")
         return
 
     link_target = member.linkname or ""
     source_path = _safe_path(extract_dir, link_target)
     if source_path is None or not os.path.exists(source_path):
-        _LOGGER.warning(f"Skipping hard link with invalid target: {member.name} -> {link_target}")
+        log.warning(f"Skipping hard link with invalid target: {member.name} -> {link_target}")
         return
 
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
@@ -202,27 +199,27 @@ def _archive_extract_safe_process_hardlink(member: tarfile.TarInfo, extract_dir:
             return
         os.link(source_path, target_path)
     except (OSError, NotImplementedError) as e:
-        _LOGGER.warning(f"Failed to create hard link {target_path} -> {source_path}: {e}")
+        log.warning(f"Failed to create hard link {target_path} -> {source_path}: {e}")
 
 
 def _archive_extract_safe_process_symlink(member: tarfile.TarInfo, extract_dir: str) -> None:
     """Safely create a symbolic link from the TarInfo entry."""
     target_path = _safe_path(extract_dir, member.name)
     if target_path is None:
-        _LOGGER.warning(f"Skipping potentially unsafe symlink path: {member.name}")
+        log.warning(f"Skipping potentially unsafe symlink path: {member.name}")
         return
 
     link_target = member.linkname or ""
 
     # Reject absolute targets to avoid links outside the tree
     if os.path.isabs(link_target):
-        _LOGGER.warning(f"Skipping symlink with absolute target: {member.name} -> {link_target}")
+        log.warning(f"Skipping symlink with absolute target: {member.name} -> {link_target}")
         return
 
     # Ensure that the resolved link target stays within the extraction directory
     resolved_target = _safe_path(os.path.dirname(target_path), link_target)
     if resolved_target is None:
-        _LOGGER.warning(f"Skipping symlink pointing outside tree: {member.name} -> {link_target}")
+        log.warning(f"Skipping symlink pointing outside tree: {member.name} -> {link_target}")
         return
 
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
@@ -232,7 +229,7 @@ def _archive_extract_safe_process_symlink(member: tarfile.TarInfo, extract_dir: 
             return
         os.symlink(link_target, target_path)
     except (OSError, NotImplementedError) as e:
-        _LOGGER.warning("Failed to create symlink %s -> %s: %s", target_path, link_target, e)
+        log.warning("Failed to create symlink %s -> %s: %s", target_path, link_target, e)
 
 
 def _safe_path(base_dir: str, *paths: str) -> str | None:
@@ -295,7 +292,7 @@ def _zip_archive_extract_member(
     if member.isdir():
         target_path = os.path.join(extract_dir, member.name)
         if not os.path.abspath(target_path).startswith(os.path.abspath(extract_dir)):
-            _LOGGER.warning("Skipping potentially unsafe path: %s", member.name)
+            log.warning("Skipping potentially unsafe path: %s", member.name)
             return 0, extracted_paths
         os.makedirs(target_path, exist_ok=True)
         return total_extracted, extracted_paths
@@ -319,14 +316,14 @@ def _zip_extract_safe_process_file(
 ) -> int:
     target_path = os.path.join(extract_dir, member.name)
     if not os.path.abspath(target_path).startswith(os.path.abspath(extract_dir)):
-        _LOGGER.warning(f"Skipping potentially unsafe path: {member.name}")
+        log.warning(f"Skipping potentially unsafe path: {member.name}")
         return 0
 
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
     source = archive.extractfile(member)
     if source is None:
-        _LOGGER.warning(f"Could not extract {member.name} from archive")
+        log.warning(f"Could not extract {member.name} from archive")
         return 0
 
     extracted_file_size = 0
