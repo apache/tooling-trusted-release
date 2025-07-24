@@ -102,7 +102,6 @@ class Committer:
                 ldap_base=self.dn,
                 ldap_scope="BASE",
             )
-            log.info(f"LDAP result: {result} for {self.dn}")
             if not (result and len(result) == 1):
                 raise CommitterError(f"User {self.user!r} not found in LDAP")
         except CommitterError:
