@@ -112,6 +112,42 @@ class FoundationCommitter:
     async def ensure_stored_one(self, key_file_text: str) -> types.Outcome[types.Key]:
         return await self.__ensure_one(key_file_text, associate=False)
 
+    @performance
+    def keyring_fingerprint_model(
+        self, keyring: pgpy.PGPKeyring, fingerprint: str, ldap_data: dict[str, str]
+    ) -> sql.PublicSigningKey | None:
+        with keyring.key(fingerprint) as key:
+            if not key.is_primary:
+                return None
+            uids = [uid.userid for uid in key.userids]
+            asf_uid = self.__uids_asf_uid(uids, ldap_data)
+
+            # TODO: Improve this
+            key_size = key.key_size
+            length = 0
+            if isinstance(key_size, constants.EllipticCurveOID):
+                if isinstance(key_size.key_size, int):
+                    length = key_size.key_size
+                else:
+                    raise ValueError(f"Key size is not an integer: {type(key_size.key_size)}, {key_size.key_size}")
+            elif isinstance(key_size, int):
+                length = key_size
+            else:
+                raise ValueError(f"Key size is not an integer: {type(key_size)}, {key_size}")
+
+            return sql.PublicSigningKey(
+                fingerprint=str(key.fingerprint).lower(),
+                algorithm=key.key_algorithm.value,
+                length=length,
+                created=key.created,
+                latest_self_signature=key.expires_at,
+                expires=key.expires_at,
+                primary_declared_uid=uids[0],
+                secondary_declared_uids=uids[1:],
+                apache_uid=asf_uid,
+                ascii_armored_key=str(key),
+            )
+
     @performance_async
     async def keys_file_text(self, committee_name: str) -> str:
         committee = await self.__data.committee(name=committee_name, _public_signing_keys=True).demand(
@@ -174,7 +210,7 @@ class FoundationCommitter:
             key = None
             for fingerprint in fingerprints:
                 try:
-                    key_model = self.__keyring_fingerprint_model(keyring, fingerprint, ldap_data)
+                    key_model = self.keyring_fingerprint_model(keyring, fingerprint, ldap_data)
                     if key_model is None:
                         # Was not a primary key, so skip it
                         continue
@@ -279,42 +315,6 @@ and was published by the committee.\
         return full_keys_file_content
 
     @performance
-    def __keyring_fingerprint_model(
-        self, keyring: pgpy.PGPKeyring, fingerprint: str, ldap_data: dict[str, str]
-    ) -> sql.PublicSigningKey | None:
-        with keyring.key(fingerprint) as key:
-            if not key.is_primary:
-                return None
-            uids = [uid.userid for uid in key.userids]
-            asf_uid = self.__uids_asf_uid(uids, ldap_data)
-
-            # TODO: Improve this
-            key_size = key.key_size
-            length = 0
-            if isinstance(key_size, constants.EllipticCurveOID):
-                if isinstance(key_size.key_size, int):
-                    length = key_size.key_size
-                else:
-                    raise ValueError(f"Key size is not an integer: {type(key_size.key_size)}, {key_size.key_size}")
-            elif isinstance(key_size, int):
-                length = key_size
-            else:
-                raise ValueError(f"Key size is not an integer: {type(key_size)}, {key_size}")
-
-            return sql.PublicSigningKey(
-                fingerprint=str(key.fingerprint).lower(),
-                algorithm=key.key_algorithm.value,
-                length=length,
-                created=key.created,
-                latest_self_signature=key.expires_at,
-                expires=key.expires_at,
-                primary_declared_uid=uids[0],
-                secondary_declared_uids=uids[1:],
-                apache_uid=asf_uid,
-                ascii_armored_key=str(key),
-            )
-
-    @performance
     def __uids_asf_uid(self, uids: list[str], ldap_data: dict[str, str]) -> str | None:
         # Test data
         test_key_uids = [
@@ -352,11 +352,13 @@ class CommitteeParticipant(FoundationCommitter):
         asf_uid: str,
         committee_name: str,
     ):
+        super().__init__(credentials, write, data, asf_uid)
         self.__credentials = credentials
         self.__write = write
         self.__data = data
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
+        self.__key_block_models_cache = {}
 
     @performance_async
     async def associate_fingerprint(self, fingerprint: str) -> types.Outcome[types.LinkedCommittee]:
@@ -487,7 +489,7 @@ class CommitteeParticipant(FoundationCommitter):
             key_list = []
             for fingerprint in fingerprints:
                 try:
-                    key_model = self.__keyring_fingerprint_model(keyring, fingerprint, ldap_data)
+                    key_model = self.keyring_fingerprint_model(keyring, fingerprint, ldap_data)
                     if key_model is None:
                         # Was not a primary key, so skip it
                         continue
@@ -592,8 +594,9 @@ class CommitteeParticipant(FoundationCommitter):
             return outcomes
         for key_block in key_blocks:
             try:
+                # TODO: Change self.__block_models to return outcomes
                 key_models = await asyncio.to_thread(self.__block_models, key_block, ldap_data)
-                outcomes.extend_results(key_models)
+                outcomes.extend_roes(Exception, key_models)
             except Exception as e:
                 outcomes.append_exception(e)
         # Try adding the keys to the database
@@ -614,6 +617,7 @@ class CommitteeMember(CommitteeParticipant):
         asf_uid: str,
         committee_name: str,
     ):
+        super().__init__(credentials, write, data, asf_uid, committee_name)
         self.__credentials = credentials
         self.__write = write
         self.__data = data
@@ -621,15 +625,22 @@ class CommitteeMember(CommitteeParticipant):
         self.__committee_name = committee_name
 
 
-# class FoundationAdmin(FoundationCommitter):
-#     def __init__(
-#         self, credentials: storage.WriteAsFoundationAdmin, write: storage.Write, data: db.Session, asf_uid: str
-#     ):
-#         self.__credentials = credentials
-#         self.__write = write
-#         self.__data = data
-#         self.__asf_uid = asf_uid
+class FoundationAdmin(CommitteeMember):
+    def __init__(
+        self,
+        credentials: storage.WriteAsFoundationAdmin,
+        write: storage.Write,
+        data: db.Session,
+        asf_uid: str,
+        committee_name: str,
+    ):
+        super().__init__(credentials, write, data, asf_uid, committee_name)
+        self.__credentials = credentials
+        self.__write = write
+        self.__data = data
+        self.__asf_uid = asf_uid
+        self.__committee_name = committee_name
 
-#     @performance_async
-#     async def ensure_stored_one(self, key_file_text: str) -> types.Outcome[types.Key]:
-#         return await self.__ensure_one(key_file_text, associate=False)
+    @property
+    def committee_name(self) -> str:
+        return self.__committee_name

@@ -29,31 +29,6 @@ E = TypeVar("E", bound=Exception)
 T = TypeVar("T", bound=object)
 
 
-# class OutcomeCore[T]:
-#     @property
-#     def ok(self) -> bool:
-#         raise NotImplementedError("ok is not implemented")
-
-#     @property
-#     def name(self) -> str | None:
-#         raise NotImplementedError("name is not implemented")
-
-#     def result_or_none(self) -> T | None:
-#         raise NotImplementedError("result_or_none is not implemented")
-
-#     def result_or_raise(self, exception_class: type[E] | None = None) -> T:
-#         raise NotImplementedError("result_or_raise is not implemented")
-
-#     def exception_or_none(self) -> Exception | None:
-#         raise NotImplementedError("exception_or_none is not implemented")
-
-#     def exception_or_raise(self, exception_class: type[E] | None = None) -> NoReturn:
-#         raise NotImplementedError("exception_or_raise is not implemented")
-
-#     def exception_type_or_none(self) -> type[Exception] | None:
-#         raise NotImplementedError("exception_type_or_none is not implemented")
-
-
 class OutcomeResult[T]:
     __result: T
 
@@ -131,6 +106,9 @@ class Outcomes[T, E: Exception = Exception]:
     def __init__(self, *outcomes: Outcome[T, E]):
         self.__outcomes = list(outcomes)
 
+    def __str__(self) -> str:
+        return f"Outcomes({self.__outcomes})"
+
     @property
     def any_exception(self) -> bool:
         return any((not outcome.ok) for outcome in self.__outcomes)
@@ -176,6 +154,11 @@ class Outcomes[T, E: Exception = Exception]:
                 if exception_or_none is not None:
                     exceptions_list.append(exception_or_none)
         return exceptions_list
+
+    def exceptions_print(self) -> None:
+        for exception in self.exceptions():
+            # traceback.print_exception(exception)
+            print(exception.__class__.__name__ + ":", exception)
 
     def extend_exceptions(self, exceptions: Sequence[E]) -> None:
         for exception in exceptions:

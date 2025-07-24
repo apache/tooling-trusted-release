@@ -461,7 +461,13 @@ async def admin_keys_update() -> str | response.Response | tuple[Mapping[str, An
         return await template.render("update-keys.html", empty_form=empty_form, previous_output=previous_output)
 
     try:
-        pid = await _update_keys()
+        web_session = await session.read()
+        if web_session is None:
+            raise base.ASFQuartException("Not authenticated", 401)
+        asf_uid = web_session.uid
+        if asf_uid is None:
+            raise base.ASFQuartException("Invalid session, uid is None", 500)
+        pid = await _update_keys(asf_uid)
         return {
             "message": f"Successfully started key update process with PID {pid}",
             "category": "success",
@@ -907,7 +913,7 @@ async def _update_committees(
     return added_count, updated_count
 
 
-async def _update_keys() -> int:
+async def _update_keys(asf_uid: str) -> int:
     async def _log_process(process: asyncio.subprocess.Process) -> None:
         try:
             stdout, stderr = await process.communicate()
@@ -924,10 +930,10 @@ async def _update_keys() -> int:
 
     if await aiofiles.os.path.exists("../Dockerfile.alpine"):
         # Not in a container, developing locally
-        command = ["poetry", "run", "python3", "scripts/keys_import.py"]
+        command = ["poetry", "run", "python3", "scripts/keys_import.py", asf_uid]
     else:
         # In a container
-        command = [sys.executable, "scripts/keys_import.py"]
+        command = [sys.executable, "scripts/keys_import.py", asf_uid]
 
     process = await asyncio.create_subprocess_exec(
         *command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=".."

@@ -32,6 +32,7 @@ import atr.log as log
 import atr.models.sql as sql
 import atr.storage.types as types
 import atr.storage.writers as writers
+import atr.user as user
 import atr.util as util
 
 VALIDATE_AT_RUNTIME: Final[bool] = True
@@ -188,26 +189,33 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
         return VALIDATE_AT_RUNTIME
 
 
-# class WriteAsFoundationAdmin(WriteAsFoundationCommitter):
-#     def __init__(self, write: Write, data: db.Session, asf_uid: str):
-#         self.__write = write
-#         self.__data = data
-#         self.__asf_uid = asf_uid
-#         self.__authenticated = True
-#         self.keys = writers.keys.FoundationAdmin(
-#             self,
-#             self.__write,
-#             self.__data,
-#             self.__asf_uid,
-#         )
+# TODO: Or WriteAsCommitteeAdmin
+class WriteAsFoundationAdmin(WriteAsCommitteeMember):
+    def __init__(self, write: Write, data: db.Session, asf_uid: str, committee_name: str):
+        self.__write = write
+        self.__data = data
+        self.__asf_uid = asf_uid
+        self.__committee_name = committee_name
+        self.__authenticated = True
+        self.keys = writers.keys.FoundationAdmin(
+            self,
+            self.__write,
+            self.__data,
+            self.__asf_uid,
+            committee_name,
+        )
 
-#     @property
-#     def authenticated(self) -> bool:
-#         return self.__authenticated
+    @property
+    def authenticated(self) -> bool:
+        return self.__authenticated
 
-#     @property
-#     def validate_at_runtime(self) -> bool:
-#         return VALIDATE_AT_RUNTIME
+    @property
+    def committee_name(self) -> str:
+        return self.__committee_name
+
+    @property
+    def validate_at_runtime(self) -> bool:
+        return VALIDATE_AT_RUNTIME
 
 
 class Write:
@@ -267,6 +275,20 @@ class Write:
         except Exception as e:
             return types.OutcomeException(e)
         return types.OutcomeResult(wafm)
+
+    def as_foundation_admin(self, committee_name: str) -> WriteAsFoundationAdmin:
+        return self.as_foundation_admin_outcome(committee_name).result_or_raise()
+
+    def as_foundation_admin_outcome(self, committee_name: str) -> types.Outcome[WriteAsFoundationAdmin]:
+        if self.__asf_uid is None:
+            return types.OutcomeException(AccessError("No ASF UID"))
+        if not user.is_admin(self.__asf_uid):
+            return types.OutcomeException(AccessError("Not an admin"))
+        try:
+            wafa = WriteAsFoundationAdmin(self, self.__data, self.__asf_uid, committee_name)
+        except Exception as e:
+            return types.OutcomeException(e)
+        return types.OutcomeResult(wafa)
 
     # async def as_key_owner(self) -> types.Outcome[WriteAsKeyOwner]:
     #     ...
@@ -346,16 +368,16 @@ class ContextManagers:
         if asfquart_session is None:
             raise AccessError("No ASFQuart session")
         if asf_uid is None:
-            asf_uid = asfquart_session.uid
+            asf_uid = asfquart_session["uid"]
             if asf_uid is None:
                 raise AccessError("No ASF UID, and not set in the ASFQuart session")
-        elif asfquart_session.uid != asf_uid:
+        elif asfquart_session["uid"] != asf_uid:
             raise AccessError("ASF UID mismatch")
 
         # TODO: Use our own LDAP calls instead of using sqlite as a cache
         await data.ns_text_set("asfquart_session", asf_uid, json.dumps(asfquart_session))
-        self.__member_of_cache[asf_uid] = set(asfquart_session.committees)
-        self.__participant_of_cache[asf_uid] = set(asfquart_session.projects)
+        self.__member_of_cache[asf_uid] = set(asfquart_session["committees"])
+        self.__participant_of_cache[asf_uid] = set(asfquart_session["projects"])
         self.__last_refreshed = int(time.time())
 
         finish = time.perf_counter_ns()

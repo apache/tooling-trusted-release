@@ -23,13 +23,14 @@ import contextlib
 import os
 import sys
 import time
+import traceback
 
 sys.path.append(".")
 
 
 import atr.config as config
 import atr.db as db
-import atr.db.interaction as interaction
+import atr.storage as storage
 import atr.util as util
 
 
@@ -41,7 +42,7 @@ def get(entry: dict, prop: str) -> str | None:
     return None
 
 
-def write(message: str) -> None:
+def print_and_flush(message: str) -> None:
     print(message)
     sys.stdout.flush()
 
@@ -64,7 +65,7 @@ def log_to_file(conf: config.AppConfig):
             sys.stderr = original_stderr
 
 
-async def keys_import(conf: config.AppConfig) -> None:
+async def keys_import(conf: config.AppConfig, asf_uid: str) -> None:
     # Runs as a standalone script, so we need a worker style database connection
     await db.init_database_for_worker()
     # Print the time and current PID
@@ -76,11 +77,11 @@ async def keys_import(conf: config.AppConfig) -> None:
     start = time.perf_counter_ns()
     email_to_uid = await util.email_to_uid_map()
     end = time.perf_counter_ns()
-    write(f"LDAP search took {(end - start) / 1000000} ms")
-    write(f"Email addresses from LDAP: {len(email_to_uid)}")
+    print_and_flush(f"LDAP search took {(end - start) / 1000000} ms")
+    print_and_flush(f"Email addresses from LDAP: {len(email_to_uid)}")
 
     # Open an ATR database connection
-    async with db.session() as data:
+    async with db.session() as data, storage.write(asf_uid) as write:
         # Get the KEYS file of each committee
         committees = await data.committee().all()
         committees = list(committees)
@@ -92,35 +93,41 @@ async def keys_import(conf: config.AppConfig) -> None:
             # For each remote KEYS file, check that it responded 200 OK
             committee_name = url.rsplit("/", 2)[-2]
             if status != 200:
-                write(f"{committee_name} error: {status}")
+                print_and_flush(f"{committee_name} error: {status}")
                 continue
 
             # Parse the KEYS file and add it to the database
             # TODO: We could have this return the keys to make it more efficient
             # Then we could use the bulk upsert query method
-            try:
-                _result, yes, no, _committees = await interaction.upload_keys_bytes(
-                    [committee_name], content, [committee_name], ldap_data=email_to_uid, update_existing=True
-                )
-            except Exception as e:
-                write(f"{committee_name} error: {e}")
-                continue
+            wafa = write.as_foundation_admin(committee_name)
+            keys_file_text = content.decode("utf-8", errors="replace")
+            outcomes = await wafa.keys.ensure_associated(keys_file_text)
+            yes = outcomes.result_count
+            no = outcomes.exception_count
+            if no:
+                outcomes.exceptions_print()
 
             # Print and record the number of keys that were okay and failed
-            write(f"{committee_name} {yes} {no}")
+            print_and_flush(f"{committee_name} {yes} {no}")
             total_yes += yes
             total_no += no
-        write(f"Total okay: {total_yes}")
-        write(f"Total failed: {total_no}")
+        print_and_flush(f"Total okay: {total_yes}")
+        print_and_flush(f"Total failed: {total_no}")
     end = time.perf_counter_ns()
-    write(f"Script took {(end - start) / 1000000} ms")
-    write("")
+    print_and_flush(f"Script took {(end - start) / 1000000} ms")
+    print_and_flush("")
 
 
 async def amain() -> None:
     conf = config.AppConfig()
     with log_to_file(conf):
-        await keys_import(conf)
+        try:
+            await keys_import(conf, sys.argv[1])
+        except Exception as e:
+            print_and_flush(f"Error: {e}")
+            traceback.print_exc()
+            sys.stdout.flush()
+            sys.exit(1)
 
 
 def main() -> None:
