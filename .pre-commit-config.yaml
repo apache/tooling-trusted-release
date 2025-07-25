@@ -1,17 +1,23 @@
+exclude: ^node_modules/
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v5.0.0
   hooks:
+    - id: check-ast
+    - id: check-case-conflict
+    - id: check-executables-have-shebangs
+    - id: check-illegal-windows-names
+    - id: check-merge-conflict
+    - id: check-shebang-scripts-are-executable
     - id: check-toml
-      exclude: ^node_modules/
+    - id: check-vcs-permalinks
     - id: check-yaml
-      exclude: ^node_modules/
+    - id: detect-private-key
     - id: end-of-file-fixer
-      exclude: ^node_modules/
+    - id: fix-byte-order-marker
+    - id: forbid-submodules
     - id: mixed-line-ending
-      exclude: ^node_modules/
     - id: trailing-whitespace
-      exclude: ^node_modules/
 - repo: https://github.com/Lucas-C/pre-commit-hooks
   rev: v1.5.5
   hooks:
@@ -55,27 +61,17 @@ repos:
       args: ['--fix']
 - repo: local
   hooks:
-    # - id: poetry-check
-    #   name: poetry-check
-    #   description: run poetry check to validate config
-    #   entry: poetry check
-    #   language: python
-    #   pass_filenames: false
-    #   files: ^(.*/)?(poetry\.lock|pyproject\.toml)$
-
     - id: ruff
       name: Ruff Linter
       entry: uv run ruff check --fix
       language: system
       types: [python]
-      exclude: ^node_modules/
 
     - id: ruff-format
       name: Ruff Formatter
       entry: uv run ruff format --force-exclude
       language: system
       types: [python]
-      exclude: ^node_modules/
 
     - id: pyright
       name: Pyright Type Check
@@ -83,7 +79,7 @@ repos:
       language: system
       require_serial: true
       types: [python]
-      exclude: ^(node_modules|tests)/
+      exclude: ^tests/
 
     - id: jinja-route-check
       name: Jinja Route Checker
