@@ -24,6 +24,7 @@ from typing import Any
 
 import aiofiles.os
 import asfquart.base as base
+import pgpy
 import quart
 import quart_schema
 import sqlalchemy
@@ -32,6 +33,7 @@ import sqlmodel
 import werkzeug.exceptions as exceptions
 
 import atr.blueprints.api as api
+import atr.config as config
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.jwtoken as jwtoken
@@ -790,6 +792,66 @@ async def users_list() -> DictResponse:
     ).model_dump(), 200
 
 
+@api.BLUEPRINT.route("/verify/provenance", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.VerifyProvenanceArgs)
+@quart_schema.validate_response(models.api.VerifyProvenanceResults, 200)
+async def verify_provenance(data: models.api.VerifyProvenanceArgs) -> DictResponse:
+    # POST because this uses significant computation and I/O
+    # We receive a file name and an SHA3-256 hash
+    # From these we find which committee(s) published the file with a signature
+    # Then we deliver the appropriate signing key from the KEYS file(s)
+    # And the URL of the KEYS file(s) for them to check
+
+    signing_keys: list[models.api.VerifyProvenanceKey] = []
+    conf = config.get()
+    host = conf.APP_HOST
+
+    signature_asc_data = data.signature_asc_text
+    sig = pgpy.PGPSignature.from_blob(signature_asc_data)
+
+    if not hasattr(sig, "signer_fingerprint"):
+        raise exceptions.NotFound("No signer fingerprint found")
+
+    signer_fingerprint = getattr(sig, "signer_fingerprint").lower()
+    async with db.session() as db_data:
+        key = await db_data.public_signing_key(
+            fingerprint=signer_fingerprint,
+            _committees=True,
+        ).demand(
+            exceptions.NotFound(
+                f"Key with fingerprint {signer_fingerprint} not found",
+            )
+        )
+
+    downloads_dir = util.get_downloads_dir()
+    matched_committee_names = await _match_committee_names(key.committees, util.get_finished_dir(), data)
+
+    for matched_committee_name in matched_committee_names:
+        keys_file_path = downloads_dir / matched_committee_name / "KEYS"
+        async with aiofiles.open(keys_file_path, "rb") as f:
+            keys_file_data = await f.read()
+        keys_file_sha3_256 = hashlib.sha3_256(keys_file_data).hexdigest()
+        signing_keys.append(
+            models.api.VerifyProvenanceKey(
+                committee=matched_committee_name,
+                keys_file_url=f"https://{host}/downloads/{matched_committee_name}/KEYS",
+                keys_file_sha3_256=keys_file_sha3_256,
+            )
+        )
+
+    if not signing_keys:
+        raise exceptions.NotFound("No signing keys found")
+
+    return models.api.VerifyProvenanceResults(
+        endpoint="/verify/provenance",
+        fingerprint=signer_fingerprint,
+        key_asc_text=key.ascii_armored_key,
+        committees_with_artifact=signing_keys,
+    ).model_dump(), 200
+
+
 @api.BLUEPRINT.route("/vote/resolve", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
@@ -948,6 +1010,54 @@ def _jwt_asf_uid() -> str:
     if not isinstance(asf_uid, str):
         raise base.ASFQuartException("Invalid token subject", errorcode=401)
     return asf_uid
+
+
+async def _match_committee_names(
+    key_committees: list[sql.Committee], finished_dir: pathlib.Path, data: models.api.VerifyProvenanceArgs
+) -> set[str]:
+    key_committee_names = set(committee.name for committee in key_committees)
+    finished_dir = util.get_finished_dir()
+    matched_committee_names = set()
+
+    # Check for finished files
+    for key_committee_name in key_committee_names:
+        key_committee_finished_dir = finished_dir / key_committee_name
+        async for rel_path in util.paths_recursive(key_committee_finished_dir):
+            if rel_path.name == data.signature_file_name:
+                abs_path = finished_dir / rel_path
+                async with aiofiles.open(abs_path, "rb") as f:
+                    rel_path_data = await f.read()
+                rel_path_sha3_256 = hashlib.sha3_256(rel_path_data).hexdigest()
+                if rel_path_sha3_256 == data.signature_sha3_256:
+                    # We got a match
+                    matched_committee_names.add(key_committee_name)
+                    break
+
+    # Check for unfinished files
+    async with db.session() as db_data:
+        for key_committee_name in key_committee_names:
+            release_directories = []
+            projects = await db_data.project(committee_name=key_committee_name).all()
+            for project in projects:
+                releases = await db_data.release(project_name=project.name).all()
+                release_directories.extend(util.release_directory(release) for release in releases)
+            for release_directory in release_directories:
+                if await _match_unfinished(release_directory, data):
+                    matched_committee_names.add(key_committee_name)
+                    break
+    return matched_committee_names
+
+
+async def _match_unfinished(release_directory: pathlib.Path, data: models.api.VerifyProvenanceArgs) -> bool:
+    async for rel_path in util.paths_recursive(release_directory):
+        if rel_path.name == data.signature_file_name:
+            abs_path = release_directory / rel_path
+            async with aiofiles.open(abs_path, "rb") as f:
+                rel_path_data = await f.read()
+                rel_path_sha3_256 = hashlib.sha3_256(rel_path_data).hexdigest()
+                if rel_path_sha3_256 == data.signature_sha3_256:
+                    return True
+    return False
 
 
 def _pagination_args_validate(query_args: Any) -> None:

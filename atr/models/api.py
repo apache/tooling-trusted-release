@@ -362,6 +362,27 @@ class UploadResults(schema.Strict):
     revision: sql.Revision
 
 
+class VerifyProvenanceArgs(schema.Strict):
+    artifact_file_name: str
+    artifact_sha3_256: str
+    signature_file_name: str
+    signature_asc_text: str
+    signature_sha3_256: str
+
+
+class VerifyProvenanceKey(schema.Strict):
+    committee: str
+    keys_file_url: str
+    keys_file_sha3_256: str
+
+
+class VerifyProvenanceResults(schema.Strict):
+    endpoint: Literal["/verify/provenance"] = schema.Field(alias="endpoint")
+    fingerprint: str
+    key_asc_text: str
+    committees_with_artifact: list[VerifyProvenanceKey]
+
+
 # This is for *Results classes only
 # We do NOT put *Args classes here
 Results = Annotated[
@@ -397,6 +418,7 @@ Results = Annotated[
     | SshListResults
     | TasksResults
     | UsersListResults
+    | VerifyProvenanceResults
     | VoteResolveResults
     | VoteStartResults
     | VoteTabulateResults
@@ -449,6 +471,7 @@ validate_ssh_delete = validator(SshDeleteResults)
 validate_ssh_list = validator(SshListResults)
 validate_tasks = validator(TasksResults)
 validate_users_list = validator(UsersListResults)
+validate_verify_provenance = validator(VerifyProvenanceResults)
 validate_vote_resolve = validator(VoteResolveResults)
 validate_vote_start = validator(VoteStartResults)
 validate_vote_tabulate = validator(VoteTabulateResults)
