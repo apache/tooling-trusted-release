@@ -19,6 +19,7 @@
 # Derived from apache/infrastructure-oauth/app/lib/ldap.py
 
 import re
+import time
 from typing import Any
 
 import atr.config as config
@@ -71,34 +72,51 @@ class Committer:
         self.__bind_dn, self.__bind_password = self._get_ldap_bind_dn_and_password()
 
     def verify(self) -> dict[str, Any]:
-        self._get_committer_details()
+        with ldap.Search(self.__bind_dn, self.__bind_password) as ldap_search:
+            start = time.perf_counter_ns()
+            self._get_committer_details(ldap_search)
+            finish = time.perf_counter_ns()
+            log.info(f"Took {finish - start:,} ns to get committer details")
 
-        member_list = self._get_group_membership(LDAP_MEMBER_BASE, "memberUid", 100)
-        self.isMember = self.user in member_list
+            start = time.perf_counter_ns()
+            member_list = self._get_group_membership(ldap_search, LDAP_MEMBER_BASE, "memberUid", 100)
+            self.isMember = self.user in member_list
+            finish = time.perf_counter_ns()
+            log.info(f"Took {finish - start:,} ns to get member list")
 
-        chair_list = self._get_group_membership(LDAP_CHAIRS_BASE, "member", 100)
-        self.isChair = self.dn in chair_list
+            start = time.perf_counter_ns()
+            chair_list = self._get_group_membership(ldap_search, LDAP_CHAIRS_BASE, "member", 100)
+            self.isChair = self.dn in chair_list
+            finish = time.perf_counter_ns()
+            log.info(f"Took {finish - start:,} ns to get chair list")
 
-        root_list = self._get_group_membership(LDAP_ROOT_BASE, "member", 3)
-        self.isRoot = self.dn in root_list
+            start = time.perf_counter_ns()
+            root_list = self._get_group_membership(ldap_search, LDAP_ROOT_BASE, "member", 3)
+            self.isRoot = self.dn in root_list
+            finish = time.perf_counter_ns()
+            log.info(f"Took {finish - start:,} ns to get root list")
 
-        tooling_list = self._get_group_membership(LDAP_TOOLING_BASE, "member", 1)
-        is_tooling = self.dn in tooling_list
+            start = time.perf_counter_ns()
+            tooling_list = self._get_group_membership(ldap_search, LDAP_TOOLING_BASE, "member", 1)
+            is_tooling = self.dn in tooling_list
+            finish = time.perf_counter_ns()
+            log.info(f"Took {finish - start:,} ns to get tooling list")
 
-        self.pmcs = self._get_project_memberships(LDAP_OWNER_FILTER)
-        self.projects = self._get_project_memberships(LDAP_MEMBER_FILTER)
+            start = time.perf_counter_ns()
+            self.pmcs = self._get_project_memberships(ldap_search, LDAP_OWNER_FILTER)
+            self.projects = self._get_project_memberships(ldap_search, LDAP_MEMBER_FILTER)
+            finish = time.perf_counter_ns()
+            log.info(f"Took {finish - start:,} ns to get project memberships")
 
-        if is_tooling:
-            self.pmcs.append("tooling")
-            self.projects.append("tooling")
+            if is_tooling:
+                self.pmcs.append("tooling")
+                self.projects.append("tooling")
 
         return self.__dict__
 
-    def _get_committer_details(self) -> None:
+    def _get_committer_details(self, ldap_search: ldap.Search) -> None:
         try:
-            result = ldap.search_single(
-                ldap_bind_dn=self.__bind_dn,
-                ldap_bind_password=self.__bind_password,
+            result = ldap_search.search(
                 ldap_base=self.dn,
                 ldap_scope="BASE",
             )
@@ -123,11 +141,11 @@ class Committer:
         self.emails = attr_to_list(data.get("mail"))
         self.altemails = attr_to_list(data.get("asf-altEmail"))
 
-    def _get_group_membership(self, ldap_base: str, attribute: str, min_members: int = 0) -> list:
+    def _get_group_membership(
+        self, ldap_search: ldap.Search, ldap_base: str, attribute: str, min_members: int = 0
+    ) -> list:
         try:
-            result = ldap.search_single(
-                ldap_bind_dn=self.__bind_dn,
-                ldap_bind_password=self.__bind_password,
+            result = ldap_search.search(
                 ldap_base=ldap_base,
                 ldap_scope="BASE",
             )
@@ -156,11 +174,9 @@ class Committer:
             raise CommitterError("LDAP bind DN or password not set")
         return bind_dn, bind_password
 
-    def _get_project_memberships(self, ldap_filter: str) -> list[str]:
+    def _get_project_memberships(self, ldap_search: ldap.Search, ldap_filter: str) -> list[str]:
         try:
-            result = ldap.search_single(
-                ldap_bind_dn=self.__bind_dn,
-                ldap_bind_password=self.__bind_password,
+            result = ldap_search.search(
                 ldap_base=LDAP_PMCS_BASE,
                 ldap_scope="SUBTREE",
                 ldap_query=ldap_filter % (self.user, self.user),

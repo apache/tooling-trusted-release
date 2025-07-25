@@ -27,6 +27,52 @@ LDAP_SEARCH_BASE: Final[str] = "ou=people,dc=apache,dc=org"
 LDAP_SERVER_HOST: Final[str] = "ldap-eu.apache.org"
 
 
+class Search:
+    def __init__(self, ldap_bind_dn: str, ldap_bind_password: str):
+        self._bind_dn = ldap_bind_dn
+        self._bind_password = ldap_bind_password
+        self._conn: ldap3.Connection | None = None
+
+    def __enter__(self):
+        server = ldap3.Server(LDAP_SERVER_HOST, use_ssl=True)
+        self._conn = ldap3.Connection(
+            server,
+            user=self._bind_dn,
+            password=self._bind_password,
+            auto_bind=True,
+            check_names=False,
+        )
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._conn and self._conn.bound:
+            self._conn.unbind()
+
+    def search(
+        self,
+        ldap_base: str,
+        ldap_scope: Literal["BASE", "LEVEL", "SUBTREE"],
+        ldap_query: str = "(objectClass=*)",
+        ldap_attrs: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        if not self._conn:
+            raise RuntimeError("Connection not available.")
+
+        attributes = ldap_attrs if ldap_attrs else ldap3.ALL_ATTRIBUTES
+        self._conn.search(
+            search_base=ldap_base,
+            search_filter=ldap_query,
+            search_scope=ldap_scope,
+            attributes=attributes,
+        )
+        results = []
+        for entry in self._conn.entries:
+            result_item: dict[str, str | list[str]] = {"dn": entry.entry_dn}
+            result_item.update(entry.entry_attributes_as_dict)
+            results.append(result_item)
+        return results
+
+
 # We use a dataclass to support ldap3.Connection objects
 @dataclasses.dataclass
 class SearchParameters:
@@ -63,42 +109,6 @@ def search(params: SearchParameters) -> None:
                 params.connection.unbind()
             except Exception:
                 ...
-
-
-def search_single(
-    ldap_bind_dn: str,
-    ldap_bind_password: str,
-    ldap_base: str,
-    ldap_scope: Literal["BASE", "LEVEL", "SUBTREE"],
-    ldap_query: str = "(objectClass=*)",
-    ldap_attrs: list[str] | None = None,
-) -> list[dict[str, Any]]:
-    server = ldap3.Server(LDAP_SERVER_HOST, use_ssl=True)
-    conn = None
-    try:
-        conn = ldap3.Connection(
-            server,
-            user=ldap_bind_dn,
-            password=ldap_bind_password,
-            auto_bind=True,
-            check_names=False,
-        )
-        attributes = ldap_attrs if ldap_attrs else ldap3.ALL_ATTRIBUTES
-        conn.search(
-            search_base=ldap_base,
-            search_filter=ldap_query,
-            search_scope=ldap_scope,
-            attributes=attributes,
-        )
-        results = []
-        for entry in conn.entries:
-            result_item: dict[str, str | list[str]] = {"dn": entry.entry_dn}
-            result_item.update(entry.entry_attributes_as_dict)
-            results.append(result_item)
-        return results
-    finally:
-        if conn and conn.bound:
-            conn.unbind()
 
 
 def _search_core(params: SearchParameters) -> None:
