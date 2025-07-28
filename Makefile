@@ -24,6 +24,9 @@ certs:
 	then uv run scripts/generate-certificates; \
 	fi
 
+certs-local:
+	mkcert localhost.apache.org localhost 127.0.0.1 ::1
+
 check:
 	git add -A
 	uv run pre-commit run --all-files
@@ -63,12 +66,14 @@ run-playwright-slow:
 
 serve:
 	SSH_HOST=127.0.0.1 uv run hypercorn --bind $(BIND) \
-	  --keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
+	  --keyfile localhost.apache.org+3-key.pem --certfile localhost.apache.org+3.pem \
+	  atr.server:app --debug --reload
 
 serve-local:
 	APP_HOST=127.0.0.1:8080 LOCAL_DEBUG=1 SECRET_KEY=insecure-local-key \
 	  SSH_HOST=127.0.0.1 uv run hypercorn --bind $(BIND) \
-	  --keyfile key.pem --certfile cert.pem atr.server:app --debug --reload
+	  --keyfile localhost.apache.org+3-key.pem --certfile localhost.apache.org+3.pem \
+	  atr.server:app --debug --reload
 
 sync:
 	uv sync --no-dev
