@@ -664,9 +664,8 @@ async def releases_project(project: str, query_args: models.api.ReleasesProjectQ
     ).model_dump(), 200
 
 
-# TODO: If we validate as sql.Release, quart_schema silently corrupts latest_revision_number to None
-# @quart_schema.validate_response(models.api.ReleasesVersionResults, 200)
 @api.BLUEPRINT.route("/releases/version/<project>/<version>")
+@quart_schema.validate_response(models.api.ReleasesVersionResults, 200)
 async def releases_version(project: str, version: str) -> DictResponse:
     """Return a single release by project and version."""
     _simple_check(project, version)

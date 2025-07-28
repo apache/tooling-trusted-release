@@ -58,6 +58,11 @@ class ChecksListResults(schema.Strict):
     checks_revision: str = schema.Field(..., **example("00005"))
     current_phase: sql.ReleasePhase = schema.Field(..., **example(sql.ReleasePhase.RELEASE_CANDIDATE))
 
+    @pydantic.field_validator("current_phase", mode="before")
+    @classmethod
+    def current_phase_to_enum(cls, v):
+        return sql.ReleasePhase(v) if isinstance(v, str) else v
+
 
 class ChecksOngoingResults(schema.Strict):
     endpoint: Literal["/checks/ongoing"] = schema.Field(alias="endpoint")
@@ -263,6 +268,19 @@ class ReleasesProjectResults(schema.Strict):
 class ReleasesVersionResults(schema.Strict):
     endpoint: Literal["/releases/version"] = schema.Field(alias="endpoint")
     release: sql.Release
+
+    @pydantic.field_validator("release", mode="before")
+    @classmethod
+    def _preserve_latest_revision_number(cls, v):
+        if isinstance(v, dict):
+            data = dict(v)
+            lrn = data.pop("latest_revision_number", None)
+            allowed = {k: data[k] for k in data if k in sql.Release.model_fields}
+            obj = sql.Release(**allowed)
+            if lrn is not None:
+                setattr(obj, "_latest_revision_number", lrn)
+            return obj
+        return v
 
 
 class ReleasesRevisionsResults(schema.Strict):
