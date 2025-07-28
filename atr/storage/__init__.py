@@ -243,7 +243,7 @@ class Write:
         if self.__asf_uid is None:
             return types.OutcomeException(AccessError("No ASF UID"))
         if committee_name not in self.__member_of:
-            return types.OutcomeException(AccessError(f"Not a member of {committee_name}"))
+            return types.OutcomeException(AccessError(f"ASF UID {self.__asf_uid} is not a member of {committee_name}"))
         try:
             wacm = WriteAsCommitteeMember(self, self.__data, self.__asf_uid, committee_name)
         except Exception as e:

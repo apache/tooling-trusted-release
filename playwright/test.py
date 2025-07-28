@@ -89,11 +89,7 @@ def get_default_gateway_ip() -> str | None:
 
 
 def go_to_path(page: sync_api.Page, path: str, wait: bool = True) -> None:
-    gateway_ip = get_default_gateway_ip()
-    if gateway_ip is None:
-        logging.error("Could not determine gateway IP")
-        raise RuntimeError("Could not determine gateway IP")
-    page.goto(f"https://{gateway_ip}:8080{path}")
+    page.goto(f"https://localhost.apache.org:8080{path}")
     if wait:
         wait_for_path(page, path)
 
@@ -314,16 +310,21 @@ def main() -> None:
     )
 
     logging.debug(f"Log level set to {args.log.upper()}")
+    # Add localhost.apache.org to /etc/hosts
+    default_gateway_ip = get_default_gateway_ip()
+    if default_gateway_ip is not None:
+        with open("/etc/hosts", "a") as f:
+            f.write(f"{default_gateway_ip} localhost.apache.org\n")
+        logging.info(f"Added localhost.apache.org to /etc/hosts with IP {default_gateway_ip}")
+    else:
+        logging.warning("Could not determine default gateway IP, skipping /etc/hosts modification")
+
     run_tests(args.skip_slow, args.tidy)
 
 
 def poll_for_tasks_completion(page: sync_api.Page, project_name: str, version_name: str, revision: str) -> None:
-    gateway_ip = get_default_gateway_ip()
-    if not gateway_ip:
-        raise RuntimeError("Cannot proceed without gateway IP")
-
     rev_path = f"{project_name}/{version_name}/{revision}"
-    polling_url = f"https://{gateway_ip}:8080/admin/ongoing-tasks/{rev_path}"
+    polling_url = f"https://localhost.apache.org:8080/admin/ongoing-tasks/{rev_path}"
     logging.info(f"Polling URL: {polling_url}")
 
     max_wait_seconds = 18

@@ -99,7 +99,7 @@
   <p>You can download all of the files in this release using curl with the following command:</p>
   <!-- TODO: Add a button to copy the command to the clipboard -->
   <pre class="bg-light border rounded p-3 mb-3">
-curl{% if server_domain.startswith("127.0.0.1") %} --insecure{% endif %} -fsS https://{{ server_domain }}{{ as_url(routes.download.sh_selected, project_name=release.project.name, version_name=release.version) }} |{% if server_domain.startswith("127.0.0.1") %} CURL_EXTRA=--insecure{% endif %} sh
+curl{% if (server_domain == "localhost.apache.org") or server_domain.startswith("localhost.apache.org:" %} --insecure{% endif %} -fsS https://{{ server_domain }}{{ as_url(routes.download.sh_selected, project_name=release.project.name, version_name=release.version) }} |{% if server_domain == "localhost.apache.org" %} CURL_EXTRA=--insecure{% endif %} sh
 </pre>
   <p>
     This downloads the files into the <em>current directory</em>. Ensure that you create a new empty directory, and change to it, before running the command. The script requires curl and a POSIX compliant version of sh. It works by downloading a POSIX complaint shell script straight into your shell. You can of course <a href="{{ as_url(routes.download.sh_selected, project_name=release.project.name, version_name=release.version) }}">download the script</a> and audit it before running it.
@@ -116,7 +116,7 @@ rsync -av -e 'ssh -p 2222' {{ asf_id }}@{{ server_domain }}:/{{ release.project.
   <h3 id="download-wget" class="mt-4">Using wget</h3>
   <p>You can download all of the files in this release using wget with the following command:</p>
   <pre class="bg-light border rounded p-3 mb-3">
-wget -r -np -nH --cut-dirs=4 --default-page=.index.html{% if server_domain.startswith("127.0.0.1") %} --no-check-certificate{% endif %} https://{{ server_domain }}{{ as_url(routes.download.path_empty, project_name=release.project.name, version_name=release.version) }}
+wget -r -np -nH --cut-dirs=4 --default-page=.index.html{% if (server_domain == "localhost.apache.org") or server_domain.startswith("localhost.apache.org:") %} --no-check-certificate{% endif %} https://{{ server_domain }}{{ as_url(routes.download.path_empty, project_name=release.project.name, version_name=release.version) }}
 </pre>
   <p>
     This downloads the files into the <em>current directory</em>. Ensure that you create a new empty directory, and change to it, before running the command.

@@ -4,7 +4,7 @@ Many of these scripts are intended to be used by other scripts, or by `Makefile`
 
 ## generate-certificates
 
-Generates self signed SSL certificates for development and testing purposes. It creates a private RSA key and a certificate valid for `127.0.0.1` with a one year expiration period, and stores them in the state directory as `cert.pem` and `key.pem`. These certificates enable HTTPS to work when running the application locally, allowing developers to test the application with SSL encryption without needing to obtain certificates from a certificate authority. Signing in using ASF OAuth does not work without the use of HTTPS, so without self signed certificates developers would be unable to test locally.
+Generates self signed SSL certificates for development and testing purposes. It creates a private RSA key and a certificate valid for `127.0.0.1` with a one year expiration period, and stores them in the state directory as `cert.pem` and `key.pem`.
 
 ## poetry/add-dev
 

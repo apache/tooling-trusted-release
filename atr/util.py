@@ -303,7 +303,10 @@ def create_path_matcher(lines: Iterable[str], full_path: pathlib.Path, base_dir:
 
 def is_dev_environment() -> bool:
     conf = config.get()
-    return (conf.APP_HOST == "127.0.0.1") or conf.APP_HOST.startswith("127.0.0.1:")
+    for development_host in ("127.0.0.1", "localhost.apache.org"):
+        if (conf.APP_HOST == development_host) or conf.APP_HOST.startswith(f"{development_host}:"):
+            return True
+    return False
 
 
 def email_from_uid(uid: str) -> str | None:
