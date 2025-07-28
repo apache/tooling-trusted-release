@@ -105,7 +105,7 @@ async def announce_post(data: models.api.AnnounceArgs) -> DictResponse:
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
 async def checks_list(project: str, version: str) -> DictResponse:
     """
-    List all of the check results for the latest revision of a release.
+    All of the check results for the latest revision of a release.
 
     Checks are only conducted during the compose a draft phase. This endpoint
     only returns the checks for the most recent draft revision. Once a release
@@ -145,7 +145,7 @@ async def checks_list(project: str, version: str) -> DictResponse:
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
 async def checks_list_revision(project: str, version: str, revision: str) -> DictResponse:
     """
-    List all of the check results for a specific revision of a release.
+    All of the check results for a specific revision of a release.
 
     Checks are only conducted during the compose a draft phase. This endpoint
     only returns the checks for the specified draft revision. Once a release
@@ -188,7 +188,7 @@ async def checks_ongoing(
     revision: str | None = None,
 ) -> DictResponse:
     """
-    Count the unfinished check results for a specifed or latest revision of a release.
+    The number of unfinished check results for a specifed or latest revision of a release.
 
     Checks are only conducted during the compose a draft phase. This endpoint
     returns the number of ongoing checks for the specified draft revision if
@@ -217,15 +217,22 @@ async def checks_ongoing(
 
 
 # TODO: Rename all paths to avoid clashes
-@api.BLUEPRINT.route("/committees/<name>")
-@quart_schema.validate_response(models.api.CommitteesResults, 200)
-async def committees(name: str) -> DictResponse:
-    """Get a specific committee by name."""
+@api.BLUEPRINT.route("/committees/get/<name>")
+@quart_schema.validate_response(models.api.CommitteesGetResults, 200)
+async def committees_get(name: str) -> DictResponse:
+    """
+    A specific committee by name.
+
+    The name of the committee is the name without any prefixes or suffixes such
+    as "Apache" or "PMC", in lower case, and with hyphens instead of spaces.
+    The Apache Simple Example PMC, for example, would have the name
+    "simple-example".
+    """
     _simple_check(name)
     async with db.session() as data:
-        committee = await data.committee(name=name).demand(exceptions.NotFound())
-    return models.api.CommitteesResults(
-        endpoint="/committees",
+        committee = await data.committee(name=name).demand(exceptions.NotFound(f"Committee '{name}' was not found"))
+    return models.api.CommitteesGetResults(
+        endpoint="/committees/get",
         committee=committee,
     ).model_dump(), 200
 
@@ -233,10 +240,19 @@ async def committees(name: str) -> DictResponse:
 @api.BLUEPRINT.route("/committees/keys/<name>")
 @quart_schema.validate_response(models.api.CommitteesKeysResults, 200)
 async def committees_keys(name: str) -> DictResponse:
-    """List all public signing keys associated with a specific committee."""
+    """
+    Public OpenPGP keys associated with a specific committee.
+
+    The name of the committee is the name without any prefixes or suffixes such
+    as "Apache" or "PMC", in lower case, and with hyphens instead of spaces.
+    The Apache Simple Example PMC, for example, would have the name
+    "simple-example".
+    """
     _simple_check(name)
     async with db.session() as data:
-        committee = await data.committee(name=name, _public_signing_keys=True).demand(exceptions.NotFound())
+        committee = await data.committee(name=name, _public_signing_keys=True).demand(
+            exceptions.NotFound(f"Committee '{name}' was not found")
+        )
     return models.api.CommitteesKeysResults(
         endpoint="/committees/keys",
         keys=committee.public_signing_keys,
@@ -246,7 +262,11 @@ async def committees_keys(name: str) -> DictResponse:
 @api.BLUEPRINT.route("/committees/list")
 @quart_schema.validate_response(models.api.CommitteesListResults, 200)
 async def committees_list() -> DictResponse:
-    """List all committees in the database."""
+    """
+    All committees.
+
+    The list of committees is returned in no particular order.
+    """
     async with db.session() as data:
         committees = await data.committee().all()
     return models.api.CommitteesListResults(
@@ -258,10 +278,19 @@ async def committees_list() -> DictResponse:
 @api.BLUEPRINT.route("/committees/projects/<name>")
 @quart_schema.validate_response(models.api.CommitteesProjectsResults, 200)
 async def committees_projects(name: str) -> DictResponse:
-    """List all projects for a specific committee."""
+    """
+    Projects managed by a specific committee.
+
+    The name of the committee is the name without any prefixes or suffixes such
+    as "Apache" or "PMC", in lower case, and with hyphens instead of spaces.
+    The Apache Simple Example PMC, for example, would have the name
+    "simple-example".
+    """
     _simple_check(name)
     async with db.session() as data:
-        committee = await data.committee(name=name, _projects=True).demand(exceptions.NotFound())
+        committee = await data.committee(name=name, _projects=True).demand(
+            exceptions.NotFound(f"Committee '{name}' was not found")
+        )
     return models.api.CommitteesProjectsResults(
         endpoint="/committees/projects",
         projects=committee.projects,
@@ -274,6 +303,9 @@ async def committees_projects(name: str) -> DictResponse:
 @quart_schema.validate_request(models.api.DraftDeleteArgs)
 @quart_schema.validate_response(models.api.DraftDeleteResults, 200)
 async def draft_delete(data: models.api.DraftDeleteArgs) -> DictResponse:
+    """
+    Delete a draft release.
+    """
     asf_uid = _jwt_asf_uid()
 
     async with db.session() as db_data:
@@ -304,7 +336,9 @@ async def draft_delete(data: models.api.DraftDeleteArgs) -> DictResponse:
 @api.BLUEPRINT.route("/jwt", methods=["POST"])
 @quart_schema.validate_request(models.api.JwtArgs)
 async def jwt(data: models.api.JwtArgs) -> DictResponse:
-    """Generate a JWT from a valid PAT."""
+    """
+    Create a JWT from a valid PAT.
+    """
     # Expects {"asfuid": "uid", "pat": "pat-token"}
     # Returns {"asfuid": "uid", "jwt": "jwt-token"}
     token_hash = hashlib.sha3_256(data.pat.encode()).hexdigest()
@@ -327,7 +361,9 @@ async def jwt(data: models.api.JwtArgs) -> DictResponse:
 @quart_schema.validate_querystring(models.api.KeysQuery)
 @quart_schema.validate_response(models.api.KeysResults, 200)
 async def keys_endpoint(query_args: models.api.KeysQuery) -> DictResponse:
-    """List all public signing keys with pagination support."""
+    """
+    All public OpenPGP keys, with pagination support.
+    """
     # TODO: Rather than pagination, let's support keys by committee and by user
     # That way, consumers can scroll through committees or users
     # Which performs logical pagination, rather than arbitrary window pagination
@@ -357,6 +393,9 @@ async def keys_endpoint(query_args: models.api.KeysQuery) -> DictResponse:
 @quart_schema.validate_request(models.api.KeysAddArgs)
 @quart_schema.validate_response(models.api.KeysAddResults, 200)
 async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
+    """
+    Add a public OpenPGP key to a list of committees.
+    """
     asf_uid = _jwt_asf_uid()
     selected_committee_names = data.committees
 
@@ -385,6 +424,9 @@ async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
 @quart_schema.validate_request(models.api.KeysDeleteArgs)
 @quart_schema.validate_response(models.api.KeysDeleteResults, 200)
 async def keys_delete(data: models.api.KeysDeleteArgs) -> DictResponse:
+    """
+    Delete a public OpenPGP key from all committees.
+    """
     asf_uid = _jwt_asf_uid()
     fingerprint = data.fingerprint.lower()
 
@@ -407,24 +449,28 @@ async def keys_delete(data: models.api.KeysDeleteArgs) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/keys/committee/<committee>")
-@quart_schema.validate_response(models.api.KeysUserResults, 200)
-async def keys_committee(committee: str) -> DictResponse:
-    """Return all public signing keys for a specific committee."""
-    _simple_check(committee)
-    async with db.session() as data:
-        committee_object = await data.committee(name=committee, _public_signing_keys=True).demand(exceptions.NotFound())
-        keys = committee_object.public_signing_keys
-    return models.api.KeysCommitteeResults(
-        endpoint="/keys/committee",
-        keys=keys,
-    ).model_dump(), 200
+# @api.BLUEPRINT.route("/keys/committee/<committee>")
+# @quart_schema.validate_response(models.api.KeysUserResults, 200)
+# async def keys_committee(committee: str) -> DictResponse:
+#     """Return all public signing keys for a specific committee."""
+#     _simple_check(committee)
+#     async with db.session() as data:
+#         committee_object = await data.committee(
+#             name=committee, _public_signing_keys=True
+#         ).demand(exceptions.NotFound(f"Committee '{committee}' was not found"))
+#         keys = committee_object.public_signing_keys
+#     return models.api.KeysCommitteeResults(
+#         endpoint="/keys/committee",
+#         keys=keys,
+#     ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/keys/get/<fingerprint>")
 @quart_schema.validate_response(models.api.KeysGetResults, 200)
 async def keys_get(fingerprint: str) -> DictResponse:
-    """Return a single public signing key by fingerprint."""
+    """
+    A single public OpenPGP key by fingerprint.
+    """
     _simple_check(fingerprint)
     async with db.session() as data:
         key = await data.public_signing_key(fingerprint=fingerprint.lower()).demand(exceptions.NotFound())
@@ -440,6 +486,9 @@ async def keys_get(fingerprint: str) -> DictResponse:
 @quart_schema.validate_request(models.api.KeysUploadArgs)
 @quart_schema.validate_response(models.api.KeysUploadResults, 200)
 async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
+    """
+    Upload a new public OpenPGP key to a committee.
+    """
     asf_uid = _jwt_asf_uid()
     filetext = data.filetext
     selected_committee_name = data.committee
@@ -492,7 +541,9 @@ async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
 @api.BLUEPRINT.route("/keys/user/<asf_uid>")
 @quart_schema.validate_response(models.api.KeysUserResults, 200)
 async def keys_user(asf_uid: str) -> DictResponse:
-    """Return all public signing keys for a specific user."""
+    """
+    All public OpenPGP keys for a specific user.
+    """
     _simple_check(asf_uid)
     async with db.session() as data:
         keys = await data.public_signing_key(apache_uid=asf_uid).all()

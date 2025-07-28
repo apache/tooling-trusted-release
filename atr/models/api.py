@@ -69,8 +69,8 @@ class ChecksOngoingResults(schema.Strict):
     ongoing: int
 
 
-class CommitteesResults(schema.Strict):
-    endpoint: Literal["/committees"] = schema.Field(alias="endpoint")
+class CommitteesGetResults(schema.Strict):
+    endpoint: Literal["/committees/get"] = schema.Field(alias="endpoint")
     committee: sql.Committee
 
 
@@ -139,9 +139,9 @@ class KeysAddResults(schema.Strict):
     fingerprint: str
 
 
-class KeysCommitteeResults(schema.Strict):
-    endpoint: Literal["/keys/committee"] = schema.Field(alias="endpoint")
-    keys: Sequence[sql.PublicSigningKey]
+# class KeysCommitteeResults(schema.Strict):
+#     endpoint: Literal["/keys/committee"] = schema.Field(alias="endpoint")
+#     keys: Sequence[sql.PublicSigningKey]
 
 
 class KeysDeleteArgs(schema.Strict):
@@ -416,7 +416,7 @@ Results = Annotated[
     AnnounceResults
     | ChecksListResults
     | ChecksOngoingResults
-    | CommitteesResults
+    | CommitteesGetResults
     | CommitteesKeysResults
     | CommitteesListResults
     | CommitteesProjectsResults
@@ -426,7 +426,7 @@ Results = Annotated[
     | KeysAddResults
     | KeysDeleteResults
     | KeysGetResults
-    | KeysCommitteeResults
+    # | KeysCommitteeResults
     | KeysUploadResults
     | KeysUserResults
     | ListResults
@@ -469,7 +469,7 @@ def validator[T](t: type[T]) -> Callable[[Any], T]:
 validate_announce = validator(AnnounceResults)
 validate_checks_list = validator(ChecksListResults)
 validate_checks_ongoing = validator(ChecksOngoingResults)
-validate_committees = validator(CommitteesResults)
+validate_committees_get = validator(CommitteesGetResults)
 validate_committees_keys = validator(CommitteesKeysResults)
 validate_committees_list = validator(CommitteesListResults)
 validate_committees_projects = validator(CommitteesProjectsResults)
@@ -477,7 +477,7 @@ validate_draft_delete = validator(DraftDeleteResults)
 validate_jwt = validator(JwtResults)
 validate_keys = validator(KeysResults)
 validate_keys_add = validator(KeysAddResults)
-validate_keys_committee = validator(KeysCommitteeResults)
+# validate_keys_committee = validator(KeysCommitteeResults)
 validate_keys_delete = validator(KeysDeleteResults)
 validate_keys_get = validator(KeysGetResults)
 validate_keys_upload = validator(KeysUploadResults)
