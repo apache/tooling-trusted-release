@@ -105,7 +105,7 @@ async def announce_post(data: models.api.AnnounceArgs) -> DictResponse:
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
 async def checks_list(project: str, version: str) -> DictResponse:
     """
-    List all of the check results for a release.
+    List all of the check results for the latest revision of a release.
 
     Checks are only conducted during the compose a draft phase. This endpoint
     only returns the checks for the most recent draft revision. Once a release
@@ -144,7 +144,17 @@ async def checks_list(project: str, version: str) -> DictResponse:
 @api.BLUEPRINT.route("/checks/list/<project>/<version>/<revision>")
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
 async def checks_list_revision(project: str, version: str, revision: str) -> DictResponse:
-    """List all check results for a specific revision of a release."""
+    """
+    List all of the check results for a specific revision of a release.
+
+    Checks are only conducted during the compose a draft phase. This endpoint
+    only returns the checks for the specified draft revision. Once a release
+    has been promoted to the vote phase or beyond, the checks returned are
+    still those for the specified revision from the compose phase.
+
+    Warning: the check results include results for archive members, so there
+    may potentially be thousands or results or more.
+    """
     _simple_check(project, version, revision)
     async with db.session() as data:
         project_result = await data.project(name=project).get()
@@ -169,7 +179,7 @@ async def checks_list_revision(project: str, version: str, revision: str) -> Dic
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/checks/ongoing/<project>/<version>")
+@api.BLUEPRINT.route("/checks/ongoing/<project>/<version>", defaults={"revision": None})
 @api.BLUEPRINT.route("/checks/ongoing/<project>/<version>/<revision>")
 @quart_schema.validate_response(models.api.ChecksOngoingResults, 200)
 async def checks_ongoing(
@@ -177,7 +187,14 @@ async def checks_ongoing(
     version: str,
     revision: str | None = None,
 ) -> DictResponse:
-    """Return a count of all unfinished check results for a given release."""
+    """
+    Count the unfinished check results for a specifed or latest revision of a release.
+
+    Checks are only conducted during the compose a draft phase. This endpoint
+    returns the number of ongoing checks for the specified draft revision if
+    present, or the most recent draft revision otherwise. A draft release
+    cannot be promoted to the vote phase if checks are still ongoing.
+    """
     _simple_check(project, version, revision)
     ongoing_tasks_count, _latest_revision = await interaction.tasks_ongoing_revision(project, version, revision)
     # TODO: Is there a way to return just an int?

@@ -657,19 +657,19 @@ class CheckResult(sqlmodel.SQLModel, table=True):
 
     # M-1: CheckResult -> Release
     # 1-M: Release -C-> [CheckResult]
-    release_name: str = sqlmodel.Field(foreign_key="release.name", ondelete="CASCADE")
+    release_name: str = sqlmodel.Field(foreign_key="release.name", ondelete="CASCADE", **example("example-0.0.1"))
     release: Release = sqlmodel.Relationship(back_populates="check_results")
 
     # We don't call this latest_revision_number, because it might not be the latest
     revision_number: str | None = sqlmodel.Field(default=None, index=True, **example("00005"))
-    checker: str = sqlmodel.Field(**example("atr.tasks.checks.hashing.HashingCheck"))
+    checker: str = sqlmodel.Field(**example("atr.tasks.checks.license.files"))
     primary_rel_path: str | None = sqlmodel.Field(
         default=None, index=True, **example("apache-example-0.0.1-source.tar.gz")
     )
     member_rel_path: str | None = sqlmodel.Field(default=None, index=True, **example("apache-example-0.0.1/pom.xml"))
     created: datetime.datetime = sqlmodel.Field(
         sa_column=sqlalchemy.Column(UTCDateTime),
-        **example(datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.UTC)),
+        **example(datetime.datetime(2025, 5, 1, 1, 2, 3, tzinfo=datetime.UTC)),
     )
     status: CheckResultStatus = sqlmodel.Field(default=CheckResultStatus.SUCCESS, **example(CheckResultStatus.SUCCESS))
     message: str = sqlmodel.Field(**example("sha512 matches for apache-example-0.0.1/pom.xml"))
