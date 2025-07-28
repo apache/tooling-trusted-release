@@ -59,11 +59,26 @@ class PathInfo(schema.Strict):
     warnings: dict[pathlib.Path, list[sql.CheckResult]] = schema.factory(dict)
 
 
+async def candidate_drafts(project: sql.Project) -> list[sql.Release]:
+    """Get the candidate drafts for the project."""
+    return await releases_by_phase(project, sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT)
+
+
+async def candidates(project: sql.Project) -> list[sql.Release]:
+    """Get the candidate releases for the project."""
+    return await releases_by_phase(project, sql.ReleasePhase.RELEASE_CANDIDATE)
+
+
 @contextlib.asynccontextmanager
 async def ephemeral_gpg_home() -> AsyncGenerator[str]:
     """Create a temporary directory for an isolated GPG home, and clean it up on exit."""
     async with util.async_temporary_directory(prefix="gpg-") as temp_dir:
         yield str(temp_dir)
+
+
+async def full_releases(project: sql.Project) -> list[sql.Release]:
+    """Get the full releases for the project."""
+    return await releases_by_phase(project, sql.ReleasePhase.RELEASE)
 
 
 async def has_failing_checks(release: sql.Release, revision_number: str, caller_data: db.Session | None = None) -> bool:
@@ -106,6 +121,11 @@ async def path_info(release: sql.Release, paths: list[pathlib.Path]) -> PathInfo
     return info
 
 
+async def previews(project: sql.Project) -> list[sql.Release]:
+    """Get the preview releases for the project."""
+    return await releases_by_phase(project, sql.ReleasePhase.RELEASE_PREVIEW)
+
+
 async def release_delete(
     release_name: str, phase: db.Opt[sql.ReleasePhase] = db.NOT_SET, include_downloads: bool = True
 ) -> None:
@@ -142,6 +162,38 @@ async def release_delete(
     if include_downloads:
         await _delete_release_data_downloads(release)
     await _delete_release_data_filesystem(release_dir, release_name)
+
+
+async def releases_by_phase(project: sql.Project, phase: sql.ReleasePhase) -> list[sql.Release]:
+    """Get the releases for the project by phase."""
+
+    query = (
+        sqlmodel.select(sql.Release)
+        .where(
+            sql.Release.project_name == project.name,
+            sql.Release.phase == phase,
+        )
+        .order_by(sql.validate_instrumented_attribute(sql.Release.created).desc())
+    )
+
+    results = []
+    async with db.session() as data:
+        for result in (await data.execute(query)).all():
+            release = result[0]
+            results.append(release)
+
+    for release in results:
+        # Don't need to eager load and lose it when the session closes
+        release.project = project
+    return results
+
+
+async def releases_in_progress(project: sql.Project) -> list[sql.Release]:
+    """Get the releases in progress for the project."""
+    drafts = await candidate_drafts(project)
+    cands = await candidates(project)
+    prevs = await previews(project)
+    return drafts + cands + prevs
 
 
 async def tasks_ongoing(project_name: str, version_name: str, revision_number: str | None = None) -> int:
@@ -321,55 +373,3 @@ async def _successes_errors_warnings(
     for error in errors:
         if primary_rel_path := error.primary_rel_path:
             info.errors.setdefault(pathlib.Path(primary_rel_path), []).append(error)
-
-
-async def releases_by_phase(project: sql.Project, phase: sql.ReleasePhase) -> list[sql.Release]:
-    """Get the releases for the project by phase."""
-
-    query = (
-        sqlmodel.select(sql.Release)
-        .where(
-            sql.Release.project_name == project.name,
-            sql.Release.phase == phase,
-        )
-        .order_by(sql.validate_instrumented_attribute(sql.Release.created).desc())
-    )
-
-    results = []
-    async with db.session() as data:
-        for result in (await data.execute(query)).all():
-            release = result[0]
-            results.append(release)
-
-    for release in results:
-        # Don't need to eager load and lose it when the session closes
-        release.project = project
-    return results
-
-
-async def candidate_drafts(project: sql.Project) -> list[sql.Release]:
-    """Get the candidate drafts for the project."""
-    return await releases_by_phase(project, sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT)
-
-
-async def candidates(project: sql.Project) -> list[sql.Release]:
-    """Get the candidate releases for the project."""
-    return await releases_by_phase(project, sql.ReleasePhase.RELEASE_CANDIDATE)
-
-
-async def previews(project: sql.Project) -> list[sql.Release]:
-    """Get the preview releases for the project."""
-    return await releases_by_phase(project, sql.ReleasePhase.RELEASE_PREVIEW)
-
-
-async def full_releases(project: sql.Project) -> list[sql.Release]:
-    """Get the full releases for the project."""
-    return await releases_by_phase(project, sql.ReleasePhase.RELEASE)
-
-
-async def releases_in_progress(project: sql.Project) -> list[sql.Release]:
-    """Get the releases in progress for the project."""
-    drafts = await candidate_drafts(project)
-    cands = await candidates(project)
-    prevs = await previews(project)
-    return drafts + cands + prevs

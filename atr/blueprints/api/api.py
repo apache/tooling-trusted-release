@@ -305,6 +305,11 @@ async def committees_projects(name: str) -> DictResponse:
 async def draft_delete(data: models.api.DraftDeleteArgs) -> DictResponse:
     """
     Delete a draft release.
+
+    The draft release is deleted, and all of its associated metadata and files
+    are removed from the database and the filesystem. This cannot be undone.
+
+    Warning: we plan to change how draft deletion works.
     """
     asf_uid = _jwt_asf_uid()
 
@@ -312,7 +317,7 @@ async def draft_delete(data: models.api.DraftDeleteArgs) -> DictResponse:
         release_name = sql.release_name(data.project, data.version)
         release = await db_data.release(
             name=release_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, _committee=True
-        ).demand(exceptions.NotFound())
+        ).demand(exceptions.NotFound(f"Draft release '{release_name}' not found"))
         if release.project.committee is None:
             raise exceptions.NotFound("Project has no committee")
         _committee_member_or_admin(release.project.committee, asf_uid)
@@ -333,9 +338,9 @@ async def draft_delete(data: models.api.DraftDeleteArgs) -> DictResponse:
 
 
 # This is the only POST endpoint that does not require a JWT
-@api.BLUEPRINT.route("/jwt", methods=["POST"])
-@quart_schema.validate_request(models.api.JwtArgs)
-async def jwt(data: models.api.JwtArgs) -> DictResponse:
+@api.BLUEPRINT.route("/jwt/create", methods=["POST"])
+@quart_schema.validate_request(models.api.JwtCreateArgs)
+async def jwt_create(data: models.api.JwtCreateArgs) -> DictResponse:
     """
     Create a JWT from a valid PAT.
     """
@@ -349,8 +354,8 @@ async def jwt(data: models.api.JwtArgs) -> DictResponse:
         raise exceptions.Unauthorized("Invalid PAT")
 
     jwt_token = jwtoken.issue(data.asfuid)
-    return models.api.JwtResults(
-        endpoint="/jwt",
+    return models.api.JwtCreateResults(
+        endpoint="/jwt/create",
         asfuid=data.asfuid,
         jwt=jwt_token,
     ).model_dump(), 200
@@ -363,6 +368,8 @@ async def jwt(data: models.api.JwtArgs) -> DictResponse:
 async def keys_endpoint(query_args: models.api.KeysQuery) -> DictResponse:
     """
     All public OpenPGP keys, with pagination support.
+
+    Warning: this endpoint is deprecated.
     """
     # TODO: Rather than pagination, let's support keys by committee and by user
     # That way, consumers can scroll through committees or users
@@ -394,7 +401,10 @@ async def keys_endpoint(query_args: models.api.KeysQuery) -> DictResponse:
 @quart_schema.validate_response(models.api.KeysAddResults, 200)
 async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
     """
-    Add a public OpenPGP key to a list of committees.
+    Add a public OpenPGP key to all specified committees.
+
+    Once associated with the specified committees, the key will appear in the
+    automatically generated KEYS file for each committee.
     """
     asf_uid = _jwt_asf_uid()
     selected_committee_names = data.committees
@@ -426,6 +436,8 @@ async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
 async def keys_delete(data: models.api.KeysDeleteArgs) -> DictResponse:
     """
     Delete a public OpenPGP key from all committees.
+
+    Warning: we plan to change how key deletion works.
     """
     asf_uid = _jwt_asf_uid()
     fingerprint = data.fingerprint.lower()
@@ -470,10 +482,14 @@ async def keys_delete(data: models.api.KeysDeleteArgs) -> DictResponse:
 async def keys_get(fingerprint: str) -> DictResponse:
     """
     A single public OpenPGP key by fingerprint.
+
+    All public OpenPGP keys stored within the database are accessible.
     """
     _simple_check(fingerprint)
     async with db.session() as data:
-        key = await data.public_signing_key(fingerprint=fingerprint.lower()).demand(exceptions.NotFound())
+        key = await data.public_signing_key(fingerprint=fingerprint.lower()).demand(
+            exceptions.NotFound(f"Key '{fingerprint}' not found")
+        )
     return models.api.KeysGetResults(
         endpoint="/keys/get",
         key=key,

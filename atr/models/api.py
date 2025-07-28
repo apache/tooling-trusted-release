@@ -66,7 +66,7 @@ class ChecksListResults(schema.Strict):
 
 class ChecksOngoingResults(schema.Strict):
     endpoint: Literal["/checks/ongoing"] = schema.Field(alias="endpoint")
-    ongoing: int
+    ongoing: int = schema.Field(..., **example(10))
 
 
 class CommitteesGetResults(schema.Strict):
@@ -90,13 +90,13 @@ class CommitteesProjectsResults(schema.Strict):
 
 
 class DraftDeleteArgs(schema.Strict):
-    project: str
-    version: str
+    project: str = schema.Field(..., **example("example"))
+    version: str = schema.Field(..., **example("0.0.1"))
 
 
 class DraftDeleteResults(schema.Strict):
     endpoint: Literal["/draft/delete"] = schema.Field(alias="endpoint")
-    success: str
+    success: str = schema.Field(..., **example("Draft 'example-0.0.1' deleted"))
 
 
 class ListResults(schema.Strict):
@@ -104,15 +104,15 @@ class ListResults(schema.Strict):
     rel_paths: Sequence[str]
 
 
-class JwtArgs(schema.Strict):
-    asfuid: str
-    pat: str
+class JwtCreateArgs(schema.Strict):
+    asfuid: str = schema.Field(..., **example("user"))
+    pat: str = schema.Field(..., **example("8M5t4GCU63EdOy4NNXgXn7o-bc-muK8TRg5W-DeBaWY"))
 
 
-class JwtResults(schema.Strict):
-    endpoint: Literal["/jwt"] = schema.Field(alias="endpoint")
-    asfuid: str
-    jwt: str
+class JwtCreateResults(schema.Strict):
+    endpoint: Literal["/jwt/create"] = schema.Field(alias="endpoint")
+    asfuid: str = schema.Field(..., **example("user"))
+    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
 
 
 @dataclasses.dataclass
@@ -124,19 +124,21 @@ class KeysQuery:
 class KeysResults(schema.Strict):
     endpoint: Literal["/keys"] = schema.Field(alias="endpoint")
     data: Sequence[sql.PublicSigningKey]
-    count: int
+    count: int = schema.Field(..., **example(10))
 
 
 class KeysAddArgs(schema.Strict):
-    asfuid: str
-    key: str
-    committees: list[str]
+    asfuid: str = schema.Field(..., **example("user"))
+    key: str = schema.Field(
+        ..., **example("-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n...\n-----END PGP PUBLIC KEY BLOCK-----\n")
+    )
+    committees: list[str] = schema.Field(..., **example(["example"]))
 
 
 class KeysAddResults(schema.Strict):
     endpoint: Literal["/keys/add"] = schema.Field(alias="endpoint")
-    success: str
-    fingerprint: str
+    success: str = schema.Field(..., **example("Key added"))
+    fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
 
 
 # class KeysCommitteeResults(schema.Strict):
@@ -145,12 +147,12 @@ class KeysAddResults(schema.Strict):
 
 
 class KeysDeleteArgs(schema.Strict):
-    fingerprint: str
+    fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
 
 
 class KeysDeleteResults(schema.Strict):
     endpoint: Literal["/keys/delete"] = schema.Field(alias="endpoint")
-    success: str
+    success: str = schema.Field(..., **example("Key deleted"))
 
 
 class KeysGetResults(schema.Strict):
@@ -159,15 +161,17 @@ class KeysGetResults(schema.Strict):
 
 
 class KeysUploadArgs(schema.Strict):
-    filetext: str
-    committee: str
+    filetext: str = schema.Field(
+        ..., **example("-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n...\n-----END PGP PUBLIC KEY BLOCK-----\n")
+    )
+    committee: str = schema.Field(..., **example("example"))
 
 
 class KeysUploadException(schema.Strict):
     status: Literal["error"] = schema.Field(alias="status")
     key: sql.PublicSigningKey | None
-    error: str
-    error_type: str
+    error: str = schema.Field(..., **example("Error message"))
+    error_type: str = schema.Field(..., **example("KeysUploadError"))
 
 
 class KeysUploadResult(schema.Strict):
@@ -193,9 +197,9 @@ KeysUploadOutcomeAdapter = pydantic.TypeAdapter(KeysUploadOutcome)
 class KeysUploadResults(schema.Strict):
     endpoint: Literal["/keys/upload"] = schema.Field(alias="endpoint")
     results: Sequence[KeysUploadResult | KeysUploadException]
-    success_count: int
-    error_count: int
-    submitted_committee: str
+    success_count: int = schema.Field(..., **example(1))
+    error_count: int = schema.Field(..., **example(0))
+    submitted_committee: str = schema.Field(..., **example("example"))
 
 
 class KeysUserResults(schema.Strict):
@@ -421,7 +425,7 @@ Results = Annotated[
     | CommitteesListResults
     | CommitteesProjectsResults
     | DraftDeleteResults
-    | JwtResults
+    | JwtCreateResults
     | KeysResults
     | KeysAddResults
     | KeysDeleteResults
@@ -474,7 +478,7 @@ validate_committees_keys = validator(CommitteesKeysResults)
 validate_committees_list = validator(CommitteesListResults)
 validate_committees_projects = validator(CommitteesProjectsResults)
 validate_draft_delete = validator(DraftDeleteResults)
-validate_jwt = validator(JwtResults)
+validate_jwt_create = validator(JwtCreateResults)
 validate_keys = validator(KeysResults)
 validate_keys_add = validator(KeysAddResults)
 # validate_keys_committee = validator(KeysCommitteeResults)
