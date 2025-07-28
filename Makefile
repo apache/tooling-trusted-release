@@ -25,7 +25,7 @@ certs:
 	fi
 
 certs-local:
-	mkcert localhost.apache.org localhost 127.0.0.1 ::1
+	cd state && mkcert localhost.apache.org localhost 127.0.0.1 ::1
 
 check:
 	git add -A
