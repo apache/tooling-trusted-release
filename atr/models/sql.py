@@ -24,7 +24,7 @@
 
 import datetime
 import enum
-from typing import Any, Final, Optional
+from typing import Any, Final, Literal, Optional, TypeVar
 
 import pydantic
 import sqlalchemy
@@ -34,6 +34,8 @@ import sqlalchemy.sql.expression as expression
 import sqlmodel
 
 from . import results, schema
+
+T = TypeVar("T")
 
 sqlmodel.SQLModel.metadata = sqlalchemy.MetaData(
     naming_convention={
@@ -64,6 +66,12 @@ class ProjectStatus(str, enum.Enum):
 
 
 class ReleasePhase(str, enum.Enum):
+    # TODO: Rename these to the UI names?
+    # COMPOSE, VOTE, FINISH, "DISTRIBUTE"
+    # Compose a draft
+    # Vote on a candidate
+    # Finish a preview
+    # Distribute a (finished) release
     # Step 1: The candidate files are added from external sources and checked by ATR
     RELEASE_CANDIDATE_DRAFT = "release_candidate_draft"
     # Step 2: The project members are voting on the candidate release
@@ -638,9 +646,14 @@ class Release(sqlmodel.SQLModel, table=True):
 # SQL models referencing Committee, Project, or Release
 
 
+def example(value: Any) -> dict[Literal["schema_extra"], dict[str, Any]]:
+    return {"schema_extra": {"json_schema_extra": {"examples": [value]}}}
+
+
 # CheckResult: Release
 class CheckResult(sqlmodel.SQLModel, table=True):
-    id: int = sqlmodel.Field(default=None, primary_key=True)
+    # TODO: We have default=None here with a field typed int, not int | None
+    id: int = sqlmodel.Field(default=None, primary_key=True, **example(123))
 
     # M-1: CheckResult -> Release
     # 1-M: Release -C-> [CheckResult]
@@ -648,14 +661,21 @@ class CheckResult(sqlmodel.SQLModel, table=True):
     release: Release = sqlmodel.Relationship(back_populates="check_results")
 
     # We don't call this latest_revision_number, because it might not be the latest
-    revision_number: str | None = sqlmodel.Field(default=None, index=True)
-    checker: str
-    primary_rel_path: str | None = sqlmodel.Field(default=None, index=True)
-    member_rel_path: str | None = sqlmodel.Field(default=None, index=True)
-    created: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
-    status: CheckResultStatus
-    message: str
-    data: Any = sqlmodel.Field(sa_column=sqlalchemy.Column(sqlalchemy.JSON))
+    revision_number: str | None = sqlmodel.Field(default=None, index=True, **example("00005"))
+    checker: str = sqlmodel.Field(**example("atr.tasks.checks.hashing.HashingCheck"))
+    primary_rel_path: str | None = sqlmodel.Field(
+        default=None, index=True, **example("apache-example-0.0.1-source.tar.gz")
+    )
+    member_rel_path: str | None = sqlmodel.Field(default=None, index=True, **example("apache-example-0.0.1/pom.xml"))
+    created: datetime.datetime = sqlmodel.Field(
+        sa_column=sqlalchemy.Column(UTCDateTime),
+        **example(datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.UTC)),
+    )
+    status: CheckResultStatus = sqlmodel.Field(default=CheckResultStatus.SUCCESS, **example(CheckResultStatus.SUCCESS))
+    message: str = sqlmodel.Field(**example("sha512 matches for apache-example-0.0.1/pom.xml"))
+    data: Any = sqlmodel.Field(
+        sa_column=sqlalchemy.Column(sqlalchemy.JSON), **example({"expected": "...", "found": "..."})
+    )
 
 
 # DistributionChannel: Project

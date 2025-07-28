@@ -70,6 +70,14 @@ DictResponse = tuple[dict[str, Any], int]
 @quart_schema.validate_request(models.api.AnnounceArgs)
 @quart_schema.validate_response(models.api.AnnounceResults, 201)
 async def announce_post(data: models.api.AnnounceArgs) -> DictResponse:
+    """
+    Announce a release to the public, making it final.
+
+    After a vote on a release has passed, if everything is in order and all
+    paths are correct, the release can be announced. This will send an email to
+    the specified announement address, and promote the release to the finished
+    release phase.
+    """
     asf_uid = _jwt_asf_uid()
 
     try:
@@ -96,15 +104,40 @@ async def announce_post(data: models.api.AnnounceArgs) -> DictResponse:
 @api.BLUEPRINT.route("/checks/list/<project>/<version>")
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
 async def checks_list(project: str, version: str) -> DictResponse:
-    """List all check results for a given release."""
+    """
+    List all of the check results for a release.
+
+    Checks are only conducted during the compose a draft phase. This endpoint
+    only returns the checks for the most recent draft revision. Once a release
+    has been promoted to the vote phase or beyond, the checks returned are
+    still those for the compose phase.
+
+    Warning: the check results include results for archive members, so there
+    may potentially be thousands or results or more.
+    """
+    # TODO: We should perhaps paginate this
+    # TODO: Add phase in the response, and the revision too
     _simple_check(project, version)
     # TODO: Merge with checks_list_project_version_revision
     async with db.session() as data:
         release_name = sql.release_name(project, version)
+        release = await data.release(name=release_name).demand(exceptions.NotFound(f"Release {release_name} not found"))
         check_results = await data.check_result(release_name=release_name).all()
+
+    revision = None
+    for check_result in check_results:
+        if revision is None:
+            revision = check_result.revision_number
+        elif revision != check_result.revision_number:
+            raise exceptions.InternalServerError("Revision mismatch")
+    if revision is None:
+        raise exceptions.InternalServerError("No revision found")
+
     return models.api.ChecksListResults(
         endpoint="/checks/list",
         checks=check_results,
+        checks_revision=revision,
+        current_phase=release.phase,
     ).model_dump(), 200
 
 
@@ -131,6 +164,8 @@ async def checks_list_revision(project: str, version: str, revision: str) -> Dic
     return models.api.ChecksListResults(
         endpoint="/checks/list",
         checks=check_results,
+        checks_revision=revision,
+        current_phase=release_result.phase,
     ).model_dump(), 200
 
 
@@ -630,9 +665,8 @@ async def releases_project(project: str, query_args: models.api.ReleasesProjectQ
 
 
 # TODO: If we validate as sql.Release, quart_schema silently corrupts latest_revision_number to None
-# @quart_schema.validate_response(sql.Release, 200)
+# @quart_schema.validate_response(models.api.ReleasesVersionResults, 200)
 @api.BLUEPRINT.route("/releases/version/<project>/<version>")
-@quart_schema.validate_response(models.api.ReleasesVersionResults, 200)
 async def releases_version(project: str, version: str) -> DictResponse:
     """Return a single release by project and version."""
     _simple_check(project, version)
