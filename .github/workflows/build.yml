@@ -11,7 +11,6 @@ permissions:
   contents: read
 
 env:
-  LATEST_PY_VERSION: '3.13'
   UV_VERSION: '0.7.12'
 
 jobs:
