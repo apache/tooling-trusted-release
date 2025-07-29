@@ -112,7 +112,8 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     return await template.render(
         "upload-selected.html",
         asf_id=session.uid,
-        server_domain=session.app_host,
+        server_domain=session.app_host.split(":", 1)[0],
+        server_host=session.app_host,
         release=release,
         project_name=project_name,
         version_name=version_name,

@@ -184,7 +184,8 @@ async def selected(
     return await template.render(
         "finish-selected.html",
         asf_id=session.uid,
-        server_domain=session.app_host,
+        server_domain=session.app_host.split(":", 1)[0],
+        server_host=session.app_host,
         release=release,
         source_files=sorted(source_files_rel),
         form=move_form,
