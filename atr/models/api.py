@@ -99,11 +99,6 @@ class DraftDeleteResults(schema.Strict):
     success: str = schema.Field(..., **example("Draft 'example-0.0.1' deleted"))
 
 
-class ListResults(schema.Strict):
-    endpoint: Literal["/list"] = schema.Field(alias="endpoint")
-    rel_paths: Sequence[str]
-
-
 class JwtCreateArgs(schema.Strict):
     asfuid: str = schema.Field(..., **example("user"))
     pat: str = schema.Field(..., **example("8M5t4GCU63EdOy4NNXgXn7o-bc-muK8TRg5W-DeBaWY"))
@@ -113,18 +108,6 @@ class JwtCreateResults(schema.Strict):
     endpoint: Literal["/jwt/create"] = schema.Field(alias="endpoint")
     asfuid: str = schema.Field(..., **example("user"))
     jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
-
-
-@dataclasses.dataclass
-class KeysQuery:
-    offset: int = 0
-    limit: int = 20
-
-
-class KeysResults(schema.Strict):
-    endpoint: Literal["/keys"] = schema.Field(alias="endpoint")
-    data: Sequence[sql.PublicSigningKey]
-    count: int = schema.Field(..., **example(10))
 
 
 class KeysAddArgs(schema.Strict):
@@ -139,11 +122,6 @@ class KeysAddResults(schema.Strict):
     endpoint: Literal["/keys/add"] = schema.Field(alias="endpoint")
     success: str = schema.Field(..., **example("Key added"))
     fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
-
-
-# class KeysCommitteeResults(schema.Strict):
-#     endpoint: Literal["/keys/committee"] = schema.Field(alias="endpoint")
-#     keys: Sequence[sql.PublicSigningKey]
 
 
 class KeysDeleteArgs(schema.Strict):
@@ -207,19 +185,19 @@ class KeysUserResults(schema.Strict):
     keys: Sequence[sql.PublicSigningKey]
 
 
-class ProjectResults(schema.Strict):
-    endpoint: Literal["/project"] = schema.Field(alias="endpoint")
+class ProjectsGetResults(schema.Strict):
+    endpoint: Literal["/projects/get"] = schema.Field(alias="endpoint")
     project: sql.Project
 
 
-class ProjectReleasesResults(schema.Strict):
-    endpoint: Literal["/project/releases"] = schema.Field(alias="endpoint")
-    releases: Sequence[sql.Release]
-
-
-class ProjectsResults(schema.Strict):
-    endpoint: Literal["/projects"] = schema.Field(alias="endpoint")
+class ProjectsListResults(schema.Strict):
+    endpoint: Literal["/projects/list"] = schema.Field(alias="endpoint")
     projects: Sequence[sql.Project]
+
+
+class ProjectsReleasesResults(schema.Strict):
+    endpoint: Literal["/projects/releases"] = schema.Field(alias="endpoint")
+    releases: Sequence[sql.Release]
 
 
 @dataclasses.dataclass
@@ -253,6 +231,11 @@ class ReleasesDeleteArgs(schema.Strict):
 class ReleasesDeleteResults(schema.Strict):
     endpoint: Literal["/releases/delete"] = schema.Field(alias="endpoint")
     deleted: str
+
+
+class ReleasesPathsResults(schema.Strict):
+    endpoint: Literal["/releases/paths"] = schema.Field(alias="endpoint")
+    rel_paths: Sequence[str]
 
 
 @dataclasses.dataclass
@@ -426,20 +409,18 @@ Results = Annotated[
     | CommitteesProjectsResults
     | DraftDeleteResults
     | JwtCreateResults
-    | KeysResults
     | KeysAddResults
     | KeysDeleteResults
     | KeysGetResults
-    # | KeysCommitteeResults
     | KeysUploadResults
     | KeysUserResults
-    | ListResults
-    | ProjectResults
-    | ProjectReleasesResults
-    | ProjectsResults
+    | ProjectsGetResults
+    | ProjectsListResults
+    | ProjectsReleasesResults
     | ReleasesResults
     | ReleasesCreateResults
     | ReleasesDeleteResults
+    | ReleasesPathsResults
     | ReleasesProjectResults
     | ReleasesVersionResults
     | ReleasesRevisionsResults
@@ -479,20 +460,18 @@ validate_committees_list = validator(CommitteesListResults)
 validate_committees_projects = validator(CommitteesProjectsResults)
 validate_draft_delete = validator(DraftDeleteResults)
 validate_jwt_create = validator(JwtCreateResults)
-validate_keys = validator(KeysResults)
 validate_keys_add = validator(KeysAddResults)
-# validate_keys_committee = validator(KeysCommitteeResults)
 validate_keys_delete = validator(KeysDeleteResults)
 validate_keys_get = validator(KeysGetResults)
 validate_keys_upload = validator(KeysUploadResults)
 validate_keys_user = validator(KeysUserResults)
-validate_list = validator(ListResults)
-validate_project = validator(ProjectResults)
-validate_project_releases = validator(ProjectReleasesResults)
-validate_projects = validator(ProjectsResults)
+validate_projects_get = validator(ProjectsGetResults)
+validate_projects_list = validator(ProjectsListResults)
+validate_projects_releases = validator(ProjectsReleasesResults)
 validate_releases = validator(ReleasesResults)
 validate_releases_create = validator(ReleasesCreateResults)
 validate_releases_delete = validator(ReleasesDeleteResults)
+validate_releases_paths = validator(ReleasesPathsResults)
 validate_releases_project = validator(ReleasesProjectResults)
 validate_releases_version = validator(ReleasesVersionResults)
 validate_releases_revisions = validator(ReleasesRevisionsResults)

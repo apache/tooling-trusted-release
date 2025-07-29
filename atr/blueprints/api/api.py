@@ -361,39 +361,6 @@ async def jwt_create(data: models.api.JwtCreateArgs) -> DictResponse:
     ).model_dump(), 200
 
 
-# TODO: Deprecate this endpoint
-@api.BLUEPRINT.route("/keys")
-@quart_schema.validate_querystring(models.api.KeysQuery)
-@quart_schema.validate_response(models.api.KeysResults, 200)
-async def keys_endpoint(query_args: models.api.KeysQuery) -> DictResponse:
-    """
-    All public OpenPGP keys, with pagination support.
-
-    Warning: this endpoint is deprecated.
-    """
-    # TODO: Rather than pagination, let's support keys by committee and by user
-    # That way, consumers can scroll through committees or users
-    # Which performs logical pagination, rather than arbitrary window pagination
-    _pagination_args_validate(query_args)
-    via = sql.validate_instrumented_attribute
-    async with db.session() as data:
-        statement = (
-            sqlmodel.select(sql.PublicSigningKey)
-            .limit(query_args.limit)
-            .offset(query_args.offset)
-            .order_by(via(sql.PublicSigningKey.fingerprint).asc())
-        )
-        paged_keys = (await data.execute(statement)).scalars().all()
-        count = (
-            await data.execute(sqlalchemy.select(sqlalchemy.func.count(via(sql.PublicSigningKey.fingerprint))))
-        ).scalar_one()
-    return models.api.KeysResults(
-        endpoint="/keys",
-        data=paged_keys,
-        count=count,
-    ).model_dump(), 200
-
-
 @api.BLUEPRINT.route("/keys/add", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
@@ -459,22 +426,6 @@ async def keys_delete(data: models.api.KeysDeleteArgs) -> DictResponse:
         endpoint="/keys/delete",
         success="Key deleted",
     ).model_dump(), 200
-
-
-# @api.BLUEPRINT.route("/keys/committee/<committee>")
-# @quart_schema.validate_response(models.api.KeysUserResults, 200)
-# async def keys_committee(committee: str) -> DictResponse:
-#     """Return all public signing keys for a specific committee."""
-#     _simple_check(committee)
-#     async with db.session() as data:
-#         committee_object = await data.committee(
-#             name=committee, _public_signing_keys=True
-#         ).demand(exceptions.NotFound(f"Committee '{committee}' was not found"))
-#         keys = committee_object.public_signing_keys
-#     return models.api.KeysCommitteeResults(
-#         endpoint="/keys/committee",
-#         keys=keys,
-#     ).model_dump(), 200
 
 
 @api.BLUEPRINT.route("/keys/get/<fingerprint>")
@@ -569,65 +520,41 @@ async def keys_user(asf_uid: str) -> DictResponse:
     ).model_dump(), 200
 
 
-# TODO: Call this release/paths
-@api.BLUEPRINT.route("/list/<project>/<version>")
-@api.BLUEPRINT.route("/list/<project>/<version>/<revision>")
-@quart_schema.validate_response(models.api.ListResults, 200)
-async def list_endpoint(project: str, version: str, revision: str | None = None) -> DictResponse:
-    _simple_check(project, version, revision)
-    async with db.session() as data:
-        release_name = sql.release_name(project, version)
-        release = await data.release(name=release_name).demand(exceptions.NotFound())
-        if revision is None:
-            dir_path = util.release_directory(release)
-        else:
-            await data.revision(release_name=release_name, number=revision).demand(exceptions.NotFound())
-            dir_path = util.release_directory_version(release) / revision
-    if not (await aiofiles.os.path.isdir(dir_path)):
-        raise exceptions.NotFound("Files not found")
-    files: list[str] = [str(path) for path in [p async for p in util.paths_recursive(dir_path)]]
-    files.sort()
-    return models.api.ListResults(
-        endpoint="/list",
-        rel_paths=files,
-    ).model_dump(), 200
-
-
-@api.BLUEPRINT.route("/project/<name>")
-@quart_schema.validate_response(models.api.ProjectResults, 200)
-async def project(name: str) -> DictResponse:
+@api.BLUEPRINT.route("/projects/get/<name>")
+@quart_schema.validate_response(models.api.ProjectsGetResults, 200)
+async def projects_get(name: str) -> DictResponse:
     _simple_check(name)
     async with db.session() as data:
         project = await data.project(name=name).demand(exceptions.NotFound())
-    return models.api.ProjectResults(
-        endpoint="/project",
+    return models.api.ProjectsGetResults(
+        endpoint="/projects/get",
         project=project,
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/project/releases/<name>")
-@quart_schema.validate_response(models.api.ProjectReleasesResults, 200)
-async def project_releases(name: str) -> DictResponse:
-    """List all releases for a specific project."""
-    _simple_check(name)
-    async with db.session() as data:
-        releases = await data.release(project_name=name).all()
-    return models.api.ProjectReleasesResults(
-        endpoint="/project/releases",
-        releases=releases,
-    ).model_dump(), 200
-
-
-@api.BLUEPRINT.route("/projects")
-@quart_schema.validate_response(models.api.ProjectsResults, 200)
-async def projects() -> DictResponse:
+@api.BLUEPRINT.route("/projects/list")
+@quart_schema.validate_response(models.api.ProjectsListResults, 200)
+async def projects_list() -> DictResponse:
     """List all projects in the database."""
     # TODO: Add pagination?
     async with db.session() as data:
         projects = await data.project().all()
-    return models.api.ProjectsResults(
-        endpoint="/projects",
+    return models.api.ProjectsListResults(
+        endpoint="/projects/list",
         projects=projects,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/projects/releases/<name>")
+@quart_schema.validate_response(models.api.ProjectsReleasesResults, 200)
+async def projects_releases(name: str) -> DictResponse:
+    """List all releases for a specific project."""
+    _simple_check(name)
+    async with db.session() as data:
+        releases = await data.release(project_name=name).all()
+    return models.api.ProjectsReleasesResults(
+        endpoint="/projects/releases",
+        releases=releases,
     ).model_dump(), 200
 
 
@@ -711,6 +638,29 @@ async def releases_delete(data: models.api.ReleasesDeleteArgs) -> DictResponse:
     return models.api.ReleasesDeleteResults(
         endpoint="/releases/delete",
         deleted=release_name,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/releases/paths/<project>/<version>")
+@api.BLUEPRINT.route("/releases/paths/<project>/<version>/<revision>")
+@quart_schema.validate_response(models.api.ReleasesPathsResults, 200)
+async def release_paths(project: str, version: str, revision: str | None = None) -> DictResponse:
+    _simple_check(project, version, revision)
+    async with db.session() as data:
+        release_name = sql.release_name(project, version)
+        release = await data.release(name=release_name).demand(exceptions.NotFound())
+        if revision is None:
+            dir_path = util.release_directory(release)
+        else:
+            await data.revision(release_name=release_name, number=revision).demand(exceptions.NotFound())
+            dir_path = util.release_directory_version(release) / revision
+    if not (await aiofiles.os.path.isdir(dir_path)):
+        raise exceptions.NotFound("Files not found")
+    files: list[str] = [str(path) for path in [p async for p in util.paths_recursive(dir_path)]]
+    files.sort()
+    return models.api.ReleasesPathsResults(
+        endpoint="/releases/paths",
+        rel_paths=files,
     ).model_dump(), 200
 
 
