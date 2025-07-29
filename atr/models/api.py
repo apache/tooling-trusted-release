@@ -34,6 +34,24 @@ class ResultsTypeError(TypeError):
     pass
 
 
+class ChecksIgnoreAddArgs(schema.Strict):
+    committee_name: str = schema.Field(..., **example("example"))
+    release_glob: str | None = schema.Field(default=None, **example("example-0.0.*"))
+    revision_number: str | None = schema.Field(default=None, **example("00001"))
+    checker_glob: str | None = schema.Field(default=None, **example("atr.tasks.checks.license.files"))
+    primary_rel_path_glob: str | None = schema.Field(default=None, **example("apache-example-0.0.1-*.tar.gz"))
+    member_rel_path_glob: str | None = schema.Field(default=None, **example("apache-example-0.0.1/*.xml"))
+    status: sql.CheckResultStatusIgnore | None = schema.Field(
+        default=None, **example(sql.CheckResultStatusIgnore.FAILURE)
+    )
+    message_glob: str | None = schema.Field(default=None, **example("sha512 matches for apache-example-0.0.1/*.xml"))
+
+
+class ChecksIgnoreAddResults(schema.Strict):
+    endpoint: Literal["/checks/ignore/add"] = schema.Field(alias="endpoint")
+    success: Literal[True] = schema.Field(..., **example(True))
+
+
 class ChecksListResults(schema.Strict):
     endpoint: Literal["/checks/list"] = schema.Field(alias="endpoint")
     checks: Sequence[sql.CheckResult]
@@ -381,7 +399,8 @@ class VoteTabulateResults(schema.Strict):
 # This is for *Results classes only
 # We do NOT put *Args classes here
 Results = Annotated[
-    ChecksListResults
+    ChecksIgnoreAddResults
+    | ChecksListResults
     | ChecksOngoingResults
     | CommitteeGetResults
     | CommitteeKeysResults
@@ -430,6 +449,7 @@ def validator[T](t: type[T]) -> Callable[[Any], T]:
     return validate
 
 
+validate_checks_ignore_add = validator(ChecksIgnoreAddResults)
 validate_checks_list = validator(ChecksListResults)
 validate_checks_ongoing = validator(ChecksOngoingResults)
 validate_committee_get = validator(CommitteeGetResults)

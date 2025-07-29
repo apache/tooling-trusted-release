@@ -732,7 +732,7 @@ class CheckResultIgnore(sqlmodel.SQLModel, table=True):
     primary_rel_path_glob: str | None = sqlmodel.Field(**example("apache-example-0.0.1-*.tar.gz"))
     member_rel_path_glob: str | None = sqlmodel.Field(**example("apache-example-0.0.1/*.xml"))
     status: CheckResultStatusIgnore | None = sqlmodel.Field(
-        default=CheckResultStatusIgnore.FAILURE,
+        default=None,
         **example(CheckResultStatusIgnore.FAILURE),
     )
     message_glob: str | None = sqlmodel.Field(**example("sha512 matches for apache-example-0.0.1/*.xml"))

@@ -230,6 +230,7 @@ async def admin_data(model: str = "Committee") -> str:
         # TODO: Add distribution channel, key link, and any others
         model_methods: dict[str, Callable[[], db.Query[Any]]] = {
             "CheckResult": data.check_result,
+            "CheckResultIgnore": data.check_result_ignore,
             "Committee": data.committee,
             "Project": data.project,
             "PublicSigningKey": data.public_signing_key,

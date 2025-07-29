@@ -18,7 +18,7 @@
 import contextlib
 import pathlib
 import re
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import AsyncGenerator, Callable, Sequence
 
 import aiofiles.os
 import aioshutil
@@ -101,6 +101,25 @@ async def latest_revision(release: sql.Release) -> sql.Revision | None:
         return None
     async with db.session() as data:
         return await data.revision(release_name=release.name, number=release.latest_revision_number).get()
+
+
+async def check_ignores_matcher(
+    committee_name: str,
+    data: db.Session | None = None,
+) -> Callable[[sql.CheckResult], bool]:
+    async with db.ensure_session(data) as data:
+        ignores = await data.check_result_ignore(
+            committee_name=committee_name,
+        ).all()
+
+    def match(cr: sql.CheckResult) -> bool:
+        for ignore in ignores:
+            if _check_ignore_match(cr, ignore):
+                # log.info(f"Ignoring check result {cr} due to ignore {ignore}")
+                return True
+        return False
+
+    return match
 
 
 async def path_info(release: sql.Release, paths: list[pathlib.Path]) -> PathInfo | None:
@@ -294,6 +313,48 @@ async def user_committees_member(asf_uid: str, caller_data: db.Session | None = 
 async def user_committees_participant(asf_uid: str, caller_data: db.Session | None = None) -> Sequence[sql.Committee]:
     async with db.ensure_session(caller_data) as data:
         return await data.committee(has_participant=asf_uid).all()
+
+
+def _check_ignore_match(cr: sql.CheckResult, cri: sql.CheckResultIgnore) -> bool:
+    # Does not check that the committee name matches
+    if cr.status == sql.CheckResultStatus.SUCCESS:
+        # Successes are never ignored
+        return False
+    if cri.release_glob is not None:
+        if not _check_ignore_match_glob(cri.release_glob, cr.release_name):
+            return False
+    if cri.revision_number is not None:
+        if cri.revision_number != cr.revision_number:
+            return False
+    if cri.checker_glob is not None:
+        if not _check_ignore_match_glob(cri.checker_glob, cr.checker):
+            return False
+    return _check_ignore_match_2(cr, cri)
+
+
+def _check_ignore_match_2(cr: sql.CheckResult, cri: sql.CheckResultIgnore) -> bool:
+    if cri.primary_rel_path_glob is not None:
+        if not _check_ignore_match_glob(cri.primary_rel_path_glob, cr.primary_rel_path):
+            return False
+    if cri.member_rel_path_glob is not None:
+        if not _check_ignore_match_glob(cri.member_rel_path_glob, cr.member_rel_path):
+            return False
+    if cri.status is not None:
+        if cr.status != cri.status:
+            return False
+    if cri.message_glob is not None:
+        if not _check_ignore_match_glob(cri.message_glob, cr.message):
+            return False
+    return True
+
+
+def _check_ignore_match_glob(glob: str | None, value: str | None) -> bool:
+    if (glob is None) or (value is None):
+        return False
+    pattern = re.escape(glob).replace(r"\*", ".*")
+    # Should also handle ^ and $
+    # And maybe .replace(r"\?", ".?")
+    return re.match(pattern, value) is not None
 
 
 async def _delete_release_data_downloads(release: sql.Release) -> None:

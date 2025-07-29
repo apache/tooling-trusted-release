@@ -76,10 +76,25 @@ def performance_async(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable
     return wrapper
 
 
-class FoundationCommitter:
+class GeneralPublic:
+    def __init__(
+        self,
+        credentials: storage.WriteAsGeneralPublic,
+        write: storage.Write,
+        data: db.Session,
+        asf_uid: str | None = None,
+    ):
+        self.__credentials = credentials
+        self.__write = write
+        self.__data = data
+        self.__asf_uid = asf_uid
+
+
+class FoundationCommitter(GeneralPublic):
     def __init__(
         self, credentials: storage.WriteAsFoundationCommitter, write: storage.Write, data: db.Session, asf_uid: str
     ):
+        super().__init__(credentials, write, data, asf_uid)
         if credentials.validate_at_runtime:
             if credentials.authenticated is not True:
                 raise storage.AccessError("Writer is not authenticated")
@@ -87,6 +102,8 @@ class FoundationCommitter:
         self.__write = write
         self.__data = data
         self.__asf_uid = asf_uid
+
+        # Specific to this module
         self.__key_block_models_cache = {}
 
     @performance_async
@@ -358,6 +375,8 @@ class CommitteeParticipant(FoundationCommitter):
         self.__data = data
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
+
+        # Specific to this module
         self.__key_block_models_cache = {}
 
     @performance_async

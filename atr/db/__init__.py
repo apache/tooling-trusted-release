@@ -195,6 +195,38 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
         return Query(self, query)
 
+    def check_result_ignore(
+        self,
+        committee_name: Opt[str] = NOT_SET,
+        release_glob: Opt[str] = NOT_SET,
+        revision_number: Opt[str] = NOT_SET,
+        checker_glob: Opt[str] = NOT_SET,
+        primary_rel_path_glob: Opt[str] = NOT_SET,
+        member_rel_path_glob: Opt[str] = NOT_SET,
+        status: Opt[sql.CheckResultStatusIgnore] = NOT_SET,
+        message_glob: Opt[str] = NOT_SET,
+    ) -> Query[sql.CheckResultIgnore]:
+        query = sqlmodel.select(sql.CheckResultIgnore)
+
+        if is_defined(committee_name):
+            query = query.where(sql.CheckResultIgnore.committee_name == committee_name)
+        if is_defined(release_glob):
+            query = query.where(sql.CheckResultIgnore.release_glob == release_glob)
+        if is_defined(revision_number):
+            query = query.where(sql.CheckResultIgnore.revision_number == revision_number)
+        if is_defined(checker_glob):
+            query = query.where(sql.CheckResultIgnore.checker_glob == checker_glob)
+        if is_defined(primary_rel_path_glob):
+            query = query.where(sql.CheckResultIgnore.primary_rel_path_glob == primary_rel_path_glob)
+        if is_defined(member_rel_path_glob):
+            query = query.where(sql.CheckResultIgnore.member_rel_path_glob == member_rel_path_glob)
+        if is_defined(status):
+            query = query.where(sql.CheckResultIgnore.status == status)
+        if is_defined(message_glob):
+            query = query.where(sql.CheckResultIgnore.message_glob == message_glob)
+
+        return Query(self, query)
+
     def committee(
         self,
         name: Opt[str] = NOT_SET,

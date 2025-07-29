@@ -64,6 +64,35 @@ import atr.util as util
 DictResponse = tuple[dict[str, Any], int]
 
 
+@api.BLUEPRINT.route("/checks/ignore/add", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.ChecksIgnoreAddArgs)
+@quart_schema.validate_response(models.api.ChecksIgnoreAddResults, 200)
+async def checks_ignore_add(data: models.api.ChecksIgnoreAddArgs) -> DictResponse:
+    """
+    Add a check ignore.
+    """
+    asf_uid = _jwt_asf_uid()
+    if not any(data.model_dump().values()):
+        raise exceptions.BadRequest("At least one field must be provided")
+    async with storage.write(asf_uid) as write:
+        wacm = write.as_committee_member(data.committee_name)
+        await wacm.checks.ignore_add(
+            data.release_glob,
+            data.revision_number,
+            data.checker_glob,
+            data.primary_rel_path_glob,
+            data.member_rel_path_glob,
+            data.status,
+            data.message_glob,
+        )
+    return models.api.ChecksIgnoreAddResults(
+        endpoint="/checks/ignore/add",
+        success=True,
+    ).model_dump(), 200
+
+
 @api.BLUEPRINT.route("/checks/list/<project>/<version>")
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
 async def checks_list(project: str, version: str) -> DictResponse:

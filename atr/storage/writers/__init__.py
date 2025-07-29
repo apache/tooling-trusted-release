@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import atr.storage.writers.checks as checks
 import atr.storage.writers.keys as keys
 
-__all__ = ["keys"]
+__all__ = ["checks", "keys"]

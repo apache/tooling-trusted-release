@@ -22,6 +22,7 @@ import aiofiles.os
 import asfquart.base as base
 
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.template as template
@@ -35,9 +36,14 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
 
     # If the draft is not found, we try to get the release candidate
     try:
-        release = await session.release(project_name, version_name)
+        release = await session.release(project_name, version_name, with_committee=True)
     except base.ASFQuartException:
-        release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE)
+        release = await session.release(
+            project_name, version_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE, with_committee=True
+        )
+
+    if release.committee is None:
+        raise base.ASFQuartException("Release has no committee", errorcode=500)
 
     # TODO: When we do more than one thing in a dir, we should use the revision directory directly
     abs_path = util.release_directory(release) / rel_path
@@ -62,6 +68,10 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
             sql.validate_instrumented_attribute(sql.CheckResult.created).desc(),
         )
         all_results = await query.all()
+
+        # Filter out any results that are ignored
+        match_ignore = await interaction.check_ignores_matcher(release.committee.name, data)
+        all_results = [r for r in all_results if not match_ignore(r)]
 
     # Filter to separate the primary and member results
     primary_results_list = []

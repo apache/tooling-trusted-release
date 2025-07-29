@@ -33,7 +33,6 @@ import atr.models.sql as sql
 import atr.storage.types as types
 import atr.storage.writers as writers
 import atr.user as user
-import atr.util as util
 
 VALIDATE_AT_RUNTIME: Final[bool] = True
 
@@ -89,11 +88,23 @@ class Read:
 
 
 class WriteAsGeneralPublic(AccessCredentialsWrite):
-    def __init__(self, write: Write, data: db.Session):
+    def __init__(self, write: Write, data: db.Session, asf_uid: str | None = None):
         self.__write = write
         self.__data = data
-        self.__asf_uid = None
+        self.__asf_uid = asf_uid
         self.__authenticated = True
+        self.checks = writers.checks.GeneralPublic(
+            self,
+            self.__write,
+            self.__data,
+            self.__asf_uid,
+        )
+        self.keys = writers.keys.GeneralPublic(
+            self,
+            self.__write,
+            self.__data,
+            self.__asf_uid,
+        )
 
     @property
     def authenticated(self) -> bool:
@@ -114,6 +125,12 @@ class WriteAsFoundationCommitter(WriteAsGeneralPublic):
         self.__asf_uid = asf_uid
         self.__authenticated = True
         # TODO: We need a definitive list of ASF UIDs
+        self.checks = writers.checks.FoundationCommitter(
+            self,
+            self.__write,
+            self.__data,
+            self.__asf_uid,
+        )
         self.keys = writers.keys.FoundationCommitter(
             self,
             self.__write,
@@ -140,6 +157,13 @@ class WriteAsCommitteeParticipant(WriteAsFoundationCommitter):
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
         self.__authenticated = True
+        self.checks = writers.checks.CommitteeParticipant(
+            self,
+            self.__write,
+            self.__data,
+            self.__asf_uid,
+            self.__committee_name,
+        )
         self.keys = writers.keys.CommitteeParticipant(
             self,
             self.__write,
@@ -168,6 +192,13 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
         self.__authenticated = True
+        self.checks = writers.checks.CommitteeMember(
+            self,
+            self.__write,
+            self.__data,
+            self.__asf_uid,
+            self.__committee_name,
+        )
         self.keys = writers.keys.CommitteeMember(
             self,
             self.__write,
@@ -197,6 +228,13 @@ class WriteAsFoundationAdmin(WriteAsCommitteeMember):
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
         self.__authenticated = True
+        # self.checks = writers.checks.FoundationAdmin(
+        #     self,
+        #     self.__write,
+        #     self.__data,
+        #     self.__asf_uid,
+        #     self.__committee_name,
+        # )
         self.keys = writers.keys.FoundationAdmin(
             self,
             self.__write,
@@ -242,6 +280,9 @@ class Write:
     def as_committee_member_outcome(self, committee_name: str) -> types.Outcome[WriteAsCommitteeMember]:
         if self.__asf_uid is None:
             return types.OutcomeException(AccessError("No ASF UID"))
+        if self.__asf_uid in {"sbp", "tn", "wave"}:
+            self.__member_of.add("tooling")
+            self.__participant_of.add("tooling")
         if committee_name not in self.__member_of:
             return types.OutcomeException(AccessError(f"ASF UID {self.__asf_uid} is not a member of {committee_name}"))
         try:
@@ -320,7 +361,8 @@ class Write:
     async def member_of_committees(self) -> list[sql.Committee]:
         committees = list(await self.__data.committee(name_in=list(self.__member_of)).all())
         committees.sort(key=lambda c: c.name)
-        return [c for c in committees if (not util.committee_is_standing(c.name))]
+        # Return even standing committees
+        return committees
 
     @property
     def participant_of(self) -> set[str]:
@@ -329,7 +371,8 @@ class Write:
     async def participant_of_committees(self) -> list[sql.Committee]:
         committees = list(await self.__data.committee(name_in=list(self.__participant_of)).all())
         committees.sort(key=lambda c: c.name)
-        return [c for c in committees if (not util.committee_is_standing(c.name))]
+        # Return even standing committees
+        return committees
 
 
 # Context managers
@@ -374,6 +417,9 @@ class ContextManagers:
         if asf_uid is None:
             raise AccessError("No ASF UID available from session or arguments")
 
+        return await self.__member_and_participant_core(start, asf_uid)
+
+    async def __member_and_participant_core(self, start: int, asf_uid: str) -> tuple[set[str], set[str]]:
         try:
             c = committer.Committer(asf_uid)
             c.verify()
@@ -385,6 +431,12 @@ class ContextManagers:
 
         finish = time.perf_counter_ns()
         log.info(f"ContextManagers.__member_and_participant took {finish - start:,} ns")
+
+        # # TODO: An intermittent bug causes Tooling to be missing from the cache
+        # # This is a workaround to ensure that Tooling is always included
+        # if asf_uid in {"sbp", "tn", "wave"}:
+        #     self.__member_of_cache[asf_uid].add("tooling")
+        #     self.__participant_of_cache[asf_uid].add("tooling")
 
         return self.__member_of_cache[asf_uid], self.__participant_of_cache[asf_uid]
 
