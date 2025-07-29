@@ -57,9 +57,11 @@ F = TypeVar("F", bound="QuartFormTyped")
 T = TypeVar("T")
 
 # TODO: Move to committee data
+# Standing committees are those which cannot make releases, by policy
 _STANDING_COMMITTEES: Final[set[str]] = {
     "attic",
     "comdev",
+    "gump",
     "incubator",
     "logodev",
     "petri",
