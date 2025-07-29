@@ -179,10 +179,9 @@ async def checks_ongoing(
     ).model_dump(), 200
 
 
-# TODO: Rename all paths to avoid clashes
-@api.BLUEPRINT.route("/committees/get/<name>")
-@quart_schema.validate_response(models.api.CommitteesGetResults, 200)
-async def committees_get(name: str) -> DictResponse:
+@api.BLUEPRINT.route("/committee/get/<name>")
+@quart_schema.validate_response(models.api.CommitteeGetResults, 200)
+async def committee_get(name: str) -> DictResponse:
     """
     A specific committee by name.
 
@@ -194,15 +193,15 @@ async def committees_get(name: str) -> DictResponse:
     _simple_check(name)
     async with db.session() as data:
         committee = await data.committee(name=name).demand(exceptions.NotFound(f"Committee '{name}' was not found"))
-    return models.api.CommitteesGetResults(
-        endpoint="/committees/get",
+    return models.api.CommitteeGetResults(
+        endpoint="/committee/get",
         committee=committee,
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/committees/keys/<name>")
-@quart_schema.validate_response(models.api.CommitteesKeysResults, 200)
-async def committees_keys(name: str) -> DictResponse:
+@api.BLUEPRINT.route("/committee/keys/<name>")
+@quart_schema.validate_response(models.api.CommitteeKeysResults, 200)
+async def committee_keys(name: str) -> DictResponse:
     """
     Public OpenPGP keys associated with a specific committee.
 
@@ -216,9 +215,31 @@ async def committees_keys(name: str) -> DictResponse:
         committee = await data.committee(name=name, _public_signing_keys=True).demand(
             exceptions.NotFound(f"Committee '{name}' was not found")
         )
-    return models.api.CommitteesKeysResults(
-        endpoint="/committees/keys",
+    return models.api.CommitteeKeysResults(
+        endpoint="/committee/keys",
         keys=committee.public_signing_keys,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/committee/projects/<name>")
+@quart_schema.validate_response(models.api.CommitteeProjectsResults, 200)
+async def committee_projects(name: str) -> DictResponse:
+    """
+    Projects managed by a specific committee.
+
+    The name of the committee is the name without any prefixes or suffixes such
+    as "Apache" or "PMC", in lower case, and with hyphens instead of spaces.
+    The Apache Simple Example PMC, for example, would have the name
+    "simple-example".
+    """
+    _simple_check(name)
+    async with db.session() as data:
+        committee = await data.committee(name=name, _projects=True).demand(
+            exceptions.NotFound(f"Committee '{name}' was not found")
+        )
+    return models.api.CommitteeProjectsResults(
+        endpoint="/committee/projects",
+        projects=committee.projects,
     ).model_dump(), 200
 
 
@@ -235,68 +256,6 @@ async def committees_list() -> DictResponse:
     return models.api.CommitteesListResults(
         endpoint="/committees/list",
         committees=committees,
-    ).model_dump(), 200
-
-
-@api.BLUEPRINT.route("/committees/projects/<name>")
-@quart_schema.validate_response(models.api.CommitteesProjectsResults, 200)
-async def committees_projects(name: str) -> DictResponse:
-    """
-    Projects managed by a specific committee.
-
-    The name of the committee is the name without any prefixes or suffixes such
-    as "Apache" or "PMC", in lower case, and with hyphens instead of spaces.
-    The Apache Simple Example PMC, for example, would have the name
-    "simple-example".
-    """
-    _simple_check(name)
-    async with db.session() as data:
-        committee = await data.committee(name=name, _projects=True).demand(
-            exceptions.NotFound(f"Committee '{name}' was not found")
-        )
-    return models.api.CommitteesProjectsResults(
-        endpoint="/committees/projects",
-        projects=committee.projects,
-    ).model_dump(), 200
-
-
-@api.BLUEPRINT.route("/draft/delete", methods=["POST"])
-@jwtoken.require
-@quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.DraftDeleteArgs)
-@quart_schema.validate_response(models.api.DraftDeleteResults, 200)
-async def draft_delete(data: models.api.DraftDeleteArgs) -> DictResponse:
-    """
-    Delete a draft release.
-
-    The draft release is deleted, and all of its associated metadata and files
-    are removed from the database and the filesystem. This cannot be undone.
-
-    Warning: we plan to change how draft deletion works.
-    """
-    asf_uid = _jwt_asf_uid()
-
-    async with db.session() as db_data:
-        release_name = sql.release_name(data.project, data.version)
-        release = await db_data.release(
-            name=release_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, _committee=True
-        ).demand(exceptions.NotFound(f"Draft release '{release_name}' not found"))
-        if release.project.committee is None:
-            raise exceptions.NotFound("Project has no committee")
-        _committee_member_or_admin(release.project.committee, asf_uid)
-
-        # TODO: This causes "A transaction is already begun on this Session"
-        # async with data.begin():
-        # Probably due to autobegin in data.release above
-        # We pass the phase again to guard against races
-        # But the removal is not actually locked
-        await interaction.release_delete(
-            release_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
-        )
-        await db_data.commit()
-    return models.api.DraftDeleteResults(
-        endpoint="/draft/delete",
-        success=f"Draft {release_name} deleted",
     ).model_dump(), 200
 
 
@@ -324,12 +283,12 @@ async def jwt_create(data: models.api.JwtCreateArgs) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/keys/add", methods=["POST"])
+@api.BLUEPRINT.route("/key/add", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.KeysAddArgs)
-@quart_schema.validate_response(models.api.KeysAddResults, 200)
-async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
+@quart_schema.validate_request(models.api.KeyAddArgs)
+@quart_schema.validate_response(models.api.KeyAddResults, 200)
+async def key_add(data: models.api.KeyAddArgs) -> DictResponse:
     """
     Add a public OpenPGP key to all specified committees.
 
@@ -351,19 +310,19 @@ async def keys_add(data: models.api.KeysAddArgs) -> DictResponse:
             )
             outcome.result_or_raise()
 
-    return models.api.KeysAddResults(
-        endpoint="/keys/add",
+    return models.api.KeyAddResults(
+        endpoint="/key/add",
         success="Key added",
         fingerprint=key.key_model.fingerprint.upper(),
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/keys/delete", methods=["POST"])
+@api.BLUEPRINT.route("/key/delete", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.KeysDeleteArgs)
-@quart_schema.validate_response(models.api.KeysDeleteResults, 200)
-async def keys_delete(data: models.api.KeysDeleteArgs) -> DictResponse:
+@quart_schema.validate_request(models.api.KeyDeleteArgs)
+@quart_schema.validate_response(models.api.KeyDeleteResults, 200)
+async def key_delete(data: models.api.KeyDeleteArgs) -> DictResponse:
     """
     Delete a public OpenPGP key from all committees.
 
@@ -385,15 +344,15 @@ async def keys_delete(data: models.api.KeysDeleteArgs) -> DictResponse:
             outcomes.append(await wacm.keys.autogenerate_keys_file())
     # TODO: Add error outcomes as warnings to the response
 
-    return models.api.KeysDeleteResults(
-        endpoint="/keys/delete",
+    return models.api.KeyDeleteResults(
+        endpoint="/key/delete",
         success="Key deleted",
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/keys/get/<fingerprint>")
-@quart_schema.validate_response(models.api.KeysGetResults, 200)
-async def keys_get(fingerprint: str) -> DictResponse:
+@api.BLUEPRINT.route("/key/get/<fingerprint>")
+@quart_schema.validate_response(models.api.KeyGetResults, 200)
+async def key_get(fingerprint: str) -> DictResponse:
     """
     A single public OpenPGP key by fingerprint.
 
@@ -404,8 +363,8 @@ async def keys_get(fingerprint: str) -> DictResponse:
         key = await data.public_signing_key(fingerprint=fingerprint.lower()).demand(
             exceptions.NotFound(f"Key '{fingerprint}' not found")
         )
-    return models.api.KeysGetResults(
-        endpoint="/keys/get",
+    return models.api.KeyGetResults(
+        endpoint="/key/get",
         key=key,
     ).model_dump(), 200
 
@@ -483,15 +442,28 @@ async def keys_user(asf_uid: str) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/projects/get/<name>")
-@quart_schema.validate_response(models.api.ProjectsGetResults, 200)
-async def projects_get(name: str) -> DictResponse:
+@api.BLUEPRINT.route("/project/get/<name>")
+@quart_schema.validate_response(models.api.ProjectGetResults, 200)
+async def project_get(name: str) -> DictResponse:
     _simple_check(name)
     async with db.session() as data:
         project = await data.project(name=name).demand(exceptions.NotFound())
-    return models.api.ProjectsGetResults(
-        endpoint="/projects/get",
+    return models.api.ProjectGetResults(
+        endpoint="/project/get",
         project=project,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/project/releases/<name>")
+@quart_schema.validate_response(models.api.ProjectReleasesResults, 200)
+async def project_releases(name: str) -> DictResponse:
+    """List all releases for a specific project."""
+    _simple_check(name)
+    async with db.session() as data:
+        releases = await data.release(project_name=name).all()
+    return models.api.ProjectReleasesResults(
+        endpoint="/project/releases",
+        releases=releases,
     ).model_dump(), 200
 
 
@@ -505,19 +477,6 @@ async def projects_list() -> DictResponse:
     return models.api.ProjectsListResults(
         endpoint="/projects/list",
         projects=projects,
-    ).model_dump(), 200
-
-
-@api.BLUEPRINT.route("/projects/releases/<name>")
-@quart_schema.validate_response(models.api.ProjectsReleasesResults, 200)
-async def projects_releases(name: str) -> DictResponse:
-    """List all releases for a specific project."""
-    _simple_check(name)
-    async with db.session() as data:
-        releases = await data.release(project_name=name).all()
-    return models.api.ProjectsReleasesResults(
-        endpoint="/projects/releases",
-        releases=releases,
     ).model_dump(), 200
 
 
@@ -558,10 +517,172 @@ async def release_announce(data: models.api.ReleaseAnnounceArgs) -> DictResponse
     ).model_dump(), 201
 
 
-@api.BLUEPRINT.route("/releases")
-@quart_schema.validate_querystring(models.api.ReleasesQuery)
-@quart_schema.validate_response(models.api.ReleasesResults, 200)
-async def releases(query_args: models.api.ReleasesQuery) -> DictResponse:
+@api.BLUEPRINT.route("/release/create", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.ReleaseCreateArgs)
+@quart_schema.validate_response(models.api.ReleaseCreateResults, 201)
+async def release_create(data: models.api.ReleaseCreateArgs) -> DictResponse:
+    """Create a new release draft for a project via POSTed JSON."""
+    asf_uid = _jwt_asf_uid()
+
+    try:
+        release, _project = await start.create_release_draft(
+            project_name=data.project,
+            version=data.version,
+            asf_uid=asf_uid,
+        )
+    except routes.FlashError as exc:
+        raise exceptions.BadRequest(str(exc))
+
+    return models.api.ReleaseCreateResults(
+        endpoint="/release/create",
+        release=release,
+    ).model_dump(), 201
+
+
+# TODO: Duplicates the below
+@api.BLUEPRINT.route("/release/delete", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.ReleaseDeleteArgs)
+@quart_schema.validate_response(models.api.ReleaseDeleteResults, 200)
+async def release_delete(data: models.api.ReleaseDeleteArgs) -> DictResponse:
+    """Delete a release draft for a project via POSTed JSON."""
+    asf_uid = _jwt_asf_uid()
+    if not user.is_admin(asf_uid):
+        raise exceptions.Forbidden("You do not have permission to create a release")
+
+    async with db.session() as db_data:
+        release_name = sql.release_name(data.project, data.version)
+        await interaction.release_delete(release_name, include_downloads=True)
+        await db_data.commit()
+    return models.api.ReleaseDeleteResults(
+        endpoint="/release/delete",
+        deleted=release_name,
+    ).model_dump(), 200
+
+
+# TODO: Duplicates the above
+@api.BLUEPRINT.route("/release/draft/delete", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.ReleaseDraftDeleteArgs)
+@quart_schema.validate_response(models.api.ReleaseDraftDeleteResults, 200)
+async def release_draft_delete(data: models.api.ReleaseDraftDeleteArgs) -> DictResponse:
+    """
+    Delete a draft release.
+
+    The draft release is deleted, and all of its associated metadata and files
+    are removed from the database and the filesystem. This cannot be undone.
+
+    Warning: we plan to change how draft deletion works.
+    """
+    asf_uid = _jwt_asf_uid()
+
+    async with db.session() as db_data:
+        release_name = sql.release_name(data.project, data.version)
+        release = await db_data.release(
+            name=release_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, _committee=True
+        ).demand(exceptions.NotFound(f"Draft release '{release_name}' not found"))
+        if release.project.committee is None:
+            raise exceptions.NotFound("Project has no committee")
+        _committee_member_or_admin(release.project.committee, asf_uid)
+
+        # TODO: This causes "A transaction is already begun on this Session"
+        # async with data.begin():
+        # Probably due to autobegin in data.release above
+        # We pass the phase again to guard against races
+        # But the removal is not actually locked
+        await interaction.release_delete(
+            release_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
+        )
+        await db_data.commit()
+    return models.api.ReleaseDraftDeleteResults(
+        endpoint="/release/draft/delete",
+        success=f"Draft {release_name} deleted",
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/release/get/<project>/<version>")
+@quart_schema.validate_response(models.api.ReleaseGetResults, 200)
+async def release_get(project: str, version: str) -> DictResponse:
+    """Return a single release by project and version."""
+    _simple_check(project, version)
+    async with db.session() as data:
+        release_name = sql.release_name(project, version)
+        release = await data.release(name=release_name).demand(exceptions.NotFound())
+    return models.api.ReleaseGetResults(
+        endpoint="/release/get",
+        release=release,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/release/paths/<project>/<version>")
+@api.BLUEPRINT.route("/release/paths/<project>/<version>/<revision>")
+@quart_schema.validate_response(models.api.ReleasePathsResults, 200)
+async def release_paths(project: str, version: str, revision: str | None = None) -> DictResponse:
+    _simple_check(project, version, revision)
+    async with db.session() as data:
+        release_name = sql.release_name(project, version)
+        release = await data.release(name=release_name).demand(exceptions.NotFound())
+        if revision is None:
+            dir_path = util.release_directory(release)
+        else:
+            await data.revision(release_name=release_name, number=revision).demand(exceptions.NotFound())
+            dir_path = util.release_directory_version(release) / revision
+    if not (await aiofiles.os.path.isdir(dir_path)):
+        raise exceptions.NotFound("Files not found")
+    files: list[str] = [str(path) for path in [p async for p in util.paths_recursive(dir_path)]]
+    files.sort()
+    return models.api.ReleasePathsResults(
+        endpoint="/release/paths",
+        rel_paths=files,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/release/revisions/<project>/<version>")
+@quart_schema.validate_response(models.api.ReleaseRevisionsResults, 200)
+async def release_revisions(project: str, version: str) -> DictResponse:
+    """List all revisions for a given release."""
+    _simple_check(project, version)
+    async with db.session() as data:
+        release_name = sql.release_name(project, version)
+        revisions = await data.revision(release_name=release_name).all()
+    if not isinstance(revisions, list):
+        revisions = list(revisions)
+    revisions.sort(key=lambda rev: rev.number)
+    return models.api.ReleaseRevisionsResults(
+        endpoint="/release/revisions",
+        revisions=revisions,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/release/upload", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.ReleaseUploadArgs)
+@quart_schema.validate_response(models.api.ReleaseUploadResults, 201)
+async def release_upload(data: models.api.ReleaseUploadArgs) -> DictResponse:
+    asf_uid = _jwt_asf_uid()
+
+    async with db.session() as db_data:
+        project = await db_data.project(name=data.project, _committee=True).demand(exceptions.NotFound())
+        # TODO: user.is_participant(project, asf_uid)
+        if not (user.is_committee_member(project.committee, asf_uid) or user.is_admin(asf_uid)):
+            raise exceptions.Forbidden("You do not have permission to upload to this project")
+
+    revision = await _upload_process_file(data, asf_uid)
+    return models.api.ReleaseUploadResults(
+        endpoint="/release/upload",
+        revision=revision,
+    ).model_dump(), 201
+
+
+@api.BLUEPRINT.route("/releases/list")
+@quart_schema.validate_querystring(models.api.ReleasesListQuery)
+@quart_schema.validate_response(models.api.ReleasesListResults, 200)
+async def releases_list(query_args: models.api.ReleasesListQuery) -> DictResponse:
     """Paged list of releases with optional filtering by phase."""
     _pagination_args_validate(query_args)
     via = sql.validate_instrumented_attribute
@@ -589,194 +710,106 @@ async def releases(query_args: models.api.ReleasesQuery) -> DictResponse:
 
         count = (await data.execute(count_stmt)).scalar_one()
 
-    return models.api.ReleasesResults(
-        endpoint="/releases",
+    return models.api.ReleasesListResults(
+        endpoint="/releases/list",
         data=paged_releases,
         count=count,
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/releases/create", methods=["POST"])
+@api.BLUEPRINT.route("/signature/provenance", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.ReleasesCreateArgs)
-@quart_schema.validate_response(models.api.ReleasesCreateResults, 201)
-async def releases_create(data: models.api.ReleasesCreateArgs) -> DictResponse:
-    """Create a new release draft for a project via POSTed JSON."""
-    asf_uid = _jwt_asf_uid()
+@quart_schema.validate_request(models.api.SignatureProvenanceArgs)
+@quart_schema.validate_response(models.api.SignatureProvenanceResults, 200)
+async def signature_provenance(data: models.api.SignatureProvenanceArgs) -> DictResponse:
+    # POST because this uses significant computation and I/O
+    # We receive a file name and an SHA3-256 hash
+    # From these we find which committee(s) published the file with a signature
+    # Then we deliver the appropriate signing key from the KEYS file(s)
+    # And the URL of the KEYS file(s) for them to check
 
-    try:
-        release, _project = await start.create_release_draft(
-            project_name=data.project,
-            version=data.version,
-            asf_uid=asf_uid,
-        )
-    except routes.FlashError as exc:
-        raise exceptions.BadRequest(str(exc))
+    signing_keys: list[models.api.SignatureProvenanceKey] = []
+    conf = config.get()
+    host = conf.APP_HOST
 
-    return models.api.ReleasesCreateResults(
-        endpoint="/releases/create",
-        release=release,
-    ).model_dump(), 201
+    signature_asc_data = data.signature_asc_text
+    sig = pgpy.PGPSignature.from_blob(signature_asc_data)
 
+    if not hasattr(sig, "signer_fingerprint"):
+        raise exceptions.NotFound("No signer fingerprint found")
 
-@api.BLUEPRINT.route("/releases/delete", methods=["POST"])
-@jwtoken.require
-@quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.ReleasesDeleteArgs)
-@quart_schema.validate_response(models.api.ReleasesDeleteResults, 200)
-async def releases_delete(data: models.api.ReleasesDeleteArgs) -> DictResponse:
-    """Delete a release draft for a project via POSTed JSON."""
-    asf_uid = _jwt_asf_uid()
-    if not user.is_admin(asf_uid):
-        raise exceptions.Forbidden("You do not have permission to create a release")
-
+    signer_fingerprint = getattr(sig, "signer_fingerprint").lower()
     async with db.session() as db_data:
-        release_name = sql.release_name(data.project, data.version)
-        await interaction.release_delete(release_name, include_downloads=True)
-        await db_data.commit()
-    return models.api.ReleasesDeleteResults(
-        endpoint="/releases/delete",
-        deleted=release_name,
-    ).model_dump(), 200
-
-
-@api.BLUEPRINT.route("/releases/paths/<project>/<version>")
-@api.BLUEPRINT.route("/releases/paths/<project>/<version>/<revision>")
-@quart_schema.validate_response(models.api.ReleasesPathsResults, 200)
-async def release_paths(project: str, version: str, revision: str | None = None) -> DictResponse:
-    _simple_check(project, version, revision)
-    async with db.session() as data:
-        release_name = sql.release_name(project, version)
-        release = await data.release(name=release_name).demand(exceptions.NotFound())
-        if revision is None:
-            dir_path = util.release_directory(release)
-        else:
-            await data.revision(release_name=release_name, number=revision).demand(exceptions.NotFound())
-            dir_path = util.release_directory_version(release) / revision
-    if not (await aiofiles.os.path.isdir(dir_path)):
-        raise exceptions.NotFound("Files not found")
-    files: list[str] = [str(path) for path in [p async for p in util.paths_recursive(dir_path)]]
-    files.sort()
-    return models.api.ReleasesPathsResults(
-        endpoint="/releases/paths",
-        rel_paths=files,
-    ).model_dump(), 200
-
-
-@api.BLUEPRINT.route("/releases/project/<project>")
-@quart_schema.validate_querystring(models.api.ReleasesProjectQuery)
-async def releases_project(project: str, query_args: models.api.ReleasesProjectQuery) -> DictResponse:
-    """List all releases for a specific project with pagination."""
-    _simple_check(project)
-    _pagination_args_validate(query_args)
-    async with db.session() as data:
-        project_result = await data.project(name=project).get()
-        if project_result is None:
-            raise exceptions.NotFound(f"Project '{project}' does not exist")
-
-        via = sql.validate_instrumented_attribute
-        statement = (
-            sqlmodel.select(sql.Release)
-            .where(sql.Release.project_name == project)
-            .order_by(via(sql.Release.created).desc())
-            .limit(query_args.limit)
-            .offset(query_args.offset)
+        key = await db_data.public_signing_key(
+            fingerprint=signer_fingerprint,
+            _committees=True,
+        ).demand(
+            exceptions.NotFound(
+                f"Key with fingerprint {signer_fingerprint} not found",
+            )
         )
 
-        paged_releases = (await data.execute(statement)).scalars().all()
+    downloads_dir = util.get_downloads_dir()
+    matched_committee_names = await _match_committee_names(key.committees, util.get_finished_dir(), data)
 
-        count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(sql.Release.name))).where(
-            via(sql.Release.project_name) == project
+    for matched_committee_name in matched_committee_names:
+        keys_file_path = downloads_dir / matched_committee_name / "KEYS"
+        async with aiofiles.open(keys_file_path, "rb") as f:
+            keys_file_data = await f.read()
+        keys_file_sha3_256 = hashlib.sha3_256(keys_file_data).hexdigest()
+        signing_keys.append(
+            models.api.SignatureProvenanceKey(
+                committee=matched_committee_name,
+                keys_file_url=f"https://{host}/downloads/{matched_committee_name}/KEYS",
+                keys_file_sha3_256=keys_file_sha3_256,
+            )
         )
-        count = (await data.execute(count_stmt)).scalar_one()
 
-    return models.api.ReleasesProjectResults(
-        endpoint="/releases/project",
-        data=paged_releases,
-        count=count,
+    if not signing_keys:
+        raise exceptions.NotFound("No signing keys found")
+
+    return models.api.SignatureProvenanceResults(
+        endpoint="/signature/provenance",
+        fingerprint=signer_fingerprint,
+        key_asc_text=key.ascii_armored_key,
+        committees_with_artifact=signing_keys,
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/releases/version/<project>/<version>")
-@quart_schema.validate_response(models.api.ReleasesVersionResults, 200)
-async def releases_version(project: str, version: str) -> DictResponse:
-    """Return a single release by project and version."""
-    _simple_check(project, version)
-    async with db.session() as data:
-        release_name = sql.release_name(project, version)
-        release = await data.release(name=release_name).demand(exceptions.NotFound())
-    return models.api.ReleasesVersionResults(
-        endpoint="/releases/version",
-        release=release,
-    ).model_dump(), 200
-
-
-# TODO: Rename this to revisions? I.e. /revisions/<project>/<version>
-@api.BLUEPRINT.route("/releases/revisions/<project>/<version>")
-@quart_schema.validate_response(models.api.ReleasesRevisionsResults, 200)
-async def releases_revisions(project: str, version: str) -> DictResponse:
-    """List all revisions for a given release."""
-    _simple_check(project, version)
-    async with db.session() as data:
-        release_name = sql.release_name(project, version)
-        revisions = await data.revision(release_name=release_name).all()
-    return models.api.ReleasesRevisionsResults(
-        endpoint="/releases/revisions",
-        revisions=revisions,
-    ).model_dump(), 200
-
-
-@api.BLUEPRINT.route("/revisions/<project>/<version>")
-@quart_schema.validate_response(models.api.RevisionsResults, 200)
-async def revisions(project: str, version: str) -> DictResponse:
-    _simple_check(project, version)
-    async with db.session() as data:
-        release_name = sql.release_name(project, version)
-        await data.release(name=release_name).demand(exceptions.NotFound())
-        revisions = await data.revision(release_name=release_name).all()
-    if not isinstance(revisions, list):
-        revisions = list(revisions)
-    revisions.sort(key=lambda rev: rev.number)
-    return models.api.RevisionsResults(
-        endpoint="/revisions",
-        revisions=revisions,
-    ).model_dump(), 200
-
-
-@api.BLUEPRINT.route("/ssh/add", methods=["POST"])
+@api.BLUEPRINT.route("/ssh-key/add", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.SshAddArgs)
-@quart_schema.validate_response(models.api.SshAddResults, 201)
-async def ssh_add(data: models.api.SshAddArgs) -> DictResponse:
+@quart_schema.validate_request(models.api.SshKeyAddArgs)
+@quart_schema.validate_response(models.api.SshKeyAddResults, 201)
+async def ssh_key_add(data: models.api.SshKeyAddArgs) -> DictResponse:
     """Add an SSH key for a user."""
     asf_uid = _jwt_asf_uid()
     fingerprint = await keys.ssh_key_add(data.text, asf_uid)
-    return models.api.SshAddResults(
-        endpoint="/ssh/add",
+    return models.api.SshKeyAddResults(
+        endpoint="/ssh-key/add",
         fingerprint=fingerprint,
     ).model_dump(), 201
 
 
-@api.BLUEPRINT.route("/ssh/delete", methods=["POST"])
+@api.BLUEPRINT.route("/ssh-key/delete", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.SshDeleteArgs)
-@quart_schema.validate_response(models.api.SshDeleteResults, 201)
-async def ssh_delete(data: models.api.SshDeleteArgs) -> DictResponse:
+@quart_schema.validate_request(models.api.SshKeyDeleteArgs)
+@quart_schema.validate_response(models.api.SshKeyDeleteResults, 201)
+async def ssh_key_delete(data: models.api.SshKeyDeleteArgs) -> DictResponse:
     """Delete an SSH key for a user."""
     asf_uid = _jwt_asf_uid()
     await keys.ssh_key_delete(data.fingerprint, asf_uid)
-    return models.api.SshDeleteResults(
-        endpoint="/ssh/delete",
+    return models.api.SshKeyDeleteResults(
+        endpoint="/ssh-key/delete",
         success="SSH key deleted",
     ).model_dump(), 201
 
 
-@api.BLUEPRINT.route("/ssh/list/<asf_uid>")
-@quart_schema.validate_querystring(models.api.SshListQuery)
-async def ssh_list(asf_uid: str, query_args: models.api.SshListQuery) -> DictResponse:
+@api.BLUEPRINT.route("/ssh-keys/list/<asf_uid>")
+@quart_schema.validate_querystring(models.api.SshKeysListQuery)
+async def ssh_keys_list(asf_uid: str, query_args: models.api.SshKeysListQuery) -> DictResponse:
     """List of developer SSH public keys."""
     _simple_check(asf_uid)
     _pagination_args_validate(query_args)
@@ -794,8 +827,8 @@ async def ssh_list(asf_uid: str, query_args: models.api.SshListQuery) -> DictRes
         count_stmt = sqlalchemy.select(sqlalchemy.func.count(via(sql.SSHKey.fingerprint)))
         count = (await data.execute(count_stmt)).scalar_one()
 
-    return models.api.SshListResults(
-        endpoint="/ssh/list",
+    return models.api.SshKeysListResults(
+        endpoint="/ssh-keys/list",
         data=paged_keys,
         count=count,
     ).model_dump(), 200
@@ -856,66 +889,6 @@ async def users_list() -> DictResponse:
     return models.api.UsersListResults(
         endpoint="/users/list",
         users=sorted(users),
-    ).model_dump(), 200
-
-
-@api.BLUEPRINT.route("/verify/provenance", methods=["POST"])
-@jwtoken.require
-@quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.VerifyProvenanceArgs)
-@quart_schema.validate_response(models.api.VerifyProvenanceResults, 200)
-async def verify_provenance(data: models.api.VerifyProvenanceArgs) -> DictResponse:
-    # POST because this uses significant computation and I/O
-    # We receive a file name and an SHA3-256 hash
-    # From these we find which committee(s) published the file with a signature
-    # Then we deliver the appropriate signing key from the KEYS file(s)
-    # And the URL of the KEYS file(s) for them to check
-
-    signing_keys: list[models.api.VerifyProvenanceKey] = []
-    conf = config.get()
-    host = conf.APP_HOST
-
-    signature_asc_data = data.signature_asc_text
-    sig = pgpy.PGPSignature.from_blob(signature_asc_data)
-
-    if not hasattr(sig, "signer_fingerprint"):
-        raise exceptions.NotFound("No signer fingerprint found")
-
-    signer_fingerprint = getattr(sig, "signer_fingerprint").lower()
-    async with db.session() as db_data:
-        key = await db_data.public_signing_key(
-            fingerprint=signer_fingerprint,
-            _committees=True,
-        ).demand(
-            exceptions.NotFound(
-                f"Key with fingerprint {signer_fingerprint} not found",
-            )
-        )
-
-    downloads_dir = util.get_downloads_dir()
-    matched_committee_names = await _match_committee_names(key.committees, util.get_finished_dir(), data)
-
-    for matched_committee_name in matched_committee_names:
-        keys_file_path = downloads_dir / matched_committee_name / "KEYS"
-        async with aiofiles.open(keys_file_path, "rb") as f:
-            keys_file_data = await f.read()
-        keys_file_sha3_256 = hashlib.sha3_256(keys_file_data).hexdigest()
-        signing_keys.append(
-            models.api.VerifyProvenanceKey(
-                committee=matched_committee_name,
-                keys_file_url=f"https://{host}/downloads/{matched_committee_name}/KEYS",
-                keys_file_sha3_256=keys_file_sha3_256,
-            )
-        )
-
-    if not signing_keys:
-        raise exceptions.NotFound("No signing keys found")
-
-    return models.api.VerifyProvenanceResults(
-        endpoint="/verify/provenance",
-        fingerprint=signer_fingerprint,
-        key_asc_text=key.ascii_armored_key,
-        committees_with_artifact=signing_keys,
     ).model_dump(), 200
 
 
@@ -1035,27 +1008,6 @@ async def vote_tabulate(data: models.api.VoteTabulateArgs) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/upload", methods=["POST"])
-@jwtoken.require
-@quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.UploadArgs)
-@quart_schema.validate_response(models.api.UploadResults, 201)
-async def upload(data: models.api.UploadArgs) -> DictResponse:
-    asf_uid = _jwt_asf_uid()
-
-    async with db.session() as db_data:
-        project = await db_data.project(name=data.project, _committee=True).demand(exceptions.NotFound())
-        # TODO: user.is_participant(project, asf_uid)
-        if not (user.is_committee_member(project.committee, asf_uid) or user.is_admin(asf_uid)):
-            raise exceptions.Forbidden("You do not have permission to upload to this project")
-
-    revision = await _upload_process_file(data, asf_uid)
-    return models.api.UploadResults(
-        endpoint="/upload",
-        revision=revision,
-    ).model_dump(), 201
-
-
 def _committee_member_or_admin(committee: sql.Committee, asf_uid: str) -> None:
     if not (user.is_committee_member(committee, asf_uid) or user.is_admin(asf_uid)):
         raise exceptions.Forbidden("You do not have permission to perform this action")
@@ -1080,7 +1032,7 @@ def _jwt_asf_uid() -> str:
 
 
 async def _match_committee_names(
-    key_committees: list[sql.Committee], finished_dir: pathlib.Path, data: models.api.VerifyProvenanceArgs
+    key_committees: list[sql.Committee], finished_dir: pathlib.Path, data: models.api.SignatureProvenanceArgs
 ) -> set[str]:
     key_committee_names = set(committee.name for committee in key_committees)
     finished_dir = util.get_finished_dir()
@@ -1115,7 +1067,7 @@ async def _match_committee_names(
     return matched_committee_names
 
 
-async def _match_unfinished(release_directory: pathlib.Path, data: models.api.VerifyProvenanceArgs) -> bool:
+async def _match_unfinished(release_directory: pathlib.Path, data: models.api.SignatureProvenanceArgs) -> bool:
     async for rel_path in util.paths_recursive(release_directory):
         if rel_path.name == data.signature_file_name:
             abs_path = release_directory / rel_path
@@ -1141,7 +1093,7 @@ def _simple_check(*args: str | None) -> None:
             raise exceptions.BadRequest("Argument cannot be the string 'None'")
 
 
-async def _upload_process_file(args: models.api.UploadArgs, asf_uid: str) -> sql.Revision:
+async def _upload_process_file(args: models.api.ReleaseUploadArgs, asf_uid: str) -> sql.Revision:
     file_bytes = base64.b64decode(args.content, validate=True)
     file_path = args.relpath.lstrip("/")
     description = f"Upload via API: {file_path}"

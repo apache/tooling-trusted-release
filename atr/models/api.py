@@ -51,34 +51,24 @@ class ChecksOngoingResults(schema.Strict):
     ongoing: int = schema.Field(..., **example(10))
 
 
-class CommitteesGetResults(schema.Strict):
-    endpoint: Literal["/committees/get"] = schema.Field(alias="endpoint")
+class CommitteeGetResults(schema.Strict):
+    endpoint: Literal["/committee/get"] = schema.Field(alias="endpoint")
     committee: sql.Committee
 
 
-class CommitteesKeysResults(schema.Strict):
-    endpoint: Literal["/committees/keys"] = schema.Field(alias="endpoint")
+class CommitteeKeysResults(schema.Strict):
+    endpoint: Literal["/committee/keys"] = schema.Field(alias="endpoint")
     keys: Sequence[sql.PublicSigningKey]
+
+
+class CommitteeProjectsResults(schema.Strict):
+    endpoint: Literal["/committee/projects"] = schema.Field(alias="endpoint")
+    projects: Sequence[sql.Project]
 
 
 class CommitteesListResults(schema.Strict):
     endpoint: Literal["/committees/list"] = schema.Field(alias="endpoint")
     committees: Sequence[sql.Committee]
-
-
-class CommitteesProjectsResults(schema.Strict):
-    endpoint: Literal["/committees/projects"] = schema.Field(alias="endpoint")
-    projects: Sequence[sql.Project]
-
-
-class DraftDeleteArgs(schema.Strict):
-    project: str = schema.Field(..., **example("example"))
-    version: str = schema.Field(..., **example("0.0.1"))
-
-
-class DraftDeleteResults(schema.Strict):
-    endpoint: Literal["/draft/delete"] = schema.Field(alias="endpoint")
-    success: str = schema.Field(..., **example("Draft 'example-0.0.1' deleted"))
 
 
 class JwtCreateArgs(schema.Strict):
@@ -92,7 +82,7 @@ class JwtCreateResults(schema.Strict):
     jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
 
 
-class KeysAddArgs(schema.Strict):
+class KeyAddArgs(schema.Strict):
     asfuid: str = schema.Field(..., **example("user"))
     key: str = schema.Field(
         ..., **example("-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n...\n-----END PGP PUBLIC KEY BLOCK-----\n")
@@ -100,23 +90,23 @@ class KeysAddArgs(schema.Strict):
     committees: list[str] = schema.Field(..., **example(["example"]))
 
 
-class KeysAddResults(schema.Strict):
-    endpoint: Literal["/keys/add"] = schema.Field(alias="endpoint")
+class KeyAddResults(schema.Strict):
+    endpoint: Literal["/key/add"] = schema.Field(alias="endpoint")
     success: str = schema.Field(..., **example("Key added"))
     fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
 
 
-class KeysDeleteArgs(schema.Strict):
+class KeyDeleteArgs(schema.Strict):
     fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
 
 
-class KeysDeleteResults(schema.Strict):
-    endpoint: Literal["/keys/delete"] = schema.Field(alias="endpoint")
+class KeyDeleteResults(schema.Strict):
+    endpoint: Literal["/key/delete"] = schema.Field(alias="endpoint")
     success: str = schema.Field(..., **example("Key deleted"))
 
 
-class KeysGetResults(schema.Strict):
-    endpoint: Literal["/keys/get"] = schema.Field(alias="endpoint")
+class KeyGetResults(schema.Strict):
+    endpoint: Literal["/key/get"] = schema.Field(alias="endpoint")
     key: sql.PublicSigningKey
 
 
@@ -147,13 +137,6 @@ KeysUploadOutcome = Annotated[
 KeysUploadOutcomeAdapter = pydantic.TypeAdapter(KeysUploadOutcome)
 
 
-# def validate_keys_upload_outcome(value: Any) -> KeysUploadOutcome:
-#     obj = KeysUploadOutcomeAdapter.validate_python(value)
-#     if not isinstance(obj, KeysUploadOutcome):
-#         raise ResultsTypeError(f"Invalid API response: {value}")
-#     return obj
-
-
 class KeysUploadResults(schema.Strict):
     endpoint: Literal["/keys/upload"] = schema.Field(alias="endpoint")
     results: Sequence[KeysUploadResult | KeysUploadException]
@@ -167,19 +150,19 @@ class KeysUserResults(schema.Strict):
     keys: Sequence[sql.PublicSigningKey]
 
 
-class ProjectsGetResults(schema.Strict):
-    endpoint: Literal["/projects/get"] = schema.Field(alias="endpoint")
+class ProjectGetResults(schema.Strict):
+    endpoint: Literal["/project/get"] = schema.Field(alias="endpoint")
     project: sql.Project
+
+
+class ProjectReleasesResults(schema.Strict):
+    endpoint: Literal["/project/releases"] = schema.Field(alias="endpoint")
+    releases: Sequence[sql.Release]
 
 
 class ProjectsListResults(schema.Strict):
     endpoint: Literal["/projects/list"] = schema.Field(alias="endpoint")
     projects: Sequence[sql.Project]
-
-
-class ProjectsReleasesResults(schema.Strict):
-    endpoint: Literal["/projects/releases"] = schema.Field(alias="endpoint")
-    releases: Sequence[sql.Release]
 
 
 class ReleaseAnnounceArgs(schema.Strict):
@@ -200,60 +183,38 @@ class ReleaseAnnounceResults(schema.Strict):
     success: bool = schema.Field(..., **example(True))
 
 
-@dataclasses.dataclass
-class ReleasesQuery:
-    offset: int = 0
-    limit: int = 20
-    phase: str | None = None
+class ReleaseDraftDeleteArgs(schema.Strict):
+    project: str = schema.Field(..., **example("example"))
+    version: str = schema.Field(..., **example("0.0.1"))
 
 
-class ReleasesResults(schema.Strict):
-    endpoint: Literal["/releases"] = schema.Field(alias="endpoint")
-    data: Sequence[sql.Release]
-    count: int
+class ReleaseDraftDeleteResults(schema.Strict):
+    endpoint: Literal["/release/draft/delete"] = schema.Field(alias="endpoint")
+    success: str = schema.Field(..., **example("Draft 'example-0.0.1' deleted"))
 
 
-class ReleasesCreateArgs(schema.Strict):
+class ReleaseCreateArgs(schema.Strict):
     project: str
     version: str
 
 
-class ReleasesCreateResults(schema.Strict):
-    endpoint: Literal["/releases/create"] = schema.Field(alias="endpoint")
+class ReleaseCreateResults(schema.Strict):
+    endpoint: Literal["/release/create"] = schema.Field(alias="endpoint")
     release: sql.Release
 
 
-class ReleasesDeleteArgs(schema.Strict):
+class ReleaseDeleteArgs(schema.Strict):
     project: str
     version: str
 
 
-class ReleasesDeleteResults(schema.Strict):
-    endpoint: Literal["/releases/delete"] = schema.Field(alias="endpoint")
+class ReleaseDeleteResults(schema.Strict):
+    endpoint: Literal["/release/delete"] = schema.Field(alias="endpoint")
     deleted: str
 
 
-class ReleasesPathsResults(schema.Strict):
-    endpoint: Literal["/releases/paths"] = schema.Field(alias="endpoint")
-    rel_paths: Sequence[str]
-
-
-@dataclasses.dataclass
-class ReleasesProjectQuery:
-    limit: int = 20
-    offset: int = 0
-    # project: str
-    # version: str
-
-
-class ReleasesProjectResults(schema.Strict):
-    endpoint: Literal["/releases/project"] = schema.Field(alias="endpoint")
-    data: Sequence[sql.Release]
-    count: int
-
-
-class ReleasesVersionResults(schema.Strict):
-    endpoint: Literal["/releases/version"] = schema.Field(alias="endpoint")
+class ReleaseGetResults(schema.Strict):
+    endpoint: Literal["/release/get"] = schema.Field(alias="endpoint")
     release: sql.Release
 
     @pydantic.field_validator("release", mode="before")
@@ -270,42 +231,88 @@ class ReleasesVersionResults(schema.Strict):
         return v
 
 
-class ReleasesRevisionsResults(schema.Strict):
-    endpoint: Literal["/releases/revisions"] = schema.Field(alias="endpoint")
+class ReleasePathsResults(schema.Strict):
+    endpoint: Literal["/release/paths"] = schema.Field(alias="endpoint")
+    rel_paths: Sequence[str]
+
+
+class ReleaseRevisionsResults(schema.Strict):
+    endpoint: Literal["/release/revisions"] = schema.Field(alias="endpoint")
     revisions: Sequence[sql.Revision]
 
 
-class RevisionsResults(schema.Strict):
-    endpoint: Literal["/revisions"] = schema.Field(alias="endpoint")
-    revisions: Sequence[sql.Revision]
+class ReleaseUploadArgs(schema.Strict):
+    project: str
+    version: str
+    relpath: str
+    content: str
 
 
-class SshAddArgs(schema.Strict):
+class ReleaseUploadResults(schema.Strict):
+    endpoint: Literal["/release/upload"] = schema.Field(alias="endpoint")
+    revision: sql.Revision
+
+
+@dataclasses.dataclass
+class ReleasesListQuery:
+    offset: int = 0
+    limit: int = 20
+    phase: str | None = None
+
+
+class ReleasesListResults(schema.Strict):
+    endpoint: Literal["/releases/list"] = schema.Field(alias="endpoint")
+    data: Sequence[sql.Release]
+    count: int
+
+
+class SignatureProvenanceArgs(schema.Strict):
+    artifact_file_name: str
+    artifact_sha3_256: str
+    signature_file_name: str
+    signature_asc_text: str
+    signature_sha3_256: str
+
+
+class SignatureProvenanceKey(schema.Strict):
+    committee: str
+    keys_file_url: str
+    keys_file_sha3_256: str
+
+
+class SignatureProvenanceResults(schema.Strict):
+    endpoint: Literal["/signature/provenance"] = schema.Field(alias="endpoint")
+    fingerprint: str
+    key_asc_text: str
+    committees_with_artifact: list[SignatureProvenanceKey]
+
+
+class SshKeyAddArgs(schema.Strict):
     text: str
 
 
-class SshAddResults(schema.Strict):
-    endpoint: Literal["/ssh/add"] = schema.Field(alias="endpoint")
+class SshKeyAddResults(schema.Strict):
+    endpoint: Literal["/ssh-key/add"] = schema.Field(alias="endpoint")
     fingerprint: str
 
 
-class SshDeleteArgs(schema.Strict):
+class SshKeyDeleteArgs(schema.Strict):
     fingerprint: str
 
 
-class SshDeleteResults(schema.Strict):
-    endpoint: Literal["/ssh/delete"] = schema.Field(alias="endpoint")
+class SshKeyDeleteResults(schema.Strict):
+    endpoint: Literal["/ssh-key/delete"] = schema.Field(alias="endpoint")
     success: str
 
 
 @dataclasses.dataclass
-class SshListQuery:
+class SshKeysListQuery:
     offset: int = 0
     limit: int = 20
 
 
-class SshListResults(schema.Strict):
-    endpoint: Literal["/ssh/list"] = schema.Field(alias="endpoint")
+class SshKeysListResults(schema.Strict):
+    endpoint: Literal["/ssh-keys/list"] = schema.Field(alias="endpoint")
     data: Sequence[sql.SSHKey]
     count: int
 
@@ -364,77 +371,42 @@ class VoteTabulateResults(schema.Strict):
     details: tabulate.VoteDetails
 
 
-class UploadArgs(schema.Strict):
-    project: str
-    version: str
-    relpath: str
-    content: str
-
-
-class UploadResults(schema.Strict):
-    endpoint: Literal["/upload"] = schema.Field(alias="endpoint")
-    revision: sql.Revision
-
-
-class VerifyProvenanceArgs(schema.Strict):
-    artifact_file_name: str
-    artifact_sha3_256: str
-    signature_file_name: str
-    signature_asc_text: str
-    signature_sha3_256: str
-
-
-class VerifyProvenanceKey(schema.Strict):
-    committee: str
-    keys_file_url: str
-    keys_file_sha3_256: str
-
-
-class VerifyProvenanceResults(schema.Strict):
-    endpoint: Literal["/verify/provenance"] = schema.Field(alias="endpoint")
-    fingerprint: str
-    key_asc_text: str
-    committees_with_artifact: list[VerifyProvenanceKey]
-
-
 # This is for *Results classes only
 # We do NOT put *Args classes here
 Results = Annotated[
     ChecksListResults
     | ChecksOngoingResults
-    | CommitteesGetResults
-    | CommitteesKeysResults
+    | CommitteeGetResults
+    | CommitteeKeysResults
+    | CommitteeProjectsResults
     | CommitteesListResults
-    | CommitteesProjectsResults
-    | DraftDeleteResults
     | JwtCreateResults
-    | KeysAddResults
-    | KeysDeleteResults
-    | KeysGetResults
+    | KeyAddResults
+    | KeyDeleteResults
+    | KeyGetResults
     | KeysUploadResults
     | KeysUserResults
-    | ProjectsGetResults
+    | ProjectGetResults
+    | ProjectReleasesResults
     | ProjectsListResults
-    | ProjectsReleasesResults
     | ReleaseAnnounceResults
-    | ReleasesResults
-    | ReleasesCreateResults
-    | ReleasesDeleteResults
-    | ReleasesPathsResults
-    | ReleasesProjectResults
-    | ReleasesVersionResults
-    | ReleasesRevisionsResults
-    | RevisionsResults
-    | SshAddResults
-    | SshDeleteResults
-    | SshListResults
+    | ReleaseCreateResults
+    | ReleaseDeleteResults
+    | ReleaseDraftDeleteResults
+    | ReleaseGetResults
+    | ReleasePathsResults
+    | ReleaseRevisionsResults
+    | ReleaseUploadResults
+    | ReleasesListResults
+    | SignatureProvenanceResults
+    | SshKeyAddResults
+    | SshKeyDeleteResults
+    | SshKeysListResults
     | TasksResults
     | UsersListResults
-    | VerifyProvenanceResults
     | VoteResolveResults
     | VoteStartResults
-    | VoteTabulateResults
-    | UploadResults,
+    | VoteTabulateResults,
     schema.Field(discriminator="endpoint"),
 ]
 
@@ -453,36 +425,34 @@ def validator[T](t: type[T]) -> Callable[[Any], T]:
 
 validate_checks_list = validator(ChecksListResults)
 validate_checks_ongoing = validator(ChecksOngoingResults)
-validate_committees_get = validator(CommitteesGetResults)
-validate_committees_keys = validator(CommitteesKeysResults)
+validate_committee_get = validator(CommitteeGetResults)
+validate_committee_keys = validator(CommitteeKeysResults)
+validate_committee_projects = validator(CommitteeProjectsResults)
 validate_committees_list = validator(CommitteesListResults)
-validate_committees_projects = validator(CommitteesProjectsResults)
-validate_draft_delete = validator(DraftDeleteResults)
 validate_jwt_create = validator(JwtCreateResults)
-validate_keys_add = validator(KeysAddResults)
-validate_keys_delete = validator(KeysDeleteResults)
-validate_keys_get = validator(KeysGetResults)
+validate_key_add = validator(KeyAddResults)
+validate_key_delete = validator(KeyDeleteResults)
+validate_key_get = validator(KeyGetResults)
 validate_keys_upload = validator(KeysUploadResults)
 validate_keys_user = validator(KeysUserResults)
-validate_projects_get = validator(ProjectsGetResults)
+validate_project_get = validator(ProjectGetResults)
+validate_project_releases = validator(ProjectReleasesResults)
 validate_projects_list = validator(ProjectsListResults)
-validate_projects_releases = validator(ProjectsReleasesResults)
 validate_release_announce = validator(ReleaseAnnounceResults)
-validate_releases = validator(ReleasesResults)
-validate_releases_create = validator(ReleasesCreateResults)
-validate_releases_delete = validator(ReleasesDeleteResults)
-validate_releases_paths = validator(ReleasesPathsResults)
-validate_releases_project = validator(ReleasesProjectResults)
-validate_releases_version = validator(ReleasesVersionResults)
-validate_releases_revisions = validator(ReleasesRevisionsResults)
-validate_revisions = validator(RevisionsResults)
-validate_ssh_add = validator(SshAddResults)
-validate_ssh_delete = validator(SshDeleteResults)
-validate_ssh_list = validator(SshListResults)
+validate_release_create = validator(ReleaseCreateResults)
+validate_release_delete = validator(ReleaseDeleteResults)
+validate_release_draft_delete = validator(ReleaseDraftDeleteResults)
+validate_release_get = validator(ReleaseGetResults)
+validate_release_paths = validator(ReleasePathsResults)
+validate_release_revisions = validator(ReleaseRevisionsResults)
+validate_release_upload = validator(ReleaseUploadResults)
+validate_releases_list = validator(ReleasesListResults)
+validate_signature_provenance = validator(SignatureProvenanceResults)
+validate_ssh_key_add = validator(SshKeyAddResults)
+validate_ssh_key_delete = validator(SshKeyDeleteResults)
+validate_ssh_keys_list = validator(SshKeysListResults)
 validate_tasks = validator(TasksResults)
 validate_users_list = validator(UsersListResults)
-validate_verify_provenance = validator(VerifyProvenanceResults)
 validate_vote_resolve = validator(VoteResolveResults)
 validate_vote_start = validator(VoteStartResults)
 validate_vote_tabulate = validator(VoteTabulateResults)
-validate_upload = validator(UploadResults)
