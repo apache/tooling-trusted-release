@@ -314,7 +314,6 @@ async def key_add(data: models.api.KeyAddArgs) -> DictResponse:
 
     return models.api.KeyAddResults(
         endpoint="/key/add",
-        success="Key added",
         fingerprint=key.key_model.fingerprint.upper(),
     ).model_dump(), 200
 
@@ -348,7 +347,7 @@ async def key_delete(data: models.api.KeyDeleteArgs) -> DictResponse:
 
     return models.api.KeyDeleteResults(
         endpoint="/key/delete",
-        success="Key deleted",
+        success=True,
     ).model_dump(), 200
 
 
@@ -574,7 +573,7 @@ async def release_delete(data: models.api.ReleaseDeleteArgs) -> DictResponse:
         await db_data.commit()
     return models.api.ReleaseDeleteResults(
         endpoint="/release/delete",
-        deleted=release_name,
+        deleted=True,
     ).model_dump(), 200
 
 
@@ -615,7 +614,7 @@ async def release_draft_delete(data: models.api.ReleaseDraftDeleteArgs) -> DictR
         await db_data.commit()
     return models.api.ReleaseDraftDeleteResults(
         endpoint="/release/draft/delete",
-        success=f"Draft {release_name} deleted",
+        success=True,
     ).model_dump(), 200
 
 
@@ -843,7 +842,7 @@ async def ssh_key_delete(data: models.api.SshKeyDeleteArgs) -> DictResponse:
     await keys.ssh_key_delete(data.fingerprint, asf_uid)
     return models.api.SshKeyDeleteResults(
         endpoint="/ssh-key/delete",
-        success="SSH key deleted",
+        success=True,
     ).model_dump(), 201
 
 
@@ -964,7 +963,6 @@ async def vote_resolve(data: models.api.VoteResolveArgs) -> DictResponse:
         match data.resolution:
             case "passed":
                 release.phase = sql.ReleasePhase.RELEASE_PREVIEW
-                success_message = "Vote marked as passed"
                 description = "Create a preview revision from the last candidate draft"
                 async with revision.create_and_manage(
                     data.project, release.version, asf_uid, description=description
@@ -972,11 +970,10 @@ async def vote_resolve(data: models.api.VoteResolveArgs) -> DictResponse:
                     pass
             case "failed":
                 release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
-                success_message = "Vote marked as failed"
         await db_data.commit()
     return models.api.VoteResolveResults(
         endpoint="/vote/resolve",
-        success=success_message,
+        success=True,
     ).model_dump(), 200
 
 

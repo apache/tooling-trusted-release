@@ -121,13 +121,21 @@ class UserRole(str, enum.Enum):
 # Pydantic models
 
 
+def pydantic_example(value: Any) -> dict[Literal["json_schema_extra"], dict[str, Any]]:
+    return {"json_schema_extra": {"example": value}}
+
+
 class VoteEntry(schema.Strict):
-    result: bool
-    summary: str
-    binding_votes: int
-    community_votes: int
-    start: datetime.datetime
-    end: datetime.datetime
+    result: bool = schema.Field(alias="result", **pydantic_example(True))
+    summary: str = schema.Field(alias="summary", **pydantic_example("This is a summary"))
+    binding_votes: int = schema.Field(alias="binding_votes", **pydantic_example(10))
+    community_votes: int = schema.Field(alias="community_votes", **pydantic_example(10))
+    start: datetime.datetime = schema.Field(
+        alias="start", **pydantic_example(datetime.datetime(2025, 5, 5, 1, 2, 3, tzinfo=datetime.UTC))
+    )
+    end: datetime.datetime = schema.Field(
+        alias="end", **pydantic_example(datetime.datetime(2025, 5, 7, 1, 2, 3, tzinfo=datetime.UTC))
+    )
 
 
 # Type decorators
@@ -551,24 +559,32 @@ class Release(sqlmodel.SQLModel, table=True):
 
     # We guarantee that "{project.name}-{version}" is unique
     # Therefore we can use that for the name
-    name: str = sqlmodel.Field(default="", primary_key=True, unique=True)
-    phase: ReleasePhase
-    created: datetime.datetime = sqlmodel.Field(sa_column=sqlalchemy.Column(UTCDateTime))
-    released: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
+    name: str = sqlmodel.Field(default="", primary_key=True, unique=True, **example("example-0.0.1"))
+    phase: ReleasePhase = sqlmodel.Field(**example(ReleasePhase.RELEASE_CANDIDATE_DRAFT))
+    created: datetime.datetime = sqlmodel.Field(
+        sa_column=sqlalchemy.Column(UTCDateTime), **example(datetime.datetime(2025, 5, 1, 1, 2, 3, tzinfo=datetime.UTC))
+    )
+    released: datetime.datetime | None = sqlmodel.Field(
+        default=None,
+        sa_column=sqlalchemy.Column(UTCDateTime),
+        **example(datetime.datetime(2025, 6, 1, 1, 2, 3, tzinfo=datetime.UTC)),
+    )
 
     # M-1: Release -> Project
     # 1-M: Project -> [Release]
-    project_name: str = sqlmodel.Field(foreign_key="project.name")
+    project_name: str = sqlmodel.Field(foreign_key="project.name", **example("example"))
     project: Project = sqlmodel.Relationship(back_populates="releases")
     see_also(Project.releases)
 
-    package_managers: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
+    package_managers: list[str] = sqlmodel.Field(
+        default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON), **example([])
+    )
     # TODO: Not all releases have a version
     # We could either make this str | None, or we could require version to be set on packages only
     # For example, Apache Airflow Providers do not have an overall version
     # They have one version per package, i.e. per provider
-    version: str
-    sboms: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
+    version: str = sqlmodel.Field(**example("0.0.1"))
+    sboms: list[str] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON), **example([]))
 
     # 1-1: Release -C-> ReleasePolicy
     # 1-1: ReleasePolicy -> Release
@@ -579,10 +595,18 @@ class Release(sqlmodel.SQLModel, table=True):
 
     # VoteEntry is a Pydantic model, not a SQL model
     votes: list[VoteEntry] = sqlmodel.Field(default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON))
-    vote_manual: bool = sqlmodel.Field(default=False)
-    vote_started: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
-    vote_resolved: datetime.datetime | None = sqlmodel.Field(default=None, sa_column=sqlalchemy.Column(UTCDateTime))
-    podling_thread_id: str | None = sqlmodel.Field(default=None)
+    vote_manual: bool = sqlmodel.Field(default=False, **example(False))
+    vote_started: datetime.datetime | None = sqlmodel.Field(
+        default=None,
+        sa_column=sqlalchemy.Column(UTCDateTime),
+        **example(datetime.datetime(2025, 5, 5, 1, 2, 3, tzinfo=datetime.UTC)),
+    )
+    vote_resolved: datetime.datetime | None = sqlmodel.Field(
+        default=None,
+        sa_column=sqlalchemy.Column(UTCDateTime),
+        **example(datetime.datetime(2025, 5, 7, 1, 2, 3, tzinfo=datetime.UTC)),
+    )
+    podling_thread_id: str | None = sqlmodel.Field(default=None, **example("hmk1lpwnnxn5zsbp8gwh7115h2qm7jrh"))
 
     # 1-M: Release -C-> [Revision]
     # M-1: Revision -> Release
@@ -625,6 +649,7 @@ class Release(sqlmodel.SQLModel, table=True):
             raise ValueError("Release has no revisions")
         return number
 
+    # TODO: How do we give an example for this?
     @pydantic.computed_field  # type: ignore[prop-decorator]
     @property
     def latest_revision_number(self) -> str | None:
@@ -777,11 +802,11 @@ class ReleasePolicy(sqlmodel.SQLModel, table=True):
 
 # Revision: Release
 class Revision(sqlmodel.SQLModel, table=True):
-    name: str = sqlmodel.Field(default="", primary_key=True, unique=True)
+    name: str = sqlmodel.Field(default="", primary_key=True, unique=True, **example("example-0.0.1 00002"))
 
     # M-1: Revision -> Release
     # 1-M: Release -C-> [Revision]
-    release_name: str | None = sqlmodel.Field(default=None, foreign_key="release.name")
+    release_name: str | None = sqlmodel.Field(default=None, foreign_key="release.name", **example("example-0.0.1"))
     release: Release = sqlmodel.Relationship(
         back_populates="revisions",
         sa_relationship_kwargs={
@@ -789,19 +814,23 @@ class Revision(sqlmodel.SQLModel, table=True):
         },
     )
 
-    seq: int = sqlmodel.Field(default=0)
+    seq: int = sqlmodel.Field(default=0, **example(1))
     # This was designed as a property, but it's better for it to be a column
     # That way, we can do dynamic Release.latest_revision_number construction easier
-    number: str = sqlmodel.Field(default="")
-    asfuid: str
+    number: str = sqlmodel.Field(default="", **example("00002"))
+    asfuid: str = sqlmodel.Field(**example("user"))
     created: datetime.datetime = sqlmodel.Field(
-        default_factory=lambda: datetime.datetime.now(datetime.UTC), sa_column=sqlalchemy.Column(UTCDateTime)
+        default_factory=lambda: datetime.datetime.now(datetime.UTC),
+        sa_column=sqlalchemy.Column(UTCDateTime),
+        **example(datetime.datetime(2025, 5, 1, 1, 2, 3, tzinfo=datetime.UTC)),
     )
-    phase: ReleasePhase
+    phase: ReleasePhase = sqlmodel.Field(**example(ReleasePhase.RELEASE_CANDIDATE_DRAFT))
 
     # 1-1: Revision -> Revision
     # 1-1: Revision -> Revision
-    parent_name: str | None = sqlmodel.Field(default=None, foreign_key="revision.name")
+    parent_name: str | None = sqlmodel.Field(
+        default=None, foreign_key="revision.name", **example("example-0.0.1 00001")
+    )
     parent: Optional["Revision"] = sqlmodel.Relationship(
         sa_relationship_kwargs=dict(
             remote_side=lambda: Revision.name,
@@ -815,7 +844,7 @@ class Revision(sqlmodel.SQLModel, table=True):
     # 1-1: Revision -> Revision
     child: Optional["Revision"] = sqlmodel.Relationship(back_populates="parent")
 
-    description: str | None = sqlmodel.Field(default=None)
+    description: str | None = sqlmodel.Field(default=None, **example("This is a description"))
 
     def model_post_init(self, _context):
         if isinstance(self.created, str):

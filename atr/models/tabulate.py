@@ -16,6 +16,7 @@
 # under the License.
 
 import enum
+from typing import Any, Literal
 
 import pydantic
 
@@ -36,15 +37,19 @@ class VoteStatus(enum.Enum):
     UNKNOWN = "Unknown"
 
 
+def example(value: Any) -> dict[Literal["json_schema_extra"], dict[str, Any]]:
+    return {"json_schema_extra": {"example": value}}
+
+
 class VoteEmail(schema.Strict):
-    asf_uid_or_email: str
-    from_email: str
-    status: VoteStatus
-    asf_eid: str
-    iso_datetime: str
-    vote: Vote
-    quotation: str
-    updated: bool
+    asf_uid_or_email: str = schema.Field(..., **example("user"))
+    from_email: str = schema.Field(..., **example("user@example.org"))
+    status: VoteStatus = schema.Field(..., **example(VoteStatus.BINDING))
+    asf_eid: str = schema.Field(..., **example("102ed8a-503db792-79bc789-b8ca87ce@apache.org"))
+    iso_datetime: str = schema.Field(..., **example("2025-05-01T12:00:00Z"))
+    vote: Vote = schema.Field(..., **example(Vote.YES))
+    quotation: str = schema.Field(..., **example("+1 (Binding)"))
+    updated: bool = schema.Field(..., **example(True))
 
     @pydantic.field_validator("status", mode="before")
     @classmethod
@@ -58,8 +63,24 @@ class VoteEmail(schema.Strict):
 
 
 class VoteDetails(schema.Strict):
-    start_unixtime: int | None
-    votes: dict[str, VoteEmail]
-    summary: dict[str, int]
-    passed: bool
-    outcome: str
+    start_unixtime: int | None = schema.Field(..., **example(1714435200))
+    votes: dict[str, VoteEmail] = schema.Field(
+        ...,
+        **example(
+            {
+                "user": VoteEmail(
+                    asf_uid_or_email="user",
+                    from_email="user@example.org",
+                    status=VoteStatus.BINDING,
+                    asf_eid="102ed8a-503db792-79bc789-b8ca87ce@apache.org",
+                    iso_datetime="2025-05-01T12:00:00Z",
+                    vote=Vote.YES,
+                    quotation="+1 (Binding)",
+                    updated=True,
+                )
+            }
+        ),
+    )
+    summary: dict[str, int] = schema.Field(..., **example({"user": 1}))
+    passed: bool = schema.Field(..., **example(True))
+    outcome: str = schema.Field(..., **example("The vote passed."))

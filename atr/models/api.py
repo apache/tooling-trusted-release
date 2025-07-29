@@ -92,7 +92,6 @@ class KeyAddArgs(schema.Strict):
 
 class KeyAddResults(schema.Strict):
     endpoint: Literal["/key/add"] = schema.Field(alias="endpoint")
-    success: str = schema.Field(..., **example("Key added"))
     fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
 
 
@@ -102,7 +101,7 @@ class KeyDeleteArgs(schema.Strict):
 
 class KeyDeleteResults(schema.Strict):
     endpoint: Literal["/key/delete"] = schema.Field(alias="endpoint")
-    success: str = schema.Field(..., **example("Key deleted"))
+    success: Literal[True] = schema.Field(..., **example(True))
 
 
 class KeyGetResults(schema.Strict):
@@ -180,7 +179,7 @@ class ReleaseAnnounceArgs(schema.Strict):
 
 class ReleaseAnnounceResults(schema.Strict):
     endpoint: Literal["/release/announce"] = schema.Field(alias="endpoint")
-    success: bool = schema.Field(..., **example(True))
+    success: Literal[True] = schema.Field(..., **example(True))
 
 
 class ReleaseDraftDeleteArgs(schema.Strict):
@@ -190,12 +189,12 @@ class ReleaseDraftDeleteArgs(schema.Strict):
 
 class ReleaseDraftDeleteResults(schema.Strict):
     endpoint: Literal["/release/draft/delete"] = schema.Field(alias="endpoint")
-    success: str = schema.Field(..., **example("Draft 'example-0.0.1' deleted"))
+    success: Literal[True] = schema.Field(..., **example(True))
 
 
 class ReleaseCreateArgs(schema.Strict):
-    project: str
-    version: str
+    project: str = schema.Field(..., **example("example"))
+    version: str = schema.Field(..., **example("0.0.1"))
 
 
 class ReleaseCreateResults(schema.Strict):
@@ -204,13 +203,13 @@ class ReleaseCreateResults(schema.Strict):
 
 
 class ReleaseDeleteArgs(schema.Strict):
-    project: str
-    version: str
+    project: str = schema.Field(..., **example("example"))
+    version: str = schema.Field(..., **example("0.0.1"))
 
 
 class ReleaseDeleteResults(schema.Strict):
     endpoint: Literal["/release/delete"] = schema.Field(alias="endpoint")
-    deleted: str
+    deleted: Literal[True] = schema.Field(..., **example(True))
 
 
 class ReleaseGetResults(schema.Strict):
@@ -233,7 +232,7 @@ class ReleaseGetResults(schema.Strict):
 
 class ReleasePathsResults(schema.Strict):
     endpoint: Literal["/release/paths"] = schema.Field(alias="endpoint")
-    rel_paths: Sequence[str]
+    rel_paths: Sequence[str] = schema.Field(..., **example(["example/0.0.1/example-0.0.1-bin.tar.gz"]))
 
 
 class ReleaseRevisionsResults(schema.Strict):
@@ -242,10 +241,10 @@ class ReleaseRevisionsResults(schema.Strict):
 
 
 class ReleaseUploadArgs(schema.Strict):
-    project: str
-    version: str
-    relpath: str
-    content: str
+    project: str = schema.Field(..., **example("example"))
+    version: str = schema.Field(..., **example("0.0.1"))
+    relpath: str = schema.Field(..., **example("example/0.0.1/example-0.0.1-bin.tar.gz"))
+    content: str = schema.Field(..., **example("This is the content of the file."))
 
 
 class ReleaseUploadResults(schema.Strict):
@@ -267,42 +266,48 @@ class ReleasesListResults(schema.Strict):
 
 
 class SignatureProvenanceArgs(schema.Strict):
-    artifact_file_name: str
-    artifact_sha3_256: str
-    signature_file_name: str
-    signature_asc_text: str
-    signature_sha3_256: str
+    artifact_file_name: str = schema.Field(..., **example("example-0.0.1-bin.tar.gz"))
+    artifact_sha3_256: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
+    signature_file_name: str = schema.Field(..., **example("example-0.0.1-bin.tar.gz.asc"))
+    signature_asc_text: str = schema.Field(
+        ..., **example("-----BEGIN PGP SIGNATURE-----\n\n...\n-----END PGP SIGNATURE-----\n")
+    )
+    signature_sha3_256: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
 
 
 class SignatureProvenanceKey(schema.Strict):
-    committee: str
-    keys_file_url: str
-    keys_file_sha3_256: str
+    committee: str = schema.Field(..., **example("example"))
+    keys_file_url: str = schema.Field(..., **example("https://example.apache.org/example/KEYS"))
+    keys_file_sha3_256: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
 
 
 class SignatureProvenanceResults(schema.Strict):
     endpoint: Literal["/signature/provenance"] = schema.Field(alias="endpoint")
-    fingerprint: str
-    key_asc_text: str
+    fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
+    key_asc_text: str = schema.Field(
+        ..., **example("-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n...\n-----END PGP PUBLIC KEY BLOCK-----\n")
+    )
     committees_with_artifact: list[SignatureProvenanceKey]
 
 
 class SshKeyAddArgs(schema.Strict):
-    text: str
+    text: str = schema.Field(
+        ..., **example("ssh-ed25519 AAAAC3NzaC1lZDI1NTEgH5C9okWi0dh25AAAAIOMqqnkVzrm0SdG6UOoqKLsabl9GKJl")
+    )
 
 
 class SshKeyAddResults(schema.Strict):
     endpoint: Literal["/ssh-key/add"] = schema.Field(alias="endpoint")
-    fingerprint: str
+    fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
 
 
 class SshKeyDeleteArgs(schema.Strict):
-    fingerprint: str
+    fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
 
 
 class SshKeyDeleteResults(schema.Strict):
     endpoint: Literal["/ssh-key/delete"] = schema.Field(alias="endpoint")
-    success: str
+    success: Literal[True] = schema.Field(..., **example(True))
 
 
 @dataclasses.dataclass
@@ -314,7 +319,7 @@ class SshKeysListQuery:
 class SshKeysListResults(schema.Strict):
     endpoint: Literal["/ssh-keys/list"] = schema.Field(alias="endpoint")
     data: Sequence[sql.SSHKey]
-    count: int
+    count: int = schema.Field(..., **example(10))
 
 
 @dataclasses.dataclass
@@ -327,33 +332,35 @@ class TasksListQuery:
 class TasksListResults(schema.Strict):
     endpoint: Literal["/tasks/list"] = schema.Field(alias="endpoint")
     data: Sequence[sql.Task]
-    count: int
+    count: int = schema.Field(..., **example(10))
 
 
 class UsersListResults(schema.Strict):
     endpoint: Literal["/users/list"] = schema.Field(alias="endpoint")
-    users: Sequence[str]
+    users: Sequence[str] = schema.Field(..., **example(["user1", "user2"]))
 
 
 class VoteResolveArgs(schema.Strict):
-    project: str
-    version: str
-    resolution: Literal["passed", "failed"]
+    project: str = schema.Field(..., **example("example"))
+    version: str = schema.Field(..., **example("0.0.1"))
+    resolution: Literal["passed", "failed"] = schema.Field(..., **example("passed"))
 
 
 class VoteResolveResults(schema.Strict):
     endpoint: Literal["/vote/resolve"] = schema.Field(alias="endpoint")
-    success: str
+    success: Literal[True] = schema.Field(..., **example(True))
 
 
 class VoteStartArgs(schema.Strict):
-    project: str
-    version: str
-    revision: str
-    email_to: str
-    vote_duration: int
-    subject: str
-    body: str
+    project: str = schema.Field(..., **example("example"))
+    version: str = schema.Field(..., **example("0.0.1"))
+    revision: str = schema.Field(..., **example("00005"))
+    email_to: str = schema.Field(..., **example("dev@example.apache.org"))
+    vote_duration: int = schema.Field(..., **example(10))
+    subject: str = schema.Field(..., **example("[VOTE] Apache Example 0.0.1 release"))
+    body: str = schema.Field(
+        ..., **example("The Apache Example team is pleased to announce the release of Example 0.0.1...")
+    )
 
 
 class VoteStartResults(schema.Strict):
@@ -362,8 +369,8 @@ class VoteStartResults(schema.Strict):
 
 
 class VoteTabulateArgs(schema.Strict):
-    project: str
-    version: str
+    project: str = schema.Field(..., **example("example"))
+    version: str = schema.Field(..., **example("0.0.1"))
 
 
 class VoteTabulateResults(schema.Strict):
