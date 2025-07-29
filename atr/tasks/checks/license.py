@@ -19,10 +19,12 @@ import asyncio
 import difflib
 import hashlib
 import os
+import pathlib
 import re
 from collections.abc import Iterator
 from typing import Any, Final
 
+import atr.db as db
 import atr.log as log
 import atr.models.results as results
 import atr.models.schema as schema
@@ -30,6 +32,7 @@ import atr.models.sql as sql
 import atr.static as static
 import atr.tarzip as tarzip
 import atr.tasks.checks as checks
+import atr.util as util
 
 # Constant that must be present in the Apache License header
 HTTP_APACHE_LICENSE_HEADER: Final[bytes] = (
@@ -157,8 +160,18 @@ async def headers(args: checks.FunctionArguments) -> results.Results | None:
 
     log.info(f"Checking license headers for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
+    async with db.session() as data:
+        release = await data.release(project_name=args.project_name, version=args.version_name).get()
+    ignore_lines = []
+    if release is not None:
+        release_directory_base = util.release_directory_base(release)
+        release_directory_revision = release_directory_base / args.revision_number
+        ignore_file = release_directory_revision / ".atr" / "license-headers-ignore"
+        if ignore_file.exists():
+            ignore_lines = ignore_file.read_text().splitlines()
+
     try:
-        for result in await asyncio.to_thread(_headers_check_core_logic, str(artifact_abs_path)):
+        for result in await asyncio.to_thread(_headers_check_core_logic, str(artifact_abs_path), ignore_lines):
             match result:
                 case ArtifactResult():
                     await _record_artifact(recorder, result)
@@ -374,7 +387,7 @@ def _get_file_extension(filename: str) -> str | None:
     return ext[1:].lower()
 
 
-def _headers_check_core_logic(artifact_path: str) -> Iterator[Result]:
+def _headers_check_core_logic(artifact_path: str, ignore_lines: list[str]) -> Iterator[Result]:
     """Verify Apache License headers in source files within an archive."""
     # We could modify @Lucas-C/pre-commit-hooks instead for this
     # But hopefully this will be robust enough, at least for testing
@@ -391,11 +404,21 @@ def _headers_check_core_logic(artifact_path: str) -> Iterator[Result]:
     #         data=None,
     #     )
 
+    artifact_basename = os.path.basename(artifact_path)
+    # log.info(f"Ignore lines: {ignore_lines}")
+
     # Check files in the archive
     with tarzip.open_archive(artifact_path) as archive:
         for member in archive:
             if member.name and member.name.split("/")[-1].startswith("._"):
                 # Metadata convention
+                continue
+
+            ignore_path = "/" + artifact_basename + "/" + member.name.lstrip("/")
+            matcher = util.create_path_matcher(ignore_lines, pathlib.Path(ignore_path), pathlib.Path("/"))
+            # log.info(f"Checking {ignore_path} with matcher {matcher}")
+            if matcher(ignore_path):
+                # log.info(f"Skipping {ignore_path} because it matches the ignore list")
                 continue
 
             match _headers_check_core_logic_process_file(archive, member):
