@@ -34,24 +34,6 @@ class ResultsTypeError(TypeError):
     pass
 
 
-class AnnounceArgs(schema.Strict):
-    project: str = schema.Field(..., **example("example"))
-    version: str = schema.Field(..., **example("1.0.0"))
-    revision: str = schema.Field(..., **example("00005"))
-    email_to: str = schema.Field(..., **example("dev@example.apache.org"))
-    subject: str = schema.Field(..., **example("[ANNOUNCE] Apache Example 1.0.0 release"))
-    body: str = schema.Field(
-        ...,
-        **example("The Apache Example team is pleased to announce the release of Example 1.0.0..."),
-    )
-    path_suffix: str = schema.Field(..., **example("example/1.0.0"))
-
-
-class AnnounceResults(schema.Strict):
-    endpoint: Literal["/announce"] = schema.Field(alias="endpoint")
-    success: str = schema.Field(..., **example("Announcement sent"))
-
-
 class ChecksListResults(schema.Strict):
     endpoint: Literal["/checks/list"] = schema.Field(alias="endpoint")
     checks: Sequence[sql.CheckResult]
@@ -198,6 +180,24 @@ class ProjectsListResults(schema.Strict):
 class ProjectsReleasesResults(schema.Strict):
     endpoint: Literal["/projects/releases"] = schema.Field(alias="endpoint")
     releases: Sequence[sql.Release]
+
+
+class ReleaseAnnounceArgs(schema.Strict):
+    project: str = schema.Field(..., **example("example"))
+    version: str = schema.Field(..., **example("1.0.0"))
+    revision: str = schema.Field(..., **example("00005"))
+    email_to: str = schema.Field(..., **example("dev@example.apache.org"))
+    subject: str = schema.Field(..., **example("[ANNOUNCE] Apache Example 1.0.0 release"))
+    body: str = schema.Field(
+        ...,
+        **example("The Apache Example team is pleased to announce the release of Example 1.0.0..."),
+    )
+    path_suffix: str = schema.Field(..., **example("example/1.0.0"))
+
+
+class ReleaseAnnounceResults(schema.Strict):
+    endpoint: Literal["/release/announce"] = schema.Field(alias="endpoint")
+    success: bool = schema.Field(..., **example(True))
 
 
 @dataclasses.dataclass
@@ -400,8 +400,7 @@ class VerifyProvenanceResults(schema.Strict):
 # This is for *Results classes only
 # We do NOT put *Args classes here
 Results = Annotated[
-    AnnounceResults
-    | ChecksListResults
+    ChecksListResults
     | ChecksOngoingResults
     | CommitteesGetResults
     | CommitteesKeysResults
@@ -417,6 +416,7 @@ Results = Annotated[
     | ProjectsGetResults
     | ProjectsListResults
     | ProjectsReleasesResults
+    | ReleaseAnnounceResults
     | ReleasesResults
     | ReleasesCreateResults
     | ReleasesDeleteResults
@@ -451,7 +451,6 @@ def validator[T](t: type[T]) -> Callable[[Any], T]:
     return validate
 
 
-validate_announce = validator(AnnounceResults)
 validate_checks_list = validator(ChecksListResults)
 validate_checks_ongoing = validator(ChecksOngoingResults)
 validate_committees_get = validator(CommitteesGetResults)
@@ -468,6 +467,7 @@ validate_keys_user = validator(KeysUserResults)
 validate_projects_get = validator(ProjectsGetResults)
 validate_projects_list = validator(ProjectsListResults)
 validate_projects_releases = validator(ProjectsReleasesResults)
+validate_release_announce = validator(ReleaseAnnounceResults)
 validate_releases = validator(ReleasesResults)
 validate_releases_create = validator(ReleasesCreateResults)
 validate_releases_delete = validator(ReleasesDeleteResults)

@@ -64,43 +64,6 @@ import atr.util as util
 DictResponse = tuple[dict[str, Any], int]
 
 
-@api.BLUEPRINT.route("/announce", methods=["POST"])
-@jwtoken.require
-@quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.AnnounceArgs)
-@quart_schema.validate_response(models.api.AnnounceResults, 201)
-async def announce_post(data: models.api.AnnounceArgs) -> DictResponse:
-    """
-    Announce a release to the public, making it final.
-
-    After a vote on a release has passed, if everything is in order and all
-    paths are correct, the release can be announced. This will send an email to
-    the specified announement address, and promote the release to the finished
-    release phase.
-    """
-    asf_uid = _jwt_asf_uid()
-
-    try:
-        await announce.announce(
-            data.project,
-            data.version,
-            data.revision,
-            data.email_to,
-            data.subject,
-            data.body,
-            data.path_suffix,
-            asf_uid,
-            asf_uid,
-        )
-    except announce.AnnounceError as e:
-        raise exceptions.BadRequest(str(e))
-
-    return models.api.AnnounceResults(
-        endpoint="/announce",
-        success="Announcement sent",
-    ).model_dump(), 201
-
-
 @api.BLUEPRINT.route("/checks/list/<project>/<version>")
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
 async def checks_list(project: str, version: str) -> DictResponse:
@@ -556,6 +519,43 @@ async def projects_releases(name: str) -> DictResponse:
         endpoint="/projects/releases",
         releases=releases,
     ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/release/announce", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.ReleaseAnnounceArgs)
+@quart_schema.validate_response(models.api.ReleaseAnnounceResults, 201)
+async def release_announce(data: models.api.ReleaseAnnounceArgs) -> DictResponse:
+    """
+    Announce a release to the public, making it final.
+
+    After a vote on a release has passed, if everything is in order and all
+    paths are correct, the release can be announced. This will send an email to
+    the specified announement address, and promote the release to the finished
+    release phase.
+    """
+    asf_uid = _jwt_asf_uid()
+
+    try:
+        await announce.announce(
+            data.project,
+            data.version,
+            data.revision,
+            data.email_to,
+            data.subject,
+            data.body,
+            data.path_suffix,
+            asf_uid,
+            asf_uid,
+        )
+    except announce.AnnounceError as e:
+        raise exceptions.BadRequest(str(e))
+
+    return models.api.ReleaseAnnounceResults(
+        endpoint="/release/announce",
+        success=True,
+    ).model_dump(), 201
 
 
 @api.BLUEPRINT.route("/releases")
