@@ -58,6 +58,12 @@ class CheckResultStatus(str, enum.Enum):
     WARNING = "warning"
 
 
+class CheckResultStatusIgnore(str, enum.Enum):
+    EXCEPTION = "exception"
+    FAILURE = "failure"
+    WARNING = "warning"
+
+
 class ProjectStatus(str, enum.Enum):
     ACTIVE = "active"
     DORMANT = "dormant"
@@ -710,6 +716,26 @@ class CheckResult(sqlmodel.SQLModel, table=True):
     data: Any = sqlmodel.Field(
         sa_column=sqlalchemy.Column(sqlalchemy.JSON), **example({"expected": "...", "found": "..."})
     )
+
+
+class CheckResultIgnore(sqlmodel.SQLModel, table=True):
+    id: int = sqlmodel.Field(default=None, primary_key=True, **example(123))
+    asf_uid: str = sqlmodel.Field(**example("user"))
+    created: datetime.datetime = sqlmodel.Field(
+        sa_column=sqlalchemy.Column(UTCDateTime),
+        **example(datetime.datetime(2025, 5, 1, 1, 2, 3, tzinfo=datetime.UTC)),
+    )
+    committee_name: str = sqlmodel.Field(**example("example"))
+    release_glob: str | None = sqlmodel.Field(**example("example-0.0.*"))
+    revision_number: str | None = sqlmodel.Field(**example("00001"))
+    checker_glob: str | None = sqlmodel.Field(**example("atr.tasks.checks.license.files"))
+    primary_rel_path_glob: str | None = sqlmodel.Field(**example("apache-example-0.0.1-*.tar.gz"))
+    member_rel_path_glob: str | None = sqlmodel.Field(**example("apache-example-0.0.1/*.xml"))
+    status: CheckResultStatusIgnore | None = sqlmodel.Field(
+        default=CheckResultStatusIgnore.FAILURE,
+        **example(CheckResultStatusIgnore.FAILURE),
+    )
+    message_glob: str | None = sqlmodel.Field(**example("sha512 matches for apache-example-0.0.1/*.xml"))
 
 
 # DistributionChannel: Project
