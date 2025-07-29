@@ -318,14 +318,14 @@ class SshKeysListResults(schema.Strict):
 
 
 @dataclasses.dataclass
-class TasksQuery:
+class TasksListQuery:
     limit: int = 20
     offset: int = 0
     status: str | None = None
 
 
-class TasksResults(schema.Strict):
-    endpoint: Literal["/tasks"] = schema.Field(alias="endpoint")
+class TasksListResults(schema.Strict):
+    endpoint: Literal["/tasks/list"] = schema.Field(alias="endpoint")
     data: Sequence[sql.Task]
     count: int
 
@@ -402,7 +402,7 @@ Results = Annotated[
     | SshKeyAddResults
     | SshKeyDeleteResults
     | SshKeysListResults
-    | TasksResults
+    | TasksListResults
     | UsersListResults
     | VoteResolveResults
     | VoteStartResults
@@ -451,7 +451,7 @@ validate_signature_provenance = validator(SignatureProvenanceResults)
 validate_ssh_key_add = validator(SshKeyAddResults)
 validate_ssh_key_delete = validator(SshKeyDeleteResults)
 validate_ssh_keys_list = validator(SshKeysListResults)
-validate_tasks = validator(TasksResults)
+validate_tasks_list = validator(TasksListResults)
 validate_users_list = validator(UsersListResults)
 validate_vote_resolve = validator(VoteResolveResults)
 validate_vote_start = validator(VoteStartResults)

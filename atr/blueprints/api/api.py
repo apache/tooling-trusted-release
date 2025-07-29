@@ -68,7 +68,7 @@ DictResponse = tuple[dict[str, Any], int]
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
 async def checks_list(project: str, version: str) -> DictResponse:
     """
-    All of the check results for the latest revision of a release.
+    List checks by project and version.
 
     Checks are only conducted during the compose a draft phase. This endpoint
     only returns the checks for the most recent draft revision. Once a release
@@ -108,7 +108,7 @@ async def checks_list(project: str, version: str) -> DictResponse:
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
 async def checks_list_revision(project: str, version: str, revision: str) -> DictResponse:
     """
-    All of the check results for a specific revision of a release.
+    List checks by project, version, and revision.
 
     Checks are only conducted during the compose a draft phase. This endpoint
     only returns the checks for the specified draft revision. Once a release
@@ -151,7 +151,7 @@ async def checks_ongoing(
     revision: str | None = None,
 ) -> DictResponse:
     """
-    The number of unfinished check results for a specifed or latest revision of a release.
+    Count ongoing checks by project, version, and optionally revision.
 
     Checks are only conducted during the compose a draft phase. This endpoint
     returns the number of ongoing checks for the specified draft revision if
@@ -183,7 +183,7 @@ async def checks_ongoing(
 @quart_schema.validate_response(models.api.CommitteeGetResults, 200)
 async def committee_get(name: str) -> DictResponse:
     """
-    A specific committee by name.
+    Get a committee by name.
 
     The name of the committee is the name without any prefixes or suffixes such
     as "Apache" or "PMC", in lower case, and with hyphens instead of spaces.
@@ -203,7 +203,7 @@ async def committee_get(name: str) -> DictResponse:
 @quart_schema.validate_response(models.api.CommitteeKeysResults, 200)
 async def committee_keys(name: str) -> DictResponse:
     """
-    Public OpenPGP keys associated with a specific committee.
+    List public OpenPGP keys by committee name.
 
     The name of the committee is the name without any prefixes or suffixes such
     as "Apache" or "PMC", in lower case, and with hyphens instead of spaces.
@@ -225,7 +225,7 @@ async def committee_keys(name: str) -> DictResponse:
 @quart_schema.validate_response(models.api.CommitteeProjectsResults, 200)
 async def committee_projects(name: str) -> DictResponse:
     """
-    Projects managed by a specific committee.
+    List projects by committee name.
 
     The name of the committee is the name without any prefixes or suffixes such
     as "Apache" or "PMC", in lower case, and with hyphens instead of spaces.
@@ -247,7 +247,7 @@ async def committee_projects(name: str) -> DictResponse:
 @quart_schema.validate_response(models.api.CommitteesListResults, 200)
 async def committees_list() -> DictResponse:
     """
-    All committees.
+    List committees.
 
     The list of committees is returned in no particular order.
     """
@@ -264,7 +264,9 @@ async def committees_list() -> DictResponse:
 @quart_schema.validate_request(models.api.JwtCreateArgs)
 async def jwt_create(data: models.api.JwtCreateArgs) -> DictResponse:
     """
-    Create a JWT from a valid PAT.
+    Create a JWT.
+
+    The payload must include a valid PAT.
     """
     # Expects {"asfuid": "uid", "pat": "pat-token"}
     # Returns {"asfuid": "uid", "jwt": "jwt-token"}
@@ -290,7 +292,7 @@ async def jwt_create(data: models.api.JwtCreateArgs) -> DictResponse:
 @quart_schema.validate_response(models.api.KeyAddResults, 200)
 async def key_add(data: models.api.KeyAddArgs) -> DictResponse:
     """
-    Add a public OpenPGP key to all specified committees.
+    Add a public OpenPGP key.
 
     Once associated with the specified committees, the key will appear in the
     automatically generated KEYS file for each committee.
@@ -324,7 +326,7 @@ async def key_add(data: models.api.KeyAddArgs) -> DictResponse:
 @quart_schema.validate_response(models.api.KeyDeleteResults, 200)
 async def key_delete(data: models.api.KeyDeleteArgs) -> DictResponse:
     """
-    Delete a public OpenPGP key from all committees.
+    Delete a public OpenPGP key.
 
     Warning: we plan to change how key deletion works.
     """
@@ -354,7 +356,7 @@ async def key_delete(data: models.api.KeyDeleteArgs) -> DictResponse:
 @quart_schema.validate_response(models.api.KeyGetResults, 200)
 async def key_get(fingerprint: str) -> DictResponse:
     """
-    A single public OpenPGP key by fingerprint.
+    Get a public OpenPGP key by fingerprint.
 
     All public OpenPGP keys stored within the database are accessible.
     """
@@ -376,7 +378,7 @@ async def key_get(fingerprint: str) -> DictResponse:
 @quart_schema.validate_response(models.api.KeysUploadResults, 200)
 async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
     """
-    Upload a new public OpenPGP key to a committee.
+    Upload a public OpenPGP KEYS file.
     """
     asf_uid = _jwt_asf_uid()
     filetext = data.filetext
@@ -431,7 +433,7 @@ async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
 @quart_schema.validate_response(models.api.KeysUserResults, 200)
 async def keys_user(asf_uid: str) -> DictResponse:
     """
-    All public OpenPGP keys for a specific user.
+    List public OpenPGP keys by the ASF UID of a user.
     """
     _simple_check(asf_uid)
     async with db.session() as data:
@@ -445,6 +447,9 @@ async def keys_user(asf_uid: str) -> DictResponse:
 @api.BLUEPRINT.route("/project/get/<name>")
 @quart_schema.validate_response(models.api.ProjectGetResults, 200)
 async def project_get(name: str) -> DictResponse:
+    """
+    Get a project by name.
+    """
     _simple_check(name)
     async with db.session() as data:
         project = await data.project(name=name).demand(exceptions.NotFound())
@@ -457,7 +462,9 @@ async def project_get(name: str) -> DictResponse:
 @api.BLUEPRINT.route("/project/releases/<name>")
 @quart_schema.validate_response(models.api.ProjectReleasesResults, 200)
 async def project_releases(name: str) -> DictResponse:
-    """List all releases for a specific project."""
+    """
+    List releases by project name.
+    """
     _simple_check(name)
     async with db.session() as data:
         releases = await data.release(project_name=name).all()
@@ -470,7 +477,9 @@ async def project_releases(name: str) -> DictResponse:
 @api.BLUEPRINT.route("/projects/list")
 @quart_schema.validate_response(models.api.ProjectsListResults, 200)
 async def projects_list() -> DictResponse:
-    """List all projects in the database."""
+    """
+    List projects.
+    """
     # TODO: Add pagination?
     async with db.session() as data:
         projects = await data.project().all()
@@ -487,12 +496,12 @@ async def projects_list() -> DictResponse:
 @quart_schema.validate_response(models.api.ReleaseAnnounceResults, 201)
 async def release_announce(data: models.api.ReleaseAnnounceArgs) -> DictResponse:
     """
-    Announce a release to the public, making it final.
+    Announce a release.
 
     After a vote on a release has passed, if everything is in order and all
     paths are correct, the release can be announced. This will send an email to
     the specified announement address, and promote the release to the finished
-    release phase.
+    release phase. Once announced, a release is final and cannot be changed.
     """
     asf_uid = _jwt_asf_uid()
 
@@ -523,7 +532,11 @@ async def release_announce(data: models.api.ReleaseAnnounceArgs) -> DictResponse
 @quart_schema.validate_request(models.api.ReleaseCreateArgs)
 @quart_schema.validate_response(models.api.ReleaseCreateResults, 201)
 async def release_create(data: models.api.ReleaseCreateArgs) -> DictResponse:
-    """Create a new release draft for a project via POSTed JSON."""
+    """
+    Create a release.
+
+    Release are created as a draft, which must be composed.
+    """
     asf_uid = _jwt_asf_uid()
 
     try:
@@ -548,7 +561,9 @@ async def release_create(data: models.api.ReleaseCreateArgs) -> DictResponse:
 @quart_schema.validate_request(models.api.ReleaseDeleteArgs)
 @quart_schema.validate_response(models.api.ReleaseDeleteResults, 200)
 async def release_delete(data: models.api.ReleaseDeleteArgs) -> DictResponse:
-    """Delete a release draft for a project via POSTed JSON."""
+    """
+    Delete a release.
+    """
     asf_uid = _jwt_asf_uid()
     if not user.is_admin(asf_uid):
         raise exceptions.Forbidden("You do not have permission to create a release")
@@ -607,7 +622,9 @@ async def release_draft_delete(data: models.api.ReleaseDraftDeleteArgs) -> DictR
 @api.BLUEPRINT.route("/release/get/<project>/<version>")
 @quart_schema.validate_response(models.api.ReleaseGetResults, 200)
 async def release_get(project: str, version: str) -> DictResponse:
-    """Return a single release by project and version."""
+    """
+    Get a release by project and version.
+    """
     _simple_check(project, version)
     async with db.session() as data:
         release_name = sql.release_name(project, version)
@@ -622,6 +639,9 @@ async def release_get(project: str, version: str) -> DictResponse:
 @api.BLUEPRINT.route("/release/paths/<project>/<version>/<revision>")
 @quart_schema.validate_response(models.api.ReleasePathsResults, 200)
 async def release_paths(project: str, version: str, revision: str | None = None) -> DictResponse:
+    """
+    List paths in a release by project and version.
+    """
     _simple_check(project, version, revision)
     async with db.session() as data:
         release_name = sql.release_name(project, version)
@@ -644,7 +664,9 @@ async def release_paths(project: str, version: str, revision: str | None = None)
 @api.BLUEPRINT.route("/release/revisions/<project>/<version>")
 @quart_schema.validate_response(models.api.ReleaseRevisionsResults, 200)
 async def release_revisions(project: str, version: str) -> DictResponse:
-    """List all revisions for a given release."""
+    """
+    List revisions by project and version.
+    """
     _simple_check(project, version)
     async with db.session() as data:
         release_name = sql.release_name(project, version)
@@ -664,6 +686,9 @@ async def release_revisions(project: str, version: str) -> DictResponse:
 @quart_schema.validate_request(models.api.ReleaseUploadArgs)
 @quart_schema.validate_response(models.api.ReleaseUploadResults, 201)
 async def release_upload(data: models.api.ReleaseUploadArgs) -> DictResponse:
+    """
+    Upload a file to a release.
+    """
     asf_uid = _jwt_asf_uid()
 
     async with db.session() as db_data:
@@ -683,7 +708,11 @@ async def release_upload(data: models.api.ReleaseUploadArgs) -> DictResponse:
 @quart_schema.validate_querystring(models.api.ReleasesListQuery)
 @quart_schema.validate_response(models.api.ReleasesListResults, 200)
 async def releases_list(query_args: models.api.ReleasesListQuery) -> DictResponse:
-    """Paged list of releases with optional filtering by phase."""
+    """
+    List releases.
+
+    The list of releases is paged and can be filtered by phase.
+    """
     _pagination_args_validate(query_args)
     via = sql.validate_instrumented_attribute
     async with db.session() as data:
@@ -723,6 +752,9 @@ async def releases_list(query_args: models.api.ReleasesListQuery) -> DictRespons
 @quart_schema.validate_request(models.api.SignatureProvenanceArgs)
 @quart_schema.validate_response(models.api.SignatureProvenanceResults, 200)
 async def signature_provenance(data: models.api.SignatureProvenanceArgs) -> DictResponse:
+    """
+    Get the provenance of a signature.
+    """
     # POST because this uses significant computation and I/O
     # We receive a file name and an SHA3-256 hash
     # From these we find which committee(s) published the file with a signature
@@ -783,7 +815,11 @@ async def signature_provenance(data: models.api.SignatureProvenanceArgs) -> Dict
 @quart_schema.validate_request(models.api.SshKeyAddArgs)
 @quart_schema.validate_response(models.api.SshKeyAddResults, 201)
 async def ssh_key_add(data: models.api.SshKeyAddArgs) -> DictResponse:
-    """Add an SSH key for a user."""
+    """
+    Add an SSH key.
+
+    An SSH key is associated with a single user.
+    """
     asf_uid = _jwt_asf_uid()
     fingerprint = await keys.ssh_key_add(data.text, asf_uid)
     return models.api.SshKeyAddResults(
@@ -798,7 +834,11 @@ async def ssh_key_add(data: models.api.SshKeyAddArgs) -> DictResponse:
 @quart_schema.validate_request(models.api.SshKeyDeleteArgs)
 @quart_schema.validate_response(models.api.SshKeyDeleteResults, 201)
 async def ssh_key_delete(data: models.api.SshKeyDeleteArgs) -> DictResponse:
-    """Delete an SSH key for a user."""
+    """
+    Delete an SSH key.
+
+    An SSH key can only be deleted by the user who owns it.
+    """
     asf_uid = _jwt_asf_uid()
     await keys.ssh_key_delete(data.fingerprint, asf_uid)
     return models.api.SshKeyDeleteResults(
@@ -810,7 +850,9 @@ async def ssh_key_delete(data: models.api.SshKeyDeleteArgs) -> DictResponse:
 @api.BLUEPRINT.route("/ssh-keys/list/<asf_uid>")
 @quart_schema.validate_querystring(models.api.SshKeysListQuery)
 async def ssh_keys_list(asf_uid: str, query_args: models.api.SshKeysListQuery) -> DictResponse:
-    """List of developer SSH public keys."""
+    """
+    List SSH keys by ASF UID.
+    """
     _simple_check(asf_uid)
     _pagination_args_validate(query_args)
     via = sql.validate_instrumented_attribute
@@ -834,9 +876,12 @@ async def ssh_keys_list(asf_uid: str, query_args: models.api.SshKeysListQuery) -
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/tasks")
-@quart_schema.validate_querystring(models.api.TasksQuery)
-async def tasks(query_args: models.api.TasksQuery) -> DictResponse:
+@api.BLUEPRINT.route("/tasks/list")
+@quart_schema.validate_querystring(models.api.TasksListQuery)
+async def tasks_list(query_args: models.api.TasksListQuery) -> DictResponse:
+    """
+    List tasks.
+    """
     _pagination_args_validate(query_args)
     via = sql.validate_instrumented_attribute
     async with db.session() as data:
@@ -851,8 +896,8 @@ async def tasks(query_args: models.api.TasksQuery) -> DictResponse:
         if query_args.status:
             count_statement = count_statement.where(via(sql.Task.status) == query_args.status)
         count = (await data.execute(count_statement)).scalar_one()
-    return models.api.TasksResults(
-        endpoint="/tasks",
+    return models.api.TasksListResults(
+        endpoint="/tasks/list",
         data=paged_tasks,
         count=count,
     ).model_dump(), 200
@@ -861,8 +906,11 @@ async def tasks(query_args: models.api.TasksQuery) -> DictResponse:
 @api.BLUEPRINT.route("/users/list")
 @quart_schema.validate_response(models.api.UsersListResults, 200)
 async def users_list() -> DictResponse:
-    """List all known users."""
-    # This is not a list of all ASF users, but only those known to ATR
+    """
+    List known users.
+
+    This is not a list of all ASF users, but only those known to ATR.
+    """
     # It is not even a list of users who have logged in to ATR
     # Only those who has stored certain kinds of data:
     # PersonalAccessToken.asfuid
@@ -898,6 +946,11 @@ async def users_list() -> DictResponse:
 @quart_schema.validate_request(models.api.VoteResolveArgs)
 @quart_schema.validate_response(models.api.VoteResolveResults, 200)
 async def vote_resolve(data: models.api.VoteResolveArgs) -> DictResponse:
+    """
+    Resolve a vote.
+
+    A vote can be resolved by passing or failing.
+    """
     asf_uid = _jwt_asf_uid()
 
     async with db.session() as db_data:
@@ -933,6 +986,9 @@ async def vote_resolve(data: models.api.VoteResolveArgs) -> DictResponse:
 @quart_schema.validate_request(models.api.VoteStartArgs)
 @quart_schema.validate_response(models.api.VoteStartResults, 201)
 async def vote_start(data: models.api.VoteStartArgs) -> DictResponse:
+    """
+    Start a vote.
+    """
     asf_uid = _jwt_asf_uid()
 
     permitted_recipients = util.permitted_recipients(asf_uid)
@@ -985,6 +1041,9 @@ async def vote_start(data: models.api.VoteStartArgs) -> DictResponse:
 @quart_schema.validate_request(models.api.VoteTabulateArgs)
 @quart_schema.validate_response(models.api.VoteTabulateResults, 200)
 async def vote_tabulate(data: models.api.VoteTabulateArgs) -> DictResponse:
+    """
+    Tabulate a vote.
+    """
     # asf_uid = _jwt_asf_uid()
     async with db.session() as db_data:
         release_name = sql.release_name(data.project, data.version)
