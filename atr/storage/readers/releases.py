@@ -60,33 +60,56 @@ class GeneralPublic:
     async def __successes_errors_warnings(
         self, release: sql.Release, latest_revision_number: str, info: types.PathInfo
     ) -> None:
-        # Get successes, warnings, and errors
+        if release.committee is None:
+            raise ValueError("Release has no committee")
+
+        match_ignore = await self.__credentials.checks.ignores_matcher(release.committee.name)
+
+        cs = types.ChecksSubset(
+            release=release,
+            latest_revision_number=latest_revision_number,
+            info=info,
+            match_ignore=match_ignore,
+        )
+        await self.__successes(cs)
+        await self.__warnings(cs)
+        await self.__errors(cs)
+
+    async def __successes(self, cs: types.ChecksSubset) -> None:
         successes = await self.__data.check_result(
-            release_name=release.name,
-            revision_number=latest_revision_number,
+            release_name=cs.release.name,
+            revision_number=cs.latest_revision_number,
             member_rel_path=None,
             status=sql.CheckResultStatus.SUCCESS,
         ).all()
         for success in successes:
+            if cs.match_ignore(success):
+                continue
             if primary_rel_path := success.primary_rel_path:
-                info.successes.setdefault(pathlib.Path(primary_rel_path), []).append(success)
+                cs.info.successes.setdefault(pathlib.Path(primary_rel_path), []).append(success)
 
+    async def __warnings(self, cs: types.ChecksSubset) -> None:
         warnings = await self.__data.check_result(
-            release_name=release.name,
-            revision_number=latest_revision_number,
+            release_name=cs.release.name,
+            revision_number=cs.latest_revision_number,
             member_rel_path=None,
             status=sql.CheckResultStatus.WARNING,
         ).all()
         for warning in warnings:
+            if cs.match_ignore(warning):
+                continue
             if primary_rel_path := warning.primary_rel_path:
-                info.warnings.setdefault(pathlib.Path(primary_rel_path), []).append(warning)
+                cs.info.warnings.setdefault(pathlib.Path(primary_rel_path), []).append(warning)
 
+    async def __errors(self, cs: types.ChecksSubset) -> None:
         errors = await self.__data.check_result(
-            release_name=release.name,
-            revision_number=latest_revision_number,
+            release_name=cs.release.name,
+            revision_number=cs.latest_revision_number,
             member_rel_path=None,
             status=sql.CheckResultStatus.FAILURE,
         ).all()
         for error in errors:
+            if cs.match_ignore(error):
+                continue
             if primary_rel_path := error.primary_rel_path:
-                info.errors.setdefault(pathlib.Path(primary_rel_path), []).append(error)
+                cs.info.errors.setdefault(pathlib.Path(primary_rel_path), []).append(error)

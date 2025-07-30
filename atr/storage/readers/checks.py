@@ -63,7 +63,7 @@ class GeneralPublic:
         # Filter out any results that are ignored
         unignored_checks = []
         ignored_checks = []
-        match_ignore = await self.__check_ignores_matcher(release.committee.name, self.__data)
+        match_ignore = await self.ignores_matcher(release.committee.name)
         for cr in all_check_results:
             if not match_ignore(cr):
                 unignored_checks.append(cr)
@@ -86,6 +86,23 @@ class GeneralPublic:
         for member_rel_path in sorted(member_results_list.keys()):
             member_results_list[member_rel_path].sort(key=lambda r: r.checker)
         return types.CheckResults(primary_results_list, member_results_list, ignored_checks)
+
+    async def ignores_matcher(
+        self,
+        committee_name: str,
+    ) -> Callable[[sql.CheckResult], bool]:
+        ignores = await self.__data.check_result_ignore(
+            committee_name=committee_name,
+        ).all()
+
+        def match(cr: sql.CheckResult) -> bool:
+            for ignore in ignores:
+                if self.__check_ignore_match(cr, ignore):
+                    # log.info(f"Ignoring check result {cr} due to ignore {ignore}")
+                    return True
+            return False
+
+        return match
 
     def __check_ignore_match(self, cr: sql.CheckResult, cri: sql.CheckResultIgnore) -> bool:
         # Does not check that the committee name matches
@@ -125,22 +142,3 @@ class GeneralPublic:
         # Should also handle ^ and $
         # And maybe .replace(r"\?", ".?")
         return re.match(pattern, value) is not None
-
-    async def __check_ignores_matcher(
-        self,
-        committee_name: str,
-        data: db.Session | None = None,
-    ) -> Callable[[sql.CheckResult], bool]:
-        async with db.ensure_session(data) as data:
-            ignores = await data.check_result_ignore(
-                committee_name=committee_name,
-            ).all()
-
-        def match(cr: sql.CheckResult) -> bool:
-            for ignore in ignores:
-                if self.__check_ignore_match(cr, ignore):
-                    # log.info(f"Ignoring check result {cr} due to ignore {ignore}")
-                    return True
-            return False
-
-        return match

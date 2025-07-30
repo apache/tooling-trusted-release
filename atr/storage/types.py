@@ -259,6 +259,14 @@ class PathInfo(schema.Strict):
     warnings: dict[pathlib.Path, list[sql.CheckResult]] = schema.factory(dict)
 
 
+@dataclasses.dataclass
+class ChecksSubset:
+    release: sql.Release
+    latest_revision_number: str
+    info: PathInfo
+    match_ignore: Callable[[sql.CheckResult], bool]
+
+
 class PublicKeyError(Exception):
     def __init__(self, key: Key, original_error: Exception):
         self.__key = key
