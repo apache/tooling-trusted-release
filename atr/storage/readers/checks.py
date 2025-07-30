@@ -87,6 +87,12 @@ class GeneralPublic:
             member_results_list[member_rel_path].sort(key=lambda r: r.checker)
         return types.CheckResults(primary_results_list, member_results_list, ignored_checks)
 
+    async def ignores(self, committee_name: str) -> list[sql.CheckResultIgnore]:
+        results = await self.__data.check_result_ignore(
+            committee_name=committee_name,
+        ).all()
+        return list(results)
+
     async def ignores_matcher(
         self,
         committee_name: str,
@@ -141,4 +147,5 @@ class GeneralPublic:
         pattern = re.escape(glob).replace(r"\*", ".*")
         # Should also handle ^ and $
         # And maybe .replace(r"\?", ".?")
+        # Could also use "!" for negation
         return re.match(pattern, value) is not None

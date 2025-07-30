@@ -737,6 +737,10 @@ class CheckResultIgnore(sqlmodel.SQLModel, table=True):
     )
     message_glob: str | None = sqlmodel.Field(**example("sha512 matches for apache-example-0.0.1/*.xml"))
 
+    def model_post_init(self, _context):
+        if isinstance(self.created, str):
+            self.created = datetime.datetime.fromisoformat(self.created.rstrip("Z"))
+
 
 # DistributionChannel: Project
 class DistributionChannel(sqlmodel.SQLModel, table=True):

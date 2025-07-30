@@ -34,24 +34,6 @@ class ResultsTypeError(TypeError):
     pass
 
 
-class ChecksIgnoreAddArgs(schema.Strict):
-    committee_name: str = schema.Field(..., **example("example"))
-    release_glob: str | None = schema.Field(default=None, **example("example-0.0.*"))
-    revision_number: str | None = schema.Field(default=None, **example("00001"))
-    checker_glob: str | None = schema.Field(default=None, **example("atr.tasks.checks.license.files"))
-    primary_rel_path_glob: str | None = schema.Field(default=None, **example("apache-example-0.0.1-*.tar.gz"))
-    member_rel_path_glob: str | None = schema.Field(default=None, **example("apache-example-0.0.1/*.xml"))
-    status: sql.CheckResultStatusIgnore | None = schema.Field(
-        default=None, **example(sql.CheckResultStatusIgnore.FAILURE)
-    )
-    message_glob: str | None = schema.Field(default=None, **example("sha512 matches for apache-example-0.0.1/*.xml"))
-
-
-class ChecksIgnoreAddResults(schema.Strict):
-    endpoint: Literal["/checks/ignore/add"] = schema.Field(alias="endpoint")
-    success: Literal[True] = schema.Field(..., **example(True))
-
-
 class ChecksListResults(schema.Strict):
     endpoint: Literal["/checks/list"] = schema.Field(alias="endpoint")
     checks: Sequence[sql.CheckResult]
@@ -87,6 +69,39 @@ class CommitteeProjectsResults(schema.Strict):
 class CommitteesListResults(schema.Strict):
     endpoint: Literal["/committees/list"] = schema.Field(alias="endpoint")
     committees: Sequence[sql.Committee]
+
+
+class IgnoreAddArgs(schema.Strict):
+    committee_name: str = schema.Field(..., **example("example"))
+    release_glob: str | None = schema.Field(default=None, **example("example-0.0.*"))
+    revision_number: str | None = schema.Field(default=None, **example("00001"))
+    checker_glob: str | None = schema.Field(default=None, **example("atr.tasks.checks.license.files"))
+    primary_rel_path_glob: str | None = schema.Field(default=None, **example("apache-example-0.0.1-*.tar.gz"))
+    member_rel_path_glob: str | None = schema.Field(default=None, **example("apache-example-0.0.1/*.xml"))
+    status: sql.CheckResultStatusIgnore | None = schema.Field(
+        default=None, **example(sql.CheckResultStatusIgnore.FAILURE)
+    )
+    message_glob: str | None = schema.Field(default=None, **example("sha512 matches for apache-example-0.0.1/*.xml"))
+
+
+class IgnoreAddResults(schema.Strict):
+    endpoint: Literal["/ignore/add"] = schema.Field(alias="endpoint")
+    success: Literal[True] = schema.Field(..., **example(True))
+
+
+class IgnoreDeleteArgs(schema.Strict):
+    committee: str = schema.Field(..., **example("example"))
+    id: int = schema.Field(..., **example(1))
+
+
+class IgnoreDeleteResults(schema.Strict):
+    endpoint: Literal["/ignore/delete"] = schema.Field(alias="endpoint")
+    success: Literal[True] = schema.Field(..., **example(True))
+
+
+class IgnoreListResults(schema.Strict):
+    endpoint: Literal["/ignore/list"] = schema.Field(alias="endpoint")
+    ignores: Sequence[sql.CheckResultIgnore]
 
 
 class JwtCreateArgs(schema.Strict):
@@ -399,13 +414,15 @@ class VoteTabulateResults(schema.Strict):
 # This is for *Results classes only
 # We do NOT put *Args classes here
 Results = Annotated[
-    ChecksIgnoreAddResults
-    | ChecksListResults
+    ChecksListResults
     | ChecksOngoingResults
     | CommitteeGetResults
     | CommitteeKeysResults
     | CommitteeProjectsResults
     | CommitteesListResults
+    | IgnoreAddResults
+    | IgnoreDeleteResults
+    | IgnoreListResults
     | JwtCreateResults
     | KeyAddResults
     | KeyDeleteResults
@@ -449,13 +466,15 @@ def validator[T](t: type[T]) -> Callable[[Any], T]:
     return validate
 
 
-validate_checks_ignore_add = validator(ChecksIgnoreAddResults)
 validate_checks_list = validator(ChecksListResults)
 validate_checks_ongoing = validator(ChecksOngoingResults)
 validate_committee_get = validator(CommitteeGetResults)
 validate_committee_keys = validator(CommitteeKeysResults)
 validate_committee_projects = validator(CommitteeProjectsResults)
 validate_committees_list = validator(CommitteesListResults)
+validate_ignore_add = validator(IgnoreAddResults)
+validate_ignore_delete = validator(IgnoreDeleteResults)
+validate_ignore_list = validator(IgnoreListResults)
 validate_jwt_create = validator(JwtCreateResults)
 validate_key_add = validator(KeyAddResults)
 validate_key_delete = validator(KeyDeleteResults)

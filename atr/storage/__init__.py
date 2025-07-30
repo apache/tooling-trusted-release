@@ -484,6 +484,15 @@ class ContextManagers:
             yield Read(data, asf_uid, member_of, participant_of)
 
     @contextlib.asynccontextmanager
+    async def read_and_write(self, asf_uid: str | None = None) -> AsyncGenerator[tuple[Read, Write]]:
+        async with db.session() as data:
+            # TODO: Replace data with a DatabaseWriter instance
+            member_of, participant_of = await self.__member_and_participant(data, asf_uid)
+            r = Read(data, asf_uid, member_of, participant_of)
+            w = Write(data, asf_uid, member_of, participant_of)
+            yield r, w
+
+    @contextlib.asynccontextmanager
     async def write(self, asf_uid: str | None = None) -> AsyncGenerator[Write]:
         async with db.session() as data:
             # TODO: Replace data with a DatabaseWriter instance
@@ -494,4 +503,5 @@ class ContextManagers:
 _MANAGERS: Final[ContextManagers] = ContextManagers()
 
 read = _MANAGERS.read
+read_and_write = _MANAGERS.read_and_write
 write = _MANAGERS.write

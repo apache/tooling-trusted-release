@@ -64,35 +64,6 @@ import atr.util as util
 DictResponse = tuple[dict[str, Any], int]
 
 
-@api.BLUEPRINT.route("/checks/ignore/add", methods=["POST"])
-@jwtoken.require
-@quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.ChecksIgnoreAddArgs)
-@quart_schema.validate_response(models.api.ChecksIgnoreAddResults, 200)
-async def checks_ignore_add(data: models.api.ChecksIgnoreAddArgs) -> DictResponse:
-    """
-    Add a check ignore.
-    """
-    asf_uid = _jwt_asf_uid()
-    if not any(data.model_dump().values()):
-        raise exceptions.BadRequest("At least one field must be provided")
-    async with storage.write(asf_uid) as write:
-        wacm = write.as_committee_member(data.committee_name)
-        await wacm.checks.ignore_add(
-            data.release_glob,
-            data.revision_number,
-            data.checker_glob,
-            data.primary_rel_path_glob,
-            data.member_rel_path_glob,
-            data.status,
-            data.message_glob,
-        )
-    return models.api.ChecksIgnoreAddResults(
-        endpoint="/checks/ignore/add",
-        success=True,
-    ).model_dump(), 200
-
-
 @api.BLUEPRINT.route("/checks/list/<project>/<version>")
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
 async def checks_list(project: str, version: str) -> DictResponse:
@@ -285,6 +256,73 @@ async def committees_list() -> DictResponse:
     return models.api.CommitteesListResults(
         endpoint="/committees/list",
         committees=committees,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/ignore/add", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.IgnoreAddArgs)
+@quart_schema.validate_response(models.api.IgnoreAddResults, 200)
+async def ignore_add(data: models.api.IgnoreAddArgs) -> DictResponse:
+    """
+    Add a check ignore.
+    """
+    asf_uid = _jwt_asf_uid()
+    if not any(data.model_dump().values()):
+        raise exceptions.BadRequest("At least one field must be provided")
+    async with storage.write(asf_uid) as write:
+        wacm = write.as_committee_member(data.committee_name)
+        await wacm.checks.ignore_add(
+            data.release_glob,
+            data.revision_number,
+            data.checker_glob,
+            data.primary_rel_path_glob,
+            data.member_rel_path_glob,
+            data.status,
+            data.message_glob,
+        )
+    return models.api.IgnoreAddResults(
+        endpoint="/ignore/add",
+        success=True,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/ignore/delete", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.IgnoreDeleteArgs)
+@quart_schema.validate_response(models.api.IgnoreDeleteResults, 200)
+async def ignore_delete(data: models.api.IgnoreDeleteArgs) -> DictResponse:
+    """
+    Delete a check ignore.
+    """
+    asf_uid = _jwt_asf_uid()
+    if not any(data.model_dump().values()):
+        raise exceptions.BadRequest("At least one field must be provided")
+    async with storage.write(asf_uid) as write:
+        wacm = write.as_committee_member(data.committee)
+        # TODO: This is more like discard
+        # Should potentially check for rowcount, and raise an error if it's 0
+        await wacm.checks.ignore_delete(data.id)
+    return models.api.IgnoreDeleteResults(
+        endpoint="/ignore/delete",
+        success=True,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/ignore/list/<committee_name>")
+@quart_schema.validate_response(models.api.IgnoreListResults, 200)
+async def ignore_list(committee_name: str) -> DictResponse:
+    """
+    List ignores by committee name.
+    """
+    _simple_check(committee_name)
+    async with db.session() as data:
+        ignores = await data.check_result_ignore(committee_name=committee_name).all()
+    return models.api.IgnoreListResults(
+        endpoint="/ignore/list",
+        ignores=ignores,
     ).model_dump(), 200
 
 

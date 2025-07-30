@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import datetime
 
+import sqlmodel
+
 import atr.db as db
 import atr.log as log
 import atr.models.sql as sql
@@ -114,6 +116,7 @@ class CommitteeMember(CommitteeParticipant):
         self.__data.add(cri)
         await self.__data.commit()
 
-    # def ignore_delete(self, id: int):
-    #     self.__data.delete(sql.CheckResultIgnore, id=id)
-    #     self.__data.commit()
+    async def ignore_delete(self, id: int) -> None:
+        via = sql.validate_instrumented_attribute
+        await self.__data.execute(sqlmodel.delete(sql.CheckResultIgnore).where(via(sql.CheckResultIgnore.id) == id))
+        await self.__data.commit()
