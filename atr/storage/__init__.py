@@ -30,6 +30,7 @@ import atr.committer as committer
 import atr.db as db
 import atr.log as log
 import atr.models.sql as sql
+import atr.storage.readers as readers
 import atr.storage.types as types
 import atr.storage.writers as writers
 import atr.user as user
@@ -64,16 +65,35 @@ class AccessError(RuntimeError): ...
 # Read
 
 
-class ReadAsCommitteeMember(AccessCredentialsRead): ...
+class ReadAsGeneralPublic(AccessCredentialsRead):
+    def __init__(self, read: Read, data: db.Session, asf_uid: str | None = None):
+        self.__read = read
+        self.__data = data
+        self.__asf_uid = asf_uid
+        self.__authenticated = True
+        self.checks = readers.checks.GeneralPublic(
+            self,
+            self.__read,
+            self.__data,
+            self.__asf_uid,
+        )
+
+    @property
+    def authenticated(self) -> bool:
+        return self.__authenticated
+
+    @property
+    def validate_at_runtime(self) -> bool:
+        return VALIDATE_AT_RUNTIME
 
 
-class ReadAsCommitteeParticipant(AccessCredentialsRead): ...
+class ReadAsFoundationCommitter(ReadAsGeneralPublic): ...
 
 
-class ReadAsFoundationCommitter(AccessCredentialsRead): ...
+class ReadAsCommitteeParticipant(ReadAsFoundationCommitter): ...
 
 
-class ReadAsGeneralPublic(AccessCredentialsRead): ...
+class ReadAsCommitteeMember(ReadAsFoundationCommitter): ...
 
 
 class Read:
@@ -82,6 +102,16 @@ class Read:
         self.__asf_uid = asf_uid
         self.__member_of = member_of
         self.__participant_of = participant_of
+
+    def as_general_public(self) -> ReadAsGeneralPublic:
+        return self.as_general_public_outcome().result_or_raise()
+
+    def as_general_public_outcome(self) -> types.Outcome[ReadAsGeneralPublic]:
+        try:
+            ragp = ReadAsGeneralPublic(self, self.__data, self.__asf_uid)
+        except Exception as e:
+            return types.OutcomeException(e)
+        return types.OutcomeResult(ragp)
 
 
 # Write

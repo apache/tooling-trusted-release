@@ -21,10 +21,9 @@ import pathlib
 import aiofiles.os
 import asfquart.base as base
 
-import atr.db as db
-import atr.db.interaction as interaction
 import atr.models.sql as sql
 import atr.routes as routes
+import atr.storage as storage
 import atr.template as template
 import atr.util as util
 
@@ -58,36 +57,11 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
     file_size = await aiofiles.os.path.getsize(abs_path)
 
     # Get all check results for this file
-    async with db.session() as data:
-        query = data.check_result(
-            release_name=release.name,
-            revision_number=release.latest_revision_number,
-            primary_rel_path=str(rel_path),
-        ).order_by(
-            sql.validate_instrumented_attribute(sql.CheckResult.checker).asc(),
-            sql.validate_instrumented_attribute(sql.CheckResult.created).desc(),
+    async with storage.read() as read:
+        ragp = read.as_general_public()
+        primary_results_list, member_results_list, _ignored_checks = await ragp.checks.by_release_path(
+            release, pathlib.Path(rel_path)
         )
-        all_results = await query.all()
-
-        # Filter out any results that are ignored
-        match_ignore = await interaction.check_ignores_matcher(release.committee.name, data)
-        all_results = [r for r in all_results if not match_ignore(r)]
-
-    # Filter to separate the primary and member results
-    primary_results_list = []
-    member_results_list: dict[str, list[sql.CheckResult]] = {}
-    for result in all_results:
-        if result.member_rel_path is None:
-            primary_results_list.append(result)
-        else:
-            member_results_list.setdefault(result.member_rel_path, []).append(result)
-
-    # Order primary results by checker name
-    primary_results_list.sort(key=lambda r: r.checker)
-
-    # Order member results by relative path and then by checker name
-    for member_rel_path in sorted(member_results_list.keys()):
-        member_results_list[member_rel_path].sort(key=lambda r: r.checker)
 
     file_data = {
         "filename": pathlib.Path(rel_path).name,
