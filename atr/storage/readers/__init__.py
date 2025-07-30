@@ -16,5 +16,6 @@
 # under the License.
 
 import atr.storage.readers.checks as checks
+import atr.storage.readers.releases as releases
 
-__all__ = ["checks"]
+__all__ = ["checks", "releases"]

@@ -27,6 +27,7 @@ import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.draft as draft
+import atr.storage as storage
 import atr.template as template
 import atr.util as util
 
@@ -50,7 +51,9 @@ async def check(
     paths = [path async for path in util.paths_recursive(base_path)]
     paths.sort()
 
-    info = await interaction.path_info(release, paths)
+    async with storage.read() as read:
+        ragp = read.as_general_public()
+        info = await ragp.releases.path_info(release, paths)
 
     user_ssh_keys: Sequence[sql.SSHKey] = []
     async with db.session() as data:

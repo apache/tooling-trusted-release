@@ -77,6 +77,12 @@ class ReadAsGeneralPublic(AccessCredentialsRead):
             self.__data,
             self.__asf_uid,
         )
+        self.releases = readers.releases.GeneralPublic(
+            self,
+            self.__read,
+            self.__data,
+            self.__asf_uid,
+        )
 
     @property
     def authenticated(self) -> bool:

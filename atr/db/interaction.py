@@ -17,7 +17,6 @@
 
 import contextlib
 import pathlib
-import re
 from collections.abc import AsyncGenerator, Sequence
 
 import aiofiles.os
@@ -27,10 +26,8 @@ import quart
 import sqlalchemy
 import sqlmodel
 
-import atr.analysis as analysis
 import atr.db as db
 import atr.log as log
-import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.user as user
 import atr.util as util
@@ -49,14 +46,6 @@ class InteractionError(RuntimeError):
 
 class PublicKeyError(RuntimeError):
     pass
-
-
-class PathInfo(schema.Strict):
-    artifacts: set[pathlib.Path] = schema.factory(set)
-    errors: dict[pathlib.Path, list[sql.CheckResult]] = schema.factory(dict)
-    metadata: set[pathlib.Path] = schema.factory(set)
-    successes: dict[pathlib.Path, list[sql.CheckResult]] = schema.factory(dict)
-    warnings: dict[pathlib.Path, list[sql.CheckResult]] = schema.factory(dict)
 
 
 async def candidate_drafts(project: sql.Project) -> list[sql.Release]:
@@ -101,24 +90,6 @@ async def latest_revision(release: sql.Release) -> sql.Revision | None:
         return None
     async with db.session() as data:
         return await data.revision(release_name=release.name, number=release.latest_revision_number).get()
-
-
-async def path_info(release: sql.Release, paths: list[pathlib.Path]) -> PathInfo | None:
-    info = PathInfo()
-    latest_revision_number = release.latest_revision_number
-    if latest_revision_number is None:
-        return None
-    async with db.session() as data:
-        await _successes_errors_warnings(data, release, latest_revision_number, info)
-        for path in paths:
-            # Get artifacts and metadata
-            search = re.search(analysis.extension_pattern(), str(path))
-            if search:
-                if search.group("artifact"):
-                    info.artifacts.add(path)
-                elif search.group("metadata"):
-                    info.metadata.add(path)
-    return info
 
 
 async def previews(project: sql.Project) -> list[sql.Release]:
@@ -338,38 +309,3 @@ async def _delete_release_data_filesystem(release_dir: pathlib.Path, release_nam
             f"Database records for '{release_name}' deleted, but failed to delete filesystem directory: {e!s}",
             "warning",
         )
-
-
-async def _successes_errors_warnings(
-    data: db.Session, release: sql.Release, latest_revision_number: str, info: PathInfo
-) -> None:
-    # Get successes, warnings, and errors
-    successes = await data.check_result(
-        release_name=release.name,
-        revision_number=latest_revision_number,
-        member_rel_path=None,
-        status=sql.CheckResultStatus.SUCCESS,
-    ).all()
-    for success in successes:
-        if primary_rel_path := success.primary_rel_path:
-            info.successes.setdefault(pathlib.Path(primary_rel_path), []).append(success)
-
-    warnings = await data.check_result(
-        release_name=release.name,
-        revision_number=latest_revision_number,
-        member_rel_path=None,
-        status=sql.CheckResultStatus.WARNING,
-    ).all()
-    for warning in warnings:
-        if primary_rel_path := warning.primary_rel_path:
-            info.warnings.setdefault(pathlib.Path(primary_rel_path), []).append(warning)
-
-    errors = await data.check_result(
-        release_name=release.name,
-        revision_number=latest_revision_number,
-        member_rel_path=None,
-        status=sql.CheckResultStatus.FAILURE,
-    ).all()
-    for error in errors:
-        if primary_rel_path := error.primary_rel_path:
-            info.errors.setdefault(pathlib.Path(primary_rel_path), []).append(error)
