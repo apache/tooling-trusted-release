@@ -225,6 +225,13 @@ class Outcomes[T, E: Exception = Exception]:
                     self.__outcomes[i] = OutcomeResult[T](result, outcome.name)
 
 
+@dataclasses.dataclass
+class CheckResults:
+    primary_results_list: list[sql.CheckResult]
+    member_results_list: dict[str, list[sql.CheckResult]]
+    ignored_checks: list[sql.CheckResult]
+
+
 class KeyStatus(enum.Flag):
     PARSED = 0
     INSERTED = enum.auto()

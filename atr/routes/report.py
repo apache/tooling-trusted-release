@@ -59,9 +59,7 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
     # Get all check results for this file
     async with storage.read() as read:
         ragp = read.as_general_public()
-        primary_results_list, member_results_list, _ignored_checks = await ragp.checks.by_release_path(
-            release, pathlib.Path(rel_path)
-        )
+        check_results = await ragp.checks.by_release_path(release, pathlib.Path(rel_path))
 
     file_data = {
         "filename": pathlib.Path(rel_path).name,
@@ -76,8 +74,9 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
         rel_path=rel_path,
         package=file_data,
         release=release,
-        primary_results=primary_results_list,
-        member_results=member_results_list,
+        primary_results=check_results.primary_results_list,
+        member_results=check_results.member_results_list,
+        ignored_results=check_results.ignored_checks,
         format_file_size=util.format_file_size,
         empty_form=await util.EmptyForm.create_form(),
     )

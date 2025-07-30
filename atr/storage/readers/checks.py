@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 import atr.db as db
 import atr.models.sql as sql
 import atr.storage as storage
+import atr.storage.types as types
 
 if TYPE_CHECKING:
     import pathlib
@@ -43,9 +44,7 @@ class GeneralPublic:
         self.__data = data
         self.__asf_uid = asf_uid
 
-    async def by_release_path(
-        self, release: sql.Release, rel_path: pathlib.Path
-    ) -> tuple[list[sql.CheckResult], dict[str, list[sql.CheckResult]], list[sql.CheckResult]]:
+    async def by_release_path(self, release: sql.Release, rel_path: pathlib.Path) -> types.CheckResults:
         if release.committee is None:
             raise ValueError("Release has no committee")
         if release.latest_revision_number is None:
@@ -86,7 +85,7 @@ class GeneralPublic:
         # Order member results by relative path and then by checker name
         for member_rel_path in sorted(member_results_list.keys()):
             member_results_list[member_rel_path].sort(key=lambda r: r.checker)
-        return primary_results_list, member_results_list, ignored_checks
+        return types.CheckResults(primary_results_list, member_results_list, ignored_checks)
 
     def __check_ignore_match(self, cr: sql.CheckResult, cri: sql.CheckResultIgnore) -> bool:
         # Does not check that the committee name matches
