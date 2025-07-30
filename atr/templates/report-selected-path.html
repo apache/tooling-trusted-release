@@ -300,25 +300,29 @@
     {% endif %}
 
     <h2>Ignored checks</h2>
-    <p>These checks were ignored by policy.</p>
-    <table class="table table-bordered border mb-3">
-      <thead class="table-light">
-        <tr>
-          <th scope="col">Check</th>
-          <th scope="col">Message</th>
-          <th scope="col">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for ignored_result in ignored_results %}
+    {% if ignored_results %}
+      <p>These checks were ignored by policy.</p>
+      <table class="table table-bordered border mb-3">
+        <thead class="table-light">
           <tr>
-            <td>{{ ignored_result.checker }}</td>
-            <td>{{ ignored_result.message }}</td>
-            <td>{{ ignored_result.status.value|title }}</td>
+            <th scope="col">Check</th>
+            <th scope="col">Message</th>
+            <th scope="col">Status</th>
           </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {% for ignored_result in ignored_results %}
+            <tr>
+              <td>{{ ignored_result.checker }}</td>
+              <td>{{ ignored_result.message }}</td>
+              <td>{{ ignored_result.status.value|title }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No ignored checks found.</p>
+    {% endif %}
 
     <h2>Metadata</h2>
     <div class="p-3 mb-4 bg-light border rounded">

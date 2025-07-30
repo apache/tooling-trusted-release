@@ -83,8 +83,7 @@ class GeneralPublic:
             status=sql.CheckResultStatus.SUCCESS,
         ).all()
         for success in successes:
-            if cs.match_ignore(success):
-                continue
+            # Successes cannot be ignored
             if primary_rel_path := success.primary_rel_path:
                 cs.info.successes.setdefault(pathlib.Path(primary_rel_path), []).append(success)
 
@@ -97,6 +96,7 @@ class GeneralPublic:
         ).all()
         for warning in warnings:
             if cs.match_ignore(warning):
+                cs.info.ignored_warnings.append(warning)
                 continue
             if primary_rel_path := warning.primary_rel_path:
                 cs.info.warnings.setdefault(pathlib.Path(primary_rel_path), []).append(warning)
@@ -110,6 +110,7 @@ class GeneralPublic:
         ).all()
         for error in errors:
             if cs.match_ignore(error):
+                cs.info.ignored_errors.append(error)
                 continue
             if primary_rel_path := error.primary_rel_path:
                 cs.info.errors.setdefault(pathlib.Path(primary_rel_path), []).append(error)

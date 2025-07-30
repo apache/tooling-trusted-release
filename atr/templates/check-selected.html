@@ -106,6 +106,57 @@
     </div>
   </div>
   {% if phase == "release_candidate_draft" %}
+    <h2>Ignored checks</h2>
+    {% if info.ignored_errors or info.ignored_warnings %}
+      {% set ignored_errors_count = info.ignored_errors|length %}
+      {% set ignored_warnings_count = info.ignored_warnings|length %}
+      <p>
+        There were {{ ignored_errors_count }} {{ 'error' if ignored_errors_count == 1 else 'errors' }} and {{ ignored_warnings_count }} {{ 'warning' if ignored_warnings_count == 1 else 'warnings' }} ignored by policy set by committee members. This does not include archive member checks.
+      </p>
+      <details>
+        <summary>Show ignored checks</summary>
+        <table class="table table-bordered border mb-3">
+          <thead class="table-light">
+            <tr>
+              <th scope="col">
+                Check
+                <br />
+                Path
+              </th>
+              <th scope="col">Message</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ignored_result in info.ignored_errors %}
+              <tr>
+                <td class="text-nowrap">
+                  {{ ignored_result.checker }}
+                  <br />
+                  {{ ignored_result.primary_rel_path }}
+                </td>
+                <td>{{ ignored_result.message }}</td>
+                <td class="text-nowrap">{{ ignored_result.status.value|title }}</td>
+              </tr>
+            {% endfor %}
+            {% for ignored_result in info.ignored_warnings %}
+              <tr>
+                <td class="text-nowrap">
+                  {{ ignored_result.checker }}
+                  <br />
+                  {{ ignored_result.primary_rel_path }}
+                </td>
+                <td>{{ ignored_result.message }}</td>
+                <td class="text-nowrap">{{ ignored_result.status.value|title }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </details>
+    {% else %}
+      <p>No ignored checks found.</p>
+    {% endif %}
+
     <h2>Debugging</h2>
     <div class="mb-2">
       <p class="text-muted">The following form is for debugging purposes only. It will create a new revision.</p>

@@ -254,6 +254,8 @@ class LinkedCommittee:
 class PathInfo(schema.Strict):
     artifacts: set[pathlib.Path] = schema.factory(set)
     errors: dict[pathlib.Path, list[sql.CheckResult]] = schema.factory(dict)
+    ignored_errors: list[sql.CheckResult] = schema.factory(list)
+    ignored_warnings: list[sql.CheckResult] = schema.factory(list)
     metadata: set[pathlib.Path] = schema.factory(set)
     successes: dict[pathlib.Path, list[sql.CheckResult]] = schema.factory(dict)
     warnings: dict[pathlib.Path, list[sql.CheckResult]] = schema.factory(dict)
