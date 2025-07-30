@@ -29,7 +29,23 @@ import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
 import wtforms
 import wtforms.fields.core as core
-from htpy import Element, code, div, form, h1, h2, p, pre, strong, table, tbody, td, th, thead, tr
+from htpy import (
+    Element,
+    code,
+    div,
+    form,
+    h1,
+    h2,
+    p,
+    pre,
+    strong,
+    table,
+    tbody,
+    td,
+    th,
+    thead,
+    tr,
+)
 
 import atr.db as db
 import atr.jwtoken as jwtoken
@@ -98,6 +114,7 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
             "Generate a JSON Web Token (JWT) to authenticate calls to ATR's private API routes. "
             "Treat the token like a password and include it in the Authorization header "
             "as a Bearer token when invoking the protected endpoints.",
+            # p["Example"],
         ],
         issue_form_elem,
         pre(id="jwt-output", class_="d-none mt-2 p-3 atr-word-wrap border rounded w-50"),
