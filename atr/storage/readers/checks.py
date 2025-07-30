@@ -116,36 +116,47 @@ class GeneralPublic:
             # Successes are never ignored
             return False
         if cri.release_glob is not None:
-            if not self.__check_ignore_match_glob(cri.release_glob, cr.release_name):
+            if not self.__check_ignore_match_pattern(cri.release_glob, cr.release_name):
                 return False
         if cri.revision_number is not None:
             if cri.revision_number != cr.revision_number:
                 return False
         if cri.checker_glob is not None:
-            if not self.__check_ignore_match_glob(cri.checker_glob, cr.checker):
+            if not self.__check_ignore_match_pattern(cri.checker_glob, cr.checker):
                 return False
         return self.__check_ignore_match_2(cr, cri)
 
     def __check_ignore_match_2(self, cr: sql.CheckResult, cri: sql.CheckResultIgnore) -> bool:
         if cri.primary_rel_path_glob is not None:
-            if not self.__check_ignore_match_glob(cri.primary_rel_path_glob, cr.primary_rel_path):
+            if not self.__check_ignore_match_pattern(cri.primary_rel_path_glob, cr.primary_rel_path):
                 return False
         if cri.member_rel_path_glob is not None:
-            if not self.__check_ignore_match_glob(cri.member_rel_path_glob, cr.member_rel_path):
+            if not self.__check_ignore_match_pattern(cri.member_rel_path_glob, cr.member_rel_path):
                 return False
         if cri.status is not None:
             if cr.status != cri.status:
                 return False
         if cri.message_glob is not None:
-            if not self.__check_ignore_match_glob(cri.message_glob, cr.message):
+            if not self.__check_ignore_match_pattern(cri.message_glob, cr.message):
                 return False
         return True
 
-    def __check_ignore_match_glob(self, glob: str | None, value: str | None) -> bool:
-        if (glob is None) or (value is None):
+    def __check_ignore_match_pattern(self, pattern: str | None, value: str | None) -> bool:
+        if pattern == "!":
+            # Special case, "!" matches None
+            return True if (value is None) else False
+        if (pattern is None) or (value is None):
             return False
-        pattern = re.escape(glob).replace(r"\*", ".*")
-        # Should also handle ^ and $
-        # And maybe .replace(r"\?", ".?")
-        # Could also use "!" for negation
-        return re.match(pattern, value) is not None
+        negate = False
+        if pattern.startswith("!"):
+            pattern = pattern[1:]
+            negate = True
+        if pattern.startswith("^") or pattern.endswith("$"):
+            regex = re.compile(pattern)
+        else:
+            regex = re.compile(re.escape(pattern).replace(r"\*", ".*"))
+            # Should maybe add .replace(r"\?", ".?")
+        matched = regex.search(value) is not None
+        if negate:
+            return not matched
+        return matched
