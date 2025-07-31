@@ -23,7 +23,6 @@ import quart
 import quart_wtf.typing as typing
 import sqlmodel
 import werkzeug.wrappers.response as response
-import wtforms
 
 import atr.construct as construct
 import atr.db as db
@@ -43,27 +42,18 @@ import atr.util as util
 class VoteInitiateForm(forms.Typed):
     """Form for initiating a release vote."""
 
-    release_name = wtforms.HiddenField("Release Name")
-    mailing_list = wtforms.RadioField(
-        "Send vote email to",
+    release_name = forms.hidden()
+    mailing_list = forms.radio("Send vote email to")
+    vote_duration = forms.integer(
+        "Minimum vote duration", default=72, description="Minimum number of hours the vote will be open for."
     )
-    vote_duration = wtforms.IntegerField(
-        "Minimum vote duration",
-        validators=[
-            wtforms.validators.InputRequired("Vote duration is required"),
-            util.validate_vote_duration,
-        ],
-        default=72,
-        description="Minimum number of hours the vote will be open for.",
-    )
-    subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
-    body = wtforms.TextAreaField(
+    subject = forms.optional("Subject")
+    body = forms.textarea(
         "Body",
-        validators=[wtforms.validators.Optional()],
         description="Edit the vote email content as needed. Placeholders like [KEY_FINGERPRINT],"
         " [DURATION], [REVIEW_URL], and [YOUR_ASF_ID] will be filled in automatically when the email is sent.",
     )
-    submit = wtforms.SubmitField("Send vote email")
+    submit = forms.submit("Send vote email")
 
 
 @routes.committer("/voting/<project_name>/<version_name>/<revision>", methods=["GET", "POST"])
