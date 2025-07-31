@@ -22,6 +22,7 @@ import wtforms
 
 import atr.db as db
 import atr.db.interaction as interaction
+import atr.forms as forms
 import atr.models.results as results
 import atr.models.sql as sql
 import atr.revision as revision
@@ -77,7 +78,7 @@ async def check(
         data={"release_name": release.name, "project_name": release.project.name, "version_name": release.version}
     )
     delete_file_form = await draft.DeleteFileForm.create_form()
-    empty_form = await util.EmptyForm.create_form()
+    empty_form = await forms.Empty.create_form()
     vote_task_warnings = _warnings_from_vote_result(vote_task)
     has_files = await util.has_files(release)
 

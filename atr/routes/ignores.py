@@ -17,10 +17,10 @@
 
 from typing import Final
 
+import htpy
 import markupsafe
 import werkzeug.wrappers.response as response
 from htpy import (
-    Element,
     button,
     div,
     form,
@@ -36,6 +36,7 @@ from htpy import (
     tr,
 )
 
+import atr.forms as forms
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.storage as storage
@@ -60,6 +61,15 @@ document.querySelectorAll("table.page-details input.form-control").forEach(funct
 """
 
 
+class AddIgnoreForm(forms.Typed):
+    release_glob = forms.string("Release glob")
+    revision_number = forms.string("Revision number")
+    checker_glob = forms.string("Checker glob")
+    primary_rel_path_glob = forms.string("Primary rel path glob")
+    member_rel_path_glob = forms.string("Member rel path glob")
+    status = forms.string("Status")
+
+
 @routes.committer("/ignores/<committee_name>", methods=["GET", "POST"])
 async def ignores(session: routes.CommitterSession, committee_name: str) -> str | response.Response:
     async with storage.read() as read:
@@ -74,15 +84,20 @@ async def ignores(session: routes.CommitterSession, committee_name: str) -> str 
         _script(_UPDATE_IGNORE_FORM),
     ]
 
-    return await template.render(
-        "blank.html",
-        title="Ignored checks",
-        description=f"Manage ignored checks for committee {committee_name}.",
-        content=content,
-    )
+    return await template.blank("Ignored checks", content)
 
 
-def _check_result_ignore_card(cri: sql.CheckResultIgnore) -> Element:
+@routes.committer("/ignores/<committee_name>/add", methods=["POST"])
+async def ignores_committe_add(session: routes.CommitterSession, committee_name: str) -> str | response.Response:
+    form = forms.Value()
+    if not form.validate_on_submit():
+        return await session.redirect(ignores, error="Form validation errors")
+
+    # TODO: Add ignore
+    return await session.redirect(ignores, success="Ignore added")
+
+
+def _check_result_ignore_card(cri: sql.CheckResultIgnore) -> htpy.Element:
     card_header_h3 = h3(".mb-0")[f"{cri.id or ''} - {cri.asf_uid} - {util.format_datetime(cri.created)}"]
 
     table_rows = []
@@ -119,14 +134,14 @@ def _check_result_ignore_card(cri: sql.CheckResultIgnore) -> Element:
     return card
 
 
-def _add_ignore() -> Element:
+def _add_ignore() -> htpy.Element:
     table_rows = []
 
     def add_row(label: str) -> None:
         nonlocal table_rows
         table_rows.append(
             tr[
-                th[label],
+                th(".text-end.text-nowrap")[label],
                 td[input(".form-control.form-control-sm")],
             ]
         )
@@ -146,19 +161,19 @@ def _add_ignore() -> Element:
         p["Add a new ignore for a check result."],
         form(".atr-canary")[
             table_striped,
-            button(".btn.btn-primary")["Add"],
+            p[button(".btn.btn-primary")["Add"]],
         ],
     ]
 
 
-def _existing_ignores(ignores: list[sql.CheckResultIgnore]) -> Element:
+def _existing_ignores(ignores: list[sql.CheckResultIgnore]) -> htpy.Element:
     return div[
         h2["Existing ignores"],
         [_check_result_ignore_card(cri) for cri in ignores],
     ]
 
 
-def _script(text: str) -> Element:
+def _script(text: str) -> htpy.Element:
     return script[
         markupsafe.Markup(f"""
 document.addEventListener("DOMContentLoaded", function () {{

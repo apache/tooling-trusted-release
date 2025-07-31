@@ -29,6 +29,7 @@ import wtforms
 
 import atr.db as db
 import atr.db.interaction as interaction
+import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
@@ -48,13 +49,13 @@ class AddFormProtocol(Protocol):
     submit: wtforms.SubmitField
 
 
-class ProjectMetadataForm(util.QuartFormTyped):
+class ProjectMetadataForm(forms.Typed):
     project_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
     category_to_add = wtforms.StringField("New category name")
     language_to_add = wtforms.StringField("New language name")
 
 
-class ReleasePolicyForm(util.QuartFormTyped):
+class ReleasePolicyForm(forms.Typed):
     """
     A Form to create or edit a ReleasePolicy.
 
@@ -181,7 +182,7 @@ async def add_project(session: routes.CommitterSession, committee_name: str) -> 
             base.ASFQuartException(f"Committee {committee_name} not found", errorcode=404)
         )
 
-    class AddForm(util.QuartFormTyped):
+    class AddForm(forms.Typed):
         committee_name = wtforms.HiddenField("committee_name")
         display_name = wtforms.StringField(
             "Display name",
@@ -256,7 +257,7 @@ async def projects() -> str:
     """Main project directory page."""
     async with db.session() as data:
         projects = await data.project(_committee=True).order_by(sql.Project.full_name).all()
-        return await template.render("projects.html", projects=projects, empty_form=await util.EmptyForm.create_form())
+        return await template.render("projects.html", projects=projects, empty_form=await forms.Empty.create_form())
 
 
 @routes.committer("/project/select")
@@ -327,7 +328,7 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
         full_releases=full_releases,
         number_of_release_files=util.number_of_release_files,
         now=datetime.datetime.now(datetime.UTC),
-        empty_form=await util.EmptyForm.create_form(),
+        empty_form=await forms.Empty.create_form(),
         policy_form=policy_form,
         can_edit=can_edit,
         metadata_form=metadata_form,

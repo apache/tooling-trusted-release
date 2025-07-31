@@ -18,12 +18,17 @@
 import asyncio
 from typing import Any
 
+import htpy
 import jinja2
 import quart
 import quart.app as app
 import quart.signals as signals
 
 render_async = quart.render_template
+
+
+async def blank(title: str, content: str | htpy.Element, description: str | None = None) -> str:
+    return await render_sync("blank.html", title=title, description=description or title, content=content)
 
 
 async def render_sync(

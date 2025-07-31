@@ -27,6 +27,7 @@ import sqlmodel
 import werkzeug.wrappers.response as response
 
 import atr.db as db
+import atr.forms as forms
 import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.revision as revision
@@ -87,7 +88,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         phase_key=phase_key,
         revision_history=list(reversed(revision_history)),
         latest_revision_number=latest_revision_number,
-        empty_form=await util.EmptyForm.create_form(),
+        empty_form=await forms.Empty.create_form(),
     )
 
 

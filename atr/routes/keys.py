@@ -34,6 +34,7 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
+import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
@@ -45,7 +46,7 @@ import atr.user as user
 import atr.util as util
 
 
-class AddSSHKeyForm(util.QuartFormTyped):
+class AddSSHKeyForm(forms.Typed):
     key = wtforms.StringField(
         "SSH public key",
         widget=wtforms.widgets.TextArea(),
@@ -58,7 +59,7 @@ class AddSSHKeyForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Add SSH key")
 
 
-class DeleteKeyForm(util.QuartFormTyped):
+class DeleteKeyForm(forms.Typed):
     submit = wtforms.SubmitField("Delete key")
 
 
@@ -66,11 +67,11 @@ class SshFingerprintError(ValueError):
     pass
 
 
-class UpdateCommitteeKeysForm(util.QuartFormTyped):
+class UpdateCommitteeKeysForm(forms.Typed):
     submit = wtforms.SubmitField("Regenerate KEYS file")
 
 
-class UploadKeyFormBase(util.QuartFormTyped):
+class UploadKeyFormBase(forms.Typed):
     key = wtforms.FileField(
         "KEYS file",
         validators=[wtforms.validators.Optional()],
@@ -130,7 +131,7 @@ async def add(session: routes.CommitterSession) -> str:
 
     committee_choices = [(c.name, c.display_name or c.name) for c in participant_of_committees]
 
-    class AddOpenPGPKeyForm(util.QuartFormTyped):
+    class AddOpenPGPKeyForm(forms.Typed):
         public_key = wtforms.TextAreaField(
             "Public OpenPGP key",
             validators=[wtforms.validators.InputRequired("Public key is required")],
@@ -242,7 +243,7 @@ async def details(session: routes.CommitterSession, fingerprint: str) -> str | r
             user_committees = await data.committee(name_in=project_list).all()
             committee_choices = [(c.name, c.display_name or c.name) for c in user_committees]
 
-            class UpdateKeyCommitteesForm(util.QuartFormTyped):
+            class UpdateKeyCommitteesForm(forms.Typed):
                 selected_committees = wtforms.SelectMultipleField(
                     "Associated PMCs",
                     coerce=str,

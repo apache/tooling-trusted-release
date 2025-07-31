@@ -30,6 +30,7 @@ import wtforms
 import atr.config as config
 import atr.construct as construct
 import atr.db as db
+import atr.forms as forms
 import atr.models.sql as sql
 import atr.routes as routes
 
@@ -62,7 +63,7 @@ class AnnounceFormProtocol(Protocol):
     async def validate_on_submit(self) -> bool: ...
 
 
-class DeleteForm(util.QuartFormTyped):
+class DeleteForm(forms.Typed):
     """Form for deleting a release preview."""
 
     preview_name = wtforms.StringField(
@@ -274,7 +275,7 @@ async def _create_announce_form_instance(
 ) -> AnnounceFormProtocol:
     """Create and return an instance of the AnnounceForm."""
 
-    class AnnounceForm(util.QuartFormTyped):
+    class AnnounceForm(forms.Typed):
         """Form for announcing a release preview."""
 
         preview_name = wtforms.HiddenField()

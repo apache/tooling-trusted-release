@@ -26,6 +26,7 @@ import wtforms
 
 import atr.construct as construct
 import atr.db as db
+import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
@@ -37,14 +38,14 @@ if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
 
 
-class AnnouncePreviewForm(util.QuartFormTyped):
+class AnnouncePreviewForm(forms.Typed):
     """Form for validating preview request data."""
 
     subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
     body = wtforms.TextAreaField("Body", validators=[wtforms.validators.InputRequired("Body is required for preview")])
 
 
-class DeleteForm(util.QuartFormTyped):
+class DeleteForm(forms.Typed):
     """Form for deleting a release preview."""
 
     release_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])

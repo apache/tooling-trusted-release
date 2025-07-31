@@ -48,6 +48,7 @@ from htpy import (
 )
 
 import atr.db as db
+import atr.forms as forms
 import atr.jwtoken as jwtoken
 import atr.log as log
 import atr.models.sql as sql
@@ -61,7 +62,7 @@ _EXPIRY_DAYS: Final[int] = 180
 type Fragment = Element | core.Field | str
 
 
-class AddTokenForm(util.QuartFormTyped):
+class AddTokenForm(forms.Typed):
     label = wtforms.StringField(
         "Label",
         validators=[wtforms.validators.Optional(), wtforms.validators.Length(max=100)],
@@ -70,12 +71,12 @@ class AddTokenForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Generate token")
 
 
-class DeleteTokenForm(util.QuartFormTyped):
+class DeleteTokenForm(forms.Typed):
     token_id = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
     submit = wtforms.SubmitField("Delete")
 
 
-class IssueJWTForm(util.QuartFormTyped):
+class IssueJWTForm(forms.Typed):
     submit = wtforms.SubmitField("Generate JWT")
 
 

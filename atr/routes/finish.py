@@ -30,6 +30,7 @@ import wtforms.fields as fields
 
 import atr.analysis as analysis
 import atr.db as db
+import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
 import atr.revision as revision
@@ -44,7 +45,7 @@ SPECIAL_SUFFIXES: Final[frozenset[str]] = frozenset({".asc", ".sha256", ".sha512
 Respond = Callable[[int, str], Awaitable[tuple[quart_response.Response, int] | response.Response]]
 
 
-class DeleteEmptyDirectoryForm(util.QuartFormTyped):
+class DeleteEmptyDirectoryForm(forms.Typed):
     """Form for deleting an empty directory within a preview revision."""
 
     directory_to_delete = wtforms.SelectField(
@@ -53,7 +54,7 @@ class DeleteEmptyDirectoryForm(util.QuartFormTyped):
     submit_delete_empty_dir = wtforms.SubmitField("Delete directory")
 
 
-class MoveFileForm(util.QuartFormTyped):
+class MoveFileForm(forms.Typed):
     """Form for moving one or more files within a preview revision."""
 
     source_files = wtforms.SelectMultipleField(
@@ -82,7 +83,7 @@ class MoveFileForm(util.QuartFormTyped):
                     )
 
 
-class RemoveRCTagsForm(util.QuartFormTyped):
+class RemoveRCTagsForm(forms.Typed):
     submit_remove_rc_tags = wtforms.SubmitField("Remove RC tags")
 
 

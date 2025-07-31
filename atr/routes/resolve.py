@@ -23,6 +23,7 @@ import wtforms
 
 import atr.construct as construct
 import atr.db as db
+import atr.forms as forms
 import atr.models.results as results
 import atr.models.sql as sql
 import atr.revision as revision
@@ -37,7 +38,7 @@ import atr.template as template
 import atr.util as util
 
 
-class ResolveVoteForm(util.QuartFormTyped):
+class ResolveVoteForm(forms.Typed):
     """Form for resolving a vote."""
 
     email_body = wtforms.TextAreaField("Email body", render_kw={"rows": 24})
@@ -49,7 +50,7 @@ class ResolveVoteForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Resolve vote")
 
 
-class ResolveVoteManualForm(util.QuartFormTyped):
+class ResolveVoteManualForm(forms.Typed):
     """Form for resolving a vote manually."""
 
     vote_result = wtforms.RadioField(
@@ -230,7 +231,7 @@ async def tabulated_selected_post(session: routes.CommitterSession, project_name
     if release.vote_manual:
         raise RuntimeError("This page is for tabulated votes only")
 
-    hidden_form = await util.HiddenFieldForm.create_form()
+    hidden_form = await forms.Hidden.create_form()
     details = None
     committee = None
     thread_id = None

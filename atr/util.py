@@ -41,19 +41,17 @@ import asfquart.session as session
 import gitignore_parser
 import jinja2
 import quart
-import quart_wtf
-import quart_wtf.typing
 import wtforms
 
 # NOTE: The atr.db module imports this module
 # Therefore, this module must not import atr.db
 import atr.config as config
+import atr.forms as forms
 import atr.ldap as ldap
 import atr.log as log
 import atr.models.sql as sql
 import atr.user as user
 
-F = TypeVar("F", bound="QuartFormTyped")
 T = TypeVar("T")
 
 # TODO: Move to committee data
@@ -79,39 +77,8 @@ class FileStat:
     is_dir: bool
 
 
-class QuartFormTyped(quart_wtf.QuartForm):
-    """Quart form with type annotations."""
-
-    csrf_token = wtforms.HiddenField()
-
-    @classmethod
-    async def create_form(
-        cls: type[F],
-        formdata: object | quart_wtf.typing.FormData = quart_wtf.form._Auto,
-        obj: Any | None = None,
-        prefix: str = "",
-        data: dict | None = None,
-        meta: dict | None = None,
-        **kwargs: dict[str, Any],
-    ) -> F:
-        """Create a form instance with typing."""
-        form = await super().create_form(formdata, obj, prefix, data, meta, **kwargs)
-        if not isinstance(form, cls):
-            raise TypeError(f"Form is not of type {cls.__name__}")
-        return form
-
-
-class EmptyForm(QuartFormTyped):
-    pass
-
-
 class FetchError(RuntimeError):
     pass
-
-
-class HiddenFieldForm(QuartFormTyped):
-    hidden_field = wtforms.HiddenField()
-    submit = wtforms.SubmitField()
 
 
 async def archive_listing(file_path: pathlib.Path) -> list[str] | None:
@@ -895,7 +862,7 @@ def validate_as_type[T](value: Any, t: type[T]) -> T:
 
 
 async def validate_empty_form() -> None:
-    empty_form = await EmptyForm.create_form(data=await quart.request.form)
+    empty_form = await forms.Empty.create_form(data=await quart.request.form)
     if not await empty_form.validate_on_submit():
         raise base.ASFQuartException("Invalid request", 400)
 

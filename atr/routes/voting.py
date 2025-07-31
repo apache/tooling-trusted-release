@@ -29,6 +29,7 @@ import wtforms
 import atr.construct as construct
 import atr.db as db
 import atr.db.interaction as interaction
+import atr.forms as forms
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.compose as compose
@@ -152,7 +153,7 @@ async def selected_revision(
     keys_warning = await _keys_warning(release)
     manual_vote_process_form = None
     if release.project.policy_manual_vote:
-        manual_vote_process_form = await util.HiddenFieldForm.create_form()
+        manual_vote_process_form = await forms.Hidden.create_form()
         manual_vote_process_form.hidden_field.data = selected_revision_number
     has_files = await util.has_files(release)
     if not has_files:
@@ -323,7 +324,7 @@ async def _form(
     release_policy_mailto_addresses: str,
     min_hours: int,
 ) -> VoteInitiateFormProtocol:
-    class VoteInitiateForm(util.QuartFormTyped):
+    class VoteInitiateForm(forms.Typed):
         """Form for initiating a release vote."""
 
         release_name = wtforms.HiddenField("Release Name")

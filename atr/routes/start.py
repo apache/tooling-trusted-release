@@ -23,6 +23,7 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
+import atr.forms as forms
 import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
@@ -31,7 +32,7 @@ import atr.template as template
 import atr.util as util
 
 
-class StartReleaseForm(util.QuartFormTyped):
+class StartReleaseForm(forms.Typed):
     project_name = wtforms.HiddenField()
     version_name = wtforms.StringField(
         "Version",

@@ -26,15 +26,15 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
+import atr.forms as forms
 import atr.log as log
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.template as template
-import atr.util as util
 
 
-class SvnImportForm(util.QuartFormTyped):
+class SvnImportForm(forms.Typed):
     """Form for importing files from SVN into a draft."""
 
     svn_url = wtforms.URLField(
@@ -64,7 +64,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     """Show a page to allow the user to add files to a candidate draft."""
     await session.check_access(project_name)
 
-    class AddFilesForm(util.QuartFormTyped):
+    class AddFilesForm(forms.Typed):
         """Form for adding files to a release candidate."""
 
         file_name = wtforms.StringField(

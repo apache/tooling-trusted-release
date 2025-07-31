@@ -23,6 +23,7 @@ import http.client
 import wtforms
 
 import atr.db as db
+import atr.forms as forms
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.template as template
@@ -44,7 +45,7 @@ async def directory() -> str:
 @routes.public("/committees/<name>")
 async def view(name: str) -> str:
     # TODO: Could also import this from keys.py
-    class UpdateCommitteeKeysForm(util.QuartFormTyped):
+    class UpdateCommitteeKeysForm(forms.Typed):
         submit = wtforms.SubmitField("Regenerate KEYS file")
 
     async with db.session() as data:

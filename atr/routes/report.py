@@ -21,6 +21,7 @@ import pathlib
 import aiofiles.os
 import asfquart.base as base
 
+import atr.forms as forms
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.storage as storage
@@ -78,5 +79,5 @@ async def selected_path(session: routes.CommitterSession, project_name: str, ver
         member_results=check_results.member_results_list,
         ignored_results=check_results.ignored_checks,
         format_file_size=util.format_file_size,
-        empty_form=await util.EmptyForm.create_form(),
+        empty_form=await forms.Empty.create_form(),
     )

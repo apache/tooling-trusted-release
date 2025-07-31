@@ -23,6 +23,7 @@ import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
+import atr.forms as forms
 import atr.log as log
 import atr.models.results as results
 import atr.models.sql as sql
@@ -47,7 +48,7 @@ _THREAD_URLS_FOR_DEVELOPMENT: Final[dict[str, str]] = {
 }
 
 
-class CastVoteForm(util.QuartFormTyped):
+class CastVoteForm(forms.Typed):
     """Form for casting a vote."""
 
     vote_value = wtforms.RadioField(
@@ -94,7 +95,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         archive_url = await task_archive_url_cached(task_mid)
 
     form = await CastVoteForm.create_form()
-    hidden_form = await util.HiddenFieldForm.create_form()
+    hidden_form = await forms.Hidden.create_form()
     hidden_form.hidden_field.data = archive_url or ""
     hidden_form.submit.label.text = "Resolve vote"
     return await compose.check(

@@ -41,6 +41,7 @@ import atr.config as config
 import atr.datasources.apache as apache
 import atr.db as db
 import atr.db.interaction as interaction
+import atr.forms as forms
 import atr.ldap as ldap
 import atr.log as log
 import atr.models.sql as sql
@@ -52,7 +53,7 @@ import atr.util as util
 import atr.validate as validate
 
 
-class BrowseAsUserForm(util.QuartFormTyped):
+class BrowseAsUserForm(forms.Typed):
     """Form for browsing as another user."""
 
     uid = wtforms.StringField(
@@ -63,7 +64,7 @@ class BrowseAsUserForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Browse as this user")
 
 
-class DeleteCommitteeKeysForm(util.QuartFormTyped):
+class DeleteCommitteeKeysForm(forms.Typed):
     committee_name = wtforms.SelectField("Committee", validators=[wtforms.validators.InputRequired()])
     confirm_delete = wtforms.StringField(
         "Confirmation",
@@ -73,7 +74,7 @@ class DeleteCommitteeKeysForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Delete all keys for selected committee")
 
 
-class DeleteReleaseForm(util.QuartFormTyped):
+class DeleteReleaseForm(forms.Typed):
     """Form for deleting releases."""
 
     confirm_delete = wtforms.StringField(
@@ -88,7 +89,7 @@ class DeleteReleaseForm(util.QuartFormTyped):
     submit = wtforms.SubmitField("Delete selected releases permanently")
 
 
-class LdapLookupForm(util.QuartFormTyped):
+class LdapLookupForm(forms.Typed):
     uid = wtforms.StringField(
         "ASF UID (optional)",
         render_kw={"placeholder": "Enter ASF UID, e.g. johnsmith, or * for all"},
@@ -386,7 +387,7 @@ async def admin_env() -> quart.wrappers.response.Response:
 async def admin_keys_check() -> quart.Response:
     """Check public signing key details."""
     if quart.request.method != "POST":
-        empty_form = await util.EmptyForm.create_form()
+        empty_form = await forms.Empty.create_form()
         return quart.Response(
             f"""
 <form method="post">
@@ -409,7 +410,7 @@ async def admin_keys_check() -> quart.Response:
 async def admin_keys_regenerate_all() -> quart.Response:
     """Regenerate the KEYS file for all committees."""
     if quart.request.method != "POST":
-        empty_form = await util.EmptyForm.create_form()
+        empty_form = await forms.Empty.create_form()
         return quart.Response(
             f"""
 <form method="post">
@@ -451,7 +452,7 @@ async def admin_keys_regenerate_all() -> quart.Response:
 async def admin_keys_update() -> str | response.Response | tuple[Mapping[str, Any], int]:
     """Update keys from remote data."""
     if quart.request.method != "POST":
-        empty_form = await util.EmptyForm.create_form()
+        empty_form = await forms.Empty.create_form()
         # Get the previous output from the log file
         log_path = pathlib.Path("keys_import.log")
         if not await aiofiles.os.path.exists(log_path):
@@ -634,7 +635,7 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
             }, 200
 
     # For GET requests, show the update form
-    empty_form = await util.EmptyForm.create_form()
+    empty_form = await forms.Empty.create_form()
     return await template.render("update-projects.html", empty_form=empty_form)
 
 
@@ -703,7 +704,7 @@ async def admin_test() -> quart.wrappers.response.Response:
 @admin.BLUEPRINT.route("/toggle-view", methods=["GET"])
 async def admin_toggle_admin_view_page() -> str:
     """Display the page with a button to toggle between admin and user views."""
-    empty_form = await util.EmptyForm.create_form()
+    empty_form = await forms.Empty.create_form()
     return await template.render("toggle-admin-view.html", empty_form=empty_form)
 
 

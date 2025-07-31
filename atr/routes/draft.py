@@ -35,6 +35,7 @@ import atr.analysis as analysis
 import atr.construct as construct
 import atr.db as db
 import atr.db.interaction as interaction
+import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
 import atr.revision as revision
@@ -60,14 +61,14 @@ class AddProtocol(Protocol):
     project_name: wtforms.SelectField
 
 
-class DeleteFileForm(util.QuartFormTyped):
+class DeleteFileForm(forms.Typed):
     """Form for deleting a file."""
 
     file_path = wtforms.StringField("File path", validators=[wtforms.validators.InputRequired("File path is required")])
     submit = wtforms.SubmitField("Delete file")
 
 
-class DeleteForm(util.QuartFormTyped):
+class DeleteForm(forms.Typed):
     """Form for deleting a candidate draft."""
 
     release_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
@@ -433,7 +434,7 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
         file_data=file_data,
         release=release,
         format_file_size=util.format_file_size,
-        empty_form=await util.EmptyForm.create_form(),
+        empty_form=await forms.Empty.create_form(),
     )
 
 
@@ -476,7 +477,7 @@ async def vote_preview(
 ) -> quart.wrappers.response.Response | response.Response | str:
     """Show the vote email preview for a release."""
 
-    class VotePreviewForm(util.QuartFormTyped):
+    class VotePreviewForm(forms.Typed):
         body = wtforms.TextAreaField("Body", validators=[wtforms.validators.InputRequired("Body is required")])
         # TODO: Validate the vote duration again? Probably not necessary in a preview
         # Note that tasks/vote.py does not use this form
