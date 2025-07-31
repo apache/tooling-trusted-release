@@ -63,6 +63,20 @@ class CheckResultStatusIgnore(str, enum.Enum):
     FAILURE = "failure"
     WARNING = "warning"
 
+    @classmethod
+    def from_form_field(cls, status: str) -> Optional["CheckResultStatusIgnore"]:
+        match status:
+            case "None":
+                return None
+            case "CheckResultStatusIgnore.EXCEPTION":
+                return cls.EXCEPTION
+            case "CheckResultStatusIgnore.FAILURE":
+                return cls.FAILURE
+            case "CheckResultStatusIgnore.WARNING":
+                return cls.WARNING
+            case _:
+                raise ValueError(f"Invalid status: {status}")
+
 
 class ProjectStatus(str, enum.Enum):
     ACTIVE = "active"

@@ -169,6 +169,12 @@ class CommitterSession:
         self._projects: list[sql.Project] | None = None
         self._session = web_session
 
+    @property
+    def asf_uid(self) -> str:
+        if self._session.uid is None:
+            raise base.ASFQuartException("Not authenticated", errorcode=401)
+        return self._session.uid
+
     def __getattr__(self, name: str) -> Any:
         # TODO: Not type safe, should subclass properly if possible
         # For example, we can access session.no_such_attr and the type checkers won't notice

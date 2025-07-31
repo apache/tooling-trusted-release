@@ -19,6 +19,8 @@ from __future__ import annotations
 
 from typing import Any, Final, TypeVar
 
+import htpy
+import markupsafe
 import quart_wtf
 import quart_wtf.typing
 import wtforms
@@ -197,9 +199,49 @@ def radio(label: str, optional: bool = False, validators: list[Any] | None = Non
     return wtforms.RadioField(label, validators=validators, **kwargs)
 
 
-def select(label: str, validators: list[Any] | None = None, **kwargs: Any) -> wtforms.SelectField:
+def render(form: Typed, action: str) -> htpy.Element:
+    hidden_elems: list[markupsafe.Markup] = []
+    field_rows: list[htpy.Element] = []
+    submit_row: htpy.Element | None = None
+
+    for field in form:
+        if isinstance(field, wtforms.HiddenField):
+            hidden_elems.append(markupsafe.Markup(str(field)))
+            continue
+        if isinstance(field, wtforms.StringField):
+            widget = markupsafe.Markup(str(field(class_="form-control")))
+            label_html = markupsafe.Markup(str(field.label(class_="col-sm-3 col-form-label text-sm-end")))
+            row = htpy.div(".mb-3 row")[label_html, htpy.div(".col-sm-8")[widget]]
+            field_rows.append(row)
+            continue
+        if isinstance(field, wtforms.SelectField):
+            widget = markupsafe.Markup(str(field(class_="form-select")))
+            label_html = markupsafe.Markup(str(field.label(class_="col-sm-3 col-form-label text-sm-end")))
+            row = htpy.div(".mb-3 row")[label_html, htpy.div(".col-sm-8")[widget]]
+            field_rows.append(row)
+            continue
+        if isinstance(field, wtforms.SubmitField):
+            button_html = markupsafe.Markup(str(field(class_="btn btn-primary mt-2")))
+            submit_row = htpy.div(".row")[htpy.div(".col-sm-9 offset-sm-3")[button_html]]
+            continue
+        raise TypeError(f"Unsupported field type: {type(field).__name__}")
+
+    form_children: list[htpy.Element | markupsafe.Markup] = hidden_elems + field_rows
+    if submit_row is not None:
+        form_children.append(submit_row)
+
+    return htpy.form(".atr-canary", action=action, method="post")[form_children]
+
+
+def select(
+    label: str, optional: bool = False, validators: list[Any] | None = None, **kwargs: Any
+) -> wtforms.SelectField:
     if validators is None:
-        validators = [REQUIRED]
+        validators = []
+    if optional is False:
+        validators.append(REQUIRED)
+    else:
+        validators.append(OPTIONAL)
     return wtforms.SelectField(label, validators=validators, **kwargs)
 
 

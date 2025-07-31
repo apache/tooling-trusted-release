@@ -19,11 +19,11 @@ from typing import Final
 
 import htpy
 import markupsafe
+import quart
 import werkzeug.wrappers.response as response
 from htpy import (
     button,
     div,
-    form,
     h1,
     h2,
     h3,
@@ -62,24 +62,37 @@ document.querySelectorAll("table.page-details input.form-control").forEach(funct
 
 
 class AddIgnoreForm(forms.Typed):
-    release_glob = forms.string("Release glob")
-    revision_number = forms.string("Revision number")
-    checker_glob = forms.string("Checker glob")
-    primary_rel_path_glob = forms.string("Primary rel path glob")
-    member_rel_path_glob = forms.string("Member rel path glob")
-    status = forms.string("Status")
+    release_glob = forms.optional("Release pattern")
+    revision_number = forms.optional("Revision number (literal)")
+    checker_glob = forms.optional("Checker pattern")
+    primary_rel_path_glob = forms.optional("Primary rel path pattern")
+    member_rel_path_glob = forms.optional("Member rel path pattern")
+    status = forms.select(
+        "Status",
+        optional=True,
+        choices=[
+            (None, "-"),
+            (sql.CheckResultStatusIgnore.EXCEPTION, "Exception"),
+            (sql.CheckResultStatusIgnore.FAILURE, "Failure"),
+            (sql.CheckResultStatusIgnore.WARNING, "Warning"),
+        ],
+    )
+    message = forms.optional("Message pattern")
+    submit = forms.submit("Add ignore")
+
+    # TODO: Validate that at least one field is set
 
 
 @routes.committer("/ignores/<committee_name>", methods=["GET", "POST"])
 async def ignores(session: routes.CommitterSession, committee_name: str) -> str | response.Response:
-    async with storage.read() as read:
+    async with storage.read(session.asf_uid) as read:
         ragp = read.as_general_public()
         ignores = await ragp.checks.ignores(committee_name)
 
     content = div[
         h1["Ignored checks"],
         p[f"Manage ignored checks for committee {committee_name}."],
-        _add_ignore(),
+        _add_ignore(committee_name),
         _existing_ignores(ignores),
         _script(_UPDATE_IGNORE_FORM),
     ]
@@ -88,13 +101,31 @@ async def ignores(session: routes.CommitterSession, committee_name: str) -> str 
 
 
 @routes.committer("/ignores/<committee_name>/add", methods=["POST"])
-async def ignores_committe_add(session: routes.CommitterSession, committee_name: str) -> str | response.Response:
-    form = forms.Value()
-    if not form.validate_on_submit():
+async def ignores_committee_add(session: routes.CommitterSession, committee_name: str) -> str | response.Response:
+    data = await quart.request.form
+    form = await AddIgnoreForm.create_form(data=data)
+    if not (await form.validate_on_submit()):
         return await session.redirect(ignores, error="Form validation errors")
 
-    # TODO: Add ignore
-    return await session.redirect(ignores, success="Ignore added")
+    status = sql.CheckResultStatusIgnore.from_form_field(form.status.data)
+
+    async with storage.write(session.asf_uid) as write:
+        wacm = write.as_committee_member(committee_name)
+        await wacm.checks.ignore_add(
+            release_glob=form.release_glob.data,
+            revision_number=form.revision_number.data,
+            checker_glob=form.checker_glob.data,
+            primary_rel_path_glob=form.primary_rel_path_glob.data,
+            member_rel_path_glob=form.member_rel_path_glob.data,
+            status=status,
+            message_glob=form.message.data,
+        )
+
+    return await session.redirect(
+        ignores,
+        committee_name=committee_name,
+        success="Ignore added",
+    )
 
 
 def _check_result_ignore_card(cri: sql.CheckResultIgnore) -> htpy.Element:
@@ -121,7 +152,7 @@ def _check_result_ignore_card(cri: sql.CheckResultIgnore) -> htpy.Element:
     add_row("Checker", cri.checker_glob)
     add_row("Primary path", cri.primary_rel_path_glob)
     add_row("Member path", cri.member_rel_path_glob)
-    add_row("Status (enum)", cri.status)
+    add_row("Status (enum)", cri.status.value.title() if cri.status else "")
     add_row("Message", cri.message_glob)
 
     table_striped = table(".table.table-striped.table-bordered.page-details")[table_rows]
@@ -134,35 +165,12 @@ def _check_result_ignore_card(cri: sql.CheckResultIgnore) -> htpy.Element:
     return card
 
 
-def _add_ignore() -> htpy.Element:
-    table_rows = []
-
-    def add_row(label: str) -> None:
-        nonlocal table_rows
-        table_rows.append(
-            tr[
-                th(".text-end.text-nowrap")[label],
-                td[input(".form-control.form-control-sm")],
-            ]
-        )
-
-    add_row("Release")
-    add_row("Revision number (literal)")
-    add_row("Checker")
-    add_row("Primary path")
-    add_row("Member path")
-    add_row("Status (enum)")
-    add_row("Message")
-
-    table_striped = table(".table.table-striped.table-bordered")[table_rows]
-
+def _add_ignore(committee_name: str) -> htpy.Element:
+    form_path = util.as_url(ignores_committee_add, committee_name=committee_name)
     return div[
         h2["Add ignore"],
         p["Add a new ignore for a check result."],
-        form(".atr-canary")[
-            table_striped,
-            p[button(".btn.btn-primary")["Add"]],
-        ],
+        forms.render(AddIgnoreForm(), form_path),
     ]
 
 
