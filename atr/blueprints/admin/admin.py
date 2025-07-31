@@ -34,7 +34,6 @@ import quart
 import sqlalchemy.orm as orm
 import sqlmodel
 import werkzeug.wrappers.response as response
-import wtforms
 
 import atr.blueprints.admin as admin
 import atr.config as config
@@ -56,49 +55,36 @@ import atr.validate as validate
 class BrowseAsUserForm(forms.Typed):
     """Form for browsing as another user."""
 
-    uid = wtforms.StringField(
-        "ASF UID",
-        validators=[wtforms.validators.InputRequired()],
-        render_kw={"placeholder": "Enter the ASF UID to browse as"},
-    )
-    submit = wtforms.SubmitField("Browse as this user")
+    uid = forms.string("ASF UID", placeholder="Enter the ASF UID to browse as")
+    submit = forms.submit("Browse as this user")
 
 
 class DeleteCommitteeKeysForm(forms.Typed):
-    committee_name = wtforms.SelectField("Committee", validators=[wtforms.validators.InputRequired()])
-    confirm_delete = wtforms.StringField(
+    committee_name = forms.select("Committee")
+    confirm_delete = forms.string(
         "Confirmation",
-        validators=[wtforms.validators.InputRequired(), wtforms.validators.Regexp("^DELETE KEYS$")],
-        render_kw={"placeholder": "DELETE KEYS"},
+        validators=forms.constant("DELETE KEYS"),
+        placeholder="DELETE KEYS",
     )
-    submit = wtforms.SubmitField("Delete all keys for selected committee")
+    submit = forms.submit("Delete all keys for selected committee")
 
 
 class DeleteReleaseForm(forms.Typed):
     """Form for deleting releases."""
 
-    confirm_delete = wtforms.StringField(
+    confirm_delete = forms.string(
         "Confirmation",
-        validators=[
-            wtforms.validators.InputRequired("Confirmation is required"),
-            wtforms.validators.Regexp("^DELETE$", message="Please type DELETE to confirm"),
-        ],
-        render_kw={"placeholder": "DELETE"},
+        validators=forms.constant("DELETE"),
+        placeholder="DELETE",
         description="Please type DELETE exactly to confirm deletion.",
     )
-    submit = wtforms.SubmitField("Delete selected releases permanently")
+    submit = forms.submit("Delete selected releases permanently")
 
 
 class LdapLookupForm(forms.Typed):
-    uid = wtforms.StringField(
-        "ASF UID (optional)",
-        render_kw={"placeholder": "Enter ASF UID, e.g. johnsmith, or * for all"},
-    )
-    email = wtforms.StringField(
-        "Email address (optional)",
-        render_kw={"placeholder": "Enter email address, e.g. user@example.org"},
-    )
-    submit = wtforms.SubmitField("Lookup")
+    uid = forms.string("ASF UID (optional)", placeholder="Enter ASF UID, e.g. johnsmith, or * for all")
+    email = forms.string("Email address (optional)", placeholder="Enter email address, e.g. user@example.org")
+    submit = forms.submit("Lookup")
 
 
 @admin.BLUEPRINT.route("/all-releases")

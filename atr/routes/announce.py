@@ -18,14 +18,13 @@
 import asyncio
 import datetime
 import pathlib
-from typing import Any, Protocol
+from typing import Any
 
 import aiofiles.os
 import aioshutil
 import quart
 import sqlmodel
 import werkzeug.wrappers.response as response
-import wtforms
 
 import atr.config as config
 import atr.construct as construct
@@ -45,38 +44,28 @@ class AnnounceError(Exception):
     """Exception for announce errors."""
 
 
-class AnnounceFormProtocol(Protocol):
-    """Protocol for the dynamically generated AnnounceForm."""
+class AnnounceForm(forms.Typed):
+    """Form for announcing a release preview."""
 
-    preview_name: wtforms.HiddenField
-    preview_revision: wtforms.HiddenField
-    mailing_list: wtforms.RadioField
-    confirm_announce: wtforms.BooleanField
-    download_path_suffix: wtforms.StringField
-    subject: wtforms.StringField
-    body: wtforms.TextAreaField
-    submit: wtforms.SubmitField
-
-    @property
-    def errors(self) -> dict[str, Any]: ...
-
-    async def validate_on_submit(self) -> bool: ...
+    preview_name = forms.hidden()
+    preview_revision = forms.hidden()
+    mailing_list = forms.radio("Send vote email to")
+    download_path_suffix = forms.optional("Download path suffix")
+    confirm_announce = forms.boolean("Confirm")
+    subject = forms.optional("Subject")
+    body = forms.textarea("Body", optional=True)
+    submit = forms.submit("Send announcement email")
 
 
 class DeleteForm(forms.Typed):
     """Form for deleting a release preview."""
 
-    preview_name = wtforms.StringField(
-        "Preview name", validators=[wtforms.validators.InputRequired("Preview name is required")]
-    )
-    confirm_delete = wtforms.StringField(
+    preview_name = forms.string("Preview name")
+    confirm_delete = forms.string(
         "Confirmation",
-        validators=[
-            wtforms.validators.InputRequired("Confirmation is required"),
-            wtforms.validators.Regexp("^DELETE$", message="Please type DELETE to confirm"),
-        ],
+        validators=forms.constant("DELETE"),
     )
-    submit = wtforms.SubmitField("Delete preview")
+    submit = forms.submit("Delete preview")
 
 
 @routes.committer("/announce/<project_name>/<version_name>")
@@ -272,34 +261,22 @@ async def announce(
 
 async def _create_announce_form_instance(
     permitted_recipients: list[str], *, data: dict[str, Any] | None = None
-) -> AnnounceFormProtocol:
+) -> AnnounceForm:
     """Create and return an instance of the AnnounceForm."""
 
-    class AnnounceForm(forms.Typed):
-        """Form for announcing a release preview."""
-
-        preview_name = wtforms.HiddenField()
-        preview_revision = wtforms.HiddenField()
-        mailing_list = wtforms.RadioField(
-            "Send vote email to",
-            choices=sorted([(recipient, recipient) for recipient in permitted_recipients]),
-            validators=[wtforms.validators.InputRequired("Mailing list selection is required")],
-            default="user-tests@tooling.apache.org",
-        )
-        download_path_suffix = wtforms.StringField("Download path suffix", validators=[wtforms.validators.Optional()])
-        confirm_announce = wtforms.BooleanField(
-            "Confirm",
-            validators=[wtforms.validators.DataRequired("You must confirm to proceed with announcement")],
-        )
-        subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
-        body = wtforms.TextAreaField("Body", validators=[wtforms.validators.Optional()])
-        submit = wtforms.SubmitField("Send announcement email")
+    mailing_list_choices: forms.Choices = sorted([(recipient, recipient) for recipient in permitted_recipients])
+    mailing_list_default = "user-tests@tooling.apache.org"
 
     form_instance = await AnnounceForm.create_form(data=data)
+    forms.choices(
+        form_instance.mailing_list,
+        mailing_list_choices,
+        mailing_list_default,
+    )
     return form_instance
 
 
-def _download_path_suffix_validated(announce_form: AnnounceFormProtocol) -> str:
+def _download_path_suffix_validated(announce_form: AnnounceForm) -> str:
     download_path_suffix = str(announce_form.download_path_suffix.data)
     if (".." in download_path_suffix) or ("//" in download_path_suffix):
         raise ValueError("Download path suffix must not contain .. or //")
