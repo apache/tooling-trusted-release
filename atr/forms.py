@@ -23,6 +23,7 @@ import quart_wtf
 import quart_wtf.typing
 import wtforms
 
+EMAIL: Final = wtforms.validators.Email()
 REQUIRED: Final = wtforms.validators.InputRequired()
 REQUIRED_DATA: Final = wtforms.validators.DataRequired()
 OPTIONAL: Final = wtforms.validators.Optional()
@@ -84,19 +85,51 @@ def boolean(
     return wtforms.BooleanField(label, **kwargs)
 
 
-def choices(field: wtforms.RadioField, choices: Choices, default: str | None = None) -> None:
+def checkboxes(
+    label: str, optional: bool = False, validators: list[Any] | None = None, **kwargs: Any
+) -> wtforms.SelectMultipleField:
+    if validators is None:
+        validators = []
+    if optional is False:
+        validators.append(REQUIRED)
+    else:
+        validators.append(OPTIONAL)
+    return wtforms.SelectMultipleField(
+        label,
+        validators=validators,
+        coerce=str,
+        option_widget=wtforms.widgets.CheckboxInput(),
+        widget=wtforms.widgets.ListWidget(prefix_label=False),
+        **kwargs,
+    )
+
+
+def choices(
+    field: wtforms.RadioField | wtforms.SelectMultipleField, choices: Choices, default: str | None = None
+) -> None:
     field.choices = choices
     # Form construction calls Field.process
     # This sets data = self.default() or self.default
     # Then self.object_data = data
     # Then calls self.process_data(data) which sets self.data = data
     # And SelectField.iter_choices reads self.data for the default
-    if default is not None:
-        field.data = default
+    if isinstance(field, wtforms.RadioField):
+        if default is not None:
+            field.data = default
 
 
 def constant(value: str) -> list[wtforms.validators.InputRequired | wtforms.validators.Regexp]:
     return [REQUIRED, wtforms.validators.Regexp(value, message=f"You must enter {value!r} in this field")]
+
+
+def file(label: str, optional: bool = False, validators: list[Any] | None = None, **kwargs: Any) -> wtforms.FileField:
+    if validators is None:
+        validators = []
+    if optional is False:
+        validators.append(REQUIRED)
+    else:
+        validators.append(OPTIONAL)
+    return wtforms.FileField(label, validators=validators, **kwargs)
 
 
 def hidden(optional: bool = False, validators: list[Any] | None = None, **kwargs: Any) -> wtforms.HiddenField:
@@ -121,6 +154,7 @@ def integer(
     return wtforms.IntegerField(label, validators=validators, **kwargs)
 
 
+# TODO: Do we need this?
 def multiple(label: str, validators: list[Any] | None = None, **kwargs: Any) -> wtforms.SelectMultipleField:
     if validators is None:
         validators = [REQUIRED]
@@ -178,6 +212,7 @@ def textarea(
     optional: bool = False,
     validators: list[Any] | None = None,
     placeholder: str | None = None,
+    rows: int | None = None,
     **kwargs: Any,
 ) -> wtforms.TextAreaField:
     if validators is None:
@@ -190,4 +225,24 @@ def textarea(
         if "render_kw" not in kwargs:
             kwargs["render_kw"] = {}
         kwargs["render_kw"]["placeholder"] = placeholder
+    if rows is not None:
+        if "render_kw" not in kwargs:
+            kwargs["render_kw"] = {}
+        kwargs["render_kw"]["rows"] = rows
     return wtforms.TextAreaField(label, validators=validators, **kwargs)
+
+
+def url(
+    label: str,
+    optional: bool = False,
+    placeholder: str | None = None,
+    validators: list[Any] | None = None,
+    **kwargs: Any,
+) -> wtforms.URLField:
+    if validators is None:
+        validators = [wtforms.validators.URL()]
+    if optional is False:
+        validators.append(REQUIRED)
+    else:
+        validators.append(OPTIONAL)
+    return wtforms.URLField(label, validators=validators, **kwargs)

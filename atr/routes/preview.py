@@ -22,7 +22,6 @@ import aioshutil
 import asfquart
 import quart
 import werkzeug.wrappers.response as response
-import wtforms
 
 import atr.construct as construct
 import atr.db as db
@@ -41,24 +40,18 @@ if asfquart.APP is ...:
 class AnnouncePreviewForm(forms.Typed):
     """Form for validating preview request data."""
 
-    subject = wtforms.StringField("Subject", validators=[wtforms.validators.Optional()])
-    body = wtforms.TextAreaField("Body", validators=[wtforms.validators.InputRequired("Body is required for preview")])
+    subject = forms.optional("Subject")
+    body = forms.textarea("Body")
 
 
 class DeleteForm(forms.Typed):
     """Form for deleting a release preview."""
 
-    release_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
-    project_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
-    version_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
-    confirm_delete = wtforms.StringField(
-        "Confirmation",
-        validators=[
-            wtforms.validators.InputRequired("Confirmation is required"),
-            wtforms.validators.Regexp("^DELETE$", message="Please type DELETE to confirm"),
-        ],
-    )
-    submit = wtforms.SubmitField("Delete preview")
+    release_name = forms.hidden()
+    project_name = forms.hidden()
+    version_name = forms.hidden()
+    confirm_delete = forms.string("Confirmation", validators=forms.constant("DELETE"))
+    submit = forms.submit("Delete preview")
 
 
 @routes.committer("/preview/announce/<project_name>/<version_name>", methods=["POST"])

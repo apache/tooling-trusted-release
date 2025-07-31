@@ -20,7 +20,7 @@
 import datetime
 import http.client
 import re
-from typing import Any, Final, Protocol
+from typing import Any, Final
 
 import asfquart.base as base
 import quart
@@ -42,17 +42,17 @@ _FORBIDDEN_CATEGORIES: Final[set[str]] = {
 }
 
 
-class AddFormProtocol(Protocol):
-    committee_name: wtforms.HiddenField
-    display_name: wtforms.StringField
-    label: wtforms.StringField
-    submit: wtforms.SubmitField
+class AddForm(forms.Typed):
+    committee_name = forms.hidden()
+    display_name = forms.string("Display name")
+    label = forms.string("Label")
+    submit = forms.submit("Add project")
 
 
 class ProjectMetadataForm(forms.Typed):
-    project_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
-    category_to_add = wtforms.StringField("New category name")
-    language_to_add = wtforms.StringField("New language name")
+    project_name = forms.hidden()
+    category_to_add = forms.string("New category name")
+    language_to_add = forms.string("New language name")
 
 
 class ReleasePolicyForm(forms.Typed):
@@ -63,84 +63,60 @@ class ReleasePolicyForm(forms.Typed):
           see: https://stackoverflow.com/questions/49066046/append-entry-to-fieldlist-with-flask-wtforms-using-ajax
     """
 
-    project_name = wtforms.HiddenField("project_name")
+    project_name = forms.hidden()
 
     # Compose section
-    source_artifact_paths = wtforms.StringField(
-        "Source artifact paths",
-        widget=wtforms.widgets.TextArea(),
-        render_kw={"rows": 5},
-        description="Paths to source artifacts to be included in the release.",
+    source_artifact_paths = forms.textarea(
+        "Source artifact paths", rows=5, description="Paths to source artifacts to be included in the release."
     )
-    binary_artifact_paths = wtforms.StringField(
-        "Binary artifact paths",
-        widget=wtforms.widgets.TextArea(),
-        render_kw={"rows": 5},
-        description="Paths to binary artifacts to be included in the release.",
+    binary_artifact_paths = forms.textarea(
+        "Binary artifact paths", rows=5, description="Paths to binary artifacts to be included in the release."
     )
-    strict_checking = wtforms.BooleanField(
-        "Strict checking",
-        description="If enabled, then the release cannot be voted upon unless all checks pass.",
+    strict_checking = forms.boolean(
+        "Strict checking", description="If enabled, then the release cannot be voted upon unless all checks pass."
     )
 
     # Vote section
-    manual_vote = wtforms.BooleanField(
+    manual_vote = forms.boolean(
         "Manual voting process",
         description="If this is set then the vote will be completely manual and following policy is ignored.",
-        default=False,
     )
-    mailto_addresses = wtforms.FieldList(
-        wtforms.StringField(
-            "Email",
-            validators=[
-                wtforms.validators.InputRequired("Please provide a valid email address"),
-                wtforms.validators.Email(),
-            ],
-            render_kw={"size": 30, "placeholder": "E.g. dev@project.apache.org"},
-            description="Note: This field determines where vote and finished release announcement emails are sent."
-            " You can set this value to your own mailing list, but ATR will currently only let you send to"
-            " user-tests@tooling.apache.org.",
-        ),
-        min_entries=1,
+    mailto_addresses = forms.string(
+        "Email",
+        validators=[forms.REQUIRED, forms.EMAIL],
+        placeholder="E.g. dev@project.apache.org",
+        description="Note: This field determines where vote and finished release announcement"
+        "emails are sent. You can set this value to your own mailing list, but ATR will "
+        "currently only let you send to user-tests@tooling.apache.org.",
     )
-    default_min_hours_value_at_render = wtforms.HiddenField()
-    min_hours = wtforms.IntegerField(
+    default_min_hours_value_at_render = forms.hidden()
+    min_hours = forms.integer(
         "Minimum voting period",
-        validators=[
-            wtforms.validators.InputRequired("Please provide a minimum voting period"),
-            util.validate_vote_duration,
-        ],
+        validators=[util.validate_vote_duration],
         default=72,
         description="The minimum time to run the vote, in hours. Must be 0 or between 72 and 144 inclusive."
         " If 0, then wait until 3 +1 votes and more +1 than -1.",
     )
-    pause_for_rm = wtforms.BooleanField(
+    pause_for_rm = forms.boolean(
         "Pause for RM", description="If enabled, RM can confirm manually if the vote has passed."
     )
-    release_checklist = wtforms.StringField(
+    release_checklist = forms.textarea(
         "Release checklist",
-        widget=wtforms.widgets.TextArea(),
-        render_kw={"rows": 10},
+        rows=10,
         description="Markdown text describing how to test release candidates.",
     )
-    default_start_vote_template_hash = wtforms.HiddenField()
-    start_vote_template = wtforms.StringField(
-        "Start vote template",
-        widget=wtforms.widgets.TextArea(),
-        render_kw={"rows": 10},
-        description="Email template for messages to start a vote on a release.",
+    default_start_vote_template_hash = forms.hidden()
+    start_vote_template = forms.textarea(
+        "Start vote template", rows=10, description="Email template for messages to start a vote on a release."
     )
 
     # Finish section
-    default_announce_release_template_hash = wtforms.HiddenField()
-    announce_release_template = wtforms.StringField(
-        "Announce release template",
-        widget=wtforms.widgets.TextArea(),
-        render_kw={"rows": 10},
-        description="Email template for messages to announce a finished release.",
+    default_announce_release_template_hash = forms.hidden()
+    announce_release_template = forms.textarea(
+        "Announce release template", rows=10, description="Email template for messages to announce a finished release."
     )
 
-    submit_policy = wtforms.SubmitField("Save")
+    submit_policy = forms.submit("Save")
 
     async def validate(self, extra_validators: dict[str, Any] | None = None) -> bool:
         await super().validate(extra_validators=extra_validators)
@@ -182,25 +158,15 @@ async def add_project(session: routes.CommitterSession, committee_name: str) -> 
             base.ASFQuartException(f"Committee {committee_name} not found", errorcode=404)
         )
 
-    class AddForm(forms.Typed):
-        committee_name = wtforms.HiddenField("committee_name")
-        display_name = wtforms.StringField(
-            "Display name",
-            description=f"""\
+    form = await AddForm.create_form(data={"committee_name": committee_name})
+    form.display_name.description = f"""\
 For example, "Apache {committee.display_name}" or "Apache {committee.display_name} Components".
 You must start with "Apache " and you must use title case.
-""",
-        )
-        label = wtforms.StringField(
-            "Label",
-            description=f"""\
+"""
+    form.label.description = f"""\
 For example, "{committee.name}" or "{committee.name}-components".
 You must start with your committee label, and you must use lower case.
-""",
-        )
-        submit = wtforms.SubmitField("Add project")
-
-    form = await AddForm.create_form(data={"committee_name": committee_name})
+"""
 
     if await form.validate_on_submit():
         return await _project_add(form, session.uid)
@@ -486,7 +452,7 @@ async def _policy_edit(
         # Vote section
         release_policy.manual_vote = policy_form.manual_vote.data or False
         if not release_policy.manual_vote:
-            release_policy.mailto_addresses = [util.unwrap(policy_form.mailto_addresses.entries[0].data)]
+            release_policy.mailto_addresses = [util.unwrap(policy_form.mailto_addresses.data)]
             _set_default_min_hours(policy_form, project, release_policy)
             release_policy.pause_for_rm = util.unwrap(policy_form.pause_for_rm.data)
             release_policy.release_checklist = util.unwrap(policy_form.release_checklist.data)
@@ -512,9 +478,9 @@ async def _policy_form_create(project: sql.Project) -> ReleasePolicyForm:
     policy_form = await ReleasePolicyForm.create_form()
     policy_form.project_name.data = project.name
     if project.policy_mailto_addresses:
-        policy_form.mailto_addresses.entries[0].data = project.policy_mailto_addresses[0]
+        policy_form.mailto_addresses.data = project.policy_mailto_addresses[0]
     else:
-        policy_form.mailto_addresses.entries[0].data = f"dev@{project.name}.apache.org"
+        policy_form.mailto_addresses.data = f"dev@{project.name}.apache.org"
     policy_form.min_hours.data = project.policy_min_hours
     policy_form.manual_vote.data = project.policy_manual_vote
     policy_form.release_checklist.data = project.policy_release_checklist
@@ -536,7 +502,7 @@ async def _policy_form_create(project: sql.Project) -> ReleasePolicyForm:
     return policy_form
 
 
-async def _project_add(form: AddFormProtocol, asf_id: str) -> response.Response:
+async def _project_add(form: AddForm, asf_id: str) -> response.Response:
     form_values = await _project_add_validate(form)
     if form_values is None:
         return quart.redirect(util.as_url(add_project, committee_name=form.committee_name.data))
@@ -579,7 +545,7 @@ async def _project_add(form: AddFormProtocol, asf_id: str) -> response.Response:
     return quart.redirect(util.as_url(view, name=label))
 
 
-async def _project_add_validate(form: AddFormProtocol) -> tuple[str, str, str] | None:
+async def _project_add_validate(form: AddForm) -> tuple[str, str, str] | None:
     committee_name = str(form.committee_name.data)
     # Normalise spaces in the display name, then validate
     display_name = str(form.display_name.data).strip()

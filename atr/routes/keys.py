@@ -46,6 +46,20 @@ import atr.user as user
 import atr.util as util
 
 
+class AddOpenPGPKeyForm(forms.Typed):
+    public_key = forms.textarea(
+        "Public OpenPGP key",
+        placeholder="Paste your ASCII-armored public OpenPGP key here...",
+        description="Your public key should be in ASCII-armored format, starting with"
+        ' "-----BEGIN PGP PUBLIC KEY BLOCK-----"',
+    )
+    selected_committees = forms.checkboxes(
+        "Associate key with committees",
+        description="Select the committees with which to associate your key.",
+    )
+    submit = forms.submit("Add OpenPGP key")
+
+
 class AddSSHKeyForm(forms.Typed):
     key = forms.textarea(
         "SSH public key",
@@ -71,34 +85,39 @@ class UpdateCommitteeKeysForm(forms.Typed):
     submit = forms.submit("Regenerate KEYS file")
 
 
+class UpdateKeyCommitteesForm(forms.Typed):
+    selected_committees = forms.multiple(
+        "Associated PMCs",
+        description="Select the committees associated with this key.",
+    )
+    submit = forms.submit("Update associations")
+
+
 class UploadKeyFormBase(forms.Typed):
-    key = wtforms.FileField(
+    key = forms.file(
         "KEYS file",
-        validators=[wtforms.validators.Optional()],
+        optional=True,
         description=(
             "Upload a KEYS file containing multiple PGP public keys."
             " The file should contain keys in ASCII-armored format, starting with"
             ' "-----BEGIN PGP PUBLIC KEY BLOCK-----".'
         ),
     )
-    keys_url = wtforms.URLField(
+    keys_url = forms.url(
         "KEYS file URL",
-        validators=[wtforms.validators.Optional(), wtforms.validators.URL()],
-        render_kw={"placeholder": "Enter URL to KEYS file"},
+        optional=True,
+        placeholder="Enter URL to KEYS file",
         description="Enter a URL to a KEYS file. This will be fetched by the server.",
     )
-    submit = wtforms.SubmitField("Upload KEYS file")
-    selected_committee = wtforms.SelectField(
-        "Associate keys with committees",
-        choices=[(c.name, c.display_name) for c in [] if (not util.committee_is_standing(c.name))],
-        coerce=str,
-        option_widget=wtforms.widgets.RadioInput(),
-        widget=wtforms.widgets.ListWidget(prefix_label=False),
-        validators=[wtforms.validators.InputRequired("You must select at least one committee")],
+
+    selected_committee = forms.radio(
+        "Associate keys with committee",
         description=(
             "Select the committee with which to associate these keys. You must be a member of the selected committee."
         ),
     )
+
+    submit = forms.submit("Upload KEYS file")
 
     async def validate(self, extra_validators: dict | None = None) -> bool:
         """Ensure that either a file is uploaded or a URL is provided, but not both."""
@@ -129,30 +148,12 @@ async def add(session: routes.CommitterSession) -> str:
     async with storage.write(session.uid) as write:
         participant_of_committees = await write.participant_of_committees()
 
-    committee_choices = [(c.name, c.display_name or c.name) for c in participant_of_committees]
-
-    class AddOpenPGPKeyForm(forms.Typed):
-        public_key = wtforms.TextAreaField(
-            "Public OpenPGP key",
-            validators=[wtforms.validators.InputRequired("Public key is required")],
-            render_kw={"placeholder": "Paste your ASCII-armored public OpenPGP key here..."},
-            description="Your public key should be in ASCII-armored format, starting with"
-            ' "-----BEGIN PGP PUBLIC KEY BLOCK-----"',
-        )
-        selected_committees = wtforms.SelectMultipleField(
-            "Associate key with committees",
-            validators=[wtforms.validators.InputRequired("You must select at least one committee")],
-            coerce=str,
-            choices=committee_choices,
-            option_widget=wtforms.widgets.CheckboxInput(),
-            widget=wtforms.widgets.ListWidget(prefix_label=False),
-            description="Select the committees with which to associate your key.",
-        )
-        submit = wtforms.SubmitField("Add OpenPGP key")
+    committee_choices: forms.Choices = [(c.name, c.display_name or c.name) for c in participant_of_committees]
 
     form = await AddOpenPGPKeyForm.create_form(
         data=await quart.request.form if quart.request.method == "POST" else None
     )
+    forms.choices(form.selected_committees, committee_choices)
 
     if await form.validate_on_submit():
         try:
@@ -177,6 +178,7 @@ async def add(session: routes.CommitterSession) -> str:
                 await quart.flash(f"OpenPGP key {key.key_model.fingerprint.upper()} added successfully.", "success")
             # Clear form data on success by creating a new empty form instance
             form = await AddOpenPGPKeyForm.create_form()
+            forms.choices(form.selected_committees, committee_choices)
 
         except routes.FlashError as e:
             log.warning("FlashError adding OpenPGP key: %s", e)
@@ -241,25 +243,13 @@ async def details(session: routes.CommitterSession, fingerprint: str) -> str | r
         if is_owner:
             project_list = session.committees + session.projects
             user_committees = await data.committee(name_in=project_list).all()
-            committee_choices = [(c.name, c.display_name or c.name) for c in user_committees]
+            committee_choices: forms.Choices = [(c.name, c.display_name or c.name) for c in user_committees]
 
-            class UpdateKeyCommitteesForm(forms.Typed):
-                selected_committees = wtforms.SelectMultipleField(
-                    "Associated PMCs",
-                    coerce=str,
-                    choices=committee_choices,
-                    option_widget=wtforms.widgets.CheckboxInput(),
-                    widget=wtforms.widgets.ListWidget(prefix_label=False),
-                    description="Select the committees associated with this key.",
-                )
-                submit = wtforms.SubmitField("Update associations")
-
+            # TODO: Probably need to do data in a separate phase
             form = await UpdateKeyCommitteesForm.create_form(
                 data=await quart.request.form if (quart.request.method == "POST") else None
             )
-
-            if quart.request.method == "GET":
-                form.selected_committees.data = [c.name for c in key.committees]
+            forms.choices(form.selected_committees, committee_choices)
 
     if form and await form.validate_on_submit():
         async with db.session() as data:

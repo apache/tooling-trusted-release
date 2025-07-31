@@ -137,11 +137,11 @@
             <div id="vote-options-extra">
 
               <div class="mb-3 pb-3 row border-bottom">
-                {{ forms.label(policy_form.mailto_addresses.entries[0], col="md3") }}
+                {{ forms.label(policy_form.mailto_addresses, col="md3") }}
                 <div class="col-sm-8">
-                  {{ forms.widget(policy_form.mailto_addresses.entries[0]) }}
-                  {{ forms.errors(policy_form.mailto_addresses.entries[0]) }}
-                  {{ forms.description(policy_form.mailto_addresses.entries[0]) }}
+                  {{ forms.widget(policy_form.mailto_addresses) }}
+                  {{ forms.errors(policy_form.mailto_addresses) }}
+                  {{ forms.description(policy_form.mailto_addresses) }}
                 </div>
               </div>
 
