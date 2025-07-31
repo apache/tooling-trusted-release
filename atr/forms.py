@@ -99,8 +99,32 @@ def constant(value: str) -> list[wtforms.validators.InputRequired | wtforms.vali
     return [REQUIRED, wtforms.validators.Regexp(value, message=f"You must enter {value!r} in this field")]
 
 
-def hidden(**kwargs: Any) -> wtforms.HiddenField:
-    return wtforms.HiddenField(**kwargs)
+def hidden(optional: bool = False, validators: list[Any] | None = None, **kwargs: Any) -> wtforms.HiddenField:
+    if validators is None:
+        validators = []
+    if optional is False:
+        validators.append(REQUIRED)
+    else:
+        validators.append(OPTIONAL)
+    return wtforms.HiddenField(validators=validators, **kwargs)
+
+
+def integer(
+    label: str, optional: bool = False, validators: list[Any] | None = None, **kwargs: Any
+) -> wtforms.IntegerField:
+    if validators is None:
+        validators = []
+    if optional is False:
+        validators.append(REQUIRED)
+    else:
+        validators.append(OPTIONAL)
+    return wtforms.IntegerField(label, validators=validators, **kwargs)
+
+
+def multiple(label: str, validators: list[Any] | None = None, **kwargs: Any) -> wtforms.SelectMultipleField:
+    if validators is None:
+        validators = [REQUIRED]
+    return wtforms.SelectMultipleField(label, validators=validators, **kwargs)
 
 
 def optional(label: str, **kwargs: Any) -> wtforms.StringField:
@@ -150,7 +174,11 @@ def submit(label: str, **kwargs: Any) -> wtforms.SubmitField:
 
 
 def textarea(
-    label: str, optional: bool = False, validators: list[Any] | None = None, **kwargs: Any
+    label: str,
+    optional: bool = False,
+    validators: list[Any] | None = None,
+    placeholder: str | None = None,
+    **kwargs: Any,
 ) -> wtforms.TextAreaField:
     if validators is None:
         validators = []
@@ -158,4 +186,8 @@ def textarea(
         validators.append(REQUIRED)
     else:
         validators.append(OPTIONAL)
+    if placeholder is not None:
+        if "render_kw" not in kwargs:
+            kwargs["render_kw"] = {}
+        kwargs["render_kw"]["placeholder"] = placeholder
     return wtforms.TextAreaField(label, validators=validators, **kwargs)

@@ -23,13 +23,12 @@ import asyncio
 import datetime
 import hashlib
 import pathlib
-from typing import TYPE_CHECKING, Protocol, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 import aiofiles.os
 import aioshutil
 import asfquart.base as base
 import quart
-import wtforms
 
 import atr.analysis as analysis
 import atr.construct as construct
@@ -54,34 +53,29 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-class AddProtocol(Protocol):
-    """Protocol for forms that create release candidate drafts."""
-
-    version_name: wtforms.StringField
-    project_name: wtforms.SelectField
-
-
 class DeleteFileForm(forms.Typed):
     """Form for deleting a file."""
 
-    file_path = wtforms.StringField("File path", validators=[wtforms.validators.InputRequired("File path is required")])
-    submit = wtforms.SubmitField("Delete file")
+    file_path = forms.string("File path")
+    submit = forms.submit("Delete file")
 
 
 class DeleteForm(forms.Typed):
     """Form for deleting a candidate draft."""
 
-    release_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
-    project_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
-    version_name = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
-    confirm_delete = wtforms.StringField(
-        "Confirmation",
-        validators=[
-            wtforms.validators.InputRequired("Confirmation is required"),
-            wtforms.validators.Regexp("^DELETE$", message="Please type DELETE to confirm"),
-        ],
-    )
-    submit = wtforms.SubmitField("Delete candidate draft")
+    release_name = forms.hidden()
+    project_name = forms.hidden()
+    version_name = forms.hidden()
+    confirm_delete = forms.string("Confirmation", validators=forms.constant("DELETE"))
+    submit = forms.submit("Delete candidate draft")
+
+
+class VotePreviewForm(forms.Typed):
+    body = forms.textarea("Body")
+    # TODO: Validate the vote duration again?
+    # Probably not necessary in a preview
+    # Note that tasks/vote.py does not use this form
+    vote_duration = forms.integer("Vote duration")
 
 
 @routes.committer("/draft/delete", methods=["POST"])
@@ -476,14 +470,6 @@ async def vote_preview(
     session: routes.CommitterSession, project_name: str, version_name: str
 ) -> quart.wrappers.response.Response | response.Response | str:
     """Show the vote email preview for a release."""
-
-    class VotePreviewForm(forms.Typed):
-        body = wtforms.TextAreaField("Body", validators=[wtforms.validators.InputRequired("Body is required")])
-        # TODO: Validate the vote duration again? Probably not necessary in a preview
-        # Note that tasks/vote.py does not use this form
-        vote_duration = wtforms.IntegerField(
-            "Vote duration", validators=[wtforms.validators.InputRequired("Vote duration is required")]
-        )
 
     form = await VotePreviewForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():

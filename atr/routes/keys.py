@@ -47,20 +47,20 @@ import atr.util as util
 
 
 class AddSSHKeyForm(forms.Typed):
-    key = wtforms.StringField(
+    key = forms.textarea(
         "SSH public key",
-        widget=wtforms.widgets.TextArea(),
-        render_kw={"placeholder": "Paste your SSH public key here (in the format used in authorized_keys files)"},
+        placeholder="Paste your SSH public key here (in the format used in authorized_keys files)",
         description=(
             "Your SSH public key should be in the standard format, starting with a key type"
             ' (like "ssh-rsa" or "ssh-ed25519") followed by the key data.'
         ),
     )
-    submit = wtforms.SubmitField("Add SSH key")
+
+    submit = forms.submit("Add SSH key")
 
 
 class DeleteKeyForm(forms.Typed):
-    submit = wtforms.SubmitField("Delete key")
+    submit = forms.submit("Delete key")
 
 
 class SshFingerprintError(ValueError):
@@ -68,7 +68,7 @@ class SshFingerprintError(ValueError):
 
 
 class UpdateCommitteeKeysForm(forms.Typed):
-    submit = wtforms.SubmitField("Regenerate KEYS file")
+    submit = forms.submit("Regenerate KEYS file")
 
 
 class UploadKeyFormBase(forms.Typed):

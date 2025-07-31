@@ -20,14 +20,16 @@
 import datetime
 import http.client
 
-import wtforms
-
 import atr.db as db
 import atr.forms as forms
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.template as template
 import atr.util as util
+
+
+class UpdateCommitteeKeysForm(forms.Typed):
+    submit = forms.submit("Regenerate KEYS file")
 
 
 @routes.public("/committees")
@@ -45,18 +47,15 @@ async def directory() -> str:
 @routes.public("/committees/<name>")
 async def view(name: str) -> str:
     # TODO: Could also import this from keys.py
-    class UpdateCommitteeKeysForm(forms.Typed):
-        submit = wtforms.SubmitField("Regenerate KEYS file")
-
     async with db.session() as data:
         committee = await data.committee(name=name, _projects=True, _public_signing_keys=True).demand(
             http.client.HTTPException(404)
         )
-        return await template.render(
-            "committee-view.html",
-            committee=committee,
-            algorithms=routes.algorithms,
-            now=datetime.datetime.now(datetime.UTC),
-            email_from_key=util.email_from_uid,
-            update_committee_keys_form=await UpdateCommitteeKeysForm.create_form(),
-        )
+    return await template.render(
+        "committee-view.html",
+        committee=committee,
+        algorithms=routes.algorithms,
+        now=datetime.datetime.now(datetime.UTC),
+        email_from_key=util.email_from_uid,
+        update_committee_keys_form=await UpdateCommitteeKeysForm.create_form(),
+    )

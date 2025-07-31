@@ -48,23 +48,15 @@ Respond = Callable[[int, str], Awaitable[tuple[quart_response.Response, int] | r
 class DeleteEmptyDirectoryForm(forms.Typed):
     """Form for deleting an empty directory within a preview revision."""
 
-    directory_to_delete = wtforms.SelectField(
-        "Directory to delete", choices=[], validators=[wtforms.validators.DataRequired()]
-    )
-    submit_delete_empty_dir = wtforms.SubmitField("Delete directory")
+    directory_to_delete = forms.select("Directory to delete")
+    submit_delete_empty_dir = forms.submit("Delete directory")
 
 
 class MoveFileForm(forms.Typed):
     """Form for moving one or more files within a preview revision."""
 
-    source_files = wtforms.SelectMultipleField(
-        "Files to move",
-        choices=[],
-        validators=[wtforms.validators.DataRequired(message="Please select at least one file to move.")],
-    )
-    target_directory = wtforms.SelectField(
-        "Target directory", choices=[], validators=[wtforms.validators.DataRequired()], validate_choice=False
-    )
+    source_files = forms.multiple("Files to move")
+    target_directory = forms.select("Target directory", validate_choice=False)
     submit = wtforms.SubmitField("Move file")
 
     def validate_source_files(self, field: fields.SelectMultipleField) -> None:
@@ -84,7 +76,7 @@ class MoveFileForm(forms.Typed):
 
 
 class RemoveRCTagsForm(forms.Typed):
-    submit_remove_rc_tags = wtforms.SubmitField("Remove RC tags")
+    submit_remove_rc_tags = forms.submit("Remove RC tags")
 
 
 @dataclasses.dataclass
