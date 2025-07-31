@@ -29,6 +29,7 @@ import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.resolve as resolve
+import atr.storage as storage
 import atr.tasks.message as message
 import atr.util as util
 
@@ -50,8 +51,8 @@ _THREAD_URLS_FOR_DEVELOPMENT: Final[dict[str, str]] = {
 class CastVoteForm(forms.Typed):
     """Form for casting a vote."""
 
-    vote_value = forms.radio("Your vote", choices=[("+1", "+1 (Binding)"), ("0", "0"), ("-1", "-1 (Binding)")])
-    vote_comment = forms.textarea("Comment (optional)")
+    vote_value = forms.radio("Your vote")
+    vote_comment = forms.textarea("Comment (optional)", optional=True)
     submit = forms.submit("Submit vote")
 
 
@@ -89,10 +90,34 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         task_mid = resolve.task_mid_get(latest_vote_task)
         archive_url = await task_archive_url_cached(task_mid)
 
-    form = await CastVoteForm.create_form()
+    # Special form for the [ Resolve vote ] button, to make it POST
     hidden_form = await forms.Hidden.create_form()
     hidden_form.hidden_field.data = archive_url or ""
     hidden_form.submit.label.text = "Resolve vote"
+
+    if release.committee is None:
+        raise ValueError("Release has no committee")
+
+    # Form to cast a vote
+    form = await CastVoteForm.create_form()
+    async with storage.write(session.asf_uid) as write:
+        try:
+            if release.committee.is_podling:
+                _wacm = write.as_committee_member("incubator")
+            else:
+                _wacm = write.as_committee_member(release.committee.name)
+            potency = "Binding"
+        except storage.AccessError:
+            potency = "Non-binding"
+    forms.choices(
+        form.vote_value,
+        choices=[
+            ("+1", f"+1 ({potency})"),
+            ("0", "0"),
+            ("-1", f"-1 ({potency})"),
+        ],
+    )
+
     return await compose.check(
         session,
         release,
