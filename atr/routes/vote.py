@@ -20,7 +20,6 @@ from typing import Final
 import aiohttp
 import quart
 import werkzeug.wrappers.response as response
-import wtforms
 
 import atr.db as db
 import atr.forms as forms
@@ -51,13 +50,9 @@ _THREAD_URLS_FOR_DEVELOPMENT: Final[dict[str, str]] = {
 class CastVoteForm(forms.Typed):
     """Form for casting a vote."""
 
-    vote_value = wtforms.RadioField(
-        "Your vote",
-        choices=[("+1", "+1 (Binding)"), ("0", "0"), ("-1", "-1 (Binding)")],
-        validators=[wtforms.validators.InputRequired("A vote value (+1, 0, -1) is required.")],
-    )
-    vote_comment = wtforms.TextAreaField("Comment (optional)", validators=[wtforms.validators.Optional()])
-    submit = wtforms.SubmitField("Submit vote")
+    vote_value = forms.radio("Your vote", choices=[("+1", "+1 (Binding)"), ("0", "0"), ("-1", "-1 (Binding)")])
+    vote_comment = forms.textarea("Comment (optional)")
+    submit = forms.submit("Submit vote")
 
 
 @routes.committer("/vote/<project_name>/<version_name>")

@@ -19,7 +19,6 @@
 import quart
 import sqlmodel
 import werkzeug.wrappers.response as response
-import wtforms
 
 import atr.construct as construct
 import atr.db as db
@@ -41,26 +40,30 @@ import atr.util as util
 class ResolveVoteForm(forms.Typed):
     """Form for resolving a vote."""
 
-    email_body = wtforms.TextAreaField("Email body", render_kw={"rows": 24})
-    vote_result = wtforms.RadioField(
+    email_body = forms.textarea("Email body", optional=True, rows=24)
+    vote_result = forms.radio(
         "Vote result",
-        choices=[("passed", "Passed"), ("failed", "Failed")],
-        validators=[wtforms.validators.InputRequired("Vote result is required")],
+        choices=[
+            ("passed", "Passed"),
+            ("failed", "Failed"),
+        ],
     )
-    submit = wtforms.SubmitField("Resolve vote")
+    submit = forms.submit("Resolve vote")
 
 
 class ResolveVoteManualForm(forms.Typed):
     """Form for resolving a vote manually."""
 
-    vote_result = wtforms.RadioField(
+    vote_result = forms.radio(
         "Vote result",
-        choices=[("passed", "Passed"), ("failed", "Failed")],
-        validators=[wtforms.validators.InputRequired("Vote result is required")],
+        choices=[
+            ("passed", "Passed"),
+            ("failed", "Failed"),
+        ],
     )
-    vote_thread_url = wtforms.StringField("Vote thread URL")
-    vote_result_url = wtforms.StringField("Vote result URL")
-    submit = wtforms.SubmitField("Resolve vote")
+    vote_thread_url = forms.string("Vote thread URL")
+    vote_result_url = forms.string("Vote result URL")
+    submit = forms.submit("Resolve vote")
 
 
 async def release_latest_vote_task(release: sql.Release) -> sql.Task | None:

@@ -34,55 +34,41 @@ import atr.routes.compose as compose
 import atr.template as template
 
 
+class AddFilesForm(forms.Typed):
+    """Form for adding files to a release candidate."""
+
+    file_name = forms.optional(
+        "File name",
+        description="Optional: Enter a file name to use when saving the "
+        "file in the release candidate. Only available when uploading a "
+        "single file.",
+    )
+    file_data = forms.files("Files", description="Select the files to upload.")
+    submit = forms.submit("Add files")
+
+    def validate_file_name(self, field: wtforms.Field) -> bool:
+        if field.data and len(self.file_data.data) > 1:
+            raise wtforms.validators.ValidationError("File name can only be used when uploading a single file")
+        return True
+
+
 class SvnImportForm(forms.Typed):
     """Form for importing files from SVN into a draft."""
 
-    svn_url = wtforms.URLField(
-        "SVN URL",
-        validators=[
-            wtforms.validators.InputRequired("SVN URL is required."),
-            wtforms.validators.URL(require_tld=False),
-        ],
-        description="The URL to the public SVN directory.",
+    svn_url = forms.url("SVN URL", description="The URL to the public SVN directory.")
+    revision = forms.string(
+        "Revision", default="HEAD", description="Specify an SVN revision number or leave as HEAD for the latest."
     )
-    revision = wtforms.StringField(
-        "Revision",
-        default="HEAD",
-        validators=[],
-        description="Specify an SVN revision number or leave as HEAD for the latest.",
+    target_subdirectory = forms.string(
+        "Target subdirectory", description="Optional: Subdirectory to place imported files, defaulting to the root."
     )
-    target_subdirectory = wtforms.StringField(
-        "Target subdirectory",
-        validators=[],
-        description="Optional: Subdirectory to place imported files, defaulting to the root.",
-    )
-    submit = wtforms.SubmitField("Queue SVN import task")
+    submit = forms.submit("Queue SVN import task")
 
 
 @routes.committer("/upload/<project_name>/<version_name>", methods=["GET", "POST"])
 async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show a page to allow the user to add files to a candidate draft."""
     await session.check_access(project_name)
-
-    class AddFilesForm(forms.Typed):
-        """Form for adding files to a release candidate."""
-
-        file_name = wtforms.StringField(
-            "File name",
-            description="Optional: Enter a file name to use when saving the"
-            " file in the release candidate. Only available when uploading a single file.",
-        )
-        file_data = wtforms.MultipleFileField(
-            "Files",
-            validators=[wtforms.validators.InputRequired("At least one file is required")],
-            description="Select the files to upload.",
-        )
-        submit = wtforms.SubmitField("Add files")
-
-        def validate_file_name(self, field: wtforms.Field) -> bool:
-            if field.data and len(self.file_data.data) > 1:
-                raise wtforms.validators.ValidationError("File name can only be used when uploading a single file")
-            return True
 
     form = await AddFilesForm.create_form()
     if await form.validate_on_submit():

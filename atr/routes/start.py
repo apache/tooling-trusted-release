@@ -20,7 +20,6 @@ import datetime
 import asfquart.base as base
 import quart
 import werkzeug.wrappers.response as response
-import wtforms
 
 import atr.db as db
 import atr.forms as forms
@@ -33,17 +32,13 @@ import atr.util as util
 
 
 class StartReleaseForm(forms.Typed):
-    project_name = wtforms.HiddenField()
-    version_name = wtforms.StringField(
+    project_name = forms.hidden()
+    version_name = forms.string(
         "Version",
-        validators=[
-            wtforms.validators.InputRequired("Version is required"),
-            wtforms.validators.Length(min=1, max=100),
-        ],
-        render_kw={"placeholder": "Examples: 1.2.3+rc1 or 2.5"},
+        placeholder="Examples: 1.2.3+rc1 or 2.5",
         description="Enter the version string for this new release.",
     )
-    submit = wtforms.SubmitField("Start new release")
+    submit = forms.submit("Start new release")
 
 
 async def create_release_draft(project_name: str, version: str, asf_uid: str) -> tuple[sql.Release, sql.Project]:

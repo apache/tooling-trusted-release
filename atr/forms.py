@@ -132,6 +132,18 @@ def file(label: str, optional: bool = False, validators: list[Any] | None = None
     return wtforms.FileField(label, validators=validators, **kwargs)
 
 
+def files(
+    label: str, optional: bool = False, validators: list[Any] | None = None, **kwargs: Any
+) -> wtforms.MultipleFileField:
+    if validators is None:
+        validators = []
+    if optional is False:
+        validators.append(REQUIRED)
+    else:
+        validators.append(OPTIONAL)
+    return wtforms.MultipleFileField(label, validators=validators, **kwargs)
+
+
 def hidden(optional: bool = False, validators: list[Any] | None = None, **kwargs: Any) -> wtforms.HiddenField:
     if validators is None:
         validators = []
@@ -152,6 +164,15 @@ def integer(
     else:
         validators.append(OPTIONAL)
     return wtforms.IntegerField(label, validators=validators, **kwargs)
+
+
+def length(min: int | None = None, max: int | None = None) -> list[wtforms.validators.Length]:
+    validators = []
+    if min is not None:
+        validators.append(wtforms.validators.Length(min=min))
+    if max is not None and max > 0:
+        validators.append(wtforms.validators.Length(max=max))
+    return validators
 
 
 # TODO: Do we need this?
@@ -235,7 +256,6 @@ def textarea(
 def url(
     label: str,
     optional: bool = False,
-    placeholder: str | None = None,
     validators: list[Any] | None = None,
     **kwargs: Any,
 ) -> wtforms.URLField:

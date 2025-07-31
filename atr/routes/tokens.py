@@ -27,7 +27,6 @@ import quart
 import sqlmodel
 import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
-import wtforms
 import wtforms.fields.core as core
 from htpy import (
     Element,
@@ -63,21 +62,17 @@ type Fragment = Element | core.Field | str
 
 
 class AddTokenForm(forms.Typed):
-    label = wtforms.StringField(
-        "Label",
-        validators=[wtforms.validators.Optional(), wtforms.validators.Length(max=100)],
-        render_kw={"placeholder": "E.g. CI bot"},
-    )
-    submit = wtforms.SubmitField("Generate token")
+    label = forms.string("Label", optional=True, validators=forms.length(max=100), placeholder="E.g. CI bot")
+    submit = forms.submit("Generate token")
 
 
 class DeleteTokenForm(forms.Typed):
-    token_id = wtforms.HiddenField(validators=[wtforms.validators.InputRequired()])
-    submit = wtforms.SubmitField("Delete")
+    token_id = forms.hidden()
+    submit = forms.submit("Delete")
 
 
 class IssueJWTForm(forms.Typed):
-    submit = wtforms.SubmitField("Generate JWT")
+    submit = forms.submit("Generate JWT")
 
 
 @routes.committer("/tokens/jwt", methods=["POST"])
