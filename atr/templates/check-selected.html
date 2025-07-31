@@ -156,6 +156,9 @@
     {% else %}
       <p>No ignored checks found.</p>
     {% endif %}
+    <p>
+      You can also <a href="{{ as_url(routes.ignores.ignores, committee_name=release.committee.name) }}">manage which check results are ignored</a>.
+    </p>
 
     <h2>Debugging</h2>
     <div class="mb-2">

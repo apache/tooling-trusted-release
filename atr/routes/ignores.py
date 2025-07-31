@@ -133,13 +133,13 @@ async def ignores_committee_add(session: routes.CommitterSession, committee_name
     async with storage.write(session.asf_uid) as write:
         wacm = write.as_committee_member(committee_name)
         await wacm.checks.ignore_add(
-            release_glob=form.release_glob.data,
-            revision_number=form.revision_number.data,
-            checker_glob=form.checker_glob.data,
-            primary_rel_path_glob=form.primary_rel_path_glob.data,
-            member_rel_path_glob=form.member_rel_path_glob.data,
+            release_glob=form.release_glob.data or None,
+            revision_number=form.revision_number.data or None,
+            checker_glob=form.checker_glob.data or None,
+            primary_rel_path_glob=form.primary_rel_path_glob.data or None,
+            member_rel_path_glob=form.member_rel_path_glob.data or None,
             status=status,
-            message_glob=form.message_glob.data,
+            message_glob=form.message_glob.data or None,
         )
 
     return await session.redirect(
@@ -199,13 +199,13 @@ async def ignores_committee_update(session: routes.CommitterSession, committee_n
         wacm = write.as_committee_member(committee_name)
         await wacm.checks.ignore_update(
             id=cri_id,
-            release_glob=form.release_glob.data,
-            revision_number=form.revision_number.data,
-            checker_glob=form.checker_glob.data,
-            primary_rel_path_glob=form.primary_rel_path_glob.data,
-            member_rel_path_glob=form.member_rel_path_glob.data,
+            release_glob=form.release_glob.data or None,
+            revision_number=form.revision_number.data or None,
+            checker_glob=form.checker_glob.data or None,
+            primary_rel_path_glob=form.primary_rel_path_glob.data or None,
+            member_rel_path_glob=form.member_rel_path_glob.data or None,
             status=status,
-            message_glob=form.message_glob.data,
+            message_glob=form.message_glob.data or None,
         )
 
     return await session.redirect(
