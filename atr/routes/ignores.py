@@ -83,6 +83,11 @@ class AddIgnoreForm(forms.Typed):
     # TODO: Validate that at least one field is set
 
 
+class DeleteIgnoreForm(forms.Typed):
+    id = forms.hidden()
+    submit = forms.submit("Delete")
+
+
 @routes.committer("/ignores/<committee_name>", methods=["GET", "POST"])
 async def ignores(session: routes.CommitterSession, committee_name: str) -> str | response.Response:
     async with storage.read(session.asf_uid) as read:
@@ -94,7 +99,7 @@ async def ignores(session: routes.CommitterSession, committee_name: str) -> str 
         p[f"Manage ignored checks for committee {committee_name}."],
         _add_ignore(committee_name),
         _existing_ignores(ignores),
-        _script(_UPDATE_IGNORE_FORM),
+        _script_dom_loaded(_UPDATE_IGNORE_FORM),
     ]
 
     return await template.blank("Ignored checks", content)
@@ -128,10 +133,50 @@ async def ignores_committee_add(session: routes.CommitterSession, committee_name
     )
 
 
+@routes.committer("/ignores/<committee_name>/delete", methods=["POST"])
+async def ignores_committee_delete(session: routes.CommitterSession, committee_name: str) -> str | response.Response:
+    data = await quart.request.form
+    form = await DeleteIgnoreForm.create_form(data=data)
+    if not (await form.validate_on_submit()):
+        return await session.redirect(
+            ignores,
+            committee_name=committee_name,
+            error="Form validation errors",
+        )
+
+    if not isinstance(form.id.data, str):
+        return await session.redirect(
+            ignores,
+            committee_name=committee_name,
+            error="Invalid ignore ID",
+        )
+
+    cri_id = int(form.id.data)
+    async with storage.write(session.asf_uid) as write:
+        wacm = write.as_committee_member(committee_name)
+        await wacm.checks.ignore_delete(id=cri_id)
+
+    return await session.redirect(
+        ignores,
+        committee_name=committee_name,
+        success="Ignore deleted",
+    )
+
+
 def _check_result_ignore_card(cri: sql.CheckResultIgnore) -> htpy.Element:
     card_header_h3 = h3(".mb-0")[f"{cri.id or ''} - {cri.asf_uid} - {util.format_datetime(cri.created)}"]
 
     table_rows = []
+
+    form = DeleteIgnoreForm(id=cri.id)
+    form_path = util.as_url(ignores_committee_delete, committee_name=cri.committee_name)
+    delete_ignore_form = forms.render(
+        form,
+        form_path,
+        form_classes="",
+        submit_classes="btn-danger",
+        columns=False,
+    )
 
     def add_row(label: str, value: str | None) -> None:
         nonlocal table_rows
@@ -140,10 +185,7 @@ def _check_result_ignore_card(cri: sql.CheckResultIgnore) -> htpy.Element:
                 tr[
                     th[label],
                     td[input(".form-control.form-control-sm", data_value=value, value=value)],
-                    td[
-                        button(".btn.btn-primary.btn-sm.me-4.disabled")["Update"],
-                        button(".btn.btn-danger.btn-sm")["Delete"],
-                    ],
+                    td[button(".btn.btn-primary.btn-sm.me-4.disabled")["Update"],],
                 ]
             )
 
@@ -159,7 +201,7 @@ def _check_result_ignore_card(cri: sql.CheckResultIgnore) -> htpy.Element:
 
     card = div(".card")[
         div(".card-header")[card_header_h3],
-        div(".card-body")[table_striped, p[button(".btn.btn-danger.btn-sm")["Delete"]]],
+        div(".card-body")[table_striped, delete_ignore_form],
     ]
 
     return card
@@ -177,15 +219,14 @@ def _add_ignore(committee_name: str) -> htpy.Element:
 def _existing_ignores(ignores: list[sql.CheckResultIgnore]) -> htpy.Element:
     return div[
         h2["Existing ignores"],
-        [_check_result_ignore_card(cri) for cri in ignores],
+        [_check_result_ignore_card(cri) for cri in ignores] or p["No ignores found."],
     ]
 
 
-def _script(text: str) -> htpy.Element:
-    return script[
-        markupsafe.Markup(f"""
+def _script_dom_loaded(text: str) -> htpy.Element:
+    script_text = markupsafe.Markup(f"""
 document.addEventListener("DOMContentLoaded", function () {{
-  {text}
+{text}
 }});
 """)
-    ]
+    return script[script_text]

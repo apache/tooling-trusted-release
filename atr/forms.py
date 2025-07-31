@@ -199,38 +199,55 @@ def radio(label: str, optional: bool = False, validators: list[Any] | None = Non
     return wtforms.RadioField(label, validators=validators, **kwargs)
 
 
-def render(form: Typed, action: str) -> htpy.Element:
+def render(
+    form: Typed,
+    action: str,
+    form_classes: str = ".atr-canary",
+    submit_classes: str = "btn-primary",
+    columns: bool = True,
+) -> htpy.Element:
     hidden_elems: list[markupsafe.Markup] = []
     field_rows: list[htpy.Element] = []
     submit_row: htpy.Element | None = None
 
+    label_class = "col-sm-3 col-form-label text-sm-end" if columns else "text-sm-end"
     for field in form:
         if isinstance(field, wtforms.HiddenField):
             hidden_elems.append(markupsafe.Markup(str(field)))
             continue
+
         if isinstance(field, wtforms.StringField):
             widget = markupsafe.Markup(str(field(class_="form-control")))
-            label_html = markupsafe.Markup(str(field.label(class_="col-sm-3 col-form-label text-sm-end")))
-            row = htpy.div(".mb-3 row")[label_html, htpy.div(".col-sm-8")[widget]]
+            label_html = markupsafe.Markup(str(field.label(class_=label_class)))
+            row_class = ".mb-3.row" if columns else ".row"
+            widget_class = ".col-sm-8" if columns else ""
+            row = htpy.div(row_class)[label_html, htpy.div(widget_class)[widget]]
             field_rows.append(row)
             continue
+
         if isinstance(field, wtforms.SelectField):
             widget = markupsafe.Markup(str(field(class_="form-select")))
-            label_html = markupsafe.Markup(str(field.label(class_="col-sm-3 col-form-label text-sm-end")))
-            row = htpy.div(".mb-3 row")[label_html, htpy.div(".col-sm-8")[widget]]
+            label_html = markupsafe.Markup(str(field.label(class_=label_class)))
+            row_class = ".mb-3.row" if columns else ".row"
+            widget_class = ".col-sm-8" if columns else ""
+            row = htpy.div(row_class)[label_html, htpy.div(widget_class)[widget]]
             field_rows.append(row)
             continue
+
         if isinstance(field, wtforms.SubmitField):
-            button_html = markupsafe.Markup(str(field(class_="btn btn-primary mt-2")))
-            submit_row = htpy.div(".row")[htpy.div(".col-sm-9 offset-sm-3")[button_html]]
+            button_class = "btn " + submit_classes
+            button_html = markupsafe.Markup(str(field(class_=button_class)))
+            div_class = ".col-sm-9.offset-sm-3" if columns else ""
+            submit_row = htpy.div(".row")[htpy.div(div_class)[button_html]]
             continue
+
         raise TypeError(f"Unsupported field type: {type(field).__name__}")
 
     form_children: list[htpy.Element | markupsafe.Markup] = hidden_elems + field_rows
     if submit_row is not None:
         form_children.append(submit_row)
 
-    return htpy.form(".atr-canary", action=action, method="post")[form_children]
+    return htpy.form(form_classes, action=action, method="post")[form_children]
 
 
 def select(
