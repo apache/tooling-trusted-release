@@ -77,6 +77,9 @@ class CheckResultStatusIgnore(str, enum.Enum):
             case _:
                 raise ValueError(f"Invalid status: {status}")
 
+    def to_form_field(self) -> str:
+        return f"CheckResultStatusIgnore.{self.value.upper()}"
+
 
 class ProjectStatus(str, enum.Enum):
     ACTIVE = "active"

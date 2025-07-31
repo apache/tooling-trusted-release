@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any, Final, TypeVar
 
 import htpy
@@ -59,6 +60,13 @@ class Typed(quart_wtf.QuartForm):
 
 
 F = TypeVar("F", bound=Typed)
+
+
+@dataclasses.dataclass
+class Elements:
+    hidden: list[markupsafe.Markup]
+    fields: list[tuple[markupsafe.Markup, markupsafe.Markup]]
+    submit: markupsafe.Markup | None
 
 
 class Empty(Typed):
@@ -199,52 +207,123 @@ def radio(label: str, optional: bool = False, validators: list[Any] | None = Non
     return wtforms.RadioField(label, validators=validators, **kwargs)
 
 
-def render(
+def render_columns(
     form: Typed,
     action: str,
     form_classes: str = ".atr-canary",
     submit_classes: str = "btn-primary",
-    columns: bool = True,
 ) -> htpy.Element:
-    hidden_elems: list[markupsafe.Markup] = []
-    field_rows: list[htpy.Element] = []
-    submit_row: htpy.Element | None = None
+    label_classes = "col-sm-3 col-form-label text-sm-end"
+    elements = render_elements(
+        form,
+        label_classes=label_classes,
+        submit_classes=submit_classes,
+    )
 
-    label_class = "col-sm-3 col-form-label text-sm-end" if columns else "text-sm-end"
+    field_rows: list[htpy.Element] = []
+    for label, widget in elements.fields:
+        row_div = htpy.div(".mb-3.row")
+        widget_div = htpy.div(".col-sm-8")
+        field_rows.append(row_div[label, widget_div[widget]])
+
+    form_children: list[htpy.Element | markupsafe.Markup] = elements.hidden + field_rows
+
+    if elements.submit is not None:
+        submit_div = htpy.div(".col-sm-9.offset-sm-3")
+        submit_row = htpy.div(".row")[submit_div[elements.submit]]
+        form_children.append(submit_row)
+
+    return htpy.form(form_classes, action=action, method="post")[form_children]
+
+
+def render_elements(
+    form: Typed,
+    label_classes: str = "col-sm-3 col-form-label text-sm-end",
+    submit_classes: str = "btn-primary",
+    small: bool = False,
+) -> Elements:
+    hidden_elements: list[markupsafe.Markup] = []
+    field_elements: list[tuple[markupsafe.Markup, markupsafe.Markup]] = []
+    submit_element: markupsafe.Markup | None = None
+
     for field in form:
         if isinstance(field, wtforms.HiddenField):
-            hidden_elems.append(markupsafe.Markup(str(field)))
+            hidden_elements.append(markupsafe.Markup(str(field)))
             continue
 
         if isinstance(field, wtforms.StringField):
-            widget = markupsafe.Markup(str(field(class_="form-control")))
-            label_html = markupsafe.Markup(str(field.label(class_=label_class)))
-            row_class = ".mb-3.row" if columns else ".row"
-            widget_class = ".col-sm-8" if columns else ""
-            row = htpy.div(row_class)[label_html, htpy.div(widget_class)[widget]]
-            field_rows.append(row)
+            label = markupsafe.Markup(str(field.label(class_=label_classes)))
+            widget_class = "form-control"
+            if small is True:
+                widget_class += " form-control-sm"
+            widget = markupsafe.Markup(str(field(class_=widget_class)))
+            field_elements.append((label, widget))
             continue
 
         if isinstance(field, wtforms.SelectField):
-            widget = markupsafe.Markup(str(field(class_="form-select")))
-            label_html = markupsafe.Markup(str(field.label(class_=label_class)))
-            row_class = ".mb-3.row" if columns else ".row"
-            widget_class = ".col-sm-8" if columns else ""
-            row = htpy.div(row_class)[label_html, htpy.div(widget_class)[widget]]
-            field_rows.append(row)
+            label = markupsafe.Markup(str(field.label(class_=label_classes)))
+            widget_class = "form-select"
+            if small is True:
+                widget_class += " form-select-sm"
+            widget = markupsafe.Markup(str(field(class_=widget_class)))
+            field_elements.append((label, widget))
             continue
 
         if isinstance(field, wtforms.SubmitField):
             button_class = "btn " + submit_classes
-            button_html = markupsafe.Markup(str(field(class_=button_class)))
-            div_class = ".col-sm-9.offset-sm-3" if columns else ""
-            submit_row = htpy.div(".row")[htpy.div(div_class)[button_html]]
+            submit_element = markupsafe.Markup(str(field(class_=button_class)))
             continue
 
         raise TypeError(f"Unsupported field type: {type(field).__name__}")
 
-    form_children: list[htpy.Element | markupsafe.Markup] = hidden_elems + field_rows
-    if submit_row is not None:
+    return Elements(hidden_elements, field_elements, submit_element)
+
+
+def render_simple(
+    form: Typed,
+    action: str,
+    form_classes: str = "",
+    submit_classes: str = "btn-primary",
+) -> htpy.Element:
+    elements = render_elements(form, submit_classes=submit_classes)
+
+    field_rows: list[htpy.Element] = []
+    for label, widget in elements.fields:
+        row_div = htpy.div[label, widget]
+        field_rows.append(row_div)
+
+    form_children: list[htpy.Element | markupsafe.Markup] = []
+    form_children.extend(elements.hidden)
+    form_children.append(htpy.div[field_rows])
+
+    if elements.submit is not None:
+        submit_row = htpy.p[elements.submit]
+        form_children.append(submit_row)
+
+    return htpy.form(form_classes, action=action, method="post")[form_children]
+
+
+def render_table(
+    form: Typed,
+    action: str,
+    form_classes: str = "",
+    table_classes: str = ".table.table-striped.table-bordered",
+    submit_classes: str = "btn-primary",
+) -> htpy.Element:
+    # Small elements in Bootstrap
+    elements = render_elements(form, submit_classes=submit_classes, small=True)
+
+    field_rows: list[htpy.Element] = []
+    for label, widget in elements.fields:
+        row_tr = htpy.tr[htpy.th[label], htpy.td[widget]]
+        field_rows.append(row_tr)
+
+    form_children: list[htpy.Element | markupsafe.Markup] = []
+    form_children.extend(elements.hidden)
+    form_children.append(htpy.table(table_classes)[htpy.tbody[field_rows]])
+
+    if elements.submit is not None:
+        submit_row = htpy.p[elements.submit]
         form_children.append(submit_row)
 
     return htpy.form(form_classes, action=action, method="post")[form_children]

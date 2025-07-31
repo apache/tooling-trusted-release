@@ -120,3 +120,26 @@ class CommitteeMember(CommitteeParticipant):
         via = sql.validate_instrumented_attribute
         await self.__data.execute(sqlmodel.delete(sql.CheckResultIgnore).where(via(sql.CheckResultIgnore.id) == id))
         await self.__data.commit()
+
+    async def ignore_update(
+        self,
+        id: int,
+        release_glob: str | None = None,
+        revision_number: str | None = None,
+        checker_glob: str | None = None,
+        primary_rel_path_glob: str | None = None,
+        member_rel_path_glob: str | None = None,
+        status: sql.CheckResultStatusIgnore | None = None,
+        message_glob: str | None = None,
+    ) -> None:
+        cri = await self.__data.get(sql.CheckResultIgnore, id)
+        if cri is None:
+            raise storage.AccessError(f"Ignore {id} not found")
+        cri.release_glob = release_glob
+        cri.revision_number = revision_number
+        cri.checker_glob = checker_glob
+        cri.primary_rel_path_glob = primary_rel_path_glob
+        cri.member_rel_path_glob = member_rel_path_glob
+        cri.status = status
+        cri.message_glob = message_glob
+        await self.__data.commit()
