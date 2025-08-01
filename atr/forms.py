@@ -395,6 +395,7 @@ def url(
     label: str,
     optional: bool = False,
     validators: list[Any] | None = None,
+    placeholder: str | None = None,
     **kwargs: Any,
 ) -> wtforms.URLField:
     if validators is None:
@@ -403,4 +404,8 @@ def url(
         validators.append(REQUIRED)
     else:
         validators.append(OPTIONAL)
+    if placeholder is not None:
+        if "render_kw" not in kwargs:
+            kwargs["render_kw"] = {}
+        kwargs["render_kw"]["placeholder"] = placeholder
     return wtforms.URLField(label, validators=validators, **kwargs)

@@ -65,4 +65,5 @@ async def view(name: str) -> str:
         now=datetime.datetime.now(datetime.UTC),
         email_from_key=util.email_from_uid,
         update_committee_keys_form=await UpdateCommitteeKeysForm.create_form(),
+        is_standing=util.committee_is_standing(name),
     )

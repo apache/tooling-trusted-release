@@ -40,53 +40,56 @@
     </div>
   </div>
 
-  <div class="card mb-4">
-    <div class="card-header bg-light">
-      <h3 class="mb-2">Signing keys</h3>
-    </div>
-    <div class="card-body">
-      <div class="mb-4">
-        <a href="{{ as_url(routes.keys.upload) }}"
-           class="btn btn-outline-primary">Upload a KEYS file</a>
+  {# Allow tooling to assocaite keys for testing #}
+  {% if (not is_standing) or (committee.name == "tooling") %}
+    <div class="card mb-4">
+      <div class="card-header bg-light">
+        <h3 class="mb-2">Signing keys</h3>
       </div>
-      {% if committee.public_signing_keys %}
-        <div class="table-responsive mb-2">
-          <table class="table border table-striped table-hover table-sm">
-            <thead>
-              <tr>
-                <th class="px-2" scope="col">Key ID</th>
-                <th class="px-2" scope="col">Email</th>
-                <th class="px-2" scope="col">Apache UID</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for key in committee.public_signing_keys %}
-                <tr>
-                  <td class="text-break font-monospace px-2">
-                    <a href="{{ as_url(routes.keys.details, fingerprint=key.fingerprint) }}">{{ key.fingerprint[-16:]|upper }}</a>
-                  </td>
-                  <td class="text-break px-2">{{ email_from_key(key.primary_declared_uid) or 'Not specified' }}</td>
-                  <td class="text-break px-2">{{ key.apache_uid or "-" }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+      <div class="card-body">
+        <div class="mb-4">
+          <a href="{{ as_url(routes.keys.upload) }}"
+             class="btn btn-outline-primary">Upload a KEYS file</a>
         </div>
-        <p class="text-muted">
-          The <code>KEYS</code> file is automatically generated when you add or remove a key, but you can also use the form below to manually regenerate it.
-        </p>
-        <form method="post"
-              action="{{ as_url(routes.keys.update_committee_keys, committee_name=committee.name) }}"
-              class="mb-4 d-inline-block">
-          {{ update_committee_keys_form.hidden_tag() }}
+        {% if committee.public_signing_keys %}
+          <div class="table-responsive mb-2">
+            <table class="table border table-striped table-hover table-sm">
+              <thead>
+                <tr>
+                  <th class="px-2" scope="col">Key ID</th>
+                  <th class="px-2" scope="col">Email</th>
+                  <th class="px-2" scope="col">Apache UID</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for key in committee.public_signing_keys %}
+                  <tr>
+                    <td class="text-break font-monospace px-2">
+                      <a href="{{ as_url(routes.keys.details, fingerprint=key.fingerprint) }}">{{ key.fingerprint[-16:]|upper }}</a>
+                    </td>
+                    <td class="text-break px-2">{{ email_from_key(key.primary_declared_uid) or 'Not specified' }}</td>
+                    <td class="text-break px-2">{{ key.apache_uid or "-" }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="text-muted">
+            The <code>KEYS</code> file is automatically generated when you add or remove a key, but you can also use the form below to manually regenerate it.
+          </p>
+          <form method="post"
+                action="{{ as_url(routes.keys.update_committee_keys, committee_name=committee.name) }}"
+                class="mb-4 d-inline-block">
+            {{ update_committee_keys_form.hidden_tag() }}
 
-          {{ update_committee_keys_form.submit(class_='btn btn-sm btn-outline-secondary') }}
-        </form>
-      {% else %}
-        <p class="mb-4">No keys uploaded for this committee yet.</p>
-      {% endif %}
+            {{ update_committee_keys_form.submit(class_='btn btn-sm btn-outline-secondary') }}
+          </form>
+        {% else %}
+          <p class="mb-4">No keys uploaded for this committee yet.</p>
+        {% endif %}
+      </div>
     </div>
-  </div>
+  {% endif %}
 
 {% endblock content %}
 

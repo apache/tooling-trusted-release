@@ -455,10 +455,15 @@ async def upload(session: routes.CommitterSession) -> str:
     async with storage.write(session.uid) as write:
         participant_of_committees = await write.participant_of_committees()
 
+    # TODO: Migrate to the forms interface
     class UploadKeyForm(UploadKeyFormBase):
         selected_committee = wtforms.SelectField(
             "Associate keys with committee",
-            choices=[(c.name, c.display_name) for c in participant_of_committees],
+            choices=[
+                (c.name, c.display_name)
+                for c in participant_of_committees
+                if (not util.committee_is_standing(c.name)) or (c.name == "tooling")
+            ],
             coerce=str,
             option_widget=wtforms.widgets.RadioInput(),
             widget=wtforms.widgets.ListWidget(prefix_label=False),
