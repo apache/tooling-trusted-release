@@ -91,6 +91,7 @@ class CommitteeData(schema.Strict):
     officers: dict[str, Any] = schema.factory(dict)
     board: dict[str, Any] = schema.factory(dict)
     committees: Annotated[list[Committee], helpers.DictToList(key="name")]
+    next_board_meetings: dict[str, Any] = schema.alias_opt("nextBoardMeetings")
 
 
 class RetiredCommittee(schema.Strict):
