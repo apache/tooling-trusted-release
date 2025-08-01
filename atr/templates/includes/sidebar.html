@@ -108,6 +108,10 @@
           <i class="bi bi-book"></i>
           <a href="{{ as_url(routes.root.tutorial) }}">Tutorial</a>
         </li>
+        <li>
+          <i class="bi bi-book"></i>
+          <a href="{{ as_url(routes.root.policies) }}">Policies</a>
+        </li>
       </ul>
 
       {% if is_viewing_as_admin_fn(current_user.uid) %}
