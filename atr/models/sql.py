@@ -559,13 +559,17 @@ Thanks,
     def policy_binary_artifact_paths(self) -> list[str]:
         if (policy := self.release_policy) is None:
             return []
-        return policy.binary_artifact_paths
+        # TODO: The type of policy.binary_artifact_paths is list[str]
+        # But the production server has None values
+        return policy.binary_artifact_paths or []
 
     @property
     def policy_source_artifact_paths(self) -> list[str]:
         if (policy := self.release_policy) is None:
             return []
-        return policy.source_artifact_paths
+        # TODO: The type of policy.source_artifact_paths is list[str]
+        # But the production server has None values
+        return policy.source_artifact_paths or []
 
     @property
     def policy_strict_checking(self) -> bool:
