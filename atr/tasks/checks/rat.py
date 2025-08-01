@@ -56,31 +56,58 @@ async def check(args: checks.FunctionArguments) -> results.Results | None:
     log.info(f"Checking RAT licenses for {artifact_abs_path} (rel: {args.primary_rel_path})")
 
     try:
-        result_data = await asyncio.to_thread(
-            _check_core_logic,
-            artifact_path=str(artifact_abs_path),
-            rat_jar_path=args.extra_args.get("rat_jar_path", _CONFIG.APACHE_RAT_JAR_PATH),
-            max_extract_size=args.extra_args.get("max_extract_size", _CONFIG.MAX_EXTRACT_SIZE),
-            chunk_size=args.extra_args.get("chunk_size", _CONFIG.EXTRACT_CHUNK_SIZE),
-        )
-
-        if result_data.get("warning"):
-            await recorder.warning(result_data["warning"], result_data)
-        elif result_data.get("error"):
-            # Handle errors from within the core logic
-            await recorder.failure(result_data["message"], result_data)
-        elif not result_data["valid"]:
-            # Handle RAT validation failures
-            await recorder.failure(result_data["message"], result_data)
-        else:
-            # Handle success
-            await recorder.success(result_data["message"], result_data)
-
+        await _check_core(args, recorder, artifact_abs_path)
     except Exception as e:
         # TODO: Or bubble for task failure?
         await recorder.failure("Error running Apache RAT check", {"error": str(e)})
 
     return None
+
+
+async def _check_core(
+    args: checks.FunctionArguments, recorder: checks.Recorder, artifact_abs_path: pathlib.Path
+) -> None:
+    result_data = await asyncio.to_thread(
+        _check_core_logic,
+        artifact_path=str(artifact_abs_path),
+        rat_jar_path=args.extra_args.get("rat_jar_path", _CONFIG.APACHE_RAT_JAR_PATH),
+        max_extract_size=args.extra_args.get("max_extract_size", _CONFIG.MAX_EXTRACT_SIZE),
+        chunk_size=args.extra_args.get("chunk_size", _CONFIG.EXTRACT_CHUNK_SIZE),
+    )
+
+    # This must come before the overall check result
+    # Otherwise the overall check result will contain the unknown license files
+    unknown_license_files = result_data.get("unknown_license_files", [])
+    if unknown_license_files:
+        for unknown_license_file in unknown_license_files:
+            await recorder.failure(
+                "Unknown license",
+                None,
+                member_rel_path=unknown_license_file["name"],
+            )
+    del result_data["unknown_license_files"]
+
+    unapproved_files = result_data.get("unapproved_files", [])
+    if unapproved_files:
+        for unapproved_file in unapproved_files:
+            await recorder.failure(
+                "Unapproved license",
+                {"license": unapproved_file["license"]},
+                member_rel_path=unapproved_file["name"],
+            )
+    del result_data["unapproved_files"]
+
+    if result_data.get("warning"):
+        await recorder.warning(result_data["warning"], result_data)
+    elif result_data.get("error"):
+        # Handle errors from within the core logic
+        await recorder.failure(result_data["message"], result_data)
+    elif not result_data["valid"]:
+        # Handle RAT validation failures
+        await recorder.failure(result_data["message"], result_data)
+    else:
+        # Handle success
+        await recorder.success(result_data["message"], result_data)
 
 
 def _check_core_logic(
@@ -166,6 +193,17 @@ def _check_core_logic(
 
             results = _check_core_logic_parse_output(xml_output_path, extract_dir)
             log.info(f"Successfully parsed RAT output with {results.get('total_files', 0)} files")
+
+            # The unknown_license_files key may contain a list of dicts
+            # {"name": "./README.md", "license": "Unknown license"}
+            # The path is missing the root of the archive, so we add it
+            extract_dir_basename = os.path.basename(extract_dir)
+            for file in results["unknown_license_files"]:
+                file["name"] = os.path.join(
+                    extract_dir_basename,
+                    os.path.normpath(file["name"]),
+                )
+
             return results
 
     except Exception as e:
