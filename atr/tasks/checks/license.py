@@ -170,20 +170,7 @@ async def headers(args: checks.FunctionArguments) -> results.Results | None:
         if ignore_file.exists():
             ignore_lines = ignore_file.read_text().splitlines()
 
-    try:
-        for result in await asyncio.to_thread(_headers_check_core_logic, str(artifact_abs_path), ignore_lines):
-            match result:
-                case ArtifactResult():
-                    await _record_artifact(recorder, result)
-                case MemberResult():
-                    await _record_member(recorder, result)
-                case MemberSkippedResult():
-                    pass
-
-    except Exception as e:
-        await recorder.exception("Error during license header check execution", {"error": str(e)})
-
-    return None
+    return await _headers_core(recorder, str(artifact_abs_path), ignore_lines)
 
 
 def headers_validate(content: bytes, _filename: str) -> tuple[bool, str | None]:
@@ -238,8 +225,8 @@ def _files_check_core_logic(artifact_path: str, is_podling: bool) -> Iterator[Re
             elif filename in {"DISCLAIMER", "DISCLAIMER-WIP"}:
                 disclaimer_found = True
 
-    yield from __license_results(license_results)
-    yield from __notice_results(notice_results)
+    yield from _license_results(license_results)
+    yield from _notice_results(notice_results)
     if is_podling and (not disclaimer_found):
         yield ArtifactResult(
             status=sql.CheckResultStatus.FAILURE,
@@ -302,7 +289,7 @@ def _files_check_core_logic_notice(archive: tarzip.Archive, member: tarzip.Membe
     return len(issues) == 0, issues, preamble
 
 
-def __license_results(
+def _license_results(
     license_results: dict[str, str | None],
 ) -> Iterator[Result]:
     """Build status messages for license file verification."""
@@ -339,7 +326,7 @@ def __license_results(
             )
 
 
-def __notice_results(
+def _notice_results(
     notice_results: dict[str, tuple[bool, list[str], str]],
 ) -> Iterator[Result]:
     """Build status messages for notice file verification."""
@@ -515,6 +502,29 @@ def _headers_check_core_logic_should_check(filepath: str) -> bool:
             return True
 
     return False
+
+
+async def _headers_core(recorder: checks.Recorder, artifact_abs_path: str, ignore_lines: list[str]) -> None:
+    try:
+        for result in await asyncio.to_thread(_headers_check_core_logic, str(artifact_abs_path), ignore_lines):
+            match result:
+                case ArtifactResult():
+                    await _record_artifact(recorder, result)
+                case MemberResult():
+                    await _record_member(recorder, result)
+                case MemberSkippedResult():
+                    pass
+        member_failures = recorder.member_problems.get(sql.CheckResultStatus.FAILURE, 0)
+        if member_failures > 0:
+            await recorder.failure(
+                f"Some files had invalid license headers ({member_failures} failures)",
+                None,
+            )
+
+    except Exception as e:
+        await recorder.exception("Error during license header check execution", {"error": str(e)})
+
+    return None
 
 
 async def _record_artifact(recorder: checks.Recorder, result: ArtifactResult) -> None:

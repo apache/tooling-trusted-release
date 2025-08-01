@@ -186,7 +186,9 @@ async def _check_path_process_single(
         # We should enquire as to whether such a policy should be instituted
         # We're forbidding dotfiles to catch accidental uploads of e.g. .git or .htaccess
         # Such cases are likely to be in error, and could carry security risks
-        errors.append("Dotfiles are forbidden")
+        # We allow .atr/ files, e.g. .atr/license-headers-ignore
+        if relative_path.parts[0] != ".atr":
+            errors.append("Dotfiles are forbidden")
 
     search = re.search(analysis.extension_pattern(), relative_path_str)
     ext_artifact = search.group("artifact") if search else None
@@ -204,6 +206,24 @@ async def _check_path_process_single(
         if (relative_path.parent == pathlib.Path(".")) and (relative_path.name not in allowed_top_level):
             warnings.append(f"Unknown top level file: {relative_path.name}")
 
+    await _record(
+        recorder_errors,
+        recorder_warnings,
+        recorder_success,
+        relative_path_str,
+        errors,
+        warnings,
+    )
+
+
+async def _record(
+    recorder_errors: checks.Recorder,
+    recorder_warnings: checks.Recorder,
+    recorder_success: checks.Recorder,
+    relative_path_str: str,
+    errors: list[str],
+    warnings: list[str],
+) -> None:
     for error in errors:
         await recorder_errors.failure(error, {}, primary_rel_path=relative_path_str)
     for warning in warnings:

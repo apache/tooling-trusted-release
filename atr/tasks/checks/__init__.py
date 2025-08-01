@@ -75,6 +75,7 @@ class Recorder:
         self.member_rel_path = member_rel_path
         self.afresh = afresh
         self.constructed = False
+        self.member_problems: dict[sql.CheckResultStatus, int] = {}
 
         self.project_name = project_name
         self.version_name = version_name
@@ -113,6 +114,10 @@ class Recorder:
             # if self.afresh is True:
             #     # Clear inner path only if it's specified
             #     await self.clear(primary_rel_path=primary_rel_path, member_rel_path=member_rel_path)
+
+        if member_rel_path is not None:
+            if status != sql.CheckResultStatus.SUCCESS:
+                self.member_problems[status] = self.member_problems.get(status, 0) + 1
 
         result = sql.CheckResult(
             release_name=self.release_name,
