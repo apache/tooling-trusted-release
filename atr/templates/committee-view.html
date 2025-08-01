@@ -31,7 +31,7 @@
     </div>
     <div class="card-body">
       <ul>
-        {% for project in committee.projects %}
+        {% for project in projects %}
           <li>
             <a href="{{ as_url(routes.projects.view, name=project.name) }}">{{ project.display_name }}</a>
           </li>

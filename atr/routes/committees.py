@@ -53,12 +53,14 @@ async def view(name: str) -> str:
             _projects=True,
             _public_signing_keys=True,
         ).demand(http.client.HTTPException(404))
-    for project in committee.projects:
+    project_list = list(committee.projects)
+    for project in project_list:
         # Workaround for the usual loading problem
         project.committee = committee
     return await template.render(
         "committee-view.html",
         committee=committee,
+        projects=project_list,
         algorithms=routes.algorithms,
         now=datetime.datetime.now(datetime.UTC),
         email_from_key=util.email_from_uid,
