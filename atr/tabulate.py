@@ -94,9 +94,7 @@ async def votes(
 
 
 async def vote_committee(thread_id: str, release: sql.Release) -> sql.Committee | None:
-    committee = None
-    if release.project is not None:
-        committee = release.project.committee
+    committee = release.project.committee
     if util.is_dev_environment():
         async for _mid, msg in util.thread_messages(thread_id):
             list_raw = msg.get("list_raw", "")
@@ -131,9 +129,8 @@ def vote_outcome(
         duration_hours = (now - start_unixtime) / 3600
 
     min_duration_hours = 72
-    if release.project is not None:
-        if release.project.release_policy is not None:
-            min_duration_hours = release.project.release_policy.min_hours or None
+    if release.project.release_policy is not None:
+        min_duration_hours = release.project.release_policy.min_hours or None
     duration_hours_remaining = None
     if min_duration_hours is not None:
         duration_hours_remaining = min_duration_hours - duration_hours
@@ -191,17 +188,17 @@ def vote_summary(tabulated_votes: dict[str, models.tabulate.VoteEmail]) -> dict[
             result["binding_votes"] += 1
             result["binding_votes_yes"] += 1 if (vote_email.vote.value == "Yes") else 0
             result["binding_votes_no"] += 1 if (vote_email.vote.value == "No") else 0
-            result["binding_votes_abstain"] += 1 if (vote_email.vote.value == "Abstain") else 0
+            result["binding_votes_abstain"] += 1 if (vote_email.vote.value == "?") else 0
         elif vote_email.status in {models.tabulate.VoteStatus.COMMITTER, models.tabulate.VoteStatus.CONTRIBUTOR}:
             result["non_binding_votes"] += 1
             result["non_binding_votes_yes"] += 1 if (vote_email.vote.value == "Yes") else 0
             result["non_binding_votes_no"] += 1 if (vote_email.vote.value == "No") else 0
-            result["non_binding_votes_abstain"] += 1 if (vote_email.vote.value == "Abstain") else 0
+            result["non_binding_votes_abstain"] += 1 if (vote_email.vote.value == "?") else 0
         else:
             result["unknown_votes"] += 1
             result["unknown_votes_yes"] += 1 if (vote_email.vote.value == "Yes") else 0
             result["unknown_votes_no"] += 1 if (vote_email.vote.value == "No") else 0
-            result["unknown_votes_abstain"] += 1 if (vote_email.vote.value == "Abstain") else 0
+            result["unknown_votes_abstain"] += 1 if (vote_email.vote.value == "?") else 0
 
     return result
 

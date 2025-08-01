@@ -122,7 +122,7 @@ async def manual_selected_post(
     if not release.vote_manual:
         raise RuntimeError("This page is for manual votes only")
     resolve_form = await ResolveVoteManualForm.create_form()
-    if not resolve_form.validate_on_submit():
+    if not (await resolve_form.validate_on_submit()):
         return await session.redirect(
             manual_selected,
             project_name=project_name,
@@ -182,7 +182,7 @@ async def submit_selected(
     if latest_vote_task is None:
         raise RuntimeError("No vote task found, unable to send resolution message.")
     resolve_form = await ResolveVoteForm.create_form()
-    if not resolve_form.validate_on_submit():
+    if not (await resolve_form.validate_on_submit()):
         # TODO: Render the page again with errors
         return await session.redirect(
             vote.selected,
@@ -254,15 +254,7 @@ async def tabulated_selected_post(session: routes.CommitterSession, project_name
         else:
             fetch_error = "The vote thread could not yet be found."
     resolve_form = await ResolveVoteForm.create_form()
-    if (
-        (committee is None)
-        or (details is None)
-        or (details.votes is None)
-        or (details.summary is None)
-        or (details.passed is None)
-        or (details.outcome is None)
-        or (thread_id is None)
-    ):
+    if (committee is None) or (details is None) or (thread_id is None):
         resolve_form.email_body.render_kw = {"rows": 12}
     else:
         resolve_form.email_body.data = tabulate.vote_resolution(

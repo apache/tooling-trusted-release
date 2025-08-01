@@ -39,6 +39,9 @@ if asfquart.APP is ...:
 @routes.committer("/release/bulk/<int:task_id>", methods=["GET"])
 async def bulk_status(session: routes.CommitterSession, task_id: int) -> str | response.Response:
     """Show status for a bulk download task."""
+    if asfquart.APP is not ...:
+        raise RuntimeError("Bulk download is not supported")
+
     async with db.session() as data:
         # Query for the task with the given ID
         task = await data.task(id=task_id).get()
@@ -46,8 +49,8 @@ async def bulk_status(session: routes.CommitterSession, task_id: int) -> str | r
             return await session.redirect(root.index, error=f"Task with ID {task_id} not found.")
 
         # Verify this is a bulk download task
-        if task.task_type != "package_bulk_download":
-            return await session.redirect(root.index, error=f"Task with ID {task_id} is not a bulk download task.")
+        # if task.task_type != "package_bulk_download":
+        #     return await session.redirect(root.index, error=f"Task with ID {task_id} is not a bulk download task.")
 
         # Get the release associated with this task if available
         release = None

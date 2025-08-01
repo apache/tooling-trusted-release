@@ -484,8 +484,8 @@ async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
                                 error=str(e),
                                 error_type=type(e).__name__,
                             )
-            if api_outcome is not None:
-                api_outcomes.append(api_outcome)
+            # Type checker is sure that it can no longer be None
+            api_outcomes.append(api_outcome)
     return models.api.KeysUploadResults(
         endpoint="/keys/upload",
         results=api_outcomes,

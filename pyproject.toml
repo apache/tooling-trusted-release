@@ -87,6 +87,11 @@ defineConstant = { DEBUG = true }
 stubPath = "typestubs"
 reportMissingImports = "error"
 reportMissingTypeStubs = false
+# reportUnusedCallResult = "error"
+# https://github.com/microsoft/pyright/issues/9579#issuecomment-2549237805
+reportUnnecessaryComparison = "error"
+reportUnusedCoroutine = "error"
+# typeCheckingMode = "strict"
 pythonVersion = "3.13"
 executionEnvironments = [
   { root = ".", pythonVersion = "3.13" }

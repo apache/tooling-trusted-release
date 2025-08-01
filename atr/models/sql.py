@@ -655,8 +655,9 @@ class Release(sqlmodel.SQLModel, table=True):
     def committee(self) -> Committee | None:
         """Get the committee for the release."""
         project = self.project
-        if project is None:
-            return None
+        # Type checker is sure that it can not be None
+        # if project is None:
+        #     return None
         return project.committee
 
     @property
@@ -955,9 +956,12 @@ def populate_revision_sequence_and_name(
 @event.listens_for(Release, "before_insert")
 def check_release_name(_mapper: orm.Mapper, _connection: sqlalchemy.Connection, release: Release) -> None:
     if release.name == "":
-        if (release.project_name is None) or (release.version is None):
+        # Quiet the type checker
+        project_name = getattr(release, "project_name", None)
+        version = getattr(release, "version", None)
+        if (project_name is None) or (version is None):
             raise ValueError("Cannot generate release name without project_name and version")
-        release.name = release_name(release.project_name, release.version)
+        release.name = release_name(project_name, version)
 
 
 def latest_revision_number_query(release_name: str | None = None) -> expression.ScalarSelect[str]:

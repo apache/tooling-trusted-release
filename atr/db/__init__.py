@@ -392,26 +392,27 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         ascii_armored_key: Opt[str] = NOT_SET,
         _committees: bool = False,
     ) -> Query[sql.PublicSigningKey]:
+        via = sql.validate_instrumented_attribute
         query = sqlmodel.select(sql.PublicSigningKey)
 
         if is_defined(fingerprint):
-            query = query.where(sql.PublicSigningKey.fingerprint == fingerprint)
+            query = query.where(via(sql.PublicSigningKey.fingerprint) == fingerprint)
         if is_defined(algorithm):
-            query = query.where(sql.PublicSigningKey.algorithm == algorithm)
+            query = query.where(via(sql.PublicSigningKey.algorithm) == algorithm)
         if is_defined(length):
-            query = query.where(sql.PublicSigningKey.length == length)
+            query = query.where(via(sql.PublicSigningKey.length) == length)
         if is_defined(created):
-            query = query.where(sql.PublicSigningKey.created == created)
+            query = query.where(via(sql.PublicSigningKey.created) == created)
         if is_defined(expires):
-            query = query.where(sql.PublicSigningKey.expires == expires)
+            query = query.where(via(sql.PublicSigningKey.expires) == expires)
         if is_defined(primary_declared_uid):
-            query = query.where(sql.PublicSigningKey.primary_declared_uid == primary_declared_uid)
+            query = query.where(via(sql.PublicSigningKey.primary_declared_uid) == primary_declared_uid)
         if is_defined(secondary_declared_uids):
-            query = query.where(sql.PublicSigningKey.secondary_declared_uids == secondary_declared_uids)
+            query = query.where(via(sql.PublicSigningKey.secondary_declared_uids) == secondary_declared_uids)
         if is_defined(apache_uid):
-            query = query.where(sql.PublicSigningKey.apache_uid == apache_uid)
+            query = query.where(via(sql.PublicSigningKey.apache_uid) == apache_uid)
         if is_defined(ascii_armored_key):
-            query = query.where(sql.PublicSigningKey.ascii_armored_key == ascii_armored_key)
+            query = query.where(via(sql.PublicSigningKey.ascii_armored_key) == ascii_armored_key)
 
         if _committees:
             query = query.options(select_in_load(sql.PublicSigningKey.committees))

@@ -388,8 +388,9 @@ def release_vote_logic(r: sql.Release) -> Divergences:
         match sr:
             case (None, None) | (_, None) | (_, _):
                 return True
-            case (None, _):
-                return False
+            # case (None, _):
+            #     return False
+        return False
 
     expected = "vote_started to be set when vote_resolved is set"
     actual = (r.vote_started, r.vote_resolved)

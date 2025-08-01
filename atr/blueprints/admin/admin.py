@@ -420,7 +420,8 @@ async def admin_keys_regenerate_all() -> quart.Response:
     outcomes = types.Outcomes[str]()
     async with storage.write(asf_uid) as write:
         for committee_name in committee_names:
-            wacm = write.as_committee_member(committee_name)
+            wacm_outcome = write.as_committee_member_outcome(committee_name)
+            wacm = wacm_outcome.result_or_none()
             if wacm is None:
                 continue
             outcomes.append(await wacm.keys.autogenerate_keys_file())
@@ -806,11 +807,13 @@ async def _process_undiscovered(data: db.Session) -> tuple[int, int]:
         log.warning(f"Missing top level project for committee {committee.name}")
         # If a committee is missing, the following code can be activated to fix it
         # But ideally the fix should be in the upstream data source
-        automatically_fix = False
-        if automatically_fix is True:
-            project = sql.Project(name=committee.name, full_name=committee.full_name, committee=committee)
-            data.add(project)
-            added_count += 1
+        # project = sql.Project(
+        #     name=committee.name,
+        #     full_name=committee.full_name,
+        #     committee=committee,
+        # )
+        # data.add(project)
+        # added_count += 1
 
     return added_count, updated_count
 

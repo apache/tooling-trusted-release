@@ -614,11 +614,10 @@ async def paths_recursive_all(base_path: pathlib.Path) -> AsyncGenerator[pathlib
 
 
 def permitted_recipients(asf_uid: str) -> list[str]:
-    test_list = "user-tests"
     return [
         # f"dev@{committee.name}.apache.org",
         # f"private@{committee.name}.apache.org",
-        f"{test_list}@tooling.apache.org",
+        USER_TESTS_ADDRESS,
         f"{asf_uid}@apache.org",
     ]
 
