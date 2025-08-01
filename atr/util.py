@@ -289,11 +289,17 @@ def email_from_uid(uid: str) -> str | None:
 
 
 async def email_mid_from_thread_id(thread_id: str) -> tuple[str, str]:
-    async for msg_id, msg_json in thread_messages(thread_id):
-        email_to = email_from_uid(msg_json.get("to", ""))
+    async for _thread_id, msg_json in thread_messages(thread_id):
+        # The .get("to", "") value may be redacted, e.g. "us...@tooling.apache.org"
+        # Therefore use .get("forum", "")
+        email_to = msg_json.get("forum", "")
         if email_to is None:
-            raise RuntimeError(f"Cannot find email address for {msg_id}")
-        return email_to, msg_id
+            raise RuntimeError(f"Cannot find email address for {thread_id}")
+        # This is delimited by angle brackets, e.g. "<1234567890@apache.org>"
+        message_id = msg_json.get("message-id", "")
+        if message_id is None:
+            raise RuntimeError(f"Cannot find message ID for {thread_id}")
+        return email_to, message_id
     raise RuntimeError(f"Cannot find any messages in {thread_id}")
 
 
