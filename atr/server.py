@@ -209,7 +209,27 @@ def app_setup_logging(app: base.QuartApp, config_mode: config.Mode, app_config: 
         handlers=[rich_logging.RichHandler(rich_tracebacks=True, show_time=False)],
     )
 
-    # enable debug output for atr.* in DEBUG mode
+    # Configure dedicated audit logger
+    try:
+        audit_handler = logging.FileHandler(
+            app_config.AUDIT_LOG_FILE,
+            encoding="utf-8",
+            mode="a",
+        )
+        audit_handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s %(message)s",
+                datefmt="%Y-%m-%dT%H:%M:%SZ",
+            )
+        )
+        audit_logger = logging.getLogger("atr.storage.audit")
+        audit_logger.setLevel(logging.INFO)
+        audit_logger.addHandler(audit_handler)
+        audit_logger.propagate = False
+    except Exception:
+        logging.getLogger(__name__).exception("Failed to configure audit logger")
+
+    # Enable debug output for atr.* in DEBUG mode
     if config_mode == config.Mode.Debug:
         logging.getLogger(atr.__name__).setLevel(logging.DEBUG)
 

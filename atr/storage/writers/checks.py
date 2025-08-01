@@ -23,7 +23,6 @@ import datetime
 import sqlmodel
 
 import atr.db as db
-import atr.log as log
 import atr.models.sql as sql
 import atr.storage as storage
 
@@ -111,15 +110,15 @@ class CommitteeMember(CommitteeParticipant):
             status=status,
             message_glob=message_glob,
         )
-        log.info(f"Status {status}")
-        log.info(f"Adding check result ignore {cri}")
         self.__data.add(cri)
         await self.__data.commit()
+        self.__credentials.audit_worthy_event(f"Added check result ignore {cri}")
 
     async def ignore_delete(self, id: int) -> None:
         via = sql.validate_instrumented_attribute
         await self.__data.execute(sqlmodel.delete(sql.CheckResultIgnore).where(via(sql.CheckResultIgnore.id) == id))
         await self.__data.commit()
+        self.__credentials.audit_worthy_event(f"Deleted check result ignore {id} by {self.__asf_uid}")
 
     async def ignore_update(
         self,
@@ -135,6 +134,8 @@ class CommitteeMember(CommitteeParticipant):
         cri = await self.__data.get(sql.CheckResultIgnore, id)
         if cri is None:
             raise storage.AccessError(f"Ignore {id} not found")
+        # The updating ASF UID is now responsible for the whole ignore
+        cri.asf_uid = self.__asf_uid
         cri.release_glob = release_glob
         cri.revision_number = revision_number
         cri.checker_glob = checker_glob
@@ -143,3 +144,4 @@ class CommitteeMember(CommitteeParticipant):
         cri.status = status
         cri.message_glob = message_glob
         await self.__data.commit()
+        self.__credentials.audit_worthy_event(f"Updated check result ignore {cri} by {self.__asf_uid}")

@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 import time
 from typing import TYPE_CHECKING, Final
 
@@ -42,8 +43,17 @@ VALIDATE_AT_RUNTIME: Final[bool] = True
 ## Access credentials
 
 
+def audit(msg: str) -> None:
+    msg = msg.replace("\n", " / ")
+    # The atr.log logger should give the same name
+    # But to be extra sure, we set it manually
+    logger = logging.getLogger("atr.storage.audit")
+    logger.info(msg)
+
+
 class AccessCredentials:
-    pass
+    def audit_worthy_event(self, msg: str) -> None:
+        audit(msg)
 
 
 class AccessCredentialsRead(AccessCredentials): ...
