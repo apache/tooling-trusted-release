@@ -48,9 +48,14 @@ async def directory() -> str:
 async def view(name: str) -> str:
     # TODO: Could also import this from keys.py
     async with db.session() as data:
-        committee = await data.committee(name=name, _projects=True, _public_signing_keys=True).demand(
-            http.client.HTTPException(404)
-        )
+        committee = await data.committee(
+            name=name,
+            _projects=True,
+            _public_signing_keys=True,
+        ).demand(http.client.HTTPException(404))
+    for project in committee.projects:
+        # Workaround for the usual loading problem
+        project.committee = committee
     return await template.render(
         "committee-view.html",
         committee=committee,
