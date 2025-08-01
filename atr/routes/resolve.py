@@ -365,7 +365,7 @@ async def _resolve_vote(
                 thread_id = archive_url.split("/")[-1]
                 release.podling_thread_id = thread_id
                 # incubator_vote_address = "general@incubator.apache.org"
-                incubator_vote_address = "user-test@tooling.apache.org"
+                incubator_vote_address = util.USER_TESTS_ADDRESS
                 if not release.project.committee:
                     raise ValueError("Project has no committee")
                 revision_number = release.latest_revision_number

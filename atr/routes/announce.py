@@ -109,6 +109,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         "announce-selected.html",
         release=release,
         announce_form=announce_form,
+        user_tests_address=util.USER_TESTS_ADDRESS,
     )
 
 
@@ -265,7 +266,7 @@ async def _create_announce_form_instance(
     """Create and return an instance of the AnnounceForm."""
 
     mailing_list_choices: forms.Choices = sorted([(recipient, recipient) for recipient in permitted_recipients])
-    mailing_list_default = "user-tests@tooling.apache.org"
+    mailing_list_default = util.USER_TESTS_ADDRESS
 
     form_instance = await AnnounceForm.create_form(data=data)
     forms.choices(

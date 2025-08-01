@@ -54,6 +54,8 @@ import atr.user as user
 
 T = TypeVar("T")
 
+USER_TESTS_ADDRESS: Final[str] = "user-tests@tooling.apache.org"
+
 # TODO: Move to committee data
 # Standing committees are those which cannot make releases, by policy
 _STANDING_COMMITTEES: Final[set[str]] = {

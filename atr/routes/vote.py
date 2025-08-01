@@ -247,7 +247,8 @@ async def _task_archive_url(task_mid: str) -> str | None:
         return None
 
     # TODO: This List ID will be dynamic when we allow posting to arbitrary lists
-    lid = "user-tests.tooling.apache.org"
+    # lid = "user-tests.tooling.apache.org"
+    lid = util.USER_TESTS_ADDRESS.replace("@", ".")
     url = f"https://lists.apache.org/api/email.lua?id=%3C{task_mid}%3E&listid=%3C{lid}%3E"
     try:
         async with aiohttp.ClientSession() as session:

@@ -172,6 +172,7 @@ async def selected_revision(
         revision=revision,
         keys_warning=keys_warning,
         manual_vote_process_form=manual_vote_process_form,
+        user_tests_address=util.USER_TESTS_ADDRESS,
     )
 
 
@@ -347,7 +348,7 @@ async def _form(
     form.release_name.data = release.name
     # Choices and defaults for mailing list
     choices: forms.Choices = sorted([(recipient, recipient) for recipient in permitted_recipients])
-    forms.choices(form.mailing_list, choices, default="user-tests@tooling.apache.org")
+    forms.choices(form.mailing_list, choices, default=util.USER_TESTS_ADDRESS)
     # Description
     form.mailing_list.description = f"""\
 NOTE: The limited options above are provided for testing purposes.

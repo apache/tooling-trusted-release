@@ -87,7 +87,7 @@ class ReleasePolicyForm(forms.Typed):
         placeholder="E.g. dev@project.apache.org",
         description="Note: This field determines where vote and finished release announcement"
         "emails are sent. You can set this value to your own mailing list, but ATR will "
-        "currently only let you send to user-tests@tooling.apache.org.",
+        f"currently only let you send to {util.USER_TESTS_ADDRESS}.",
     )
     default_min_hours_value_at_render = forms.hidden()
     min_hours = forms.integer(
