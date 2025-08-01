@@ -117,6 +117,7 @@ async def _initiate_core_logic(args: Initiate) -> results.Results | None:
 
     permitted_recipients = util.permitted_recipients(args.initiator_id)
     if args.email_to not in permitted_recipients:
+        log.error(f"Invalid mailing list choice: {args.email_to} not in {permitted_recipients}")
         raise VoteInitiationError("Invalid mailing list choice")
 
     # Create mail message

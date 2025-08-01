@@ -28,6 +28,7 @@ import atr.construct as construct
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
+import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.compose as compose
@@ -250,6 +251,7 @@ async def start_vote(
 ):
     if email_to not in permitted_recipients:
         # This will be checked again by tasks/vote.py for extra safety
+        log.info(f"Invalid mailing list choice: {email_to} not in {permitted_recipients}")
         raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
 
     if promote is True:
