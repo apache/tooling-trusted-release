@@ -381,8 +381,9 @@ def app_route_performance_measure(route_path: str, http_methods: list[str] | Non
                     wait_start = time.perf_counter()
                     loop_start = loop.time()
                     if future is not None:
-                        while not future.done():
-                            await asyncio.sleep(0)
+                        done = asyncio.Event()
+                        future.add_done_callback(lambda _: done.set())
+                        await done.wait()
                     wait_end = time.perf_counter()
                     loop_end = loop.time()
                     async_time += wait_end - wait_start
