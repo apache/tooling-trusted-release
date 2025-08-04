@@ -100,7 +100,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
 
     # Form to cast a vote
     form = await CastVoteForm.create_form()
-    async with storage.write(session.asf_uid) as write:
+    async with storage.write() as write:
         try:
             if release.committee.is_podling:
                 _wacm = write.as_committee_member("incubator")

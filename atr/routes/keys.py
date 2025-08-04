@@ -145,7 +145,7 @@ async def add(session: routes.CommitterSession) -> str:
     """Add a new public signing key to the user's account."""
     key_info = None
 
-    async with storage.write(session.uid) as write:
+    async with storage.write() as write:
         participant_of_committees = await write.participant_of_committees()
 
     committee_choices: forms.Choices = [(c.name, c.display_name or c.name) for c in participant_of_committees]
@@ -157,11 +157,10 @@ async def add(session: routes.CommitterSession) -> str:
 
     if await form.validate_on_submit():
         try:
-            asf_uid = session.uid
             key_text: str = util.unwrap(form.public_key.data)
             selected_committee_names: list[str] = util.unwrap(form.selected_committees.data)
 
-            async with storage.write(asf_uid) as write:
+            async with storage.write() as write:
                 wafc = write.as_foundation_committer()
                 ocr: types.Outcome[types.Key] = await wafc.keys.ensure_stored_one(key_text)
                 key = ocr.result_or_raise()
@@ -169,7 +168,7 @@ async def add(session: routes.CommitterSession) -> str:
                 for selected_committee_name in selected_committee_names:
                     # TODO: Should this be committee member or committee participant?
                     # Also, should we emit warnings and continue here?
-                    wacp = write.as_committee_participant(selected_committee_name)
+                    wacp = await write.as_committee_participant(selected_committee_name)
                     outcome: types.Outcome[types.LinkedCommittee] = await wacp.keys.associate_fingerprint(
                         key.key_model.fingerprint
                     )
@@ -219,7 +218,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
             return await session.redirect(keys, success="SSH key deleted successfully")
 
     # Otherwise, delete an OpenPGP key
-    async with storage.write(session.uid) as write:
+    async with storage.write() as write:
         wafc = write.as_foundation_committer_outcome().result_or_none()
         if wafc is None:
             return await session.redirect(keys, error="Key not found or not owned by you")
@@ -267,9 +266,9 @@ async def details(session: routes.CommitterSession, fingerprint: str) -> str | r
 
             affected_committee_names = old_committee_names.union(set(selected_committee_names))
             if affected_committee_names:
-                async with storage.write(session.uid) as write:
+                async with storage.write() as write:
                     for affected_committee_name in affected_committee_names:
-                        wacm = write.as_committee_member_outcome(affected_committee_name).result_or_none()
+                        wacm = (await write.as_committee_member_outcome(affected_committee_name)).result_or_none()
                         if wacm is None:
                             continue
                         await wacm.keys.autogenerate_keys_file()
@@ -293,7 +292,7 @@ async def details(session: routes.CommitterSession, fingerprint: str) -> str | r
 @routes.committer("/keys/export/<committee_name>")
 async def export(session: routes.CommitterSession, committee_name: str) -> quart.Response:
     """Export a KEYS file for a specific committee."""
-    async with storage.write(session.uid) as write:
+    async with storage.write() as write:
         wafc = write.as_foundation_committer()
         keys_file_text = await wafc.keys.keys_file_text(committee_name)
 
@@ -306,7 +305,7 @@ async def import_selected_revision(
 ) -> response.Response:
     await util.validate_empty_form()
 
-    async with storage.write(session.uid) as write:
+    async with storage.write() as write:
         wacm = await write.as_project_committee_member(project_name)
         outcomes: types.Outcomes[types.Key] = await wacm.keys.import_keys_file(project_name, version_name)
 
@@ -436,8 +435,8 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
     if not await form.validate_on_submit():
         return await session.redirect(keys, error="Invalid request to update KEYS file.")
 
-    async with storage.write(session.uid) as write:
-        wacm = write.as_committee_member(committee_name)
+    async with storage.write() as write:
+        wacm = await write.as_committee_member(committee_name)
         match await wacm.keys.autogenerate_keys_file():
             case types.OutcomeResult():
                 await quart.flash(
@@ -452,7 +451,7 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
 @routes.committer("/keys/upload", methods=["GET", "POST"])
 async def upload(session: routes.CommitterSession) -> str:
     """Upload a KEYS file containing multiple OpenPGP keys."""
-    async with storage.write(session.uid) as write:
+    async with storage.write() as write:
         participant_of_committees = await write.participant_of_committees()
 
     # TODO: Migrate to the forms interface
@@ -520,8 +519,8 @@ async def upload(session: routes.CommitterSession) -> str:
         if not selected_committee:
             return await render(error="You must select at least one committee")
 
-        async with storage.write(session.uid) as write:
-            wacm = write.as_committee_member(selected_committee)
+        async with storage.write() as write:
+            wacm = await write.as_committee_member(selected_committee)
             outcomes = await wacm.keys.ensure_associated(keys_text)
         results = outcomes
         success_count = outcomes.result_count

@@ -106,7 +106,7 @@ class UpdateIgnoreForm(forms.Typed):
 
 @routes.committer("/ignores/<committee_name>", methods=["GET", "POST"])
 async def ignores(session: routes.CommitterSession, committee_name: str) -> str | response.Response:
-    async with storage.read(session.asf_uid) as read:
+    async with storage.read() as read:
         ragp = read.as_general_public()
         ignores = await ragp.checks.ignores(committee_name)
 
@@ -130,8 +130,8 @@ async def ignores_committee_add(session: routes.CommitterSession, committee_name
 
     status = sql.CheckResultStatusIgnore.from_form_field(form.status.data)
 
-    async with storage.write(session.asf_uid) as write:
-        wacm = write.as_committee_member(committee_name)
+    async with storage.write() as write:
+        wacm = await write.as_committee_member(committee_name)
         await wacm.checks.ignore_add(
             release_glob=form.release_glob.data or None,
             revision_number=form.revision_number.data or None,
@@ -168,8 +168,8 @@ async def ignores_committee_delete(session: routes.CommitterSession, committee_n
         )
 
     cri_id = int(form.id.data)
-    async with storage.write(session.asf_uid) as write:
-        wacm = write.as_committee_member(committee_name)
+    async with storage.write() as write:
+        wacm = await write.as_committee_member(committee_name)
         await wacm.checks.ignore_delete(id=cri_id)
 
     return await session.redirect(
@@ -195,8 +195,8 @@ async def ignores_committee_update(session: routes.CommitterSession, committee_n
         )
     cri_id = int(form.id.data)
 
-    async with storage.write(session.asf_uid) as write:
-        wacm = write.as_committee_member(committee_name)
+    async with storage.write() as write:
+        wacm = await write.as_committee_member(committee_name)
         await wacm.checks.ignore_update(
             id=cri_id,
             release_glob=form.release_glob.data or None,

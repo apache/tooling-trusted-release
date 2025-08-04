@@ -82,26 +82,20 @@ class GeneralPublic:
         credentials: storage.WriteAsGeneralPublic,
         write: storage.Write,
         data: db.Session,
-        asf_uid: str | None = None,
     ):
         self.__credentials = credentials
         self.__write = write
         self.__data = data
-        self.__asf_uid = asf_uid
+        self.__asf_uid = write.authorisation.asf_uid
 
 
 class FoundationCommitter(GeneralPublic):
-    def __init__(
-        self, credentials: storage.WriteAsFoundationCommitter, write: storage.Write, data: db.Session, asf_uid: str
-    ):
-        super().__init__(credentials, write, data, asf_uid)
-        if credentials.validate_at_runtime:
-            if credentials.authenticated is not True:
-                raise storage.AccessError("Writer is not authenticated")
+    def __init__(self, credentials: storage.WriteAsFoundationCommitter, write: storage.Write, data: db.Session):
+        super().__init__(credentials, write, data)
         self.__credentials = credentials
         self.__write = write
         self.__data = data
-        self.__asf_uid = asf_uid
+        self.__asf_uid = write.authorisation.asf_uid
 
         # Specific to this module
         self.__key_block_models_cache = {}
@@ -117,7 +111,7 @@ class FoundationCommitter(GeneralPublic):
             await self.__data.delete(key)
             await self.__data.commit()
             for committee in key.committees:
-                wacm = self.__write.as_committee_member_outcome(committee.name).result_or_none()
+                wacm = (await self.__write.as_committee_member_outcome(committee.name)).result_or_none()
                 if wacm is None:
                     continue
                 await wacm.keys.autogenerate_keys_file()
@@ -366,13 +360,15 @@ class CommitteeParticipant(FoundationCommitter):
         credentials: storage.WriteAsCommitteeParticipant,
         write: storage.Write,
         data: db.Session,
-        asf_uid: str,
         committee_name: str,
     ):
-        super().__init__(credentials, write, data, asf_uid)
+        super().__init__(credentials, write, data)
         self.__credentials = credentials
         self.__write = write
         self.__data = data
+        asf_uid = write.authorisation.asf_uid
+        if asf_uid is None:
+            raise storage.AccessError("No ASF UID")
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
 
@@ -633,14 +629,13 @@ class CommitteeMember(CommitteeParticipant):
         credentials: storage.WriteAsCommitteeMember,
         write: storage.Write,
         data: db.Session,
-        asf_uid: str,
         committee_name: str,
     ):
-        super().__init__(credentials, write, data, asf_uid, committee_name)
+        super().__init__(credentials, write, data, committee_name)
         self.__credentials = credentials
         self.__write = write
         self.__data = data
-        self.__asf_uid = asf_uid
+        self.__asf_uid = write.authorisation.asf_uid
         self.__committee_name = committee_name
 
 
@@ -650,14 +645,13 @@ class FoundationAdmin(CommitteeMember):
         credentials: storage.WriteAsFoundationAdmin,
         write: storage.Write,
         data: db.Session,
-        asf_uid: str,
         committee_name: str,
     ):
-        super().__init__(credentials, write, data, asf_uid, committee_name)
+        super().__init__(credentials, write, data, committee_name)
         self.__credentials = credentials
         self.__write = write
         self.__data = data
-        self.__asf_uid = asf_uid
+        self.__asf_uid = write.authorisation.asf_uid
         self.__committee_name = committee_name
 
     @property
