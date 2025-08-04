@@ -52,6 +52,7 @@ import atr.jwtoken as jwtoken
 import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
+import atr.storage as storage
 import atr.template as templates
 import atr.util as util
 
@@ -220,16 +221,9 @@ async def _create_token(uid: str, label: str | None) -> str:
     created = datetime.datetime.now(datetime.UTC)
     expires = created + datetime.timedelta(days=_EXPIRY_DAYS)
 
-    async with db.session() as data:
-        async with data.begin():
-            pat = sql.PersonalAccessToken(
-                asfuid=uid,
-                token_hash=token_hash,
-                created=created,
-                expires=expires,
-                label=label,
-            )
-            data.add(pat)
+    async with storage.write() as write:
+        wafc = write.as_foundation_committer()
+        await wafc.tokens.add_token(uid, token_hash, created, expires, label)
     return plaintext
 
 

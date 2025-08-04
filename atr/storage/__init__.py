@@ -109,6 +109,7 @@ class WriteAsGeneralPublic(AccessCredentialsWrite):
     def __init__(self, write: Write, data: db.Session):
         self.checks = writers.checks.GeneralPublic(self, write, data)
         self.keys = writers.keys.GeneralPublic(self, write, data)
+        self.tokens = writers.tokens.GeneralPublic(self, write, data)
 
 
 class WriteAsFoundationCommitter(WriteAsGeneralPublic):
@@ -116,6 +117,7 @@ class WriteAsFoundationCommitter(WriteAsGeneralPublic):
         # TODO: We need a definitive list of ASF UIDs
         self.checks = writers.checks.FoundationCommitter(self, write, data)
         self.keys = writers.keys.FoundationCommitter(self, write, data)
+        self.tokens = writers.tokens.FoundationCommitter(self, write, data)
 
 
 class WriteAsCommitteeParticipant(WriteAsFoundationCommitter):
@@ -123,6 +125,7 @@ class WriteAsCommitteeParticipant(WriteAsFoundationCommitter):
         self.__committee_name = committee_name
         self.checks = writers.checks.CommitteeParticipant(self, write, data, committee_name)
         self.keys = writers.keys.CommitteeParticipant(self, write, data, committee_name)
+        self.tokens = writers.tokens.CommitteeParticipant(self, write, data, committee_name)
 
     @property
     def committee_name(self) -> str:
@@ -134,6 +137,7 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
         self.__committee_name = committee_name
         self.checks = writers.checks.CommitteeMember(self, write, data, committee_name)
         self.keys = writers.keys.CommitteeMember(self, write, data, committee_name)
+        self.tokens = writers.tokens.CommitteeMember(self, write, data, committee_name)
 
     @property
     def committee_name(self) -> str:
@@ -146,6 +150,7 @@ class WriteAsFoundationAdmin(WriteAsCommitteeMember):
         self.__committee_name = committee_name
         # self.checks = writers.checks.FoundationAdmin(self, write, data, committee_name)
         self.keys = writers.keys.FoundationAdmin(self, write, data, committee_name)
+        # self.tokens = writers.tokens.FoundationAdmin(self, write, data, committee_name)
 
     @property
     def committee_name(self) -> str:
