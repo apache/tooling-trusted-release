@@ -229,29 +229,22 @@ class AuthoriserASFQuart:
     def __init__(self):
         self.__cache = Cache()
 
-    async def is_member_of(self, asf_uid: str, asfquart_session: session.ClientSession, committee_name: str) -> bool:
-        await self.__cache_refresh(asf_uid, asfquart_session)
+    def is_member_of(self, asf_uid: str, committee_name: str) -> bool:
         return committee_name in self.__cache.member_of[asf_uid]
 
-    async def is_participant_of(self, asf_uid: str, asfquart_session: session.ClientSession, project_name: str) -> bool:
-        await self.__cache_refresh(asf_uid, asfquart_session)
-        return project_name in self.__cache.participant_of[asf_uid]
+    def is_participant_of(self, asf_uid: str, committee_name: str) -> bool:
+        return committee_name in self.__cache.participant_of[asf_uid]
 
-    async def member_of(self, asf_uid: str, asfquart_session: session.ClientSession) -> frozenset[str]:
-        await self.__cache_refresh(asf_uid, asfquart_session)
+    def member_of(self, asf_uid: str) -> frozenset[str]:
         return self.__cache.member_of[asf_uid]
 
-    async def participant_of(self, asf_uid: str, asfquart_session: session.ClientSession) -> frozenset[str]:
-        await self.__cache_refresh(asf_uid, asfquart_session)
+    def participant_of(self, asf_uid: str) -> frozenset[str]:
         return self.__cache.participant_of[asf_uid]
 
-    async def member_of_and_participant_of(
-        self, asf_uid: str, asfquart_session: dict[str, Any]
-    ) -> tuple[frozenset[str], frozenset[str]]:
-        await self.__cache_refresh(asf_uid, asfquart_session)
+    def member_of_and_participant_of(self, asf_uid: str) -> tuple[frozenset[str], frozenset[str]]:
         return self.__cache.member_of[asf_uid], self.__cache.participant_of[asf_uid]
 
-    async def __cache_refresh(self, asf_uid: str, asfquart_session: dict[str, Any]) -> None:
+    async def cache_refresh(self, asf_uid: str, asfquart_session: session.ClientSession) -> None:
         if not self.__cache.outdated():
             return
         # We do not check that the ASF UID is the same as the one in the session
@@ -265,27 +258,22 @@ class AuthoriserLDAP:
     def __init__(self):
         self.__cache = Cache()
 
-    async def is_member_of(self, asf_uid: str, committee_name: str) -> bool:
-        await self.__cache_refresh(asf_uid)
+    def is_member_of(self, asf_uid: str, committee_name: str) -> bool:
         return committee_name in self.__cache.member_of[asf_uid]
 
-    async def is_participant_of(self, asf_uid: str, committee_name: str) -> bool:
-        await self.__cache_refresh(asf_uid)
+    def is_participant_of(self, asf_uid: str, committee_name: str) -> bool:
         return committee_name in self.__cache.participant_of[asf_uid]
 
-    async def member_of(self, asf_uid: str) -> frozenset[str]:
-        await self.__cache_refresh(asf_uid)
+    def member_of(self, asf_uid: str) -> frozenset[str]:
         return self.__cache.member_of[asf_uid]
 
-    async def participant_of(self, asf_uid: str) -> frozenset[str]:
-        await self.__cache_refresh(asf_uid)
+    def participant_of(self, asf_uid: str) -> frozenset[str]:
         return self.__cache.participant_of[asf_uid]
 
-    async def member_of_and_participant_of(self, asf_uid: str) -> tuple[frozenset[str], frozenset[str]]:
-        await self.__cache_refresh(asf_uid)
+    def member_of_and_participant_of(self, asf_uid: str) -> tuple[frozenset[str], frozenset[str]]:
         return self.__cache.member_of[asf_uid], self.__cache.participant_of[asf_uid]
 
-    async def __cache_refresh(self, asf_uid: str) -> None:
+    async def cache_refresh(self, asf_uid: str) -> None:
         if not self.__cache.outdated():
             return
         try:
@@ -302,67 +290,10 @@ authoriser_asfquart: Final[AuthoriserASFQuart] = AuthoriserASFQuart()
 authoriser_ldap: Final[AuthoriserLDAP] = AuthoriserLDAP()
 
 
-class AuthorisationASFQuart:
-    def __init__(self, authoriser: AuthoriserASFQuart, asfquart_session: session.ClientSession):
-        # We provide and authenticate the ASF UID for the caller
-        self.asfquart_session = asfquart_session
-        self.authoriser = authoriser
-        self.asf_uid = self.asfquart_session.get("uid")
-        self.authenticated = True
-
-    async def is_member_of(self, committee_name: str) -> bool:
-        if self.asf_uid is None:
-            return False
-        return await self.authoriser.is_member_of(self.asf_uid, self.asfquart_session, committee_name)
-
-    async def is_participant_of(self, committee_name: str) -> bool:
-        if self.asf_uid is None:
-            return False
-        return await self.authoriser.is_participant_of(self.asf_uid, self.asfquart_session, committee_name)
-
-    async def participant_of(self) -> frozenset[str]:
-        if self.asf_uid is None:
-            return frozenset()
-        return await self.authoriser.participant_of(self.asf_uid, self.asfquart_session)
-
-    async def member_of(self) -> frozenset[str]:
-        if self.asf_uid is None:
-            return frozenset()
-        return await self.authoriser.member_of(self.asf_uid, self.asfquart_session)
-
-
-class AuthorisationLDAP:
-    def __init__(self, authoriser: AuthoriserLDAP, asf_uid: str | None = None):
-        # The caller must provide an already authenticated ASF UID
-        self.authoriser = authoriser
-        self.asf_uid = asf_uid
-        self.authenticated = asf_uid is None
-
-    async def is_member_of(self, committee_name: str) -> bool:
-        if self.asf_uid is None:
-            return False
-        return await self.authoriser.is_member_of(self.asf_uid, committee_name)
-
-    async def is_participant_of(self, committee_name: str) -> bool:
-        if self.asf_uid is None:
-            return False
-        return await self.authoriser.is_participant_of(self.asf_uid, committee_name)
-
-    async def participant_of(self) -> frozenset[str]:
-        if self.asf_uid is None:
-            return frozenset()
-        return await self.authoriser.participant_of(self.asf_uid)
-
-    async def member_of(self) -> frozenset[str]:
-        if self.asf_uid is None:
-            return frozenset()
-        return await self.authoriser.member_of(self.asf_uid)
-
-
 class AsyncObject:
-    async def __new__(cls, *a, **kw):
+    async def __new__(cls, *args, **kwargs):
         instance = super().__new__(cls)
-        await instance.__init__(*a, **kw)
+        await instance.__init__(*args, **kwargs)
         return instance
 
     async def __init__(self):
@@ -382,42 +313,58 @@ class Authorisation(AsyncObject):
                 if asfquart_session is None:
                     raise AuthenticationError("No ASFQuart session found")
                 self.__authoriser = AuthoriserASFQuart()
-                self.__authorisation = AuthorisationASFQuart(self.__authoriser, asfquart_session)
+                self.__asf_uid = asfquart_session.get("uid")
+                if not isinstance(self.__asf_uid, str | None):
+                    raise AuthenticationError("ASFQuart session has no uid")
+                self.__authenticated = True
+                if isinstance(self.__asf_uid, str):
+                    await self.__authoriser.cache_refresh(self.__asf_uid, asfquart_session)
             case str() | None:
                 self.__authoriser = AuthoriserLDAP()
-                self.__authorisation = AuthorisationLDAP(self.__authoriser, asf_uid)
+                self.__asf_uid = asf_uid
+                self.__authenticated = asf_uid is None
+                if isinstance(asf_uid, str):
+                    await self.__authoriser.cache_refresh(asf_uid)
 
     @property
     def asf_uid(self) -> str | None:
-        return self.__authorisation.asf_uid
+        return self.__asf_uid
 
     @property
     def is_asfquart_session(self) -> bool:
-        match self.__authorisation:
-            case AuthorisationASFQuart():
+        match self.__authoriser:
+            case AuthoriserASFQuart():
                 return True
-            case AuthorisationLDAP():
+            case AuthoriserLDAP():
                 return False
 
     @property
     def is_authenticated(self) -> bool:
-        return self.__authorisation.authenticated
+        return self.__authenticated
 
     def is_committer(self) -> bool:
-        return self.__authorisation.asf_uid is not None
+        return self.__asf_uid is not None
 
-    async def is_member_of(self, committee_name: str) -> bool:
+    def is_member_of(self, committee_name: str) -> bool:
         # TODO: This is a workaround for a bug
-        if self.__authorisation.asf_uid in {"sbp", "tn", "wave"}:
+        if self.__asf_uid in {"sbp", "tn", "wave"}:
             if committee_name == "tooling":
                 return True
-        return await self.__authorisation.is_member_of(committee_name)
+        if self.__asf_uid is None:
+            return False
+        return self.__authoriser.is_member_of(self.__asf_uid, committee_name)
 
-    async def is_participant_of(self, committee_name: str) -> bool:
-        return await self.__authorisation.is_participant_of(committee_name)
+    def is_participant_of(self, committee_name: str) -> bool:
+        if self.__asf_uid is None:
+            return False
+        return self.__authoriser.is_participant_of(self.__asf_uid, committee_name)
 
-    async def participant_of(self) -> frozenset[str]:
-        return await self.__authorisation.participant_of()
+    def participant_of(self) -> frozenset[str]:
+        if self.__asf_uid is None:
+            return frozenset()
+        return self.__authoriser.participant_of(self.__asf_uid)
 
-    async def member_of(self) -> frozenset[str]:
-        return await self.__authorisation.member_of()
+    def member_of(self) -> frozenset[str]:
+        if self.__asf_uid is None:
+            return frozenset()
+        return self.__authoriser.member_of(self.__asf_uid)

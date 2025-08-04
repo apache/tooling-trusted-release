@@ -172,13 +172,13 @@ class Write:
     #         return types.OutcomeException(e)
     #     return types.OutcomeResult(wacm)
 
-    async def as_committee_member(self, committee_name: str) -> WriteAsCommitteeMember:
-        return (await self.as_committee_member_outcome(committee_name)).result_or_raise()
+    def as_committee_member(self, committee_name: str) -> WriteAsCommitteeMember:
+        return self.as_committee_member_outcome(committee_name).result_or_raise()
 
-    async def as_committee_member_outcome(self, committee_name: str) -> types.Outcome[WriteAsCommitteeMember]:
+    def as_committee_member_outcome(self, committee_name: str) -> types.Outcome[WriteAsCommitteeMember]:
         if self.__authorisation.asf_uid is None:
             return types.OutcomeException(AccessError("No ASF UID"))
-        if not (await self.__authorisation.is_member_of(committee_name)):
+        if not self.__authorisation.is_member_of(committee_name):
             return types.OutcomeException(
                 AccessError(f"ASF UID {self.__authorisation.asf_uid} is not a member of {committee_name}")
             )
@@ -188,13 +188,13 @@ class Write:
             return types.OutcomeException(e)
         return types.OutcomeResult(wacm)
 
-    async def as_committee_participant(self, committee_name: str) -> WriteAsCommitteeParticipant:
-        return (await self.as_committee_participant_outcome(committee_name)).result_or_raise()
+    def as_committee_participant(self, committee_name: str) -> WriteAsCommitteeParticipant:
+        return self.as_committee_participant_outcome(committee_name).result_or_raise()
 
-    async def as_committee_participant_outcome(self, committee_name: str) -> types.Outcome[WriteAsCommitteeParticipant]:
+    def as_committee_participant_outcome(self, committee_name: str) -> types.Outcome[WriteAsCommitteeParticipant]:
         if self.__authorisation.asf_uid is None:
             return types.OutcomeException(AccessError("No ASF UID"))
-        if not (await self.__authorisation.is_participant_of(committee_name)):
+        if not self.__authorisation.is_participant_of(committee_name):
             return types.OutcomeException(AccessError(f"Not a participant of {committee_name}"))
         try:
             wacp = WriteAsCommitteeParticipant(self, self.__data, committee_name)
@@ -243,7 +243,7 @@ class Write:
             return types.OutcomeException(AccessError("No committee found for project"))
         if self.__authorisation.asf_uid is None:
             return types.OutcomeException(AccessError("No ASF UID"))
-        if not (await self.__authorisation.is_member_of(project.committee.name)):
+        if not self.__authorisation.is_member_of(project.committee.name):
             return types.OutcomeException(AccessError(f"Not a member of {project.committee.name}"))
         try:
             wacm = WriteAsCommitteeMember(self, self.__data, project.committee.name)
@@ -251,21 +251,23 @@ class Write:
             return types.OutcomeException(e)
         return types.OutcomeResult(wacm)
 
-    async def member_of(self) -> frozenset[str]:
-        return await self.__authorisation.member_of()
+    @property
+    def member_of(self) -> frozenset[str]:
+        return self.__authorisation.member_of()
 
     async def member_of_committees(self) -> list[sql.Committee]:
-        names = list(await self.__authorisation.member_of())
+        names = list(self.__authorisation.member_of())
         committees = list(await self.__data.committee(name_in=names).all())
         committees.sort(key=lambda c: c.name)
         # Return even standing committees
         return committees
 
-    async def participant_of(self) -> frozenset[str]:
-        return await self.__authorisation.participant_of()
+    @property
+    def participant_of(self) -> frozenset[str]:
+        return self.__authorisation.participant_of()
 
     async def participant_of_committees(self) -> list[sql.Committee]:
-        names = list(await self.__authorisation.participant_of())
+        names = list(self.__authorisation.participant_of())
         committees = list(await self.__data.committee(name_in=names).all())
         committees.sort(key=lambda c: c.name)
         # Return even standing committees

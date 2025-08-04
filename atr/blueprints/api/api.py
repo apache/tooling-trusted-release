@@ -272,7 +272,7 @@ async def ignore_add(data: models.api.IgnoreAddArgs) -> DictResponse:
     if not any(data.model_dump().values()):
         raise exceptions.BadRequest("At least one field must be provided")
     async with storage.write(asf_uid) as write:
-        wacm = await write.as_committee_member(data.committee_name)
+        wacm = write.as_committee_member(data.committee_name)
         await wacm.checks.ignore_add(
             data.release_glob,
             data.revision_number,
@@ -301,7 +301,7 @@ async def ignore_delete(data: models.api.IgnoreDeleteArgs) -> DictResponse:
     if not any(data.model_dump().values()):
         raise exceptions.BadRequest("At least one field must be provided")
     async with storage.write(asf_uid) as write:
-        wacm = await write.as_committee_member(data.committee)
+        wacm = write.as_committee_member(data.committee)
         # TODO: This is more like discard
         # Should potentially check for rowcount, and raise an error if it's 0
         await wacm.checks.ignore_delete(data.id)
@@ -373,7 +373,7 @@ async def key_add(data: models.api.KeyAddArgs) -> DictResponse:
         key = ocr.result_or_raise()
 
         for selected_committee_name in selected_committee_names:
-            wacm = await write.as_committee_member(selected_committee_name)
+            wacm = write.as_committee_member(selected_committee_name)
             outcome: types.Outcome[types.LinkedCommittee] = await wacm.keys.associate_fingerprint(
                 key.key_model.fingerprint
             )
@@ -406,7 +406,7 @@ async def key_delete(data: models.api.KeyDeleteArgs) -> DictResponse:
         key = outcome.result_or_raise()
 
         for committee in key.committees:
-            wacm = (await write.as_committee_member_outcome(committee.name)).result_or_none()
+            wacm = write.as_committee_member_outcome(committee.name).result_or_none()
             if wacm is None:
                 continue
             outcomes.append(await wacm.keys.autogenerate_keys_file())
@@ -450,7 +450,7 @@ async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
     filetext = data.filetext
     selected_committee_name = data.committee
     async with storage.write(asf_uid) as write:
-        wacm = await write.as_committee_member(selected_committee_name)
+        wacm = write.as_committee_member(selected_committee_name)
         outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_associated(filetext)
 
         # TODO: It would be nice to serialise the actual outcomes

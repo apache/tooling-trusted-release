@@ -168,7 +168,7 @@ async def add(session: routes.CommitterSession) -> str:
                 for selected_committee_name in selected_committee_names:
                     # TODO: Should this be committee member or committee participant?
                     # Also, should we emit warnings and continue here?
-                    wacp = await write.as_committee_participant(selected_committee_name)
+                    wacp = write.as_committee_participant(selected_committee_name)
                     outcome: types.Outcome[types.LinkedCommittee] = await wacp.keys.associate_fingerprint(
                         key.key_model.fingerprint
                     )
@@ -268,7 +268,7 @@ async def details(session: routes.CommitterSession, fingerprint: str) -> str | r
             if affected_committee_names:
                 async with storage.write() as write:
                     for affected_committee_name in affected_committee_names:
-                        wacm = (await write.as_committee_member_outcome(affected_committee_name)).result_or_none()
+                        wacm = write.as_committee_member_outcome(affected_committee_name).result_or_none()
                         if wacm is None:
                             continue
                         await wacm.keys.autogenerate_keys_file()
@@ -436,7 +436,7 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
         return await session.redirect(keys, error="Invalid request to update KEYS file.")
 
     async with storage.write() as write:
-        wacm = await write.as_committee_member(committee_name)
+        wacm = write.as_committee_member(committee_name)
         match await wacm.keys.autogenerate_keys_file():
             case types.OutcomeResult():
                 await quart.flash(
@@ -520,7 +520,7 @@ async def upload(session: routes.CommitterSession) -> str:
             return await render(error="You must select at least one committee")
 
         async with storage.write() as write:
-            wacm = await write.as_committee_member(selected_committee)
+            wacm = write.as_committee_member(selected_committee)
             outcomes = await wacm.keys.ensure_associated(keys_text)
         results = outcomes
         success_count = outcomes.result_count
