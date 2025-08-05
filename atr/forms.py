@@ -212,12 +212,14 @@ def render_columns(
     action: str,
     form_classes: str = ".atr-canary",
     submit_classes: str = "btn-primary",
+    descriptions: bool = False,
 ) -> htpy.Element:
     label_classes = "col-sm-3 col-form-label text-sm-end"
-    elements = render_elements(
+    elements = _render_elements(
         form,
         label_classes=label_classes,
         submit_classes=submit_classes,
+        descriptions=descriptions,
     )
 
     field_rows: list[htpy.Element] = []
@@ -236,56 +238,14 @@ def render_columns(
     return htpy.form(form_classes, action=action, method="post")[form_children]
 
 
-def render_elements(
-    form: Typed,
-    label_classes: str = "col-sm-3 col-form-label text-sm-end",
-    submit_classes: str = "btn-primary",
-    small: bool = False,
-) -> Elements:
-    hidden_elements: list[markupsafe.Markup] = []
-    field_elements: list[tuple[markupsafe.Markup, markupsafe.Markup]] = []
-    submit_element: markupsafe.Markup | None = None
-
-    for field in form:
-        if isinstance(field, wtforms.HiddenField):
-            hidden_elements.append(markupsafe.Markup(str(field)))
-            continue
-
-        if isinstance(field, wtforms.StringField):
-            label = markupsafe.Markup(str(field.label(class_=label_classes)))
-            widget_class = "form-control"
-            if small is True:
-                widget_class += " form-control-sm"
-            widget = markupsafe.Markup(str(field(class_=widget_class)))
-            field_elements.append((label, widget))
-            continue
-
-        if isinstance(field, wtforms.SelectField):
-            label = markupsafe.Markup(str(field.label(class_=label_classes)))
-            widget_class = "form-select"
-            if small is True:
-                widget_class += " form-select-sm"
-            widget = markupsafe.Markup(str(field(class_=widget_class)))
-            field_elements.append((label, widget))
-            continue
-
-        if isinstance(field, wtforms.SubmitField):
-            button_class = "btn " + submit_classes
-            submit_element = markupsafe.Markup(str(field(class_=button_class)))
-            continue
-
-        raise TypeError(f"Unsupported field type: {type(field).__name__}")
-
-    return Elements(hidden_elements, field_elements, submit_element)
-
-
 def render_simple(
     form: Typed,
     action: str,
     form_classes: str = "",
     submit_classes: str = "btn-primary",
+    descriptions: bool = False,
 ) -> htpy.Element:
-    elements = render_elements(form, submit_classes=submit_classes)
+    elements = _render_elements(form, submit_classes=submit_classes, descriptions=descriptions)
 
     field_rows: list[htpy.Element] = []
     for label, widget in elements.fields:
@@ -309,9 +269,10 @@ def render_table(
     form_classes: str = "",
     table_classes: str = ".table.table-striped.table-bordered",
     submit_classes: str = "btn-primary",
+    descriptions: bool = False,
 ) -> htpy.Element:
     # Small elements in Bootstrap
-    elements = render_elements(form, submit_classes=submit_classes, small=True)
+    elements = _render_elements(form, submit_classes=submit_classes, small=True, descriptions=descriptions)
 
     field_rows: list[htpy.Element] = []
     for label, widget in elements.fields:
@@ -409,3 +370,43 @@ def url(
             kwargs["render_kw"] = {}
         kwargs["render_kw"]["placeholder"] = placeholder
     return wtforms.URLField(label, validators=validators, **kwargs)
+
+
+def _render_elements(
+    form: Typed,
+    label_classes: str = "col-sm-3 col-form-label text-sm-end",
+    submit_classes: str = "btn-primary",
+    small: bool = False,
+    descriptions: bool = False,
+) -> Elements:
+    hidden_elements: list[markupsafe.Markup] = []
+    field_elements: list[tuple[markupsafe.Markup, markupsafe.Markup]] = []
+    submit_element: markupsafe.Markup | None = None
+
+    for field in form:
+        if isinstance(field, wtforms.HiddenField):
+            hidden_elements.append(markupsafe.Markup(str(field)))
+            continue
+
+        if isinstance(field, wtforms.StringField) or isinstance(field, wtforms.SelectField):
+            label = markupsafe.Markup(str(field.label(class_=label_classes)))
+
+            widget_class = "form-control" if isinstance(field, wtforms.StringField) else "form-select"
+            widget_classes = widget_class if (small is False) else f"{widget_class}-sm"
+            widget = markupsafe.Markup(str(field(class_=widget_classes)))
+
+            if descriptions is True and field.description:
+                desc = htpy.div(".form-text.text-muted")[str(field.description)]
+                widget += markupsafe.Markup(str(desc))
+
+            field_elements.append((label, widget))
+            continue
+
+        if isinstance(field, wtforms.SubmitField):
+            button_class = "btn " + submit_classes
+            submit_element = markupsafe.Markup(str(field(class_=button_class)))
+            continue
+
+        raise TypeError(f"Unsupported field type: {type(field).__name__}")
+
+    return Elements(hidden_elements, field_elements, submit_element)

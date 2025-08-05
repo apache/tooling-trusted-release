@@ -67,14 +67,12 @@ async def distribute_post(session: routes.CommitterSession, project: str, versio
 
 async def _distribute_page(*, project: str, version: str) -> str:
     form = await DistributeForm.create_form(data={"package": project, "version": version})
-    form_content = forms.render_columns(form, action=quart.request.path)
-    help_text = htpy.p[
-        htpy.strong["Owner or Namespace"],
-        """: this field in the form below describes who owns or names the
-        package (Maven groupId, npm @scope, Docker namespace, GitHub owner,
-        ArtifactHub repo). Leave blank if not used.""",
+    form_content = forms.render_columns(form, action=quart.request.path, descriptions=True)
+    introduction = htpy.p[
+        """Record a manual distribution using the form below. Please note that
+        this form is a work in progress and not fully functional."""
     ]
-    content = _page("Distribute", htpy.div[help_text, form_content])
+    content = _page("Distribute", introduction, form_content)
     return await template.blank("Distribute", content=content)
 
 
@@ -111,5 +109,5 @@ def _distribute_post_table(data: dict[str, str]) -> htpy.Element:
     return htpy.table(".table.table-striped.table-bordered")[tbody]
 
 
-def _page(title_str: str, content: htpy.Element) -> htpy.Element:
-    return htpy.div[htpy.h1[title_str], content]
+def _page(title_str: str, *content: htpy.Element) -> htpy.Element:
+    return htpy.div[htpy.h1[title_str], *content]
