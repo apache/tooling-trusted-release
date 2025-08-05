@@ -45,7 +45,7 @@ import atr.user as user
 def audit(**kwargs: types.JSON) -> None:
     now = datetime.datetime.now(datetime.UTC).isoformat(timespec="milliseconds")
     now = now.replace("+00:00", "Z")
-    action = log.caller_name()
+    action = log.caller_name(depth=2)
     kwargs = {"datetime": now, "action": action, **kwargs}
     msg = json.dumps(kwargs, allow_nan=False)
     # The atr.log logger should give the same name
