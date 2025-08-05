@@ -312,7 +312,7 @@ class Authorisation(AsyncObject):
                 asfquart_session = await session.read()
                 if asfquart_session is None:
                     raise AuthenticationError("No ASFQuart session found")
-                self.__authoriser = AuthoriserASFQuart()
+                self.__authoriser = authoriser_asfquart
                 self.__asf_uid = asfquart_session.get("uid")
                 if not isinstance(self.__asf_uid, str | None):
                     raise AuthenticationError("ASFQuart session has no uid")
@@ -320,7 +320,7 @@ class Authorisation(AsyncObject):
                 if isinstance(self.__asf_uid, str):
                     await self.__authoriser.cache_refresh(self.__asf_uid, asfquart_session)
             case str() | None:
-                self.__authoriser = AuthoriserLDAP()
+                self.__authoriser = authoriser_ldap
                 self.__asf_uid = asf_uid
                 self.__authenticated = asf_uid is None
                 if isinstance(asf_uid, str):
