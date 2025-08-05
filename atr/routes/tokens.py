@@ -123,9 +123,9 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
     if most_recent_pat and most_recent_pat.last_used:
         issue_jwt.append(
             p(".mt-3")[
-                "Your most recently issued JWT was on ",
-                strong[util.format_datetime(most_recent_pat.last_used)],
-                " using the PAT labelled ",
+                "You most recently used a PAT to issue a JWT at ",
+                strong[util.format_datetime(most_recent_pat.last_used) + "Z"],
+                ", using the PAT labelled ",
                 code[most_recent_pat.label or "[Untitled]"],
                 ".",
             ]
