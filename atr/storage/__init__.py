@@ -54,15 +54,15 @@ def audit(**kwargs: types.JSON) -> None:
     logger.info(msg)
 
 
-class AccessCredentials:
+class AccessAs:
     def log_auditable_event(self, **kwargs: types.JSON) -> None:
         audit(**kwargs)
 
 
-class AccessCredentialsRead(AccessCredentials): ...
+class ReadAs(AccessAs): ...
 
 
-class AccessCredentialsWrite(AccessCredentials): ...
+class WriteAs(AccessAs): ...
 
 
 # A = TypeVar("A", bound=AccessCredentials)
@@ -78,7 +78,7 @@ class AccessError(RuntimeError): ...
 # Read
 
 
-class ReadAsGeneralPublic(AccessCredentialsRead):
+class ReadAsGeneralPublic(ReadAs):
     def __init__(self, read: Read, data: db.Session):
         self.checks = readers.checks.GeneralPublic(self, read, data)
         self.releases = readers.releases.GeneralPublic(self, read, data)
@@ -112,27 +112,27 @@ class Read:
 # Write
 
 
-class WriteAsGeneralPublic(AccessCredentialsWrite):
+class WriteAsGeneralPublic(WriteAs):
     def __init__(self, write: Write, data: db.Session):
-        self.checks = writers.checks.GeneralPublic(self, write, data)
-        self.keys = writers.keys.GeneralPublic(self, write, data)
-        self.tokens = writers.tokens.GeneralPublic(self, write, data)
+        self.checks = writers.checks.GeneralPublic(write, self, data)
+        self.keys = writers.keys.GeneralPublic(write, self, data)
+        self.tokens = writers.tokens.GeneralPublic(write, self, data)
 
 
 class WriteAsFoundationCommitter(WriteAsGeneralPublic):
     def __init__(self, write: Write, data: db.Session):
         # TODO: We need a definitive list of ASF UIDs
-        self.checks = writers.checks.FoundationCommitter(self, write, data)
-        self.keys = writers.keys.FoundationCommitter(self, write, data)
-        self.tokens = writers.tokens.FoundationCommitter(self, write, data)
+        self.checks = writers.checks.FoundationCommitter(write, self, data)
+        self.keys = writers.keys.FoundationCommitter(write, self, data)
+        self.tokens = writers.tokens.FoundationCommitter(write, self, data)
 
 
 class WriteAsCommitteeParticipant(WriteAsFoundationCommitter):
     def __init__(self, write: Write, data: db.Session, committee_name: str):
         self.__committee_name = committee_name
-        self.checks = writers.checks.CommitteeParticipant(self, write, data, committee_name)
-        self.keys = writers.keys.CommitteeParticipant(self, write, data, committee_name)
-        self.tokens = writers.tokens.CommitteeParticipant(self, write, data, committee_name)
+        self.checks = writers.checks.CommitteeParticipant(write, self, data, committee_name)
+        self.keys = writers.keys.CommitteeParticipant(write, self, data, committee_name)
+        self.tokens = writers.tokens.CommitteeParticipant(write, self, data, committee_name)
 
     @property
     def committee_name(self) -> str:
@@ -142,9 +142,9 @@ class WriteAsCommitteeParticipant(WriteAsFoundationCommitter):
 class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
     def __init__(self, write: Write, data: db.Session, committee_name: str):
         self.__committee_name = committee_name
-        self.checks = writers.checks.CommitteeMember(self, write, data, committee_name)
-        self.keys = writers.keys.CommitteeMember(self, write, data, committee_name)
-        self.tokens = writers.tokens.CommitteeMember(self, write, data, committee_name)
+        self.checks = writers.checks.CommitteeMember(write, self, data, committee_name)
+        self.keys = writers.keys.CommitteeMember(write, self, data, committee_name)
+        self.tokens = writers.tokens.CommitteeMember(write, self, data, committee_name)
 
     @property
     def committee_name(self) -> str:
@@ -155,15 +155,16 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
 class WriteAsFoundationAdmin(WriteAsCommitteeMember):
     def __init__(self, write: Write, data: db.Session, committee_name: str):
         self.__committee_name = committee_name
-        # self.checks = writers.checks.FoundationAdmin(self, write, data, committee_name)
-        self.keys = writers.keys.FoundationAdmin(self, write, data, committee_name)
-        # self.tokens = writers.tokens.FoundationAdmin(self, write, data, committee_name)
+        # self.checks = writers.checks.FoundationAdmin(write, self, data, committee_name)
+        self.keys = writers.keys.FoundationAdmin(write, self, data, committee_name)
+        # self.tokens = writers.tokens.FoundationAdmin(write, self, data, committee_name)
 
     @property
     def committee_name(self) -> str:
         return self.__committee_name
 
 
+# TODO: Could name this WriteDispatcher
 class Write:
     # Read and Write have authenticator methods which return access outcomes
     # TODO: Still need to send some runtime credentials guarantee to the WriteAs* classes

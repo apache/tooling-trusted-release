@@ -30,21 +30,21 @@ import atr.storage as storage
 class GeneralPublic:
     def __init__(
         self,
-        credentials: storage.WriteAsGeneralPublic,
         write: storage.Write,
+        write_as: storage.WriteAsGeneralPublic,
         data: db.Session,
     ):
-        self.__credentials = credentials
         self.__write = write
+        self.__write_as = write_as
         self.__data = data
         self.__asf_uid = write.authorisation.asf_uid
 
 
 class FoundationCommitter(GeneralPublic):
-    def __init__(self, credentials: storage.WriteAsFoundationCommitter, write: storage.Write, data: db.Session):
-        super().__init__(credentials, write, data)
-        self.__credentials = credentials
+    def __init__(self, write: storage.Write, write_as: storage.WriteAsFoundationCommitter, data: db.Session):
+        super().__init__(write, write_as, data)
         self.__write = write
+        self.__write_as = write_as
         self.__data = data
         self.__asf_uid = write.authorisation.asf_uid
 
@@ -52,14 +52,14 @@ class FoundationCommitter(GeneralPublic):
 class CommitteeParticipant(FoundationCommitter):
     def __init__(
         self,
-        credentials: storage.WriteAsCommitteeParticipant,
         write: storage.Write,
+        write_as: storage.WriteAsCommitteeParticipant,
         data: db.Session,
         committee_name: str,
     ):
-        super().__init__(credentials, write, data)
-        self.__credentials = credentials
+        super().__init__(write, write_as, data)
         self.__write = write
+        self.__write_as = write_as
         self.__data = data
         self.__asf_uid = write.authorisation.asf_uid
         self.__committee_name = committee_name
@@ -68,14 +68,14 @@ class CommitteeParticipant(FoundationCommitter):
 class CommitteeMember(CommitteeParticipant):
     def __init__(
         self,
-        credentials: storage.WriteAsCommitteeMember,
         write: storage.Write,
+        write_as: storage.WriteAsCommitteeMember,
         data: db.Session,
         committee_name: str,
     ):
-        super().__init__(credentials, write, data, committee_name)
-        self.__credentials = credentials
+        super().__init__(write, write_as, data, committee_name)
         self.__write = write
+        self.__write_as = write_as
         self.__data = data
         asf_uid = write.authorisation.asf_uid
         if asf_uid is None:
@@ -107,7 +107,7 @@ class CommitteeMember(CommitteeParticipant):
         )
         self.__data.add(cri)
         await self.__data.commit()
-        self.__credentials.log_auditable_event(
+        self.__write_as.log_auditable_event(
             asf_uid=self.__asf_uid,
             cri=cri.model_dump_json(exclude_none=True),
         )
@@ -116,7 +116,7 @@ class CommitteeMember(CommitteeParticipant):
         via = sql.validate_instrumented_attribute
         await self.__data.execute(sqlmodel.delete(sql.CheckResultIgnore).where(via(sql.CheckResultIgnore.id) == id))
         await self.__data.commit()
-        self.__credentials.log_auditable_event(
+        self.__write_as.log_auditable_event(
             asf_uid=self.__asf_uid,
             ignore_id=id,
         )
@@ -145,7 +145,7 @@ class CommitteeMember(CommitteeParticipant):
         cri.status = status
         cri.message_glob = message_glob
         await self.__data.commit()
-        self.__credentials.log_auditable_event(
+        self.__write_as.log_auditable_event(
             asf_uid=self.__asf_uid,
             cri=cri.model_dump_json(exclude_none=True),
         )
