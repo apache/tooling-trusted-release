@@ -20,6 +20,7 @@ import atr.routes.announce as announce
 import atr.routes.candidate as candidate
 import atr.routes.committees as committees
 import atr.routes.compose as compose
+import atr.routes.distribute as distribute
 import atr.routes.download as download
 import atr.routes.draft as draft
 import atr.routes.file as file

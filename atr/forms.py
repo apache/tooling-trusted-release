@@ -362,7 +362,7 @@ def string(
     return wtforms.StringField(label, validators=validators, **kwargs)
 
 
-def submit(label: str, **kwargs: Any) -> wtforms.SubmitField:
+def submit(label: str = "Submit", **kwargs: Any) -> wtforms.SubmitField:
     return wtforms.SubmitField(label, **kwargs)
 
 
