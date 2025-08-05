@@ -20,6 +20,7 @@
 import asyncio
 import contextlib
 import os
+import queue
 from collections.abc import Iterable
 from types import ModuleType
 from typing import Any
@@ -147,6 +148,9 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
     @app.before_serving
     async def startup() -> None:
         """Start services before the app starts serving requests."""
+        if listener := app.extensions.get("logging_listener"):
+            listener.start()
+
         worker_manager = manager.get_worker_manager()
         await worker_manager.start()
 
@@ -193,6 +197,9 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
+        if listener := app.extensions.get("logging_listener"):
+            listener.stop()
+
         await db.shutdown_database()
 
         app.background_tasks.clear()
@@ -201,12 +208,19 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
 def app_setup_logging(app: base.QuartApp, config_mode: config.Mode, app_config: type[config.AppConfig]) -> None:
     """Setup application logging."""
     import logging
+    import logging.handlers
+
+    console_handler = rich_logging.RichHandler(rich_tracebacks=True, show_time=False)
+    log_queue = queue.Queue(-1)
+    listener = logging.handlers.QueueListener(log_queue, console_handler)
+    app.extensions["logging_listener"] = listener
 
     logging.basicConfig(
         format="[ %(asctime)s.%(msecs)03d ] %(process)d <%(name)s> %(message)s",
         level=logging.INFO,
         datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=[rich_logging.RichHandler(rich_tracebacks=True, show_time=False)],
+        handlers=[logging.handlers.QueueHandler(log_queue)],
+        force=True,
     )
 
     # Configure dedicated audit logger
