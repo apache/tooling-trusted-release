@@ -31,14 +31,18 @@ import atr.storage.types as types
 class GeneralPublic:
     def __init__(
         self,
-        credentials: storage.ReadAsGeneralPublic,
         read: storage.Read,
+        read_as: storage.ReadAsGeneralPublic,
         data: db.Session,
         asf_uid: str | None = None,
     ):
-        self.__credentials = credentials
         self.__read = read
+        self.__read_as = read_as
         self.__data = data
+        if asf_uid is None:
+            asf_uid = read.authorisation.asf_uid
+        if asf_uid is None:
+            raise ValueError("An ASF UID is required")
         self.__asf_uid = asf_uid
 
     async def path_info(self, release: sql.Release, paths: list[pathlib.Path]) -> types.PathInfo | None:
@@ -63,7 +67,7 @@ class GeneralPublic:
         if release.committee is None:
             raise ValueError("Release has no committee")
 
-        match_ignore = await self.__credentials.checks.ignores_matcher(release.committee.name)
+        match_ignore = await self.__read_as.checks.ignores_matcher(release.committee.name)
 
         cs = types.ChecksSubset(
             release=release,

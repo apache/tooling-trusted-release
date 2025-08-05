@@ -34,14 +34,18 @@ if TYPE_CHECKING:
 class GeneralPublic:
     def __init__(
         self,
-        credentials: storage.ReadAsGeneralPublic,
         read: storage.Read,
+        read_as: storage.ReadAsGeneralPublic,
         data: db.Session,
         asf_uid: str | None = None,
     ):
-        self.__credentials = credentials
         self.__read = read
+        self.__read_as = read_as
         self.__data = data
+        if asf_uid is None:
+            asf_uid = read.authorisation.asf_uid
+        if asf_uid is None:
+            raise ValueError("An ASF UID is required")
         self.__asf_uid = asf_uid
 
     async def by_release_path(self, release: sql.Release, rel_path: pathlib.Path) -> types.CheckResults:

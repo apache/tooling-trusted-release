@@ -98,6 +98,8 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
 
     start = time.perf_counter_ns()
     tokens_list = await _fetch_tokens(session.uid)
+    async with storage.read_as_foundation_committer() as rafc:
+        most_recent_pat = await rafc.tokens.most_recent_jwt_pat()
     end = time.perf_counter_ns()
     log.info("Tokens list fetched in %dms", (end - start) / 1_000_000)
 
@@ -106,7 +108,7 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
     issue_form_elem = _build_issue_jwt_form_element(issue_form)
     tokens_table = _build_tokens_table(tokens_list)
 
-    issue_jwt_elem = div[
+    issue_jwt = [
         p[
             """Generate a JSON Web Token (JWT) to authenticate calls to ATR's
             private API routes. Treat the token like a password and include it
@@ -117,6 +119,17 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
         issue_form_elem,
         pre(id="jwt-output", class_="d-none mt-2 p-3 atr-word-wrap border rounded w-50"),
     ]
+
+    if most_recent_pat and most_recent_pat.last_used:
+        issue_jwt.append(
+            p(".mt-3")[
+                "Your most recently issued JWT was on ",
+                strong[util.format_datetime(most_recent_pat.last_used)],
+                " using the PAT labelled ",
+                code[most_recent_pat.label or "[Untitled]"],
+                ".",
+            ]
+        )
 
     content_elem = div[
         h1["Tokens"],
@@ -132,7 +145,7 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
         ],
         tokens_table,
         h2["JSON Web Token (JWT)"],
-        issue_jwt_elem,
+        div[issue_jwt],
     ]
     end = time.perf_counter_ns()
     log.info("Content elem built in %dms", (end - start) / 1_000_000)

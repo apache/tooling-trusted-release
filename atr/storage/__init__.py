@@ -79,12 +79,17 @@ class AccessError(RuntimeError): ...
 
 
 class ReadAsGeneralPublic(ReadAs):
-    def __init__(self, read: Read, data: db.Session):
-        self.checks = readers.checks.GeneralPublic(self, read, data)
-        self.releases = readers.releases.GeneralPublic(self, read, data)
+    def __init__(self, read: Read, data: db.Session) -> None:
+        self.checks = readers.checks.GeneralPublic(read, self, data)
+        self.releases = readers.releases.GeneralPublic(read, self, data)
+        self.tokens = readers.tokens.GeneralPublic(read, self, data)
 
 
-class ReadAsFoundationCommitter(ReadAsGeneralPublic): ...
+class ReadAsFoundationCommitter(ReadAsGeneralPublic):
+    def __init__(self, read: Read, data: db.Session) -> None:
+        # self.checks = readers.checks.FoundationCommitter(read, self, data)
+        # self.releases = readers.releases.FoundationCommitter(read, self, data)
+        self.tokens = readers.tokens.FoundationCommitter(read, self, data)
 
 
 class ReadAsCommitteeParticipant(ReadAsFoundationCommitter): ...
@@ -97,6 +102,20 @@ class Read:
     def __init__(self, authorisation: principal.Authorisation, data: db.Session):
         self.authorisation = authorisation
         self.__data = data
+
+    # @property
+    # def asf_uid(self) -> str | None:
+    #     return self.authorisation.asf_uid
+
+    def as_foundation_committer(self) -> ReadAsFoundationCommitter:
+        return self.as_foundation_committer_outcome().result_or_raise()
+
+    def as_foundation_committer_outcome(self) -> types.Outcome[ReadAsFoundationCommitter]:
+        try:
+            rafc = ReadAsFoundationCommitter(self, self.__data)
+        except Exception as e:
+            return types.OutcomeException(e)
+        return types.OutcomeResult(rafc)
 
     def as_general_public(self) -> ReadAsGeneralPublic:
         return self.as_general_public_outcome().result_or_raise()
@@ -306,6 +325,22 @@ async def read(asf_uid: str | None | ArgumentNoneType = ArgumentNone) -> AsyncGe
     async with db.session() as data:
         # TODO: Replace data with a DatabaseReader instance
         yield Read(authorisation, data)
+
+
+@contextlib.asynccontextmanager
+async def read_as_foundation_committer(
+    asf_uid: str | None | ArgumentNoneType = ArgumentNone,
+) -> AsyncGenerator[ReadAsFoundationCommitter]:
+    async with read(asf_uid) as r:
+        yield r.as_foundation_committer()
+
+
+@contextlib.asynccontextmanager
+async def read_as_general_public(
+    asf_uid: str | None | ArgumentNoneType = ArgumentNone,
+) -> AsyncGenerator[ReadAsGeneralPublic]:
+    async with read(asf_uid) as r:
+        yield r.as_general_public()
 
 
 @contextlib.asynccontextmanager
