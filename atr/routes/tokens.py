@@ -108,9 +108,10 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
 
     issue_jwt_elem = div[
         p[
-            "Generate a JSON Web Token (JWT) to authenticate calls to ATR's private API routes. "
-            "Treat the token like a password and include it in the Authorization header "
-            "as a Bearer token when invoking the protected endpoints.",
+            """Generate a JSON Web Token (JWT) to authenticate calls to ATR's
+            private API routes. Treat the token like a password and include it
+            in the Authorization header as a Bearer token when invoking the
+            protected endpoints."""
             # p["Example"],
         ],
         issue_form_elem,
@@ -121,9 +122,9 @@ async def tokens(session: routes.CommitterSession) -> str | response.Response:
         h1["Tokens"],
         h2["Personal Access Tokens (PATs)"],
         p[
-            "Generate tokens for API access. For security, the plaintext token "
-            "is shown only once when you create it. You can revoke tokens you no "
-            "longer need.",
+            """Generate tokens for API access. For security, the plaintext
+            token is shown only once when you create it. You can revoke tokens
+            you no longer need."""
         ],
         div(".card.mb-4")[
             div(".card-header")["Generate new token"],

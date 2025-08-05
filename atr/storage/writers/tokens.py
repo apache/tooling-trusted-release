@@ -18,14 +18,15 @@
 # Removing this will cause circular imports
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import datetime
+import hashlib
+
+import sqlmodel
 
 import atr.db as db
+import atr.jwtoken as jwtoken
 import atr.models.sql as sql
 import atr.storage as storage
-
-if TYPE_CHECKING:
-    import datetime
 
 
 class GeneralPublic:
@@ -47,7 +48,10 @@ class FoundationCommitter(GeneralPublic):
         self.__credentials = credentials
         self.__write = write
         self.__data = data
-        self.__asf_uid = write.authorisation.asf_uid
+        asf_uid = write.authorisation.asf_uid
+        if asf_uid is None:
+            raise storage.AccessError("No ASF UID")
+        self.__asf_uid = asf_uid
 
     async def add_token(
         self, uid: str, token_hash: str, created: datetime.datetime, expires: datetime.datetime, label: str | None
@@ -62,6 +66,23 @@ class FoundationCommitter(GeneralPublic):
         self.__data.add(pat)
         await self.__data.commit()
         return pat
+
+    async def issue_jwt(self, pat_text: str) -> str:
+        pat_hash = hashlib.sha3_256(pat_text.encode()).hexdigest()
+        pat = await self.__data.query_one_or_none(
+            sqlmodel.select(sql.PersonalAccessToken).where(
+                sql.PersonalAccessToken.asfuid == self.__asf_uid,
+                sql.PersonalAccessToken.token_hash == pat_hash,
+            )
+        )
+        if pat is None:
+            raise storage.AccessError("Invalid PAT")
+        if pat.expires < datetime.datetime.now(datetime.UTC):
+            raise storage.AccessError("Expired PAT")
+        issued_jwt = jwtoken.issue(self.__asf_uid)
+        pat.last_used = datetime.datetime.now(datetime.UTC)
+        await self.__data.commit()
+        return issued_jwt
 
 
 class CommitteeParticipant(FoundationCommitter):

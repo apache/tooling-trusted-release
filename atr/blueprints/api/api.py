@@ -17,7 +17,6 @@
 
 
 import base64
-import datetime
 import hashlib
 import pathlib
 from typing import Any
@@ -337,18 +336,15 @@ async def jwt_create(data: models.api.JwtCreateArgs) -> DictResponse:
     """
     # Expects {"asfuid": "uid", "pat": "pat-token"}
     # Returns {"asfuid": "uid", "jwt": "jwt-token"}
-    token_hash = hashlib.sha3_256(data.pat.encode()).hexdigest()
-    pat_rec = await _get_pat(data.asfuid, token_hash)
+    asf_uid = data.asfuid
+    async with storage.write(asf_uid) as write:
+        wafc = write.as_foundation_committer()
+        jwt = await wafc.tokens.issue_jwt(data.pat)
 
-    now = datetime.datetime.now(datetime.UTC)
-    if (pat_rec is None) or (pat_rec.expires < now):
-        raise exceptions.Unauthorized("Invalid PAT")
-
-    jwt_token = jwtoken.issue(data.asfuid)
     return models.api.JwtCreateResults(
         endpoint="/jwt/create",
         asfuid=data.asfuid,
-        jwt=jwt_token,
+        jwt=jwt,
     ).model_dump(), 200
 
 
