@@ -61,7 +61,7 @@ class AppConfig:
     # TODO: We need to get Puppet to check SVN out initially, or do it manually
     SVN_STORAGE_DIR = os.path.join(STATE_DIR, "svn")
     SQLITE_DB_PATH = decouple.config("SQLITE_DB_PATH", default="atr.db")
-    AUDIT_LOG_FILE = os.path.join(STATE_DIR, "audit.log")
+    STORAGE_AUDIT_LOG_FILE = os.path.join(STATE_DIR, "storage-audit.log")
 
     # Apache RAT configuration
     APACHE_RAT_JAR_PATH = decouple.config("APACHE_RAT_JAR_PATH", default="/opt/tools/apache-rat-0.16.1.jar")
@@ -132,7 +132,7 @@ def get() -> type[AppConfig]:
         (config.FINISHED_STORAGE_DIR, "FINISHED_STORAGE_DIR"),
         (config.UNFINISHED_STORAGE_DIR, "UNFINISHED_STORAGE_DIR"),
         (config.SVN_STORAGE_DIR, "SVN_STORAGE_DIR"),
-        (config.AUDIT_LOG_FILE, "AUDIT_LOG_FILE"),
+        (config.STORAGE_AUDIT_LOG_FILE, "STORAGE_AUDIT_LOG_FILE"),
     ]
     relative_paths = [
         (config.SQLITE_DB_PATH, "SQLITE_DB_PATH"),

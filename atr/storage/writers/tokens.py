@@ -25,6 +25,7 @@ import sqlmodel
 
 import atr.db as db
 import atr.jwtoken as jwtoken
+import atr.log as log
 import atr.models.sql as sql
 import atr.storage as storage
 
@@ -82,6 +83,11 @@ class FoundationCommitter(GeneralPublic):
         issued_jwt = jwtoken.issue(self.__asf_uid)
         pat.last_used = datetime.datetime.now(datetime.UTC)
         await self.__data.commit()
+        self.__credentials.log_auditable_event(
+            action=log.interface_name(),
+            asf_uid=self.__asf_uid,
+            pat_hash=pat_hash,
+        )
         return issued_jwt
 
 

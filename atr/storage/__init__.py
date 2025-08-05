@@ -18,6 +18,8 @@
 from __future__ import annotations
 
 import contextlib
+import datetime
+import json
 import logging
 from typing import TYPE_CHECKING, Final
 
@@ -25,8 +27,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 import atr.db as db
-
-# import atr.log as log
+import atr.log as log
 import atr.models.sql as sql
 import atr.principal as principal
 import atr.storage.readers as readers
@@ -39,8 +40,14 @@ import atr.user as user
 ## Access credentials
 
 
-def audit(msg: str) -> None:
-    msg = msg.replace("\n", " / ")
+# Do not rename this interface
+# It is named to reserve the atr.storage.audit logger name
+def audit(**kwargs: types.JSON) -> None:
+    now = datetime.datetime.now(datetime.UTC).isoformat(timespec="milliseconds")
+    now = now.replace("+00:00", "Z")
+    action = log.caller_name()
+    kwargs = {"datetime": now, "action": action, **kwargs}
+    msg = json.dumps(kwargs, allow_nan=False)
     # The atr.log logger should give the same name
     # But to be extra sure, we set it manually
     logger = logging.getLogger("atr.storage.audit")
@@ -48,8 +55,8 @@ def audit(msg: str) -> None:
 
 
 class AccessCredentials:
-    def audit_worthy_event(self, msg: str) -> None:
-        audit(msg)
+    def log_auditable_event(self, **kwargs: types.JSON) -> None:
+        audit(**kwargs)
 
 
 class AccessCredentialsRead(AccessCredentials): ...

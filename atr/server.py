@@ -226,20 +226,24 @@ def app_setup_logging(app: base.QuartApp, config_mode: config.Mode, app_config: 
     # Configure dedicated audit logger
     try:
         audit_handler = logging.FileHandler(
-            app_config.AUDIT_LOG_FILE,
+            app_config.STORAGE_AUDIT_LOG_FILE,
             encoding="utf-8",
             mode="a",
         )
-        audit_handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s %(message)s",
-                datefmt="%Y-%m-%dT%H:%M:%SZ",
-            )
-        )
+        # audit_handler.setFormatter(
+        #     logging.Formatter("%(message)s")
+        # )
+        audit_queue = queue.Queue(-1)
+        audit_listener = logging.handlers.QueueListener(audit_queue, audit_handler)
+        audit_listener.start()
+        app.extensions["audit_listener"] = audit_listener
+
         audit_logger = logging.getLogger("atr.storage.audit")
         audit_logger.setLevel(logging.INFO)
         audit_logger.addHandler(audit_handler)
         audit_logger.propagate = False
+        audit_queue_handler = logging.handlers.QueueHandler(audit_queue)
+        audit_logger.handlers = [audit_queue_handler]
     except Exception:
         logging.getLogger(__name__).exception("Failed to configure audit logger")
 

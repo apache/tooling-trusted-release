@@ -23,6 +23,7 @@ import datetime
 import sqlmodel
 
 import atr.db as db
+import atr.log as log
 import atr.models.sql as sql
 import atr.storage as storage
 
@@ -107,13 +108,21 @@ class CommitteeMember(CommitteeParticipant):
         )
         self.__data.add(cri)
         await self.__data.commit()
-        self.__credentials.audit_worthy_event(f"Added check result ignore {cri}")
+        self.__credentials.log_auditable_event(
+            action=log.interface_name(),
+            asf_uid=self.__asf_uid,
+            cri=cri.model_dump_json(exclude_none=True),
+        )
 
     async def ignore_delete(self, id: int) -> None:
         via = sql.validate_instrumented_attribute
         await self.__data.execute(sqlmodel.delete(sql.CheckResultIgnore).where(via(sql.CheckResultIgnore.id) == id))
         await self.__data.commit()
-        self.__credentials.audit_worthy_event(f"Deleted check result ignore {id} by {self.__asf_uid}")
+        self.__credentials.log_auditable_event(
+            action=log.interface_name(),
+            asf_uid=self.__asf_uid,
+            ignore_id=id,
+        )
 
     async def ignore_update(
         self,
@@ -139,4 +148,8 @@ class CommitteeMember(CommitteeParticipant):
         cri.status = status
         cri.message_glob = message_glob
         await self.__data.commit()
-        self.__credentials.audit_worthy_event(f"Updated check result ignore {cri} by {self.__asf_uid}")
+        self.__credentials.log_auditable_event(
+            action=log.interface_name(),
+            asf_uid=self.__asf_uid,
+            cri=cri.model_dump_json(exclude_none=True),
+        )

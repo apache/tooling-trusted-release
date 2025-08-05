@@ -226,6 +226,11 @@ class Outcomes[T, E: Exception = Exception]:
                     self.__outcomes[i] = OutcomeResult[T](result, outcome.name)
 
 
+# TODO: Or we could use pydantic.types.JsonValue
+# Also this should be moved to models, so that the client can also use it
+type JSON = None | bool | int | float | str | list[JSON] | dict[str, JSON]
+
+
 @dataclasses.dataclass
 class CheckResults:
     primary_results_list: list[sql.CheckResult]
