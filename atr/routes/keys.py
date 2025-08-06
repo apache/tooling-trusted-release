@@ -40,6 +40,7 @@ import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.storage as storage
+import atr.storage.outcome as outcome
 import atr.storage.types as types
 import atr.template as template
 import atr.user as user
@@ -162,17 +163,17 @@ async def add(session: routes.CommitterSession) -> str:
 
             async with storage.write() as write:
                 wafc = write.as_foundation_committer()
-                ocr: types.Outcome[types.Key] = await wafc.keys.ensure_stored_one(key_text)
+                ocr: outcome.Outcome[types.Key] = await wafc.keys.ensure_stored_one(key_text)
                 key = ocr.result_or_raise()
 
                 for selected_committee_name in selected_committee_names:
                     # TODO: Should this be committee member or committee participant?
                     # Also, should we emit warnings and continue here?
                     wacp = write.as_committee_participant(selected_committee_name)
-                    outcome: types.Outcome[types.LinkedCommittee] = await wacp.keys.associate_fingerprint(
+                    oc: outcome.Outcome[types.LinkedCommittee] = await wacp.keys.associate_fingerprint(
                         key.key_model.fingerprint
                     )
-                    outcome.result_or_raise()
+                    oc.result_or_raise()
 
                 await quart.flash(f"OpenPGP key {key.key_model.fingerprint.upper()} added successfully.", "success")
             # Clear form data on success by creating a new empty form instance
@@ -222,12 +223,12 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         wafc = write.as_foundation_committer_outcome().result_or_none()
         if wafc is None:
             return await session.redirect(keys, error="Key not found or not owned by you")
-        outcome: types.Outcome[sql.PublicSigningKey] = await wafc.keys.delete_key(fingerprint)
-        match outcome:
-            case types.OutcomeResult():
+        oc: outcome.Outcome[sql.PublicSigningKey] = await wafc.keys.delete_key(fingerprint)
+        match oc:
+            case outcome.Result():
                 return await session.redirect(keys, success="Key deleted successfully")
-            case types.OutcomeException():
-                return await session.redirect(keys, error=f"Error deleting key: {outcome.exception_or_raise()}")
+            case outcome.Error(error):
+                return await session.redirect(keys, error=f"Error deleting key: {error}")
 
     return await session.redirect(keys, error="Key not found or not owned by you")
 
@@ -307,11 +308,11 @@ async def import_selected_revision(
 
     async with storage.write() as write:
         wacm = await write.as_project_committee_member(project_name)
-        outcomes: types.Outcomes[types.Key] = await wacm.keys.import_keys_file(project_name, version_name)
+        outcomes: outcome.List[types.Key] = await wacm.keys.import_keys_file(project_name, version_name)
 
     message = f"Uploaded {outcomes.result_count} keys,"
-    if outcomes.exception_count > 0:
-        message += f" failed to upload {outcomes.exception_count} keys for {wacm.committee_name}"
+    if outcomes.error_count > 0:
+        message += f" failed to upload {outcomes.error_count} keys for {wacm.committee_name}"
     return await session.redirect(
         compose.selected,
         success=message,
@@ -438,11 +439,11 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
     async with storage.write() as write:
         wacm = write.as_committee_member(committee_name)
         match await wacm.keys.autogenerate_keys_file():
-            case types.OutcomeResult():
+            case outcome.Result():
                 await quart.flash(
                     f'Successfully regenerated the KEYS file for the "{committee_name}" committee.', "success"
                 )
-            case types.OutcomeException():
+            case outcome.Error():
                 await quart.flash(f"Error regenerating the KEYS file for the {committee_name} committee.", "error")
 
     return await session.redirect(keys)
@@ -474,7 +475,7 @@ async def upload(session: routes.CommitterSession) -> str:
         )
 
     form = await UploadKeyForm.create_form()
-    results: types.Outcomes[types.Key] | None = None
+    results: outcome.List[types.Key] | None = None
 
     async def render(
         error: str | None = None,

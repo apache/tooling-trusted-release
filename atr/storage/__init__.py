@@ -31,8 +31,8 @@ import atr.log as log
 import atr.models.basic as basic
 import atr.models.sql as sql
 import atr.principal as principal
+import atr.storage.outcome as outcome
 import atr.storage.readers as readers
-import atr.storage.types as types
 import atr.storage.writers as writers
 import atr.user as user
 
@@ -111,22 +111,22 @@ class Read:
     def as_foundation_committer(self) -> ReadAsFoundationCommitter:
         return self.as_foundation_committer_outcome().result_or_raise()
 
-    def as_foundation_committer_outcome(self) -> types.Outcome[ReadAsFoundationCommitter]:
+    def as_foundation_committer_outcome(self) -> outcome.Outcome[ReadAsFoundationCommitter]:
         try:
             rafc = ReadAsFoundationCommitter(self, self.__data)
         except Exception as e:
-            return types.OutcomeException(e)
-        return types.OutcomeResult(rafc)
+            return outcome.Error(e)
+        return outcome.Result(rafc)
 
     def as_general_public(self) -> ReadAsGeneralPublic:
         return self.as_general_public_outcome().result_or_raise()
 
-    def as_general_public_outcome(self) -> types.Outcome[ReadAsGeneralPublic]:
+    def as_general_public_outcome(self) -> outcome.Outcome[ReadAsGeneralPublic]:
         try:
             ragp = ReadAsGeneralPublic(self, self.__data)
         except Exception as e:
-            return types.OutcomeException(e)
-        return types.OutcomeResult(ragp)
+            return outcome.Error(e)
+        return outcome.Result(ragp)
 
 
 # Write
@@ -208,58 +208,58 @@ class Write:
     def as_committee_member(self, committee_name: str) -> WriteAsCommitteeMember:
         return self.as_committee_member_outcome(committee_name).result_or_raise()
 
-    def as_committee_member_outcome(self, committee_name: str) -> types.Outcome[WriteAsCommitteeMember]:
+    def as_committee_member_outcome(self, committee_name: str) -> outcome.Outcome[WriteAsCommitteeMember]:
         if self.__authorisation.asf_uid is None:
-            return types.OutcomeException(AccessError("No ASF UID"))
+            return outcome.Error(AccessError("No ASF UID"))
         if not self.__authorisation.is_member_of(committee_name):
-            return types.OutcomeException(
+            return outcome.Error(
                 AccessError(f"ASF UID {self.__authorisation.asf_uid} is not a member of {committee_name}")
             )
         try:
             wacm = WriteAsCommitteeMember(self, self.__data, committee_name)
         except Exception as e:
-            return types.OutcomeException(e)
-        return types.OutcomeResult(wacm)
+            return outcome.Error(e)
+        return outcome.Result(wacm)
 
     def as_committee_participant(self, committee_name: str) -> WriteAsCommitteeParticipant:
         return self.as_committee_participant_outcome(committee_name).result_or_raise()
 
-    def as_committee_participant_outcome(self, committee_name: str) -> types.Outcome[WriteAsCommitteeParticipant]:
+    def as_committee_participant_outcome(self, committee_name: str) -> outcome.Outcome[WriteAsCommitteeParticipant]:
         if self.__authorisation.asf_uid is None:
-            return types.OutcomeException(AccessError("No ASF UID"))
+            return outcome.Error(AccessError("No ASF UID"))
         if not self.__authorisation.is_participant_of(committee_name):
-            return types.OutcomeException(AccessError(f"Not a participant of {committee_name}"))
+            return outcome.Error(AccessError(f"Not a participant of {committee_name}"))
         try:
             wacp = WriteAsCommitteeParticipant(self, self.__data, committee_name)
         except Exception as e:
-            return types.OutcomeException(e)
-        return types.OutcomeResult(wacp)
+            return outcome.Error(e)
+        return outcome.Result(wacp)
 
     def as_foundation_committer(self) -> WriteAsFoundationCommitter:
         return self.as_foundation_committer_outcome().result_or_raise()
 
-    def as_foundation_committer_outcome(self) -> types.Outcome[WriteAsFoundationCommitter]:
+    def as_foundation_committer_outcome(self) -> outcome.Outcome[WriteAsFoundationCommitter]:
         if self.__authorisation.asf_uid is None:
-            return types.OutcomeException(AccessError("No ASF UID"))
+            return outcome.Error(AccessError("No ASF UID"))
         try:
             wafm = WriteAsFoundationCommitter(self, self.__data)
         except Exception as e:
-            return types.OutcomeException(e)
-        return types.OutcomeResult(wafm)
+            return outcome.Error(e)
+        return outcome.Result(wafm)
 
     def as_foundation_admin(self, committee_name: str) -> WriteAsFoundationAdmin:
         return self.as_foundation_admin_outcome(committee_name).result_or_raise()
 
-    def as_foundation_admin_outcome(self, committee_name: str) -> types.Outcome[WriteAsFoundationAdmin]:
+    def as_foundation_admin_outcome(self, committee_name: str) -> outcome.Outcome[WriteAsFoundationAdmin]:
         if self.__authorisation.asf_uid is None:
-            return types.OutcomeException(AccessError("No ASF UID"))
+            return outcome.Error(AccessError("No ASF UID"))
         if not user.is_admin(self.__authorisation.asf_uid):
-            return types.OutcomeException(AccessError("Not an admin"))
+            return outcome.Error(AccessError("Not an admin"))
         try:
             wafa = WriteAsFoundationAdmin(self, self.__data, committee_name)
         except Exception as e:
-            return types.OutcomeException(e)
-        return types.OutcomeResult(wafa)
+            return outcome.Error(e)
+        return outcome.Result(wafa)
 
     # async def as_key_owner(self) -> types.Outcome[WriteAsKeyOwner]:
     #     ...
@@ -268,21 +268,21 @@ class Write:
         write_as_outcome = await self.as_project_committee_member_outcome(project_name)
         return write_as_outcome.result_or_raise()
 
-    async def as_project_committee_member_outcome(self, project_name: str) -> types.Outcome[WriteAsCommitteeMember]:
+    async def as_project_committee_member_outcome(self, project_name: str) -> outcome.Outcome[WriteAsCommitteeMember]:
         project = await self.__data.project(project_name, _committee=True).demand(
             AccessError(f"Project not found: {project_name}")
         )
         if project.committee is None:
-            return types.OutcomeException(AccessError("No committee found for project"))
+            return outcome.Error(AccessError("No committee found for project"))
         if self.__authorisation.asf_uid is None:
-            return types.OutcomeException(AccessError("No ASF UID"))
+            return outcome.Error(AccessError("No ASF UID"))
         if not self.__authorisation.is_member_of(project.committee.name):
-            return types.OutcomeException(AccessError(f"Not a member of {project.committee.name}"))
+            return outcome.Error(AccessError(f"Not a member of {project.committee.name}"))
         try:
             wacm = WriteAsCommitteeMember(self, self.__data, project.committee.name)
         except Exception as e:
-            return types.OutcomeException(e)
-        return types.OutcomeResult(wacm)
+            return outcome.Error(e)
+        return outcome.Result(wacm)
 
     @property
     def member_of(self) -> frozenset[str]:

@@ -46,6 +46,7 @@ import atr.log as log
 import atr.models.sql as sql
 import atr.routes.mapping as mapping
 import atr.storage as storage
+import atr.storage.outcome as outcome
 import atr.storage.types as types
 import atr.template as template
 import atr.util as util
@@ -417,7 +418,7 @@ async def admin_keys_regenerate_all() -> quart.Response:
     if asf_uid is None:
         raise base.ASFQuartException("Invalid session, uid is None", 500)
 
-    outcomes = types.Outcomes[str]()
+    outcomes = outcome.List[str]()
     async with storage.write() as write:
         for committee_name in committee_names:
             wacm_outcome = write.as_committee_member_outcome(committee_name)
@@ -429,7 +430,7 @@ async def admin_keys_regenerate_all() -> quart.Response:
     response_lines = []
     for ocr in outcomes.results():
         response_lines.append(f"Regenerated: {ocr}")
-    for oce in outcomes.exceptions():
+    for oce in outcomes.errors():
         response_lines.append(f"Error regenerating: {type(oce).__name__} {oce}")
 
     return quart.Response("\n".join(response_lines), mimetype="text/plain")
@@ -668,12 +669,12 @@ async def admin_test() -> quart.wrappers.response.Response:
     async with storage.write() as write:
         wacm = write.as_committee_member("tooling")
         start = time.perf_counter_ns()
-        outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_stored(keys_file_text)
+        outcomes: outcome.List[types.Key] = await wacm.keys.ensure_stored(keys_file_text)
         end = time.perf_counter_ns()
         log.info(f"Upload of {outcomes.result_count} keys took {end - start} ns")
     for ocr in outcomes.results():
         log.info(f"Uploaded key: {type(ocr)} {ocr.key_model.fingerprint}")
-    for oce in outcomes.exceptions():
+    for oce in outcomes.errors():
         log.error(f"Error uploading key: {type(oce)} {oce}")
     parsed_count = outcomes.result_predicate_count(lambda k: k.status == types.KeyStatus.PARSED)
     inserted_count = outcomes.result_predicate_count(lambda k: k.status == types.KeyStatus.INSERTED)

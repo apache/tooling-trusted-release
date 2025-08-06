@@ -47,6 +47,7 @@ import atr.routes.start as start
 import atr.routes.vote as vote
 import atr.routes.voting as voting
 import atr.storage as storage
+import atr.storage.outcome as outcome
 import atr.storage.types as types
 import atr.tabulate as tabulate
 import atr.tasks.vote as tasks_vote
@@ -365,15 +366,15 @@ async def key_add(data: models.api.KeyAddArgs) -> DictResponse:
 
     async with storage.write(asf_uid) as write:
         wafc = write.as_foundation_committer()
-        ocr: types.Outcome[types.Key] = await wafc.keys.ensure_stored_one(data.key)
+        ocr: outcome.Outcome[types.Key] = await wafc.keys.ensure_stored_one(data.key)
         key = ocr.result_or_raise()
 
         for selected_committee_name in selected_committee_names:
             wacm = write.as_committee_member(selected_committee_name)
-            outcome: types.Outcome[types.LinkedCommittee] = await wacm.keys.associate_fingerprint(
+            oc: outcome.Outcome[types.LinkedCommittee] = await wacm.keys.associate_fingerprint(
                 key.key_model.fingerprint
             )
-            outcome.result_or_raise()
+            oc.result_or_raise()
 
     return models.api.KeyAddResults(
         endpoint="/key/add",
@@ -395,11 +396,11 @@ async def key_delete(data: models.api.KeyDeleteArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
     fingerprint = data.fingerprint.lower()
 
-    outcomes = types.Outcomes[str]()
+    outcomes = outcome.List[str]()
     async with storage.write(asf_uid) as write:
         wafc = write.as_foundation_committer()
-        outcome: types.Outcome[sql.PublicSigningKey] = await wafc.keys.delete_key(fingerprint)
-        key = outcome.result_or_raise()
+        oc: outcome.Outcome[sql.PublicSigningKey] = await wafc.keys.delete_key(fingerprint)
+        key = oc.result_or_raise()
 
         for committee in key.committees:
             wacm = write.as_committee_member_outcome(committee.name).result_or_none()
@@ -447,25 +448,24 @@ async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
     selected_committee_name = data.committee
     async with storage.write(asf_uid) as write:
         wacm = write.as_committee_member(selected_committee_name)
-        outcomes: types.Outcomes[types.Key] = await wacm.keys.ensure_associated(filetext)
+        outcomes: outcome.List[types.Key] = await wacm.keys.ensure_associated(filetext)
 
         # TODO: It would be nice to serialise the actual outcomes
         # Or, perhaps better yet, to have a standard datatype mapping
         # This would be specified in models.api, then imported into storage.types
         # Or perhaps it should go in models.storage or models.outcomes
         api_outcomes = []
-        for outcome in outcomes.outcomes():
+        for oc in outcomes.outcomes():
             api_outcome: models.api.KeysUploadOutcome | None = None
-            match outcome:
-                case types.OutcomeResult() as ocr:
-                    result: types.Key = ocr.result_or_raise()
+            match oc:
+                case outcome.Result(result):
                     api_outcome = models.api.KeysUploadResult(
                         status="success",
                         key=result.key_model,
                     )
-                case types.OutcomeException() as oce:
+                case outcome.Error(error):
                     # TODO: This branch means we must improve the return type
-                    match oce.exception_or_none():
+                    match error:
                         case types.PublicKeyError() as pke:
                             api_outcome = models.api.KeysUploadException(
                                 status="error",
@@ -486,7 +486,7 @@ async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
         endpoint="/keys/upload",
         results=api_outcomes,
         success_count=outcomes.result_count,
-        error_count=outcomes.exception_count,
+        error_count=outcomes.error_count,
         submitted_committee=selected_committee_name,
     ).model_dump(), 200
 

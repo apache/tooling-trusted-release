@@ -33,7 +33,7 @@ import atr.models.basic as basic
 import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.routes as routes
-import atr.storage.types as types
+import atr.storage.outcome as outcome
 import atr.template as template
 
 
@@ -177,16 +177,16 @@ async def _distribute_page(*, project: str, version: str, form: DistributeForm) 
     return await template.blank("Distribute", content=content)
 
 
-async def _distribute_post_api(api_url: str) -> types.Outcome[basic.JSON]:
+async def _distribute_post_api(api_url: str) -> outcome.Outcome[basic.JSON]:
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url) as response:
                 response.raise_for_status()
                 response_json = await response.json()
-        return types.OutcomeResult(basic.as_json(response_json))
+        return outcome.Result(basic.as_json(response_json))
     except aiohttp.ClientError as e:
         # Can be 404
-        return types.OutcomeException(e)
+        return outcome.Error(e)
 
 
 async def _distribute_post_validated(form: DistributeForm) -> str:
@@ -218,9 +218,9 @@ async def _distribute_post_validated(form: DistributeForm) -> str:
     ## API response
     block.h2["API response"]
     match await _distribute_post_api(api_url):
-        case types.OutcomeResult(result):
+        case outcome.Result(result):
             block.pre[json.dumps(result, indent=2)]
-        case types.OutcomeException(exception):
+        case outcome.Error(exception):
             block.pre[f"Error: {exception}"]
 
     content = _page("Distribution submitted", block.collect())

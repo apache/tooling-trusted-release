@@ -20,10 +20,10 @@ async with storage.write(asf_uid) as write:
 
     for selected_committee_name in selected_committee_names:
         wacm = write.as_committee_member(selected_committee_name)
-        outcome: types.Outcome[types.LinkedCommittee] = await wacm.keys.associate_fingerprint(
+        oc: types.Outcome[types.LinkedCommittee] = await wacm.keys.associate_fingerprint(
             key.key_model.fingerprint
         )
-        outcome.result_or_raise()
+        oc.result_or_raise()
 ```
 
 The `wafm` (**w**rite **a**s **f**oundation **m**ember) object exposes functionality which is only available to foundation members. The `wafm.keys.ensure_stored_one` method is an example of such functionality. The `wacm` object goes further and exposes functionality only available to committee members.
