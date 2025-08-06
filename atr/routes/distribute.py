@@ -143,7 +143,7 @@ async def distribute(session: routes.CommitterSession, project: str, version: st
 async def distribute_post(session: routes.CommitterSession, project: str, version: str) -> str:
     form = await DistributeForm.create_form(data=await quart.request.form)
     if await form.validate():
-        return await _distribute_post_validated(form)
+        return await _distribute_post_validated(form, project, version)
     match len(form.errors):
         case 0:
             # Should not happen
@@ -155,8 +155,11 @@ async def distribute_post(session: routes.CommitterSession, project: str, versio
     return await _distribute_page(project=project, version=version, form=form)
 
 
-async def _distribute_page(*, project: str, version: str, form: DistributeForm) -> str:
-    # Used in the GET and POST routes
+# This function is used in both GET and POST routes
+async def _distribute_page(
+    *, project: str, version: str, form: DistributeForm, extra_content: htpy.Element | None = None
+) -> str:
+    # Validate the Release
     async with db.session() as data:
         release = await data.release(project_name=project, version=version).demand(
             RuntimeError(f"Release {project} {version} not found")
@@ -165,16 +168,24 @@ async def _distribute_page(*, project: str, version: str, form: DistributeForm) 
             raise RuntimeError(f"Release {project} {version} is not a release preview")
         # if release.project.status != sql.ProjectStatus.ACTIVE:
         #     raise RuntimeError(f"Project {project} is not active")
-    form_content = forms.render_columns(form, action=quart.request.path, descriptions=True)
+
+    # Render the explanation and form
     block = htm.Block()
+
+    # Record a manual distribution
+    block.h1["Record a manual distribution"]
+    if extra_content:
+        block.append(extra_content)
     block.p[
         "Record a manual distribution during the ",
         htpy.span(".atr-phase-three.atr-phase-label")["FINISH"],
         " phase using the form below.",
     ]
     block.p["Please note that this form is a work in progress and not fully functional."]
-    content = _page("Record a manual distribution", *block.elements, form_content)
-    return await template.blank("Distribute", content=content)
+    block.append(forms.render_columns(form, action=quart.request.path, descriptions=True))
+
+    # Render the page
+    return await template.blank("Distribute", content=block.collect())
 
 
 async def _distribute_post_api(api_url: str) -> outcome.Outcome[basic.JSON]:
@@ -189,15 +200,36 @@ async def _distribute_post_api(api_url: str) -> outcome.Outcome[basic.JSON]:
         return outcome.Error(e)
 
 
-async def _distribute_post_validated(form: DistributeForm) -> str:
+async def _distribute_post_validated(form: DistributeForm, project: str, version: str) -> str:
     dd = DistributeData.model_validate(form.data)
     api_url = form.platform.data.value.template_url.format(
         owner_namespace=dd.owner_namespace,
         package=dd.package,
         version=dd.version,
     )
+    api_oc = await _distribute_post_api(api_url)
 
     block = htm.Block()
+
+    # Distribution submitted
+    block.h1["Distribution submitted"]
+    match api_oc:
+        case outcome.Result():
+            block.p["The distribution was submitted successfully."]
+        case outcome.Error(error):
+            div = htm.Block(htpy.div(".alert.alert-danger"))
+            div.p[
+                "This package and version was not found in ",
+                htpy.a(href=api_url)["the distribution platform API"],
+                ". Please check the package name and version.",
+            ]
+            div.pre(".atr-pre-wrap")[str(error)]
+            return await _distribute_page(
+                project=project,
+                version=version,
+                form=form,
+                extra_content=div.collect(),
+            )
 
     if dd.details:
         ## Details
@@ -217,14 +249,13 @@ async def _distribute_post_validated(form: DistributeForm) -> str:
 
     ## API response
     block.h2["API response"]
-    match await _distribute_post_api(api_url):
+    match api_oc:
         case outcome.Result(result):
             block.pre[json.dumps(result, indent=2)]
-        case outcome.Error(exception):
-            block.pre[f"Error: {exception}"]
+        # case outcome.Error(exception):
+        #     block.pre[f"Error: {exception}"]
 
-    content = _page("Distribution submitted", block.collect())
-    return await template.blank("Distribution submitted", content=content)
+    return await template.blank("Distribution submitted", content=block.collect())
 
 
 def _distribute_post_table(block: htm.Block, dd: DistributeData) -> None:
@@ -238,7 +269,3 @@ def _distribute_post_table(block: htm.Block, dd: DistributeData) -> None:
         row("Version", dd.version),
     ]
     block.table(".table.table-striped.table-bordered")[tbody]
-
-
-def _page(title_str: str, *content: htpy.Element) -> htpy.Element:
-    return htpy.div[htpy.h1[title_str], *content]

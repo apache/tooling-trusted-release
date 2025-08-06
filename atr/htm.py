@@ -59,7 +59,7 @@ class BlockElementCallable:
 class Block:
     def __init__(self, element: htpy.Element | None = None, *elements: htpy.Element):
         self.element = element
-        self.elements = list(elements)
+        self.elements: list[htpy.Element | str] = list(elements)
 
     def __str__(self) -> str:
         return f"{self.element}{self.elements}"
@@ -74,6 +74,18 @@ class Block:
         if self.element is None:
             return htpy.div[*self.elements]
         return self.element[*self.elements]
+
+    @property
+    def a(self) -> BlockElementCallable:
+        return BlockElementCallable(self, htpy.a)
+
+    @property
+    def code(self) -> BlockElementCallable:
+        return BlockElementCallable(self, htpy.code)
+
+    @property
+    def div(self) -> BlockElementCallable:
+        return BlockElementCallable(self, htpy.div)
 
     @property
     def h1(self) -> BlockElementCallable:
@@ -98,3 +110,6 @@ class Block:
     @property
     def table(self) -> BlockElementCallable:
         return BlockElementCallable(self, htpy.table)
+
+    def text(self, text: str) -> None:
+        self.elements.append(text)
