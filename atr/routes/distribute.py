@@ -29,9 +29,11 @@ import quart
 import atr.db as db
 import atr.forms as forms
 import atr.htm as htm
+import atr.models.basic as basic
 import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.routes as routes
+import atr.storage.types as types
 import atr.template as template
 
 
@@ -81,15 +83,15 @@ class Platform(enum.Enum):
 
 class DistributeForm(forms.Typed):
     platform = forms.select("Platform", choices=Platform)
-    owner_namespace = forms.string(
+    owner_namespace = forms.optional(
         "Owner or Namespace",
-        optional=True,
-        placeholder="E.g. com.example or @scope or library",
+        placeholder="E.g. com.example or scope or library",
         description="Who owns or names the package (Maven groupId, npm @scope, "
         "Docker namespace, GitHub owner, ArtifactHub repo). Leave blank if not used.",
     )
     package = forms.string("Package", placeholder="E.g. artifactId or package-name")
     version = forms.string("Version", placeholder="E.g. 1.2.3, without a leading v")
+    details = forms.checkbox("Include details", description="Include the details of the distribution in the response")
     submit = forms.submit()
 
     async def validate(self, extra_validators: dict | None = None) -> bool:
@@ -112,6 +114,23 @@ class DistributeForm(forms.Typed):
             msg = f'Platform "{self.platform.data.name}" does not require an owner or namespace.'
             return forms.error(self.owner_namespace, msg)
         return True
+
+
+# Lax to ignore csrf_token and submit
+# WTForms types platform as Any, which is insufficient
+# And this way we also get nice JSON from the Pydantic model dump
+# Including all of the enum properties
+class DistributeData(schema.Lax):
+    platform: Platform
+    owner_namespace: str | None = None
+    package: str
+    version: str
+    details: bool
+
+    @pydantic.field_validator("owner_namespace", mode="before")
+    @classmethod
+    def empty_to_none(cls, v):
+        return None if v is None or (isinstance(v, str) and v.strip() == "") else v
 
 
 @routes.committer("/distribute/<project>/<version>", methods=["GET"])
@@ -158,61 +177,65 @@ async def _distribute_page(*, project: str, version: str, form: DistributeForm) 
     return await template.blank("Distribute", content=content)
 
 
-# Lax to ignore csrf_token and submit
-class Data(schema.Lax):
-    platform: Platform
-    owner_namespace: str | None = None
-    package: str
-    version: str
-
-    @pydantic.field_validator("owner_namespace", mode="before")
-    @classmethod
-    def empty_to_none(cls, v):
-        return None if v is None or (isinstance(v, str) and v.strip() == "") else v
+async def _distribute_post_api(api_url: str) -> types.Outcome[basic.JSON]:
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api_url) as response:
+                response.raise_for_status()
+                response_json = await response.json()
+        return types.OutcomeResult(basic.as_json(response_json))
+    except aiohttp.ClientError as e:
+        # Can be 404
+        return types.OutcomeException(e)
 
 
 async def _distribute_post_validated(form: DistributeForm) -> str:
+    dd = DistributeData.model_validate(form.data)
+    api_url = form.platform.data.value.template_url.format(
+        owner_namespace=dd.owner_namespace,
+        package=dd.package,
+        version=dd.version,
+    )
+
     block = htm.Block()
 
-    # Submitted values
-    block.h2["Submitted values"]
-    data = Data.model_validate(form.data)
-    _distribute_post_table(block, data)
+    if dd.details:
+        ## Details
+        block.h2["Details"]
 
-    # As JSON
-    block.h2["As JSON"]
-    block.pre[data.model_dump_json(indent=2)]
+        ### Submitted values
+        block.h3["Submitted values"]
+        _distribute_post_table(block, dd)
 
-    # API URL
-    block.h2["API URL"]
-    api_url = form.platform.data.value.template_url.format(
-        owner_namespace=data.owner_namespace,
-        package=data.package,
-        version=data.version,
-    )
-    block.pre[api_url]
+        ### As JSON
+        block.h3["As JSON"]
+        block.pre[dd.model_dump_json(indent=2)]
 
-    # API response
+        ### API URL
+        block.h3["API URL"]
+        block.pre[api_url]
+
+    ## API response
     block.h2["API response"]
-    async with aiohttp.ClientSession() as session:
-        async with session.get(api_url) as response:
-            response.raise_for_status()
-            json_results = await response.json()
-    block.pre[json.dumps(json_results, indent=2)]
+    match await _distribute_post_api(api_url):
+        case types.OutcomeResult(result):
+            block.pre[json.dumps(result, indent=2)]
+        case types.OutcomeException(exception):
+            block.pre[f"Error: {exception}"]
 
     content = _page("Distribution submitted", block.collect())
     return await template.blank("Distribution submitted", content=content)
 
 
-def _distribute_post_table(block: htm.Block, data: Data) -> None:
+def _distribute_post_table(block: htm.Block, dd: DistributeData) -> None:
     def row(label: str, value: str) -> htpy.Element:
         return htpy.tr[htpy.th[label], htpy.td[value]]
 
     tbody = htpy.tbody[
-        row("Platform", data.platform.name),
-        row("Owner or Namespace", data.owner_namespace or "(blank)"),
-        row("Package", data.package),
-        row("Version", data.version),
+        row("Platform", dd.platform.name),
+        row("Owner or Namespace", dd.owner_namespace or "(blank)"),
+        row("Package", dd.package),
+        row("Version", dd.version),
     ]
     block.table(".table.table-striped.table-bordered")[tbody]
 

@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 
 import atr.db as db
 import atr.log as log
+import atr.models.basic as basic
 import atr.models.sql as sql
 import atr.principal as principal
 import atr.storage.readers as readers
@@ -42,7 +43,7 @@ import atr.user as user
 
 # Do not rename this interface
 # It is named to reserve the atr.storage.audit logger name
-def audit(**kwargs: types.JSON) -> None:
+def audit(**kwargs: basic.JSON) -> None:
     now = datetime.datetime.now(datetime.UTC).isoformat(timespec="milliseconds")
     now = now.replace("+00:00", "Z")
     action = log.caller_name(depth=2)
@@ -55,7 +56,7 @@ def audit(**kwargs: types.JSON) -> None:
 
 
 class AccessAs:
-    def log_auditable_event(self, **kwargs: types.JSON) -> None:
+    def log_auditable_event(self, **kwargs: basic.JSON) -> None:
         audit(**kwargs)
 
 

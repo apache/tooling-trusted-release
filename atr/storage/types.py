@@ -31,6 +31,7 @@ T = TypeVar("T", bound=object)
 
 
 class OutcomeResult[T]:
+    __match_args__ = ("_result",)
     __result: T
 
     def __init__(self, result: T, name: str | None = None):
@@ -38,17 +39,17 @@ class OutcomeResult[T]:
         self.__name = name
 
     @property
+    def name(self) -> str | None:
+        return self.__name
+
+    @property
     def ok(self) -> bool:
         return True
 
     @property
-    def name(self) -> str | None:
-        return self.__name
-
-    def result_or_none(self) -> T | None:
-        return self.__result
-
-    def result_or_raise(self, exception_class: type[Exception] | None = None) -> T:
+    def _result(self) -> T:
+        # This is only available on OutcomeResult
+        # It is intended for pattern matching only
         return self.__result
 
     def exception_or_none(self) -> Exception | None:
@@ -62,8 +63,15 @@ class OutcomeResult[T]:
     def exception_type_or_none(self) -> type[Exception] | None:
         return None
 
+    def result_or_none(self) -> T | None:
+        return self.__result
+
+    def result_or_raise(self, exception_class: type[Exception] | None = None) -> T:
+        return self.__result
+
 
 class OutcomeException[T, E: Exception = Exception]:
+    __match_args__ = ("_exception",)
     __exception: E
 
     def __init__(self, exception: E, name: str | None = None):
@@ -71,20 +79,18 @@ class OutcomeException[T, E: Exception = Exception]:
         self.__name = name
 
     @property
+    def name(self) -> str | None:
+        return self.__name
+
+    @property
     def ok(self) -> bool:
         return False
 
     @property
-    def name(self) -> str | None:
-        return self.__name
-
-    def result_or_none(self) -> T | None:
-        return None
-
-    def result_or_raise(self, exception_class: type[Exception] | None = None) -> NoReturn:
-        if exception_class is not None:
-            raise exception_class(str(self.__exception)) from self.__exception
-        raise self.__exception
+    def _exception(self) -> E:
+        # This is only available on OutcomeException
+        # It is intended for pattern matching only
+        return self.__exception
 
     def exception_or_none(self) -> E | None:
         return self.__exception
@@ -96,6 +102,14 @@ class OutcomeException[T, E: Exception = Exception]:
 
     def exception_type_or_none(self) -> type[E] | None:
         return type(self.__exception)
+
+    def result_or_none(self) -> T | None:
+        return None
+
+    def result_or_raise(self, exception_class: type[Exception] | None = None) -> NoReturn:
+        if exception_class is not None:
+            raise exception_class(str(self.__exception)) from self.__exception
+        raise self.__exception
 
 
 type Outcome[T, E: Exception = Exception] = OutcomeResult[T] | OutcomeException[T, E]
@@ -224,11 +238,6 @@ class Outcomes[T, E: Exception = Exception]:
                     self.__outcomes[i] = OutcomeException[T, E](e, outcome.name)
                 else:
                     self.__outcomes[i] = OutcomeResult[T](result, outcome.name)
-
-
-# TODO: Or we could use pydantic.types.JsonValue
-# Also this should be moved to models, so that the client can also use it
-type JSON = None | bool | int | float | str | list[JSON] | dict[str, JSON]
 
 
 @dataclasses.dataclass

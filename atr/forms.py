@@ -102,6 +102,18 @@ def boolean(
     return wtforms.BooleanField(label, **kwargs)
 
 
+def checkbox(
+    label: str, optional: bool = False, validators: list[Any] | None = None, **kwargs: Any
+) -> wtforms.BooleanField:
+    if validators is None:
+        validators = []
+    if optional is False:
+        validators.append(REQUIRED_DATA)
+    else:
+        validators.append(OPTIONAL)
+    return wtforms.BooleanField(label, **kwargs)
+
+
 def checkboxes(
     label: str, optional: bool = False, validators: list[Any] | None = None, **kwargs: Any
 ) -> wtforms.SelectMultipleField:
@@ -450,9 +462,22 @@ def _render_elements(
             field_elements.append((label, widget))
             continue
 
+        # wtforms.SubmitField is a subclass of wtforms.BooleanField
+        # So we need to check for it before BooleanField
         if isinstance(field, wtforms.SubmitField):
             button_class = "btn " + submit_classes
             submit_element = markupsafe.Markup(str(field(class_=button_class)))
+            continue
+
+        if isinstance(field, wtforms.BooleanField):
+            # Replacing col-form-label with form-check-label moves the label up
+            # This aligns it properly with the checkbox
+            # TODO: Move the widget down instead of the label up
+            classes = label_classes.replace("col-form-label", "form-check-label")
+            label = markupsafe.Markup(str(field.label(class_=classes)))
+            widget = markupsafe.Markup(str(field(class_="form-check-input")))
+            field_elements.append((label, widget))
+            # TODO: Errors and description
             continue
 
         raise TypeError(f"Unsupported field type: {type(field).__name__}")
