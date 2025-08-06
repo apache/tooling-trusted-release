@@ -58,7 +58,6 @@ def main() -> None:
         os.chdir(conf.STATE_DIR)
 
     _setup_logging()
-
     log.info(f"Starting worker process with pid {os.getpid()}")
 
     tasks: list[asyncio.Task] = []

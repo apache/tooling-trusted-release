@@ -21,11 +21,15 @@ import dataclasses
 import enum
 import json
 
+import aiohttp
 import htpy
+import pydantic
 import quart
 
 import atr.db as db
 import atr.forms as forms
+import atr.htm as htm
+import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.template as template
@@ -143,60 +147,74 @@ async def _distribute_page(*, project: str, version: str, form: DistributeForm) 
         # if release.project.status != sql.ProjectStatus.ACTIVE:
         #     raise RuntimeError(f"Project {project} is not active")
     form_content = forms.render_columns(form, action=quart.request.path, descriptions=True)
-    introduction = [
-        htpy.p[
-            "Record a manual distribution during the ",
-            htpy.span(".atr-phase-three.atr-phase-label")["FINISH"],
-            " phase using the form below.",
-        ],
-        htpy.p["Please note that this form is a work in progress and not fully functional."],
+    block = htm.Block()
+    block.p[
+        "Record a manual distribution during the ",
+        htpy.span(".atr-phase-three.atr-phase-label")["FINISH"],
+        " phase using the form below.",
     ]
-    content = _page("Record a manual distribution", *introduction, form_content)
+    block.p["Please note that this form is a work in progress and not fully functional."]
+    content = _page("Record a manual distribution", *block.elements, form_content)
     return await template.blank("Distribute", content=content)
 
 
+# Lax to ignore csrf_token and submit
+class Data(schema.Lax):
+    platform: Platform
+    owner_namespace: str | None = None
+    package: str
+    version: str
+
+    @pydantic.field_validator("owner_namespace", mode="before")
+    @classmethod
+    def empty_to_none(cls, v):
+        return None if v is None or (isinstance(v, str) and v.strip() == "") else v
+
+
 async def _distribute_post_validated(form: DistributeForm) -> str:
-    data = {
-        "platform": form.platform.data,
-        "owner_namespace": form.owner_namespace.data,
-        "package": form.package.data,
-        "version": form.version.data,
-    }
-    table = _distribute_post_table(data)
-    pre_json_results = htpy.pre[
-        json.dumps({k: str(v.name if isinstance(v, enum.Enum) else v) for k, v in data.items()}, indent=2)
-    ]
-    content = _page(
-        "Submitted values",
-        htpy.div[
-            table,
-            htpy.h2["As JSON"],
-            pre_json_results,
-        ],
-        htpy.pre[
-            form.platform.data.value.template_url.format(
-                owner_namespace=data["owner_namespace"],
-                package=data["package"],
-                version=data["version"],
-            ),
-        ],
+    block = htm.Block()
+
+    # Submitted values
+    block.h2["Submitted values"]
+    data = Data.model_validate(form.data)
+    _distribute_post_table(block, data)
+
+    # As JSON
+    block.h2["As JSON"]
+    block.pre[data.model_dump_json(indent=2)]
+
+    # API URL
+    block.h2["API URL"]
+    api_url = form.platform.data.value.template_url.format(
+        owner_namespace=data.owner_namespace,
+        package=data.package,
+        version=data.version,
     )
-    return await template.blank("Distribution Submitted", content=content)
+    block.pre[api_url]
+
+    # API response
+    block.h2["API response"]
+    async with aiohttp.ClientSession() as session:
+        async with session.get(api_url) as response:
+            response.raise_for_status()
+            json_results = await response.json()
+    block.pre[json.dumps(json_results, indent=2)]
+
+    content = _page("Distribution submitted", block.collect())
+    return await template.blank("Distribution submitted", content=content)
 
 
-def _distribute_post_table(data: dict[str, str | Platform]) -> htpy.Element:
-    def row(label: str, value: str | Platform) -> htpy.Element:
-        if isinstance(value, Platform):
-            return htpy.tr[htpy.th[label], htpy.td[value.name]]
+def _distribute_post_table(block: htm.Block, data: Data) -> None:
+    def row(label: str, value: str) -> htpy.Element:
         return htpy.tr[htpy.th[label], htpy.td[value]]
 
     tbody = htpy.tbody[
-        row("Platform", data["platform"]),
-        row("Owner or Namespace", data["owner_namespace"] or "(blank)"),
-        row("Package", data["package"]),
-        row("Version", data["version"]),
+        row("Platform", data.platform.name),
+        row("Owner or Namespace", data.owner_namespace or "(blank)"),
+        row("Package", data.package),
+        row("Version", data.version),
     ]
-    return htpy.table(".table.table-striped.table-bordered")[tbody]
+    block.table(".table.table-striped.table-bordered")[tbody]
 
 
 def _page(title_str: str, *content: htpy.Element) -> htpy.Element:
