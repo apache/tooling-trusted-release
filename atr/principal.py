@@ -225,9 +225,12 @@ class Cache:
         return since_last_refresh > self.cache_for_at_most_seconds
 
 
+cache = Cache()
+
+
 class AuthoriserASFQuart:
     def __init__(self):
-        self.__cache = Cache()
+        self.__cache = cache
 
     def is_member_of(self, asf_uid: str, committee_name: str) -> bool:
         return committee_name in self.__cache.member_of[asf_uid]
@@ -256,7 +259,7 @@ class AuthoriserASFQuart:
 
 class AuthoriserLDAP:
     def __init__(self):
-        self.__cache = Cache()
+        self.__cache = cache
 
     def is_member_of(self, asf_uid: str, committee_name: str) -> bool:
         return committee_name in self.__cache.member_of[asf_uid]
