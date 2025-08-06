@@ -18,13 +18,17 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, Final, TypeVar
+import enum
+from typing import TYPE_CHECKING, Any, Final, Literal, TypeVar
 
 import htpy
 import markupsafe
 import quart_wtf
 import quart_wtf.typing
 import wtforms
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 EMAIL: Final = wtforms.validators.Email()
 REQUIRED: Final = wtforms.validators.InputRequired()
@@ -35,6 +39,9 @@ OPTIONAL: Final = wtforms.validators.Optional()
 # typeshed-fallback/stubs/WTForms/wtforms/fields/choices.pyi
 type Choice = tuple[Any, str] | tuple[Any, str, dict[str, Any]]
 type Choices = list[Choice]
+
+
+E = TypeVar("E", bound=enum.Enum)
 
 
 class Typed(quart_wtf.QuartForm):
@@ -130,6 +137,34 @@ def choices(
 
 def constant(value: str) -> list[wtforms.validators.InputRequired | wtforms.validators.Regexp]:
     return [REQUIRED, wtforms.validators.Regexp(value, message=f"You must enter {value!r} in this field")]
+
+
+def enumeration[E: enum.Enum](enum_cls: type[E]) -> list[tuple[str, str]]:
+    return [(member.name, member.value.name) for member in enum_cls]
+
+
+def enumeration_coerce[E: enum.Enum](enum_cls: type[E]) -> Callable[[Any], E | None]:
+    def coerce(value: Any) -> E | None:
+        if isinstance(value, enum_cls):
+            return value
+        if value in (None, ""):
+            return None
+        try:
+            return enum_cls[value]
+        except KeyError as exc:
+            raise ValueError(value) from exc
+
+    return coerce
+
+
+def error(field: wtforms.Field, message: str) -> Literal[False]:
+    if not isinstance(field.errors, list):
+        try:
+            field.errors = list(field.errors)
+        except Exception:
+            field.errors = []
+    field.errors.append(message)
+    return False
 
 
 def file(label: str, optional: bool = False, validators: list[Any] | None = None, **kwargs: Any) -> wtforms.FileField:
@@ -299,6 +334,12 @@ def select(
         validators.append(REQUIRED)
     else:
         validators.append(OPTIONAL)
+    if "choices" in kwargs:
+        # https://github.com/pallets-eco/wtforms/issues/338
+        if isinstance(kwargs["choices"], type) and issubclass(kwargs["choices"], enum.Enum):
+            enum_cls = kwargs["choices"]
+            kwargs["choices"] = enumeration(enum_cls)
+            kwargs["coerce"] = enumeration_coerce(enum_cls)
     return wtforms.SelectField(label, validators=validators, **kwargs)
 
 
@@ -393,7 +434,14 @@ def _render_elements(
 
             widget_class = "form-control" if isinstance(field, wtforms.StringField) else "form-select"
             widget_classes = widget_class if (small is False) else f"{widget_class}-sm"
+            if field.errors:
+                widget_classes += " is-invalid"
             widget = markupsafe.Markup(str(field(class_=widget_classes)))
+
+            if field.errors:
+                joined_errors = " ".join(field.errors)
+                div = htpy.div(".invalid-feedback.d-block")[joined_errors]
+                widget += markupsafe.Markup(str(div))
 
             if descriptions is True and field.description:
                 desc = htpy.div(".form-text.text-muted")[str(field.description)]
