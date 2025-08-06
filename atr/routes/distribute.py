@@ -36,6 +36,7 @@ class PlatformValue:
     name: str
     template_url: str
     requires_owner_namespace: bool = False
+    default_owner_namespace: str | None = None
 
 
 class Platform(enum.Enum):
@@ -48,6 +49,11 @@ class Platform(enum.Enum):
         name="PyPI",
         template_url="https://pypi.org/pypi/{package}/{version}/json",
     )
+    NPM_SCOPED = PlatformValue(
+        name="npm (scoped)",
+        template_url="https://registry.npmjs.org/@{owner_namespace}/{package}/{version}",
+        requires_owner_namespace=True,
+    )
     NPM = PlatformValue(
         name="npm",
         template_url="https://registry.npmjs.org/{package}/{version}",
@@ -55,7 +61,7 @@ class Platform(enum.Enum):
     DOCKER = PlatformValue(
         name="Docker",
         template_url="https://hub.docker.com/v2/namespaces/{owner_namespace}/repositories/{package}/tags/{version}",
-        requires_owner_namespace=True,
+        default_owner_namespace="library",
     )
     ARTIFACTHUB = PlatformValue(
         name="ArtifactHub (Helm)",
@@ -87,15 +93,18 @@ class DistributeForm(forms.Typed):
             return False
         if not self.platform.data:
             return False
+        default_owner_namespace = self.platform.data.value.default_owner_namespace
         requires_owner_namespace = self.platform.data.value.requires_owner_namespace
         owner_namespace = self.owner_namespace.data
-        # TODO: We should disable owner_namespace if it's not required
+        # TODO: We should disable the owner_namespace field if it's not required
         # But that would be a lot of complexity
         # And this validation, which we need to keep, is complex enough
+        if default_owner_namespace and (not owner_namespace):
+            self.owner_namespace.data = default_owner_namespace
         if requires_owner_namespace and (not owner_namespace):
             msg = f'Platform "{self.platform.data.name}" requires an owner or namespace.'
             return forms.error(self.owner_namespace, msg)
-        if (not requires_owner_namespace) and owner_namespace:
+        if (not requires_owner_namespace) and (not default_owner_namespace) and owner_namespace:
             msg = f'Platform "{self.platform.data.name}" does not require an owner or namespace.'
             return forms.error(self.owner_namespace, msg)
         return True
@@ -142,7 +151,7 @@ async def _distribute_page(*, project: str, version: str, form: DistributeForm) 
         ],
         htpy.p["Please note that this form is a work in progress and not fully functional."],
     ]
-    content = _page("Distribute", *introduction, form_content)
+    content = _page("Record a manual distribution", *introduction, form_content)
     return await template.blank("Distribute", content=content)
 
 
