@@ -18,7 +18,10 @@
 # Removing this will cause circular imports
 from __future__ import annotations
 
+import sqlite3
 from typing import TYPE_CHECKING
+
+import sqlalchemy.exc as exc
 
 import atr.db as db
 import atr.models.sql as sql
@@ -97,7 +100,7 @@ class CommitteeMember(CommitteeParticipant):
         staging: bool,
         upload_date: datetime.datetime | None,
         api_url: str,
-    ) -> sql.Distribution:
+    ) -> tuple[sql.Distribution, bool]:
         distribution = sql.Distribution(
             platform=platform,
             release_name=release_name,
@@ -109,5 +112,36 @@ class CommitteeMember(CommitteeParticipant):
             api_url=api_url,
         )
         self.__data.add(distribution)
+        try:
+            await self.__data.commit()
+        except exc.IntegrityError as e:
+            # "The names and numeric values for existing result codes are fixed and unchanging."
+            # https://www.sqlite.org/rescode.html
+            # e.orig.sqlite_errorcode == 1555
+            # e.orig.sqlite_errorname == "SQLITE_CONSTRAINT_PRIMARYKEY"
+            match e.orig:
+                case sqlite3.IntegrityError(sqlite_errorcode=sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY):
+                    # log.debug(f"Distribution already exists: {distribution}")
+                    return distribution, False
+            raise e
+        return distribution, True
+
+    async def delete_distribution(
+        self,
+        release_name: str,
+        platform: sql.DistributionPlatform,
+        owner_namespace: str,
+        package: str,
+        version: str,
+    ) -> None:
+        distribution = await self.__data.distribution(
+            release_name=release_name,
+            platform=platform,
+            owner_namespace=owner_namespace,
+            package=package,
+            version=version,
+        ).demand(
+            RuntimeError(f"Distribution {release_name} {platform} {owner_namespace} {package} {version} not found")
+        )
+        await self.__data.delete(distribution)
         await self.__data.commit()
-        return distribution

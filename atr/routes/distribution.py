@@ -20,6 +20,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import json
+from typing import TYPE_CHECKING
 
 import aiohttp
 import htpy
@@ -36,6 +37,10 @@ import atr.routes as routes
 import atr.storage as storage
 import atr.storage.outcome as outcome
 import atr.template as template
+import atr.util as util
+
+if TYPE_CHECKING:
+    import werkzeug.wrappers.response as response
 
 
 class ArtifactHubAvailableVersion(schema.Lax):
@@ -72,6 +77,30 @@ class PyPIUrl(schema.Lax):
 
 class PyPIResponse(schema.Lax):
     urls: list[PyPIUrl] = pydantic.Field(default_factory=list)
+
+
+class DeleteForm(forms.Typed):
+    release_name = forms.hidden()
+    platform = forms.hidden()
+    owner_namespace = forms.hidden()
+    package = forms.hidden()
+    version = forms.hidden()
+    submit = forms.submit("Delete")
+
+
+class DeleteData(schema.Lax):
+    release_name: str
+    platform: sql.DistributionPlatform
+    owner_namespace: str
+    package: str
+    version: str
+
+    @pydantic.field_validator("platform", mode="before")
+    @classmethod
+    def coerce_platform(cls, v: object) -> object:
+        if isinstance(v, str):
+            return sql.DistributionPlatform[v]
+        return v
 
 
 class DistributeForm(forms.Typed):
@@ -133,6 +162,35 @@ class DistributeData(schema.Lax):
         return None if v is None or (isinstance(v, str) and v.strip() == "") else v
 
 
+@routes.committer("/distribution/delete/<project>/<version>", methods=["POST"])
+async def delete(session: routes.CommitterSession, project: str, version: str) -> response.Response:
+    form = await DeleteForm.create_form(data=await quart.request.form)
+    dd = DeleteData.model_validate(form.data)
+
+    # Validate the submitted data, and obtain the committee for its name
+    async with db.session() as data:
+        release = await data.release(name=dd.release_name).demand(RuntimeError(f"Release {dd.release_name} not found"))
+    committee = release.committee
+    if committee is None:
+        raise RuntimeError(f"Release {dd.release_name} has no committee")
+
+    # Delete the distribution
+    async with storage.write_as_committee_member(committee_name=committee.name) as wacm:
+        await wacm.distributions.delete_distribution(
+            release_name=dd.release_name,
+            platform=dd.platform,
+            owner_namespace=dd.owner_namespace,
+            package=dd.package,
+            version=dd.version,
+        )
+    return await session.redirect(
+        list_get,
+        project=project,
+        version=version,
+        success="Distribution deleted",
+    )
+
+
 @routes.committer("/distributions/list/<project>/<version>", methods=["GET"])
 async def list_get(session: routes.CommitterSession, project: str, version: str) -> str:
     async with db.session() as data:
@@ -142,7 +200,22 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
 
     block = htm.Block()
     block.h1["Distribution list"]
+    if not distributions:
+        block.p["No distributions found."]
+        return await template.blank(
+            "Distribution list",
+            content=block.collect(),
+        )
     for distribution in distributions:
+        delete_form = await DeleteForm.create_form(
+            data={
+                "release_name": distribution.release_name,
+                "platform": distribution.platform.name,
+                "owner_namespace": distribution.owner_namespace,
+                "package": distribution.package,
+                "version": distribution.version,
+            }
+        )
         block.h2[f"{distribution.platform.name} {distribution.package} {distribution.version}"]
         tbody = htpy.tbody[
             _tr("Release name", distribution.release_name),
@@ -155,6 +228,13 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
             _tr("API URL", distribution.api_url),
         ]
         block.table(".table.table-striped.table-bordered")[tbody]
+        form_action = util.as_url(delete, project=project, version=version)
+        delete_form_element = forms.render_simple(
+            delete_form,
+            action=form_action,
+            submit_classes="btn-danger",
+        )
+        block.append(htpy.div(".mb-3")[delete_form_element])
     title = f"Distribution list for {project} {version}"
     return await template.blank(title, content=block.collect())
 
@@ -251,7 +331,7 @@ async def _distribute_post_validated(fpv: FormProjectVersion, /) -> str:
     block.h1["Distribution recorded"]
     match api_oc:
         case outcome.Result(result):
-            block.p["The distribution was recorded successfully."]
+            pass
         case outcome.Error():
             alert = _alert("package and version", "check the package name and version")
             return await _distribute_page(fpv, extra_content=alert)
@@ -265,7 +345,7 @@ async def _distribute_post_validated(fpv: FormProjectVersion, /) -> str:
         return await _distribute_page(fpv, extra_content=alert)
 
     async with storage.write_as_committee_member(committee_name=committee.name) as w:
-        distribution = await w.distributions.add_distribution(
+        distribution, added = await w.distributions.add_distribution(
             release_name=release.name,
             platform=dd.platform,
             owner_namespace=dd.owner_namespace,
@@ -278,6 +358,10 @@ async def _distribute_post_validated(fpv: FormProjectVersion, /) -> str:
 
     ### Record
     block.h2["Record"]
+    if added:
+        block.p["The distribution was recorded successfully."]
+    else:
+        block.p["The distribution was already recorded."]
     block.table(".table.table-striped.table-bordered")[
         htpy.tbody[
             _tr("Release name", distribution.release_name),
