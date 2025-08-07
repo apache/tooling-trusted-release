@@ -34,6 +34,7 @@ import atr.models.basic as basic
 import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.routes as routes
+import atr.routes.finish as finish
 import atr.storage as storage
 import atr.storage.outcome as outcome
 import atr.template as template
@@ -199,13 +200,19 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
         ).all()
 
     block = htm.Block()
-    block.h1["Distribution list"]
+    # Distribution list for project-version
+    block.h1["Distribution list for ", htpy.em[f"{project}-{version}"]]
     if not distributions:
         block.p["No distributions found."]
+        block.p[htpy.a(href=util.as_url(record, project=project, version=version))["Record a distribution"],]
         return await template.blank(
             "Distribution list",
             content=block.collect(),
         )
+    block.p["Here are all of the distributions recorded for this release."]
+
+    ## Distributions
+    block.h2["Distributions"]
     for distribution in distributions:
         delete_form = await DeleteForm.create_form(
             data={
@@ -216,7 +223,9 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
                 "version": distribution.version,
             }
         )
-        block.h2[f"{distribution.platform.name} {distribution.package} {distribution.version}"]
+
+        ### Platform package version
+        block.h3[f"{distribution.platform.value.name} {distribution.package} {distribution.version}"]
         tbody = htpy.tbody[
             _tr("Release name", distribution.release_name),
             _tr("Platform", distribution.platform.value.name),
@@ -235,6 +244,13 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
             submit_classes="btn-danger",
         )
         block.append(htpy.div(".mb-3")[delete_form_element])
+
+    ## Actions
+    block.h2["Actions"]
+    block.p[htpy.a(href=util.as_url(record, project=project, version=version))["Record a distribution"]]
+    block.p[
+        htpy.a(href=util.as_url(finish.selected, project_name=project, version_name=version))["Return to release page"]
+    ]
     title = f"Distribution list for {project} {version}"
     return await template.blank(title, content=block.collect())
 
@@ -276,12 +292,20 @@ async def _distribute_page(fpv: FormProjectVersion, *, extra_content: htpy.Eleme
     if extra_content:
         block.append(extra_content)
     block.p[
-        "Record a manual distribution during the ",
+        "Record a manual distribution of ",
+        htpy.strong[f"{fpv.project}-{fpv.version}"],
+        " during the ",
         htpy.span(".atr-phase-three.atr-phase-label")["FINISH"],
         " phase using the form below.",
     ]
     block.append(forms.render_columns(fpv.form, action=quart.request.path, descriptions=True))
-
+    block.p[
+        "Or view the ",
+        htpy.a(href=util.as_url(list_get, project=fpv.project, version=fpv.version))["distribution list"],
+        ", or return to the ",
+        htpy.a(href=util.as_url(finish.selected, project_name=fpv.project, version_name=fpv.version))["release page"],
+        ".",
+    ]
     # Render the page
     return await template.blank("Record a manual distribution", content=block.collect())
 
@@ -374,6 +398,7 @@ async def _distribute_post_validated(fpv: FormProjectVersion, /) -> str:
             _tr("API URL", distribution.api_url),
         ]
     ]
+    block.p[htpy.a(href=util.as_url(list_get, project=fpv.project, version=fpv.version))["Back to distribution list"],]
 
     if dd.details:
         ## Details
