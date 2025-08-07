@@ -101,7 +101,7 @@ class CommitteeMember(CommitteeParticipant):
         distribution = sql.Distribution(
             platform=platform,
             release_name=release_name,
-            owner_namespace=owner_namespace,
+            owner_namespace=owner_namespace or "",
             package=package,
             version=version,
             staging=staging,

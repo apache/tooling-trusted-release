@@ -133,6 +133,32 @@ class DistributeData(schema.Lax):
         return None if v is None or (isinstance(v, str) and v.strip() == "") else v
 
 
+@routes.committer("/distributions/list/<project>/<version>", methods=["GET"])
+async def list_get(session: routes.CommitterSession, project: str, version: str) -> str:
+    async with db.session() as data:
+        distributions = await data.distribution(
+            release_name=sql.release_name(project, version),
+        ).all()
+
+    block = htm.Block()
+    block.h1["Distribution list"]
+    for distribution in distributions:
+        block.h2[f"{distribution.platform.name} {distribution.package} {distribution.version}"]
+        tbody = htpy.tbody[
+            _tr("Release name", distribution.release_name),
+            _tr("Platform", distribution.platform.value.name),
+            _tr("Owner or Namespace", distribution.owner_namespace or "-"),
+            _tr("Package", distribution.package),
+            _tr("Version", distribution.version),
+            _tr("Staging", "Yes" if distribution.staging else "No"),
+            _tr("Upload date", str(distribution.upload_date)),
+            _tr("API URL", distribution.api_url),
+        ]
+        block.table(".table.table-striped.table-bordered")[tbody]
+    title = f"Distribution list for {project} {version}"
+    return await template.blank(title, content=block.collect())
+
+
 @routes.committer("/distribution/record/<project>/<version>", methods=["GET"])
 async def record(session: routes.CommitterSession, project: str, version: str) -> str:
     form = await DistributeForm.create_form(data={"package": project, "version": version})
@@ -259,7 +285,7 @@ async def _distribute_post_validated(fpv: FormProjectVersion, /) -> str:
             _tr("Owner or Namespace", distribution.owner_namespace or "-"),
             _tr("Package", distribution.package),
             _tr("Version", distribution.version),
-            _tr("Staging", "No" if distribution.staging else "Yes"),
+            _tr("Staging", "Yes" if distribution.staging else "No"),
             _tr("Upload date", str(distribution.upload_date)),
             _tr("API URL", distribution.api_url),
         ]

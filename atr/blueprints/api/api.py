@@ -311,6 +311,7 @@ async def ignore_delete(data: models.api.IgnoreDeleteArgs) -> DictResponse:
     ).model_dump(), 200
 
 
+# TODO: Rename to ignores
 @api.BLUEPRINT.route("/ignore/list/<committee_name>")
 @quart_schema.validate_response(models.api.IgnoreListResults, 200)
 async def ignore_list(committee_name: str) -> DictResponse:

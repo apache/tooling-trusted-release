@@ -283,6 +283,27 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
         return Query(self, query)
 
+    def distribution(
+        self,
+        release_name: Opt[str] = NOT_SET,
+        platform: Opt[sql.DistributionPlatform] = NOT_SET,
+        owner_namespace: Opt[str] = NOT_SET,
+        package: Opt[str] = NOT_SET,
+        version: Opt[str] = NOT_SET,
+    ) -> Query[sql.Distribution]:
+        query = sqlmodel.select(sql.Distribution)
+        if is_defined(release_name):
+            query = query.where(sql.Distribution.release_name == release_name)
+        if is_defined(platform):
+            query = query.where(sql.Distribution.platform == platform)
+        if is_defined(owner_namespace):
+            query = query.where(sql.Distribution.owner_namespace == owner_namespace)
+        if is_defined(package):
+            query = query.where(sql.Distribution.package == package)
+        if is_defined(version):
+            query = query.where(sql.Distribution.version == version)
+        return Query(self, query)
+
     async def execute_query(self, query: sqlalchemy.sql.expression.Executable) -> sqlalchemy.engine.Result:
         if (self.log_queries or global_log_query) and isinstance(query, sqlalchemy.sql.expression.Select):
             try:

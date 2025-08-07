@@ -819,13 +819,14 @@ class CheckResultIgnore(sqlmodel.SQLModel, table=True):
 
 # Distribution: Release
 class Distribution(sqlmodel.SQLModel, table=True):
-    id: int = sqlmodel.Field(default=None, primary_key=True)
-    release_name: str = sqlmodel.Field(foreign_key="release.name", ondelete="CASCADE")
+    release_name: str = sqlmodel.Field(primary_key=True, index=True, foreign_key="release.name", ondelete="CASCADE")
     release: Release = sqlmodel.Relationship(back_populates="distributions")
-    platform: DistributionPlatform = sqlmodel.Field(default=DistributionPlatform.ARTIFACTHUB)
-    owner_namespace: str | None = sqlmodel.Field(default=None)
-    package: str
-    version: str
+    platform: DistributionPlatform = sqlmodel.Field(
+        primary_key=True, index=True, default=DistributionPlatform.ARTIFACTHUB
+    )
+    owner_namespace: str = sqlmodel.Field(primary_key=True, index=True, default="")
+    package: str = sqlmodel.Field(primary_key=True, index=True)
+    version: str = sqlmodel.Field(primary_key=True, index=True)
     staging: bool = sqlmodel.Field(default=False)
     upload_date: datetime.datetime | None = sqlmodel.Field(default=None)
     api_url: str
