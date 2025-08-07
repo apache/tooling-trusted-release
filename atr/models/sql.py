@@ -117,9 +117,9 @@ class DistributionPlatform(enum.Enum):
     MAVEN = DistributionPlatformValue(
         name="Maven Central",
         template_url="https://search.maven.org/solrsearch/select?q=g:{owner_namespace}+AND+a:{package}+AND+v:{version}&core=gav&rows=20&wt=json",
-        # Until recently OSSRH could be used for this
-        # https://central.sonatype.org/pages/ossrh-eol/
-        # But it was sunset on 30 Jun 2025
+        # Java ASF projects use staging URLs along the lines of
+        # https://repository.apache.org/content/repositories/orgapachePROJECT-NNNN/
+        # There's no JSON, but each individual package has maven-metadata.xml
         requires_owner_namespace=True,
     )
     NPM = DistributionPlatformValue(
