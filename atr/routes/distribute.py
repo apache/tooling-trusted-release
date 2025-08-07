@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import datetime
 import json
 
@@ -32,6 +33,7 @@ import atr.models.basic as basic
 import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.routes as routes
+import atr.storage as storage
 import atr.storage.outcome as outcome
 import atr.template as template
 
@@ -107,6 +109,13 @@ class DistributeForm(forms.Typed):
         return True
 
 
+@dataclasses.dataclass
+class FormProjectVersion:
+    form: DistributeForm
+    project: str
+    version: str
+
+
 # Lax to ignore csrf_token and submit
 # WTForms types platform as Any, which is insufficient
 # And this way we also get nice JSON from the Pydantic model dump
@@ -127,14 +136,16 @@ class DistributeData(schema.Lax):
 @routes.committer("/distribute/<project>/<version>", methods=["GET"])
 async def distribute(session: routes.CommitterSession, project: str, version: str) -> str:
     form = await DistributeForm.create_form(data={"package": project, "version": version})
-    return await _distribute_page(project=project, version=version, form=form)
+    fpv = FormProjectVersion(form=form, project=project, version=version)
+    return await _distribute_page(fpv)
 
 
 @routes.committer("/distribute/<project>/<version>", methods=["POST"])
 async def distribute_post(session: routes.CommitterSession, project: str, version: str) -> str:
     form = await DistributeForm.create_form(data=await quart.request.form)
+    fpv = FormProjectVersion(form=form, project=project, version=version)
     if await form.validate():
-        return await _distribute_post_validated(form, project, version)
+        return await _distribute_post_validated(fpv)
     match len(form.errors):
         case 0:
             # Should not happen
@@ -143,22 +154,13 @@ async def distribute_post(session: routes.CommitterSession, project: str, versio
             await quart.flash("There was 1 submission error", category="error")
         case _ as n:
             await quart.flash(f"There were {n} submission errors", category="error")
-    return await _distribute_page(project=project, version=version, form=form)
+    return await _distribute_page(fpv)
 
 
 # This function is used in both GET and POST routes
-async def _distribute_page(
-    *, project: str, version: str, form: DistributeForm, extra_content: htpy.Element | None = None
-) -> str:
+async def _distribute_page(fpv: FormProjectVersion, *, extra_content: htpy.Element | None = None) -> str:
     # Validate the Release
-    async with db.session() as data:
-        release = await data.release(project_name=project, version=version).demand(
-            RuntimeError(f"Release {project} {version} not found")
-        )
-        if release.phase != sql.ReleasePhase.RELEASE_PREVIEW:
-            raise RuntimeError(f"Release {project} {version} is not a release preview")
-        # if release.project.status != sql.ProjectStatus.ACTIVE:
-        #     raise RuntimeError(f"Project {project} is not active")
+    await _release_validated(fpv.project, fpv.version)
 
     # Render the explanation and form
     block = htm.Block()
@@ -173,7 +175,7 @@ async def _distribute_page(
         " phase using the form below.",
     ]
     block.p["Please note that this form is a work in progress and not fully functional."]
-    block.append(forms.render_columns(form, action=quart.request.path, descriptions=True))
+    block.append(forms.render_columns(fpv.form, action=quart.request.path, descriptions=True))
 
     # Render the page
     return await template.blank("Distribute", content=block.collect())
@@ -198,9 +200,10 @@ async def _distribute_post_api(
     return outcome.Result(result)
 
 
-async def _distribute_post_validated(form: DistributeForm, project: str, version: str) -> str:
-    dd = DistributeData.model_validate(form.data)
-    api_url = form.platform.data.value.template_url.format(
+async def _distribute_post_validated(fpv: FormProjectVersion, /) -> str:
+    dd = DistributeData.model_validate(fpv.form.data)
+    release, committee = await _release_committee_validated(fpv.project, fpv.version)
+    api_url = fpv.form.platform.data.value.template_url.format(
         owner_namespace=dd.owner_namespace,
         package=dd.package,
         version=dd.version,
@@ -209,34 +212,59 @@ async def _distribute_post_validated(form: DistributeForm, project: str, version
 
     block = htm.Block()
 
+    # In case of error, show an alert
+    def _alert(not_found: str, action: str) -> htpy.Element:
+        div = htm.Block(htpy.div(".alert.alert-danger"))
+        div.p[
+            f"The {not_found} was not found in ",
+            htpy.a(href=api_url)["the distribution platform API"],
+            f". Please {action}.",
+        ]
+        return div.collect()
+
     # Distribution submitted
-    block.h1["Distribution submitted"]
+    block.h1["Distribution recorded"]
     match api_oc:
         case outcome.Result(result):
-            block.p["The distribution was submitted successfully."]
-        case outcome.Error(error):
-            div = htm.Block(htpy.div(".alert.alert-danger"))
-            div.p[
-                "This package and version was not found in ",
-                htpy.a(href=api_url)["the distribution platform API"],
-                ". Please check the package name and version.",
-            ]
-            div.pre(".atr-pre-wrap")[str(error)]
-            return await _distribute_page(
-                project=project,
-                version=version,
-                form=form,
-                extra_content=div.collect(),
-            )
+            block.p["The distribution was recorded successfully."]
+        case outcome.Error():
+            alert = _alert("package and version", "check the package name and version")
+            return await _distribute_page(fpv, extra_content=alert)
         # We leak result, usefully, from this scope
 
-    ### Upload date
-    block.h2["Upload date"]
+    # This must come after the api_oc match, as it uses the result
     upload_date = _platform_upload_date(dd.platform, result, dd.version)
-    if upload_date is not None:
-        block.pre[str(upload_date)]
-    else:
-        block.p["No upload date found."]
+    if upload_date is None:
+        # TODO: Add a link to an issue tracker
+        alert = _alert("upload date", "report this bug to ASF Tooling")
+        return await _distribute_page(fpv, extra_content=alert)
+
+    async with storage.write_as_committee_member(committee_name=committee.name) as w:
+        distribution = await w.distributions.add_distribution(
+            release_name=release.name,
+            platform=dd.platform,
+            owner_namespace=dd.owner_namespace,
+            package=dd.package,
+            version=dd.version,
+            staging=False,
+            upload_date=upload_date,
+            api_url=api_url,
+        )
+
+    ### Record
+    block.h2["Record"]
+    block.table(".table.table-striped.table-bordered")[
+        htpy.tbody[
+            _tr("Release name", distribution.release_name),
+            _tr("Platform", distribution.platform.name),
+            _tr("Owner or Namespace", distribution.owner_namespace or "-"),
+            _tr("Package", distribution.package),
+            _tr("Version", distribution.version),
+            _tr("Staging", "No" if distribution.staging else "Yes"),
+            _tr("Upload date", str(distribution.upload_date)),
+            _tr("API URL", distribution.api_url),
+        ]
+    ]
 
     if dd.details:
         ## Details
@@ -265,14 +293,11 @@ async def _distribute_post_validated(form: DistributeForm, project: str, version
 
 
 def _distribute_post_table(block: htm.Block, dd: DistributeData) -> None:
-    def row(label: str, value: str) -> htpy.Element:
-        return htpy.tr[htpy.th[label], htpy.td[value]]
-
     tbody = htpy.tbody[
-        row("Platform", dd.platform.name),
-        row("Owner or Namespace", dd.owner_namespace or "(blank)"),
-        row("Package", dd.package),
-        row("Version", dd.version),
+        _tr("Platform", dd.platform.name),
+        _tr("Owner or Namespace", dd.owner_namespace or "-"),
+        _tr("Package", dd.package),
+        _tr("Version", dd.version),
     ]
     block.table(".table.table-striped.table-bordered")[tbody]
 
@@ -315,3 +340,29 @@ def _platform_upload_date(  # noqa: C901
                 return None
             return datetime.datetime.fromisoformat(upload_time.rstrip("Z"))
     raise NotImplementedError(f"Platform {platform.name} is not yet supported")
+
+
+async def _release_committee_validated(project: str, version: str) -> tuple[sql.Release, sql.Committee]:
+    release = await _release_validated(project, version, committee=True)
+    committee = release.committee
+    if committee is None:
+        raise RuntimeError(f"Release {project} {version} has no committee")
+    return release, committee
+
+
+async def _release_validated(project: str, version: str, committee: bool = False) -> sql.Release:
+    async with db.session() as data:
+        release = await data.release(
+            project_name=project,
+            version=version,
+            _committee=committee,
+        ).demand(RuntimeError(f"Release {project} {version} not found"))
+        if release.phase != sql.ReleasePhase.RELEASE_PREVIEW:
+            raise RuntimeError(f"Release {project} {version} is not a release preview")
+        # if release.project.status != sql.ProjectStatus.ACTIVE:
+        #     raise RuntimeError(f"Project {project} is not active")
+    return release
+
+
+def _tr(label: str, value: str) -> htpy.Element:
+    return htpy.tr[htpy.th[label], htpy.td[value]]

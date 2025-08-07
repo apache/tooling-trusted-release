@@ -820,7 +820,7 @@ class CheckResultIgnore(sqlmodel.SQLModel, table=True):
 # Distribution: Release
 class Distribution(sqlmodel.SQLModel, table=True):
     id: int = sqlmodel.Field(default=None, primary_key=True)
-    release_name: str = sqlmodel.Field(foreign_key="release.name")
+    release_name: str = sqlmodel.Field(foreign_key="release.name", ondelete="CASCADE")
     release: Release = sqlmodel.Relationship(back_populates="distributions")
     platform: DistributionPlatform = sqlmodel.Field(default=DistributionPlatform.ARTIFACTHUB)
     owner_namespace: str | None = sqlmodel.Field(default=None)
