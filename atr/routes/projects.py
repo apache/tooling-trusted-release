@@ -206,11 +206,6 @@ async def delete(session: routes.CommitterSession) -> response.Response:
             return await session.redirect(
                 projects, error=f"Cannot delete project '{project_name}' because it has associated releases."
             )
-        if project.distribution_channels:
-            return await session.redirect(
-                projects,
-                error=f"Cannot delete project '{project_name}' because it has associated distribution channels.",
-            )
 
         await data.delete(project)
         await data.commit()

@@ -22,6 +22,7 @@
 # https://github.com/fastapi/sqlmodel/pull/778/files
 # from __future__ import annotations
 
+import dataclasses
 import datetime
 import enum
 from typing import Any, Final, Literal, Optional, TypeVar
@@ -46,6 +47,16 @@ sqlmodel.SQLModel.metadata = sqlalchemy.MetaData(
         "pk": "pk_%(table_name)s",
     }
 )
+
+# Data classes
+
+
+@dataclasses.dataclass(frozen=True)
+class DistributionPlatformValue:
+    name: str
+    template_url: str
+    requires_owner_namespace: bool = False
+    default_owner_namespace: str | None = None
 
 
 # Enumerations
@@ -79,6 +90,42 @@ class CheckResultStatusIgnore(str, enum.Enum):
 
     def to_form_field(self) -> str:
         return f"CheckResultStatusIgnore.{self.value.upper()}"
+
+
+class DistributionPlatform(enum.Enum):
+    ARTIFACTHUB = DistributionPlatformValue(
+        name="ArtifactHub (Helm)",
+        template_url="https://artifacthub.io/api/v1/packages/helm/{owner_namespace}/{package}/{version}",
+        requires_owner_namespace=True,
+    )
+    DOCKER = DistributionPlatformValue(
+        name="Docker",
+        template_url="https://hub.docker.com/v2/namespaces/{owner_namespace}/repositories/{package}/tags/{version}",
+        default_owner_namespace="library",
+    )
+    GITHUB = DistributionPlatformValue(
+        name="GitHub",
+        template_url="https://api.github.com/repos/{owner_namespace}/{package}/releases/tags/v{version}",
+        requires_owner_namespace=True,
+    )
+    MAVEN = DistributionPlatformValue(
+        name="Maven Central",
+        template_url="https://search.maven.org/solrsearch/select?q=g:{owner_namespace}+AND+a:{package}+AND+v:{version}&core=gav&rows=20&wt=json",
+        requires_owner_namespace=True,
+    )
+    NPM = DistributionPlatformValue(
+        name="npm",
+        template_url="https://registry.npmjs.org/{package}",
+    )
+    NPM_SCOPED = DistributionPlatformValue(
+        name="npm (scoped)",
+        template_url="https://registry.npmjs.org/@{owner_namespace}/{package}",
+        requires_owner_namespace=True,
+    )
+    PYPI = DistributionPlatformValue(
+        name="PyPI",
+        template_url="https://pypi.org/pypi/{package}/{version}/json",
+    )
 
 
 class ProjectStatus(str, enum.Enum):
@@ -426,9 +473,9 @@ class Project(sqlmodel.SQLModel, table=True):
     # see_also(Release.project)
     releases: list["Release"] = sqlmodel.Relationship(back_populates="project")
 
-    # 1-M: Project -> [DistributionChannel]
-    # M-1: DistributionChannel -> Project
-    distribution_channels: list["DistributionChannel"] = sqlmodel.Relationship(back_populates="project")
+    # # 1-M: Project -> [DistributionChannel]
+    # # M-1: DistributionChannel -> Project
+    # distribution_channels: list["DistributionChannel"] = sqlmodel.Relationship(back_populates="project")
 
     # 1-1: Project -C-> ReleasePolicy
     # 1-1: ReleasePolicy -> Project
@@ -652,6 +699,12 @@ class Release(sqlmodel.SQLModel, table=True):
         back_populates="release", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
 
+    # 1-M: Release -> [Distribution]
+    # M-1: Distribution -> Release
+    distributions: list["Distribution"] = sqlmodel.Relationship(
+        back_populates="release", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
     # The combination of project_name and version must be unique
     __table_args__ = (sqlmodel.UniqueConstraint("project_name", "version", name="unique_project_version"),)
 
@@ -764,21 +817,38 @@ class CheckResultIgnore(sqlmodel.SQLModel, table=True):
             self.created = datetime.datetime.fromisoformat(self.created.rstrip("Z"))
 
 
-# DistributionChannel: Project
-class DistributionChannel(sqlmodel.SQLModel, table=True):
+# Distribution: Release
+class Distribution(sqlmodel.SQLModel, table=True):
     id: int = sqlmodel.Field(default=None, primary_key=True)
-    name: str = sqlmodel.Field(index=True, unique=True)
-    url: str
-    credentials: str
-    is_test: bool = sqlmodel.Field(default=False)
-    automation_endpoint: str
+    release_name: str = sqlmodel.Field(foreign_key="release.name")
+    release: Release = sqlmodel.Relationship(back_populates="distributions")
+    platform: DistributionPlatform = sqlmodel.Field(default=DistributionPlatform.ARTIFACTHUB)
+    owner_namespace: str | None = sqlmodel.Field(default=None)
+    package: str
+    version: str
+    staging: bool = sqlmodel.Field(default=False)
+    upload_date: datetime.datetime | None = sqlmodel.Field(default=None)
+    api_url: str
+    # The API response can be huge, e.g. from npm
+    # So we do not store it in the database
+    # api_response: Any = sqlmodel.Field(sa_column=sqlalchemy.Column(sqlalchemy.JSON))
 
-    project_name: str = sqlmodel.Field(foreign_key="project.name")
 
-    # M-1: DistributionChannel -> Project
-    # 1-M: Project -> [DistributionChannel]
-    project: Project = sqlmodel.Relationship(back_populates="distribution_channels")
-    see_also(Project.distribution_channels)
+# # DistributionChannel: Project
+# class DistributionChannel(sqlmodel.SQLModel, table=True):
+#     id: int = sqlmodel.Field(default=None, primary_key=True)
+#     name: str = sqlmodel.Field(index=True, unique=True)
+#     url: str
+#     credentials: str
+#     is_test: bool = sqlmodel.Field(default=False)
+#     automation_endpoint: str
+#
+#     project_name: str = sqlmodel.Field(foreign_key="project.name")
+#
+#     # M-1: DistributionChannel -> Project
+#     # 1-M: Project -> [DistributionChannel]
+#     project: Project = sqlmodel.Relationship(back_populates="distribution_channels")
+#     see_also(Project.distribution_channels)
 
 
 # PublicSigningKey: Committee

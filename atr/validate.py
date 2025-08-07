@@ -171,7 +171,6 @@ def project(p: sql.Project) -> AnnotatedDivergences:
     yield from project_category(p)
     yield from project_committee(p)
     yield from project_created(p)
-    yield from project_distribution_channels(p)
     yield from project_full_name(p)
     yield from project_programming_languages(p)
     yield from project_release_policy(p)
@@ -233,14 +232,6 @@ def project_created(p: sql.Project) -> Divergences:
 
     expected = "value to be in the past"
     yield from divergences_predicate(predicate, expected, p.created)
-
-
-@project_components("Project.distribution_channels")
-def project_distribution_channels(p: sql.Project) -> Divergences:
-    """Check that distribution_channels is empty."""
-    expected: list[object] = []
-    actual = p.distribution_channels
-    yield from divergences(expected, actual)
 
 
 @project_components("Project.full_name")

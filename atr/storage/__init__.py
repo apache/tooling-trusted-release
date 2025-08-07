@@ -163,6 +163,7 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
     def __init__(self, write: Write, data: db.Session, committee_name: str):
         self.__committee_name = committee_name
         self.checks = writers.checks.CommitteeMember(write, self, data, committee_name)
+        self.distributions = writers.distributions.CommitteeMember(write, self, data, committee_name)
         self.keys = writers.keys.CommitteeMember(write, self, data, committee_name)
         self.tokens = writers.tokens.CommitteeMember(write, self, data, committee_name)
 
@@ -171,7 +172,6 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
         return self.__committee_name
 
 
-# TODO: Or WriteAsCommitteeAdmin
 class WriteAsFoundationAdmin(WriteAsCommitteeMember):
     def __init__(self, write: Write, data: db.Session, committee_name: str):
         self.__committee_name = committee_name
@@ -195,15 +195,6 @@ class Write:
     @property
     def authorisation(self) -> principal.Authorisation:
         return self.__authorisation
-
-    # def as_committee_admin(self, committee_name: str) -> types.Outcome[WriteAsCommitteeMember]:
-    #     if self.__asf_uid is None:
-    #         return types.OutcomeException(AccessError("No ASF UID"))
-    #     try:
-    #         wacm = WriteAsCommitteeMember(self, self.__data, self.__asf_uid, committee_name)
-    #     except Exception as e:
-    #         return types.OutcomeException(e)
-    #     return types.OutcomeResult(wacm)
 
     def as_committee_member(self, committee_name: str) -> WriteAsCommitteeMember:
         return self.as_committee_member_outcome(committee_name).result_or_raise()
@@ -366,3 +357,12 @@ async def write(asf_uid: str | None | ArgumentNoneType = ArgumentNone) -> AsyncG
     async with db.session() as data:
         # TODO: Replace data with a DatabaseWriter instance
         yield Write(authorisation, data)
+
+
+@contextlib.asynccontextmanager
+async def write_as_committee_member(
+    committee_name: str,
+    asf_uid: str | None | ArgumentNoneType = ArgumentNone,
+) -> AsyncGenerator[WriteAsCommitteeMember]:
+    async with write(asf_uid) as w:
+        yield w.as_committee_member(committee_name)

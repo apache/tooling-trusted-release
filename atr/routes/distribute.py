@@ -17,9 +17,7 @@
 
 from __future__ import annotations
 
-import dataclasses
 import datetime
-import enum
 import json
 
 import aiohttp
@@ -74,52 +72,8 @@ class PyPIResponse(schema.Lax):
     urls: list[PyPIUrl] = pydantic.Field(default_factory=list)
 
 
-@dataclasses.dataclass(frozen=True)
-class PlatformValue:
-    name: str
-    template_url: str
-    requires_owner_namespace: bool = False
-    default_owner_namespace: str | None = None
-
-
-class Platform(enum.Enum):
-    ARTIFACTHUB = PlatformValue(
-        name="ArtifactHub (Helm)",
-        template_url="https://artifacthub.io/api/v1/packages/helm/{owner_namespace}/{package}/{version}",
-        requires_owner_namespace=True,
-    )
-    DOCKER = PlatformValue(
-        name="Docker",
-        template_url="https://hub.docker.com/v2/namespaces/{owner_namespace}/repositories/{package}/tags/{version}",
-        default_owner_namespace="library",
-    )
-    GITHUB = PlatformValue(
-        name="GitHub",
-        template_url="https://api.github.com/repos/{owner_namespace}/{package}/releases/tags/v{version}",
-        requires_owner_namespace=True,
-    )
-    MAVEN = PlatformValue(
-        name="Maven Central",
-        template_url="https://search.maven.org/solrsearch/select?q=g:{owner_namespace}+AND+a:{package}+AND+v:{version}&core=gav&rows=20&wt=json",
-        requires_owner_namespace=True,
-    )
-    NPM = PlatformValue(
-        name="npm",
-        template_url="https://registry.npmjs.org/{package}",
-    )
-    NPM_SCOPED = PlatformValue(
-        name="npm (scoped)",
-        template_url="https://registry.npmjs.org/@{owner_namespace}/{package}",
-        requires_owner_namespace=True,
-    )
-    PYPI = PlatformValue(
-        name="PyPI",
-        template_url="https://pypi.org/pypi/{package}/{version}/json",
-    )
-
-
 class DistributeForm(forms.Typed):
-    platform = forms.select("Platform", choices=Platform)
+    platform = forms.select("Platform", choices=sql.DistributionPlatform)
     owner_namespace = forms.optional(
         "Owner or Namespace",
         placeholder="E.g. com.example or scope or library",
@@ -158,7 +112,7 @@ class DistributeForm(forms.Typed):
 # And this way we also get nice JSON from the Pydantic model dump
 # Including all of the enum properties
 class DistributeData(schema.Lax):
-    platform: Platform
+    platform: sql.DistributionPlatform
     owner_namespace: str | None = None
     package: str
     version: str
@@ -225,7 +179,9 @@ async def _distribute_page(
     return await template.blank("Distribute", content=block.collect())
 
 
-async def _distribute_post_api(api_url: str, platform: Platform, version: str) -> outcome.Outcome[basic.JSON]:
+async def _distribute_post_api(
+    api_url: str, platform: sql.DistributionPlatform, version: str
+) -> outcome.Outcome[basic.JSON]:
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url) as response:
@@ -235,7 +191,7 @@ async def _distribute_post_api(api_url: str, platform: Platform, version: str) -
     except aiohttp.ClientError as e:
         return outcome.Error(e)
     match platform:
-        case Platform.NPM | Platform.NPM_SCOPED:
+        case sql.DistributionPlatform.NPM | sql.DistributionPlatform.NPM_SCOPED:
             if version not in NpmResponse.model_validate(result).time:
                 e = RuntimeError(f"Version '{version}' not found")
                 return outcome.Error(e)
@@ -321,34 +277,38 @@ def _distribute_post_table(block: htm.Block, dd: DistributeData) -> None:
     block.table(".table.table-striped.table-bordered")[tbody]
 
 
-def _platform_upload_date(platform: Platform, data: basic.JSON, version: str) -> datetime.datetime | None:  # noqa: C901
+def _platform_upload_date(  # noqa: C901
+    platform: sql.DistributionPlatform,
+    data: basic.JSON,
+    version: str,
+) -> datetime.datetime | None:
     match platform:
-        case Platform.ARTIFACTHUB:
+        case sql.DistributionPlatform.ARTIFACTHUB:
             if not (versions := ArtifactHubResponse.model_validate(data).available_versions):
                 return None
             return datetime.datetime.fromtimestamp(versions[0].ts, tz=datetime.UTC)
-        case Platform.DOCKER:
+        case sql.DistributionPlatform.DOCKER:
             if not (pushed_at := DockerResponse.model_validate(data).tag_last_pushed):
                 return None
             return datetime.datetime.fromisoformat(pushed_at.rstrip("Z"))
-        case Platform.GITHUB:
+        case sql.DistributionPlatform.GITHUB:
             if not (published_at := GitHubResponse.model_validate(data).published_at):
                 return None
             return datetime.datetime.fromisoformat(published_at.rstrip("Z"))
-        case Platform.MAVEN:
+        case sql.DistributionPlatform.MAVEN:
             if not (docs := MavenResponse.model_validate(data).response.get("docs")):
                 return None
             if not (timestamp := docs[0].timestamp):
                 return None
             return datetime.datetime.fromtimestamp(timestamp / 1000, tz=datetime.UTC)
-        case Platform.NPM | Platform.NPM_SCOPED:
+        case sql.DistributionPlatform.NPM | sql.DistributionPlatform.NPM_SCOPED:
             if not (times := NpmResponse.model_validate(data).time):
                 return None
             # Versions can be in the form "1.2.3" or "v1.2.3", so we check for both
             if not (upload_time := times.get(version) or times.get(f"v{version}")):
                 return None
             return datetime.datetime.fromisoformat(upload_time.rstrip("Z"))
-        case Platform.PYPI:
+        case sql.DistributionPlatform.PYPI:
             if not (urls := PyPIResponse.model_validate(data).urls):
                 return None
             if not (upload_time := urls[0].upload_time_iso_8601):

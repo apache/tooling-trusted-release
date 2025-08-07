@@ -370,8 +370,6 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
         if _releases:
             query = query.options(select_in_load(sql.Project.releases))
-        if _distribution_channels:
-            query = query.options(select_in_load(sql.Project.distribution_channels))
         if _super_project:
             query = query.options(joined_load(sql.Project.super_project))
         if _release_policy:
