@@ -85,7 +85,7 @@ class DistributeForm(forms.Typed):
     package = forms.string("Package", placeholder="E.g. artifactId or package-name")
     version = forms.string("Version", placeholder="E.g. 1.2.3, without a leading v")
     details = forms.checkbox("Include details", description="Include the details of the distribution in the response")
-    submit = forms.submit()
+    submit = forms.submit("Record")
 
     async def validate(self, extra_validators: dict | None = None) -> bool:
         if not await super().validate(extra_validators):
@@ -133,15 +133,15 @@ class DistributeData(schema.Lax):
         return None if v is None or (isinstance(v, str) and v.strip() == "") else v
 
 
-@routes.committer("/distribute/<project>/<version>", methods=["GET"])
-async def distribute(session: routes.CommitterSession, project: str, version: str) -> str:
+@routes.committer("/distribution/record/<project>/<version>", methods=["GET"])
+async def record(session: routes.CommitterSession, project: str, version: str) -> str:
     form = await DistributeForm.create_form(data={"package": project, "version": version})
     fpv = FormProjectVersion(form=form, project=project, version=version)
     return await _distribute_page(fpv)
 
 
-@routes.committer("/distribute/<project>/<version>", methods=["POST"])
-async def distribute_post(session: routes.CommitterSession, project: str, version: str) -> str:
+@routes.committer("/distribution/record/<project>/<version>", methods=["POST"])
+async def record_post(session: routes.CommitterSession, project: str, version: str) -> str:
     form = await DistributeForm.create_form(data=await quart.request.form)
     fpv = FormProjectVersion(form=form, project=project, version=version)
     if await form.validate():
@@ -174,11 +174,10 @@ async def _distribute_page(fpv: FormProjectVersion, *, extra_content: htpy.Eleme
         htpy.span(".atr-phase-three.atr-phase-label")["FINISH"],
         " phase using the form below.",
     ]
-    block.p["Please note that this form is a work in progress and not fully functional."]
     block.append(forms.render_columns(fpv.form, action=quart.request.path, descriptions=True))
 
     # Render the page
-    return await template.blank("Distribute", content=block.collect())
+    return await template.blank("Record a manual distribution", content=block.collect())
 
 
 async def _distribute_post_api(
