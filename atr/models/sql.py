@@ -55,6 +55,7 @@ sqlmodel.SQLModel.metadata = sqlalchemy.MetaData(
 class DistributionPlatformValue:
     name: str
     template_url: str
+    template_staging_url: str | None = None
     requires_owner_namespace: bool = False
     default_owner_namespace: str | None = None
 
@@ -96,35 +97,46 @@ class DistributionPlatform(enum.Enum):
     ARTIFACTHUB = DistributionPlatformValue(
         name="ArtifactHub (Helm)",
         template_url="https://artifacthub.io/api/v1/packages/helm/{owner_namespace}/{package}/{version}",
+        template_staging_url="https://staging.artifacthub.io/api/v1/packages/helm/{owner_namespace}/{package}/{version}",
         requires_owner_namespace=True,
     )
     DOCKER = DistributionPlatformValue(
         name="Docker",
         template_url="https://hub.docker.com/v2/namespaces/{owner_namespace}/repositories/{package}/tags/{version}",
+        # TODO: Need to use staging tags?
+        # template_staging_url="https://hub.docker.com/v2/namespaces/{owner_namespace}/repositories/{package}/tags/{version}",
         default_owner_namespace="library",
     )
     GITHUB = DistributionPlatformValue(
         name="GitHub",
         template_url="https://api.github.com/repos/{owner_namespace}/{package}/releases/tags/v{version}",
+        # Combine with {"prerelease": true}
+        template_staging_url="https://api.github.com/repos/{owner_namespace}/{package}/releases",
         requires_owner_namespace=True,
     )
     MAVEN = DistributionPlatformValue(
         name="Maven Central",
         template_url="https://search.maven.org/solrsearch/select?q=g:{owner_namespace}+AND+a:{package}+AND+v:{version}&core=gav&rows=20&wt=json",
+        # Until recently OSSRH could be used for this
+        # https://central.sonatype.org/pages/ossrh-eol/
+        # But it was sunset on 30 Jun 2025
         requires_owner_namespace=True,
     )
     NPM = DistributionPlatformValue(
         name="npm",
+        # TODO: Need to parse dist-tags
         template_url="https://registry.npmjs.org/{package}",
     )
     NPM_SCOPED = DistributionPlatformValue(
         name="npm (scoped)",
+        # TODO: Need to parse dist-tags
         template_url="https://registry.npmjs.org/@{owner_namespace}/{package}",
         requires_owner_namespace=True,
     )
     PYPI = DistributionPlatformValue(
         name="PyPI",
         template_url="https://pypi.org/pypi/{package}/{version}/json",
+        template_staging_url="https://test.pypi.org/pypi/{package}/{version}/json",
     )
 
 
