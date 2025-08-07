@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import enum
 import json
 
@@ -37,6 +38,42 @@ import atr.storage.outcome as outcome
 import atr.template as template
 
 
+class ArtifactHubAvailableVersion(schema.Lax):
+    ts: int
+
+
+class ArtifactHubResponse(schema.Lax):
+    available_versions: list[ArtifactHubAvailableVersion] = pydantic.Field(default_factory=list)
+
+
+class DockerResponse(schema.Lax):
+    tag_last_pushed: str | None = None
+
+
+class GitHubResponse(schema.Lax):
+    published_at: str | None = None
+
+
+class MavenDoc(schema.Lax):
+    timestamp: int | None = None
+
+
+class MavenResponse(schema.Lax):
+    response: dict[str, list[MavenDoc]] = pydantic.Field(default_factory=dict)
+
+
+class NpmResponse(schema.Lax):
+    pass
+
+
+class PyPIUrl(schema.Lax):
+    upload_time_iso_8601: str | None = None
+
+
+class PyPIResponse(schema.Lax):
+    urls: list[PyPIUrl] = pydantic.Field(default_factory=list)
+
+
 @dataclasses.dataclass(frozen=True)
 class PlatformValue:
     name: str
@@ -46,38 +83,38 @@ class PlatformValue:
 
 
 class Platform(enum.Enum):
-    MAVEN = PlatformValue(
-        name="Maven Central",
-        template_url="https://search.maven.org/solrsearch/select?q=g:{owner_namespace}+AND+a:{package}+AND+v:{version}&core=gav&rows=20&wt=json",
+    ARTIFACTHUB = PlatformValue(
+        name="ArtifactHub (Helm)",
+        template_url="https://artifacthub.io/api/v1/packages/helm/{owner_namespace}/{package}/{version}",
         requires_owner_namespace=True,
-    )
-    PYPI = PlatformValue(
-        name="PyPI",
-        template_url="https://pypi.org/pypi/{package}/{version}/json",
-    )
-    NPM_SCOPED = PlatformValue(
-        name="npm (scoped)",
-        template_url="https://registry.npmjs.org/@{owner_namespace}/{package}/{version}",
-        requires_owner_namespace=True,
-    )
-    NPM = PlatformValue(
-        name="npm",
-        template_url="https://registry.npmjs.org/{package}/{version}",
     )
     DOCKER = PlatformValue(
         name="Docker",
         template_url="https://hub.docker.com/v2/namespaces/{owner_namespace}/repositories/{package}/tags/{version}",
         default_owner_namespace="library",
     )
-    ARTIFACTHUB = PlatformValue(
-        name="ArtifactHub (Helm)",
-        template_url="https://artifacthub.io/api/v1/packages/helm/{owner_namespace}/{package}/{version}",
-        requires_owner_namespace=True,
-    )
     GITHUB = PlatformValue(
         name="GitHub",
         template_url="https://api.github.com/repos/{owner_namespace}/{package}/releases/tags/v{version}",
         requires_owner_namespace=True,
+    )
+    MAVEN = PlatformValue(
+        name="Maven Central",
+        template_url="https://search.maven.org/solrsearch/select?q=g:{owner_namespace}+AND+a:{package}+AND+v:{version}&core=gav&rows=20&wt=json",
+        requires_owner_namespace=True,
+    )
+    NPM = PlatformValue(
+        name="npm",
+        template_url="https://registry.npmjs.org/{package}/{version}",
+    )
+    NPM_SCOPED = PlatformValue(
+        name="npm (scoped)",
+        template_url="https://registry.npmjs.org/@{owner_namespace}/{package}/{version}",
+        requires_owner_namespace=True,
+    )
+    PYPI = PlatformValue(
+        name="PyPI",
+        template_url="https://pypi.org/pypi/{package}/{version}/json",
     )
 
 
@@ -214,7 +251,7 @@ async def _distribute_post_validated(form: DistributeForm, project: str, version
     # Distribution submitted
     block.h1["Distribution submitted"]
     match api_oc:
-        case outcome.Result():
+        case outcome.Result(result):
             block.p["The distribution was submitted successfully."]
         case outcome.Error(error):
             div = htm.Block(htpy.div(".alert.alert-danger"))
@@ -230,6 +267,15 @@ async def _distribute_post_validated(form: DistributeForm, project: str, version
                 form=form,
                 extra_content=div.collect(),
             )
+        # We leak result, usefully, from this scope
+
+    ### Upload date
+    block.h2["Upload date"]
+    upload_date = _platform_upload_date(form.platform.data, result)
+    if upload_date is not None:
+        block.pre[str(upload_date)]
+    else:
+        block.p["No upload date found."]
 
     if dd.details:
         ## Details
@@ -241,19 +287,18 @@ async def _distribute_post_validated(form: DistributeForm, project: str, version
 
         ### As JSON
         block.h3["As JSON"]
-        block.pre[dd.model_dump_json(indent=2)]
+        block.pre(".mb-3")[dd.model_dump_json(indent=2)]
 
         ### API URL
         block.h3["API URL"]
-        block.pre[api_url]
+        block.pre(".mb-3")[api_url]
 
-    ## API response
-    block.h2["API response"]
-    match api_oc:
-        case outcome.Result(result):
-            block.pre[json.dumps(result, indent=2)]
-        # case outcome.Error(exception):
-        #     block.pre[f"Error: {exception}"]
+        ### API response
+        block.h3["API response"]
+        block.details[
+            htpy.summary["Show full API response"],
+            htpy.pre(".atr-pre-wrap.mb-3")[json.dumps(result, indent=2)],
+        ]
 
     return await template.blank("Distribution submitted", content=block.collect())
 
@@ -269,3 +314,34 @@ def _distribute_post_table(block: htm.Block, dd: DistributeData) -> None:
         row("Version", dd.version),
     ]
     block.table(".table.table-striped.table-bordered")[tbody]
+
+
+def _platform_upload_date(platform: Platform, data: basic.JSON) -> datetime.datetime | None:  # noqa: C901
+    match platform:
+        case Platform.ARTIFACTHUB:
+            if not (versions := ArtifactHubResponse.model_validate(data).available_versions):
+                return None
+            return datetime.datetime.fromtimestamp(versions[0].ts, tz=datetime.UTC)
+        case Platform.DOCKER:
+            if not (pushed_at := DockerResponse.model_validate(data).tag_last_pushed):
+                return None
+            return datetime.datetime.fromisoformat(pushed_at.rstrip("Z"))
+        case Platform.GITHUB:
+            if not (published_at := GitHubResponse.model_validate(data).published_at):
+                return None
+            return datetime.datetime.fromisoformat(published_at.rstrip("Z"))
+        case Platform.MAVEN:
+            if not (docs := MavenResponse.model_validate(data).response.get("docs")):
+                return None
+            if not (timestamp := docs[0].timestamp):
+                return None
+            return datetime.datetime.fromtimestamp(timestamp / 1000, tz=datetime.UTC)
+        case Platform.NPM | Platform.NPM_SCOPED:
+            return None
+        case Platform.PYPI:
+            if not (urls := PyPIResponse.model_validate(data).urls):
+                return None
+            if not (upload_time := urls[0].upload_time_iso_8601):
+                return None
+            return datetime.datetime.fromisoformat(upload_time.rstrip("Z"))
+    raise NotImplementedError(f"Platform {platform.name} is not yet supported")

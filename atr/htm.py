@@ -84,6 +84,10 @@ class Block:
         return BlockElementCallable(self, htpy.code)
 
     @property
+    def details(self) -> BlockElementCallable:
+        return BlockElementCallable(self, htpy.details)
+
+    @property
     def div(self) -> BlockElementCallable:
         return BlockElementCallable(self, htpy.div)
 
@@ -106,6 +110,10 @@ class Block:
     @property
     def pre(self) -> BlockElementCallable:
         return BlockElementCallable(self, htpy.pre)
+
+    @property
+    def summary(self) -> BlockElementCallable:
+        return BlockElementCallable(self, htpy.summary)
 
     @property
     def table(self) -> BlockElementCallable:
