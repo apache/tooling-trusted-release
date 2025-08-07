@@ -70,7 +70,11 @@ class Block:
     def append(self, element: htpy.Element) -> None:
         self.elements.append(element)
 
-    def collect(self) -> htpy.Element:
+    def collect(self, separator: str | None = None) -> htpy.Element:
+        if separator is not None:
+            separated: list[htpy.Element | str] = [separator] * (2 * len(self.elements) - 1)
+            separated[::2] = self.elements
+            self.elements = separated
         if self.element is None:
             return htpy.div[*self.elements]
         return self.element[*self.elements]
@@ -110,6 +114,14 @@ class Block:
     @property
     def pre(self) -> BlockElementCallable:
         return BlockElementCallable(self, htpy.pre)
+
+    @property
+    def span(self) -> BlockElementCallable:
+        return BlockElementCallable(self, htpy.span)
+
+    @property
+    def strong(self) -> BlockElementCallable:
+        return BlockElementCallable(self, htpy.strong)
 
     @property
     def summary(self) -> BlockElementCallable:

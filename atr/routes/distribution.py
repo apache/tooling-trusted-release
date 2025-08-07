@@ -20,7 +20,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import aiohttp
 import htpy
@@ -42,6 +42,8 @@ import atr.util as util
 
 if TYPE_CHECKING:
     import werkzeug.wrappers.response as response
+
+type Phase = Literal["COMPOSE", "VOTE", "FINISH"]
 
 
 class ArtifactHubAvailableVersion(schema.Lax):
@@ -200,6 +202,9 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
         ).all()
 
     block = htm.Block()
+    back_url = util.as_url(finish.selected, project_name=project, version_name=version)
+    _nav(block, back_url, back_anchor=f"Finish {project} {version}", phase="FINISH")
+
     # Distribution list for project-version
     block.h1["Distribution list for ", htpy.em[f"{project}-{version}"]]
     if not distributions:
@@ -210,6 +215,13 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
             content=block.collect(),
         )
     block.p["Here are all of the distributions recorded for this release."]
+
+    ## Actions
+    block.p[
+        "You can also ",
+        htpy.a(href=util.as_url(record, project=project, version=version))["record a distribution"],
+        ".",
+    ]
 
     ## Distributions
     block.h2["Distributions"]
@@ -245,12 +257,6 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
         )
         block.append(htpy.div(".mb-3")[delete_form_element])
 
-    ## Actions
-    block.h2["Actions"]
-    block.p[htpy.a(href=util.as_url(record, project=project, version=version))["Record a distribution"]]
-    block.p[
-        htpy.a(href=util.as_url(finish.selected, project_name=project, version_name=version))["Return to release page"]
-    ]
     title = f"Distribution list for {project} {version}"
     return await template.blank(title, content=block.collect())
 
@@ -287,6 +293,9 @@ async def _distribute_page(fpv: FormProjectVersion, *, extra_content: htpy.Eleme
     # Render the explanation and form
     block = htm.Block()
 
+    back_url = util.as_url(finish.selected, project_name=fpv.project, version_name=fpv.version)
+    _nav(block, back_url, back_anchor=f"Finish {fpv.project} {fpv.version}", phase="FINISH")
+
     # Record a manual distribution
     block.h1["Record a manual distribution"]
     if extra_content:
@@ -298,14 +307,13 @@ async def _distribute_page(fpv: FormProjectVersion, *, extra_content: htpy.Eleme
         htpy.span(".atr-phase-three.atr-phase-label")["FINISH"],
         " phase using the form below.",
     ]
-    block.append(forms.render_columns(fpv.form, action=quart.request.path, descriptions=True))
     block.p[
-        "Or view the ",
-        htpy.a(href=util.as_url(list_get, project=fpv.project, version=fpv.version))["distribution list"],
-        ", or return to the ",
-        htpy.a(href=util.as_url(finish.selected, project_name=fpv.project, version_name=fpv.version))["release page"],
+        "You can also ",
+        htpy.a(href=util.as_url(list_get, project=fpv.project, version=fpv.version))["view the distribution list"],
         ".",
     ]
+    block.append(forms.render_columns(fpv.form, action=quart.request.path, descriptions=True))
+
     # Render the page
     return await template.blank("Record a manual distribution", content=block.collect())
 
@@ -434,6 +442,38 @@ def _distribute_post_table(block: htm.Block, dd: DistributeData) -> None:
         _tr("Version", dd.version),
     ]
     block.table(".table.table-striped.table-bordered")[tbody]
+
+
+# TODO: Move this to an appropriate module
+def _nav(container: htm.Block, back_url: str, back_anchor: str, phase: Phase) -> None:
+    classes = ".d-flex.justify-content-between.align-items-center"
+    block = htm.Block(htpy.p(classes))
+    block.a(".atr-back-link", href=back_url)[f"← Back to {back_anchor}"]
+    span = htm.Block(htpy.span)
+
+    def _phase(actual: Phase, expected: Phase) -> None:
+        nonlocal span
+        match expected:
+            case "COMPOSE":
+                symbol = "①"
+            case "VOTE":
+                symbol = "②"
+            case "FINISH":
+                symbol = "③"
+        if actual == expected:
+            span.strong(f".atr-phase-{actual}.atr-phase-symbol")[symbol]
+            span.span(f".atr-phase-{actual}.atr-phase-label")[actual]
+        else:
+            span.span(".atr-phase-symbol-other")[symbol]
+
+    _phase(phase, "COMPOSE")
+    span.span(".atr-phase-arrow")["→"]
+    _phase(phase, "VOTE")
+    span.span(".atr-phase-arrow")["→"]
+    _phase(phase, "FINISH")
+
+    block.append(span.collect(separator=" "))
+    container.append(block.collect())
 
 
 def _platform_upload_date(  # noqa: C901
