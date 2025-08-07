@@ -63,7 +63,7 @@ class MavenResponse(schema.Lax):
 
 
 class NpmResponse(schema.Lax):
-    pass
+    time: dict[str, str] = pydantic.Field(default_factory=dict)
 
 
 class PyPIUrl(schema.Lax):
@@ -105,11 +105,11 @@ class Platform(enum.Enum):
     )
     NPM = PlatformValue(
         name="npm",
-        template_url="https://registry.npmjs.org/{package}/{version}",
+        template_url="https://registry.npmjs.org/{package}",
     )
     NPM_SCOPED = PlatformValue(
         name="npm (scoped)",
-        template_url="https://registry.npmjs.org/@{owner_namespace}/{package}/{version}",
+        template_url="https://registry.npmjs.org/@{owner_namespace}/{package}",
         requires_owner_namespace=True,
     )
     PYPI = PlatformValue(
@@ -225,16 +225,21 @@ async def _distribute_page(
     return await template.blank("Distribute", content=block.collect())
 
 
-async def _distribute_post_api(api_url: str) -> outcome.Outcome[basic.JSON]:
+async def _distribute_post_api(api_url: str, platform: Platform, version: str) -> outcome.Outcome[basic.JSON]:
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url) as response:
                 response.raise_for_status()
                 response_json = await response.json()
-        return outcome.Result(basic.as_json(response_json))
+        result = basic.as_json(response_json)
     except aiohttp.ClientError as e:
-        # Can be 404
         return outcome.Error(e)
+    match platform:
+        case Platform.NPM | Platform.NPM_SCOPED:
+            if version not in NpmResponse.model_validate(result).time:
+                e = RuntimeError(f"Version '{version}' not found")
+                return outcome.Error(e)
+    return outcome.Result(result)
 
 
 async def _distribute_post_validated(form: DistributeForm, project: str, version: str) -> str:
@@ -244,7 +249,7 @@ async def _distribute_post_validated(form: DistributeForm, project: str, version
         package=dd.package,
         version=dd.version,
     )
-    api_oc = await _distribute_post_api(api_url)
+    api_oc = await _distribute_post_api(api_url, dd.platform, dd.version)
 
     block = htm.Block()
 
@@ -271,7 +276,7 @@ async def _distribute_post_validated(form: DistributeForm, project: str, version
 
     ### Upload date
     block.h2["Upload date"]
-    upload_date = _platform_upload_date(form.platform.data, result)
+    upload_date = _platform_upload_date(dd.platform, result, dd.version)
     if upload_date is not None:
         block.pre[str(upload_date)]
     else:
@@ -316,7 +321,7 @@ def _distribute_post_table(block: htm.Block, dd: DistributeData) -> None:
     block.table(".table.table-striped.table-bordered")[tbody]
 
 
-def _platform_upload_date(platform: Platform, data: basic.JSON) -> datetime.datetime | None:  # noqa: C901
+def _platform_upload_date(platform: Platform, data: basic.JSON, version: str) -> datetime.datetime | None:  # noqa: C901
     match platform:
         case Platform.ARTIFACTHUB:
             if not (versions := ArtifactHubResponse.model_validate(data).available_versions):
@@ -337,7 +342,12 @@ def _platform_upload_date(platform: Platform, data: basic.JSON) -> datetime.date
                 return None
             return datetime.datetime.fromtimestamp(timestamp / 1000, tz=datetime.UTC)
         case Platform.NPM | Platform.NPM_SCOPED:
-            return None
+            if not (times := NpmResponse.model_validate(data).time):
+                return None
+            # Versions can be in the form "1.2.3" or "v1.2.3", so we check for both
+            if not (upload_time := times.get(version) or times.get(f"v{version}")):
+                return None
+            return datetime.datetime.fromisoformat(upload_time.rstrip("Z"))
         case Platform.PYPI:
             if not (urls := PyPIResponse.model_validate(data).urls):
                 return None
