@@ -118,7 +118,7 @@ class DistributeForm(forms.Typed):
     package = forms.string("Package", placeholder="E.g. artifactId or package-name")
     version = forms.string("Version", placeholder="E.g. 1.2.3, without a leading v")
     details = forms.checkbox("Include details", description="Include the details of the distribution in the response")
-    submit = forms.submit("Record")
+    submit = forms.submit("Record distribution")
 
     async def validate(self, extra_validators: dict | None = None) -> bool:
         if not await super().validate(extra_validators):
@@ -203,26 +203,31 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
         ).all()
 
     block = htm.Block()
-    back_url = util.as_url(finish.selected, project_name=project, version_name=version)
-    _nav(block, back_url, back_anchor=f"Finish {project} {version}", phase="FINISH")
+
+    release = await _release_validated(project, version)
+    staging = release.phase == sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+    _nav_phase(block, project, version, staging)
+
+    record_a_distribution = htpy.a(
+        ".btn.btn-primary",
+        href=util.as_url(
+            stage if staging else record,
+            project=project,
+            version=version,
+        ),
+    )["Record a distribution"]
 
     # Distribution list for project-version
     block.h1["Distribution list for ", htpy.em[f"{project}-{version}"]]
     if not distributions:
         block.p["No distributions found."]
-        block.p[htpy.a(href=util.as_url(record, project=project, version=version))["Record a distribution"],]
+        block.p[record_a_distribution]
         return await template.blank(
             "Distribution list",
             content=block.collect(),
         )
     block.p["Here are all of the distributions recorded for this release."]
-
-    ## Actions
-    block.p[
-        "You can also ",
-        htpy.a(href=util.as_url(record, project=project, version=version))["record a distribution"],
-        ".",
-    ]
+    block.p[record_a_distribution]
 
     ## Distributions
     block.h2["Distributions"]
@@ -313,41 +318,23 @@ async def stage_post(session: routes.CommitterSession, project: str, version: st
 async def _distribute_page(
     fpv: FormProjectVersion, *, extra_content: htpy.Element | None = None, staging: bool = False
 ) -> str:
-    if staging:
-        await _release_validated(fpv.project, fpv.version, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT)
-    else:
-        await _release_validated(fpv.project, fpv.version)
+    phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT if staging else sql.ReleasePhase.RELEASE_PREVIEW
+    await _release_validated(fpv.project, fpv.version, phase={phase})
 
     # Render the explanation and form
     block = htm.Block()
-
-    if staging:
-        back_url = util.as_url(compose.selected, project_name=fpv.project, version_name=fpv.version)
-        _nav(block, back_url, back_anchor=f"Compose {fpv.project} {fpv.version}", phase="COMPOSE")
-    else:
-        back_url = util.as_url(finish.selected, project_name=fpv.project, version_name=fpv.version)
-        _nav(block, back_url, back_anchor=f"Finish {fpv.project} {fpv.version}", phase="FINISH")
+    _nav_phase(block, fpv.project, fpv.version, staging)
 
     # Record a manual distribution
-    block.h1["Record a staging distribution" if staging else "Record a manual distribution"]
+    title_and_heading = f"Record a {'staging' if staging else 'manual'} distribution"
+    block.h1[title_and_heading]
     if extra_content:
         block.append(extra_content)
-    if staging:
-        block.p[
-            "Record a staging distribution of ",
-            htpy.strong[f"{fpv.project}-{fpv.version}"],
-            " during the ",
-            htpy.span(".atr-phase-one.atr-phase-label")["COMPOSE"],
-            " phase using the form below.",
-        ]
-    else:
-        block.p[
-            "Record a manual distribution of ",
-            htpy.strong[f"{fpv.project}-{fpv.version}"],
-            " during the ",
-            htpy.span(".atr-phase-three.atr-phase-label")["FINISH"],
-            " phase using the form below.",
-        ]
+    block.p[
+        "Record a distribution of ",
+        htpy.strong[f"{fpv.project}-{fpv.version}"],
+        " using the form below.",
+    ]
     block.p[
         "You can also ",
         htpy.a(href=util.as_url(list_get, project=fpv.project, version=fpv.version))["view the distribution list"],
@@ -356,9 +343,7 @@ async def _distribute_page(
     block.append(forms.render_columns(fpv.form, action=quart.request.path, descriptions=True))
 
     # Render the page
-    return await template.blank(
-        "Record a staging distribution" if staging else "Record a manual distribution", content=block.collect()
-    )
+    return await template.blank(title_and_heading, content=block.collect())
 
 
 async def _distribute_post_api(
@@ -384,21 +369,21 @@ async def _resolve_release_committee_and_template(
     fpv: FormProjectVersion,
     dd: DistributeData,
     staging: bool,
-) -> tuple[sql.Release, sql.Committee, str] | str:
+) -> tuple[sql.Release, sql.Committee, str] | htpy.Element:
     if staging:
         release, committee = await _release_committee_validated(
-            fpv.project, fpv.version, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+            fpv.project, fpv.version, phase={sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT}
         )
         supported = {sql.DistributionPlatform.ARTIFACTHUB, sql.DistributionPlatform.PYPI}
         if dd.platform not in supported:
             div = htm.Block(htpy.div(".alert.alert-danger"))
             div.p["Staging is currently supported only for ArtifactHub and PyPI."]
-            return await _distribute_page(fpv, extra_content=div.collect(), staging=True)
+            return div.collect()
         template_url = dd.platform.value.template_staging_url
         if template_url is None:
             div = htm.Block(htpy.div(".alert.alert-danger"))
             div.p["This platform does not provide a staging API endpoint."]
-            return await _distribute_page(fpv, extra_content=div.collect(), staging=True)
+            return div.collect()
         return release, committee, template_url
     release, committee = await _release_committee_validated(fpv.project, fpv.version)
     return release, committee, dd.platform.value.template_url
@@ -413,6 +398,7 @@ async def _maybe_upgrade_existing_final(
     staging: bool,
     distribution: sql.Distribution,
 ) -> sql.Distribution:
+    # TODO: Move this to the storage interface
     if (not added) and (not staging):
         async with db.session() as data:
             existing = await data.distribution(
@@ -434,8 +420,8 @@ async def _maybe_upgrade_existing_final(
 async def _distribute_post_validated(fpv: FormProjectVersion, /, staging: bool = False) -> str:
     dd = DistributeData.model_validate(fpv.form.data)
     resolved = await _resolve_release_committee_and_template(fpv, dd, staging)
-    if isinstance(resolved, str):
-        return resolved
+    if isinstance(resolved, htpy.Element):
+        return await _distribute_page(fpv, extra_content=resolved, staging=staging)
     release, committee, template_url = resolved
     api_url = template_url.format(
         owner_namespace=dd.owner_namespace,
@@ -576,6 +562,22 @@ def _nav(container: htm.Block, back_url: str, back_anchor: str, phase: Phase) ->
     container.append(block.collect())
 
 
+def _nav_phase(block: htm.Block, project: str, version: str, staging: bool) -> None:
+    label: Phase
+    route, label = (compose.selected, "COMPOSE") if staging else (finish.selected, "FINISH")
+    back_url = util.as_url(
+        route,
+        project_name=project,
+        version_name=version,
+    )
+    _nav(
+        block,
+        back_url,
+        back_anchor=f"{label.title()} {project} {version}",
+        phase=label,
+    )
+
+
 def _platform_upload_date(  # noqa: C901
     platform: sql.DistributionPlatform,
     data: basic.JSON,
@@ -620,7 +622,7 @@ async def _release_committee_validated(
     project: str,
     version: str,
     *,
-    phase: sql.ReleasePhase = sql.ReleasePhase.RELEASE_PREVIEW,
+    phase: set[sql.ReleasePhase] = {sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, sql.ReleasePhase.RELEASE_PREVIEW},
 ) -> tuple[sql.Release, sql.Committee]:
     release = await _release_validated(project, version, committee=True, phase=phase)
     committee = release.committee
@@ -633,7 +635,7 @@ async def _release_validated(
     project: str,
     version: str,
     committee: bool = False,
-    phase: sql.ReleasePhase = sql.ReleasePhase.RELEASE_PREVIEW,
+    phase: set[sql.ReleasePhase] = {sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, sql.ReleasePhase.RELEASE_PREVIEW},
 ) -> sql.Release:
     async with db.session() as data:
         release = await data.release(
@@ -641,8 +643,8 @@ async def _release_validated(
             version=version,
             _committee=committee,
         ).demand(RuntimeError(f"Release {project} {version} not found"))
-        if release.phase != phase:
-            raise RuntimeError(f"Release {project} {version} is not a {phase.value.upper()}")
+        if release.phase not in phase:
+            raise RuntimeError(f"Release {project} {version} is not a {', or '.join(phase)}")
         # if release.project.status != sql.ProjectStatus.ACTIVE:
         #     raise RuntimeError(f"Project {project} is not active")
     return release
