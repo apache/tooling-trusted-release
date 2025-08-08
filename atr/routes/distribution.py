@@ -34,6 +34,7 @@ import atr.models.basic as basic
 import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.routes as routes
+import atr.routes.compose as compose
 import atr.routes.finish as finish
 import atr.storage as storage
 import atr.storage.outcome as outcome
@@ -285,28 +286,68 @@ async def record_post(session: routes.CommitterSession, project: str, version: s
     return await _distribute_page(fpv)
 
 
+@routes.committer("/distribution/stage/<project>/<version>", methods=["GET"])
+async def stage(session: routes.CommitterSession, project: str, version: str) -> str:
+    form = await DistributeForm.create_form(data={"package": project, "version": version})
+    fpv = FormProjectVersion(form=form, project=project, version=version)
+    return await _distribute_page(fpv, staging=True)
+
+
+@routes.committer("/distribution/stage/<project>/<version>", methods=["POST"])
+async def stage_post(session: routes.CommitterSession, project: str, version: str) -> str:
+    form = await DistributeForm.create_form(data=await quart.request.form)
+    fpv = FormProjectVersion(form=form, project=project, version=version)
+    if await form.validate():
+        return await _distribute_post_validated(fpv, staging=True)
+    match len(form.errors):
+        case 0:
+            await quart.flash("Ambiguous submission errors", category="warning")
+        case 1:
+            await quart.flash("There was 1 submission error", category="error")
+        case _ as n:
+            await quart.flash(f"There were {n} submission errors", category="error")
+    return await _distribute_page(fpv, staging=True)
+
+
 # This function is used in both GET and POST routes
-async def _distribute_page(fpv: FormProjectVersion, *, extra_content: htpy.Element | None = None) -> str:
-    # Validate the Release
-    await _release_validated(fpv.project, fpv.version)
+async def _distribute_page(
+    fpv: FormProjectVersion, *, extra_content: htpy.Element | None = None, staging: bool = False
+) -> str:
+    if staging:
+        await _release_validated(fpv.project, fpv.version, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT)
+    else:
+        await _release_validated(fpv.project, fpv.version)
 
     # Render the explanation and form
     block = htm.Block()
 
-    back_url = util.as_url(finish.selected, project_name=fpv.project, version_name=fpv.version)
-    _nav(block, back_url, back_anchor=f"Finish {fpv.project} {fpv.version}", phase="FINISH")
+    if staging:
+        back_url = util.as_url(compose.selected, project_name=fpv.project, version_name=fpv.version)
+        _nav(block, back_url, back_anchor=f"Compose {fpv.project} {fpv.version}", phase="COMPOSE")
+    else:
+        back_url = util.as_url(finish.selected, project_name=fpv.project, version_name=fpv.version)
+        _nav(block, back_url, back_anchor=f"Finish {fpv.project} {fpv.version}", phase="FINISH")
 
     # Record a manual distribution
-    block.h1["Record a manual distribution"]
+    block.h1["Record a staging distribution" if staging else "Record a manual distribution"]
     if extra_content:
         block.append(extra_content)
-    block.p[
-        "Record a manual distribution of ",
-        htpy.strong[f"{fpv.project}-{fpv.version}"],
-        " during the ",
-        htpy.span(".atr-phase-three.atr-phase-label")["FINISH"],
-        " phase using the form below.",
-    ]
+    if staging:
+        block.p[
+            "Record a staging distribution of ",
+            htpy.strong[f"{fpv.project}-{fpv.version}"],
+            " during the ",
+            htpy.span(".atr-phase-one.atr-phase-label")["COMPOSE"],
+            " phase using the form below.",
+        ]
+    else:
+        block.p[
+            "Record a manual distribution of ",
+            htpy.strong[f"{fpv.project}-{fpv.version}"],
+            " during the ",
+            htpy.span(".atr-phase-three.atr-phase-label")["FINISH"],
+            " phase using the form below.",
+        ]
     block.p[
         "You can also ",
         htpy.a(href=util.as_url(list_get, project=fpv.project, version=fpv.version))["view the distribution list"],
@@ -315,7 +356,9 @@ async def _distribute_page(fpv: FormProjectVersion, *, extra_content: htpy.Eleme
     block.append(forms.render_columns(fpv.form, action=quart.request.path, descriptions=True))
 
     # Render the page
-    return await template.blank("Record a manual distribution", content=block.collect())
+    return await template.blank(
+        "Record a staging distribution" if staging else "Record a manual distribution", content=block.collect()
+    )
 
 
 async def _distribute_post_api(
@@ -337,10 +380,64 @@ async def _distribute_post_api(
     return outcome.Result(result)
 
 
-async def _distribute_post_validated(fpv: FormProjectVersion, /) -> str:
-    dd = DistributeData.model_validate(fpv.form.data)
+async def _resolve_release_committee_and_template(
+    fpv: FormProjectVersion,
+    dd: DistributeData,
+    staging: bool,
+) -> tuple[sql.Release, sql.Committee, str] | str:
+    if staging:
+        release, committee = await _release_committee_validated(
+            fpv.project, fpv.version, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+        )
+        supported = {sql.DistributionPlatform.ARTIFACTHUB, sql.DistributionPlatform.PYPI}
+        if dd.platform not in supported:
+            div = htm.Block(htpy.div(".alert.alert-danger"))
+            div.p["Staging is currently supported only for ArtifactHub and PyPI."]
+            return await _distribute_page(fpv, extra_content=div.collect(), staging=True)
+        template_url = dd.platform.value.template_staging_url
+        if template_url is None:
+            div = htm.Block(htpy.div(".alert.alert-danger"))
+            div.p["This platform does not provide a staging API endpoint."]
+            return await _distribute_page(fpv, extra_content=div.collect(), staging=True)
+        return release, committee, template_url
     release, committee = await _release_committee_validated(fpv.project, fpv.version)
-    api_url = fpv.form.platform.data.value.template_url.format(
+    return release, committee, dd.platform.value.template_url
+
+
+async def _maybe_upgrade_existing_final(
+    release: sql.Release,
+    dd: DistributeData,
+    upload_date: datetime.datetime,
+    api_url: str,
+    added: bool,
+    staging: bool,
+    distribution: sql.Distribution,
+) -> sql.Distribution:
+    if (not added) and (not staging):
+        async with db.session() as data:
+            existing = await data.distribution(
+                release_name=release.name,
+                platform=dd.platform,
+                owner_namespace=dd.owner_namespace or "",
+                package=dd.package,
+                version=dd.version,
+            ).demand(RuntimeError("Distribution not found"))
+            if existing.staging:
+                existing.staging = False
+                existing.upload_date = upload_date
+                existing.api_url = api_url
+                await data.commit()
+                return existing
+    return distribution
+
+
+async def _distribute_post_validated(fpv: FormProjectVersion, /, staging: bool = False) -> str:
+    dd = DistributeData.model_validate(fpv.form.data)
+    resolved = await _resolve_release_committee_and_template(fpv, dd, staging)
+    if isinstance(resolved, str):
+        return resolved
+    release, committee, template_url = resolved
+    api_url = template_url.format(
         owner_namespace=dd.owner_namespace,
         package=dd.package,
         version=dd.version,
@@ -366,7 +463,7 @@ async def _distribute_post_validated(fpv: FormProjectVersion, /) -> str:
             pass
         case outcome.Error():
             alert = _alert("package and version", "check the package name and version")
-            return await _distribute_page(fpv, extra_content=alert)
+            return await _distribute_page(fpv, extra_content=alert, staging=staging)
         # We leak result, usefully, from this scope
 
     # This must come after the api_oc match, as it uses the result
@@ -374,7 +471,7 @@ async def _distribute_post_validated(fpv: FormProjectVersion, /) -> str:
     if upload_date is None:
         # TODO: Add a link to an issue tracker
         alert = _alert("upload date", "report this bug to ASF Tooling")
-        return await _distribute_page(fpv, extra_content=alert)
+        return await _distribute_page(fpv, extra_content=alert, staging=staging)
 
     async with storage.write_as_committee_member(committee_name=committee.name) as w:
         distribution, added = await w.distributions.add_distribution(
@@ -383,9 +480,12 @@ async def _distribute_post_validated(fpv: FormProjectVersion, /) -> str:
             owner_namespace=dd.owner_namespace,
             package=dd.package,
             version=dd.version,
-            staging=False,
+            staging=staging,
             upload_date=upload_date,
             api_url=api_url,
+        )
+        distribution = await _maybe_upgrade_existing_final(
+            release, dd, upload_date, api_url, added, staging, distribution
         )
 
     ### Record
@@ -516,23 +616,33 @@ def _platform_upload_date(  # noqa: C901
     raise NotImplementedError(f"Platform {platform.name} is not yet supported")
 
 
-async def _release_committee_validated(project: str, version: str) -> tuple[sql.Release, sql.Committee]:
-    release = await _release_validated(project, version, committee=True)
+async def _release_committee_validated(
+    project: str,
+    version: str,
+    *,
+    phase: sql.ReleasePhase = sql.ReleasePhase.RELEASE_PREVIEW,
+) -> tuple[sql.Release, sql.Committee]:
+    release = await _release_validated(project, version, committee=True, phase=phase)
     committee = release.committee
     if committee is None:
         raise RuntimeError(f"Release {project} {version} has no committee")
     return release, committee
 
 
-async def _release_validated(project: str, version: str, committee: bool = False) -> sql.Release:
+async def _release_validated(
+    project: str,
+    version: str,
+    committee: bool = False,
+    phase: sql.ReleasePhase = sql.ReleasePhase.RELEASE_PREVIEW,
+) -> sql.Release:
     async with db.session() as data:
         release = await data.release(
             project_name=project,
             version=version,
             _committee=committee,
         ).demand(RuntimeError(f"Release {project} {version} not found"))
-        if release.phase != sql.ReleasePhase.RELEASE_PREVIEW:
-            raise RuntimeError(f"Release {project} {version} is not a release preview")
+        if release.phase != phase:
+            raise RuntimeError(f"Release {project} {version} is not a {phase.value.upper()}")
         # if release.project.status != sql.ProjectStatus.ACTIVE:
         #     raise RuntimeError(f"Project {project} is not active")
     return release
