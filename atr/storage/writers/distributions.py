@@ -100,6 +100,7 @@ class CommitteeMember(CommitteeParticipant):
         staging: bool,
         upload_date: datetime.datetime | None,
         api_url: str,
+        web_url: str | None = None,
     ) -> tuple[sql.Distribution, bool]:
         distribution = sql.Distribution(
             platform=platform,
@@ -110,6 +111,7 @@ class CommitteeMember(CommitteeParticipant):
             staging=staging,
             upload_date=upload_date,
             api_url=api_url,
+            web_url=web_url,
         )
         self.__data.add(distribution)
         try:
@@ -130,6 +132,7 @@ class CommitteeMember(CommitteeParticipant):
                             version,
                             upload_date,
                             api_url,
+                            web_url,
                         )
                         if upgraded is not None:
                             return upgraded, False
@@ -146,6 +149,7 @@ class CommitteeMember(CommitteeParticipant):
         version: str,
         upload_date: datetime.datetime | None,
         api_url: str,
+        web_url: str | None,
     ) -> sql.Distribution | None:
         tag = f"{release_name} {platform} {owner_namespace or ''} {package} {version}"
         existing = await self.__data.distribution(
@@ -159,6 +163,7 @@ class CommitteeMember(CommitteeParticipant):
             existing.staging = False
             existing.upload_date = upload_date
             existing.api_url = api_url
+            existing.web_url = web_url
             await self.__data.commit()
             return existing
         return None

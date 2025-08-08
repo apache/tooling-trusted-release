@@ -51,8 +51,22 @@ class ArtifactHubAvailableVersion(schema.Lax):
     ts: int
 
 
+class ArtifactHubLink(schema.Lax):
+    url: str | None = None
+    name: str | None = None
+
+
+class ArtifactHubRepository(schema.Lax):
+    name: str | None = None
+
+
 class ArtifactHubResponse(schema.Lax):
     available_versions: list[ArtifactHubAvailableVersion] = pydantic.Field(default_factory=list)
+    home_url: str | None = None
+    links: list[ArtifactHubLink] = pydantic.Field(default_factory=list)
+    name: str | None = None
+    version: str | None = None
+    repository: ArtifactHubRepository | None = None
 
 
 class DockerResponse(schema.Lax):
@@ -61,26 +75,41 @@ class DockerResponse(schema.Lax):
 
 class GitHubResponse(schema.Lax):
     published_at: str | None = None
+    html_url: str | None = None
 
 
 class MavenDoc(schema.Lax):
     timestamp: int | None = None
 
 
+class MavenResponseBody(schema.Lax):
+    start: int | None = None
+    docs: list[MavenDoc] = pydantic.Field(default_factory=list)
+
+
 class MavenResponse(schema.Lax):
-    response: dict[str, list[MavenDoc]] = pydantic.Field(default_factory=dict)
+    response: MavenResponseBody = pydantic.Field(default_factory=MavenResponseBody)
 
 
 class NpmResponse(schema.Lax):
+    name: str | None = None
     time: dict[str, str] = pydantic.Field(default_factory=dict)
+    homepage: str | None = None
 
 
 class PyPIUrl(schema.Lax):
     upload_time_iso_8601: str | None = None
+    url: str | None = None
+
+
+class PyPIInfo(schema.Lax):
+    release_url: str | None = None
+    project_url: str | None = None
 
 
 class PyPIResponse(schema.Lax):
     urls: list[PyPIUrl] = pydantic.Field(default_factory=list)
+    info: PyPIInfo = pydantic.Field(default_factory=PyPIInfo)
 
 
 class DeleteForm(forms.Typed):
@@ -252,7 +281,8 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
             _html_tr("Version", distribution.version),
             _html_tr("Staging", "Yes" if distribution.staging else "No"),
             _html_tr("Upload date", str(distribution.upload_date)),
-            _html_tr("API URL", distribution.api_url),
+            _html_tr_a("API URL", distribution.api_url),
+            _html_tr_a("Web URL", distribution.web_url),
         ]
         block.table(".table.table-striped.table-bordered")[tbody]
         form_action = util.as_url(delete, project=project, version=version)
@@ -333,9 +363,12 @@ def _distribution_upload_date(  # noqa: C901
                 return None
             return datetime.datetime.fromisoformat(published_at.rstrip("Z"))
         case sql.DistributionPlatform.MAVEN:
-            if not (docs := MavenResponse.model_validate(data).response.get("docs")):
+            m = MavenResponse.model_validate(data)
+            docs = m.response.docs
+            if not docs:
                 return None
-            if not (timestamp := docs[0].timestamp):
+            timestamp = docs[0].timestamp
+            if not timestamp:
                 return None
             return datetime.datetime.fromtimestamp(timestamp / 1000, tz=datetime.UTC)
         case sql.DistributionPlatform.NPM | sql.DistributionPlatform.NPM_SCOPED:
@@ -351,6 +384,51 @@ def _distribution_upload_date(  # noqa: C901
             if not (upload_time := urls[0].upload_time_iso_8601):
                 return None
             return datetime.datetime.fromisoformat(upload_time.rstrip("Z"))
+    raise NotImplementedError(f"Platform {platform.name} is not yet supported")
+
+
+def _distribution_web_url(  # noqa: C901
+    platform: sql.DistributionPlatform,
+    data: basic.JSON,
+    version: str,
+) -> str | None:
+    match platform:
+        case sql.DistributionPlatform.ARTIFACTHUB:
+            ah = ArtifactHubResponse.model_validate(data)
+            repo_name = ah.repository.name if ah.repository else None
+            pkg_name = ah.name
+            ver = ah.version
+            if repo_name and pkg_name:
+                if ver:
+                    return f"https://artifacthub.io/packages/helm/{repo_name}/{pkg_name}/{ver}"
+                return f"https://artifacthub.io/packages/helm/{repo_name}/{pkg_name}"
+            if ah.home_url:
+                return ah.home_url
+            for link in ah.links:
+                if link.url:
+                    return link.url
+            return None
+        case sql.DistributionPlatform.DOCKER:
+            # The best we can do on Docker Hub is:
+            # f"https://hub.docker.com/_/{package}"
+            # TODO: Rename to DOCKER_HUB and "Docker Hub"
+            return None
+        case sql.DistributionPlatform.GITHUB:
+            gh = GitHubResponse.model_validate(data)
+            return gh.html_url
+        case sql.DistributionPlatform.MAVEN:
+            return None
+        case sql.DistributionPlatform.NPM:
+            nr = NpmResponse.model_validate(data)
+            # return nr.homepage
+            return f"https://www.npmjs.com/package/{nr.name}/v/{version}"
+        case sql.DistributionPlatform.NPM_SCOPED:
+            nr = NpmResponse.model_validate(data)
+            # TODO: This is not correct
+            return nr.homepage
+        case sql.DistributionPlatform.PYPI:
+            info = PyPIResponse.model_validate(data).info
+            return info.release_url or info.project_url
     raise NotImplementedError(f"Platform {platform.name} is not yet supported")
 
 
@@ -436,6 +514,10 @@ def _html_tr(label: str, value: str) -> htpy.Element:
     return htpy.tr[htpy.th[label], htpy.td[value]]
 
 
+def _html_tr_a(label: str, value: str | None) -> htpy.Element:
+    return htpy.tr[htpy.th[label], htpy.td[htpy.a(href=value)[value] if value else "-"]]
+
+
 # This function is used for COMPOSE (stage) and FINISH (record)
 # It's also used whenever there is an error
 async def _record_form_page(
@@ -510,6 +592,7 @@ async def _record_form_process_page(fpv: FormProjectVersion, /, staging: bool = 
         alert = _alert("upload date", "report this bug to ASF Tooling")
         return await _record_form_page(fpv, extra_content=alert, staging=staging)
 
+    web_url = _distribution_web_url(dd.platform, result, dd.version)
     async with storage.write_as_committee_member(committee_name=committee.name) as w:
         distribution, added = await w.distributions.add_distribution(
             release_name=release.name,
@@ -520,6 +603,7 @@ async def _record_form_process_page(fpv: FormProjectVersion, /, staging: bool = 
             staging=staging,
             upload_date=upload_date,
             api_url=api_url,
+            web_url=web_url,
         )
 
     ### Record
@@ -537,7 +621,8 @@ async def _record_form_process_page(fpv: FormProjectVersion, /, staging: bool = 
             _html_tr("Version", distribution.version),
             _html_tr("Staging", "Yes" if distribution.staging else "No"),
             _html_tr("Upload date", str(distribution.upload_date)),
-            _html_tr("API URL", distribution.api_url),
+            _html_tr_a("API URL", distribution.api_url),
+            _html_tr_a("Web URL", distribution.web_url),
         ]
     ]
     block.p[htpy.a(href=util.as_url(list_get, project=fpv.project, version=fpv.version))["Back to distribution list"],]
