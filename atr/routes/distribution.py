@@ -401,7 +401,7 @@ def _distribution_web_url(  # noqa: C901
             if repo_name and pkg_name:
                 if ver:
                     return f"https://artifacthub.io/packages/helm/{repo_name}/{pkg_name}/{ver}"
-                return f"https://artifacthub.io/packages/helm/{repo_name}/{pkg_name}"
+                return f"https://artifacthub.io/packages/helm/{repo_name}/{pkg_name}/{version}"
             if ah.home_url:
                 return ah.home_url
             for link in ah.links:

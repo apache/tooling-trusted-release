@@ -106,6 +106,10 @@
     </div>
   </div>
   {% if phase == "release_candidate_draft" %}
+    <p>
+      <a class="btn btn-primary"
+         href="{{ as_url(routes.distribution.stage, project=release.project.name, version=release.version) }}">Record a distribution</a>
+    </p>
     <h2>Ignored checks</h2>
     {% if info.ignored_errors or info.ignored_warnings %}
       {% set ignored_errors_count = info.ignored_errors|length %}
