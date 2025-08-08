@@ -121,10 +121,47 @@ class CommitteeMember(CommitteeParticipant):
             # e.orig.sqlite_errorname == "SQLITE_CONSTRAINT_PRIMARYKEY"
             match e.orig:
                 case sqlite3.IntegrityError(sqlite_errorcode=sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY):
-                    # log.debug(f"Distribution already exists: {distribution}")
+                    if not staging:
+                        upgraded = await self.__upgrade_staging_to_final(
+                            release_name,
+                            platform,
+                            owner_namespace,
+                            package,
+                            version,
+                            upload_date,
+                            api_url,
+                        )
+                        if upgraded is not None:
+                            return upgraded, False
                     return distribution, False
             raise e
         return distribution, True
+
+    async def __upgrade_staging_to_final(
+        self,
+        release_name: str,
+        platform: sql.DistributionPlatform,
+        owner_namespace: str | None,
+        package: str,
+        version: str,
+        upload_date: datetime.datetime | None,
+        api_url: str,
+    ) -> sql.Distribution | None:
+        tag = f"{release_name} {platform} {owner_namespace or ''} {package} {version}"
+        existing = await self.__data.distribution(
+            release_name=release_name,
+            platform=platform,
+            owner_namespace=(owner_namespace or ""),
+            package=package,
+            version=version,
+        ).demand(RuntimeError(f"Distribution {tag} not found"))
+        if existing.staging:
+            existing.staging = False
+            existing.upload_date = upload_date
+            existing.api_url = api_url
+            await self.__data.commit()
+            return existing
+        return None
 
     async def delete_distribution(
         self,
