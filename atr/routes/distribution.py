@@ -350,11 +350,11 @@ def _distribution_upload_date(  # noqa: C901
     version: str,
 ) -> datetime.datetime | None:
     match platform:
-        case sql.DistributionPlatform.ARTIFACTHUB:
+        case sql.DistributionPlatform.ARTIFACT_HUB:
             if not (versions := ArtifactHubResponse.model_validate(data).available_versions):
                 return None
             return datetime.datetime.fromtimestamp(versions[0].ts, tz=datetime.UTC)
-        case sql.DistributionPlatform.DOCKER:
+        case sql.DistributionPlatform.DOCKER_HUB:
             if not (pushed_at := DockerResponse.model_validate(data).tag_last_pushed):
                 return None
             return datetime.datetime.fromisoformat(pushed_at.rstrip("Z"))
@@ -393,7 +393,7 @@ def _distribution_web_url(  # noqa: C901
     version: str,
 ) -> str | None:
     match platform:
-        case sql.DistributionPlatform.ARTIFACTHUB:
+        case sql.DistributionPlatform.ARTIFACT_HUB:
             ah = ArtifactHubResponse.model_validate(data)
             repo_name = ah.repository.name if ah.repository else None
             pkg_name = ah.name
@@ -408,10 +408,9 @@ def _distribution_web_url(  # noqa: C901
                 if link.url:
                     return link.url
             return None
-        case sql.DistributionPlatform.DOCKER:
+        case sql.DistributionPlatform.DOCKER_HUB:
             # The best we can do on Docker Hub is:
             # f"https://hub.docker.com/_/{package}"
-            # TODO: Rename to DOCKER_HUB and "Docker Hub"
             return None
         case sql.DistributionPlatform.GITHUB:
             gh = GitHubResponse.model_validate(data)
@@ -705,7 +704,7 @@ async def _release_validated_and_committee_and_template(
     if staging is False:
         return release, committee, dd.platform.value.template_url
 
-    supported = {sql.DistributionPlatform.ARTIFACTHUB, sql.DistributionPlatform.PYPI}
+    supported = {sql.DistributionPlatform.ARTIFACT_HUB, sql.DistributionPlatform.PYPI}
     if dd.platform not in supported:
         div = htm.Block(htpy.div(".alert.alert-danger"))
         div.p["Staging is currently supported only for ArtifactHub and PyPI."]

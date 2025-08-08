@@ -94,14 +94,14 @@ class CheckResultStatusIgnore(str, enum.Enum):
 
 
 class DistributionPlatform(enum.Enum):
-    ARTIFACTHUB = DistributionPlatformValue(
-        name="ArtifactHub (Helm)",
+    ARTIFACT_HUB = DistributionPlatformValue(
+        name="Artifact Hub",
         template_url="https://artifacthub.io/api/v1/packages/helm/{owner_namespace}/{package}/{version}",
         template_staging_url="https://staging.artifacthub.io/api/v1/packages/helm/{owner_namespace}/{package}/{version}",
         requires_owner_namespace=True,
     )
-    DOCKER = DistributionPlatformValue(
-        name="Docker",
+    DOCKER_HUB = DistributionPlatformValue(
+        name="Docker Hub",
         template_url="https://hub.docker.com/v2/namespaces/{owner_namespace}/repositories/{package}/tags/{version}",
         # TODO: Need to use staging tags?
         # template_staging_url="https://hub.docker.com/v2/namespaces/{owner_namespace}/repositories/{package}/tags/{version}",
@@ -833,9 +833,7 @@ class CheckResultIgnore(sqlmodel.SQLModel, table=True):
 class Distribution(sqlmodel.SQLModel, table=True):
     release_name: str = sqlmodel.Field(primary_key=True, index=True, foreign_key="release.name", ondelete="CASCADE")
     release: Release = sqlmodel.Relationship(back_populates="distributions")
-    platform: DistributionPlatform = sqlmodel.Field(
-        primary_key=True, index=True, default=DistributionPlatform.ARTIFACTHUB
-    )
+    platform: DistributionPlatform = sqlmodel.Field(primary_key=True, index=True)
     owner_namespace: str = sqlmodel.Field(primary_key=True, index=True, default="")
     package: str = sqlmodel.Field(primary_key=True, index=True)
     version: str = sqlmodel.Field(primary_key=True, index=True)
