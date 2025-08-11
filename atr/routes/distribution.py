@@ -257,6 +257,12 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
         )
     block.p["Here are all of the distributions recorded for this release."]
     block.p[record_a_distribution]
+    # Table of contents
+    ul_toc = htm.Block(htpy.ul)
+    for distribution in distributions:
+        a = htpy.a(href=f"#distribution-{distribution.identifier}")[distribution.title]
+        ul_toc.li[a]
+    block.append(ul_toc)
 
     ## Distributions
     block.h2["Distributions"]
@@ -272,7 +278,11 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
         )
 
         ### Platform package version
-        block.h3[f"{distribution.platform.value.name} {distribution.package} {distribution.version}"]
+        block.h3(
+            # Cannot use "#id" here, because the ID contains "."
+            # If an ID contains ".", htpy parses that as a class
+            id=f"distribution-{distribution.identifier}"
+        )[distribution.title]
         tbody = htpy.tbody[
             _html_tr("Release name", distribution.release_name),
             _html_tr("Platform", distribution.platform.value.name),
@@ -479,7 +489,7 @@ def _html_nav(container: htm.Block, back_url: str, back_anchor: str, phase: Phas
     _phase(phase, "FINISH")
 
     block.append(span.collect(separator=" "))
-    container.append(block.collect())
+    container.append(block)
 
 
 def _html_nav_phase(block: htm.Block, project: str, version: str, staging: bool) -> None:

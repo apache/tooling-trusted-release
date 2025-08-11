@@ -57,6 +57,8 @@ class BlockElementCallable:
 
 
 class Block:
+    __match_args__ = ("elements",)
+
     def __init__(self, element: htpy.Element | None = None, *elements: htpy.Element):
         self.element = element
         self.elements: list[htpy.Element | str] = list(elements)
@@ -67,8 +69,13 @@ class Block:
     def __repr__(self) -> str:
         return f"{self.element!r}[*{self.elements!r}]"
 
-    def append(self, element: htpy.Element) -> None:
-        self.elements.append(element)
+    def append(self, eob: Block | htpy.Element) -> None:
+        match eob:
+            case Block():
+                # TODO: Does not support separator
+                self.elements.append(eob.collect())
+            case htpy.Element():
+                self.elements.append(eob)
 
     def collect(self, separator: str | None = None) -> htpy.Element:
         if separator is not None:
@@ -108,6 +115,10 @@ class Block:
         return BlockElementCallable(self, htpy.h3)
 
     @property
+    def li(self) -> BlockElementCallable:
+        return BlockElementCallable(self, htpy.li)
+
+    @property
     def p(self) -> BlockElementCallable:
         return BlockElementCallable(self, htpy.p)
 
@@ -133,3 +144,7 @@ class Block:
 
     def text(self, text: str) -> None:
         self.elements.append(text)
+
+    @property
+    def ul(self) -> BlockElementCallable:
+        return BlockElementCallable(self, htpy.ul)

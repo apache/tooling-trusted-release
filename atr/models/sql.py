@@ -845,6 +845,20 @@ class Distribution(sqlmodel.SQLModel, table=True):
     # So we do not store it in the database
     # api_response: Any = sqlmodel.Field(sa_column=sqlalchemy.Column(sqlalchemy.JSON))
 
+    @property
+    def identifier(self) -> str:
+        def normal(text: str) -> str:
+            return text.replace(" ", "_").lower()
+
+        name = normal(self.platform.value.name)
+        package = normal(self.package)
+        version = normal(self.version)
+        return f"{name}-{package}-{version}"
+
+    @property
+    def title(self) -> str:
+        return f"{self.platform.value.name} {self.package} {self.version}"
+
 
 # # DistributionChannel: Project
 # class DistributionChannel(sqlmodel.SQLModel, table=True):
