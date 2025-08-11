@@ -7,7 +7,7 @@ authors = [
 ]
 license = "Apache-2.0"
 readme = "README.md"
-requires-python = "~=3.13"
+requires-python = "~=3.13.0"
 # https://bugs.launchpad.net/dkimpy/+bug/2024461
 dependencies = [
   "aiofiles>=24.1.0,<25.0.0",
