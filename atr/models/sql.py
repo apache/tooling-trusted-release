@@ -107,13 +107,13 @@ class DistributionPlatform(enum.Enum):
         # template_staging_url="https://hub.docker.com/v2/namespaces/{owner_namespace}/repositories/{package}/tags/{version}",
         default_owner_namespace="library",
     )
-    GITHUB = DistributionPlatformValue(
-        name="GitHub",
-        template_url="https://api.github.com/repos/{owner_namespace}/{package}/releases/tags/v{version}",
-        # Combine with {"prerelease": true}
-        template_staging_url="https://api.github.com/repos/{owner_namespace}/{package}/releases",
-        requires_owner_namespace=True,
-    )
+    # GITHUB = DistributionPlatformValue(
+    #     name="GitHub",
+    #     template_url="https://api.github.com/repos/{owner_namespace}/{package}/releases/tags/v{version}",
+    #     # Combine with {"prerelease": true}
+    #     template_staging_url="https://api.github.com/repos/{owner_namespace}/{package}/releases",
+    #     requires_owner_namespace=True,
+    # )
     MAVEN = DistributionPlatformValue(
         name="Maven Central",
         template_url="https://search.maven.org/solrsearch/select?q=g:{owner_namespace}+AND+a:{package}+AND+v:{version}&core=gav&rows=20&wt=json",

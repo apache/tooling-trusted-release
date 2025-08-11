@@ -368,10 +368,10 @@ def _distribution_upload_date(  # noqa: C901
             if not (pushed_at := DockerResponse.model_validate(data).tag_last_pushed):
                 return None
             return datetime.datetime.fromisoformat(pushed_at.rstrip("Z"))
-        case sql.DistributionPlatform.GITHUB:
-            if not (published_at := GitHubResponse.model_validate(data).published_at):
-                return None
-            return datetime.datetime.fromisoformat(published_at.rstrip("Z"))
+        # case sql.DistributionPlatform.GITHUB:
+        #     if not (published_at := GitHubResponse.model_validate(data).published_at):
+        #         return None
+        #     return datetime.datetime.fromisoformat(published_at.rstrip("Z"))
         case sql.DistributionPlatform.MAVEN:
             m = MavenResponse.model_validate(data)
             docs = m.response.docs
@@ -422,9 +422,9 @@ def _distribution_web_url(  # noqa: C901
             # The best we can do on Docker Hub is:
             # f"https://hub.docker.com/_/{package}"
             return None
-        case sql.DistributionPlatform.GITHUB:
-            gh = GitHubResponse.model_validate(data)
-            return gh.html_url
+        # case sql.DistributionPlatform.GITHUB:
+        #     gh = GitHubResponse.model_validate(data)
+        #     return gh.html_url
         case sql.DistributionPlatform.MAVEN:
             return None
         case sql.DistributionPlatform.NPM:
