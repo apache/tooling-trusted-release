@@ -18,7 +18,6 @@
 
 import base64
 import hashlib
-import json
 import pathlib
 from typing import Any
 
@@ -360,9 +359,12 @@ async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
     The payload must include a valid GitHub OIDC JWT.
     """
     # TODO: This is a placeholder for the actual implementation
-    unverified_header_and_payload = jwtoken.unverified_header_and_payload(data.jwt)
-    unverified_header_and_payload_json = json.dumps(unverified_header_and_payload).encode("utf-8")
-    log.secret("GitHub OIDC JWT header and payload", unverified_header_and_payload_json)
+    payload = await jwtoken.verify_github_oidc(data.jwt)
+    del payload["actor_id"]
+    del payload["repository_id"]
+    del payload["repository_owner_id"]
+    del payload["run_id"]
+    log.info(f"GitHub OIDC JWT payload: {payload}")
 
     return models.api.JwtGithubResults(
         endpoint="/jwt/github",

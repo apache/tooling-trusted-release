@@ -22,6 +22,7 @@ import functools
 import secrets as secrets
 from typing import TYPE_CHECKING, Any, Final
 
+import aiohttp
 import asfquart.base as base
 import jwt
 import quart
@@ -74,6 +75,32 @@ def unverified_header_and_payload(jwt_value: str) -> dict[str, Any]:
 
 def verify(token: str) -> dict[str, Any]:
     return jwt.decode(token, _SECRET_KEY, algorithms=[_ALGORITHM])
+
+
+async def verify_github_oidc(token: str) -> dict[str, Any]:
+    issuer = "token.actions.githubusercontent.com"
+    try:
+        async with aiohttp.ClientSession() as session:
+            r = await session.get(
+                f"https://{issuer}/.well-known/openid-configuration",
+                timeout=aiohttp.ClientTimeout(total=5),
+            )
+            r.raise_for_status()
+            jwks_uri = (await r.json())["jwks_uri"]
+    except Exception:
+        jwks_uri = f"https://{issuer}/.well-known/jwks"
+
+    jwks_client = jwt.PyJWKClient(jwks_uri)
+    signing_key = jwks_client.get_signing_key_from_jwt(token)
+    payload = jwt.decode(
+        token,
+        key=signing_key.key,
+        algorithms=["RS256"],
+        audience="atr-test",
+        issuer=f"https://{issuer}",
+        options={"require": ["exp", "iat"]},
+    )
+    return payload
 
 
 def _extract_bearer_token(request: quart.Request) -> str:
