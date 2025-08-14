@@ -360,9 +360,9 @@ async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
     The payload must include a valid GitHub OIDC JWT.
     """
     # TODO: This is a placeholder for the actual implementation
-    unverified_payload = jwtoken.rs256_unverified_payload(data.jwt)
-    unverified_payload_json = json.dumps(unverified_payload).encode("utf-8")
-    log.secret("GitHub OIDC JWT payload", unverified_payload_json)
+    unverified_header_and_payload = jwtoken.unverified_header_and_payload(data.jwt)
+    unverified_header_and_payload_json = json.dumps(unverified_header_and_payload).encode("utf-8")
+    log.secret("GitHub OIDC JWT header and payload", unverified_header_and_payload_json)
 
     return models.api.JwtGithubResults(
         endpoint="/jwt/github",
