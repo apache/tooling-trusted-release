@@ -115,6 +115,15 @@ class JwtCreateResults(schema.Strict):
     jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
 
 
+class JwtGithubArgs(schema.Strict):
+    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
+
+
+class JwtGithubResults(schema.Strict):
+    endpoint: Literal["/jwt/github"] = schema.Field(alias="endpoint")
+    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
+
+
 class KeyAddArgs(schema.Strict):
     asfuid: str = schema.Field(..., **example("user"))
     key: str = schema.Field(
@@ -424,6 +433,7 @@ Results = Annotated[
     | IgnoreDeleteResults
     | IgnoreListResults
     | JwtCreateResults
+    | JwtGithubResults
     | KeyAddResults
     | KeyDeleteResults
     | KeyGetResults
@@ -476,6 +486,7 @@ validate_ignore_add = validator(IgnoreAddResults)
 validate_ignore_delete = validator(IgnoreDeleteResults)
 validate_ignore_list = validator(IgnoreListResults)
 validate_jwt_create = validator(JwtCreateResults)
+validate_jwt_github = validator(JwtGithubResults)
 validate_key_add = validator(KeyAddResults)
 validate_key_delete = validator(KeyDeleteResults)
 validate_key_get = validator(KeyGetResults)

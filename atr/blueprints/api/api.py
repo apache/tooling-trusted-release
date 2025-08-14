@@ -18,6 +18,7 @@
 
 import base64
 import hashlib
+import json
 import pathlib
 from typing import Any
 
@@ -36,6 +37,7 @@ import atr.config as config
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.jwtoken as jwtoken
+import atr.log as log
 import atr.models as models
 import atr.models.sql as sql
 import atr.revision as revision
@@ -327,7 +329,6 @@ async def ignore_list(committee_name: str) -> DictResponse:
     ).model_dump(), 200
 
 
-# This is the only POST endpoint that does not require a JWT
 @api.BLUEPRINT.route("/jwt/create", methods=["POST"])
 @quart_schema.validate_request(models.api.JwtCreateArgs)
 async def jwt_create(data: models.api.JwtCreateArgs) -> DictResponse:
@@ -347,6 +348,25 @@ async def jwt_create(data: models.api.JwtCreateArgs) -> DictResponse:
         endpoint="/jwt/create",
         asfuid=data.asfuid,
         jwt=jwt,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/jwt/github", methods=["POST"])
+@quart_schema.validate_request(models.api.JwtGithubArgs)
+async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
+    """
+    Create a JWT from a GitHub OIDC JWT.
+
+    The payload must include a valid GitHub OIDC JWT.
+    """
+    # TODO: This is a placeholder for the actual implementation
+    unverified_payload = jwtoken.rs256_unverified_payload(data.jwt)
+    unverified_payload_json = json.dumps(unverified_payload).encode("utf-8")
+    log.secret("GitHub OIDC JWT payload", unverified_payload_json)
+
+    return models.api.JwtGithubResults(
+        endpoint="/jwt/github",
+        jwt="TODO",
     ).model_dump(), 200
 
 
