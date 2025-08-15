@@ -1,6 +1,6 @@
 .PHONY: build build-alpine build-playwright build-ts build-ubuntu certs \
-  check check-extra check-light commit docs generate-version run-playwright \
-  run-playwright-slow serve serve-local sync update-deps
+  check check-extra check-light commit docs generate-version ipython \
+  run-playwright run-playwright-slow serve serve-local sync update-deps
 
 BIND ?= 127.0.0.1:8080
 IMAGE ?= tooling-trusted-release
@@ -57,6 +57,9 @@ generate-version:
 	@uv run python atr/metadata.py > /tmp/version.py
 	@mv /tmp/version.py atr/version.py
 	@cat atr/version.py
+
+ipython:
+	uv run --frozen --with ipython ipython
 
 run-playwright:
 	docker run --net=host -it atr-playwright python3 test.py --skip-slow
