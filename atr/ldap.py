@@ -56,7 +56,7 @@ class Search:
         ldap_attrs: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         if not self._conn:
-            raise RuntimeError("Connection not available.")
+            raise RuntimeError("LDAP connection not available")
 
         attributes = ldap_attrs if ldap_attrs else ldap3.ALL_ATTRIBUTES
         self._conn.search(
@@ -78,6 +78,7 @@ class Search:
 class SearchParameters:
     uid_query: str | None = None
     email_query: str | None = None
+    github_username_query: str | None = None
     bind_dn_from_config: str | None = None
     bind_password_from_config: str | None = None
     results_list: list[dict[str, str | list[str]]] = dataclasses.field(default_factory=list)
@@ -146,10 +147,17 @@ def _search_core(params: SearchParameters) -> None:
         else:
             filters.append(f"(asf-altEmail={escaped_email})")
 
+    if params.github_username_query:
+        filters.append(f"(githubUsername={conv.escape_filter_chars(params.github_username_query)})")
+
     if not filters:
-        params.err_msg = "Please provide a UID or an email address to search."
+        params.err_msg = "Please provide a UID, an email address, or a GitHub username to search."
         return
 
+    _search_core_2(params, filters)
+
+
+def _search_core_2(params: SearchParameters, filters: list[str]) -> None:
     search_filter = f"(&{''.join(filters)})" if (len(filters) > 1) else filters[0]
 
     if not params.connection:

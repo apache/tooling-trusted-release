@@ -83,8 +83,8 @@ class DeleteReleaseForm(forms.Typed):
 
 
 class LdapLookupForm(forms.Typed):
-    uid = forms.string("ASF UID (optional)", placeholder="Enter ASF UID, e.g. johnsmith, or * for all")
-    email = forms.string("Email address (optional)", placeholder="Enter email address, e.g. user@example.org")
+    uid = forms.optional("ASF UID (optional)", placeholder="Enter ASF UID, e.g. johnsmith, or * for all")
+    email = forms.optional("Email address (optional)", placeholder="Enter email address, e.g. user@example.org")
     submit = forms.submit("Lookup")
 
 
@@ -493,7 +493,7 @@ async def admin_ldap() -> str:
             email_query=email_query,
             bind_dn_from_config=bind_dn,
             bind_password_from_config=bind_password,
-            email_only=True,
+            email_only=False,
         )
         await asyncio.to_thread(ldap.search, ldap_params)
         end = time.perf_counter_ns()
