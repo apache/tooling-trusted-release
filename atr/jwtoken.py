@@ -29,8 +29,16 @@ import quart
 
 import atr.config as config
 
-_SECRET_KEY: Final[str] = config.get().SECRET_KEY
 _ALGORITHM: Final[str] = "HS256"
+_GITHUB_OIDC_AUDIENCE: Final[str] = "atr-test"
+_GITHUB_OIDC_EXPECTED: Final[dict[str, str]] = {
+    "enterprise": "the-asf",
+    "enterprise_id": "212555",
+    "repository_owner": "apache",
+    "runner_environment": "github-hosted",
+}
+_GITHUB_OIDC_ISSUER: Final[str] = "https://token.actions.githubusercontent.com"
+_JWT_SECRET_KEY: Final[str] = config.get().JWT_SECRET_KEY
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Coroutine
@@ -44,7 +52,7 @@ def issue(uid: str, *, ttl: int = 90 * 60) -> str:
         "exp": now + datetime.timedelta(seconds=ttl),
         "jti": secrets.token_hex(8),
     }
-    return jwt.encode(payload, _SECRET_KEY, algorithm=_ALGORITHM)
+    return jwt.encode(payload, _JWT_SECRET_KEY, algorithm=_ALGORITHM)
 
 
 def require[**P, R](func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Awaitable[R]]:
@@ -74,21 +82,20 @@ def unverified_header_and_payload(jwt_value: str) -> dict[str, Any]:
 
 
 def verify(token: str) -> dict[str, Any]:
-    return jwt.decode(token, _SECRET_KEY, algorithms=[_ALGORITHM])
+    return jwt.decode(token, _JWT_SECRET_KEY, algorithms=[_ALGORITHM])
 
 
 async def verify_github_oidc(token: str) -> dict[str, Any]:
-    issuer = "token.actions.githubusercontent.com"
     try:
         async with aiohttp.ClientSession() as session:
             r = await session.get(
-                f"https://{issuer}/.well-known/openid-configuration",
+                f"{_GITHUB_OIDC_ISSUER}/.well-known/openid-configuration",
                 timeout=aiohttp.ClientTimeout(total=5),
             )
             r.raise_for_status()
             jwks_uri = (await r.json())["jwks_uri"]
     except Exception:
-        jwks_uri = f"https://{issuer}/.well-known/jwks"
+        jwks_uri = f"{_GITHUB_OIDC_ISSUER}/.well-known/jwks"
 
     jwks_client = jwt.PyJWKClient(jwks_uri)
     signing_key = jwks_client.get_signing_key_from_jwt(token)
@@ -96,10 +103,20 @@ async def verify_github_oidc(token: str) -> dict[str, Any]:
         token,
         key=signing_key.key,
         algorithms=["RS256"],
-        audience="atr-test",
-        issuer=f"https://{issuer}",
+        audience=_GITHUB_OIDC_AUDIENCE,
+        issuer=_GITHUB_OIDC_ISSUER,
         options={"require": ["exp", "iat"]},
     )
+    for key, value in _GITHUB_OIDC_EXPECTED.items():
+        if payload[key] != value:
+            raise base.ASFQuartException(
+                f"GitHub OIDC payload mismatch: {key} = {payload[key]} != {value}",
+                errorcode=401,
+            )
+    # del payload["actor_id"]
+    del payload["repository_id"]
+    del payload["repository_owner_id"]
+    del payload["run_id"]
     return payload
 
 

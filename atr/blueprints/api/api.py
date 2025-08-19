@@ -361,9 +361,6 @@ async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
     # TODO: This is a placeholder for the actual implementation
     payload = await jwtoken.verify_github_oidc(data.jwt)
     del payload["actor_id"]
-    del payload["repository_id"]
-    del payload["repository_owner_id"]
-    del payload["run_id"]
     log.info(f"GitHub OIDC JWT payload: {payload}")
 
     return models.api.JwtGithubResults(
