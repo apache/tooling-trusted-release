@@ -521,6 +521,8 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         min_hours: Opt[int] = NOT_SET,
         release_checklist: Opt[str] = NOT_SET,
         pause_for_rm: Opt[bool] = NOT_SET,
+        github_repository_name: Opt[str] = NOT_SET,
+        github_workflow_path: Opt[str] = NOT_SET,
         _project: bool = False,
     ) -> Query[sql.ReleasePolicy]:
         query = sqlmodel.select(sql.ReleasePolicy)
@@ -537,6 +539,10 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(sql.ReleasePolicy.release_checklist == release_checklist)
         if is_defined(pause_for_rm):
             query = query.where(sql.ReleasePolicy.pause_for_rm == pause_for_rm)
+        if is_defined(github_repository_name):
+            query = query.where(sql.ReleasePolicy.github_repository_name == github_repository_name)
+        if is_defined(github_workflow_path):
+            query = query.where(sql.ReleasePolicy.github_workflow_path == github_workflow_path)
 
         if _project:
             query = query.options(joined_load(sql.ReleasePolicy.project))

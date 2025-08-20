@@ -117,6 +117,9 @@ class JwtCreateResults(schema.Strict):
 
 class JwtGithubArgs(schema.Strict):
     jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
+    ssh_key: str = schema.Field(
+        ..., **example("ssh-ed25519 AAAAC3NzaC1lZDI1NTEgH5C9okWi0dh25AAAAIOMqqnkVzrm0SdG6UOoqKLsabl9GKJl")
+    )
 
 
 class JwtGithubResults(schema.Strict):
