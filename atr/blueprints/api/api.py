@@ -358,25 +358,27 @@ async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
 
     The payload must include a valid GitHub OIDC JWT.
     """
+    log.info(f"SSH key: {data.ssh_key}")
+
     # TODO: This is a placeholder for the actual implementation
     payload = await jwtoken.verify_github_oidc(data.jwt)
+
+    # Debugging
+    del payload["actor_id"]
+    log.info(f"GitHub OIDC JWT payload: {payload}")
+
     repository = payload["repository"]
     if not repository.startswith("apache/"):
         raise exceptions.BadRequest("Repository must start with 'apache/'")
     repository_name = repository.removeprefix("apache/")
     workflow = payload["workflow"]
     if not workflow.startswith(".github/workflows/"):
-        raise exceptions.BadRequest("Workflow path must start with '.github/workflows/'")
+        raise exceptions.BadRequest(f"Workflow path must start with '.github/workflows/', got {workflow}")
     async with db.session() as db_data:
         policy = await db_data.release_policy(
             github_repository_name=repository_name, github_workflow_path=workflow
         ).demand(exceptions.NotFound(f"No release policy found for repository {repository} and workflow {workflow}"))
-
-    # Debugging
-    del payload["actor_id"]
-    log.info(f"GitHub OIDC JWT payload: {payload}")
     log.info(f"Release policy: {policy}")
-    log.info(f"SSH key: {data.ssh_key}")
 
     return models.api.JwtGithubResults(
         endpoint="/jwt/github",
