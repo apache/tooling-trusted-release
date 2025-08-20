@@ -97,7 +97,7 @@
               </div>
             </div>
 
-            <div class="mb-3 pb-3 row">
+            <div class="mb-3 pb-3 row border-bottom">
               {{ forms.label(policy_form.binary_artifact_paths, col="md3") }}
               <div class="col-sm-8">
                 {{ forms.widget(policy_form.binary_artifact_paths, classes="form-control font-monospace") }}
@@ -107,6 +107,24 @@
             </div>
 
             <div class="mb-3 pb-3 row border-bottom">
+              {{ forms.label(policy_form.github_repository_name, col="md3") }}
+              <div class="col-sm-8">
+                {{ forms.widget(policy_form.github_repository_name, classes="form-control font-monospace") }}
+                {{ forms.errors(policy_form.github_repository_name) }}
+                {{ forms.description(policy_form.github_repository_name) }}
+              </div>
+            </div>
+
+            <div class="mb-3 pb-3 row border-bottom">
+              {{ forms.label(policy_form.github_workflow_path, col="md3") }}
+              <div class="col-sm-8">
+                {{ forms.widget(policy_form.github_workflow_path, classes="form-control font-monospace") }}
+                {{ forms.errors(policy_form.github_workflow_path) }}
+                {{ forms.description(policy_form.github_workflow_path) }}
+              </div>
+            </div>
+
+            <div class="mb-3 pb-3 row">
               {{ forms.label(policy_form.strict_checking, col="md3-high") }}
               <div class="col-sm-8">
                 <div class="form-check">

@@ -638,6 +638,18 @@ Thanks,
             return False
         return policy.strict_checking
 
+    @property
+    def policy_github_repository_name(self) -> str:
+        if (policy := self.release_policy) is None:
+            return ""
+        return policy.github_repository_name
+
+    @property
+    def policy_github_workflow_path(self) -> str:
+        if (policy := self.release_policy) is None:
+            return ""
+        return policy.github_workflow_path
+
 
 # Release: Project ReleasePolicy Revision CheckResult
 class Release(sqlmodel.SQLModel, table=True):
@@ -942,6 +954,8 @@ class ReleasePolicy(sqlmodel.SQLModel, table=True):
         default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON)
     )
     strict_checking: bool = sqlmodel.Field(default=False)
+    github_repository_name: str = sqlmodel.Field(default="")
+    github_workflow_path: str = sqlmodel.Field(default="")
 
     # 1-1: ReleasePolicy -> Project
     # 1-1: Project -C-> ReleasePolicy

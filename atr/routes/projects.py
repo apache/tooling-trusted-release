@@ -67,10 +67,25 @@ class ReleasePolicyForm(forms.Typed):
 
     # Compose section
     source_artifact_paths = forms.textarea(
-        "Source artifact paths", rows=5, description="Paths to source artifacts to be included in the release."
+        "Source artifact paths",
+        optional=True,
+        rows=5,
+        description="Paths to source artifacts to be included in the release.",
     )
     binary_artifact_paths = forms.textarea(
-        "Binary artifact paths", rows=5, description="Paths to binary artifacts to be included in the release."
+        "Binary artifact paths",
+        optional=True,
+        rows=5,
+        description="Paths to binary artifacts to be included in the release.",
+    )
+    github_repository_name = forms.optional(
+        "GitHub repository name",
+        description="The name of the GitHub repository to use for the release, excluding the apache/ prefix.",
+    )
+    github_workflow_path = forms.optional(
+        "GitHub workflow path",
+        description="The full path to the GitHub workflow to use for the release,"
+        " including the .github/workflows/ prefix.",
     )
     strict_checking = forms.boolean(
         "Strict checking", description="If enabled, then the release cannot be voted upon unless all checks pass."
@@ -102,23 +117,30 @@ class ReleasePolicyForm(forms.Typed):
     )
     release_checklist = forms.textarea(
         "Release checklist",
+        optional=True,
         rows=10,
         description="Markdown text describing how to test release candidates.",
     )
     default_start_vote_template_hash = forms.hidden()
     start_vote_template = forms.textarea(
-        "Start vote template", rows=10, description="Email template for messages to start a vote on a release."
+        "Start vote template",
+        optional=True,
+        rows=10,
+        description="Email template for messages to start a vote on a release.",
     )
 
     # Finish section
     default_announce_release_template_hash = forms.hidden()
     announce_release_template = forms.textarea(
-        "Announce release template", rows=10, description="Email template for messages to announce a finished release."
+        "Announce release template",
+        optional=True,
+        rows=10,
+        description="Email template for messages to announce a finished release.",
     )
 
     submit_policy = forms.submit("Save")
 
-    async def validate(self, extra_validators: dict[str, Any] | None = None) -> bool:
+    async def validate(self, extra_validators: dict[str, Any] | None = None) -> bool:  # noqa: C901
         await super().validate(extra_validators=extra_validators)
 
         if self.manual_vote.data:
@@ -145,6 +167,20 @@ class ReleasePolicyForm(forms.Typed):
             _form_append(self.strict_checking, msg)
             # _form_setdefault_append(self, "manual_vote", [], msg)
             # _form_setdefault_append(self, "strict_checking", [], msg)
+
+        grn = self.github_repository_name.data
+        gwp = self.github_workflow_path.data
+        if (grn and (not gwp)) or ((not grn) and gwp):
+            msg = "GitHub repository name and workflow path must be set together."
+            _form_append(self.github_repository_name, msg)
+            _form_append(self.github_workflow_path, msg)
+        elif grn and gwp:
+            if "/" in grn:
+                msg = "GitHub repository name must not contain a slash."
+                _form_append(self.github_repository_name, msg)
+            if not gwp.startswith(".github/workflows/"):
+                msg = "GitHub workflow path must start with '.github/workflows/'."
+                _form_append(self.github_workflow_path, msg)
 
         return not self.errors
 
@@ -442,6 +478,8 @@ async def _policy_edit(
         release_policy.binary_artifact_paths = _parse_artifact_paths(
             util.unwrap(policy_form.binary_artifact_paths.data)
         )
+        release_policy.github_repository_name = util.unwrap(policy_form.github_repository_name.data)
+        release_policy.github_workflow_path = util.unwrap(policy_form.github_workflow_path.data)
         release_policy.strict_checking = util.unwrap(policy_form.strict_checking.data)
 
         # Vote section
@@ -485,6 +523,8 @@ async def _policy_form_create(project: sql.Project) -> ReleasePolicyForm:
     policy_form.source_artifact_paths.data = "\n".join(project.policy_source_artifact_paths)
     policy_form.pause_for_rm.data = project.policy_pause_for_rm
     policy_form.strict_checking.data = project.policy_strict_checking
+    policy_form.github_repository_name.data = project.policy_github_repository_name
+    policy_form.github_workflow_path.data = project.policy_github_workflow_path
 
     # Set the hashes and value of the current defaults
     policy_form.default_start_vote_template_hash.data = util.compute_sha3_256(
