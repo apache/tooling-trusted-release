@@ -681,6 +681,26 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
 
         return Query(self, query)
 
+    def workflow_ssh_key(
+        self,
+        fingerprint: Opt[str] = NOT_SET,
+        key: Opt[str] = NOT_SET,
+        project_name: Opt[str] = NOT_SET,
+        expires: Opt[int] = NOT_SET,
+    ) -> Query[sql.WorkflowSSHKey]:
+        query = sqlmodel.select(sql.WorkflowSSHKey)
+
+        if is_defined(fingerprint):
+            query = query.where(sql.WorkflowSSHKey.fingerprint == fingerprint)
+        if is_defined(key):
+            query = query.where(sql.WorkflowSSHKey.key == key)
+        if is_defined(project_name):
+            query = query.where(sql.WorkflowSSHKey.project_name == project_name)
+        if is_defined(expires):
+            query = query.where(sql.WorkflowSSHKey.expires == expires)
+
+        return Query(self, query)
+
 
 async def create_async_engine(app_config: type[config.AppConfig]) -> sqlalchemy.ext.asyncio.AsyncEngine:
     absolute_db_path = os.path.join(app_config.STATE_DIR, app_config.SQLITE_DB_PATH)

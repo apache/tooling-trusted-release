@@ -397,6 +397,14 @@ class TextValue(sqlmodel.SQLModel, table=True):
     value: str = sqlmodel.Field()
 
 
+# WorkflowSSHKey:
+class WorkflowSSHKey(sqlmodel.SQLModel, table=True):
+    fingerprint: str = sqlmodel.Field(primary_key=True, index=True)
+    key: str = sqlmodel.Field()
+    project_name: str = sqlmodel.Field(index=True)
+    expires: int = sqlmodel.Field()
+
+
 # SQL core models
 
 

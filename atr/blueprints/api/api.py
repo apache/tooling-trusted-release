@@ -19,6 +19,7 @@
 import base64
 import hashlib
 import pathlib
+import time
 from typing import Any
 
 import aiofiles.os
@@ -380,17 +381,43 @@ async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
     workflow_path = workflow_path_at.rsplit("@", 1)[0]
     if not workflow_path.startswith(".github/workflows/"):
         raise exceptions.BadRequest(f"Workflow path must start with '.github/workflows/', got {workflow_path}")
+    # TODO: If a policy is reused between projects, we can't get the project
     async with db.session() as db_data:
         policy = await db_data.release_policy(
             github_repository_name=repository_name, github_workflow_path=workflow_path
         ).demand(
-            exceptions.NotFound(f"No release policy found for repository {repository} and workflow {workflow_path}")
+            exceptions.NotFound(
+                f"No release policy found for repository name {repository_name} and workflow path {workflow_path}"
+            )
+        )
+        project = await db_data.project(release_policy_id=policy.id).demand(
+            exceptions.NotFound(f"Project for release policy {policy.id} not found")
         )
     log.info(f"Release policy: {policy}")
+    log.info(f"Project: {project}")
+
+    # TODO: This needs to go in the storage interface
+    # And it needs to create an audit event for logging
+    now = int(time.time())
+    # Twenty minutes to upload all files
+    ttl = 20 * 60
+    expires = now + ttl
+    fingerprint = keys.key_ssh_fingerprint(data.ssh_key)
+    async with db.session() as db_data:
+        wsk = sql.WorkflowSSHKey(
+            fingerprint=fingerprint,
+            key=data.ssh_key,
+            project_name=project.name,
+            expires=expires,
+        )
+        db_data.add(wsk)
+        await db_data.commit()
 
     return models.api.JwtGithubResults(
         endpoint="/jwt/github",
-        jwt="TODO",
+        fingerprint=fingerprint,
+        project=project.name,
+        expires=expires,
     ).model_dump(), 200
 
 

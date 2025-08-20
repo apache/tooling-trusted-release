@@ -124,7 +124,9 @@ class JwtGithubArgs(schema.Strict):
 
 class JwtGithubResults(schema.Strict):
     endpoint: Literal["/jwt/github"] = schema.Field(alias="endpoint")
-    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
+    fingerprint: str = schema.Field(..., **example("SHA256:0123456789abcdef0123456789abcdef01234567"))
+    project: str = schema.Field(..., **example("example"))
+    expires: int = schema.Field(..., **example(1713547200))
 
 
 class KeyAddArgs(schema.Strict):

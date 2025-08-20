@@ -413,7 +413,7 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
 
 async def ssh_key_add(key: str, asf_uid: str) -> str:
     try:
-        fingerprint = await asyncio.to_thread(key_ssh_fingerprint, key)
+        fingerprint = key_ssh_fingerprint(key)
     except Exception as e:
         raise SshFingerprintError(str(e)) from e
     async with db.session() as data:
