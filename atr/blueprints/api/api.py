@@ -371,13 +371,21 @@ async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
     if not repository.startswith("apache/"):
         raise exceptions.BadRequest("Repository must start with 'apache/'")
     repository_name = repository.removeprefix("apache/")
-    workflow = payload["workflow"]
-    if not workflow.startswith(".github/workflows/"):
-        raise exceptions.BadRequest(f"Workflow path must start with '.github/workflows/', got {workflow}")
+    workflow_ref = payload["workflow_ref"]
+    if not workflow_ref.startswith(repository + "/"):
+        raise exceptions.BadRequest(f"Workflow ref must start with repository, got {workflow_ref}")
+    workflow_path_at = workflow_ref.removeprefix(repository + "/")
+    if "@" not in workflow_path_at:
+        raise exceptions.BadRequest(f"Workflow path must contain '@', got {workflow_path_at}")
+    workflow_path = workflow_path_at.rsplit("@", 1)[0]
+    if not workflow_path.startswith(".github/workflows/"):
+        raise exceptions.BadRequest(f"Workflow path must start with '.github/workflows/', got {workflow_path}")
     async with db.session() as db_data:
         policy = await db_data.release_policy(
-            github_repository_name=repository_name, github_workflow_path=workflow
-        ).demand(exceptions.NotFound(f"No release policy found for repository {repository} and workflow {workflow}"))
+            github_repository_name=repository_name, github_workflow_path=workflow_path
+        ).demand(
+            exceptions.NotFound(f"No release policy found for repository {repository} and workflow {workflow_path}")
+        )
     log.info(f"Release policy: {policy}")
 
     return models.api.JwtGithubResults(
