@@ -50,23 +50,12 @@ import atr.forms as forms
 import atr.ldap as ldap
 import atr.log as log
 import atr.models.sql as sql
+import atr.registry as registry
 import atr.user as user
 
 T = TypeVar("T")
 
 USER_TESTS_ADDRESS: Final[str] = "user-tests@tooling.apache.org"
-
-# TODO: Move to committee data
-# Standing committees are those which cannot make releases, by policy
-_STANDING_COMMITTEES: Final[set[str]] = {
-    "attic",
-    "comdev",
-    "gump",
-    "incubator",
-    "logodev",
-    "petri",
-    "whimsy",
-}
 
 
 @dataclasses.dataclass
@@ -185,7 +174,7 @@ def chmod_directories(path: pathlib.Path, permissions: int = 0o755) -> None:
 
 
 def committee_is_standing(committee_name: str) -> bool:
-    return committee_name in _STANDING_COMMITTEES
+    return committee_name in registry.STANDING_COMMITTEES
 
 
 def compute_sha3_256(file_data: bytes) -> str:

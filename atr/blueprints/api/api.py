@@ -42,6 +42,7 @@ import atr.jwtoken as jwtoken
 import atr.log as log
 import atr.models as models
 import atr.models.sql as sql
+import atr.registry as registry
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.announce as announce
@@ -404,6 +405,10 @@ async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
         project = await db_data.project(release_policy_id=policy.id).demand(
             exceptions.NotFound(f"Project for release policy {policy.id} not found")
         )
+    if project.committee is None:
+        raise exceptions.BadRequest(f"Project {project.name} has no committee")
+    if project.committee.name not in registry.GITHUB_AUTOMATED_RELEASE_COMMITTEES:
+        raise exceptions.BadRequest(f"Project {project.name} is not in a committee that can make releases")
     log.info(f"Release policy: {policy}")
     log.info(f"Project: {project}")
 
