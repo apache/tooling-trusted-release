@@ -373,7 +373,7 @@ async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
         github_nid_to_asf_uid = json.loads(await f.read())
     if payload["actor_id"] not in github_nid_to_asf_uid:
         raise exceptions.BadRequest(f"GitHub NID {payload['actor_id']} not registered with the ATR")
-    asf_uid = github_nid_to_asf_uid[payload["actor_id"]]
+    asf_uid = github_nid_to_asf_uid[str(payload["actor_id"])]
     log.info(f"ASF UID: {asf_uid}")
 
     # Debugging
