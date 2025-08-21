@@ -18,6 +18,8 @@
 
 import base64
 import hashlib
+import json
+import os.path
 import pathlib
 import time
 from typing import Any
@@ -364,8 +366,17 @@ async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
     # TODO: This is a placeholder for the actual implementation
     payload = await jwtoken.verify_github_oidc(data.jwt)
 
+    # We need to lookup the ASF UID from the GitHub NID
+    conf = config.get()
+    github_nid_to_asf_uid_strpath = os.path.join(conf.STATE_DIR, "github-nid-to-asf-uid.json")
+    async with aiofiles.open(github_nid_to_asf_uid_strpath) as f:
+        github_nid_to_asf_uid = json.loads(await f.read())
+    if payload["actor_id"] not in github_nid_to_asf_uid:
+        raise exceptions.BadRequest(f"GitHub NID {payload['actor_id']} not registered with the ATR")
+    asf_uid = github_nid_to_asf_uid[payload["actor_id"]]
+    log.info(f"ASF UID: {asf_uid}")
+
     # Debugging
-    del payload["actor_id"]
     log.info(f"GitHub OIDC JWT payload: {payload}")
 
     repository = payload["repository"]
@@ -408,6 +419,9 @@ async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
             fingerprint=fingerprint,
             key=data.ssh_key,
             project_name=project.name,
+            asf_uid=asf_uid,
+            github_uid=payload["actor"],
+            github_nid=payload["actor_id"],
             expires=expires,
         )
         db_data.add(wsk)

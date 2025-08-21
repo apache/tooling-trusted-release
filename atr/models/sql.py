@@ -402,6 +402,9 @@ class WorkflowSSHKey(sqlmodel.SQLModel, table=True):
     fingerprint: str = sqlmodel.Field(primary_key=True, index=True)
     key: str = sqlmodel.Field()
     project_name: str = sqlmodel.Field(index=True)
+    asf_uid: str = sqlmodel.Field(index=True)
+    github_uid: str = sqlmodel.Field(index=True)
+    github_nid: int = sqlmodel.Field(index=True)
     expires: int = sqlmodel.Field()
 
 

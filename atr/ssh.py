@@ -22,6 +22,7 @@ import asyncio.subprocess
 import datetime
 import os
 import string
+import time
 from typing import Final, TypeVar
 
 import aiofiles
@@ -72,8 +73,14 @@ class SSHServer(asyncssh.SSHServer):
             # Load SSH keys for this user from the database
             async with db.session() as data:
                 user_keys = await data.ssh_key(asf_uid=username).all()
+                workflow_keys = await data.workflow_ssh_key(asf_uid=username).all()
+                now = int(time.time())
+                valid_workflow_keys = []
+                for workflow_key in workflow_keys:
+                    if workflow_key.expires > now:
+                        valid_workflow_keys.append(workflow_key)
 
-                if not user_keys:
+                if not (user_keys or valid_workflow_keys):
                     log.warning(f"No SSH keys found for user: {username}")
                     # Still require authentication, but it will fail
                     return True
@@ -82,6 +89,8 @@ class SSHServer(asyncssh.SSHServer):
                 auth_keys_lines = []
                 for user_key in user_keys:
                     auth_keys_lines.append(user_key.key)
+                for workflow_key in valid_workflow_keys:
+                    auth_keys_lines.append(workflow_key.key)
 
                 auth_keys_data = "\n".join(auth_keys_lines)
                 log.info(f"Loaded {len(user_keys)} SSH keys for user {username}")
