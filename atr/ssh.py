@@ -185,6 +185,7 @@ async def _step_02_handle_safely(process: asyncssh.SSHServerProcess) -> None:
         raise RsyncArgsError("No command specified")
 
     _output_stderr(process, f"Received command: {process.command}")
+    log.info(f"Received command: {process.command}")
     # TODO: Use shlex.split or similar if commands can contain quoted arguments
     argv = process.command.split()
 
