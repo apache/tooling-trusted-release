@@ -1,4 +1,4 @@
-FROM python:3.13.2-alpine3.21 AS builder
+FROM python:3.13.7-alpine3.22 AS builder
 
 ENV PIP_DEFAULT_TIMEOUT=100 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -26,7 +26,7 @@ RUN make sync
 RUN make generate-version
 
 # final image
-FROM python:3.13.2-alpine3.21
+FROM python:3.13.7-alpine3.22
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -42,6 +42,7 @@ RUN apk update && \
       curl \
       file \
       git \
+      go \
       gpg \
       gpg-agent \
       make \
@@ -78,9 +79,8 @@ RUN [ -f apache-rat-${RAT_VERSION}.jar ] || mv $(find . -maxdepth 1 -type f -nam
 RUN mv apache-rat-${RAT_VERSION}.jar /opt/tools
 RUN java -version
 
-# TODO: We should pin the syft version
-# RUN GOPATH=/usr/local go install github.com/anchore/syft/cmd/syft@latest
-RUN curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+RUN GOPATH=/usr/local go install github.com/anchore/syft/cmd/syft@v1.31.0
+# RUN curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 
 EXPOSE 4443
 
