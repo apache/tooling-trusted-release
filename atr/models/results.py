@@ -46,6 +46,51 @@ class SBOMGenerateCycloneDX(schema.Strict):
     msg: str = schema.description("The message from the SBOM generation")
 
 
+class SbomQsScore(schema.Strict):
+    category: str
+    feature: str
+    score: float | int
+    max_score: float | int
+    description: str
+    ignored: bool
+
+
+class SbomQsFile(schema.Strict):
+    file_name: str
+    spec: str
+    spec_version: str
+    file_format: str
+    avg_score: float | int
+    num_components: int
+    creation_time: str
+    gen_tool_name: str
+    gen_tool_version: str
+    scores: list[SbomQsScore]
+
+
+class SbomQsCreationInfo(schema.Strict):
+    name: str
+    version: str
+    scoring_engine_version: str
+    vendor: str
+
+
+class SbomQsReport(schema.Strict):
+    run_id: str
+    timestamp: str
+    creation_info: SbomQsCreationInfo
+    files: list[SbomQsFile]
+
+
+class SBOMQsScoreResult(schema.Strict):
+    kind: Literal["sbom_qs_score"] = schema.Field(alias="kind")
+    project_name: str = schema.description("Project name")
+    version_name: str = schema.description("Version name")
+    revision_number: str = schema.description("Revision number")
+    file_path: str = schema.description("Relative path to the scored SBOM file")
+    report: SbomQsReport
+
+
 class SvnImportFiles(schema.Strict):
     """Result of the task to import files from SVN."""
 
@@ -66,7 +111,7 @@ class VoteInitiate(schema.Strict):
 
 
 Results = Annotated[
-    HashingCheck | MessageSend | SBOMGenerateCycloneDX | SvnImportFiles | VoteInitiate,
+    HashingCheck | MessageSend | SBOMGenerateCycloneDX | SBOMQsScoreResult | SvnImportFiles | VoteInitiate,
     schema.Field(discriminator="kind"),
 ]
 

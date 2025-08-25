@@ -49,6 +49,21 @@ class SBOMGenerationError(Exception):
         self.details = details or {}
 
 
+class SBOMScoringError(Exception):
+    """Raised on a failure to score an SBOM."""
+
+    def __init__(self, msg: str, context: dict[str, Any] | None = None) -> None:
+        super().__init__(msg)
+        self.context = context if context is not None else {}
+
+
+class ScoreArgs(schema.Strict):
+    project_name: str = schema.description("Project name")
+    version_name: str = schema.description("Version name")
+    revision_number: str = schema.description("Revision number")
+    file_path: str = schema.description("Relative path to the SBOM file to score")
+
+
 @checks.with_model(GenerateCycloneDX)
 async def generate_cyclonedx(args: GenerateCycloneDX) -> results.Results | None:
     """Generate a CycloneDX SBOM for the given artifact and write it to the output path."""
@@ -65,6 +80,41 @@ async def generate_cyclonedx(args: GenerateCycloneDX) -> results.Results | None:
     except (archives.ExtractionError, SBOMGenerationError) as e:
         log.error(f"SBOM generation failed for {args.artifact_path}: {e}")
         raise
+
+
+@checks.with_model(ScoreArgs)
+async def score_qs(args: ScoreArgs) -> results.Results | None:
+    base_dir = util.get_unfinished_dir() / args.project_name / args.version_name / args.revision_number
+    if not os.path.isdir(base_dir):
+        raise SBOMScoringError("Revision directory does not exist", {"base_dir": str(base_dir)})
+    full_path = os.path.join(base_dir, args.file_path)
+    if not (full_path.endswith(".cdx.json") and os.path.isfile(full_path)):
+        raise SBOMScoringError("SBOM file does not exist", {"file_path": args.file_path})
+    proc = await asyncio.create_subprocess_exec(
+        "sbomqs",
+        "score",
+        os.path.basename(full_path),
+        "--json",
+        cwd=os.path.dirname(full_path),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    # TODO: Timeout should probably be a lot shorter
+    stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+    if proc.returncode != 0:
+        raise SBOMScoringError(
+            "sbomqs command failed",
+            {"returncode": proc.returncode, "stderr": stderr.decode("utf-8", "ignore")},
+        )
+    report_obj = results.SbomQsReport.model_validate(json.loads(stdout.decode("utf-8")))
+    return results.SBOMQsScoreResult(
+        kind="sbom_qs_score",
+        project_name=args.project_name,
+        version_name=args.version_name,
+        revision_number=args.revision_number,
+        file_path=args.file_path,
+        report=report_obj,
+    )
 
 
 async def _generate_cyclonedx_core(artifact_path: str, output_path: str) -> dict[str, Any]:

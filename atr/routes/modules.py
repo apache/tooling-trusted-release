@@ -35,6 +35,7 @@ import atr.routes.report as report
 import atr.routes.resolve as resolve
 import atr.routes.revisions as revisions
 import atr.routes.root as root
+import atr.routes.sbom as sbom
 import atr.routes.start as start
 import atr.routes.tokens as tokens
 import atr.routes.upload as upload

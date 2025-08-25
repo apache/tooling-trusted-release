@@ -79,6 +79,24 @@ async def draft_checks(
                 for task in await task_function(asf_uid, release, revision_number, path_str):
                     task.revision_number = revision_number
                     data.add(task)
+            # TODO: Should we check .json files for their content?
+            # Ideally we would not have to do that
+            if path.name.endswith(".cdx.json"):
+                data.add(
+                    queued(
+                        asf_uid,
+                        sql.TaskType.SBOM_QS_SCORE,
+                        release,
+                        revision_number,
+                        path_str,
+                        extra_args={
+                            "project_name": project_name,
+                            "version_name": release_version,
+                            "revision_number": revision_number,
+                            "file_path": path_str,
+                        },
+                    )
+                )
 
         is_podling = False
         if release.project.committee is not None:
@@ -154,6 +172,8 @@ def resolve(task_type: sql.TaskType) -> Callable[..., Awaitable[results.Results 
             return rat.check
         case sql.TaskType.SBOM_GENERATE_CYCLONEDX:
             return sbom.generate_cyclonedx
+        case sql.TaskType.SBOM_QS_SCORE:
+            return sbom.score_qs
         case sql.TaskType.SIGNATURE_CHECK:
             return signature.check
         case sql.TaskType.SVN_IMPORT_FILES:

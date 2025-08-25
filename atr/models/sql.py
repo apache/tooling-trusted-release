@@ -182,6 +182,7 @@ class TaskType(str, enum.Enum):
     PATHS_CHECK = "paths_check"
     RAT_CHECK = "rat_check"
     SBOM_GENERATE_CYCLONEDX = "sbom_generate_cyclonedx"
+    SBOM_QS_SCORE = "sbom_qs_score"
     SIGNATURE_CHECK = "signature_check"
     SVN_IMPORT_FILES = "svn_import_files"
     TARGZ_INTEGRITY = "targz_integrity"
