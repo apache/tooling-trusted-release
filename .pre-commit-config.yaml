@@ -1,90 +1,106 @@
+---
+# https://pre-commit.com/
+default_stages: [pre-commit, pre-push]
+default_language_version:
+  # force all unspecified Python hooks to run python3
+  python: python3
+minimum_pre_commit_version: "3.2.0"
 exclude: ^node_modules/
 repos:
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v5.0.0
-  hooks:
-    - id: check-ast
-    - id: check-case-conflict
-    - id: check-executables-have-shebangs
-    - id: check-illegal-windows-names
-    - id: check-merge-conflict
-    - id: check-shebang-scripts-are-executable
-    - id: check-toml
-    - id: check-vcs-permalinks
-    - id: check-yaml
-    - id: detect-private-key
-    - id: end-of-file-fixer
-    - id: fix-byte-order-marker
-    - id: forbid-submodules
-    - id: mixed-line-ending
-    - id: trailing-whitespace
-- repo: https://github.com/Lucas-C/pre-commit-hooks
-  rev: v1.5.5
-  hooks:
-    - id: insert-license
-      name: Add license for all Python files
-      files: ^(atr|scripts|tests)/(.*\.py$|.*\.pyi)$
-      args:
-        - --comment-style
-        - "|#|"
-        - --license-filepath
-        - scripts/ci/LICENSE-template.txt
-        - --fuzzy-match-generates-todo
-- repo: https://github.com/shellcheck-py/shellcheck-py
-  rev: v0.10.0.1
-  hooks:
-  -   id: shellcheck
-- repo: https://github.com/Riverside-Healthcare/djLint
-  rev: v1.36.4
-  hooks:
-    - id: djlint
-      files: "atr/templates/.*\\.html$"
-      types_or: ['html']
-      args:
-        - --profile=jinja
-        - --lint
-    - id: djlint
-      name: Format HTML templates
-      files: "atr/templates/.*\\.html$"
-      types_or: ['html']
-      args:
-        - --profile=jinja
-        - --reformat
-- repo: https://github.com/thibaudcolas/pre-commit-stylelint
-  rev: v16.14.1
-  hooks:
-    - id: stylelint
-      additional_dependencies: ['stylelint@16.14.1', 'stylelint-config-standard@37.0.0']
-      files: "atr/static/css/.*\\.css$"
-      exclude: "atr/static/css/bootstrap\\..*\\.css$|atr/static/css/bootstrap\\-.*\\.css$|atr/static/css/normalize\\.css$|atr/static/css/mermaid\\.min\\.css$"
-      types_or: ['css']
-      args: ['--fix']
-- repo: local
-  hooks:
-    - id: ruff
-      name: Ruff Linter
-      entry: uv run ruff check --fix
-      language: system
-      types: [python]
+  - repo: meta
+    hooks:
+      - id: identity
+        name: run identity
+        description: check your identity
+      - id: check-hooks-apply
+        name: run check-hooks-apply
+        description: check hooks apply to the repository
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-ast
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-illegal-windows-names
+      - id: check-merge-conflict
+      - id: check-shebang-scripts-are-executable
+      - id: check-toml
+      - id: check-vcs-permalinks
+      - id: check-yaml
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: forbid-submodules
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.5
+    hooks:
+      - id: insert-license
+        name: Add license for all Python files
+        files: ^(atr|scripts|tests)/.*\.pyi?$
+        args:
+          - --comment-style
+          - "|#|"
+          - --license-filepath
+          - scripts/ci/LICENSE-template.txt
+          - --fuzzy-match-generates-todo
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+    -   id: shellcheck
+  - repo: https://github.com/Riverside-Healthcare/djLint
+    rev: v1.36.4
+    hooks:
+      - id: djlint
+        files: "atr/templates/.*\\.html$"
+        types_or: ['html']
+        args:
+          - --profile=jinja
+          - --lint
+      - id: djlint
+        name: Format HTML templates
+        files: "atr/templates/.*\\.html$"
+        types_or: ['html']
+        args:
+          - --profile=jinja
+          - --reformat
+  - repo: https://github.com/thibaudcolas/pre-commit-stylelint
+    rev: v16.14.1
+    hooks:
+      - id: stylelint
+        additional_dependencies: ['stylelint@16.14.1', 'stylelint-config-standard@37.0.0']
+        files: "atr/static/css/.*\\.css$"
+        exclude: "atr/static/css/bootstrap\\..*\\.css$|atr/static/css/bootstrap\\-.*\\.css$|atr/static/css/normalize\\.css$|atr/static/css/mermaid\\.min\\.css$"
+        types_or: ['css']
+        args: ['--fix']
+  - repo: local
+    hooks:
+      - id: ruff
+        name: Ruff Linter
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
 
-    - id: ruff-format
-      name: Ruff Formatter
-      entry: uv run ruff format --force-exclude
-      language: system
-      types: [python]
+      - id: ruff-format
+        name: Ruff Formatter
+        entry: uv run ruff format --force-exclude
+        language: system
+        types: [python]
 
-    - id: pyright
-      name: Pyright Type Check
-      entry: uv run pyright
-      language: system
-      require_serial: true
-      types: [python]
-      exclude: ^tests/
+      - id: pyright
+        name: Pyright Type Check
+        entry: uv run pyright
+        language: system
+        require_serial: true
+        types: [python]
+        exclude: ^tests/
 
-    - id: jinja-route-check
-      name: Jinja Route Checker
-      description: Check whether routes used in Jinja2 templates actually exist
-      entry: uv run python scripts/lint/jinja_route_checker.py
-      language: system
-      pass_filenames: false
-      always_run: true
+      - id: jinja-route-check
+        name: Jinja Route Checker
+        description: Check whether routes used in Jinja2 templates actually exist
+        entry: uv run python scripts/lint/jinja_route_checker.py
+        language: system
+        pass_filenames: false
+        always_run: true
