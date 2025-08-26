@@ -128,5 +128,7 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "atr/analysis.py" = ["RUF001"]
 "atr/db/__init__.py" = ["C901"]
+"atr/models/cyclonedx/__init__.py" = ["N815"]
+"atr/models/cyclonedx/spdx.py" = ["N815"]
 "atr/routes/modules.py" = ["F401"]
 "migrations/env.py" = ["E402"]
