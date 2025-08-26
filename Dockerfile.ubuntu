@@ -91,10 +91,12 @@ RUN [ -f apache-rat-${RAT_VERSION}.jar ] || mv $(find . -maxdepth 1 -type f -nam
 RUN mv apache-rat-${RAT_VERSION}.jar /opt/tools
 RUN java -version
 
+# WORKDIR /var/run
 RUN GOPATH=/usr/local go install github.com/anchore/syft/cmd/syft@v1.31.0
 # RUN curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-RUN GOPATH=/usr/local go install github.com/interlynk-io/sbomasm@v1.0.6
-RUN GOPATH=/usr/local go install github.com/snyk/parlay@v0.9.0
+# RUN git clone https://github.com/sbp/sbomasm && cd sbomasm && GOPATH=/usr/local go install ./...
+# RUN GOPATH=/usr/local go install github.com/interlynk-io/sbomasm@v1.0.6
+# RUN GOPATH=/usr/local go install github.com/snyk/parlay@v0.9.0
 RUN GOPATH=/usr/local go install github.com/interlynk-io/sbomqs@v1.1.0
 
 EXPOSE 4443
