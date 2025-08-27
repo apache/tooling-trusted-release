@@ -41,7 +41,7 @@ def main(argv: list[str]) -> None:
     path = pathlib.Path(argv[1])
     try:
         data = path.read_text(encoding="utf-8")
-        _ = cyclonedx.CyclonedxBillOfMaterialsStandard.model_validate_json(data)
+        cyclonedx.CyclonedxBillOfMaterialsStandard.model_validate_json(data)
     except (OSError, pydantic.ValidationError, ValueError) as exc:
         sys.stderr.write(f"error: {exc}\n")
         sys.exit(1)
