@@ -23,6 +23,7 @@ import pathlib
 import sys
 
 import pydantic
+import yyjson
 
 
 class Lax(pydantic.BaseModel):
@@ -92,6 +93,9 @@ class MissingComponentProperty:
     index: int | None = None
 
 
+type Missing = MissingProperty | MissingComponentProperty
+
+
 def main() -> None:
     path = pathlib.Path(sys.argv[1])
     if err := simple_validate_path(path):
@@ -99,7 +103,7 @@ def main() -> None:
         sys.exit(1)
 
 
-def ntia_2021_conformant(bom: Bom) -> tuple[list[str], list[str]]:
+def ntia_2021_conformant(bom: Bom) -> tuple[list[Missing], list[Missing]]:
     # 1. Supplier
     # ECMA-424 1st edition says that this is the supplier of the primary component
     # Despite it being bom.metadata.supplier and not bom.metadata.component.supplier
@@ -132,8 +136,8 @@ def ntia_2021_conformant(bom: Bom) -> tuple[list[str], list[str]]:
     # NTIA 2021 only requires that this be present
     # It does not mandate a format
 
-    warnings = []
-    errors = []
+    warnings: list[Missing] = []
+    errors: list[Missing] = []
 
     if bom.metadata is not None:
         # 1. Supplier (Primary, despite appearing to be an SBOM property)
@@ -204,11 +208,34 @@ def simple_validate_path(path: pathlib.Path) -> None | str:
     except pydantic.ValidationError as e:
         return str(e)
 
+    doc = yyjson.Document(text)
+    patch_ops: list[dict] = []
     warnings, errors = ntia_2021_conformant(bom)
+    for error in errors:
+        match error:
+            case MissingProperty(property):
+                match property:
+                    case Property.METADATA_SUPPLIER:
+                        print("error: metadata.supplier")
+                        if doc.get_pointer("/metadata") is None:
+                            patch_ops.append({"op": "add", "path": "/metadata", "value": {}})
+                        patch_ops.append(
+                            {
+                                "op": "add",
+                                "path": "/metadata/supplier",
+                                "value": {"name": "The Apache Software Foundation"},
+                            }
+                        )
+                print(f"error: {property.name}")
+            case MissingComponentProperty(property, index):
+                print(f"error: {property.name} at index {index}")
+
     if warnings:
         print(f"warning: {warnings}")
-    if errors:
-        print(f"error: {errors}")
+    if patch_ops:
+        print("patch:", yyjson.Document(patch_ops).dumps())
+        merged = doc.patch(yyjson.Document(patch_ops))
+        print("merged:", merged.dumps())
 
 
 if __name__ == "__main__":
