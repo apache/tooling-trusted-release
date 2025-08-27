@@ -131,4 +131,5 @@ select = [
 "atr/models/cyclonedx/__init__.py" = ["N815"]
 "atr/models/cyclonedx/spdx.py" = ["N815"]
 "atr/routes/modules.py" = ["F401"]
+"atr/sbomtool.py" = ["C901"]
 "migrations/env.py" = ["E402"]
