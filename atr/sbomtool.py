@@ -21,6 +21,7 @@ import dataclasses
 import enum
 import pathlib
 import sys
+from typing import Any, Literal
 
 import pydantic
 import yyjson
@@ -28,6 +29,49 @@ import yyjson
 
 class Lax(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra="allow", strict=False)
+
+
+class Strict(pydantic.BaseModel):
+    model_config = pydantic.ConfigDict(extra="forbid", strict=True, validate_assignment=True)
+
+
+class AddOp(Strict):
+    op: Literal["add"]
+    path: str
+    value: Any
+
+
+class CopyOp(Strict):
+    op: Literal["copy"]
+    path: str
+    from_: str = pydantic.Field(alias="from")
+
+
+class MoveOp(Strict):
+    op: Literal["move"]
+    path: str
+    from_: str = pydantic.Field(alias="from")
+
+
+class RemoveOp(Strict):
+    op: Literal["remove"]
+    path: str
+
+
+class ReplaceOp(Strict):
+    op: Literal["replace"]
+    path: str
+    value: Any
+
+
+class TestOp(Strict):
+    op: Literal["test"]
+    path: str
+    value: Any
+
+
+type PatchOp = AddOp | RemoveOp | ReplaceOp | MoveOp | CopyOp | TestOp
+type Patch = list[PatchOp]
 
 
 class Swid(Lax):
@@ -96,14 +140,41 @@ class MissingComponentProperty:
 type Missing = MissingProperty | MissingComponentProperty
 
 
+@dataclasses.dataclass
+class Bundle:
+    doc: yyjson.Document
+    bom: Bom
+
+
+def bundle_to_patch(bundle: Bundle) -> Patch:
+    _warnings, errors = ntia_2021_conformance_issues(bundle.bom)
+    patch_ops = ntia_2021_conformance_patch(bundle.doc, errors)
+    return patch_ops
+
+
 def main() -> None:
-    path = pathlib.Path(sys.argv[1])
-    if err := simple_validate_path(path):
-        sys.stderr.write(f"error: {err}\n")
-        sys.exit(1)
+    path = pathlib.Path(sys.argv[2])
+    bundle = path_to_bundle(path)
+    patch_ops = bundle_to_patch(bundle)
+    match sys.argv[1]:
+        case "patch":
+            if patch_ops:
+                patch_data = patch_to_data(patch_ops)
+                print(yyjson.Document(patch_data).dumps())
+            else:
+                print("no patch needed")
+        case "merge":
+            if patch_ops:
+                patch_data = patch_to_data(patch_ops)
+                merged = bundle.doc.patch(yyjson.Document(patch_data))
+                print(merged.dumps())
+            else:
+                print(bundle.doc.dumps())
+        case "validate":
+            print(bundle.doc.dumps())
 
 
-def ntia_2021_conformant(bom: Bom) -> tuple[list[Missing], list[Missing]]:
+def ntia_2021_conformance_issues(bom: Bom) -> tuple[list[Missing], list[Missing]]:
     # 1. Supplier
     # ECMA-424 1st edition says that this is the supplier of the primary component
     # Despite it being bom.metadata.supplier and not bom.metadata.component.supplier
@@ -201,41 +272,38 @@ def ntia_2021_conformant(bom: Bom) -> tuple[list[Missing], list[Missing]]:
     return warnings, errors
 
 
-def simple_validate_path(path: pathlib.Path) -> None | str:
-    text = path.read_text(encoding="utf-8")
-    try:
-        bom = Bom.model_validate_json(text)
-    except pydantic.ValidationError as e:
-        return str(e)
-
-    doc = yyjson.Document(text)
-    patch_ops: list[dict] = []
-    warnings, errors = ntia_2021_conformant(bom)
+def ntia_2021_conformance_patch(doc: yyjson.Document, errors: list[Missing]) -> Patch:
+    patch: Patch = []
     for error in errors:
         match error:
             case MissingProperty(property):
                 match property:
                     case Property.METADATA_SUPPLIER:
-                        print("error: metadata.supplier")
+                        # print("error: metadata.supplier")
                         if doc.get_pointer("/metadata") is None:
-                            patch_ops.append({"op": "add", "path": "/metadata", "value": {}})
-                        patch_ops.append(
-                            {
-                                "op": "add",
-                                "path": "/metadata/supplier",
-                                "value": {"name": "The Apache Software Foundation"},
-                            }
+                            patch.append(AddOp(op="add", path="/metadata", value={}))
+                        patch.append(
+                            AddOp(
+                                op="add",
+                                path="/metadata/supplier",
+                                value={"name": "The Apache Software Foundation"},
+                            )
                         )
-                print(f"error: {property.name}")
-            case MissingComponentProperty(property, index):
-                print(f"error: {property.name} at index {index}")
+                # print(f"error: {property.name}")
+            case MissingComponentProperty(property, _index):
+                # print(f"error: {property.name} at index {index}")
+                ...
 
-    if warnings:
-        print(f"warning: {warnings}")
-    if patch_ops:
-        print("patch:", yyjson.Document(patch_ops).dumps())
-        merged = doc.patch(yyjson.Document(patch_ops))
-        print("merged:", merged.dumps())
+    return patch
+
+
+def patch_to_data(patch: Patch) -> list[dict[str, Any]]:
+    return [op.model_dump(by_alias=True, exclude_none=True) for op in patch]
+
+
+def path_to_bundle(path: pathlib.Path) -> Bundle:
+    text = path.read_text(encoding="utf-8")
+    return Bundle(doc=yyjson.Document(text), bom=Bom.model_validate_json(text))
 
 
 if __name__ == "__main__":
