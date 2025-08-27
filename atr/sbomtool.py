@@ -21,7 +21,9 @@ import dataclasses
 import datetime
 import enum
 import pathlib
+import subprocess
 import sys
+import tempfile
 from typing import Any, Literal
 
 import pydantic
@@ -149,6 +151,14 @@ class Bundle:
     bom: Bom
 
 
+class SBOMQSSummary(Lax):
+    total_score: float
+
+
+class SBOMQSReport(Lax):
+    summary: SBOMQSSummary
+
+
 def assemble_metadata_supplier(doc: yyjson.Document, patch: Patch) -> None:
     assemble_metadata(doc, patch)
     patch.append(
@@ -244,6 +254,16 @@ def bundle_to_patch(bundle: Bundle) -> Patch:
     return patch_ops
 
 
+def get_pointer(doc: yyjson.Document, path: str) -> Any | None:
+    try:
+        return doc.get_pointer(path)
+    except ValueError as e:
+        # TODO: This is not necessarily stable
+        if str(e) == "JSON pointer cannot be resolved":
+            return None
+        raise
+
+
 def main() -> None:
     path = pathlib.Path(sys.argv[2])
     bundle = path_to_bundle(path)
@@ -262,18 +282,15 @@ def main() -> None:
                 print(merged.dumps())
             else:
                 print(bundle.doc.dumps())
+        case "scores":
+            if patch_ops:
+                patch_data = patch_to_data(patch_ops)
+                merged = bundle.doc.patch(yyjson.Document(patch_data))
+                print(sbomqs_total_score(bundle.doc), "->", sbomqs_total_score(merged))
+            else:
+                print(sbomqs_total_score(bundle.doc))
         case "validate":
             print(bundle.doc.dumps())
-
-
-def get_pointer(doc: yyjson.Document, path: str) -> Any | None:
-    try:
-        return doc.get_pointer(path)
-    except ValueError as e:
-        # TODO: This is not necessarily stable
-        if str(e) == "JSON pointer cannot be resolved":
-            return None
-        raise
 
 
 def ntia_2021_conformance_issues(bom: Bom) -> tuple[list[Missing], list[Missing]]:
@@ -376,6 +393,7 @@ def ntia_2021_conformance_issues(bom: Bom) -> tuple[list[Missing], list[Missing]
 
 def ntia_2021_conformance_patch(doc: yyjson.Document, errors: list[Missing]) -> Patch:
     patch: Patch = []
+    # TODO: Add tool metadata
     for error in errors:
         match error:
             case MissingProperty(property):
@@ -392,16 +410,16 @@ def ntia_2021_conformance_patch(doc: yyjson.Document, errors: list[Missing]) -> 
                         assemble_metadata_timestamp(doc, patch)
                     case Property.DEPENDENCIES:
                         assemble_dependencies(doc, patch)
-            case MissingComponentProperty(property, _index):
+            case MissingComponentProperty(property, index):
                 match property:
-                    case ComponentProperty.SUPPLIER if _index is not None:
-                        assemble_component_supplier(doc, patch, _index)
-                    case ComponentProperty.NAME if _index is not None:
-                        assemble_component_name(doc, patch, _index)
-                    case ComponentProperty.VERSION if _index is not None:
-                        assemble_component_version(doc, patch, _index)
-                    case ComponentProperty.IDENTIFIER if _index is not None:
-                        assemble_component_identifier(doc, patch, _index)
+                    case ComponentProperty.SUPPLIER if index is not None:
+                        assemble_component_supplier(doc, patch, index)
+                    case ComponentProperty.NAME if index is not None:
+                        assemble_component_name(doc, patch, index)
+                    case ComponentProperty.VERSION if index is not None:
+                        assemble_component_version(doc, patch, index)
+                    case ComponentProperty.IDENTIFIER if index is not None:
+                        assemble_component_identifier(doc, patch, index)
     return patch
 
 
@@ -412,6 +430,30 @@ def patch_to_data(patch: Patch) -> list[dict[str, Any]]:
 def path_to_bundle(path: pathlib.Path) -> Bundle:
     text = path.read_text(encoding="utf-8")
     return Bundle(doc=yyjson.Document(text), bom=Bom.model_validate_json(text))
+
+
+def sbomqs_total_score(value: pathlib.Path | str | yyjson.Document) -> float:
+    args = ["sbomqs", "compliance", "--ntia", "--json"]
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json") as tf:
+        match value:
+            case yyjson.Document():
+                tf.write(value.dumps())
+            case pathlib.Path():
+                tf.write(pathlib.Path(value).read_text(encoding="utf-8"))
+            case str():
+                tf.write(value)
+        args.append(tf.name)
+
+        proc = subprocess.run(
+            args,
+            text=True,
+            capture_output=True,
+        )
+    if proc.returncode != 0:
+        err = proc.stderr.strip() or "sbomqs failed"
+        raise RuntimeError(err)
+    report = SBOMQSReport.model_validate_json(proc.stdout)
+    return report.summary.total_score
 
 
 if __name__ == "__main__":
