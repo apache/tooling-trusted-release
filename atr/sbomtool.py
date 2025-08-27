@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import enum
 import pathlib
 import sys
@@ -25,6 +26,8 @@ from typing import Any, Literal
 
 import pydantic
 import yyjson
+
+THE_APACHE_SOFTWARE_FOUNDATION = "The Apache Software Foundation"
 
 
 class Lax(pydantic.BaseModel):
@@ -146,6 +149,95 @@ class Bundle:
     bom: Bom
 
 
+def assemble_metadata_supplier(doc: yyjson.Document, patch: Patch) -> None:
+    assemble_metadata(doc, patch)
+    patch.append(
+        AddOp(
+            op="add",
+            path="/metadata/supplier",
+            value={"name": THE_APACHE_SOFTWARE_FOUNDATION},
+        )
+    )
+
+
+def assemble_metadata(doc: yyjson.Document, patch: Patch) -> None:
+    if get_pointer(doc, "/metadata") is None:
+        patch.append(
+            AddOp(
+                op="add",
+                path="/metadata",
+                value={},
+            )
+        )
+
+
+def assemble_metadata_component(doc: yyjson.Document, patch: Patch) -> None:
+    # This is a hard failure
+    # The SBOM is completely invalid, and there is no recovery
+    raise ValueError("metadata.component is required")
+
+
+def assemble_metadata_author(doc: yyjson.Document, patch: Patch) -> None:
+    assemble_metadata(doc, patch)
+    if get_pointer(doc, "/metadata/author") is None:
+        patch.append(
+            AddOp(
+                op="add",
+                path="/metadata/author",
+                value=THE_APACHE_SOFTWARE_FOUNDATION,
+            )
+        )
+
+
+def assemble_metadata_timestamp(doc: yyjson.Document, patch: Patch) -> None:
+    assemble_metadata(doc, patch)
+    if get_pointer(doc, "/metadata/timestamp") is None:
+        patch.append(
+            AddOp(
+                op="add",
+                path="/metadata/timestamp",
+                value=datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            )
+        )
+
+
+def assemble_dependencies(doc: yyjson.Document, patch: Patch) -> None:
+    # This is just a warning
+    # There is nothing we can do, but we should alert the user
+    pass
+
+
+def assemble_component_supplier(doc: yyjson.Document, patch: Patch, index: int) -> None:
+    # We need to detect whether this is an ASF component
+    # If it is, we can trivially fix it
+    # If not, this is much more difficult
+    add_op = AddOp(
+        op="add",
+        path=f"/components/{index}/supplier",
+        value={"name": THE_APACHE_SOFTWARE_FOUNDATION},
+    )
+    if get_pointer(doc, f"/components/{index}/publisher") == THE_APACHE_SOFTWARE_FOUNDATION:
+        patch.append(add_op)
+    elif bom_ref := get_pointer(doc, f"/components/{index}/bom-ref"):
+        if bom_ref.startswith("pkg:maven/org.apache."):
+            patch.append(add_op)
+
+
+def assemble_component_name(doc: yyjson.Document, patch: Patch, index: int) -> None:
+    # May be able to derive this from other fields
+    pass
+
+
+def assemble_component_version(doc: yyjson.Document, patch: Patch, index: int) -> None:
+    # May be able to derive this from other fields
+    pass
+
+
+def assemble_component_identifier(doc: yyjson.Document, patch: Patch, index: int) -> None:
+    # May be able to derive this from other fields
+    pass
+
+
 def bundle_to_patch(bundle: Bundle) -> Patch:
     _warnings, errors = ntia_2021_conformance_issues(bundle.bom)
     patch_ops = ntia_2021_conformance_patch(bundle.doc, errors)
@@ -172,6 +264,16 @@ def main() -> None:
                 print(bundle.doc.dumps())
         case "validate":
             print(bundle.doc.dumps())
+
+
+def get_pointer(doc: yyjson.Document, path: str) -> Any | None:
+    try:
+        return doc.get_pointer(path)
+    except ValueError as e:
+        # TODO: This is not necessarily stable
+        if str(e) == "JSON pointer cannot be resolved":
+            return None
+        raise
 
 
 def ntia_2021_conformance_issues(bom: Bom) -> tuple[list[Missing], list[Missing]]:
@@ -279,21 +381,27 @@ def ntia_2021_conformance_patch(doc: yyjson.Document, errors: list[Missing]) -> 
             case MissingProperty(property):
                 match property:
                     case Property.METADATA_SUPPLIER:
-                        # print("error: metadata.supplier")
-                        if doc.get_pointer("/metadata") is None:
-                            patch.append(AddOp(op="add", path="/metadata", value={}))
-                        patch.append(
-                            AddOp(
-                                op="add",
-                                path="/metadata/supplier",
-                                value={"name": "The Apache Software Foundation"},
-                            )
-                        )
-                # print(f"error: {property.name}")
+                        assemble_metadata_supplier(doc, patch)
+                    case Property.METADATA:
+                        assemble_metadata(doc, patch)
+                    case Property.METADATA_COMPONENT:
+                        assemble_metadata_component(doc, patch)
+                    case Property.METADATA_AUTHOR:
+                        assemble_metadata_author(doc, patch)
+                    case Property.METADATA_TIMESTAMP:
+                        assemble_metadata_timestamp(doc, patch)
+                    case Property.DEPENDENCIES:
+                        assemble_dependencies(doc, patch)
             case MissingComponentProperty(property, _index):
-                # print(f"error: {property.name} at index {index}")
-                ...
-
+                match property:
+                    case ComponentProperty.SUPPLIER if _index is not None:
+                        assemble_component_supplier(doc, patch, _index)
+                    case ComponentProperty.NAME if _index is not None:
+                        assemble_component_name(doc, patch, _index)
+                    case ComponentProperty.VERSION if _index is not None:
+                        assemble_component_version(doc, patch, _index)
+                    case ComponentProperty.IDENTIFIER if _index is not None:
+                        assemble_component_identifier(doc, patch, _index)
     return patch
 
 
