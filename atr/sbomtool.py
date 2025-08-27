@@ -30,6 +30,7 @@ import pydantic
 import yyjson
 
 THE_APACHE_SOFTWARE_FOUNDATION = "The Apache Software Foundation"
+VERSION = "0.0.1-dev1"
 
 
 class Lax(pydantic.BaseModel):
@@ -135,11 +136,19 @@ class ComponentProperty(enum.Enum):
 class MissingProperty:
     property: Property
 
+    def __str__(self) -> str:
+        return f"missing {self.property.name}"
+
 
 @dataclasses.dataclass
 class MissingComponentProperty:
     property: ComponentProperty
     index: int | None = None
+
+    def __str__(self) -> str:
+        if self.index is None:
+            return f"missing {self.property.name} in primary component"
+        return f"missing {self.property.name} in component {self.index}"
 
 
 type Missing = MissingProperty | MissingComponentProperty
@@ -161,11 +170,15 @@ class SBOMQSReport(Lax):
 
 def assemble_metadata_supplier(doc: yyjson.Document, patch: Patch) -> None:
     assemble_metadata(doc, patch)
+    # NOTE: The sbomqs tool requires a URL (or email) on a supplier
     patch.append(
         AddOp(
             op="add",
             path="/metadata/supplier",
-            value={"name": THE_APACHE_SOFTWARE_FOUNDATION},
+            value={
+                "name": THE_APACHE_SOFTWARE_FOUNDATION,
+                "url": ["https://apache.org/"],
+            },
         )
     )
 
@@ -194,7 +207,7 @@ def assemble_metadata_author(doc: yyjson.Document, patch: Patch) -> None:
             AddOp(
                 op="add",
                 path="/metadata/author",
-                value=THE_APACHE_SOFTWARE_FOUNDATION,
+                value=f"sbomtool v{VERSION}, by ASF Tooling",
             )
         )
 
@@ -221,16 +234,49 @@ def assemble_component_supplier(doc: yyjson.Document, patch: Patch, index: int) 
     # We need to detect whether this is an ASF component
     # If it is, we can trivially fix it
     # If not, this is much more difficult
-    add_op = AddOp(
-        op="add",
-        path=f"/components/{index}/supplier",
-        value={"name": THE_APACHE_SOFTWARE_FOUNDATION},
+    # NOTE: The sbomqs tool requires a URL (or email) on a supplier
+    def make_supplier_op(name: str, url: str) -> AddOp:
+        nonlocal index
+        return AddOp(
+            op="add",
+            path=f"/components/{index}/supplier",
+            value={
+                "name": name,
+                "url": [url],
+            },
+        )
+
+    add_asf_op = make_supplier_op(
+        THE_APACHE_SOFTWARE_FOUNDATION,
+        "https://apache.org/",
     )
+
     if get_pointer(doc, f"/components/{index}/publisher") == THE_APACHE_SOFTWARE_FOUNDATION:
-        patch.append(add_op)
-    elif bom_ref := get_pointer(doc, f"/components/{index}/bom-ref"):
+        patch.append(add_asf_op)
+        return
+
+    if purl := get_pointer(doc, f"/components/{index}/purl"):
+        if purl.startswith("pkg:maven/org.apache."):
+            patch.append(add_asf_op)
+            return
+
+    if group_id := get_pointer(doc, f"/components/{index}/group"):
+        if group_id.startswith("org.apache."):
+            patch.append(add_asf_op)
+            return
+        elif group_id.startswith("com.github."):
+            github_user = group_id.split(".", 2)[2]
+            add_github_op = make_supplier_op(
+                f"@github/{github_user}",
+                f"https://github.com/{github_user}",
+            )
+            patch.append(add_github_op)
+            return
+
+    if bom_ref := get_pointer(doc, f"/components/{index}/bom-ref"):
         if bom_ref.startswith("pkg:maven/org.apache."):
-            patch.append(add_op)
+            patch.append(add_asf_op)
+            return
 
 
 def assemble_component_name(doc: yyjson.Document, patch: Patch, index: int) -> None:
@@ -291,6 +337,31 @@ def main() -> None:
                 print(sbomqs_total_score(bundle.doc))
         case "validate":
             print(bundle.doc.dumps())
+        case "missing":
+            _warnings, errors = ntia_2021_conformance_issues(bundle.bom)
+            for error in errors:
+                print(error)
+            # for warning in warnings:
+            #     print(warning)
+        case "where":
+            _warnings, errors = ntia_2021_conformance_issues(bundle.bom)
+            for error in errors:
+                match error:
+                    case MissingProperty():
+                        print(f"metadata.{error.property.name}")
+                        print()
+                    case MissingComponentProperty():
+                        components = bundle.bom.components
+                        primary_component = bundle.bom.metadata and bundle.bom.metadata.component
+                        if (error.index is not None) and (components is not None):
+                            print(components[error.index].model_dump_json(indent=2))
+                            print()
+                        elif primary_component is not None:
+                            print(primary_component.model_dump_json(indent=2))
+                            print()
+        case _:
+            print(f"unknown command: {sys.argv[1]}")
+            sys.exit(1)
 
 
 def ntia_2021_conformance_issues(bom: Bom) -> tuple[list[Missing], list[Missing]]:
