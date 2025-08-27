@@ -470,7 +470,7 @@ class Dependency(BaseModel):
         ),
     ]
     dependsOn: Annotated[
-        set[RefLinkType] | None,
+        list[RefLinkType] | None,
         Field(
             description=(
                 "The bom-ref identifiers of the components or services that are dependencies of this dependency object."
@@ -479,7 +479,7 @@ class Dependency(BaseModel):
         ),
     ] = None
     provides: Annotated[
-        set[RefLinkType] | None,
+        list[RefLinkType] | None,
         Field(
             description=(
                 "The bom-ref identifiers of the components or services that define a given specification or standard,"
@@ -5311,7 +5311,7 @@ class Compositions(BaseModel):
         ),
     ]
     assemblies: Annotated[
-        set[RefLinkType | BomLinkElementType] | None,
+        list[RefLinkType | BomLinkElementType] | None,
         Field(
             description=(
                 "The bom-ref identifiers of the components or services being described. Assemblies refer to nested"
@@ -5322,7 +5322,7 @@ class Compositions(BaseModel):
         ),
     ] = None
     dependencies: Annotated[
-        set[StrictStr] | None,
+        list[StrictStr] | None,
         Field(
             description=(
                 "The bom-ref identifiers of the components or services being described. Dependencies refer to a"
@@ -5992,14 +5992,14 @@ class CyclonedxBillOfMaterialsStandard(BaseModel):
         ),
     ] = None
     components: Annotated[
-        set[Component] | None,
+        list[Component] | None,
         Field(
             description="A list of software and hardware components.",
             title="Components",
         ),
     ] = None
     services: Annotated[
-        set[Service] | None,
+        list[Service] | None,
         Field(
             description=(
                 "A list of services. This may include microservices, function-as-a-service, and other types of network"
@@ -6020,7 +6020,7 @@ class CyclonedxBillOfMaterialsStandard(BaseModel):
         ),
     ] = None
     dependencies: Annotated[
-        set[Dependency] | None,
+        list[Dependency] | None,
         Field(
             description=(
                 "Provides the ability to document dependency relationships including provided & implemented components."
@@ -6029,7 +6029,7 @@ class CyclonedxBillOfMaterialsStandard(BaseModel):
         ),
     ] = None
     compositions: Annotated[
-        set[Compositions] | None,
+        list[Compositions] | None,
         Field(
             description=(
                 "Compositions describe constituent parts (including components, services, and dependency relationships)"
@@ -6039,14 +6039,14 @@ class CyclonedxBillOfMaterialsStandard(BaseModel):
         ),
     ] = None
     vulnerabilities: Annotated[
-        set[Vulnerability] | None,
+        list[Vulnerability] | None,
         Field(
             description="Vulnerabilities identified in components or services.",
             title="Vulnerabilities",
         ),
     ] = None
     annotations: Annotated[
-        set[Annotations] | None,
+        list[Annotations] | None,
         Field(
             description=(
                 "Comments made by people, organizations, or tools about any object with a bom-ref, such as components,"
@@ -6116,14 +6116,14 @@ class Tools(BaseModel):
         extra="forbid",
     )
     components: Annotated[
-        set[Component] | None,
+        list[Component] | None,
         Field(
             description="A list of software and hardware components used as tools.",
             title="Components",
         ),
     ] = None
     services: Annotated[
-        set[Service] | None,
+        list[Service] | None,
         Field(
             description=(
                 "A list of services used as tools. This may include microservices, function-as-a-service, and other"
