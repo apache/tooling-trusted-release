@@ -24,12 +24,16 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 from typing import Any, Literal
 
 import pydantic
 import yyjson
 
 THE_APACHE_SOFTWARE_FOUNDATION = "The Apache Software Foundation"
+# TODO: Simple cache to avoid rate limiting, not thread safe
+CACHE_PATH = pathlib.Path("/tmp/sbomtool-cache.json")
 VERSION = "0.0.1-dev1"
 
 
@@ -278,6 +282,50 @@ def assemble_component_supplier(doc: yyjson.Document, patch: Patch, index: int) 
             patch.append(add_asf_op)
             return
 
+    if purl and purl.startswith("pkg:maven/"):
+        package_version = purl.removeprefix("pkg:maven/").rsplit("?", 1)[0]
+        package, version = package_version.rsplit("@", 1)
+        package = package.replace("/", ":")
+        key = f"{package} / {version}"
+
+        def supplier_op_from_url(url: str) -> AddOp:
+            if url.startswith("https://github.com/"):
+                github_user = url.removeprefix("https://github.com/").split("/", 1)[0]
+                return make_supplier_op(f"@github/{github_user}", f"https://github.com/{github_user}")
+            return make_supplier_op(url, url)
+
+        cache: dict[str, Any] = maven_cache_read()
+
+        if key in cache:
+            cached = cache[key]
+            if cached is None:
+                return
+            if isinstance(cached, str) and cached:
+                patch.append(supplier_op_from_url(cached))
+            return
+
+        url = f"https://api.deps.dev/v3/systems/MAVEN/packages/{package}/versions/{version}"
+        try:
+            with urllib.request.urlopen(url) as response:
+                data = yyjson.Document(response.read())
+        except urllib.error.HTTPError:
+            cache[key] = None
+            maven_cache_write(cache)
+            return
+        links = get_pointer(data, "/links") or []
+        homepage = None
+        for i, link in enumerate(links):
+            if isinstance(link, dict) and link.get("label") == "HOMEPAGE":
+                homepage = link.get("url")
+                break
+        if homepage:
+            patch.append(supplier_op_from_url(homepage))
+            cache[key] = homepage
+        else:
+            cache[key] = None
+        maven_cache_write(cache)
+        return
+
 
 def assemble_component_name(doc: yyjson.Document, patch: Patch, index: int) -> None:
     # May be able to derive this from other fields
@@ -362,6 +410,22 @@ def main() -> None:
         case _:
             print(f"unknown command: {sys.argv[1]}")
             sys.exit(1)
+
+
+def maven_cache_read() -> dict[str, Any]:
+    try:
+        with open(CACHE_PATH) as f:
+            return yyjson.load(f)
+    except Exception:
+        return {}
+
+
+def maven_cache_write(cache: dict[str, Any]) -> None:
+    try:
+        with open(CACHE_PATH, "w") as f:
+            yyjson.dump(cache, f)
+    except Exception:
+        pass
 
 
 def ntia_2021_conformance_issues(bom: Bom) -> tuple[list[Missing], list[Missing]]:
