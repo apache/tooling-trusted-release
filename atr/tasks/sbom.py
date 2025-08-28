@@ -22,12 +22,14 @@ import pathlib
 from typing import Any, Final
 
 import aiofiles
+import yyjson
 
 import atr.archives as archives
 import atr.config as config
 import atr.log as log
 import atr.models.results as results
 import atr.models.schema as schema
+import atr.revision as revision
 import atr.sbomtool as sbomtool
 import atr.tasks.checks as checks
 import atr.tasks.checks.targz as targz
@@ -59,11 +61,45 @@ class SBOMScoringError(Exception):
         self.context = context if context is not None else {}
 
 
-class ScoreArgs(schema.Strict):
+class FileArgs(schema.Strict):
     project_name: str = schema.description("Project name")
     version_name: str = schema.description("Version name")
     revision_number: str = schema.description("Revision number")
-    file_path: str = schema.description("Relative path to the SBOM file to score")
+    file_path: str = schema.description("Relative path to the SBOM file")
+    asf_uid: str | None = None
+
+
+@checks.with_model(FileArgs)
+async def augment(args: FileArgs) -> results.Results | None:
+    base_dir = util.get_unfinished_dir() / args.project_name / args.version_name / args.revision_number
+    if not os.path.isdir(base_dir):
+        raise SBOMScoringError("Revision directory does not exist", {"base_dir": str(base_dir)})
+    full_path = os.path.join(base_dir, args.file_path)
+    if not (full_path.endswith(".cdx.json") and os.path.isfile(full_path)):
+        raise SBOMScoringError("SBOM file does not exist", {"file_path": args.file_path})
+    # Read from the old revision
+    bundle = sbomtool.path_to_bundle(pathlib.Path(full_path))
+    patch_ops = sbomtool.bundle_to_patch(bundle)
+    new_full_path: str | None = None
+    if patch_ops:
+        patch_data = sbomtool.patch_to_data(patch_ops)
+        merged = bundle.doc.patch(yyjson.Document(patch_data))
+        description = "SBOM augmentation through web interface"
+        async with revision.create_and_manage(
+            args.project_name, args.version_name, args.asf_uid or "unknown", description=description
+        ) as creating:
+            new_full_path = os.path.join(str(creating.interim_path), args.file_path)
+            # Write to the new revision
+            async with aiofiles.open(new_full_path, "w", encoding="utf-8") as f:
+                await f.write(merged.dumps())
+
+        if creating.new is None:
+            raise RuntimeError("Internal error: New revision not found")
+
+    return results.SBOMAugment(
+        kind="sbom_augment",
+        path=(new_full_path if new_full_path is not None else full_path),
+    )
 
 
 @checks.with_model(GenerateCycloneDX)
@@ -84,8 +120,8 @@ async def generate_cyclonedx(args: GenerateCycloneDX) -> results.Results | None:
         raise
 
 
-@checks.with_model(ScoreArgs)
-async def score_qs(args: ScoreArgs) -> results.Results | None:
+@checks.with_model(FileArgs)
+async def score_qs(args: FileArgs) -> results.Results | None:
     base_dir = util.get_unfinished_dir() / args.project_name / args.version_name / args.revision_number
     if not os.path.isdir(base_dir):
         raise SBOMScoringError("Revision directory does not exist", {"base_dir": str(base_dir)})
@@ -109,7 +145,7 @@ async def score_qs(args: ScoreArgs) -> results.Results | None:
             {"returncode": proc.returncode, "stderr": stderr.decode("utf-8", "ignore")},
         )
     report_obj = results.SbomQsReport.model_validate(json.loads(stdout.decode("utf-8")))
-    return results.SBOMQsScoreResult(
+    return results.SBOMQsScore(
         kind="sbom_qs_score",
         project_name=args.project_name,
         version_name=args.version_name,
@@ -119,8 +155,8 @@ async def score_qs(args: ScoreArgs) -> results.Results | None:
     )
 
 
-@checks.with_model(ScoreArgs)
-async def score_tool(args: ScoreArgs) -> results.Results | None:
+@checks.with_model(FileArgs)
+async def score_tool(args: FileArgs) -> results.Results | None:
     base_dir = util.get_unfinished_dir() / args.project_name / args.version_name / args.revision_number
     if not os.path.isdir(base_dir):
         raise SBOMScoringError("Revision directory does not exist", {"base_dir": str(base_dir)})
@@ -129,7 +165,7 @@ async def score_tool(args: ScoreArgs) -> results.Results | None:
         raise SBOMScoringError("SBOM file does not exist", {"file_path": args.file_path})
     bundle = sbomtool.path_to_bundle(pathlib.Path(full_path))
     warnings, errors = sbomtool.ntia_2021_conformance_issues(bundle.bom)
-    return results.SBOMToolScoreResult(
+    return results.SBOMToolScore(
         kind="sbom_tool_score",
         project_name=args.project_name,
         version_name=args.version_name,
@@ -144,6 +180,7 @@ async def _generate_cyclonedx_core(artifact_path: str, output_path: str) -> dict
     """Core logic to generate CycloneDX SBOM on failure."""
     log.info(f"Generating CycloneDX SBOM for {artifact_path} -> {output_path}")
 
+    # TODO: Should create a new revision here rather than in the caller
     async with util.async_temporary_directory(prefix="cyclonedx_sbom_") as temp_dir:
         log.info(f"Created temporary directory: {temp_dir}")
 

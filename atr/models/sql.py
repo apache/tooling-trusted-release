@@ -181,6 +181,7 @@ class TaskType(str, enum.Enum):
     MESSAGE_SEND = "message_send"
     PATHS_CHECK = "paths_check"
     RAT_CHECK = "rat_check"
+    SBOM_AUGMENT = "sbom_augment"
     SBOM_GENERATE_CYCLONEDX = "sbom_generate_cyclonedx"
     SBOM_QS_SCORE = "sbom_qs_score"
     SBOM_TOOL_SCORE = "sbom_tool_score"

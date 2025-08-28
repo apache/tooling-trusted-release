@@ -17,18 +17,92 @@
 
 from __future__ import annotations
 
+import datetime
 import json
+import pathlib
+from typing import TYPE_CHECKING
 
 import asfquart.base as base
 import htpy
+import markupsafe
+import quart
 
 import atr.db as db
+import atr.forms as forms
 import atr.htm as htm
+import atr.log as log
 import atr.models.results as results
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.sbomtool as sbomtool
+import atr.tasks as tasks
 import atr.template as template
+import atr.util as util
+
+if TYPE_CHECKING:
+    import werkzeug.wrappers.response as response
+
+
+@routes.committer("/sbom/augment/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+async def augment(
+    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
+) -> response.Response:
+    """Augment a CycloneDX SBOM file."""
+    await session.check_access(project_name)
+
+    await util.validate_empty_form()
+    rel_path = pathlib.Path(file_path)
+
+    # Check that the file is a .cdx.json archive before creating a revision
+    if not (file_path.endswith(".cdx.json")):
+        raise base.ASFQuartException("SBOM augmentation is only supported for .cdx.json files", errorcode=400)
+
+    try:
+        async with db.session() as data:
+            release = await data.release(project_name=project_name, version=version_name).demand(
+                RuntimeError("Release does not exist for new revision creation")
+            )
+            revision_number = release.latest_revision_number
+            if revision_number is None:
+                raise RuntimeError("No revision number found for new revision creation")
+            log.info(f"Augmenting SBOM for {project_name} {version_name} {revision_number} {rel_path}")
+            sbom_task = sql.Task(
+                task_type=sql.TaskType.SBOM_AUGMENT,
+                task_args=tasks.sbom.FileArgs(
+                    project_name=project_name,
+                    version_name=version_name,
+                    revision_number=revision_number,
+                    file_path=str(rel_path),
+                    asf_uid=util.unwrap(session.uid),
+                ).model_dump(),
+                asf_uid=util.unwrap(session.uid),
+                added=datetime.datetime.now(datetime.UTC),
+                status=sql.TaskStatus.QUEUED,
+                project_name=project_name,
+                version_name=version_name,
+                revision_number=revision_number,
+            )
+            data.add(sbom_task)
+            await data.commit()
+            await data.refresh(sbom_task)
+
+    except Exception as e:
+        log.exception("Error augmenting SBOM:")
+        await quart.flash(f"Error augmenting SBOM: {e!s}", "error")
+        return await session.redirect(
+            report,
+            project=project_name,
+            version=version_name,
+            file_path=str(rel_path),
+        )
+
+    return await session.redirect(
+        report,
+        success=f"SBOM augmentation task queued for {rel_path.name} (task ID: {util.unwrap(sbom_task.id)})",
+        project=project_name,
+        version=version_name,
+        file_path=str(rel_path),
+    )
 
 
 @routes.committer("/sbom/report/<project>/<version>/<path:file_path>")
@@ -53,11 +127,12 @@ async def report(session: routes.CommitterSession, project: str, version: str, f
     block.h1["SBOM report"]
 
     if not tasks:
+        # TODO: Show task if the score is being computed
         block.p["No SBOM score found."]
         return await template.blank("SBOM report", content=block.collect())
 
     task_result = tasks[0].result
-    if not isinstance(task_result, results.SBOMToolScoreResult):
+    if not isinstance(task_result, results.SBOMToolScore):
         raise base.ASFQuartException("Invalid SBOM score result", errorcode=500)
     warnings = [sbomtool.MissingAdapter.validate_python(json.loads(w)) for w in task_result.warnings]
     errors = [sbomtool.MissingAdapter.validate_python(json.loads(e)) for e in task_result.errors]
@@ -68,6 +143,23 @@ async def report(session: routes.CommitterSession, project: str, version: str, f
         guideline to the quality of your SBOM file. It currently
         checks for NTIA 2021 minimum data field conformance."""
     ]
+
+    empty_form = await forms.Empty.create_form()
+    # TODO: Show the status if the task to augment the SBOM is still running
+    # TODO: Add a field to the SBOM to show that it's been augmented
+    # And then don't allow it to be augmented again
+    action = util.as_url(
+        augment,
+        project_name=project,
+        version_name=version,
+        file_path=file_path,
+    )
+    block.append(
+        htpy.form("", action=action, method="post")[
+            markupsafe.Markup(str(empty_form.hidden_tag())),
+            htpy.button(".btn.btn-primary", type="submit")["Augment SBOM"],
+        ]
+    )
 
     if warnings:
         block.h2["Warnings"]

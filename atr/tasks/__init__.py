@@ -94,6 +94,7 @@ async def draft_checks(
                             "version_name": release_version,
                             "revision_number": revision_number,
                             "file_path": path_str,
+                            "asf_uid": asf_uid,
                         },
                     )
                 )
@@ -170,6 +171,8 @@ def resolve(task_type: sql.TaskType) -> Callable[..., Awaitable[results.Results 
             return paths.check
         case sql.TaskType.RAT_CHECK:
             return rat.check
+        case sql.TaskType.SBOM_AUGMENT:
+            return sbom.augment
         case sql.TaskType.SBOM_GENERATE_CYCLONEDX:
             return sbom.generate_cyclonedx
         case sql.TaskType.SBOM_QS_SCORE:
