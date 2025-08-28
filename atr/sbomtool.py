@@ -293,6 +293,9 @@ def assemble_component_supplier(doc: yyjson.Document, patch: Patch, index: int) 
         if purl.startswith("pkg:maven/org.apache."):
             patch.append(add_asf_op)
             return
+        if purl.startswith("pkg:maven/com.atlassian."):
+            patch.append(make_supplier_op("Atlassian", "https://www.atlassian.com/"))
+            return
 
     if group_id := get_pointer(doc, f"/components/{index}/group"):
         if group_id.startswith("org.apache."):
