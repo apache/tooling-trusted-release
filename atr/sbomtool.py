@@ -26,7 +26,7 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import pydantic
 import yyjson
@@ -36,13 +36,29 @@ THE_APACHE_SOFTWARE_FOUNDATION = "The Apache Software Foundation"
 CACHE_PATH = pathlib.Path("/tmp/sbomtool-cache.json")
 VERSION = "0.0.1-dev1"
 
+# We include some sections from other files to make this standalone
 
+# # FROM atr/models/basic.py
+# type JSON = pydantic.JsonValue
+
+# _JSON_TYPE_ADAPTER: Final[pydantic.TypeAdapter[JSON]] = pydantic.TypeAdapter(JSON)
+
+
+# def as_json(value: Any) -> JSON:
+#     return _JSON_TYPE_ADAPTER.validate_python(value)
+# # END FROM
+
+
+# FROM atr/models/schema.py
 class Lax(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra="allow", strict=False)
 
 
 class Strict(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra="forbid", strict=True, validate_assignment=True)
+
+
+# END FROM
 
 
 class AddOp(Strict):
@@ -136,16 +152,24 @@ class ComponentProperty(enum.Enum):
     IDENTIFIER = enum.auto()
 
 
-@dataclasses.dataclass
-class MissingProperty:
+class MissingProperty(Strict):
+    # __match_args__ = ("property",)
+    # __match_args__: ClassVar[tuple[str, ...]] = cast("Any", ("property",))
+    kind: Literal["missing_property"] = "missing_property"
     property: Property
 
     def __str__(self) -> str:
         return f"missing {self.property.name}"
 
+    @pydantic.field_validator("property", mode="before")
+    @classmethod
+    def _coerce_property(cls, v: Any) -> Property:
+        return v if isinstance(v, Property) else Property(v)
 
-@dataclasses.dataclass
-class MissingComponentProperty:
+
+class MissingComponentProperty(Strict):
+    # __match_args__ = ("property", "index")
+    kind: Literal["missing_component_property"] = "missing_component_property"
     property: ComponentProperty
     index: int | None = None
 
@@ -154,8 +178,14 @@ class MissingComponentProperty:
             return f"missing {self.property.name} in primary component"
         return f"missing {self.property.name} in component {self.index}"
 
+    @pydantic.field_validator("property", mode="before")
+    @classmethod
+    def _coerce_component_property(cls, v: Any) -> ComponentProperty:
+        return v if isinstance(v, ComponentProperty) else ComponentProperty(v)
 
-type Missing = MissingProperty | MissingComponentProperty
+
+Missing = Annotated[MissingProperty | MissingComponentProperty, pydantic.Field(discriminator="kind")]
+MissingAdapter = pydantic.TypeAdapter(Missing)
 
 
 @dataclasses.dataclass
@@ -486,17 +516,17 @@ def ntia_2021_conformance_issues(bom: Bom) -> tuple[list[Missing], list[Missing]
             if cpe_is_none and purl_is_none and swid_is_none:
                 warnings.append(MissingComponentProperty(property=ComponentProperty.IDENTIFIER))
         else:
-            errors.append(MissingProperty(Property.METADATA_COMPONENT))
+            errors.append(MissingProperty(property=Property.METADATA_COMPONENT))
 
         # 6. Author of SBOM Data (Secondary)
         if bom.metadata.author is None:
-            errors.append(MissingProperty(Property.METADATA_AUTHOR))
+            errors.append(MissingProperty(property=Property.METADATA_AUTHOR))
 
         # 7. Timestamp (Secondary)
         if bom.metadata.timestamp is None:
-            errors.append(MissingProperty(Property.METADATA_TIMESTAMP))
+            errors.append(MissingProperty(property=Property.METADATA_TIMESTAMP))
     else:
-        errors.append(MissingProperty(Property.METADATA))
+        errors.append(MissingProperty(property=Property.METADATA))
 
     for i, component in enumerate(bom.components or []):
         # 1. Supplier (Secondary)
@@ -521,7 +551,7 @@ def ntia_2021_conformance_issues(bom: Bom) -> tuple[list[Missing], list[Missing]
 
     # 5. Dependency Relationship (Secondary)
     if not bom.dependencies:
-        warnings.append(MissingProperty(Property.DEPENDENCIES))
+        warnings.append(MissingProperty(property=Property.DEPENDENCIES))
 
     return warnings, errors
 
@@ -531,7 +561,7 @@ def ntia_2021_conformance_patch(doc: yyjson.Document, errors: list[Missing]) -> 
     # TODO: Add tool metadata
     for error in errors:
         match error:
-            case MissingProperty(property):
+            case MissingProperty(property=property):
                 match property:
                     case Property.METADATA_SUPPLIER:
                         assemble_metadata_supplier(doc, patch)
@@ -545,7 +575,7 @@ def ntia_2021_conformance_patch(doc: yyjson.Document, errors: list[Missing]) -> 
                         assemble_metadata_timestamp(doc, patch)
                     case Property.DEPENDENCIES:
                         assemble_dependencies(doc, patch)
-            case MissingComponentProperty(property, index):
+            case MissingComponentProperty(property=property, index=index):
                 match property:
                     case ComponentProperty.SUPPLIER if index is not None:
                         assemble_component_supplier(doc, patch, index)

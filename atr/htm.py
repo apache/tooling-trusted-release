@@ -30,7 +30,7 @@ class BlockElementGetable:
         self.block = block
         self.element = element
 
-    def __getitem__(self, *items: htpy.Element | str) -> htpy.Element:
+    def __getitem__(self, *items: htpy.Element | str | tuple[htpy.Element | str, ...]) -> htpy.Element:
         element = self.element[*items]
         for i in range(len(self.block.elements) - 1, -1, -1):
             if self.block.elements[i] is self.element:

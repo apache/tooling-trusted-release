@@ -135,8 +135,8 @@ async def score_tool(args: ScoreArgs) -> results.Results | None:
         version_name=args.version_name,
         revision_number=args.revision_number,
         file_path=args.file_path,
-        warnings=[str(w) for w in warnings],
-        errors=[str(e) for e in errors],
+        warnings=[w.model_dump_json() for w in warnings],
+        errors=[e.model_dump_json() for e in errors],
     )
 
 
