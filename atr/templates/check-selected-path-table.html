@@ -65,6 +65,10 @@
                   <button type="submit" class="btn btn-sm btn-outline-primary">Import keys</button>
                 </form>
               {% endif %}
+              {% if path.suffixes[-2:] == [".cdx", ".json"] %}
+                <a href="{{ as_url(routes.sbom.report, project=project_name, version=version_name, file_path=path) }}"
+                   class="btn btn-sm btn-outline-secondary">Show SBOM</a>
+              {% endif %}
               {% if has_errors %}
                 <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                    class="btn btn-sm btn-outline-danger"><i class="bi bi-exclamation-triangle me-1"></i> Show {{ info.errors[path]|length }} {{ "error" if info.errors[path]|length == 1 else "errors" }}</a>

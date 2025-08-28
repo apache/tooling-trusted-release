@@ -18,6 +18,7 @@
 import asyncio
 import json
 import os
+import pathlib
 from typing import Any, Final
 
 import aiofiles
@@ -27,6 +28,7 @@ import atr.config as config
 import atr.log as log
 import atr.models.results as results
 import atr.models.schema as schema
+import atr.sbomtool as sbomtool
 import atr.tasks.checks as checks
 import atr.tasks.checks.targz as targz
 import atr.util as util
@@ -114,6 +116,27 @@ async def score_qs(args: ScoreArgs) -> results.Results | None:
         revision_number=args.revision_number,
         file_path=args.file_path,
         report=report_obj,
+    )
+
+
+@checks.with_model(ScoreArgs)
+async def score_tool(args: ScoreArgs) -> results.Results | None:
+    base_dir = util.get_unfinished_dir() / args.project_name / args.version_name / args.revision_number
+    if not os.path.isdir(base_dir):
+        raise SBOMScoringError("Revision directory does not exist", {"base_dir": str(base_dir)})
+    full_path = os.path.join(base_dir, args.file_path)
+    if not (full_path.endswith(".cdx.json") and os.path.isfile(full_path)):
+        raise SBOMScoringError("SBOM file does not exist", {"file_path": args.file_path})
+    bundle = sbomtool.path_to_bundle(pathlib.Path(full_path))
+    warnings, errors = sbomtool.ntia_2021_conformance_issues(bundle.bom)
+    return results.SBOMToolScoreResult(
+        kind="sbom_tool_score",
+        project_name=args.project_name,
+        version_name=args.version_name,
+        revision_number=args.revision_number,
+        file_path=args.file_path,
+        warnings=[str(w) for w in warnings],
+        errors=[str(e) for e in errors],
     )
 
 

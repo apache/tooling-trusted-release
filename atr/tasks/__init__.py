@@ -85,7 +85,7 @@ async def draft_checks(
                 data.add(
                     queued(
                         asf_uid,
-                        sql.TaskType.SBOM_QS_SCORE,
+                        sql.TaskType.SBOM_TOOL_SCORE,
                         release,
                         revision_number,
                         path_str,
@@ -174,6 +174,8 @@ def resolve(task_type: sql.TaskType) -> Callable[..., Awaitable[results.Results 
             return sbom.generate_cyclonedx
         case sql.TaskType.SBOM_QS_SCORE:
             return sbom.score_qs
+        case sql.TaskType.SBOM_TOOL_SCORE:
+            return sbom.score_tool
         case sql.TaskType.SIGNATURE_CHECK:
             return signature.check
         case sql.TaskType.SVN_IMPORT_FILES:

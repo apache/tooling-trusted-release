@@ -91,6 +91,16 @@ class SBOMQsScoreResult(schema.Strict):
     report: SbomQsReport
 
 
+class SBOMToolScoreResult(schema.Strict):
+    kind: Literal["sbom_tool_score"] = schema.Field(alias="kind")
+    project_name: str = schema.description("Project name")
+    version_name: str = schema.description("Version name")
+    revision_number: str = schema.description("Revision number")
+    file_path: str = schema.description("Relative path to the scored SBOM file")
+    warnings: list[str] = schema.description("Warnings from the SBOM tool")
+    errors: list[str] = schema.description("Errors from the SBOM tool")
+
+
 class SvnImportFiles(schema.Strict):
     """Result of the task to import files from SVN."""
 
@@ -111,7 +121,13 @@ class VoteInitiate(schema.Strict):
 
 
 Results = Annotated[
-    HashingCheck | MessageSend | SBOMGenerateCycloneDX | SBOMQsScoreResult | SvnImportFiles | VoteInitiate,
+    HashingCheck
+    | MessageSend
+    | SBOMGenerateCycloneDX
+    | SBOMQsScoreResult
+    | SBOMToolScoreResult
+    | SvnImportFiles
+    | VoteInitiate,
     schema.Field(discriminator="kind"),
 ]
 

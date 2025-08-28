@@ -38,75 +38,40 @@ async def report(session: routes.CommitterSession, project: str, version: str, f
             await data.task(
                 project_name=project,
                 version_name=version,
-                task_type=sql.TaskType.SBOM_QS_SCORE,
+                task_type=sql.TaskType.SBOM_TOOL_SCORE,
                 status=sql.TaskStatus.COMPLETED,
                 primary_rel_path=file_path,
             )
             .order_by(sql.sqlmodel.desc(via(sql.Task.completed)))
             .all()
         )
-    if not tasks:
-        raise base.ASFQuartException("SBOM score not found", errorcode=404)
-    task_result = tasks[0].result
-    if not isinstance(task_result, results.SBOMQsScoreResult):
-        raise base.ASFQuartException("Invalid SBOM score result", errorcode=500)
-    report_obj = task_result.report
 
     block = htm.Block()
     block.h1["SBOM report"]
 
-    summary_tbody = htpy.tbody[
-        _tr("Run ID", report_obj.run_id),
-        _tr("Timestamp", report_obj.timestamp),
-        _tr("Tool", report_obj.creation_info.name),
-        _tr("Tool version", report_obj.creation_info.version),
-        _tr("Engine version", report_obj.creation_info.scoring_engine_version),
-        _tr("Vendor", report_obj.creation_info.vendor),
+    if not tasks:
+        block.p["No SBOM score found."]
+        return await template.blank("SBOM report", content=block.collect())
+
+    task_result = tasks[0].result
+    if not isinstance(task_result, results.SBOMToolScoreResult):
+        raise base.ASFQuartException("Invalid SBOM score result", errorcode=500)
+    warnings = task_result.warnings
+    errors = task_result.errors
+
+    block.p[
+        """This is a report by the sbomtool, for debugging and
+        informational purposes. Please use it only as an approximate
+        guideline to the quality of your SBOM file. It currently
+        checks for NTIA 2021 minimum data field conformance."""
     ]
-    block.h2["Summary"]
-    block.table(".table.table-striped.table-bordered")[summary_tbody]
 
-    block.h2["Files"]
-    for fr in report_obj.files:
-        block.h3[fr.file_name]
-        file_tbody = htpy.tbody[
-            _tr("Spec", fr.spec),
-            _tr("Spec version", fr.spec_version),
-            _tr("Format", fr.file_format),
-            _tr("Avg score", str(fr.avg_score)),
-            _tr("Components", str(fr.num_components)),
-            _tr("Creation time", fr.creation_time),
-            _tr("Generator", fr.gen_tool_name),
-            _tr("Generator version", fr.gen_tool_version),
-        ]
-        block.table(".table.table-striped.table-bordered")[file_tbody]
+    if warnings:
+        block.h2["Warnings"]
+        block.ul[*[htpy.li[w] for w in warnings]]
 
-        header = htpy.thead[
-            htpy.tr[
-                htpy.th["Category"],
-                htpy.th["Feature"],
-                htpy.th["Score"],
-                htpy.th["Max"],
-                htpy.th["Ignored"],
-            ]
-        ]
-        rows = [
-            htpy.tr[
-                htpy.td[s.category],
-                htpy.td[s.feature],
-                htpy.td[str(s.score)],
-                htpy.td[str(s.max_score)],
-                htpy.td["Yes" if s.ignored else "No"],
-            ]
-            for s in fr.scores
-        ]
-        table_block = htm.Block(htpy.table(".table.table-striped.table-bordered"))
-        table_block.append(header)
-        table_block.append(htpy.tbody[*rows])
-        block.append(table_block.collect())
+    if errors:
+        block.h2["Errors"]
+        block.ul[*[htpy.li[e] for e in errors]]
 
     return await template.blank("SBOM report", content=block.collect())
-
-
-def _tr(label: str, value: str) -> htpy.Element:
-    return htpy.tr[htpy.th[label], htpy.td[value]]
