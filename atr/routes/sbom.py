@@ -143,6 +143,7 @@ async def report(session: routes.CommitterSession, project: str, version: str, f
         guideline to the quality of your SBOM file. It currently
         checks for NTIA 2021 minimum data field conformance."""
     ]
+    block.p["This report is for revision ", htpy.code[task_result.revision_number], "."]
 
     empty_form = await forms.Empty.create_form()
     # TODO: Show the status if the task to augment the SBOM is still running
