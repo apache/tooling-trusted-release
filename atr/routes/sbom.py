@@ -170,6 +170,10 @@ async def report(session: routes.CommitterSession, project: str, version: str, f
         block.h2["Errors"]
         _missing_table(block, errors)
 
+    if not (warnings or errors):
+        block.h2["Results"]
+        block.p["No NTIA 2021 minimum data field conformance warnings or errors found."]
+
     return await template.blank("SBOM report", content=block.collect())
 
 

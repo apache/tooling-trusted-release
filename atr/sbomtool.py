@@ -27,15 +27,27 @@ import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 
 import pydantic
 import yyjson
 
-THE_APACHE_SOFTWARE_FOUNDATION = "The Apache Software Foundation"
 # TODO: Simple cache to avoid rate limiting, not thread safe
 CACHE_PATH = pathlib.Path("/tmp/sbomtool-cache.json")
-VERSION = "0.0.1-dev1"
+KNOWN_PURL_PREFIXES: Final[dict[str, tuple[str, str]]] = {
+    "pkg:maven/com.atlassian.": ("Atlassian", "https://www.atlassian.com/"),
+    "pkg:maven/concurrent/concurrent@": (
+        "Dough Lea",
+        "http://gee.cs.oswego.edu/dl/classes/EDU/oswego/cs/dl/util/concurrent/intro.html",
+    ),
+}
+KNOWN_PURL_SUPPLIERS: Final[dict[tuple[str, str], tuple[str, str]]] = {
+    ("pkg:maven", "jakarta-regexp"): ("The Apache Software Foundation", "https://apache.org/"),
+    ("pkg:maven", "javax.servlet.jsp"): ("Sun Microsystems", "https://sun.com/"),
+    ("pkg:maven", "org.osgi"): ("OSGi Working Group, The Eclipse Foundation", "https://www.osgi.org/"),
+}
+THE_APACHE_SOFTWARE_FOUNDATION: Final[str] = "The Apache Software Foundation"
+VERSION: Final[str] = "0.0.1-dev1"
 
 # We include some sections from other files to make this standalone
 
@@ -291,12 +303,15 @@ def assemble_component_supplier(doc: yyjson.Document, patch: Patch, index: int) 
         return
 
     if purl := get_pointer(doc, f"/components/{index}/purl"):
-        if purl.startswith("pkg:maven/org.apache."):
-            patch.append(add_asf_op)
+        prefix = tuple(purl.split("/", 2)[:2])
+        if prefix in KNOWN_PURL_SUPPLIERS:
+            supplier, url = KNOWN_PURL_SUPPLIERS[prefix]
+            patch.append(make_supplier_op(supplier, url))
             return
-        if purl.startswith("pkg:maven/com.atlassian."):
-            patch.append(make_supplier_op("Atlassian", "https://www.atlassian.com/"))
-            return
+        for prefix, (supplier, url) in KNOWN_PURL_PREFIXES.items():
+            if purl.startswith(prefix):
+                patch.append(make_supplier_op(supplier, url))
+                return
 
     if group_id := get_pointer(doc, f"/components/{index}/group"):
         if group_id.startswith("org.apache."):
