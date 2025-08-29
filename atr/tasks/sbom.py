@@ -22,6 +22,7 @@ import pathlib
 from typing import Any, Final
 
 import aiofiles
+import aiofiles.os
 import yyjson
 
 import atr.archives as archives
@@ -90,6 +91,8 @@ async def augment(args: FileArgs) -> results.Results | None:
         ) as creating:
             new_full_path = os.path.join(str(creating.interim_path), args.file_path)
             # Write to the new revision
+            log.info(f"Writing augmented SBOM to {new_full_path}")
+            await aiofiles.os.remove(new_full_path)
             async with aiofiles.open(new_full_path, "w", encoding="utf-8") as f:
                 await f.write(merged.dumps())
 
