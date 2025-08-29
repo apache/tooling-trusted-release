@@ -180,7 +180,7 @@ async def report(session: routes.CommitterSession, project: str, version: str, f
 def _missing_table(block: htm.Block, items: list[sbomtool.Missing]) -> None:
     warning_rows = [
         htpy.tr[
-            htpy.td[kind],
+            htpy.td[kind.upper()],
             htpy.td[prop],
             htpy.td[str(count)],
         ]

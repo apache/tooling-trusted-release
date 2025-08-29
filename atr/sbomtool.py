@@ -40,10 +40,12 @@ KNOWN_PURL_PREFIXES: Final[dict[str, tuple[str, str]]] = {
         "Dough Lea",
         "http://gee.cs.oswego.edu/dl/classes/EDU/oswego/cs/dl/util/concurrent/intro.html",
     ),
+    "pkg:maven/net.shibboleth.": ("The Shibboleth Consortium", "https://www.shibboleth.net/"),
 }
 KNOWN_PURL_SUPPLIERS: Final[dict[tuple[str, str], tuple[str, str]]] = {
     ("pkg:maven", "jakarta-regexp"): ("The Apache Software Foundation", "https://apache.org/"),
     ("pkg:maven", "javax.servlet.jsp"): ("Sun Microsystems", "https://sun.com/"),
+    ("pkg:maven", "org.opensaml"): ("The Shibboleth Consortium", "https://www.shibboleth.net/"),
     ("pkg:maven", "org.osgi"): ("OSGi Working Group, The Eclipse Foundation", "https://www.osgi.org/"),
 }
 THE_APACHE_SOFTWARE_FOUNDATION: Final[str] = "The Apache Software Foundation"
