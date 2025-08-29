@@ -25,6 +25,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Annotated, Any, Literal
 
@@ -325,6 +326,12 @@ def assemble_component_supplier(doc: yyjson.Document, patch: Patch, index: int) 
             if url.startswith("https://github.com/"):
                 github_user = url.removeprefix("https://github.com/").split("/", 1)[0]
                 return make_supplier_op(f"@github/{github_user}", f"https://github.com/{github_user}")
+            domain = urllib.parse.urlparse(url).netloc
+            if domain.endswith(".github.io"):
+                github_user = domain.removesuffix(".github.io")
+                return make_supplier_op(f"@github/{github_user}", f"https://github.com/{github_user}")
+            if ("//" in url) and (url.count("/") == 2):
+                url += "/"
             return make_supplier_op(url, url)
 
         cache: dict[str, Any] = maven_cache_read()
