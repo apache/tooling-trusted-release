@@ -18,6 +18,7 @@
 import asyncio
 import pathlib
 import re
+from typing import Final
 
 import aiofiles.os
 
@@ -28,7 +29,14 @@ import atr.tasks.checks as checks
 import atr.user as user
 import atr.util as util
 
-_ALLOWED_TOP_LEVEL = {"CHANGES", "LICENSE", "NOTICE", "README"}
+_ALLOWED_TOP_LEVEL: Final = frozenset(
+    {
+        "CHANGES",
+        "LICENSE",
+        "NOTICE",
+        "README",
+    }
+)
 
 
 async def check(args: checks.FunctionArguments) -> results.Results | None:
@@ -147,7 +155,7 @@ async def _check_metadata_rules(
     # not be provided, unless named as indicated above." (RDP)
     # Also .mds is allowed, but we'll ignore that for now
     # TODO: Is .mds supported in analysis.METADATA_SUFFIXES?
-    if ext_metadata not in {".asc", ".sha256", ".sha512", ".md5", ".sha", ".sha1"}:
+    if ext_metadata not in {".asc", ".cdx.json", ".sha256", ".sha512", ".md5", ".sha", ".sha1"}:
         warnings.append("The use of this metadata file is discouraged")
 
     # Check whether the corresponding artifact exists

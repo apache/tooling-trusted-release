@@ -68,6 +68,8 @@ METADATA_SUFFIXES: Final[list[str]] = [
     "asc.sha1",
     "asc.sha256",
     "asc.sha512",
+    "cdx.json",
+    "cdx.xml",
     "sha512.asc",
     "sha512.md5",
     "sha512.sha1",
