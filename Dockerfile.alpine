@@ -71,6 +71,7 @@ ENV RAT_VERSION=0.16.1
 RUN mkdir -p /opt/tools
 RUN mkdir -p /tmp/apache-rat
 WORKDIR /tmp/apache-rat
+# TODO: Check hash
 RUN curl -L https://dlcdn.apache.org/creadur/apache-rat-${RAT_VERSION}/apache-rat-${RAT_VERSION}-bin.tar.gz -o apache-rat.tar.gz
 RUN tar -xzf apache-rat.tar.gz
 RUN find apache-rat-${RAT_VERSION} -type f -name "*.jar" -exec cp {} . \;
@@ -86,6 +87,11 @@ RUN GOPATH=/usr/local go install github.com/anchore/syft/cmd/syft@v1.31.0
 # RUN GOPATH=/usr/local go install github.com/interlynk-io/sbomasm@v1.0.6
 RUN GOPATH=/usr/local go install github.com/snyk/parlay@v0.9.0
 RUN GOPATH=/usr/local go install github.com/interlynk-io/sbomqs@v1.1.0
+
+ENV CDXCLI_VERSION=0.29.1
+# TODO: Check hash
+RUN curl -L https://github.com/CycloneDX/cyclonedx-cli/releases/download/v{CDXCLI_VERSION}/cyclonedx-linux-musl-x64 \
+    -o /usr/local/bin/cyclonedx
 
 EXPOSE 4443
 

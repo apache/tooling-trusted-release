@@ -330,6 +330,7 @@ OutdatedAdapter = pydantic.TypeAdapter(Outdated)
 class Bundle:
     doc: yyjson.Document
     bom: Bom
+    path: pathlib.Path
     text: str
 
 
@@ -578,8 +579,8 @@ def main() -> None:
                 print(sbomqs_total_score(bundle.doc), "->", sbomqs_total_score(merged))
             else:
                 print(sbomqs_total_score(bundle.doc))
-        case "validate":
-            errors = validate_cyclonedx_json(bundle)
+        case "validate-atr":
+            errors = validate_cyclonedx_atr(bundle)
             if not errors:
                 print("valid")
             else:
@@ -588,8 +589,18 @@ def main() -> None:
                     if i > 10:
                         print("...")
                         break
-        case "validate-atr":
-            errors = validate_atr(bundle)
+        case "validate-cli":
+            errors = validate_cyclonedx_cli(bundle)
+            if not errors:
+                print("valid")
+            else:
+                for i, e in enumerate(errors):
+                    print(e)
+                    if i > 25:
+                        print("...")
+                        break
+        case "validate-py":
+            errors = validate_cyclonedx_py(bundle)
             if not errors:
                 print("valid")
             else:
@@ -848,7 +859,7 @@ def patch_to_data(patch: Patch) -> list[dict[str, Any]]:
 
 def path_to_bundle(path: pathlib.Path) -> Bundle:
     text = path.read_text(encoding="utf-8")
-    return Bundle(doc=yyjson.Document(text), bom=Bom.model_validate_json(text), text=text)
+    return Bundle(doc=yyjson.Document(text), bom=Bom.model_validate_json(text), path=path, text=text)
 
 
 def sbomqs_total_score(value: pathlib.Path | str | yyjson.Document) -> float:
@@ -875,7 +886,7 @@ def sbomqs_total_score(value: pathlib.Path | str | yyjson.Document) -> float:
     return report.summary.total_score
 
 
-def validate_atr(bundle: Bundle) -> Iterable[Any] | None:
+def validate_cyclonedx_atr(bundle: Bundle) -> Iterable[Any] | None:
     if models_cyclonedx is None:
         raise RuntimeError("models_cyclonedx is not loaded")
     try:
@@ -885,7 +896,28 @@ def validate_atr(bundle: Bundle) -> Iterable[Any] | None:
     return None
 
 
-def validate_cyclonedx_json(bundle: Bundle) -> Iterable[cyclonedx.validation.json.JsonValidationError] | None:
+def validate_cyclonedx_cli(bundle: Bundle) -> Iterable[Any] | None:
+    args = [
+        "cyclonedx",
+        "validate",
+        "--fail-on-errors",
+        "--input-format",
+        "json",
+        "--input-file",
+        bundle.path.as_posix(),
+    ]
+    proc = subprocess.run(
+        args,
+        text=True,
+        capture_output=True,
+    )
+    if proc.returncode != 0:
+        err = proc.stdout.strip() or proc.stderr.strip() or "cyclonedx failed"
+        return err.splitlines()
+    return None
+
+
+def validate_cyclonedx_py(bundle: Bundle) -> Iterable[cyclonedx.validation.json.JsonValidationError] | None:
     json_sv = get_pointer(bundle.doc, "/specVersion")
     sv = cyclonedx.schema.SchemaVersion.V1_6
     if isinstance(json_sv, str):
