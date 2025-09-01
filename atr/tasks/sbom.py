@@ -168,6 +168,7 @@ async def score_tool(args: FileArgs) -> results.Results | None:
         raise SBOMScoringError("SBOM file does not exist", {"file_path": args.file_path})
     bundle = sbomtool.path_to_bundle(pathlib.Path(full_path))
     warnings, errors = sbomtool.ntia_2021_conformance_issues(bundle.bom)
+    outdated = sbomtool.maven_plugin_outdated_version(bundle.bom)
     return results.SBOMToolScore(
         kind="sbom_tool_score",
         project_name=args.project_name,
@@ -176,6 +177,7 @@ async def score_tool(args: FileArgs) -> results.Results | None:
         file_path=args.file_path,
         warnings=[w.model_dump_json() for w in warnings],
         errors=[e.model_dump_json() for e in errors],
+        outdated=outdated.model_dump_json() if outdated else None,
     )
 
 

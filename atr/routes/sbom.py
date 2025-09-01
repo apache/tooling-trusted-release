@@ -111,6 +111,7 @@ async def report(session: routes.CommitterSession, project: str, version: str, f
     await session.release(project, version)
     async with db.session() as data:
         via = sql.validate_instrumented_attribute
+        # TODO: Abstract this code and the sbomtool.MissingAdapter validators
         tasks = (
             await data.task(
                 project_name=project,
@@ -140,8 +141,8 @@ async def report(session: routes.CommitterSession, project: str, version: str, f
     block.p[
         """This is a report by the sbomtool, for debugging and
         informational purposes. Please use it only as an approximate
-        guideline to the quality of your SBOM file. It currently
-        checks for NTIA 2021 minimum data field conformance."""
+        guideline to the quality of your SBOM file. It checks for NTIA 2021
+        minimum data field conformance."""
     ]
     block.p["This report is for revision ", htpy.code[task_result.revision_number], "."]
 
@@ -173,6 +174,26 @@ async def report(session: routes.CommitterSession, project: str, version: str, f
     if not (warnings or errors):
         block.h2["Results"]
         block.p["No NTIA 2021 minimum data field conformance warnings or errors found."]
+
+    outdated = None
+    if task_result.outdated:
+        outdated = sbomtool.OutdatedAdapter.validate_python(json.loads(task_result.outdated))
+    block.h2["Outdated tool"]
+    if outdated:
+        if outdated.kind == "tool":
+            block.p[
+                f"""The CycloneDX Maven Plugin is outdated. The used version is
+                {outdated.used_version} and the available version is
+                {outdated.available_version}."""
+            ]
+        else:
+            block.p[
+                f"""There was a problem with the SBOM detected when trying to
+                determine if the CycloneDX Maven Plugin is outdated:
+                {outdated.kind.upper()}."""
+            ]
+    else:
+        block.p["No outdated tool found."]
 
     return await template.blank("SBOM report", content=block.collect())
 

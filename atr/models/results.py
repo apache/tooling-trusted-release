@@ -104,6 +104,7 @@ class SBOMToolScore(schema.Strict):
     file_path: str = schema.description("Relative path to the scored SBOM file")
     warnings: list[str] = schema.description("Warnings from the SBOM tool")
     errors: list[str] = schema.description("Errors from the SBOM tool")
+    outdated: str | None = schema.description("Outdated tool from the SBOM tool")
 
 
 class SvnImportFiles(schema.Strict):
