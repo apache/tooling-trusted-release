@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+
 from __future__ import annotations
 
 import dataclasses
@@ -47,6 +48,62 @@ KNOWN_PURL_SUPPLIERS: Final[dict[tuple[str, str], tuple[str, str]]] = {
     ("pkg:maven", "javax.servlet.jsp"): ("Sun Microsystems", "https://sun.com/"),
     ("pkg:maven", "org.opensaml"): ("The Shibboleth Consortium", "https://www.shibboleth.net/"),
     ("pkg:maven", "org.osgi"): ("OSGi Working Group, The Eclipse Foundation", "https://www.osgi.org/"),
+}
+# TODO: Manually updated for now
+# Use GITHUB_TOKEN=... uv run python3 scripts/github_tag_dates.py CycloneDX/cyclonedx-maven-plugin
+MAVEN_PLUGIN_VERSIONS: Final[dict[str, str]] = {
+    "2024-11-28T21:29:12Z": "2.9.1",
+    "2024-10-08T04:31:11Z": "2.9.0",
+    "2024-09-25T20:08:34Z": "2.8.2",
+    "2024-08-03T22:37:32Z": "2.8.1",
+    "2024-03-23T12:35:22Z": "2.8.0",
+    "2024-01-16T08:02:43Z": "2.7.11",
+    "2023-10-30T00:44:15Z": "2.7.10",
+    "2023-05-16T18:58:36Z": "2.7.9",
+    "2023-04-25T19:47:56Z": "2.7.8",
+    "2023-04-17T22:41:32Z": "2.7.7",
+    "2023-03-30T21:58:15Z": "2.7.6",
+    "2023-02-15T23:43:55Z": "2.7.5",
+    "2023-01-04T20:24:45Z": "2.7.4",
+    "2022-11-10T07:37:12Z": "2.7.3",
+    "2022-10-10T14:23:53Z": "2.7.2",
+    "2022-07-20T04:23:22Z": "2.7.1",
+    "2022-05-26T13:55:36Z": "2.7.0",
+    "2022-05-03T14:19:50Z": "2.6.2",
+    "2022-05-03T02:39:34Z": "2.6.1",
+    "2022-04-30T05:28:10Z": "2.6.0",
+    "2021-09-03T02:00:01Z": "2.5.3",
+    "2021-08-19T05:29:24Z": "2.5.2",
+    "2021-05-17T06:09:59Z": "2.5.1",
+    "2021-05-16T06:14:27Z": "2.5.0",
+    "2021-04-09T04:58:23Z": "2.4.1",
+    "2021-04-01T04:09:47Z": "2.4.0",
+    "2021-03-05T03:12:42Z": "2.3.0",
+    "2021-01-30T23:42:19Z": "2.2.0",
+    "2020-11-19T04:57:18Z": "2.1.1",
+    "2020-10-12T20:09:06Z": "2.1.0",
+    "2020-08-11T03:36:18Z": "2.0.3",
+    "2020-07-20T01:41:20Z": "2.0.2",
+    "2020-07-15T16:42:24Z": "2.0.1",
+    "2020-07-14T03:45:56Z": "2.0.0",
+    "2020-02-07T04:38:47Z": "1.6.4",
+    "2020-02-01T04:51:27Z": "1.6.3",
+    "2020-01-27T23:45:33Z": "1.6.2",
+    "2020-01-24T21:33:32Z": "1.6.1",
+    "2020-01-08T05:33:32Z": "1.6.0",
+    "2019-11-26T21:07:06Z": "1.5.1",
+    "2019-11-20T05:13:32Z": "1.5.0",
+    "2019-06-19T16:41:47Z": "1.4.1",
+    "2019-06-08T05:04:41Z": "1.4.0",
+    "2019-01-02T20:44:14Z": "1.3.1",
+    "2018-12-05T01:56:08Z": "1.3.0",
+    "2018-11-28T00:27:19Z": "1.2.0",
+    "2018-11-09T04:28:00Z": "1.1.3",
+    "2018-07-25T20:54:37Z": "1.1.2",
+    "2018-07-18T02:59:25Z": "1.1.1",
+    "2018-06-07T04:20:23Z": "1.1.0",
+    "2018-05-24T23:24:10Z": "1.0.1",
+    "2018-05-02T16:34:05Z": "1.0.0",
 }
 THE_APACHE_SOFTWARE_FOUNDATION: Final[str] = "The Apache Software Foundation"
 VERSION: Final[str] = "0.0.1-dev1"
@@ -133,11 +190,27 @@ class Component(Lax):
     swid: Swid | None = None
 
 
+class ToolComponent(Lax):
+    name: str | None = None
+    version: str | None = None
+
+
+class Tool(Lax):
+    vendor: str | None = None
+    name: str | None = None
+    version: str | None = None
+
+
+class Tools(Lax):
+    components: list[ToolComponent] | None = None
+
+
 class Metadata(Lax):
     author: str | None = None
     timestamp: str | None = None
     supplier: Supplier | None = None
     component: Component | None = None
+    tools: Tools | list[Tool] | None = None
 
 
 class Dependency(Lax):
@@ -165,6 +238,9 @@ class ComponentProperty(enum.Enum):
     NAME = enum.auto()
     VERSION = enum.auto()
     IDENTIFIER = enum.auto()
+
+
+# Missing* is for NTIA 2021 conformance only
 
 
 class MissingProperty(Strict):
@@ -201,6 +277,36 @@ class MissingComponentProperty(Strict):
 
 Missing = Annotated[MissingProperty | MissingComponentProperty, pydantic.Field(discriminator="kind")]
 MissingAdapter = pydantic.TypeAdapter(Missing)
+
+
+# Outdated* is for any outdated tool
+
+
+class OutdatedTool(Strict):
+    kind: Literal["tool"] = "tool"
+    name: str
+    used_version: str
+    available_version: str
+
+
+class OutdatedMissingMetadata(Strict):
+    kind: Literal["missing_metadata"] = "missing_metadata"
+
+
+class OutdatedMissingTimestamp(Strict):
+    kind: Literal["missing_timestamp"] = "missing_timestamp"
+
+
+class OutdatedMissingVersion(Strict):
+    kind: Literal["missing_version"] = "missing_version"
+    name: str
+
+
+Outdated = Annotated[
+    OutdatedTool | OutdatedMissingMetadata | OutdatedMissingTimestamp | OutdatedMissingVersion,
+    pydantic.Field(discriminator="kind"),
+]
+OutdatedAdapter = pydantic.TypeAdapter(Outdated)
 
 
 @dataclasses.dataclass
@@ -418,22 +524,36 @@ def get_pointer(doc: yyjson.Document, path: str) -> Any | None:
 def main() -> None:
     path = pathlib.Path(sys.argv[2])
     bundle = path_to_bundle(path)
-    patch_ops = bundle_to_patch(bundle)
     match sys.argv[1]:
-        case "patch":
-            if patch_ops:
-                patch_data = patch_to_data(patch_ops)
-                print(yyjson.Document(patch_data).dumps())
-            else:
-                print("no patch needed")
         case "merge":
+            patch_ops = bundle_to_patch(bundle)
             if patch_ops:
                 patch_data = patch_to_data(patch_ops)
                 merged = bundle.doc.patch(yyjson.Document(patch_data))
                 print(merged.dumps())
             else:
                 print(bundle.doc.dumps())
+        case "missing":
+            _warnings, errors = ntia_2021_conformance_issues(bundle.bom)
+            for error in errors:
+                print(error)
+            # for warning in warnings:
+            #     print(warning)
+        case "outdated":
+            outdated = maven_plugin_outdated_version(bundle.bom)
+            if outdated:
+                print(outdated)
+            else:
+                print("no outdated tool found")
+        case "patch":
+            patch_ops = bundle_to_patch(bundle)
+            if patch_ops:
+                patch_data = patch_to_data(patch_ops)
+                print(yyjson.Document(patch_data).dumps())
+            else:
+                print("no patch needed")
         case "scores":
+            patch_ops = bundle_to_patch(bundle)
             if patch_ops:
                 patch_data = patch_to_data(patch_ops)
                 merged = bundle.doc.patch(yyjson.Document(patch_data))
@@ -442,12 +562,6 @@ def main() -> None:
                 print(sbomqs_total_score(bundle.doc))
         case "validate":
             print(bundle.doc.dumps())
-        case "missing":
-            _warnings, errors = ntia_2021_conformance_issues(bundle.bom)
-            for error in errors:
-                print(error)
-            # for warning in warnings:
-            #     print(warning)
         case "where":
             _warnings, errors = ntia_2021_conformance_issues(bundle.bom)
             for error in errors:
@@ -485,6 +599,76 @@ def maven_cache_write(cache: dict[str, Any]) -> None:
         pass
 
 
+def maven_plugin_outdated_version(bom: Bom) -> Outdated | None:
+    # Need to search for the CycloneDX Maven Plugin
+    # metadata.tools.components[].name == "cyclonedx-maven-plugin"
+    # We check the version against when the SBOM was generated
+    # This is just a warning, of course
+    if bom.metadata is None:
+        return OutdatedMissingMetadata()
+    if bom.metadata.timestamp is None:
+        # This quite often isn't available
+        # We could use the file mtime, but that's extremely heuristic
+        return OutdatedMissingTimestamp()
+    tools = []
+    t = bom.metadata.tools
+    if isinstance(t, list):
+        tools = t
+    elif t:
+        tools = t.components or []
+    for tool in tools:
+        if tool.name != "cyclonedx-maven-plugin":
+            continue
+        if tool.version is None:
+            return OutdatedMissingVersion(name=tool.name)
+        available_version = maven_plugin_outdated_version_core(bom.metadata.timestamp, tool.version)
+        if available_version is not None:
+            return OutdatedTool(
+                name=tool.name,
+                used_version=tool.version,
+                available_version=available_version,
+            )
+    return None
+
+
+def maven_plugin_outdated_version_core(isotime: str, version: str) -> str | None:
+    expected_version = maven_version_as_of(isotime)
+    if expected_version is None:
+        return None
+    if version == expected_version:
+        return None
+    expected_version_comparable = maven_version_parse(expected_version)
+    version_comparable = maven_version_parse(version)
+    # If the version used is less than the version available
+    if version_comparable < expected_version_comparable:
+        # Then note the version available
+        return expected_version
+    # Otherwise, the user is using the latest version
+    return None
+
+
+def maven_version_as_of(isotime: str) -> str | None:
+    # Given these mappings:
+    # {
+    #     t3: v3
+    #     t2: v2
+    #     t1: v1
+    # }
+    # If the input is after t3, then the output is v3
+    # If the input is between t2 and t1, then the output is v2
+    # If the input is between t1 and t2, then the output is v1
+    # If the input is before t1, then the output is None
+    for date, version in sorted(MAVEN_PLUGIN_VERSIONS.items(), reverse=True):
+        if isotime >= date:
+            return version
+    return None
+
+
+def maven_version_parse(version: str) -> tuple[int, int, int]:
+    parts = version.split(".")
+    return int(parts[0]), int(parts[1]), int(parts[2])
+
+
 def ntia_2021_conformance_issues(bom: Bom) -> tuple[list[Missing], list[Missing]]:
     # 1. Supplier
     # ECMA-424 1st edition says that this is the supplier of the primary component
@@ -504,7 +688,7 @@ def ntia_2021_conformance_issues(bom: Bom) -> tuple[list[Missing], list[Missing]
     # NOTE: The CycloneDX guide is missing bom.metadata.component.cpe,purl,swid
     # bom.components[].cpe,purl,swid
     # NOTE: NTIA 2021 does not require unique identifiers
-    # This is clear from NTIA 2025 draft adding this requirement
+    # This is clear from the CISA 2025 draft adding this requirement
 
     # 5. Dependency Relationship
     # bom.dependencies[]
