@@ -195,6 +195,12 @@ async def report(session: routes.CommitterSession, project: str, version: str, f
     else:
         block.p["No outdated tool found."]
 
+    block.h2["CycloneDX CLI validation errors"]
+    if task_result.cli_errors:
+        block.pre["\n".join(task_result.cli_errors)]
+    else:
+        block.p["No CycloneDX CLI validation errors found."]
+
     return await template.blank("SBOM report", content=block.collect())
 
 

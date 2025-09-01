@@ -105,6 +105,7 @@ class SBOMToolScore(schema.Strict):
     warnings: list[str] = schema.description("Warnings from the SBOM tool")
     errors: list[str] = schema.description("Errors from the SBOM tool")
     outdated: str | None = schema.description("Outdated tool from the SBOM tool")
+    cli_errors: list[str] | None = schema.description("Errors from the CycloneDX CLI")
 
 
 class SvnImportFiles(schema.Strict):

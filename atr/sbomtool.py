@@ -896,7 +896,7 @@ def validate_cyclonedx_atr(bundle: Bundle) -> Iterable[Any] | None:
     return None
 
 
-def validate_cyclonedx_cli(bundle: Bundle) -> Iterable[Any] | None:
+def validate_cyclonedx_cli(bundle: Bundle) -> list[str] | None:
     args = [
         "cyclonedx",
         "validate",

@@ -169,6 +169,7 @@ async def score_tool(args: FileArgs) -> results.Results | None:
     bundle = sbomtool.path_to_bundle(pathlib.Path(full_path))
     warnings, errors = sbomtool.ntia_2021_conformance_issues(bundle.bom)
     outdated = sbomtool.maven_plugin_outdated_version(bundle.bom)
+    cli_errors = sbomtool.validate_cyclonedx_cli(bundle)
     return results.SBOMToolScore(
         kind="sbom_tool_score",
         project_name=args.project_name,
@@ -178,6 +179,7 @@ async def score_tool(args: FileArgs) -> results.Results | None:
         warnings=[w.model_dump_json() for w in warnings],
         errors=[e.model_dump_json() for e in errors],
         outdated=outdated.model_dump_json() if outdated else None,
+        cli_errors=cli_errors,
     )
 
 
