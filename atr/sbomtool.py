@@ -193,12 +193,14 @@ class Component(Lax):
 class ToolComponent(Lax):
     name: str | None = None
     version: str | None = None
+    description: str | None = None
 
 
 class Tool(Lax):
-    vendor: str | None = None
+    # vendor: str | None = None
     name: str | None = None
     version: str | None = None
+    description: str | None = None
 
 
 class Tools(Lax):
@@ -606,10 +608,12 @@ def maven_plugin_outdated_version(bom: Bom) -> Outdated | None:
     # This is just a warning, of course
     if bom.metadata is None:
         return OutdatedMissingMetadata()
-    if bom.metadata.timestamp is None:
+    timestamp = bom.metadata.timestamp
+    if timestamp is None:
         # This quite often isn't available
         # We could use the file mtime, but that's extremely heuristic
-        return OutdatedMissingTimestamp()
+        # return OutdatedMissingTimestamp()
+        timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     tools = []
     t = bom.metadata.tools
     if isinstance(t, list):
@@ -617,14 +621,19 @@ def maven_plugin_outdated_version(bom: Bom) -> Outdated | None:
     elif t:
         tools = t.components or []
     for tool in tools:
-        if tool.name != "cyclonedx-maven-plugin":
+        names_or_descriptions = {
+            "cyclonedx maven plugin",
+            "cyclonedx-maven-plugin",
+        }
+        name_or_description = (tool.name or tool.description or "").lower()
+        if name_or_description not in names_or_descriptions:
             continue
         if tool.version is None:
-            return OutdatedMissingVersion(name=tool.name)
-        available_version = maven_plugin_outdated_version_core(bom.metadata.timestamp, tool.version)
+            return OutdatedMissingVersion(name=name_or_description)
+        available_version = maven_plugin_outdated_version_core(timestamp, tool.version)
         if available_version is not None:
             return OutdatedTool(
-                name=tool.name,
+                name=name_or_description,
                 used_version=tool.version,
                 available_version=available_version,
             )
