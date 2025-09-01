@@ -21,6 +21,7 @@ dependencies = [
   "asyncssh>=2.20.0,<3.0.0",
   "blockbuster>=1.5.23,<2.0.0",
   "cryptography~=44.0",
+  "cyclonedx-python-lib[json-validation]>=11.0.0",
   "dkimpy @ git+https://github.com/sbp/dkimpy.git@main",
   "dnspython>=2.7.0,<3.0.0",
   "dunamai>=1.23.0",

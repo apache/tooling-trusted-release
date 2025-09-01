@@ -28,10 +28,16 @@ import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Annotated, Any, Final, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Final, Literal
 
+import cyclonedx.exception
+import cyclonedx.schema
+import cyclonedx.validation.json
 import pydantic
 import yyjson
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 # TODO: Simple cache to avoid rate limiting, not thread safe
 CACHE_PATH = pathlib.Path("/tmp/sbomtool-cache.json")
@@ -315,6 +321,7 @@ OutdatedAdapter = pydantic.TypeAdapter(Outdated)
 class Bundle:
     doc: yyjson.Document
     bom: Bom
+    text: str
 
 
 class SBOMQSSummary(Lax):
@@ -563,7 +570,15 @@ def main() -> None:
             else:
                 print(sbomqs_total_score(bundle.doc))
         case "validate":
-            print(bundle.doc.dumps())
+            errors = validate_cyclonedx_json(bundle)
+            if not errors:
+                print("valid")
+            else:
+                for i, e in enumerate(errors):
+                    print(e)
+                    if i > 10:
+                        print("...")
+                        break
         case "where":
             _warnings, errors = ntia_2021_conformance_issues(bundle.bom)
             for error in errors:
@@ -814,7 +829,7 @@ def patch_to_data(patch: Patch) -> list[dict[str, Any]]:
 
 def path_to_bundle(path: pathlib.Path) -> Bundle:
     text = path.read_text(encoding="utf-8")
-    return Bundle(doc=yyjson.Document(text), bom=Bom.model_validate_json(text))
+    return Bundle(doc=yyjson.Document(text), bom=Bom.model_validate_json(text), text=text)
 
 
 def sbomqs_total_score(value: pathlib.Path | str | yyjson.Document) -> float:
@@ -839,6 +854,24 @@ def sbomqs_total_score(value: pathlib.Path | str | yyjson.Document) -> float:
         raise RuntimeError(err)
     report = SBOMQSReport.model_validate_json(proc.stdout)
     return report.summary.total_score
+
+
+def validate_cyclonedx_json(bundle: Bundle) -> Iterable[cyclonedx.validation.json.JsonValidationError] | None:
+    json_sv = get_pointer(bundle.doc, "/specVersion")
+    sv = cyclonedx.schema.SchemaVersion.V1_6
+    if isinstance(json_sv, str):
+        sv = cyclonedx.schema.SchemaVersion.from_version(json_sv)
+    try:
+        validator = cyclonedx.validation.json.JsonStrictValidator(sv)
+        errors = validator.validate_str(bundle.text, all_errors=True)
+    except cyclonedx.exception.MissingOptionalDependencyException:
+        # Placeholder, just in case we want to handle this somehow
+        raise
+    if isinstance(errors, cyclonedx.validation.json.JsonValidationError):
+        # The VSC type checker doesn't think this can happen
+        # But pyright does
+        return [errors]
+    return errors
 
 
 if __name__ == "__main__":
