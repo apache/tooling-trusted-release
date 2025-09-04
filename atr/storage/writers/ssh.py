@@ -22,8 +22,8 @@ import time
 
 import atr.db as db
 import atr.models.sql as sql
-import atr.routes.keys as keys
 import atr.storage as storage
+import atr.util as util
 
 
 class GeneralPublic:
@@ -74,7 +74,7 @@ class CommitteeParticipant(FoundationCommitter):
         # Twenty minutes to upload all files
         ttl = 20 * 60
         expires = now + ttl
-        fingerprint = keys.key_ssh_fingerprint(key)
+        fingerprint = util.key_ssh_fingerprint(key)
         wsk = sql.WorkflowSSHKey(
             fingerprint=fingerprint,
             key=key,

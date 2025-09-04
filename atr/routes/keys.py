@@ -18,10 +18,7 @@
 """keys.py"""
 
 import asyncio
-import base64
-import binascii
 import datetime
-import hashlib
 from collections.abc import Awaitable, Callable, Sequence
 
 import aiohttp
@@ -321,30 +318,6 @@ async def import_selected_revision(
     )
 
 
-def key_ssh_fingerprint(ssh_key_string: str) -> str:
-    # The format should be as in *.pub or authorized_keys files
-    # I.e. TYPE DATA COMMENT
-    ssh_key_parts = ssh_key_string.strip().split()
-    if len(ssh_key_parts) >= 2:
-        # We discard the type, which is ssh_key_parts[0]
-        key_data = ssh_key_parts[1]
-        # We discard the comment, which is ssh_key_parts[2]
-
-        # Standard fingerprint calculation
-        try:
-            decoded_key_data = base64.b64decode(key_data)
-        except binascii.Error as e:
-            raise ValueError(f"Invalid base64 encoding in key data: {e}") from e
-
-        digest = hashlib.sha256(decoded_key_data).digest()
-        fingerprint_b64 = base64.b64encode(digest).decode("utf-8").rstrip("=")
-
-        # Prefix follows the standard format
-        return f"SHA256:{fingerprint_b64}"
-
-    raise ValueError("Invalid SSH key format")
-
-
 @routes.committer("/keys")
 async def keys(session: routes.CommitterSession) -> str:
     """View all keys associated with the user's account."""
@@ -413,7 +386,7 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
 
 async def ssh_key_add(key: str, asf_uid: str) -> str:
     try:
-        fingerprint = key_ssh_fingerprint(key)
+        fingerprint = util.key_ssh_fingerprint(key)
     except Exception as e:
         raise SshFingerprintError(str(e)) from e
     async with db.session() as data:

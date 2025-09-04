@@ -16,6 +16,7 @@
 # under the License.
 
 import asyncio
+import base64
 import binascii
 import contextlib
 import dataclasses
@@ -521,6 +522,30 @@ def is_user_viewing_as_admin(uid: str | None) -> bool:
     except Exception:
         log.exception(f"Error checking admin downgrade session status for {uid}")
         return True
+
+
+def key_ssh_fingerprint(ssh_key_string: str) -> str:
+    # The format should be as in *.pub or authorized_keys files
+    # I.e. TYPE DATA COMMENT
+    ssh_key_parts = ssh_key_string.strip().split()
+    if len(ssh_key_parts) >= 2:
+        # We discard the type, which is ssh_key_parts[0]
+        key_data = ssh_key_parts[1]
+        # We discard the comment, which is ssh_key_parts[2]
+
+        # Standard fingerprint calculation
+        try:
+            decoded_key_data = base64.b64decode(key_data)
+        except binascii.Error as e:
+            raise ValueError(f"Invalid base64 encoding in key data: {e}") from e
+
+        digest = hashlib.sha256(decoded_key_data).digest()
+        fingerprint_b64 = base64.b64encode(digest).decode("utf-8").rstrip("=")
+
+        # Prefix follows the standard format
+        return f"SHA256:{fingerprint_b64}"
+
+    raise ValueError("Invalid SSH key format")
 
 
 async def number_of_release_files(release: sql.Release) -> int:
