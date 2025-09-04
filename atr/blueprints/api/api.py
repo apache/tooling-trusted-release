@@ -19,7 +19,6 @@
 import base64
 import hashlib
 import pathlib
-import time
 from typing import Any
 
 import aiofiles.os
@@ -356,37 +355,20 @@ async def jwt_create(data: models.api.JwtCreateArgs) -> DictResponse:
 @quart_schema.validate_request(models.api.JwtGithubArgs)
 async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
     """
-    Create a JWT from a GitHub OIDC JWT.
-
-    The payload must include a valid GitHub OIDC JWT.
+    Register an SSH key sent with a corroborating GitHub OIDC JWT.
     """
     log.info(f"SSH key: {data.ssh_key}")
 
-    # TODO: This is a placeholder for the actual implementation
     payload = await jwtoken.verify_github_oidc(data.jwt)
     asf_uid = await ldap.github_to_apache(payload["actor_id"])
-
     project = await interaction.trusted_project(payload["repository"], payload["workflow_ref"])
-
-    # TODO: This needs to go in the storage interface
-    # And it needs to create an audit event for logging
-    now = int(time.time())
-    # Twenty minutes to upload all files
-    ttl = 20 * 60
-    expires = now + ttl
-    fingerprint = keys.key_ssh_fingerprint(data.ssh_key)
-    async with db.session() as db_data:
-        wsk = sql.WorkflowSSHKey(
-            fingerprint=fingerprint,
-            key=data.ssh_key,
-            project_name=project.name,
-            asf_uid=asf_uid,
-            github_uid=payload["actor"],
-            github_nid=payload["actor_id"],
-            expires=expires,
+    async with storage.write_as_committee_member(util.unwrap(project.committee).name, asf_uid) as wacm:
+        fingerprint, expires = await wacm.ssh.add_workflow_key(
+            payload["actor"],
+            payload["actor_id"],
+            project.name,
+            data.ssh_key,
         )
-        db_data.add(wsk)
-        await db_data.commit()
 
     return models.api.JwtGithubResults(
         endpoint="/jwt/github",

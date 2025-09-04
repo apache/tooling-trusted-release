@@ -18,6 +18,7 @@
 import atr.storage.writers.checks as checks
 import atr.storage.writers.distributions as distributions
 import atr.storage.writers.keys as keys
+import atr.storage.writers.ssh as ssh
 import atr.storage.writers.tokens as tokens
 
-__all__ = ["checks", "distributions", "keys", "tokens"]
+__all__ = ["checks", "distributions", "keys", "ssh", "tokens"]
