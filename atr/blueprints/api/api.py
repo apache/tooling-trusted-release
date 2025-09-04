@@ -18,8 +18,6 @@
 
 import base64
 import hashlib
-import json
-import os.path
 import pathlib
 import time
 from typing import Any
@@ -39,6 +37,7 @@ import atr.config as config
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.jwtoken as jwtoken
+import atr.ldap as ldap
 import atr.log as log
 import atr.models as models
 import atr.models.sql as sql
@@ -366,16 +365,7 @@ async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
 
     # TODO: This is a placeholder for the actual implementation
     payload = await jwtoken.verify_github_oidc(data.jwt)
-
-    # We need to lookup the ASF UID from the GitHub NID
-    conf = config.get()
-    github_nid_to_asf_uid_strpath = os.path.join(conf.STATE_DIR, "github-nid-to-asf-uid.json")
-    async with aiofiles.open(github_nid_to_asf_uid_strpath) as f:
-        github_nid_to_asf_uid = json.loads(await f.read())
-    if payload["actor_id"] not in github_nid_to_asf_uid:
-        raise exceptions.BadRequest(f"GitHub NID {payload['actor_id']} not registered with the ATR")
-    asf_uid = github_nid_to_asf_uid[str(payload["actor_id"])]
-    log.info(f"ASF UID: {asf_uid}")
+    asf_uid = await ldap.github_to_apache(payload["actor_id"])
 
     # Debugging
     log.info(f"GitHub OIDC JWT payload: {payload}")

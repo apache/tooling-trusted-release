@@ -17,8 +17,11 @@
 
 import collections
 import dataclasses
+import json
+import os.path
 from typing import Any, Final, Literal
 
+import aiofiles
 import ldap3
 import ldap3.utils.conv as conv
 import ldap3.utils.dn as dn
@@ -73,6 +76,10 @@ class Search:
         return results
 
 
+class LookupError(Exception):
+    pass
+
+
 # We use a dataclass to support ldap3.Connection objects
 @dataclasses.dataclass
 class SearchParameters:
@@ -87,6 +94,21 @@ class SearchParameters:
     detail_err: str | None = None
     connection: ldap3.Connection | None = None
     email_only: bool = False
+
+
+async def github_to_apache(github_numeric_uid: int) -> str:
+    import atr.config as config
+
+    # We need to lookup the ASF UID from the GitHub NID
+    conf = config.get()
+    # TODO: Get this information from backfilled LDAP instead
+    github_nid_to_asf_uid_strpath = os.path.join(conf.STATE_DIR, "github-nid-to-asf-uid.json")
+    async with aiofiles.open(github_nid_to_asf_uid_strpath) as f:
+        github_nid_to_asf_uid = json.loads(await f.read())
+    if github_numeric_uid not in github_nid_to_asf_uid:
+        raise LookupError(f"GitHub NID {github_numeric_uid} not registered with the ATR")
+    asf_uid = github_nid_to_asf_uid[str(github_numeric_uid)]
+    return asf_uid
 
 
 def parse_dn(dn_string: str) -> dict[str, list[str]]:
