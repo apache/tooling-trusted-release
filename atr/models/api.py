@@ -438,6 +438,7 @@ Results = Annotated[
     | IgnoreAddResults
     | IgnoreDeleteResults
     | IgnoreListResults
+    | JwtCreateResults
     | KeyAddResults
     | KeyDeleteResults
     | KeyGetResults
