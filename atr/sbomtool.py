@@ -30,15 +30,6 @@ import urllib.parse
 import urllib.request
 from typing import TYPE_CHECKING, Annotated, Any, Final, Literal
 
-try:
-    import atr.models.cyclonedx as models_cyclonedx
-except ImportError:
-    sys.path.append(".")
-    try:
-        import atr.models.cyclonedx as models_cyclonedx
-    except ImportError:
-        models_cyclonedx = None
-
 import cyclonedx.exception
 import cyclonedx.schema
 import cyclonedx.validation.json
@@ -589,16 +580,6 @@ def main() -> None:
                 print(sbomqs_total_score(bundle.doc), "->", sbomqs_total_score(merged))
             else:
                 print(sbomqs_total_score(bundle.doc))
-        case "validate-atr":
-            errors = validate_cyclonedx_atr(bundle)
-            if not errors:
-                print("valid")
-            else:
-                for i, e in enumerate(errors):
-                    print(e)
-                    if i > 10:
-                        print("...")
-                        break
         case "validate-cli":
             errors = validate_cyclonedx_cli(bundle)
             if not errors:
@@ -894,16 +875,6 @@ def sbomqs_total_score(value: pathlib.Path | str | yyjson.Document) -> float:
         raise RuntimeError(err)
     report = SBOMQSReport.model_validate_json(proc.stdout)
     return report.summary.total_score
-
-
-def validate_cyclonedx_atr(bundle: Bundle) -> Iterable[Any] | None:
-    if models_cyclonedx is None:
-        raise RuntimeError("models_cyclonedx is not loaded")
-    try:
-        models_cyclonedx.CyclonedxBillOfMaterialsStandard.model_validate_json(bundle.text)
-    except pydantic.ValidationError as e:
-        return e.errors()
-    return None
 
 
 def validate_cyclonedx_cli(bundle: Bundle) -> list[str] | None:
