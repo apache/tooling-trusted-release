@@ -70,7 +70,6 @@ class CommitteeParticipant(FoundationCommitter):
         self.__committee_name = committee_name
 
     async def add_workflow_key(self, github_uid: str, github_nid: int, project_name: str, key: str) -> tuple[str, int]:
-        # TODO: This needs to create an audit event for logging
         now = int(time.time())
         # Twenty minutes to upload all files
         ttl = 20 * 60
@@ -87,6 +86,14 @@ class CommitteeParticipant(FoundationCommitter):
         )
         self.__data.add(wsk)
         await self.__data.commit()
+        self.__write_as.log_auditable_event(
+            asf_uid=self.__asf_uid,
+            fingerprint=fingerprint,
+            project_name=project_name,
+            github_uid=github_uid,
+            github_nid=github_nid,
+            expires=expires,
+        )
         return fingerprint, expires
 
 
