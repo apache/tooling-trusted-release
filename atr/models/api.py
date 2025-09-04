@@ -71,6 +71,24 @@ class CommitteesListResults(schema.Strict):
     committees: Sequence[sql.Committee]
 
 
+class GithubReleaseAnnounceArgs(schema.Strict):
+    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
+    version: str = schema.Field(..., **example("0.0.1"))
+    revision: str = schema.Field(..., **example("00005"))
+    email_to: str = schema.Field(..., **example("dev@example.apache.org"))
+    subject: str = schema.Field(..., **example("[ANNOUNCE] Apache Example 1.0.0 release"))
+    body: str = schema.Field(
+        ...,
+        **example("The Apache Example team is pleased to announce the release of Example 1.0.0..."),
+    )
+    path_suffix: str = schema.Field(..., **example("example/1.0.0"))
+
+
+class GithubReleaseAnnounceResults(schema.Strict):
+    endpoint: Literal["/github/release/announce"] = schema.Field(alias="endpoint")
+    success: Literal[True] = schema.Field(..., **example(True))
+
+
 class GithubSshRegisterArgs(schema.Strict):
     jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
     ssh_key: str = schema.Field(
@@ -445,6 +463,7 @@ Results = Annotated[
     | CommitteeKeysResults
     | CommitteeProjectsResults
     | CommitteesListResults
+    | GithubReleaseAnnounceResults
     | GithubSshRegisterResults
     | GithubVoteResolveResults
     | IgnoreAddResults
@@ -499,6 +518,7 @@ validate_committee_get = validator(CommitteeGetResults)
 validate_committee_keys = validator(CommitteeKeysResults)
 validate_committee_projects = validator(CommitteeProjectsResults)
 validate_committees_list = validator(CommitteesListResults)
+validate_github_release_announce = validator(GithubReleaseAnnounceResults)
 validate_github_ssh_register = validator(GithubSshRegisterResults)
 validate_github_vote_resolve = validator(GithubVoteResolveResults)
 validate_ignore_add = validator(IgnoreAddResults)

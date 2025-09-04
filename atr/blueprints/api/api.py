@@ -259,12 +259,65 @@ async def committees_list() -> DictResponse:
     ).model_dump(), 200
 
 
+@api.BLUEPRINT.route("/github/release/announce", methods=["POST"])
+@quart_schema.validate_request(models.api.GithubReleaseAnnounceArgs)
+async def github_release_announce(data: models.api.GithubReleaseAnnounceArgs) -> DictResponse:
+    """
+    Announce a release with a corroborating GitHub OIDC JWT.
+    """
+    _payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt)
+    try:
+        # TODO: Add defaults
+        await announce.announce(
+            project.name,
+            data.version,
+            data.revision,
+            data.email_to,
+            data.subject,
+            data.body,
+            data.path_suffix,
+            asf_uid,
+            asf_uid,
+        )
+    except announce.AnnounceError as e:
+        raise exceptions.BadRequest(str(e))
+
+    return models.api.GithubReleaseAnnounceResults(
+        endpoint="/github/release/announce",
+        success=True,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/github/ssh/register", methods=["POST"])
+@quart_schema.validate_request(models.api.GithubSshRegisterArgs)
+async def github_ssh_register(data: models.api.GithubSshRegisterArgs) -> DictResponse:
+    """
+    Register an SSH key sent with a corroborating GitHub OIDC JWT.
+    """
+    payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt)
+    async with storage.write_as_committee_member(util.unwrap(project.committee).name, asf_uid) as wacm:
+        fingerprint, expires = await wacm.ssh.add_workflow_key(
+            payload["actor"],
+            payload["actor_id"],
+            project.name,
+            data.ssh_key,
+        )
+
+    return models.api.GithubSshRegisterResults(
+        endpoint="/github/ssh/register",
+        fingerprint=fingerprint,
+        project=project.name,
+        expires=expires,
+    ).model_dump(), 200
+
+
 @api.BLUEPRINT.route("/github/vote/resolve", methods=["POST"])
 @quart_schema.validate_request(models.api.GithubVoteResolveArgs)
 async def github_vote_resolve(data: models.api.GithubVoteResolveArgs) -> DictResponse:
     """
     Resolve a vote with a corroborating GitHub OIDC JWT.
     """
+    # TODO: Need to be able to resolve and make the release immutable
     _payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt)
     if project.committee is None:
         raise exceptions.NotFound("Project has no committee")
@@ -294,29 +347,6 @@ async def github_vote_resolve(data: models.api.GithubVoteResolveArgs) -> DictRes
     return models.api.GithubVoteResolveResults(
         endpoint="/github/vote/resolve",
         success=True,
-    ).model_dump(), 200
-
-
-@api.BLUEPRINT.route("/github/ssh/register", methods=["POST"])
-@quart_schema.validate_request(models.api.GithubSshRegisterArgs)
-async def github_ssh_register(data: models.api.GithubSshRegisterArgs) -> DictResponse:
-    """
-    Register an SSH key sent with a corroborating GitHub OIDC JWT.
-    """
-    payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt)
-    async with storage.write_as_committee_member(util.unwrap(project.committee).name, asf_uid) as wacm:
-        fingerprint, expires = await wacm.ssh.add_workflow_key(
-            payload["actor"],
-            payload["actor_id"],
-            project.name,
-            data.ssh_key,
-        )
-
-    return models.api.GithubSshRegisterResults(
-        endpoint="/github/ssh/register",
-        fingerprint=fingerprint,
-        project=project.name,
-        expires=expires,
     ).model_dump(), 200
 
 
