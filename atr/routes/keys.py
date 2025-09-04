@@ -26,7 +26,6 @@ import asfquart as asfquart
 import asfquart.base as base
 import quart
 import werkzeug.datastructures as datastructures
-import werkzeug.exceptions as exceptions
 import werkzeug.wrappers.response as response
 import wtforms
 
@@ -73,10 +72,6 @@ class AddSSHKeyForm(forms.Typed):
 
 class DeleteKeyForm(forms.Typed):
     submit = forms.submit("Delete key")
-
-
-class SshFingerprintError(ValueError):
-    pass
 
 
 class UpdateCommitteeKeysForm(forms.Typed):
@@ -366,8 +361,10 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
     if await form.validate_on_submit():
         key: str = util.unwrap(form.key.data)
         try:
-            fingerprint = await ssh_key_add(key, session.uid)
-        except SshFingerprintError as e:
+            async with storage.write(session.uid) as write:
+                wafc = write.as_foundation_committer()
+                fingerprint = await wafc.ssh.add_key(key, session.uid)
+        except util.SshFingerprintError as e:
             if isinstance(form.key.errors, list):
                 form.key.errors.append(str(e))
             else:
@@ -382,24 +379,6 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
         form=form,
         fingerprint=fingerprint,
     )
-
-
-async def ssh_key_add(key: str, asf_uid: str) -> str:
-    try:
-        fingerprint = util.key_ssh_fingerprint(key)
-    except Exception as e:
-        raise SshFingerprintError(str(e)) from e
-    async with db.session() as data:
-        data.add(sql.SSHKey(fingerprint=fingerprint, key=key, asf_uid=asf_uid))
-        await data.commit()
-    return fingerprint
-
-
-async def ssh_key_delete(fingerprint: str, asf_uid: str) -> None:
-    async with db.session() as data:
-        ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=asf_uid).demand(exceptions.NotFound())
-        await data.delete(ssh_key)
-        await data.commit()
 
 
 @routes.committer("/keys/update-committee-keys/<committee_name>", methods=["POST"])

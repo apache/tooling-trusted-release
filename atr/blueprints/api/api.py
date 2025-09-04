@@ -41,7 +41,6 @@ import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.announce as announce
-import atr.routes.keys as keys
 import atr.routes.resolve as resolve
 import atr.routes.start as start
 import atr.routes.vote as vote
@@ -974,7 +973,9 @@ async def ssh_key_add(data: models.api.SshKeyAddArgs) -> DictResponse:
     An SSH key is associated with a single user.
     """
     asf_uid = _jwt_asf_uid()
-    fingerprint = await keys.ssh_key_add(data.text, asf_uid)
+    async with storage.write(asf_uid) as write:
+        wafc = write.as_foundation_committer()
+        fingerprint = await wafc.ssh.add_key(data.text, asf_uid)
     return models.api.SshKeyAddResults(
         endpoint="/ssh-key/add",
         fingerprint=fingerprint,
@@ -993,7 +994,9 @@ async def ssh_key_delete(data: models.api.SshKeyDeleteArgs) -> DictResponse:
     An SSH key can only be deleted by the user who owns it.
     """
     asf_uid = _jwt_asf_uid()
-    await keys.ssh_key_delete(data.fingerprint, asf_uid)
+    async with storage.write(asf_uid) as write:
+        wafc = write.as_foundation_committer()
+        await wafc.ssh.delete_key(data.fingerprint)
     return models.api.SshKeyDeleteResults(
         endpoint="/ssh-key/delete",
         success=True,

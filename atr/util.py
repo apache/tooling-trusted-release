@@ -59,6 +59,10 @@ T = TypeVar("T")
 USER_TESTS_ADDRESS: Final[str] = "user-tests@tooling.apache.org"
 
 
+class SshFingerprintError(ValueError):
+    pass
+
+
 @dataclasses.dataclass
 class FileStat:
     path: str
@@ -525,6 +529,13 @@ def is_user_viewing_as_admin(uid: str | None) -> bool:
 
 
 def key_ssh_fingerprint(ssh_key_string: str) -> str:
+    try:
+        return key_ssh_fingerprint_core(ssh_key_string)
+    except ValueError as e:
+        raise SshFingerprintError(str(e)) from e
+
+
+def key_ssh_fingerprint_core(ssh_key_string: str) -> str:
     # The format should be as in *.pub or authorized_keys files
     # I.e. TYPE DATA COMMENT
     ssh_key_parts = ssh_key_string.strip().split()
