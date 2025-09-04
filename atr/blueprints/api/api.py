@@ -41,7 +41,6 @@ import atr.ldap as ldap
 import atr.log as log
 import atr.models as models
 import atr.models.sql as sql
-import atr.registry as registry
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.announce as announce
@@ -367,40 +366,7 @@ async def jwt_github(data: models.api.JwtGithubArgs) -> DictResponse:
     payload = await jwtoken.verify_github_oidc(data.jwt)
     asf_uid = await ldap.github_to_apache(payload["actor_id"])
 
-    # Debugging
-    log.info(f"GitHub OIDC JWT payload: {payload}")
-
-    repository = payload["repository"]
-    if not repository.startswith("apache/"):
-        raise exceptions.BadRequest("Repository must start with 'apache/'")
-    repository_name = repository.removeprefix("apache/")
-    workflow_ref = payload["workflow_ref"]
-    if not workflow_ref.startswith(repository + "/"):
-        raise exceptions.BadRequest(f"Workflow ref must start with repository, got {workflow_ref}")
-    workflow_path_at = workflow_ref.removeprefix(repository + "/")
-    if "@" not in workflow_path_at:
-        raise exceptions.BadRequest(f"Workflow path must contain '@', got {workflow_path_at}")
-    workflow_path = workflow_path_at.rsplit("@", 1)[0]
-    if not workflow_path.startswith(".github/workflows/"):
-        raise exceptions.BadRequest(f"Workflow path must start with '.github/workflows/', got {workflow_path}")
-    # TODO: If a policy is reused between projects, we can't get the project
-    async with db.session() as db_data:
-        policy = await db_data.release_policy(
-            github_repository_name=repository_name, github_workflow_path=workflow_path
-        ).demand(
-            exceptions.NotFound(
-                f"No release policy found for repository name {repository_name} and workflow path {workflow_path}"
-            )
-        )
-        project = await db_data.project(release_policy_id=policy.id).demand(
-            exceptions.NotFound(f"Project for release policy {policy.id} not found")
-        )
-    if project.committee is None:
-        raise exceptions.BadRequest(f"Project {project.name} has no committee")
-    if project.committee.name not in registry.GITHUB_AUTOMATED_RELEASE_COMMITTEES:
-        raise exceptions.BadRequest(f"Project {project.name} is not in a committee that can make releases")
-    log.info(f"Release policy: {policy}")
-    log.info(f"Project: {project}")
+    project = await interaction.trusted_project(payload["repository"], payload["workflow_ref"])
 
     # TODO: This needs to go in the storage interface
     # And it needs to create an audit event for logging

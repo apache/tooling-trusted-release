@@ -29,6 +29,7 @@ import sqlmodel
 import atr.db as db
 import atr.log as log
 import atr.models.sql as sql
+import atr.registry as registry
 import atr.user as user
 import atr.util as util
 
@@ -217,6 +218,42 @@ async def tasks_ongoing_revision(
     async with db.session() as session:
         task_count, latest_revision = (await session.execute(query)).one()
         return task_count, latest_revision
+
+
+async def trusted_project(repository: str, workflow_ref: str) -> sql.Project:
+    # Debugging
+    log.info(f"GitHub OIDC JWT payload: {repository} {workflow_ref}")
+
+    if not repository.startswith("apache/"):
+        raise InteractionError("Repository must start with 'apache/'")
+    repository_name = repository.removeprefix("apache/")
+    if not workflow_ref.startswith(repository + "/"):
+        raise InteractionError(f"Workflow ref must start with repository, got {workflow_ref}")
+    workflow_path_at = workflow_ref.removeprefix(repository + "/")
+    if "@" not in workflow_path_at:
+        raise InteractionError(f"Workflow path must contain '@', got {workflow_path_at}")
+    workflow_path = workflow_path_at.rsplit("@", 1)[0]
+    if not workflow_path.startswith(".github/workflows/"):
+        raise InteractionError(f"Workflow path must start with '.github/workflows/', got {workflow_path}")
+    # TODO: If a policy is reused between projects, we can't get the project
+    async with db.session() as db_data:
+        policy = await db_data.release_policy(
+            github_repository_name=repository_name, github_workflow_path=workflow_path
+        ).demand(
+            InteractionError(
+                f"No release policy found for repository name {repository_name} and workflow path {workflow_path}"
+            )
+        )
+        project = await db_data.project(release_policy_id=policy.id).demand(
+            InteractionError(f"Project for release policy {policy.id} not found")
+        )
+    if project.committee is None:
+        raise InteractionError(f"Project {project.name} has no committee")
+    if project.committee.name not in registry.GITHUB_AUTOMATED_RELEASE_COMMITTEES:
+        raise InteractionError(f"Project {project.name} is not in a committee that can make releases")
+    log.info(f"Release policy: {policy}")
+    log.info(f"Project: {project}")
+    return project
 
 
 async def unfinished_releases(asfuid: str) -> dict[str, list[sql.Release]]:
