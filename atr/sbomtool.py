@@ -376,12 +376,22 @@ def assemble_metadata_component(doc: yyjson.Document, patch: Patch) -> None:
 
 def assemble_metadata_author(doc: yyjson.Document, patch: Patch) -> None:
     assemble_metadata(doc, patch)
-    if get_pointer(doc, "/metadata/author") is None:
+    tools = get_pointer(doc, "/metadata/tools")
+    tool = {"name": "sbomtool", "version": VERSION, "description": "By ASF Tooling"}
+    if tools is None:
         patch.append(
             AddOp(
                 op="add",
-                path="/metadata/author",
-                value=f"sbomtool v{VERSION}, by ASF Tooling",
+                path="/metadata/tools",
+                value=[tool],
+            )
+        )
+    elif isinstance(tools, list):
+        patch.append(
+            AddOp(
+                op="add",
+                path="/metadata/tools/-",
+                value=tool,
             )
         )
 
