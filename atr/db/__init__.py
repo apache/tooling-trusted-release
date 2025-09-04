@@ -522,7 +522,9 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
         release_checklist: Opt[str] = NOT_SET,
         pause_for_rm: Opt[bool] = NOT_SET,
         github_repository_name: Opt[str] = NOT_SET,
-        github_workflow_path: Opt[str] = NOT_SET,
+        github_compose_workflow_path: Opt[str] = NOT_SET,
+        github_vote_workflow_path: Opt[str] = NOT_SET,
+        github_finish_workflow_path: Opt[str] = NOT_SET,
         _project: bool = False,
     ) -> Query[sql.ReleasePolicy]:
         query = sqlmodel.select(sql.ReleasePolicy)
@@ -541,8 +543,12 @@ class Session(sqlalchemy.ext.asyncio.AsyncSession):
             query = query.where(sql.ReleasePolicy.pause_for_rm == pause_for_rm)
         if is_defined(github_repository_name):
             query = query.where(sql.ReleasePolicy.github_repository_name == github_repository_name)
-        if is_defined(github_workflow_path):
-            query = query.where(sql.ReleasePolicy.github_workflow_path == github_workflow_path)
+        if is_defined(github_compose_workflow_path):
+            query = query.where(sql.ReleasePolicy.github_compose_workflow_path == github_compose_workflow_path)
+        if is_defined(github_vote_workflow_path):
+            query = query.where(sql.ReleasePolicy.github_vote_workflow_path == github_vote_workflow_path)
+        if is_defined(github_finish_workflow_path):
+            query = query.where(sql.ReleasePolicy.github_finish_workflow_path == github_finish_workflow_path)
 
         if _project:
             query = query.options(joined_load(sql.ReleasePolicy.project))

@@ -16,6 +16,7 @@
 # under the License.
 
 import contextlib
+import enum
 import pathlib
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any
@@ -52,6 +53,12 @@ class PublicKeyError(RuntimeError):
     pass
 
 
+class TrustedProjectPhase(enum.Enum):
+    COMPOSE = "compose"
+    VOTE = "vote"
+    FINISH = "finish"
+
+
 async def candidate_drafts(project: sql.Project) -> list[sql.Release]:
     """Get the candidate drafts for the project."""
     return await releases_by_phase(project, sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT)
@@ -74,10 +81,10 @@ async def full_releases(project: sql.Project) -> list[sql.Release]:
     return await releases_by_phase(project, sql.ReleasePhase.RELEASE)
 
 
-async def github_trusted_jwt(jwt: str) -> tuple[dict[str, Any], str, sql.Project]:
+async def github_trusted_jwt(jwt: str, phase: TrustedProjectPhase) -> tuple[dict[str, Any], str, sql.Project]:
     payload = await jwtoken.verify_github_oidc(jwt)
     asf_uid = await ldap.github_to_apache(payload["actor_id"])
-    project = await _trusted_project(payload["repository"], payload["workflow_ref"])
+    project = await _trusted_project(payload["repository"], payload["workflow_ref"], phase)
     return payload, asf_uid, project
 
 
@@ -322,7 +329,7 @@ async def _delete_release_data_filesystem(release_dir: pathlib.Path, release_nam
         )
 
 
-async def _trusted_project(repository: str, workflow_ref: str) -> sql.Project:
+async def _trusted_project(repository: str, workflow_ref: str, phase: TrustedProjectPhase) -> sql.Project:
     # Debugging
     log.info(f"GitHub OIDC JWT payload: {repository} {workflow_ref}")
 
@@ -337,15 +344,24 @@ async def _trusted_project(repository: str, workflow_ref: str) -> sql.Project:
     workflow_path = workflow_path_at.rsplit("@", 1)[0]
     if not workflow_path.startswith(".github/workflows/"):
         raise InteractionError(f"Workflow path must start with '.github/workflows/', got {workflow_path}")
+    value_error = ValueError(
+        f"Release policy for repository {repository_name} and {phase.value} workflow path {workflow_path} not found"
+    )
     # TODO: If a policy is reused between projects, we can't get the project
     async with db.session() as db_data:
-        policy = await db_data.release_policy(
-            github_repository_name=repository_name, github_workflow_path=workflow_path
-        ).demand(
-            InteractionError(
-                f"No release policy found for repository name {repository_name} and workflow path {workflow_path}"
-            )
-        )
+        match phase:
+            case TrustedProjectPhase.COMPOSE:
+                policy = await db_data.release_policy(
+                    github_repository_name=repository_name, github_compose_workflow_path=workflow_path
+                ).demand(value_error)
+            case TrustedProjectPhase.VOTE:
+                policy = await db_data.release_policy(
+                    github_repository_name=repository_name, github_vote_workflow_path=workflow_path
+                ).demand(value_error)
+            case TrustedProjectPhase.FINISH:
+                policy = await db_data.release_policy(
+                    github_repository_name=repository_name, github_finish_workflow_path=workflow_path
+                ).demand(value_error)
         project = await db_data.project(release_policy_id=policy.id).demand(
             InteractionError(f"Project for release policy {policy.id} not found")
         )

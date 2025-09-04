@@ -659,10 +659,22 @@ Thanks,
         return policy.github_repository_name
 
     @property
-    def policy_github_workflow_path(self) -> str:
+    def policy_github_compose_workflow_path(self) -> str:
         if (policy := self.release_policy) is None:
             return ""
-        return policy.github_workflow_path
+        return policy.github_compose_workflow_path
+
+    @property
+    def policy_github_vote_workflow_path(self) -> str:
+        if (policy := self.release_policy) is None:
+            return ""
+        return policy.github_vote_workflow_path
+
+    @property
+    def policy_github_finish_workflow_path(self) -> str:
+        if (policy := self.release_policy) is None:
+            return ""
+        return policy.github_finish_workflow_path
 
 
 # Release: Project ReleasePolicy Revision CheckResult
@@ -969,7 +981,9 @@ class ReleasePolicy(sqlmodel.SQLModel, table=True):
     )
     strict_checking: bool = sqlmodel.Field(default=False)
     github_repository_name: str = sqlmodel.Field(default="")
-    github_workflow_path: str = sqlmodel.Field(default="")
+    github_compose_workflow_path: str = sqlmodel.Field(default="")
+    github_vote_workflow_path: str = sqlmodel.Field(default="")
+    github_finish_workflow_path: str = sqlmodel.Field(default="")
 
     # 1-1: ReleasePolicy -> Project
     # 1-1: Project -C-> ReleasePolicy

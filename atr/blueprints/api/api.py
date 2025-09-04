@@ -265,7 +265,7 @@ async def github_release_announce(data: models.api.GithubReleaseAnnounceArgs) ->
     """
     Announce a release with a corroborating GitHub OIDC JWT.
     """
-    _payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt)
+    _payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt, interaction.TrustedProjectPhase.FINISH)
     try:
         # TODO: Add defaults
         await announce.announce(
@@ -294,7 +294,7 @@ async def github_ssh_register(data: models.api.GithubSshRegisterArgs) -> DictRes
     """
     Register an SSH key sent with a corroborating GitHub OIDC JWT.
     """
-    payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt)
+    payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt, interaction.TrustedProjectPhase.COMPOSE)
     async with storage.write_as_committee_member(util.unwrap(project.committee).name, asf_uid) as wacm:
         fingerprint, expires = await wacm.ssh.add_workflow_key(
             payload["actor"],
@@ -318,7 +318,7 @@ async def github_vote_resolve(data: models.api.GithubVoteResolveArgs) -> DictRes
     Resolve a vote with a corroborating GitHub OIDC JWT.
     """
     # TODO: Need to be able to resolve and make the release immutable
-    _payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt)
+    _payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt, interaction.TrustedProjectPhase.VOTE)
     if project.committee is None:
         raise exceptions.NotFound("Project has no committee")
     # WARNING: This is subtly different from the /vote/resolve code

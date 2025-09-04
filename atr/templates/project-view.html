@@ -116,11 +116,11 @@
             </div>
 
             <div class="mb-3 pb-3 row border-bottom">
-              {{ forms.label(policy_form.github_workflow_path, col="md3") }}
+              {{ forms.label(policy_form.github_compose_workflow_path, col="md3") }}
               <div class="col-sm-8">
-                {{ forms.widget(policy_form.github_workflow_path, classes="form-control font-monospace") }}
-                {{ forms.errors(policy_form.github_workflow_path) }}
-                {{ forms.description(policy_form.github_workflow_path) }}
+                {{ forms.widget(policy_form.github_compose_workflow_path, classes="form-control font-monospace") }}
+                {{ forms.errors(policy_form.github_compose_workflow_path) }}
+                {{ forms.description(policy_form.github_compose_workflow_path) }}
               </div>
             </div>
 
@@ -151,6 +151,15 @@
                 </div>
               </div>
             {% endif %}
+
+            <div class="mb-3 pb-3 row border-bottom">
+              {{ forms.label(policy_form.github_vote_workflow_path, col="md3") }}
+              <div class="col-sm-8">
+                {{ forms.widget(policy_form.github_vote_workflow_path, classes="form-control font-monospace") }}
+                {{ forms.errors(policy_form.github_vote_workflow_path) }}
+                {{ forms.description(policy_form.github_vote_workflow_path) }}
+              </div>
+            </div>
 
             <div id="vote-options-extra">
 
@@ -205,6 +214,15 @@
 
             <div class="row mt-5 mb-3">
               <h3 class="col-md-3 col-form-label text-md-end fs-4">Finish options</h3>
+            </div>
+
+            <div class="mb-3 pb-3 row border-bottom">
+              {{ forms.label(policy_form.github_finish_workflow_path, col="md3") }}
+              <div class="col-sm-8">
+                {{ forms.widget(policy_form.github_finish_workflow_path, classes="form-control font-monospace") }}
+                {{ forms.errors(policy_form.github_finish_workflow_path) }}
+                {{ forms.description(policy_form.github_finish_workflow_path) }}
+              </div>
             </div>
 
             <div class="mb-3 pb-3 row border-bottom">
