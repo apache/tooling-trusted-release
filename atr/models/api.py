@@ -85,6 +85,17 @@ class GithubSshRegisterResults(schema.Strict):
     expires: int = schema.Field(..., **example(1713547200))
 
 
+class GithubVoteResolveArgs(schema.Strict):
+    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
+    version: str = schema.Field(..., **example("0.0.1"))
+    resolution: Literal["passed", "failed"] = schema.Field(..., **example("passed"))
+
+
+class GithubVoteResolveResults(schema.Strict):
+    endpoint: Literal["/github/vote/resolve"] = schema.Field(alias="endpoint")
+    success: Literal[True] = schema.Field(..., **example(True))
+
+
 class IgnoreAddArgs(schema.Strict):
     committee_name: str = schema.Field(..., **example("example"))
     release_glob: str | None = schema.Field(default=None, **example("example-0.0.*"))
@@ -435,6 +446,7 @@ Results = Annotated[
     | CommitteeProjectsResults
     | CommitteesListResults
     | GithubSshRegisterResults
+    | GithubVoteResolveResults
     | IgnoreAddResults
     | IgnoreDeleteResults
     | IgnoreListResults
@@ -488,6 +500,7 @@ validate_committee_keys = validator(CommitteeKeysResults)
 validate_committee_projects = validator(CommitteeProjectsResults)
 validate_committees_list = validator(CommitteesListResults)
 validate_github_ssh_register = validator(GithubSshRegisterResults)
+validate_github_vote_resolve = validator(GithubVoteResolveResults)
 validate_ignore_add = validator(IgnoreAddResults)
 validate_ignore_delete = validator(IgnoreDeleteResults)
 validate_ignore_list = validator(IgnoreListResults)

@@ -36,7 +36,6 @@ import atr.config as config
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.jwtoken as jwtoken
-import atr.log as log
 import atr.models as models
 import atr.models.sql as sql
 import atr.revision as revision
@@ -260,14 +259,50 @@ async def committees_list() -> DictResponse:
     ).model_dump(), 200
 
 
+@api.BLUEPRINT.route("/github/vote/resolve", methods=["POST"])
+@quart_schema.validate_request(models.api.GithubVoteResolveArgs)
+async def github_vote_resolve(data: models.api.GithubVoteResolveArgs) -> DictResponse:
+    """
+    Resolve a vote with a corroborating GitHub OIDC JWT.
+    """
+    _payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt)
+    if project.committee is None:
+        raise exceptions.NotFound("Project has no committee")
+    # WARNING: This is subtly different from the /vote/resolve code
+    async with db.session() as db_data:
+        release_name = sql.release_name(project.name, data.version)
+        release = await db_data.release(name=release_name, _project=True, _committee=True).demand(exceptions.NotFound())
+        if release.project.committee is None:
+            raise exceptions.NotFound("Project has no committee")
+        if release.project.committee.name != project.committee.name:
+            raise exceptions.BadRequest("Release project committee does not match the OIDC project committee")
+        _committee_member_or_admin(release.project.committee, asf_uid)
+
+        release = await db_data.merge(release)
+        match data.resolution:
+            case "passed":
+                release.phase = sql.ReleasePhase.RELEASE_PREVIEW
+                description = "Create a preview revision from the last candidate draft"
+                async with revision.create_and_manage(
+                    project.name, release.version, asf_uid, description=description
+                ) as _creating:
+                    pass
+            case "failed":
+                release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+        await db_data.commit()
+
+    return models.api.GithubVoteResolveResults(
+        endpoint="/github/vote/resolve",
+        success=True,
+    ).model_dump(), 200
+
+
 @api.BLUEPRINT.route("/github/ssh/register", methods=["POST"])
 @quart_schema.validate_request(models.api.GithubSshRegisterArgs)
 async def github_ssh_register(data: models.api.GithubSshRegisterArgs) -> DictResponse:
     """
     Register an SSH key sent with a corroborating GitHub OIDC JWT.
     """
-    log.info(f"SSH key: {data.ssh_key}")
-
     payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt)
     async with storage.write_as_committee_member(util.unwrap(project.committee).name, asf_uid) as wacm:
         fingerprint, expires = await wacm.ssh.add_workflow_key(
@@ -1158,14 +1193,14 @@ def _committee_member_or_admin(committee: sql.Committee, asf_uid: str) -> None:
         raise exceptions.Forbidden("You do not have permission to perform this action")
 
 
-@db.session_function
-async def _get_pat(data: db.Session, uid: str, token_hash: str) -> sql.PersonalAccessToken | None:
-    return await data.query_one_or_none(
-        sqlmodel.select(sql.PersonalAccessToken).where(
-            sql.PersonalAccessToken.asfuid == uid,
-            sql.PersonalAccessToken.token_hash == token_hash,
-        )
-    )
+# @db.session_function
+# async def _get_pat(data: db.Session, uid: str, token_hash: str) -> sql.PersonalAccessToken | None:
+#     return await data.query_one_or_none(
+#         sqlmodel.select(sql.PersonalAccessToken).where(
+#             sql.PersonalAccessToken.asfuid == uid,
+#             sql.PersonalAccessToken.token_hash == token_hash,
+#         )
+#     )
 
 
 def _jwt_asf_uid() -> str:
