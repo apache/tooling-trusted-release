@@ -138,6 +138,7 @@ class WriteAsGeneralPublic(WriteAs):
         self.keys = writers.keys.GeneralPublic(write, self, data)
         self.ssh = writers.ssh.GeneralPublic(write, self, data)
         self.tokens = writers.tokens.GeneralPublic(write, self, data)
+        self.vote = writers.vote.GeneralPublic(write, self, data)
 
 
 class WriteAsFoundationCommitter(WriteAsGeneralPublic):
@@ -147,6 +148,7 @@ class WriteAsFoundationCommitter(WriteAsGeneralPublic):
         self.keys = writers.keys.FoundationCommitter(write, self, data)
         self.ssh = writers.ssh.FoundationCommitter(write, self, data)
         self.tokens = writers.tokens.FoundationCommitter(write, self, data)
+        self.vote = writers.vote.FoundationCommitter(write, self, data)
 
 
 class WriteAsCommitteeParticipant(WriteAsFoundationCommitter):
@@ -156,6 +158,7 @@ class WriteAsCommitteeParticipant(WriteAsFoundationCommitter):
         self.keys = writers.keys.CommitteeParticipant(write, self, data, committee_name)
         self.ssh = writers.ssh.CommitteeParticipant(write, self, data, committee_name)
         self.tokens = writers.tokens.CommitteeParticipant(write, self, data, committee_name)
+        self.vote = writers.vote.CommitteeParticipant(write, self, data, committee_name)
 
     @property
     def committee_name(self) -> str:
@@ -170,6 +173,7 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
         self.keys = writers.keys.CommitteeMember(write, self, data, committee_name)
         self.ssh = writers.ssh.CommitteeMember(write, self, data, committee_name)
         self.tokens = writers.tokens.CommitteeMember(write, self, data, committee_name)
+        self.vote = writers.vote.CommitteeMember(write, self, data, committee_name)
 
     @property
     def committee_name(self) -> str:
@@ -183,6 +187,7 @@ class WriteAsFoundationAdmin(WriteAsCommitteeMember):
         self.keys = writers.keys.FoundationAdmin(write, self, data, committee_name)
         # self.ssh = writers.ssh.FoundationAdmin(write, self, data, committee_name)
         # self.tokens = writers.tokens.FoundationAdmin(write, self, data, committee_name)
+        # self.vote = writers.vote.FoundationAdmin(write, self, data, committee_name)
 
     @property
     def committee_name(self) -> str:
