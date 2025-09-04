@@ -71,6 +71,20 @@ class CommitteesListResults(schema.Strict):
     committees: Sequence[sql.Committee]
 
 
+class GithubSshRegisterArgs(schema.Strict):
+    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
+    ssh_key: str = schema.Field(
+        ..., **example("ssh-ed25519 AAAAC3NzaC1lZDI1NTEgH5C9okWi0dh25AAAAIOMqqnkVzrm0SdG6UOoqKLsabl9GKJl")
+    )
+
+
+class GithubSshRegisterResults(schema.Strict):
+    endpoint: Literal["/github/ssh/register"] = schema.Field(alias="endpoint")
+    fingerprint: str = schema.Field(..., **example("SHA256:0123456789abcdef0123456789abcdef01234567"))
+    project: str = schema.Field(..., **example("example"))
+    expires: int = schema.Field(..., **example(1713547200))
+
+
 class IgnoreAddArgs(schema.Strict):
     committee_name: str = schema.Field(..., **example("example"))
     release_glob: str | None = schema.Field(default=None, **example("example-0.0.*"))
@@ -113,20 +127,6 @@ class JwtCreateResults(schema.Strict):
     endpoint: Literal["/jwt/create"] = schema.Field(alias="endpoint")
     asfuid: str = schema.Field(..., **example("user"))
     jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
-
-
-class JwtGithubArgs(schema.Strict):
-    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
-    ssh_key: str = schema.Field(
-        ..., **example("ssh-ed25519 AAAAC3NzaC1lZDI1NTEgH5C9okWi0dh25AAAAIOMqqnkVzrm0SdG6UOoqKLsabl9GKJl")
-    )
-
-
-class JwtGithubResults(schema.Strict):
-    endpoint: Literal["/jwt/github"] = schema.Field(alias="endpoint")
-    fingerprint: str = schema.Field(..., **example("SHA256:0123456789abcdef0123456789abcdef01234567"))
-    project: str = schema.Field(..., **example("example"))
-    expires: int = schema.Field(..., **example(1713547200))
 
 
 class KeyAddArgs(schema.Strict):
@@ -434,11 +434,10 @@ Results = Annotated[
     | CommitteeKeysResults
     | CommitteeProjectsResults
     | CommitteesListResults
+    | GithubSshRegisterResults
     | IgnoreAddResults
     | IgnoreDeleteResults
     | IgnoreListResults
-    | JwtCreateResults
-    | JwtGithubResults
     | KeyAddResults
     | KeyDeleteResults
     | KeyGetResults
@@ -487,11 +486,11 @@ validate_committee_get = validator(CommitteeGetResults)
 validate_committee_keys = validator(CommitteeKeysResults)
 validate_committee_projects = validator(CommitteeProjectsResults)
 validate_committees_list = validator(CommitteesListResults)
+validate_github_ssh_register = validator(GithubSshRegisterResults)
 validate_ignore_add = validator(IgnoreAddResults)
 validate_ignore_delete = validator(IgnoreDeleteResults)
 validate_ignore_list = validator(IgnoreListResults)
 validate_jwt_create = validator(JwtCreateResults)
-validate_jwt_github = validator(JwtGithubResults)
 validate_key_add = validator(KeyAddResults)
 validate_key_delete = validator(KeyDeleteResults)
 validate_key_get = validator(KeyGetResults)
