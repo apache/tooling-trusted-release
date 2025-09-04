@@ -56,7 +56,7 @@ def audit(**kwargs: basic.JSON) -> None:
 
 
 class AccessAs:
-    def log_auditable_event(self, **kwargs: basic.JSON) -> None:
+    def append_to_audit_log(self, **kwargs: basic.JSON) -> None:
         audit(**kwargs)
 
 

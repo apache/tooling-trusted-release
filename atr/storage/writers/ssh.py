@@ -86,7 +86,7 @@ class CommitteeParticipant(FoundationCommitter):
         )
         self.__data.add(wsk)
         await self.__data.commit()
-        self.__write_as.log_auditable_event(
+        self.__write_as.append_to_audit_log(
             asf_uid=self.__asf_uid,
             fingerprint=fingerprint,
             project_name=project_name,

@@ -82,7 +82,7 @@ class FoundationCommitter(GeneralPublic):
         issued_jwt = jwtoken.issue(self.__asf_uid)
         pat.last_used = datetime.datetime.now(datetime.UTC)
         await self.__data.commit()
-        self.__write_as.log_auditable_event(
+        self.__write_as.append_to_audit_log(
             asf_uid=self.__asf_uid,
             pat_hash=pat_hash,
         )

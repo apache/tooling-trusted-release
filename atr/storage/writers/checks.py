@@ -107,7 +107,7 @@ class CommitteeMember(CommitteeParticipant):
         )
         self.__data.add(cri)
         await self.__data.commit()
-        self.__write_as.log_auditable_event(
+        self.__write_as.append_to_audit_log(
             asf_uid=self.__asf_uid,
             cri=cri.model_dump_json(exclude_none=True),
         )
@@ -116,7 +116,7 @@ class CommitteeMember(CommitteeParticipant):
         via = sql.validate_instrumented_attribute
         await self.__data.execute(sqlmodel.delete(sql.CheckResultIgnore).where(via(sql.CheckResultIgnore.id) == id))
         await self.__data.commit()
-        self.__write_as.log_auditable_event(
+        self.__write_as.append_to_audit_log(
             asf_uid=self.__asf_uid,
             ignore_id=id,
         )
@@ -145,7 +145,7 @@ class CommitteeMember(CommitteeParticipant):
         cri.status = status
         cri.message_glob = message_glob
         await self.__data.commit()
-        self.__write_as.log_auditable_event(
+        self.__write_as.append_to_audit_log(
             asf_uid=self.__asf_uid,
             cri=cri.model_dump_json(exclude_none=True),
         )
