@@ -39,8 +39,11 @@
 
       {% set unfinished_releases = unfinished_releases_fn(current_user.uid) %}
       {% if unfinished_releases %}
-        {% for project_short_display_name, releases in unfinished_releases.items() %}
-          <h3>{{ project_short_display_name }}</h3>
+        {% for project_short_display_name, project_name, releases in unfinished_releases %}
+          <h3>
+            <a href="{{ as_url(routes.projects.view, name=project_name) }}"
+               class="text-decoration-none text-reset">{{ project_short_display_name }}</a>
+          </h3>
           <ul>
             {% for release in releases %}
               <li>

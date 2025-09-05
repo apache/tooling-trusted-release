@@ -33,6 +33,11 @@
 
   {{ forms.errors_summary(policy_form) }}
 
+  <p class="mb-4">
+    <a href="{{ as_url(routes.start.selected, project_name=project.name) }}"
+       class="btn btn-sm btn-outline-primary">Start a new release</a>
+  </p>
+
   <div class="card mb-4">
     <div class="card-header bg-light">
       <h3 class="mb-2">Project label</h3>

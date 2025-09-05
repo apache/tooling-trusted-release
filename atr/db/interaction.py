@@ -298,8 +298,8 @@ async def tasks_ongoing_revision(
         return task_count, latest_revision
 
 
-async def unfinished_releases(asfuid: str) -> dict[str, list[sql.Release]]:
-    releases: dict[str, list[sql.Release]] = {}
+async def unfinished_releases(asfuid: str) -> list[tuple[str, str, list[sql.Release]]]:
+    releases: list[tuple[str, str, list[sql.Release]]] = []
     async with db.session() as data:
         user_projects = await user.projects(asfuid)
         user_projects.sort(key=lambda p: p.display_name)
@@ -323,7 +323,7 @@ async def unfinished_releases(asfuid: str) -> dict[str, list[sql.Release]]:
             active_releases = list(result.scalars().all())
             if active_releases:
                 active_releases.sort(key=lambda r: r.created, reverse=True)
-                releases[project.short_display_name] = active_releases
+                releases.append((project.short_display_name, project.name, active_releases))
 
     return releases
 
