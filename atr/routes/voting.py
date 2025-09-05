@@ -130,6 +130,7 @@ async def selected_revision(
 
         if await form.validate_on_submit():
             email_to: str = util.unwrap(form.mailing_list.data)
+            log.info(f"voting.selected_revision: email to: {email_to}")
             vote_duration_choice: int = util.unwrap(form.vote_duration.data)
             subject_data: str = util.unwrap(form.subject.data)
             body_data: str = util.unwrap(form.body.data)

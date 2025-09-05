@@ -121,6 +121,7 @@ async def _initiate_core_logic(args: Initiate) -> results.Results | None:
         raise VoteInitiationError("Invalid mailing list choice")
 
     # Create mail message
+    log.info(f"Creating mail message for {args.email_to}")
     message = mail.Message(
         email_sender=f"{args.initiator_id}@apache.org",
         email_recipient=args.email_to,
