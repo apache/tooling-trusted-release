@@ -29,7 +29,7 @@ import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.finish as finish
 import atr.routes.vote as vote
-import atr.routes.voting as voting
+import atr.storage as storage
 import atr.tabulate as tabulate
 import atr.tasks.message as message
 import atr.template as template
@@ -332,20 +332,23 @@ async def _resolve_vote(
             revision_number = release.latest_revision_number
             if revision_number is None:
                 raise ValueError("Release has no revision number")
-            await voting.start_vote(
-                email_to=incubator_vote_address,
-                permitted_recipients=[incubator_vote_address],
-                project_name=release.project.name,
-                version_name=release.version,
-                selected_revision_number=revision_number,
-                session=session,
-                vote_duration_choice=latest_vote_task.task_args["vote_duration"],
-                subject_data=f"[VOTE] Release {release.project.display_name} {release.version}",
-                body_data=await construct.start_vote_default(release.project.name),
-                data=data,
-                release=release,
-                promote=False,
-            )
+            if release.committee is None:
+                raise ValueError("Project has no committee")
+            async with storage.write_as_committee_member(release.committee.name) as wacm:
+                await wacm.vote.start(
+                    email_to=incubator_vote_address,
+                    permitted_recipients=[incubator_vote_address],
+                    project_name=release.project.name,
+                    version_name=release.version,
+                    selected_revision_number=revision_number,
+                    asf_uid=session.uid,
+                    asf_fullname=session.fullname,
+                    vote_duration_choice=latest_vote_task.task_args["vote_duration"],
+                    subject_data=f"[VOTE] Release {release.project.display_name} {release.version}",
+                    body_data=await construct.start_vote_default(release.project.name),
+                    release=release,
+                    promote=False,
+                )
             success_message = "Project PPMC vote marked as passed, and Incubator PMC vote automatically started"
         elif vote_result == "passed":
             release.phase = sql.ReleasePhase.RELEASE_PREVIEW

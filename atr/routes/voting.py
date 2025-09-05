@@ -33,7 +33,6 @@ import atr.routes.compose as compose
 import atr.routes.root as root
 import atr.routes.vote as vote
 import atr.storage as storage
-import atr.tasks.vote as tasks_vote
 import atr.template as template
 import atr.user as user
 import atr.util as util
@@ -109,69 +108,6 @@ async def selected_revision(
         keys_warning=keys_warning,
         manual_vote_process_form=manual_vote_process_form,
         user_tests_address=util.USER_TESTS_ADDRESS,
-    )
-
-
-async def start_vote(
-    email_to: str,
-    permitted_recipients: list[str],
-    project_name: str,
-    version_name: str,
-    selected_revision_number: str,
-    session: routes.CommitterSession,
-    vote_duration_choice: int,
-    subject_data: str,
-    body_data: str,
-    data: db.Session,
-    release: sql.Release,
-    promote: bool = True,
-) -> response.Response | str:
-    if email_to not in permitted_recipients:
-        # This will be checked again by tasks/vote.py for extra safety
-        log.info(f"Invalid mailing list choice: {email_to} not in {permitted_recipients}")
-        raise base.ASFQuartException("Invalid mailing list choice", errorcode=400)
-
-    if promote is True:
-        # This verifies the state and sets the phase to RELEASE_CANDIDATE
-        error = await interaction.promote_release(data, release.name, selected_revision_number, vote_manual=False)
-        if error:
-            return await session.redirect(root.index, error=error)
-
-    # TODO: We also need to store the duration of the vote
-    # We can't allow resolution of the vote until the duration has elapsed
-    # But we allow the user to specify in the form
-    # And yet we also have ReleasePolicy.min_hours
-    # Presumably this sets the default, and the form takes precedence?
-    # ReleasePolicy.min_hours can also be 0, though
-
-    # Create a task for vote initiation
-    task = sql.Task(
-        status=sql.TaskStatus.QUEUED,
-        task_type=sql.TaskType.VOTE_INITIATE,
-        task_args=tasks_vote.Initiate(
-            release_name=release.name,
-            email_to=email_to,
-            vote_duration=vote_duration_choice,
-            initiator_id=session.uid,
-            initiator_fullname=session.fullname,
-            subject=subject_data,
-            body=body_data,
-        ).model_dump(),
-        asf_uid=util.unwrap(session.uid),
-        project_name=project_name,
-        version_name=version_name,
-    )
-    data.add(task)
-    await data.commit()
-
-    # TODO: We should log all outgoing email and the session so that users can confirm
-    # And can be warned if there was a failure
-    # (The message should be shown on the vote resolution page)
-    return await session.redirect(
-        vote.selected,
-        success=f"The vote announcement email will soon be sent to {email_to}.",
-        project_name=project_name,
-        version_name=version_name,
     )
 
 
