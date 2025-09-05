@@ -279,15 +279,17 @@ async def _form(
     )
 
     # Set defaults
+    choices: forms.Choices = sorted([(recipient, recipient) for recipient in permitted_recipients])
     if quart.request.method == "GET":
         # Defaults for GET requests
         form.subject.data = default_subject
         form.body.data = default_body
+        # Choices and defaults for mailing list
+        forms.choices(form.mailing_list, choices, default=util.USER_TESTS_ADDRESS)
+    else:
+        forms.choices(form.mailing_list, choices)
     # Hidden field
     form.release_name.data = release.name
-    # Choices and defaults for mailing list
-    choices: forms.Choices = sorted([(recipient, recipient) for recipient in permitted_recipients])
-    forms.choices(form.mailing_list, choices, default=util.USER_TESTS_ADDRESS)
     # Description
     form.mailing_list.description = f"""\
 NOTE: The limited options above are provided for testing purposes.
