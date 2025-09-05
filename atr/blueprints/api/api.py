@@ -40,7 +40,6 @@ import atr.models as models
 import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
-import atr.routes.announce as announce
 import atr.routes.start as start
 import atr.storage as storage
 import atr.storage.outcome as outcome
@@ -260,21 +259,26 @@ async def github_release_announce(data: models.api.GithubReleaseAnnounceArgs) ->
     """
     Announce a release with a corroborating GitHub OIDC JWT.
     """
-    _payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt, interaction.TrustedProjectPhase.FINISH)
+    _payload, asf_uid, project = await interaction.github_trusted_jwt(
+        data.jwt,
+        interaction.TrustedProjectPhase.FINISH,
+    )
     try:
         # TODO: Add defaults
-        await announce.announce(
-            project.name,
-            data.version,
-            data.revision,
-            data.email_to,
-            data.subject,
-            data.body,
-            data.path_suffix,
-            asf_uid,
-            asf_uid,
-        )
-    except announce.AnnounceError as e:
+        committee = util.unwrap(project.committee)
+        async with storage.write_as_committee_member(committee.name, asf_uid) as wacm:
+            await wacm.announce.release(
+                project.name,
+                data.version,
+                data.revision,
+                data.email_to,
+                data.subject,
+                data.body,
+                data.path_suffix,
+                asf_uid,
+                asf_uid,
+            )
+    except storage.AccessError as e:
         raise exceptions.BadRequest(str(e))
 
     return models.api.GithubReleaseAnnounceResults(
@@ -643,18 +647,20 @@ async def release_announce(data: models.api.ReleaseAnnounceArgs) -> DictResponse
     asf_uid = _jwt_asf_uid()
 
     try:
-        await announce.announce(
-            data.project,
-            data.version,
-            data.revision,
-            data.email_to,
-            data.subject,
-            data.body,
-            data.path_suffix,
-            asf_uid,
-            asf_uid,
-        )
-    except announce.AnnounceError as e:
+        async with storage.write_as_project_committee_member(data.project, asf_uid) as wacm:
+            # TODO: Get fullname and use it instead of asf_uid
+            await wacm.announce.release(
+                data.project,
+                data.version,
+                data.revision,
+                data.email_to,
+                data.subject,
+                data.body,
+                data.path_suffix,
+                asf_uid,
+                asf_uid,
+            )
+    except storage.AccessError as e:
         raise exceptions.BadRequest(str(e))
 
     return models.api.ReleaseAnnounceResults(
