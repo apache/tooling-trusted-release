@@ -38,7 +38,15 @@ class SendError(Exception): ...
 
 @checks.with_model(Send)
 async def send(args: Send) -> results.Results | None:
-    if args.email_recipient not in util.permitted_recipients(args.email_sender):
+    if "@" not in args.email_sender:
+        log.warning(f"Invalid email sender: {args.email_sender}")
+        sender_asf_uid = args.email_sender
+    elif args.email_sender.endswith("@apache.org"):
+        sender_asf_uid = args.email_sender.split("@")[0]
+    else:
+        raise SendError(f"Invalid email sender: {args.email_sender}")
+
+    if args.email_recipient not in util.permitted_recipients(sender_asf_uid):
         raise SendError(f"You are not permitted to send announcements to {args.email_recipient}")
 
     message = mail.Message(
