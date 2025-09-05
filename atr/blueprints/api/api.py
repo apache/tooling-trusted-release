@@ -313,31 +313,20 @@ async def github_vote_resolve(data: models.api.GithubVoteResolveArgs) -> DictRes
     Resolve a vote with a corroborating GitHub OIDC JWT.
     """
     # TODO: Need to be able to resolve and make the release immutable
-    _payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt, interaction.TrustedProjectPhase.VOTE)
-    if project.committee is None:
-        raise exceptions.NotFound("Project has no committee")
-    # WARNING: This is subtly different from the /vote/resolve code
-    async with db.session() as db_data:
-        release_name = sql.release_name(project.name, data.version)
-        release = await db_data.release(name=release_name, _project=True, _committee=True).demand(exceptions.NotFound())
-        if release.project.committee is None:
-            raise exceptions.NotFound("Project has no committee")
-        if release.project.committee.name != project.committee.name:
-            raise exceptions.BadRequest("Release project committee does not match the OIDC project committee")
-        _committee_member_or_admin(release.project.committee, asf_uid)
-
-        release = await db_data.merge(release)
-        match data.resolution:
-            case "passed":
-                release.phase = sql.ReleasePhase.RELEASE_PREVIEW
-                description = "Create a preview revision from the last candidate draft"
-                async with revision.create_and_manage(
-                    project.name, release.version, asf_uid, description=description
-                ) as _creating:
-                    pass
-            case "failed":
-                release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
-        await db_data.commit()
+    _payload, asf_uid, project = await interaction.github_trusted_jwt(
+        data.jwt,
+        interaction.TrustedProjectPhase.VOTE,
+    )
+    async with storage.write_as_project_committee_member(project.name, asf_uid) as wacm:
+        # TODO: Get fullname and use instead of asf_uid
+        # TODO: Add resolution templating to atr.construct
+        _release, _voting_round, _success_message, _error_message = await wacm.vote.resolve(
+            project.name,
+            data.version,
+            data.resolution,
+            asf_uid,
+            f"The vote {data.resolution}.",
+        )
 
     return models.api.GithubVoteResolveResults(
         endpoint="/github/vote/resolve",
