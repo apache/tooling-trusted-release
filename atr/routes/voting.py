@@ -32,6 +32,7 @@ import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.root as root
 import atr.routes.vote as vote
+import atr.storage as storage
 import atr.tasks.vote as tasks_vote
 import atr.template as template
 import atr.user as user
@@ -71,83 +72,19 @@ async def selected_revision(
             with_committee=True,
             with_project_release_policy=True,
         )
-        if release.project.policy_strict_checking:
-            if await interaction.has_failing_checks(release, revision, caller_data=data):
-                return await session.redirect(
-                    compose.selected,
-                    error="This release candidate draft has errors. Please fix the errors before starting a vote.",
-                    project_name=project_name,
-                    version_name=version_name,
-                    revision=revision,
-                )
-
-        # Check that the user is on the project committee for the release
-        # TODO: Consider relaxing this to all committers
-        # Otherwise we must not show the vote form
-        if not (user.is_committee_member(release.committee, session.uid) or user.is_admin(session.uid)):
-            return await session.redirect(
-                compose.selected,
-                error="You must be on the PMC of this project to start a vote",
-                project_name=project_name,
-                version_name=version_name,
-                revision=revision,
-            )
-
         selected_revision_number = release.latest_revision_number
         if selected_revision_number is None:
             return await session.redirect(compose.selected, error="No revision found for this release")
-
-        # committee = util.unwrap(release.committee)
-        permitted_recipients = util.permitted_recipients(session.uid)
-        if release.release_policy:
-            min_hours = release.release_policy.min_hours if (release.release_policy.min_hours is not None) else 72
-        else:
-            min_hours = 72
-        release_policy_mailto_addresses = ", ".join(release.project.policy_mailto_addresses)
-
-        form_data = (await quart.request.form) if (quart.request.method == "POST") else None
-        hidden_field = (form_data or {}).get("hidden_field")
-        if isinstance(hidden_field, str):
-            # This hidden_field is set to selected_revision_number
-            # It's manual_vote_process_form.hidden_field.data in selected_revision
-            selected_revision_number = hidden_field
-            return await start_vote_manual(
-                release,
-                selected_revision_number,
-                session,
-                data,
+        if revision != selected_revision_number:
+            return await session.redirect(
+                compose.selected, error="The selected revision does not match the revision you are voting on"
             )
-
-        form = await _form(
-            release,
-            form_data,
-            project_name,
-            version_name,
-            permitted_recipients,
-            release_policy_mailto_addresses,
-            min_hours,
+        response_or_form = await _selected_revision_data(
+            release, project_name, version_name, selected_revision_number, data, session
         )
-
-        if await form.validate_on_submit():
-            email_to: str = util.unwrap(form.mailing_list.data)
-            log.info(f"voting.selected_revision: email to: {email_to}")
-            vote_duration_choice: int = util.unwrap(form.vote_duration.data)
-            subject_data: str = util.unwrap(form.subject.data)
-            body_data: str = util.unwrap(form.body.data)
-            return await start_vote(
-                email_to,
-                permitted_recipients,
-                project_name,
-                version_name,
-                selected_revision_number,
-                session,
-                vote_duration_choice,
-                subject_data,
-                body_data,
-                data,
-                release,
-                promote=True,
-            )
+        if not isinstance(response_or_form, VoteInitiateForm):
+            return response_or_form
+        form = response_or_form
 
     keys_warning = await _keys_warning(release)
     manual_vote_process_form = None
@@ -311,3 +248,96 @@ async def _keys_warning(
     else:
         keys_file_path = util.get_downloads_dir() / release.committee.name / "KEYS"
     return not await aiofiles.os.path.isfile(keys_file_path)
+
+
+async def _selected_revision_data(
+    release: sql.Release,
+    project_name: str,
+    version_name: str,
+    revision: str,
+    data: db.Session,
+    session: routes.CommitterSession,
+) -> response.Response | str | VoteInitiateForm:
+    if release.project.policy_strict_checking:
+        if await interaction.has_failing_checks(release, revision, caller_data=data):
+            return await session.redirect(
+                compose.selected,
+                error="This release candidate draft has errors. Please fix the errors before starting a vote.",
+                project_name=project_name,
+                version_name=version_name,
+                revision=revision,
+            )
+
+    # Check that the user is on the project committee for the release
+    # TODO: Consider relaxing this to all committers
+    # Otherwise we must not show the vote form
+    if not (user.is_committee_member(release.committee, session.uid) or user.is_admin(session.uid)):
+        return await session.redirect(
+            compose.selected,
+            error="You must be on the PMC of this project to start a vote",
+            project_name=project_name,
+            version_name=version_name,
+            revision=revision,
+        )
+
+    # committee = util.unwrap(release.committee)
+    permitted_recipients = util.permitted_recipients(session.uid)
+    if release.release_policy:
+        min_hours = release.release_policy.min_hours if (release.release_policy.min_hours is not None) else 72
+    else:
+        min_hours = 72
+    release_policy_mailto_addresses = ", ".join(release.project.policy_mailto_addresses)
+
+    form_data = (await quart.request.form) if (quart.request.method == "POST") else None
+    hidden_field = (form_data or {}).get("hidden_field")
+    if isinstance(hidden_field, str):
+        # This hidden_field is set to selected_revision_number
+        # It's manual_vote_process_form.hidden_field.data in selected_revision
+        selected_revision_number = hidden_field
+        return await start_vote_manual(
+            release,
+            selected_revision_number,
+            session,
+            data,
+        )
+
+    form = await _form(
+        release,
+        form_data,
+        project_name,
+        version_name,
+        permitted_recipients,
+        release_policy_mailto_addresses,
+        min_hours,
+    )
+
+    if await form.validate_on_submit():
+        email_to: str = util.unwrap(form.mailing_list.data)
+        log.info(f"voting.selected_revision: email to: {email_to}")
+        vote_duration_choice: int = util.unwrap(form.vote_duration.data)
+        subject_data: str = util.unwrap(form.subject.data)
+        body_data: str = util.unwrap(form.body.data)
+        if release.committee is None:
+            raise base.ASFQuartException("Release has no associated committee", errorcode=400)
+        async with storage.write_as_committee_member(release.committee.name) as wacm:
+            await wacm.vote.start(
+                email_to,
+                permitted_recipients,
+                project_name,
+                version_name,
+                revision,
+                session.uid,
+                session.fullname,
+                vote_duration_choice,
+                subject_data,
+                body_data,
+                release,
+                promote=True,
+            )
+        return await session.redirect(
+            vote.selected,
+            success=f"The vote announcement email will soon be sent to {email_to}.",
+            project_name=project_name,
+            version_name=version_name,
+        )
+    return form
