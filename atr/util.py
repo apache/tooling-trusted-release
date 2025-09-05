@@ -772,6 +772,29 @@ def static_path(*args: str) -> str:
     return quart.url_for("static", filename=filename)
 
 
+async def task_archive_url(task_mid: str) -> str | None:
+    if "@" not in task_mid:
+        return None
+
+    # TODO: This List ID will be dynamic when we allow posting to arbitrary lists
+    # lid = "user-tests.tooling.apache.org"
+    lid = USER_TESTS_ADDRESS.replace("@", ".")
+    url = f"https://lists.apache.org/api/email.lua?id=%3C{task_mid}%3E&listid=%3C{lid}%3E"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                # TODO: Check whether this blocks from network
+                email_data = await response.json()
+        mid = email_data["mid"]
+        if not isinstance(mid, str):
+            return None
+        return "https://lists.apache.org/thread/" + mid
+    except Exception:
+        log.exception("Failed to get archive URL for task %s", task_mid)
+        return None
+
+
 async def thread_messages(
     thread_id: str,
 ) -> AsyncGenerator[tuple[str, dict[str, Any]]]:

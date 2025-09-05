@@ -15,37 +15,20 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Final
-
-import aiohttp
 import quart
 import werkzeug.wrappers.response as response
 
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.log as log
 import atr.models.results as results
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.compose as compose
-import atr.routes.resolve as resolve
 import atr.storage as storage
 import atr.tasks.message as message
 import atr.util as util
-
-# TEST_MID: Final[str | None] = "CAH5JyZo8QnWmg9CwRSwWY=GivhXW4NiLyeNJO71FKdK81J5-Uw@mail.gmail.com"
-TEST_MID: Final[str | None] = None
-_THREAD_URLS_FOR_DEVELOPMENT: Final[dict[str, str]] = {
-    "CAH5JyZo8QnWmg9CwRSwWY=GivhXW4NiLyeNJO71FKdK81J5-Uw@mail.gmail.com": "https://lists.apache.org/thread/z0o7xnjnyw2o886rxvvq2ql4rdfn754w",
-    "818a44a3-6984-4aba-a650-834e86780b43@apache.org": "https://lists.apache.org/thread/619hn4x796mh3hkk3kxg1xnl48dy2s64",
-    "CAA9ykM+bMPNk=BOF9hj0O+mjN1igppOJ+pKdZHcAM0ddVi+5_w@mail.gmail.com": "https://lists.apache.org/thread/x0m3p2xqjvflgtkb6oxqysm36cr9l5mg",
-    "CAFHDsVzgtfboqYF+a3owaNf+55MUiENWd3g53mU4rD=WHkXGwQ@mail.gmail.com": "https://lists.apache.org/thread/brj0k3g8pq63g8f7xhmfg2rbt1240nts",
-    "CAMomwMrvKTQK7K2-OtZTrEO0JjXzO2g5ynw3gSoks_PXWPZfoQ@mail.gmail.com": "https://lists.apache.org/thread/y5rqp5qk6dmo08wlc3g20n862hznc9m8",
-    "CANVKqzfLYj6TAVP_Sfsy5vFbreyhKskpRY-vs=F7aLed+rL+uA@mail.gmail.com": "https://lists.apache.org/thread/oy969lhh6wlzd51ovckn8fly9rvpopwh",
-    "CAH4123ZwGtkwszhEU7qnMByLa-yvyKz2W+DjH_UChPMuzaa54g@mail.gmail.com": "https://lists.apache.org/thread/7111mqyc25sfqxm6bf4ynwhs0bk0r4ys",
-    "CADL1oArKFcXvNb1MJfjN=10-yRfKxgpLTRUrdMM1R7ygaTkdYQ@mail.gmail.com": "https://lists.apache.org/thread/d7119h2qm7jrd5zsbp8ghkk0lpvnnxnw",
-    "a1507118-88b1-4b7b-923e-7f2b5330fc01@apache.org": "https://lists.apache.org/thread/gzjd2jv7yod5sk5rgdf4x33g5l3fdf5o",
-}
 
 
 class CastVoteForm(forms.Typed):
@@ -68,7 +51,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         phase=sql.ReleasePhase.RELEASE_CANDIDATE,
         with_project_release_policy=True,
     )
-    latest_vote_task = await resolve.release_latest_vote_task(release)
+    latest_vote_task = await interaction.release_latest_vote_task(release)
     archive_url = None
     task_mid = None
 
@@ -82,13 +65,13 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
                 email_to="example@example.org.INVALID",
                 vote_end="2025-07-01 12:00:00",
                 subject="Test vote",
-                mid=TEST_MID,
+                mid=interaction.TEST_MID,
                 mail_send_warnings=[],
             )
 
         # Move task_mid_get here?
-        task_mid = resolve.task_mid_get(latest_vote_task)
-        archive_url = await task_archive_url_cached(task_mid)
+        task_mid = interaction.task_mid_get(latest_vote_task)
+        archive_url = await interaction.task_archive_url_cached(task_mid)
 
     # Special form for the [ Resolve vote ] button, to make it POST
     hidden_form = await forms.Hidden.create_form()
@@ -163,34 +146,6 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
         )
 
 
-async def task_archive_url_cached(task_mid: str | None) -> str | None:
-    if task_mid in _THREAD_URLS_FOR_DEVELOPMENT:
-        return _THREAD_URLS_FOR_DEVELOPMENT[task_mid]
-
-    if task_mid is None:
-        return None
-    if "@" not in task_mid:
-        return None
-
-    async with db.session() as data:
-        url = await data.ns_text_get(
-            "mid-url-cache",
-            task_mid,
-        )
-        if url is not None:
-            return url
-
-    url = await _task_archive_url(task_mid)
-    if url is not None:
-        await data.ns_text_set(
-            "mid-url-cache",
-            task_mid,
-            url,
-        )
-
-    return url
-
-
 async def _send_vote(
     session: routes.CommitterSession,
     release: sql.Release,
@@ -198,10 +153,10 @@ async def _send_vote(
     comment: str,
 ) -> tuple[str, str]:
     # Get the email thread
-    latest_vote_task = await resolve.release_latest_vote_task(release)
+    latest_vote_task = await interaction.release_latest_vote_task(release)
     if latest_vote_task is None:
         return "", "No vote task found."
-    vote_thread_mid = resolve.task_mid_get(latest_vote_task)
+    vote_thread_mid = interaction.task_mid_get(latest_vote_task)
     if vote_thread_mid is None:
         return "", "No vote thread found."
 
@@ -240,26 +195,3 @@ async def _send_vote(
         await data.commit()
 
     return email_recipient, ""
-
-
-async def _task_archive_url(task_mid: str) -> str | None:
-    if "@" not in task_mid:
-        return None
-
-    # TODO: This List ID will be dynamic when we allow posting to arbitrary lists
-    # lid = "user-tests.tooling.apache.org"
-    lid = util.USER_TESTS_ADDRESS.replace("@", ".")
-    url = f"https://lists.apache.org/api/email.lua?id=%3C{task_mid}%3E&listid=%3C{lid}%3E"
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                response.raise_for_status()
-                # TODO: Check whether this blocks from network
-                email_data = await response.json()
-        mid = email_data["mid"]
-        if not isinstance(mid, str):
-            return None
-        return "https://lists.apache.org/thread/" + mid
-    except Exception:
-        log.exception("Failed to get archive URL for task %s", task_mid)
-        return None

@@ -41,9 +41,7 @@ import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.announce as announce
-import atr.routes.resolve as resolve
 import atr.routes.start as start
-import atr.routes.vote as vote
 import atr.storage as storage
 import atr.storage.outcome as outcome
 import atr.storage.types as types
@@ -1109,7 +1107,7 @@ async def vote_resolve(data: models.api.VoteResolveArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
     async with storage.write(asf_uid) as write:
         wacm = await write.as_project_committee_member(data.project)
-        await wacm.vote.resolve(data.project, data.version, data.resolution)
+        await wacm.vote.resolve_api(data.project, data.version, data.resolution)
     return models.api.VoteResolveResults(
         endpoint="/vote/resolve",
         success=True,
@@ -1134,7 +1132,7 @@ async def vote_start(data: models.api.VoteStartArgs) -> DictResponse:
     try:
         async with storage.write(asf_uid) as write:
             wacm = await write.as_project_committee_member(data.project)
-            task = await wacm.vote.start(
+            task = await wacm.vote.start_api(
                 data.project,
                 data.version,
                 data.revision,
@@ -1168,11 +1166,11 @@ async def vote_tabulate(data: models.api.VoteTabulateArgs) -> DictResponse:
             exceptions.NotFound(f"Release {release_name} not found"),
         )
 
-    latest_vote_task = await resolve.release_latest_vote_task(release)
+    latest_vote_task = await interaction.release_latest_vote_task(release)
     if latest_vote_task is None:
         raise exceptions.NotFound("No vote task found")
-    task_mid = resolve.task_mid_get(latest_vote_task)
-    archive_url = await vote.task_archive_url_cached(task_mid)
+    task_mid = interaction.task_mid_get(latest_vote_task)
+    archive_url = await interaction.task_archive_url_cached(task_mid)
     if archive_url is None:
         raise exceptions.NotFound("No archive URL found")
     thread_id = archive_url.split("/")[-1]

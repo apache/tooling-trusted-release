@@ -17,13 +17,12 @@
 
 
 import quart
-import sqlmodel
 import werkzeug.wrappers.response as response
 
 import atr.construct as construct
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.forms as forms
-import atr.models.results as results
 import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
@@ -64,24 +63,6 @@ class ResolveVoteManualForm(forms.Typed):
     vote_thread_url = forms.string("Vote thread URL")
     vote_result_url = forms.string("Vote result URL")
     submit = forms.submit("Resolve vote")
-
-
-async def release_latest_vote_task(release: sql.Release) -> sql.Task | None:
-    """Find the most recent VOTE_INITIATE task for this release."""
-    via = sql.validate_instrumented_attribute
-    async with db.session() as data:
-        query = (
-            sqlmodel.select(sql.Task)
-            .where(sql.Task.project_name == release.project_name)
-            .where(sql.Task.version_name == release.version)
-            .where(sql.Task.task_type == sql.TaskType.VOTE_INITIATE)
-            .where(via(sql.Task.status).notin_([sql.TaskStatus.QUEUED, sql.TaskStatus.ACTIVE]))
-            .where(via(sql.Task.result).is_not(None))
-            .order_by(via(sql.Task.added).desc())
-            .limit(1)
-        )
-        task = (await data.execute(query)).scalar_one_or_none()
-        return task
 
 
 @routes.committer("/resolve/manual/<project_name>/<version_name>")
@@ -135,19 +116,19 @@ async def manual_selected_post(
     await _committees_check(vote_thread_url, vote_result_url)
 
     async with db.session() as data:
-        async with data.begin():
-            release = await data.merge(release)
-            if vote_result == "passed":
-                release.phase = sql.ReleasePhase.RELEASE_PREVIEW
-                success_message = "Vote marked as passed"
-                description = "Create a preview revision from the last candidate draft"
-                async with revision.create_and_manage(
-                    project_name, release.version, session.uid, description=description
-                ) as _creating:
-                    pass
-            else:
-                release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
-                success_message = "Vote marked as failed"
+        release = await data.merge(release)
+        if vote_result == "passed":
+            release.phase = sql.ReleasePhase.RELEASE_PREVIEW
+            success_message = "Vote marked as passed"
+            description = "Create a preview revision from the last candidate draft"
+            async with revision.create_and_manage(
+                project_name, release.version, session.uid, description=description
+            ) as _creating:
+                pass
+        else:
+            release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+            success_message = "Vote marked as failed"
+        await data.commit()
     if vote_result == "passed":
         destination = finish.selected
     else:
@@ -178,7 +159,7 @@ async def submit_selected(
         is_podling = release.project.committee.is_podling
     podling_thread_id = release.podling_thread_id
 
-    latest_vote_task = await release_latest_vote_task(release)
+    latest_vote_task = await interaction.release_latest_vote_task(release)
     if latest_vote_task is None:
         raise RuntimeError("No vote task found, unable to send resolution message.")
     resolve_form = await ResolveVoteForm.create_form()
@@ -281,17 +262,6 @@ async def tabulated_selected_post(session: routes.CommitterSession, project_name
     )
 
 
-def task_mid_get(latest_vote_task: sql.Task) -> str | None:
-    if util.is_dev_environment():
-        return vote.TEST_MID
-    # TODO: Improve this
-
-    result = latest_vote_task.result
-    if not isinstance(result, results.VoteInitiate):
-        return None
-    return result.mid
-
-
 async def _committees_check(vote_thread_url: str, vote_result_url: str) -> None:
     if not vote_thread_url.startswith("https://lists.apache.org/thread/"):
         raise RuntimeError("Vote thread URL is not a valid Apache email thread URL")
@@ -338,63 +308,63 @@ async def _resolve_vote(
 
     # Update release status in the database
     async with db.session() as data:
-        async with data.begin():
-            # Attach the existing release to the session
-            release = await data.merge(release)
-            # Update the release phase based on vote result
-            extra_destination = None
-            if (voting_round == 1) and (vote_result == "passed"):
-                # This is the first podling vote, by the PPMC and not the Incubator PMC
-                # In this branch, we do not move to RELEASE_PREVIEW but keep everything the same
-                # We only set the podling_thread_id to the thread_id of the vote thread
-                # Then we automatically start the Incubator PMC vote
-                # TODO: Note on the resolve vote page that resolving the Project PPMC vote starts the Incubator PMC vote
-                task_mid = task_mid_get(latest_vote_task)
-                archive_url = await vote.task_archive_url_cached(task_mid)
-                if archive_url is None:
-                    await quart.flash("No archive URL found for podling vote", "error")
-                    return release, "Failure"
-                thread_id = archive_url.split("/")[-1]
-                release.podling_thread_id = thread_id
-                # incubator_vote_address = "general@incubator.apache.org"
-                incubator_vote_address = util.USER_TESTS_ADDRESS
-                if not release.project.committee:
-                    raise ValueError("Project has no committee")
-                revision_number = release.latest_revision_number
-                if revision_number is None:
-                    raise ValueError("Release has no revision number")
-                await voting.start_vote(
-                    email_to=incubator_vote_address,
-                    permitted_recipients=[incubator_vote_address],
-                    project_name=release.project.name,
-                    version_name=release.version,
-                    selected_revision_number=revision_number,
-                    session=session,
-                    vote_duration_choice=latest_vote_task.task_args["vote_duration"],
-                    subject_data=f"[VOTE] Release {release.project.display_name} {release.version}",
-                    body_data=await construct.start_vote_default(release.project.name),
-                    data=data,
-                    release=release,
-                    promote=False,
-                )
-                success_message = "Project PPMC vote marked as passed, and Incubator PMC vote automatically started"
-            elif vote_result == "passed":
-                release.phase = sql.ReleasePhase.RELEASE_PREVIEW
-                success_message = "Vote marked as passed"
+        # Attach the existing release to the session
+        release = await data.merge(release)
+        # Update the release phase based on vote result
+        extra_destination = None
+        if (voting_round == 1) and (vote_result == "passed"):
+            # This is the first podling vote, by the PPMC and not the Incubator PMC
+            # In this branch, we do not move to RELEASE_PREVIEW but keep everything the same
+            # We only set the podling_thread_id to the thread_id of the vote thread
+            # Then we automatically start the Incubator PMC vote
+            # TODO: Note on the resolve vote page that resolving the Project PPMC vote starts the Incubator PMC vote
+            task_mid = interaction.task_mid_get(latest_vote_task)
+            archive_url = await interaction.task_archive_url_cached(task_mid)
+            if archive_url is None:
+                await quart.flash("No archive URL found for podling vote", "error")
+                return release, "Failure"
+            thread_id = archive_url.split("/")[-1]
+            release.podling_thread_id = thread_id
+            # incubator_vote_address = "general@incubator.apache.org"
+            incubator_vote_address = util.USER_TESTS_ADDRESS
+            if not release.project.committee:
+                raise ValueError("Project has no committee")
+            revision_number = release.latest_revision_number
+            if revision_number is None:
+                raise ValueError("Release has no revision number")
+            await voting.start_vote(
+                email_to=incubator_vote_address,
+                permitted_recipients=[incubator_vote_address],
+                project_name=release.project.name,
+                version_name=release.version,
+                selected_revision_number=revision_number,
+                session=session,
+                vote_duration_choice=latest_vote_task.task_args["vote_duration"],
+                subject_data=f"[VOTE] Release {release.project.display_name} {release.version}",
+                body_data=await construct.start_vote_default(release.project.name),
+                data=data,
+                release=release,
+                promote=False,
+            )
+            success_message = "Project PPMC vote marked as passed, and Incubator PMC vote automatically started"
+        elif vote_result == "passed":
+            release.phase = sql.ReleasePhase.RELEASE_PREVIEW
+            success_message = "Vote marked as passed"
 
-                description = "Create a preview revision from the last candidate draft"
-                async with revision.create_and_manage(
-                    project_name, release.version, session.uid, description=description
-                ) as _creating:
-                    pass
-                if (voting_round == 2) and (release.podling_thread_id is not None):
-                    round_one_email_address, round_one_message_id = await util.email_mid_from_thread_id(
-                        release.podling_thread_id
-                    )
-                    extra_destination = (round_one_email_address, round_one_message_id)
-            else:
-                release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
-                success_message = "Vote marked as failed"
+            description = "Create a preview revision from the last candidate draft"
+            async with revision.create_and_manage(
+                project_name, release.version, session.uid, description=description
+            ) as _creating:
+                pass
+            if (voting_round == 2) and (release.podling_thread_id is not None):
+                round_one_email_address, round_one_message_id = await util.email_mid_from_thread_id(
+                    release.podling_thread_id
+                )
+                extra_destination = (round_one_email_address, round_one_message_id)
+        else:
+            release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+            success_message = "Vote marked as failed"
+        await data.commit()
 
     error_message = await _send_resolution(
         session, release, vote_result, resolution_body, extra_destination=extra_destination
@@ -412,10 +382,10 @@ async def _send_resolution(
     extra_destination: tuple[str, str] | None = None,
 ) -> str | None:
     # Get the email thread
-    latest_vote_task = await release_latest_vote_task(release)
+    latest_vote_task = await interaction.release_latest_vote_task(release)
     if latest_vote_task is None:
         return "No vote task found, unable to send resolution message."
-    vote_thread_mid = task_mid_get(latest_vote_task)
+    vote_thread_mid = interaction.task_mid_get(latest_vote_task)
     if vote_thread_mid is None:
         return "No vote thread found, unable to send resolution message."
 

@@ -188,7 +188,7 @@ async def start_vote(
     data: db.Session,
     release: sql.Release,
     promote: bool = True,
-):
+) -> response.Response | str:
     if email_to not in permitted_recipients:
         # This will be checked again by tasks/vote.py for extra safety
         log.info(f"Invalid mailing list choice: {email_to} not in {permitted_recipients}")
