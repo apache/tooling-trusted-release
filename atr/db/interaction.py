@@ -16,6 +16,7 @@
 # under the License.
 
 import contextlib
+import datetime
 import enum
 import pathlib
 from collections.abc import AsyncGenerator, Sequence
@@ -113,6 +114,66 @@ async def latest_revision(release: sql.Release) -> sql.Revision | None:
 async def previews(project: sql.Project) -> list[sql.Release]:
     """Get the preview releases for the project."""
     return await releases_by_phase(project, sql.ReleasePhase.RELEASE_PREVIEW)
+
+
+async def promote_release(
+    data: db.Session,
+    release_name: str,
+    selected_revision_number: str,
+    vote_manual: bool = False,
+) -> str | None:
+    """Promote a release candidate draft to a new phase."""
+    # TODO: Use session.release here
+    release_for_pre_checks = await data.release(name=release_name, _project=True).demand(
+        InteractionError("Release candidate draft not found")
+    )
+    project_name = release_for_pre_checks.project.name
+    version_name = release_for_pre_checks.version
+
+    # Check for ongoing tasks
+    ongoing_tasks = await tasks_ongoing(project_name, version_name, selected_revision_number)
+    if ongoing_tasks > 0:
+        return "All checks must be completed before starting a vote"
+
+    # Verify that it's in the correct phase
+    # The atomic update below will also check this
+    if release_for_pre_checks.phase != sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+        return "This release is not in the candidate draft phase"
+
+    # Check that the revision number is the latest
+    if release_for_pre_checks.latest_revision_number != selected_revision_number:
+        return "The selected revision number does not match the latest revision number"
+
+    # Check that there is at least one file in the draft
+    # This is why we require _project=True above
+    file_count = await util.number_of_release_files(release_for_pre_checks)
+    if file_count == 0:
+        return "This candidate draft is empty, containing no files"
+
+    # Promote it to RELEASE_CANDIDATE
+    # NOTE: We previously allowed skipping phases, but removed that functionality
+    # We don't need a lock here because we use an atomic update
+    via = sql.validate_instrumented_attribute
+    stmt = (
+        sqlmodel.update(sql.Release)
+        .where(
+            via(sql.Release.name) == release_name,
+            via(sql.Release.phase) == sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+            sql.latest_revision_number_query() == selected_revision_number,
+        )
+        .values(
+            phase=sql.ReleasePhase.RELEASE_CANDIDATE,
+            vote_started=datetime.datetime.now(datetime.UTC),
+            vote_manual=vote_manual,
+        )
+    )
+
+    result = await data.execute(stmt)
+    if result.rowcount != 1:
+        await data.rollback()
+        return "A newer revision appeared, please refresh and try again."
+    await data.commit()
+    return None
 
 
 async def release_delete(

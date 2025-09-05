@@ -44,12 +44,10 @@ import atr.routes.announce as announce
 import atr.routes.resolve as resolve
 import atr.routes.start as start
 import atr.routes.vote as vote
-import atr.routes.voting as voting
 import atr.storage as storage
 import atr.storage.outcome as outcome
 import atr.storage.types as types
 import atr.tabulate as tabulate
-import atr.tasks.vote as tasks_vote
 import atr.user as user
 import atr.util as util
 
@@ -1096,6 +1094,7 @@ async def users_list() -> DictResponse:
     ).model_dump(), 200
 
 
+# TODO: Add endpoints to allow users to vote
 @api.BLUEPRINT.route("/vote/resolve", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
@@ -1108,26 +1107,9 @@ async def vote_resolve(data: models.api.VoteResolveArgs) -> DictResponse:
     A vote can be resolved by passing or failing.
     """
     asf_uid = _jwt_asf_uid()
-
-    async with db.session() as db_data:
-        release_name = sql.release_name(data.project, data.version)
-        release = await db_data.release(name=release_name, _project=True, _committee=True).demand(exceptions.NotFound())
-        if release.project.committee is None:
-            raise exceptions.NotFound("Project has no committee")
-        _committee_member_or_admin(release.project.committee, asf_uid)
-
-        release = await db_data.merge(release)
-        match data.resolution:
-            case "passed":
-                release.phase = sql.ReleasePhase.RELEASE_PREVIEW
-                description = "Create a preview revision from the last candidate draft"
-                async with revision.create_and_manage(
-                    data.project, release.version, asf_uid, description=description
-                ) as _creating:
-                    pass
-            case "failed":
-                release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
-        await db_data.commit()
+    async with storage.write(asf_uid) as write:
+        wacm = await write.as_project_committee_member(data.project)
+        await wacm.vote.resolve(data.project, data.version, data.resolution)
     return models.api.VoteResolveResults(
         endpoint="/vote/resolve",
         success=True,
@@ -1149,40 +1131,21 @@ async def vote_start(data: models.api.VoteStartArgs) -> DictResponse:
     if data.email_to not in permitted_recipients:
         raise exceptions.Forbidden("Invalid mailing list choice")
 
-    async with db.session() as db_data:
-        release_name = sql.release_name(data.project, data.version)
-        release = await db_data.release(name=release_name, _project=True, _committee=True).demand(exceptions.NotFound())
-        if release.project.committee is None:
-            raise exceptions.NotFound("Project has no committee")
-        _committee_member_or_admin(release.project.committee, asf_uid)
+    try:
+        async with storage.write(asf_uid) as write:
+            wacm = await write.as_project_committee_member(data.project)
+            task = await wacm.vote.start(
+                data.project,
+                data.version,
+                data.revision,
+                data.email_to,
+                data.vote_duration,
+                data.subject,
+                data.body,
+            )
+    except storage.AccessError as e:
+        raise exceptions.BadRequest(str(e))
 
-        revision_exists = await db_data.revision(release_name=release_name, number=data.revision).get()
-        if revision_exists is None:
-            raise exceptions.NotFound(f"Revision '{data.revision}' does not exist")
-
-        error = await voting.promote_release(db_data, release_name, data.revision, vote_manual=False)
-        if error:
-            raise exceptions.BadRequest(error)
-
-        # TODO: Move this into a function in routes/voting.py
-        task = sql.Task(
-            status=sql.TaskStatus.QUEUED,
-            task_type=sql.TaskType.VOTE_INITIATE,
-            task_args=tasks_vote.Initiate(
-                release_name=release_name,
-                email_to=data.email_to,
-                vote_duration=data.vote_duration,
-                initiator_id=asf_uid,
-                initiator_fullname=asf_uid,
-                subject=data.subject,
-                body=data.body,
-            ).model_dump(),
-            asf_uid=asf_uid,
-            project_name=data.project,
-            version_name=data.version,
-        )
-        db_data.add(task)
-        await db_data.commit()
     return models.api.VoteStartResults(
         endpoint="/vote/start",
         task=task,
