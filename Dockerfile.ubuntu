@@ -92,7 +92,7 @@ RUN mv apache-rat-${RAT_VERSION}.jar /opt/tools
 RUN java -version
 
 # WORKDIR /var/run
-RUN GOPATH=/usr/local go install github.com/anchore/syft/cmd/syft@v1.31.0
+# RUN GOPATH=/usr/local go install github.com/anchore/syft/cmd/syft@v1.31.0
 # RUN curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
 # RUN git clone https://github.com/sbp/sbomasm && cd sbomasm && GOPATH=/usr/local go install ./...
 # RUN GOPATH=/usr/local go install github.com/interlynk-io/sbomasm@v1.0.6

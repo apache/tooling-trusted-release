@@ -52,6 +52,7 @@
 
   {% if file_path.endswith(".tar.gz") and is_viewing_as_admin_fn(current_user.uid) %}
     <h3>Generate SBOM</h3>
+    <p>NOTE: This functionality is currently not available.</p>
     <p>Generate a CycloneDX Software Bill of Materials (SBOM) file for this artifact.</p>
     <form method="post"
           action="{{ as_url(routes.draft.sbomgen, project_name=project_name, version_name=version_name, file_path=file_path) }}">
