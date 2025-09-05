@@ -376,3 +376,12 @@ async def write_as_committee_member(
 ) -> AsyncGenerator[WriteAsCommitteeMember]:
     async with write(asf_uid) as w:
         yield w.as_committee_member(committee_name)
+
+
+@contextlib.asynccontextmanager
+async def write_as_project_committee_member(
+    project_name: str,
+    asf_uid: str | None | ArgumentNoneType = ArgumentNone,
+) -> AsyncGenerator[WriteAsCommitteeMember]:
+    async with write(asf_uid) as w:
+        yield await w.as_project_committee_member(project_name)

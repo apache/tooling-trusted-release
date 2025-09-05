@@ -20,7 +20,6 @@ import quart
 import werkzeug.wrappers.response as response
 
 import atr.db as db
-import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.models.sql as sql
 import atr.revision as revision
@@ -144,22 +143,6 @@ async def submit_selected(
     """Resolve a vote."""
     await session.check_access(project_name)
 
-    release = await session.release(
-        project_name,
-        version_name,
-        with_project=True,
-        with_committee=True,
-        phase=sql.ReleasePhase.RELEASE_CANDIDATE,
-    )
-
-    is_podling = False
-    if release.project.committee is not None:
-        is_podling = release.project.committee.is_podling
-    podling_thread_id = release.podling_thread_id
-
-    latest_vote_task = await interaction.release_latest_vote_task(release)
-    if latest_vote_task is None:
-        raise RuntimeError("No vote task found, unable to send resolution message.")
     resolve_form = await ResolveVoteForm.create_form()
     if not (await resolve_form.validate_on_submit()):
         # TODO: Render the page again with errors
@@ -171,18 +154,12 @@ async def submit_selected(
         )
     email_body = util.unwrap(resolve_form.email_body.data)
     vote_result = util.unwrap(resolve_form.vote_result.data)
-    voting_round = None
-    if is_podling is True:
-        voting_round = 1 if (podling_thread_id is None) else 2
-    if release.committee is None:
-        raise ValueError("Project has no committee")
-    async with storage.write_as_committee_member(release.committee.name) as wacm:
-        release, success_message, error_message = await wacm.vote.resolve(
+
+    async with storage.write_as_project_committee_member(project_name) as wacm:
+        _release, voting_round, success_message, error_message = await wacm.vote.resolve(
             project_name,
-            release,
-            voting_round,
+            version_name,
             vote_result,
-            latest_vote_task,
             session.fullname,
             email_body,
         )

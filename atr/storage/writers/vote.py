@@ -98,13 +98,53 @@ class CommitteeMember(CommitteeParticipant):
     async def resolve(
         self,
         project_name: str,
+        version_name: str,
+        vote_result: Literal["passed", "failed"],
+        asf_fullname: str,
+        resolution_body: str,
+    ) -> tuple[sql.Release, int | None, str, str | None]:
+        release = await self.__data.release(
+            name=sql.release_name(project_name, version_name),
+            phase=sql.ReleasePhase.RELEASE_CANDIDATE,
+            _project=True,
+            _committee=True,
+        ).demand(storage.AccessError("Release not found"))
+
+        is_podling = False
+        if release.project.committee is not None:
+            is_podling = release.project.committee.is_podling
+        podling_thread_id = release.podling_thread_id
+
+        latest_vote_task = await interaction.release_latest_vote_task(release)
+        if latest_vote_task is None:
+            raise RuntimeError("No vote task found, unable to send resolution message.")
+
+        voting_round = None
+        if is_podling is True:
+            voting_round = 1 if (podling_thread_id is None) else 2
+        if release.committee is None:
+            raise ValueError("Project has no committee")
+
+        return await self.resolve_release(
+            project_name,
+            release,
+            voting_round,
+            vote_result,
+            latest_vote_task,
+            asf_fullname,
+            resolution_body,
+        )
+
+    async def resolve_release(
+        self,
+        project_name: str,
         release: sql.Release,
         voting_round: int | None,
         vote_result: Literal["passed", "failed"],
         latest_vote_task: sql.Task,
         asf_fullname: str,
         resolution_body: str,
-    ) -> tuple[sql.Release, str, str | None]:
+    ) -> tuple[sql.Release, int | None, str, str | None]:
         # Attach the existing release to the session
         release = await self.__data.merge(release)
         # Update the release phase based on vote result
@@ -170,7 +210,7 @@ class CommitteeMember(CommitteeParticipant):
             asf_fullname=asf_fullname,
             extra_destination=extra_destination,
         )
-        return release, success_message, error_message
+        return release, voting_round, success_message, error_message
 
     async def resolve_api(self, project_name: str, version_name: str, resolution: Literal["passed", "failed"]) -> None:
         release_name = sql.release_name(project_name, version_name)
