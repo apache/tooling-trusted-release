@@ -231,6 +231,9 @@ async def release_delete(
 
 async def release_latest_vote_task(release: sql.Release) -> sql.Task | None:
     """Find the most recent VOTE_INITIATE task for this release."""
+    disallowed_statuses = [sql.TaskStatus.QUEUED, sql.TaskStatus.ACTIVE]
+    if util.is_dev_environment():
+        disallowed_statuses = []
     via = sql.validate_instrumented_attribute
     async with db.session() as data:
         query = (
@@ -238,7 +241,7 @@ async def release_latest_vote_task(release: sql.Release) -> sql.Task | None:
             .where(sql.Task.project_name == release.project_name)
             .where(sql.Task.version_name == release.version)
             .where(sql.Task.task_type == sql.TaskType.VOTE_INITIATE)
-            .where(via(sql.Task.status).notin_([sql.TaskStatus.QUEUED, sql.TaskStatus.ACTIVE]))
+            .where(via(sql.Task.status).notin_(disallowed_statuses))
             .where(via(sql.Task.result).is_not(None))
             .order_by(via(sql.Task.added).desc())
             .limit(1)

@@ -1105,9 +1105,23 @@ async def vote_resolve(data: models.api.VoteResolveArgs) -> DictResponse:
     A vote can be resolved by passing or failing.
     """
     asf_uid = _jwt_asf_uid()
-    async with storage.write(asf_uid) as write:
-        wacm = await write.as_project_committee_member(data.project)
-        await wacm.vote.resolve_api(data.project, data.version, data.resolution)
+    # try:
+    async with storage.write_as_project_committee_member(data.project, asf_uid) as wacm:
+        # TODO: Get fullname and use instead of asf_uid
+        # TODO: Add resolution templating to atr.construct
+        _release, _voting_round, _success_message, _error_message = await wacm.vote.resolve(
+            data.project,
+            data.version,
+            data.resolution,
+            asf_uid,
+            f"The vote {data.resolution}.",
+        )
+    # except Exception as e:
+    #     import atr.log as log
+    #     import traceback
+    #     log.info(traceback.format_exc())
+    #     raise exceptions.BadRequest(str(e))
+
     return models.api.VoteResolveResults(
         endpoint="/vote/resolve",
         success=True,

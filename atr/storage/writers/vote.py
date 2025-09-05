@@ -206,33 +206,12 @@ class CommitteeMember(CommitteeParticipant):
             release,
             vote_result,
             resolution_body,
-            asf_uid=self.__asf_uid,
-            asf_fullname=asf_fullname,
+            self.__asf_uid,
+            asf_fullname,
+            latest_vote_task,
             extra_destination=extra_destination,
         )
         return release, voting_round, success_message, error_message
-
-    async def resolve_api(self, project_name: str, version_name: str, resolution: Literal["passed", "failed"]) -> None:
-        release_name = sql.release_name(project_name, version_name)
-        release = await self.__data.release(name=release_name, _project=True, _committee=True).demand(
-            storage.AccessError("Release not found")
-        )
-        if release.project.committee is None:
-            raise storage.AccessError("Project has no committee")
-        self.__committee_member_or_admin(release.project.committee, self.__asf_uid)
-
-        release = await self.__data.merge(release)
-        match resolution:
-            case "passed":
-                release.phase = sql.ReleasePhase.RELEASE_PREVIEW
-                description = "Create a preview revision from the last candidate draft"
-                async with revision.create_and_manage(
-                    project_name, release.version, self.__asf_uid, description=description
-                ) as _creating:
-                    pass
-            case "failed":
-                release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
-        await self.__data.commit()
 
     async def send_resolution(
         self,
@@ -241,12 +220,10 @@ class CommitteeMember(CommitteeParticipant):
         body: str,
         asf_uid: str,
         asf_fullname: str,
+        latest_vote_task: sql.Task,
         extra_destination: tuple[str, str] | None = None,
     ) -> str | None:
         # Get the email thread
-        latest_vote_task = await interaction.release_latest_vote_task(release)
-        if latest_vote_task is None:
-            return "No vote task found, unable to send resolution message."
         vote_thread_mid = interaction.task_mid_get(latest_vote_task)
         if vote_thread_mid is None:
             return "No vote thread found, unable to send resolution message."
@@ -258,7 +235,10 @@ class CommitteeMember(CommitteeParticipant):
         email_recipient = latest_vote_task.task_args["email_to"]
         email_sender = f"{asf_uid}@apache.org"
         subject = f"[VOTE] [RESULT] Release {release.project.display_name} {release.version} {resolution.upper()}"
-        body = f"{body}\n\n-- \n{asf_fullname} ({asf_uid})"
+        signature = f"-- \n{asf_fullname} ({asf_uid})"
+        if asf_fullname == asf_uid:
+            signature = f"-- \n{asf_fullname}"
+        body = f"{body}\n\n{signature}"
         in_reply_to = vote_thread_mid
 
         task = sql.Task(

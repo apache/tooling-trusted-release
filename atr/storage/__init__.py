@@ -144,15 +144,23 @@ class WriteAsGeneralPublic(WriteAs):
 class WriteAsFoundationCommitter(WriteAsGeneralPublic):
     def __init__(self, write: Write, data: db.Session):
         # TODO: We need a definitive list of ASF UIDs
+        self.__asf_uid = write.authorisation.asf_uid
         self.checks = writers.checks.FoundationCommitter(write, self, data)
         self.keys = writers.keys.FoundationCommitter(write, self, data)
         self.ssh = writers.ssh.FoundationCommitter(write, self, data)
         self.tokens = writers.tokens.FoundationCommitter(write, self, data)
         self.vote = writers.vote.FoundationCommitter(write, self, data)
 
+    @property
+    def asf_uid(self) -> str:
+        if self.__asf_uid is None:
+            raise AccessError("No ASF UID")
+        return self.__asf_uid
+
 
 class WriteAsCommitteeParticipant(WriteAsFoundationCommitter):
     def __init__(self, write: Write, data: db.Session, committee_name: str):
+        self.__asf_uid = write.authorisation.asf_uid
         self.__committee_name = committee_name
         self.checks = writers.checks.CommitteeParticipant(write, self, data, committee_name)
         self.keys = writers.keys.CommitteeParticipant(write, self, data, committee_name)
@@ -161,12 +169,19 @@ class WriteAsCommitteeParticipant(WriteAsFoundationCommitter):
         self.vote = writers.vote.CommitteeParticipant(write, self, data, committee_name)
 
     @property
+    def asf_uid(self) -> str:
+        if self.__asf_uid is None:
+            raise AccessError("No ASF UID")
+        return self.__asf_uid
+
+    @property
     def committee_name(self) -> str:
         return self.__committee_name
 
 
 class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
     def __init__(self, write: Write, data: db.Session, committee_name: str):
+        self.__asf_uid = write.authorisation.asf_uid
         self.__committee_name = committee_name
         self.checks = writers.checks.CommitteeMember(write, self, data, committee_name)
         self.distributions = writers.distributions.CommitteeMember(write, self, data, committee_name)
@@ -176,18 +191,31 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
         self.vote = writers.vote.CommitteeMember(write, self, data, committee_name)
 
     @property
+    def asf_uid(self) -> str:
+        if self.__asf_uid is None:
+            raise AccessError("No ASF UID")
+        return self.__asf_uid
+
+    @property
     def committee_name(self) -> str:
         return self.__committee_name
 
 
 class WriteAsFoundationAdmin(WriteAsCommitteeMember):
     def __init__(self, write: Write, data: db.Session, committee_name: str):
+        self.__asf_uid = write.authorisation.asf_uid
         self.__committee_name = committee_name
         # self.checks = writers.checks.FoundationAdmin(write, self, data, committee_name)
         self.keys = writers.keys.FoundationAdmin(write, self, data, committee_name)
         # self.ssh = writers.ssh.FoundationAdmin(write, self, data, committee_name)
         # self.tokens = writers.tokens.FoundationAdmin(write, self, data, committee_name)
         # self.vote = writers.vote.FoundationAdmin(write, self, data, committee_name)
+
+    @property
+    def asf_uid(self) -> str:
+        if self.__asf_uid is None:
+            raise AccessError("No ASF UID")
+        return self.__asf_uid
 
     @property
     def committee_name(self) -> str:
