@@ -104,7 +104,7 @@ class CommitteeMember(CommitteeParticipant):
         latest_vote_task: sql.Task,
         asf_fullname: str,
         resolution_body: str,
-    ) -> tuple[sql.Release, str]:
+    ) -> tuple[sql.Release, str, str | None]:
         # Attach the existing release to the session
         release = await self.__data.merge(release)
         # Update the release phase based on vote result
@@ -170,9 +170,7 @@ class CommitteeMember(CommitteeParticipant):
             asf_fullname=asf_fullname,
             extra_destination=extra_destination,
         )
-        if error_message is not None:
-            raise storage.AccessError(error_message)
-        return release, success_message
+        return release, success_message, error_message
 
     async def resolve_api(self, project_name: str, version_name: str, resolution: Literal["passed", "failed"]) -> None:
         release_name = sql.release_name(project_name, version_name)

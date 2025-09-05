@@ -19,7 +19,6 @@
 import quart
 import werkzeug.wrappers.response as response
 
-import atr.construct as construct
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
@@ -31,7 +30,6 @@ import atr.routes.finish as finish
 import atr.routes.vote as vote
 import atr.storage as storage
 import atr.tabulate as tabulate
-import atr.tasks.message as message
 import atr.template as template
 import atr.util as util
 
@@ -176,15 +174,20 @@ async def submit_selected(
     voting_round = None
     if is_podling is True:
         voting_round = 1 if (podling_thread_id is None) else 2
-    release, success_message = await _resolve_vote(
-        session,
-        project_name,
-        vote_result,
-        email_body,
-        latest_vote_task,
-        release,
-        voting_round,
-    )
+    if release.committee is None:
+        raise ValueError("Project has no committee")
+    async with storage.write_as_committee_member(release.committee.name) as wacm:
+        release, success_message, error_message = await wacm.vote.resolve(
+            project_name,
+            release,
+            voting_round,
+            vote_result,
+            latest_vote_task,
+            session.fullname,
+            email_body,
+        )
+    if error_message is not None:
+        await quart.flash(error_message, "error")
     if vote_result == "passed":
         if voting_round == 1:
             destination = vote.selected
@@ -292,149 +295,3 @@ async def _committees_check(vote_thread_url: str, vote_result_url: str) -> None:
         raise RuntimeError("Vote committee not found")
     if result_committee_label is None:
         raise RuntimeError("Result committee not found")
-
-
-async def _resolve_vote(
-    session: routes.CommitterSession,
-    project_name: str,
-    vote_result: str,
-    resolution_body: str,
-    latest_vote_task: sql.Task,
-    release: sql.Release,
-    voting_round: int | None,
-) -> tuple[sql.Release, str]:
-    # Check that the user has access to the project
-    await session.check_access(project_name)
-
-    # Update release status in the database
-    async with db.session() as data:
-        # Attach the existing release to the session
-        release = await data.merge(release)
-        # Update the release phase based on vote result
-        extra_destination = None
-        if (voting_round == 1) and (vote_result == "passed"):
-            # This is the first podling vote, by the PPMC and not the Incubator PMC
-            # In this branch, we do not move to RELEASE_PREVIEW but keep everything the same
-            # We only set the podling_thread_id to the thread_id of the vote thread
-            # Then we automatically start the Incubator PMC vote
-            # TODO: Note on the resolve vote page that resolving the Project PPMC vote starts the Incubator PMC vote
-            task_mid = interaction.task_mid_get(latest_vote_task)
-            archive_url = await interaction.task_archive_url_cached(task_mid)
-            if archive_url is None:
-                await quart.flash("No archive URL found for podling vote", "error")
-                return release, "Failure"
-            thread_id = archive_url.split("/")[-1]
-            release.podling_thread_id = thread_id
-            # incubator_vote_address = "general@incubator.apache.org"
-            incubator_vote_address = util.USER_TESTS_ADDRESS
-            if not release.project.committee:
-                raise ValueError("Project has no committee")
-            revision_number = release.latest_revision_number
-            if revision_number is None:
-                raise ValueError("Release has no revision number")
-            if release.committee is None:
-                raise ValueError("Project has no committee")
-            async with storage.write_as_committee_member(release.committee.name) as wacm:
-                await wacm.vote.start(
-                    email_to=incubator_vote_address,
-                    permitted_recipients=[incubator_vote_address],
-                    project_name=release.project.name,
-                    version_name=release.version,
-                    selected_revision_number=revision_number,
-                    asf_uid=session.uid,
-                    asf_fullname=session.fullname,
-                    vote_duration_choice=latest_vote_task.task_args["vote_duration"],
-                    subject_data=f"[VOTE] Release {release.project.display_name} {release.version}",
-                    body_data=await construct.start_vote_default(release.project.name),
-                    release=release,
-                    promote=False,
-                )
-            success_message = "Project PPMC vote marked as passed, and Incubator PMC vote automatically started"
-        elif vote_result == "passed":
-            release.phase = sql.ReleasePhase.RELEASE_PREVIEW
-            success_message = "Vote marked as passed"
-
-            description = "Create a preview revision from the last candidate draft"
-            async with revision.create_and_manage(
-                project_name, release.version, session.uid, description=description
-            ) as _creating:
-                pass
-            if (voting_round == 2) and (release.podling_thread_id is not None):
-                round_one_email_address, round_one_message_id = await util.email_mid_from_thread_id(
-                    release.podling_thread_id
-                )
-                extra_destination = (round_one_email_address, round_one_message_id)
-        else:
-            release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
-            success_message = "Vote marked as failed"
-        await data.commit()
-
-    error_message = await _send_resolution(
-        session, release, vote_result, resolution_body, extra_destination=extra_destination
-    )
-    if error_message is not None:
-        await quart.flash(error_message, "error")
-    return release, success_message
-
-
-async def _send_resolution(
-    session: routes.CommitterSession,
-    release: sql.Release,
-    resolution: str,
-    body: str,
-    extra_destination: tuple[str, str] | None = None,
-) -> str | None:
-    # Get the email thread
-    latest_vote_task = await interaction.release_latest_vote_task(release)
-    if latest_vote_task is None:
-        return "No vote task found, unable to send resolution message."
-    vote_thread_mid = interaction.task_mid_get(latest_vote_task)
-    if vote_thread_mid is None:
-        return "No vote thread found, unable to send resolution message."
-
-    # Construct the reply email
-    # original_subject = latest_vote_task.task_args["subject"]
-
-    # Arguments for the task to cast a vote
-    email_recipient = latest_vote_task.task_args["email_to"]
-    email_sender = f"{session.uid}@apache.org"
-    subject = f"[VOTE] [RESULT] Release {release.project.display_name} {release.version} {resolution.upper()}"
-    body = f"{body}\n\n-- \n{session.fullname} ({session.uid})"
-    in_reply_to = vote_thread_mid
-
-    task = sql.Task(
-        status=sql.TaskStatus.QUEUED,
-        task_type=sql.TaskType.MESSAGE_SEND,
-        task_args=message.Send(
-            email_sender=email_sender,
-            email_recipient=email_recipient,
-            subject=subject,
-            body=body,
-            in_reply_to=in_reply_to,
-        ).model_dump(),
-        asf_uid=util.unwrap(session.uid),
-        project_name=release.project.name,
-        version_name=release.version,
-    )
-    tasks = [task]
-    if extra_destination is not None:
-        task = sql.Task(
-            status=sql.TaskStatus.QUEUED,
-            task_type=sql.TaskType.MESSAGE_SEND,
-            task_args=message.Send(
-                email_sender=email_sender,
-                email_recipient=extra_destination[0],
-                subject=subject,
-                body=body,
-                in_reply_to=extra_destination[1],
-            ).model_dump(),
-            asf_uid=util.unwrap(session.uid),
-            project_name=release.project.name,
-            version_name=release.version,
-        )
-        tasks.append(task)
-    async with db.session() as data:
-        data.add_all(tasks)
-        await data.flush()
-        await data.commit()
-    return None
