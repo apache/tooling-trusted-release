@@ -280,18 +280,27 @@ class CommitteeMember(CommitteeParticipant):
     async def start(
         self,
         email_to: str,
-        permitted_recipients: list[str],
         project_name: str,
         version_name: str,
         selected_revision_number: str,
-        asf_uid: str,
-        asf_fullname: str,
         vote_duration_choice: int,
         subject_data: str,
         body_data: str,
-        release: sql.Release,
+        asf_uid: str,
+        asf_fullname: str,
+        release: sql.Release | None = None,
         promote: bool = True,
-    ) -> str:
+        permitted_recipients: list[str] | None = None,
+    ) -> sql.Task:
+        if release is None:
+            release = await self.__data.release(
+                project_name=project_name,
+                version=version_name,
+                _project=True,
+                _committee=True,
+            ).demand(storage.AccessError("Release not found"))
+        if permitted_recipients is None:
+            permitted_recipients = util.permitted_recipients(asf_uid)
         if email_to not in permitted_recipients:
             # This will be checked again by tasks/vote.py for extra safety
             log.info(f"Invalid mailing list choice: {email_to} not in {permitted_recipients}")
@@ -335,53 +344,6 @@ class CommitteeMember(CommitteeParticipant):
         # TODO: We should log all outgoing email and the session so that users can confirm
         # And can be warned if there was a failure
         # (The message should be shown on the vote resolution page)
-        return f"The vote announcement email will soon be sent to {email_to}."
-
-    async def start_api(
-        self,
-        project_name: str,
-        version_name: str,
-        revision_number: str,
-        email_to: str,
-        vote_duration: int,
-        subject: str,
-        body: str,
-    ) -> sql.Task:
-        release_name = sql.release_name(project_name, version_name)
-        release = await self.__data.release(name=release_name, _project=True, _committee=True).demand(
-            storage.AccessError("Release not found")
-        )
-        if release.project.committee is None:
-            raise storage.AccessError("Project has no committee")
-        self.__committee_member_or_admin(release.project.committee, self.__asf_uid)
-
-        revision_exists = await self.__data.revision(release_name=release_name, number=revision_number).get()
-        if revision_exists is None:
-            raise storage.AccessError(f"Revision '{revision_number}' does not exist")
-
-        error = await interaction.promote_release(self.__data, release_name, revision_number, vote_manual=False)
-        if error:
-            raise storage.AccessError(error)
-
-        # TODO: Move this into a function in routes/voting.py
-        task = sql.Task(
-            status=sql.TaskStatus.QUEUED,
-            task_type=sql.TaskType.VOTE_INITIATE,
-            task_args=tasks_vote.Initiate(
-                release_name=release_name,
-                email_to=email_to,
-                vote_duration=vote_duration,
-                initiator_id=self.__asf_uid,
-                initiator_fullname=self.__asf_uid,
-                subject=subject,
-                body=body,
-            ).model_dump(),
-            asf_uid=self.__asf_uid,
-            project_name=project_name,
-            version_name=version_name,
-        )
-        self.__data.add(task)
-        await self.__data.commit()
         return task
 
     def __committee_member_or_admin(self, committee: sql.Committee, asf_uid: str) -> None:

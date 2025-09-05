@@ -1146,15 +1146,23 @@ async def vote_start(data: models.api.VoteStartArgs) -> DictResponse:
     try:
         async with storage.write(asf_uid) as write:
             wacm = await write.as_project_committee_member(data.project)
-            task = await wacm.vote.start_api(
+            # TODO: Get fullname and use instead of asf_uid
+            task = await wacm.vote.start(
+                data.email_to,
                 data.project,
                 data.version,
                 data.revision,
-                data.email_to,
                 data.vote_duration,
                 data.subject,
                 data.body,
+                asf_uid,
+                asf_uid,
             )
+    # except Exception as e:
+    #     import traceback
+    #     import atr.log as log
+    #     log.info(traceback.format_exc())
+    #     raise exceptions.BadRequest(str(e))
     except storage.AccessError as e:
         raise exceptions.BadRequest(str(e))
 

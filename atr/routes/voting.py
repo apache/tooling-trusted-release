@@ -256,19 +256,19 @@ async def _selected_revision_data(
         if release.committee is None:
             raise base.ASFQuartException("Release has no associated committee", errorcode=400)
         async with storage.write_as_committee_member(release.committee.name) as wacm:
-            await wacm.vote.start(
+            _task = await wacm.vote.start(
                 email_to,
-                permitted_recipients,
                 project_name,
                 version_name,
                 revision,
-                session.uid,
-                session.fullname,
                 vote_duration_choice,
                 subject_data,
                 body_data,
-                release,
+                session.uid,
+                session.fullname,
+                release=release,
                 promote=True,
+                permitted_recipients=permitted_recipients,
             )
         return await session.redirect(
             vote.selected,
