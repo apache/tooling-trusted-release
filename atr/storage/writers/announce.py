@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import datetime
 from typing import TYPE_CHECKING
 
@@ -114,26 +115,45 @@ class CommitteeMember(CommitteeParticipant):
         unfinished_dir: str = ""
         finished_dir: str = ""
 
-        try:
-            release = await self.__data.release(
-                project_name=project_name,
-                version=version_name,
-                phase=sql.ReleasePhase.RELEASE_PREVIEW,
-                latest_revision_number=preview_revision_number,
-                _revisions=True,
-            ).demand(RuntimeError(f"Release {project_name} {version_name} {preview_revision_number} does not exist"))
-            if (committee := release.project.committee) is None:
-                raise ValueError("Release has no committee")
-
-            body = await construct.announce_release_body(
-                body,
-                options=construct.AnnounceReleaseOptions(
-                    asfuid=asf_uid,
-                    fullname=fullname,
-                    project_name=project_name,
-                    version_name=version_name,
-                ),
+        release = await self.__data.release(
+            project_name=project_name,
+            version=version_name,
+            phase=sql.ReleasePhase.RELEASE_PREVIEW,
+            latest_revision_number=preview_revision_number,
+            _revisions=True,
+        ).demand(
+            storage.AccessError(
+                f"Release {project_name} {version_name} {preview_revision_number} does not exist",
             )
+        )
+        if (committee := release.project.committee) is None:
+            raise storage.AccessError("Release has no committee")
+
+        body = await construct.announce_release_body(
+            body,
+            options=construct.AnnounceReleaseOptions(
+                asfuid=asf_uid,
+                fullname=fullname,
+                project_name=project_name,
+                version_name=version_name,
+            ),
+        )
+
+        # Prepare paths for file operations
+        unfinished_revisions_path = util.release_directory_base(release)
+        unfinished_path = unfinished_revisions_path / release.unwrap_revision_number
+        unfinished_dir = str(unfinished_path)
+        release_date = datetime.datetime.now(datetime.UTC)
+        predicted_finished_release = self.__predicted_finished_release(release, release_date)
+        finished_path = util.release_directory(predicted_finished_release)
+        finished_dir = str(finished_path)
+        if await aiofiles.os.path.exists(finished_dir):
+            raise storage.AccessError("Release already exists")
+        # TODO: This is not reliable because of race conditions
+        # But it adds a layer of protection in most cases
+        await self.__hard_link_downloads(committee, unfinished_path, download_path_suffix, dry_run=True)
+
+        try:
             task = sql.Task(
                 status=sql.TaskStatus.QUEUED,
                 task_type=sql.TaskType.MESSAGE_SEND,
@@ -150,28 +170,12 @@ class CommitteeMember(CommitteeParticipant):
             )
             self.__data.add(task)
 
-            # Prepare paths for file operations
-            unfinished_revisions_path = util.release_directory_base(release)
-            unfinished_path = unfinished_revisions_path / release.unwrap_revision_number
-            unfinished_dir = str(unfinished_path)
-
-            await self.__promote_in_database(release, preview_revision_number)
+            await self.__promote_in_database(release, preview_revision_number, release_date)
             await self.__data.commit()
         except storage.AccessError as e:
             raise e
         except Exception as e:
             raise storage.AccessError(f"Error announcing preview: {e!s}")
-
-        # This must come after updating the release object
-        # Do not put it in the data block after data.commit()
-        # Otherwise util.release_directory() will not work
-        release = await self.__data.release(name=release.name).demand(
-            RuntimeError(f"Release {release.name} does not exist"),
-        )
-        finished_path = util.release_directory(release)
-        finished_dir = str(finished_path)
-        if await aiofiles.os.path.exists(finished_dir):
-            raise storage.AccessError("Release already exists")
 
         # Ensure that the permissions of every directory are 755
         await asyncio.to_thread(util.chmod_directories, unfinished_path)
@@ -181,24 +185,54 @@ class CommitteeMember(CommitteeParticipant):
             # The whole finished hierarchy is write once for each directory, and then read only
             # TODO: Set permissions to help enforce this, or find alternative methods
             await aioshutil.move(unfinished_dir, finished_dir)
+            self.__write_as.append_to_audit_log(
+                action="announce.release",
+                project_name=project_name,
+                version_name=version_name,
+                revision_number=preview_revision_number,
+                source_directory=unfinished_dir,
+                target_directory=finished_dir,
+                email_recipient=recipient,
+            )
             if unfinished_revisions_path:
                 # This removes all of the prior revisions
                 await aioshutil.rmtree(str(unfinished_revisions_path))  # type: ignore[call-arg]
         except Exception as e:
             raise storage.AccessError(f"Database updated, but error moving files: {e!s}. Manual cleanup needed.")
 
+        # TODO: Add an audit log entry here
         await self.__hard_link_downloads(committee, finished_path, download_path_suffix)
 
     async def __hard_link_downloads(
-        self, committee: sql.Committee, unfinished_path: pathlib.Path, download_path_suffix: str
+        self,
+        committee: sql.Committee,
+        unfinished_path: pathlib.Path,
+        download_path_suffix: str,
+        dry_run: bool = False,
     ) -> None:
         """Hard link the release files to the downloads directory."""
         # TODO: Rename *_dir functions to _path functions
         downloads_base_path = util.get_downloads_dir()
         downloads_path = downloads_base_path / committee.name / download_path_suffix.removeprefix("/")
-        await util.create_hard_link_clone(unfinished_path, downloads_path, exist_ok=True)
+        await util.create_hard_link_clone(
+            unfinished_path,
+            downloads_path,
+            do_not_create_dest_dir=dry_run,
+            exist_ok=True,
+            dry_run=dry_run,
+        )
 
-    async def __promote_in_database(self, release: sql.Release, preview_revision_number: str) -> None:
+    def __predicted_finished_release(self, release: sql.Release, release_date: datetime.datetime) -> sql.Release:
+        # Taking a deep copy stops this from being a SQLAlchemy proxy object
+        # https://docs.sqlalchemy.org/en/20/orm/session_basics.html
+        predicted_finished_release = copy.deepcopy(release)
+        predicted_finished_release.phase = sql.ReleasePhase.RELEASE
+        predicted_finished_release.released = release_date
+        return predicted_finished_release
+
+    async def __promote_in_database(
+        self, release: sql.Release, preview_revision_number: str, release_date: datetime.datetime
+    ) -> None:
         """Promote a release preview to a release and delete its old revisions."""
         via = sql.validate_instrumented_attribute
 
@@ -211,7 +245,7 @@ class CommitteeMember(CommitteeParticipant):
             )
             .values(
                 phase=sql.ReleasePhase.RELEASE,
-                released=datetime.datetime.now(datetime.UTC),
+                released=release_date,
             )
         )
         update_result = await self.__data.execute_query(update_stmt)
@@ -221,5 +255,7 @@ class CommitteeMember(CommitteeParticipant):
         if rowcount != 1:
             raise RuntimeError("A newer revision appeared, please refresh and try again.")
 
-        delete_revisions_stmt = sqlmodel.delete(sql.Revision).where(via(sql.Revision.release_name) == release.name)
+        delete_revisions_stmt = sqlmodel.delete(sql.Revision).where(
+            via(sql.Revision.release_name) == release.name,
+        )
         await self.__data.execute_query(delete_revisions_stmt)

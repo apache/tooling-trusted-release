@@ -223,15 +223,10 @@ async def create_hard_link_clone(
     dest_dir: pathlib.Path,
     do_not_create_dest_dir: bool = False,
     exist_ok: bool = False,
+    dry_run: bool = False,
 ) -> None:
     """Recursively create a clone of source_dir in dest_dir using hard links for files."""
-    # Ensure source exists and is a directory
-    if not await aiofiles.os.path.isdir(source_dir):
-        raise ValueError(f"Source path is not a directory or does not exist: {source_dir}")
-
-    # Create destination directory
-    if do_not_create_dest_dir is False:
-        await aiofiles.os.makedirs(dest_dir, exist_ok=exist_ok)
+    await _create_hard_link_clone_checks(source_dir, dest_dir, do_not_create_dest_dir, exist_ok, dry_run)
 
     async def _clone_recursive(current_source: pathlib.Path, current_dest: pathlib.Path) -> None:
         for entry in await aiofiles.os.scandir(current_source):
@@ -243,7 +238,10 @@ async def create_hard_link_clone(
                     await aiofiles.os.makedirs(dest_entry_path, exist_ok=True)
                     await _clone_recursive(source_entry_path, dest_entry_path)
                 elif entry.is_file():
-                    await aiofiles.os.link(source_entry_path, dest_entry_path)
+                    if not dry_run:
+                        await aiofiles.os.link(source_entry_path, dest_entry_path)
+                    elif dry_run and (await aiofiles.os.path.exists(dest_entry_path)):
+                        raise ValueError(f"Destination path exists: {dest_entry_path}")
                 # Ignore other types like symlinks for now
             except OSError as e:
                 log.error(f"Error cloning {source_entry_path} to {dest_entry_path}: {e}")
@@ -699,7 +697,7 @@ async def read_file_for_viewer(full_path: pathlib.Path, max_size: int) -> tuple[
 def release_directory(release: sql.Release) -> pathlib.Path:
     """Return the absolute path to the directory containing the active files for a given release phase."""
     latest_revision_number = release.latest_revision_number
-    if latest_revision_number is None:
+    if (release.phase == sql.ReleasePhase.RELEASE) or (latest_revision_number is None):
         return release_directory_base(release)
     return release_directory_base(release) / latest_revision_number
 
@@ -946,6 +944,25 @@ def version_name_error(version_name: str) -> str | None:
     if not re.match(r"^[a-zA-Z0-9+.-]+$", version_name):
         return "Must contain only letters, numbers, plus, full stop, or hyphen"
     return None
+
+
+async def _create_hard_link_clone_checks(
+    source_dir: pathlib.Path,
+    dest_dir: pathlib.Path,
+    do_not_create_dest_dir: bool = False,
+    exist_ok: bool = False,
+    dry_run: bool = False,
+) -> None:
+    if dry_run and ((not do_not_create_dest_dir) or (not exist_ok)):
+        raise ValueError("Cannot dry run and create destination directory or exist ok")
+
+    # Ensure source exists and is a directory
+    if (not dry_run) and (not await aiofiles.os.path.isdir(source_dir)):
+        raise ValueError(f"Source path is not a directory or does not exist: {source_dir}")
+
+    # Create destination directory
+    if do_not_create_dest_dir is False:
+        await aiofiles.os.makedirs(dest_dir, exist_ok=exist_ok)
 
 
 def _generate_hexdump(data: bytes) -> str:

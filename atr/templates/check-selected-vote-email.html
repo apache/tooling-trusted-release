@@ -1,7 +1,7 @@
 
 <div class="p-3 border rounded bg-white mb-3">
   {% if vote_task %}
-    {% if vote_task.status.value == "completed" %}
+    {% if (vote_task.status.value == "completed") and vote_task.completed %}
       <p class="mb-0 text-success fw-semibold"
          {% if task_mid %}title="{{- task_mid -}}"{% endif %}>
         <i class="bi bi-check-circle me-1"></i> Vote thread started: {{ format_datetime(vote_task.completed) }}
@@ -21,7 +21,7 @@
           </ul>
         </div>
       {% endif %}
-    {% elif vote_task.status.value == "failed" %}
+    {% elif (vote_task.status.value == "failed") and vote_task.completed %}
       <p class="mb-1 text-danger fw-semibold">
         <i class="bi bi-x-circle me-1"></i> Vote thread failed: {{ format_datetime(vote_task.completed) }}
       </p>

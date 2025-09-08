@@ -52,6 +52,7 @@ def audit(**kwargs: basic.JSON) -> None:
     # The atr.log logger should give the same name
     # But to be extra sure, we set it manually
     logger = logging.getLogger("atr.storage.audit")
+    # TODO: Convert to async
     logger.info(msg)
 
 
