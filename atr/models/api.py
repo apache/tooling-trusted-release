@@ -230,7 +230,6 @@ class ProjectsListResults(schema.Strict):
 class PublisherDistributionRecordArgs(schema.Strict):
     publisher: str = schema.Field(..., **example("user"))
     jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
-    project: str = schema.Field(..., **example("example"))
     version: str = schema.Field(..., **example("0.0.1"))
     platform: sql.DistributionPlatform = schema.Field(..., **example(sql.DistributionPlatform.ARTIFACT_HUB))
     distribution_owner_namespace: str | None = schema.Field(default=None, **example("example"))

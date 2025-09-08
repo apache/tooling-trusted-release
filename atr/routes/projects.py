@@ -82,9 +82,11 @@ class ReleasePolicyForm(forms.Typed):
         "GitHub repository name",
         description="The name of the GitHub repository to use for the release, excluding the apache/ prefix.",
     )
-    github_compose_workflow_path = forms.optional(
-        "GitHub compose workflow path",
-        description="The full path to the GitHub workflow to use for the release,"
+    github_compose_workflow_path = forms.textarea(
+        "GitHub compose workflow paths",
+        optional=True,
+        rows=5,
+        description="The full paths to the GitHub workflows to use for the release,"
         " including the .github/workflows/ prefix.",
     )
     strict_checking = forms.boolean(
@@ -128,9 +130,11 @@ class ReleasePolicyForm(forms.Typed):
         rows=10,
         description="Email template for messages to start a vote on a release.",
     )
-    github_vote_workflow_path = forms.optional(
-        "GitHub vote workflow path",
-        description="The full path to the GitHub workflow to use for the release,"
+    github_vote_workflow_path = forms.textarea(
+        "GitHub vote workflow paths",
+        optional=True,
+        rows=5,
+        description="The full paths to the GitHub workflows to use for the release,"
         " including the .github/workflows/ prefix.",
     )
 
@@ -142,9 +146,11 @@ class ReleasePolicyForm(forms.Typed):
         rows=10,
         description="Email template for messages to announce a finished release.",
     )
-    github_finish_workflow_path = forms.optional(
-        "GitHub finish workflow path",
-        description="The full path to the GitHub workflow to use for the release,"
+    github_finish_workflow_path = forms.textarea(
+        "GitHub finish workflow paths",
+        optional=True,
+        rows=5,
+        description="The full paths to the GitHub workflows to use for the release,"
         " including the .github/workflows/ prefix.",
     )
 
@@ -192,18 +198,30 @@ class ReleasePolicyForm(forms.Typed):
         if grn:
             if "/" in grn:
                 _form_append(self.github_repository_name, "GitHub repository name must not contain a slash.")
-            if compose and (not compose.startswith(".github/workflows/")):
-                _form_append(
-                    self.github_compose_workflow_path, "GitHub workflow path must start with '.github/workflows/'."
-                )
-            if vote and (not vote.startswith(".github/workflows/")):
-                _form_append(
-                    self.github_vote_workflow_path, "GitHub workflow path must start with '.github/workflows/'."
-                )
-            if finish and (not finish.startswith(".github/workflows/")):
-                _form_append(
-                    self.github_finish_workflow_path, "GitHub workflow path must start with '.github/workflows/'."
-                )
+            if compose:
+                for p in _parse_artifact_paths(compose):
+                    if not p.startswith(".github/workflows/"):
+                        _form_append(
+                            self.github_compose_workflow_path,
+                            "GitHub workflow paths must start with '.github/workflows/'.",
+                        )
+                        break
+            if vote:
+                for p in _parse_artifact_paths(vote):
+                    if not p.startswith(".github/workflows/"):
+                        _form_append(
+                            self.github_vote_workflow_path,
+                            "GitHub workflow paths must start with '.github/workflows/'.",
+                        )
+                        break
+            if finish:
+                for p in _parse_artifact_paths(finish):
+                    if not p.startswith(".github/workflows/"):
+                        _form_append(
+                            self.github_finish_workflow_path,
+                            "GitHub workflow paths must start with '.github/workflows/'.",
+                        )
+                        break
 
         return not self.errors
 
@@ -502,9 +520,15 @@ async def _policy_edit(
             util.unwrap(policy_form.binary_artifact_paths.data)
         )
         release_policy.github_repository_name = util.unwrap(policy_form.github_repository_name.data)
-        release_policy.github_compose_workflow_path = util.unwrap(policy_form.github_compose_workflow_path.data)
-        release_policy.github_vote_workflow_path = util.unwrap(policy_form.github_vote_workflow_path.data)
-        release_policy.github_finish_workflow_path = util.unwrap(policy_form.github_finish_workflow_path.data)
+        release_policy.github_compose_workflow_path = _parse_artifact_paths(
+            util.unwrap(policy_form.github_compose_workflow_path.data)
+        )
+        release_policy.github_vote_workflow_path = _parse_artifact_paths(
+            util.unwrap(policy_form.github_vote_workflow_path.data)
+        )
+        release_policy.github_finish_workflow_path = _parse_artifact_paths(
+            util.unwrap(policy_form.github_finish_workflow_path.data)
+        )
         release_policy.strict_checking = util.unwrap(policy_form.strict_checking.data)
 
         # Vote section
@@ -549,9 +573,9 @@ async def _policy_form_create(project: sql.Project) -> ReleasePolicyForm:
     policy_form.pause_for_rm.data = project.policy_pause_for_rm
     policy_form.strict_checking.data = project.policy_strict_checking
     policy_form.github_repository_name.data = project.policy_github_repository_name
-    policy_form.github_compose_workflow_path.data = project.policy_github_compose_workflow_path
-    policy_form.github_vote_workflow_path.data = project.policy_github_vote_workflow_path
-    policy_form.github_finish_workflow_path.data = project.policy_github_finish_workflow_path
+    policy_form.github_compose_workflow_path.data = "\n".join(project.policy_github_compose_workflow_path)
+    policy_form.github_vote_workflow_path.data = "\n".join(project.policy_github_vote_workflow_path)
+    policy_form.github_finish_workflow_path.data = "\n".join(project.policy_github_finish_workflow_path)
 
     # Set the hashes and value of the current defaults
     policy_form.default_start_vote_template_hash.data = util.compute_sha3_256(

@@ -472,18 +472,8 @@ async def _delete_release_data_filesystem(release_dir: pathlib.Path, release_nam
 async def _trusted_project(repository: str, workflow_ref: str, phase: TrustedProjectPhase) -> sql.Project:
     # Debugging
     log.info(f"GitHub OIDC JWT payload: {repository} {workflow_ref}")
+    repository_name, workflow_path = _trusted_project_checks(repository, workflow_ref, phase)
 
-    if not repository.startswith("apache/"):
-        raise InteractionError("Repository must start with 'apache/'")
-    repository_name = repository.removeprefix("apache/")
-    if not workflow_ref.startswith(repository + "/"):
-        raise InteractionError(f"Workflow ref must start with repository, got {workflow_ref}")
-    workflow_path_at = workflow_ref.removeprefix(repository + "/")
-    if "@" not in workflow_path_at:
-        raise InteractionError(f"Workflow path must contain '@', got {workflow_path_at}")
-    workflow_path = workflow_path_at.rsplit("@", 1)[0]
-    if not workflow_path.startswith(".github/workflows/"):
-        raise InteractionError(f"Workflow path must start with '.github/workflows/', got {workflow_path}")
     value_error = ValueError(
         f"Release policy for repository {repository_name} and {phase.value} workflow path {workflow_path} not found"
     )
@@ -492,15 +482,18 @@ async def _trusted_project(repository: str, workflow_ref: str, phase: TrustedPro
         match phase:
             case TrustedProjectPhase.COMPOSE:
                 policy = await db_data.release_policy(
-                    github_repository_name=repository_name, github_compose_workflow_path=workflow_path
+                    github_repository_name=repository_name,
+                    github_compose_workflow_path_has=workflow_path,
                 ).demand(value_error)
             case TrustedProjectPhase.VOTE:
                 policy = await db_data.release_policy(
-                    github_repository_name=repository_name, github_vote_workflow_path=workflow_path
+                    github_repository_name=repository_name,
+                    github_vote_workflow_path_has=workflow_path,
                 ).demand(value_error)
             case TrustedProjectPhase.FINISH:
                 policy = await db_data.release_policy(
-                    github_repository_name=repository_name, github_finish_workflow_path=workflow_path
+                    github_repository_name=repository_name,
+                    github_finish_workflow_path_has=workflow_path,
                 ).demand(value_error)
         project = await db_data.project(release_policy_id=policy.id).demand(
             InteractionError(f"Project for release policy {policy.id} not found")
@@ -512,3 +505,18 @@ async def _trusted_project(repository: str, workflow_ref: str, phase: TrustedPro
     log.info(f"Release policy: {policy}")
     log.info(f"Project: {project}")
     return project
+
+
+def _trusted_project_checks(repository: str, workflow_ref: str, phase: TrustedProjectPhase) -> tuple[str, str]:
+    if not repository.startswith("apache/"):
+        raise InteractionError("Repository must start with 'apache/'")
+    repository_name = repository.removeprefix("apache/")
+    if not workflow_ref.startswith(repository + "/"):
+        raise InteractionError(f"Workflow ref must start with repository, got {workflow_ref}")
+    workflow_path_at = workflow_ref.removeprefix(repository + "/")
+    if "@" not in workflow_path_at:
+        raise InteractionError(f"Workflow path must contain '@', got {workflow_path_at}")
+    workflow_path = workflow_path_at.rsplit("@", 1)[0]
+    if not workflow_path.startswith(".github/workflows/"):
+        raise InteractionError(f"Workflow path must start with '.github/workflows/', got {workflow_path}")
+    return repository_name, workflow_path
