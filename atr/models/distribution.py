@@ -15,10 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import datetime
+
 import pydantic
 
-import atr.models.schema as schema
-import atr.models.sql as sql
+from . import basic, schema, sql
 
 
 class ArtifactHubAvailableVersion(schema.Lax):
@@ -116,3 +117,10 @@ class Data(schema.Lax):
     @classmethod
     def empty_to_none(cls, v):
         return None if v is None or (isinstance(v, str) and v.strip() == "") else v
+
+
+class Metadata(schema.Strict):
+    api_url: str
+    result: basic.JSON
+    upload_date: datetime.datetime
+    web_url: str | None

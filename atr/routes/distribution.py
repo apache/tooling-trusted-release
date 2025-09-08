@@ -463,61 +463,35 @@ async def _record_form_page(
 
 async def _record_form_process_page(fpv: FormProjectVersion, /, staging: bool = False) -> str:
     dd = distribution.Data.model_validate(fpv.form.data)
-    resolved = await _release_validated_and_committee_and_template(fpv, dd, staging)
-    if isinstance(resolved, htpy.Element):
-        return await _record_form_page(fpv, extra_content=resolved, staging=staging)
-    release, committee, template_url = resolved
-    api_url = template_url.format(
-        owner_namespace=dd.owner_namespace,
-        package=dd.package,
-        version=dd.version,
+    release, committee = await _release_validated_and_committee(
+        fpv.project,
+        fpv.version,
+        staging=staging,
     )
-    api_oc = await _json_from_distribution_platform(api_url, dd.platform, dd.version)
+
+    # In case of error, show an alert
+    async def _alert(message: str) -> str:
+        div = htm.Block(htpy.div(".alert.alert-danger"))
+        div.p[message]
+        collected = div.collect()
+        return await _record_form_page(fpv, extra_content=collected, staging=staging)
+
+    async with storage.write_as_committee_member(committee_name=committee.name) as w:
+        try:
+            dist, added, metadata = await w.distributions.add_distribution_from_data(
+                release=release,
+                staging=staging,
+                dd=dd,
+            )
+        except storage.AccessError as e:
+            return await _alert(str(e))
 
     block = htm.Block()
 
-    # In case of error, show an alert
-    def _alert(not_found: str, action: str) -> htpy.Element:
-        div = htm.Block(htpy.div(".alert.alert-danger"))
-        div.p[
-            f"The {not_found} was not found in ",
-            htpy.a(href=api_url)["the distribution platform API"],
-            f". Please {action}.",
-        ]
-        return div.collect()
-
     # Distribution submitted
     block.h1["Distribution recorded"]
-    match api_oc:
-        case outcome.Result(result):
-            pass
-        case outcome.Error():
-            alert = _alert("package and version", "check the package name and version")
-            return await _record_form_page(fpv, extra_content=alert, staging=staging)
-        # We leak result, usefully, from this scope
 
-    # This must come after the api_oc match, as it uses the result
-    upload_date = _distribution_upload_date(dd.platform, result, dd.version)
-    if upload_date is None:
-        # TODO: Add a link to an issue tracker
-        alert = _alert("upload date", "report this bug to ASF Tooling")
-        return await _record_form_page(fpv, extra_content=alert, staging=staging)
-
-    web_url = _distribution_web_url(dd.platform, result, dd.version)
-    async with storage.write_as_committee_member(committee_name=committee.name) as w:
-        dist, added = await w.distributions.add_distribution(
-            release_name=release.name,
-            platform=dd.platform,
-            owner_namespace=dd.owner_namespace,
-            package=dd.package,
-            version=dd.version,
-            staging=staging,
-            upload_date=upload_date,
-            api_url=api_url,
-            web_url=web_url,
-        )
-
-    ### Record
+    ## Record
     block.h2["Record"]
     if added:
         block.p["The distribution was recorded successfully."]
@@ -552,13 +526,13 @@ async def _record_form_process_page(fpv: FormProjectVersion, /, staging: bool = 
 
         ### API URL
         block.h3["API URL"]
-        block.pre(".mb-3")[api_url]
+        block.pre(".mb-3")[metadata.api_url]
 
         ### API response
         block.h3["API response"]
         block.details[
             htpy.summary["Show full API response"],
-            htpy.pre(".atr-pre-wrap.mb-3")[json.dumps(result, indent=2)],
+            htpy.pre(".atr-pre-wrap.mb-3")[json.dumps(metadata.result, indent=2)],
         ]
 
     return await template.blank("Distribution submitted", content=block.collect())
@@ -601,31 +575,3 @@ async def _release_validated(
         # if release.project.status != sql.ProjectStatus.ACTIVE:
         #     raise RuntimeError(f"Project {project} is not active")
     return release
-
-
-async def _release_validated_and_committee_and_template(
-    fpv: FormProjectVersion,
-    dd: distribution.Data,
-    staging: bool | None = None,
-) -> tuple[sql.Release, sql.Committee, str] | htpy.Element:
-    release, committee = await _release_validated_and_committee(
-        fpv.project,
-        fpv.version,
-        staging=staging,
-    )
-    if staging is False:
-        return release, committee, dd.platform.value.template_url
-
-    supported = {sql.DistributionPlatform.ARTIFACT_HUB, sql.DistributionPlatform.PYPI}
-    if dd.platform not in supported:
-        div = htm.Block(htpy.div(".alert.alert-danger"))
-        div.p["Staging is currently supported only for ArtifactHub and PyPI."]
-        return div.collect()
-
-    template_url = dd.platform.value.template_staging_url
-    if template_url is None:
-        div = htm.Block(htpy.div(".alert.alert-danger"))
-        div.p["This platform does not provide a staging API endpoint."]
-        return div.collect()
-
-    return release, committee, template_url

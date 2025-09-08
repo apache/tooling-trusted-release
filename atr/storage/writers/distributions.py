@@ -142,12 +142,46 @@ class CommitteeMember(CommitteeParticipant):
             raise e
         return distribution, True
 
-    async def add_distribution_from_url(
+    async def add_distribution_from_data(
         self,
-        api_url: str,
-        platform: sql.DistributionPlatform,
-        version: str,
-    ) -> tuple[sql.Distribution, bool]: ...
+        release: sql.Release,
+        staging: bool,
+        dd: distribution.Data,
+    ) -> tuple[sql.Distribution, bool, distribution.Metadata]:
+        template_url = await self.__template_url(dd, staging)
+        api_url = template_url.format(
+            owner_namespace=dd.owner_namespace,
+            package=dd.package,
+            version=dd.version,
+        )
+        api_oc = await self.__json_from_distribution_platform(api_url, dd.platform, dd.version)
+        match api_oc:
+            case outcome.Result(result):
+                pass
+            case outcome.Error():
+                raise storage.AccessError("Failed to get API response from distribution platform")
+        upload_date = self.__distribution_upload_date(dd.platform, result, dd.version)
+        if upload_date is None:
+            raise storage.AccessError("Failed to get upload date from distribution platform")
+        web_url = self.__distribution_web_url(dd.platform, result, dd.version)
+        metadata = distribution.Metadata(
+            api_url=api_url,
+            result=result,
+            upload_date=upload_date,
+            web_url=web_url,
+        )
+        dist, added = await self.add_distribution(
+            release_name=release.name,
+            platform=dd.platform,
+            owner_namespace=dd.owner_namespace,
+            package=dd.package,
+            version=dd.version,
+            staging=staging,
+            upload_date=upload_date,
+            api_url=api_url,
+            web_url=web_url,
+        )
+        return dist, added, metadata
 
     def __distribution_upload_date(  # noqa: C901
         self,
