@@ -18,17 +18,18 @@
 # Removing this will cause circular imports
 from __future__ import annotations
 
+import datetime
 import sqlite3
-from typing import TYPE_CHECKING
 
+import aiohttp
 import sqlalchemy.exc as exc
 
 import atr.db as db
+import atr.models.basic as basic
+import atr.models.distribution as distribution
 import atr.models.sql as sql
 import atr.storage as storage
-
-if TYPE_CHECKING:
-    import datetime
+import atr.storage.outcome as outcome
 
 
 class GeneralPublic:
@@ -122,6 +123,7 @@ class CommitteeMember(CommitteeParticipant):
             # e.orig.sqlite_errorcode == 1555
             # e.orig.sqlite_errorname == "SQLITE_CONSTRAINT_PRIMARYKEY"
             match e.orig:
+                # TODO: Document this
                 case sqlite3.IntegrityError(sqlite_errorcode=sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY):
                     if not staging:
                         upgraded = await self.__upgrade_staging_to_final(
@@ -139,6 +141,136 @@ class CommitteeMember(CommitteeParticipant):
                     return distribution, False
             raise e
         return distribution, True
+
+    async def add_distribution_from_url(
+        self,
+        api_url: str,
+        platform: sql.DistributionPlatform,
+        version: str,
+    ) -> tuple[sql.Distribution, bool]: ...
+
+    def __distribution_upload_date(  # noqa: C901
+        self,
+        platform: sql.DistributionPlatform,
+        data: basic.JSON,
+        version: str,
+    ) -> datetime.datetime | None:
+        match platform:
+            case sql.DistributionPlatform.ARTIFACT_HUB:
+                if not (versions := distribution.ArtifactHubResponse.model_validate(data).available_versions):
+                    return None
+                return datetime.datetime.fromtimestamp(versions[0].ts, tz=datetime.UTC)
+            case sql.DistributionPlatform.DOCKER_HUB:
+                if not (pushed_at := distribution.DockerResponse.model_validate(data).tag_last_pushed):
+                    return None
+                return datetime.datetime.fromisoformat(pushed_at.rstrip("Z"))
+            # case sql.DistributionPlatform.GITHUB:
+            #     if not (published_at := GitHubResponse.model_validate(data).published_at):
+            #         return None
+            #     return datetime.datetime.fromisoformat(published_at.rstrip("Z"))
+            case sql.DistributionPlatform.MAVEN:
+                m = distribution.MavenResponse.model_validate(data)
+                docs = m.response.docs
+                if not docs:
+                    return None
+                timestamp = docs[0].timestamp
+                if not timestamp:
+                    return None
+                return datetime.datetime.fromtimestamp(timestamp / 1000, tz=datetime.UTC)
+            case sql.DistributionPlatform.NPM | sql.DistributionPlatform.NPM_SCOPED:
+                if not (times := distribution.NpmResponse.model_validate(data).time):
+                    return None
+                # Versions can be in the form "1.2.3" or "v1.2.3", so we check for both
+                if not (upload_time := times.get(version) or times.get(f"v{version}")):
+                    return None
+                return datetime.datetime.fromisoformat(upload_time.rstrip("Z"))
+            case sql.DistributionPlatform.PYPI:
+                if not (urls := distribution.PyPIResponse.model_validate(data).urls):
+                    return None
+                if not (upload_time := urls[0].upload_time_iso_8601):
+                    return None
+                return datetime.datetime.fromisoformat(upload_time.rstrip("Z"))
+        raise NotImplementedError(f"Platform {platform.name} is not yet supported")
+
+    def __distribution_web_url(  # noqa: C901
+        self,
+        platform: sql.DistributionPlatform,
+        data: basic.JSON,
+        version: str,
+    ) -> str | None:
+        match platform:
+            case sql.DistributionPlatform.ARTIFACT_HUB:
+                ah = distribution.ArtifactHubResponse.model_validate(data)
+                repo_name = ah.repository.name if ah.repository else None
+                pkg_name = ah.name
+                ver = ah.version
+                if repo_name and pkg_name:
+                    if ver:
+                        return f"https://artifacthub.io/packages/helm/{repo_name}/{pkg_name}/{ver}"
+                    return f"https://artifacthub.io/packages/helm/{repo_name}/{pkg_name}/{version}"
+                if ah.home_url:
+                    return ah.home_url
+                for link in ah.links:
+                    if link.url:
+                        return link.url
+                return None
+            case sql.DistributionPlatform.DOCKER_HUB:
+                # The best we can do on Docker Hub is:
+                # f"https://hub.docker.com/_/{package}"
+                return None
+            # case sql.DistributionPlatform.GITHUB:
+            #     gh = GitHubResponse.model_validate(data)
+            #     return gh.html_url
+            case sql.DistributionPlatform.MAVEN:
+                return None
+            case sql.DistributionPlatform.NPM:
+                nr = distribution.NpmResponse.model_validate(data)
+                # return nr.homepage
+                return f"https://www.npmjs.com/package/{nr.name}/v/{version}"
+            case sql.DistributionPlatform.NPM_SCOPED:
+                nr = distribution.NpmResponse.model_validate(data)
+                # TODO: This is not correct
+                return nr.homepage
+            case sql.DistributionPlatform.PYPI:
+                info = distribution.PyPIResponse.model_validate(data).info
+                return info.release_url or info.project_url
+        raise NotImplementedError(f"Platform {platform.name} is not yet supported")
+
+    async def __json_from_distribution_platform(
+        self, api_url: str, platform: sql.DistributionPlatform, version: str
+    ) -> outcome.Outcome[basic.JSON]:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url) as response:
+                    response.raise_for_status()
+                    response_json = await response.json()
+            result = basic.as_json(response_json)
+        except aiohttp.ClientError as e:
+            return outcome.Error(e)
+        match platform:
+            case sql.DistributionPlatform.NPM | sql.DistributionPlatform.NPM_SCOPED:
+                if version not in distribution.NpmResponse.model_validate(result).time:
+                    e = RuntimeError(f"Version '{version}' not found")
+                    return outcome.Error(e)
+        return outcome.Result(result)
+
+    async def __template_url(
+        self,
+        dd: distribution.Data,
+        staging: bool | None = None,
+    ) -> str:
+        if staging is False:
+            return dd.platform.value.template_url
+
+        supported = {sql.DistributionPlatform.ARTIFACT_HUB, sql.DistributionPlatform.PYPI}
+        if dd.platform not in supported:
+            raise storage.AccessError("Staging is currently supported only for ArtifactHub and PyPI.")
+
+        template_url = dd.platform.value.template_staging_url
+        if template_url is None:
+            raise storage.AccessError("This platform does not provide a staging API endpoint.")
+
+        return template_url
 
     async def __upgrade_staging_to_final(
         self,

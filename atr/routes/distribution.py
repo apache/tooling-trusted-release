@@ -24,14 +24,13 @@ from typing import TYPE_CHECKING, Literal
 
 import aiohttp
 import htpy
-import pydantic
 import quart
 
 import atr.db as db
 import atr.forms as forms
 import atr.htm as htm
 import atr.models.basic as basic
-import atr.models.schema as schema
+import atr.models.distribution as distribution
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.compose as compose
@@ -47,71 +46,6 @@ if TYPE_CHECKING:
 type Phase = Literal["COMPOSE", "VOTE", "FINISH"]
 
 
-class ArtifactHubAvailableVersion(schema.Lax):
-    ts: int
-
-
-class ArtifactHubLink(schema.Lax):
-    url: str | None = None
-    name: str | None = None
-
-
-class ArtifactHubRepository(schema.Lax):
-    name: str | None = None
-
-
-class ArtifactHubResponse(schema.Lax):
-    available_versions: list[ArtifactHubAvailableVersion] = pydantic.Field(default_factory=list)
-    home_url: str | None = None
-    links: list[ArtifactHubLink] = pydantic.Field(default_factory=list)
-    name: str | None = None
-    version: str | None = None
-    repository: ArtifactHubRepository | None = None
-
-
-class DockerResponse(schema.Lax):
-    tag_last_pushed: str | None = None
-
-
-class GitHubResponse(schema.Lax):
-    published_at: str | None = None
-    html_url: str | None = None
-
-
-class MavenDoc(schema.Lax):
-    timestamp: int | None = None
-
-
-class MavenResponseBody(schema.Lax):
-    start: int | None = None
-    docs: list[MavenDoc] = pydantic.Field(default_factory=list)
-
-
-class MavenResponse(schema.Lax):
-    response: MavenResponseBody = pydantic.Field(default_factory=MavenResponseBody)
-
-
-class NpmResponse(schema.Lax):
-    name: str | None = None
-    time: dict[str, str] = pydantic.Field(default_factory=dict)
-    homepage: str | None = None
-
-
-class PyPIUrl(schema.Lax):
-    upload_time_iso_8601: str | None = None
-    url: str | None = None
-
-
-class PyPIInfo(schema.Lax):
-    release_url: str | None = None
-    project_url: str | None = None
-
-
-class PyPIResponse(schema.Lax):
-    urls: list[PyPIUrl] = pydantic.Field(default_factory=list)
-    info: PyPIInfo = pydantic.Field(default_factory=PyPIInfo)
-
-
 class DeleteForm(forms.Typed):
     release_name = forms.hidden()
     platform = forms.hidden()
@@ -119,21 +53,6 @@ class DeleteForm(forms.Typed):
     package = forms.hidden()
     version = forms.hidden()
     submit = forms.submit("Delete")
-
-
-class DeleteData(schema.Lax):
-    release_name: str
-    platform: sql.DistributionPlatform
-    owner_namespace: str
-    package: str
-    version: str
-
-    @pydantic.field_validator("platform", mode="before")
-    @classmethod
-    def coerce_platform(cls, v: object) -> object:
-        if isinstance(v, str):
-            return sql.DistributionPlatform[v]
-        return v
 
 
 class DistributeForm(forms.Typed):
@@ -178,27 +97,10 @@ class FormProjectVersion:
     version: str
 
 
-# Lax to ignore csrf_token and submit
-# WTForms types platform as Any, which is insufficient
-# And this way we also get nice JSON from the Pydantic model dump
-# Including all of the enum properties
-class DistributeData(schema.Lax):
-    platform: sql.DistributionPlatform
-    owner_namespace: str | None = None
-    package: str
-    version: str
-    details: bool
-
-    @pydantic.field_validator("owner_namespace", mode="before")
-    @classmethod
-    def empty_to_none(cls, v):
-        return None if v is None or (isinstance(v, str) and v.strip() == "") else v
-
-
 @routes.committer("/distribution/delete/<project>/<version>", methods=["POST"])
 async def delete(session: routes.CommitterSession, project: str, version: str) -> response.Response:
     form = await DeleteForm.create_form(data=await quart.request.form)
-    dd = DeleteData.model_validate(form.data)
+    dd = distribution.DeleteData.model_validate(form.data)
 
     # Validate the submitted data, and obtain the committee for its name
     async with db.session() as data:
@@ -259,21 +161,21 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
     block.p[record_a_distribution]
     # Table of contents
     ul_toc = htm.Block(htpy.ul)
-    for distribution in distributions:
-        a = htpy.a(href=f"#distribution-{distribution.identifier}")[distribution.title]
+    for dist in distributions:
+        a = htpy.a(href=f"#distribution-{dist.identifier}")[dist.title]
         ul_toc.li[a]
     block.append(ul_toc)
 
     ## Distributions
     block.h2["Distributions"]
-    for distribution in distributions:
+    for dist in distributions:
         delete_form = await DeleteForm.create_form(
             data={
-                "release_name": distribution.release_name,
-                "platform": distribution.platform.name,
-                "owner_namespace": distribution.owner_namespace,
-                "package": distribution.package,
-                "version": distribution.version,
+                "release_name": dist.release_name,
+                "platform": dist.platform.name,
+                "owner_namespace": dist.owner_namespace,
+                "package": dist.package,
+                "version": dist.version,
             }
         )
 
@@ -281,18 +183,18 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
         block.h3(
             # Cannot use "#id" here, because the ID contains "."
             # If an ID contains ".", htpy parses that as a class
-            id=f"distribution-{distribution.identifier}"
-        )[distribution.title]
+            id=f"distribution-{dist.identifier}"
+        )[dist.title]
         tbody = htpy.tbody[
-            _html_tr("Release name", distribution.release_name),
-            _html_tr("Platform", distribution.platform.value.name),
-            _html_tr("Owner or Namespace", distribution.owner_namespace or "-"),
-            _html_tr("Package", distribution.package),
-            _html_tr("Version", distribution.version),
-            _html_tr("Staging", "Yes" if distribution.staging else "No"),
-            _html_tr("Upload date", str(distribution.upload_date)),
-            _html_tr_a("API URL", distribution.api_url),
-            _html_tr_a("Web URL", distribution.web_url),
+            _html_tr("Release name", dist.release_name),
+            _html_tr("Platform", dist.platform.value.name),
+            _html_tr("Owner or Namespace", dist.owner_namespace or "-"),
+            _html_tr("Package", dist.package),
+            _html_tr("Version", dist.version),
+            _html_tr("Staging", "Yes" if dist.staging else "No"),
+            _html_tr("Upload date", str(dist.upload_date)),
+            _html_tr_a("API URL", dist.api_url),
+            _html_tr_a("Web URL", dist.web_url),
         ]
         block.table(".table.table-striped.table-bordered")[tbody]
         form_action = util.as_url(delete, project=project, version=version)
@@ -361,11 +263,11 @@ def _distribution_upload_date(  # noqa: C901
 ) -> datetime.datetime | None:
     match platform:
         case sql.DistributionPlatform.ARTIFACT_HUB:
-            if not (versions := ArtifactHubResponse.model_validate(data).available_versions):
+            if not (versions := distribution.ArtifactHubResponse.model_validate(data).available_versions):
                 return None
             return datetime.datetime.fromtimestamp(versions[0].ts, tz=datetime.UTC)
         case sql.DistributionPlatform.DOCKER_HUB:
-            if not (pushed_at := DockerResponse.model_validate(data).tag_last_pushed):
+            if not (pushed_at := distribution.DockerResponse.model_validate(data).tag_last_pushed):
                 return None
             return datetime.datetime.fromisoformat(pushed_at.rstrip("Z"))
         # case sql.DistributionPlatform.GITHUB:
@@ -373,7 +275,7 @@ def _distribution_upload_date(  # noqa: C901
         #         return None
         #     return datetime.datetime.fromisoformat(published_at.rstrip("Z"))
         case sql.DistributionPlatform.MAVEN:
-            m = MavenResponse.model_validate(data)
+            m = distribution.MavenResponse.model_validate(data)
             docs = m.response.docs
             if not docs:
                 return None
@@ -382,14 +284,14 @@ def _distribution_upload_date(  # noqa: C901
                 return None
             return datetime.datetime.fromtimestamp(timestamp / 1000, tz=datetime.UTC)
         case sql.DistributionPlatform.NPM | sql.DistributionPlatform.NPM_SCOPED:
-            if not (times := NpmResponse.model_validate(data).time):
+            if not (times := distribution.NpmResponse.model_validate(data).time):
                 return None
             # Versions can be in the form "1.2.3" or "v1.2.3", so we check for both
             if not (upload_time := times.get(version) or times.get(f"v{version}")):
                 return None
             return datetime.datetime.fromisoformat(upload_time.rstrip("Z"))
         case sql.DistributionPlatform.PYPI:
-            if not (urls := PyPIResponse.model_validate(data).urls):
+            if not (urls := distribution.PyPIResponse.model_validate(data).urls):
                 return None
             if not (upload_time := urls[0].upload_time_iso_8601):
                 return None
@@ -404,7 +306,7 @@ def _distribution_web_url(  # noqa: C901
 ) -> str | None:
     match platform:
         case sql.DistributionPlatform.ARTIFACT_HUB:
-            ah = ArtifactHubResponse.model_validate(data)
+            ah = distribution.ArtifactHubResponse.model_validate(data)
             repo_name = ah.repository.name if ah.repository else None
             pkg_name = ah.name
             ver = ah.version
@@ -428,15 +330,15 @@ def _distribution_web_url(  # noqa: C901
         case sql.DistributionPlatform.MAVEN:
             return None
         case sql.DistributionPlatform.NPM:
-            nr = NpmResponse.model_validate(data)
+            nr = distribution.NpmResponse.model_validate(data)
             # return nr.homepage
             return f"https://www.npmjs.com/package/{nr.name}/v/{version}"
         case sql.DistributionPlatform.NPM_SCOPED:
-            nr = NpmResponse.model_validate(data)
+            nr = distribution.NpmResponse.model_validate(data)
             # TODO: This is not correct
             return nr.homepage
         case sql.DistributionPlatform.PYPI:
-            info = PyPIResponse.model_validate(data).info
+            info = distribution.PyPIResponse.model_validate(data).info
             return info.release_url or info.project_url
     raise NotImplementedError(f"Platform {platform.name} is not yet supported")
 
@@ -454,7 +356,7 @@ async def _json_from_distribution_platform(
         return outcome.Error(e)
     match platform:
         case sql.DistributionPlatform.NPM | sql.DistributionPlatform.NPM_SCOPED:
-            if version not in NpmResponse.model_validate(result).time:
+            if version not in distribution.NpmResponse.model_validate(result).time:
                 e = RuntimeError(f"Version '{version}' not found")
                 return outcome.Error(e)
     return outcome.Result(result)
@@ -509,7 +411,7 @@ def _html_nav_phase(block: htm.Block, project: str, version: str, staging: bool)
     )
 
 
-def _html_submitted_values_table(block: htm.Block, dd: DistributeData) -> None:
+def _html_submitted_values_table(block: htm.Block, dd: distribution.Data) -> None:
     tbody = htpy.tbody[
         _html_tr("Platform", dd.platform.name),
         _html_tr("Owner or Namespace", dd.owner_namespace or "-"),
@@ -560,7 +462,7 @@ async def _record_form_page(
 
 
 async def _record_form_process_page(fpv: FormProjectVersion, /, staging: bool = False) -> str:
-    dd = DistributeData.model_validate(fpv.form.data)
+    dd = distribution.Data.model_validate(fpv.form.data)
     resolved = await _release_validated_and_committee_and_template(fpv, dd, staging)
     if isinstance(resolved, htpy.Element):
         return await _record_form_page(fpv, extra_content=resolved, staging=staging)
@@ -603,7 +505,7 @@ async def _record_form_process_page(fpv: FormProjectVersion, /, staging: bool = 
 
     web_url = _distribution_web_url(dd.platform, result, dd.version)
     async with storage.write_as_committee_member(committee_name=committee.name) as w:
-        distribution, added = await w.distributions.add_distribution(
+        dist, added = await w.distributions.add_distribution(
             release_name=release.name,
             platform=dd.platform,
             owner_namespace=dd.owner_namespace,
@@ -623,15 +525,15 @@ async def _record_form_process_page(fpv: FormProjectVersion, /, staging: bool = 
         block.p["The distribution was already recorded."]
     block.table(".table.table-striped.table-bordered")[
         htpy.tbody[
-            _html_tr("Release name", distribution.release_name),
-            _html_tr("Platform", distribution.platform.name),
-            _html_tr("Owner or Namespace", distribution.owner_namespace or "-"),
-            _html_tr("Package", distribution.package),
-            _html_tr("Version", distribution.version),
-            _html_tr("Staging", "Yes" if distribution.staging else "No"),
-            _html_tr("Upload date", str(distribution.upload_date)),
-            _html_tr_a("API URL", distribution.api_url),
-            _html_tr_a("Web URL", distribution.web_url),
+            _html_tr("Release name", dist.release_name),
+            _html_tr("Platform", dist.platform.name),
+            _html_tr("Owner or Namespace", dist.owner_namespace or "-"),
+            _html_tr("Package", dist.package),
+            _html_tr("Version", dist.version),
+            _html_tr("Staging", "Yes" if dist.staging else "No"),
+            _html_tr("Upload date", str(dist.upload_date)),
+            _html_tr_a("API URL", dist.api_url),
+            _html_tr_a("Web URL", dist.web_url),
         ]
     ]
     block.p[htpy.a(href=util.as_url(list_get, project=fpv.project, version=fpv.version))["Back to distribution list"],]
@@ -703,7 +605,7 @@ async def _release_validated(
 
 async def _release_validated_and_committee_and_template(
     fpv: FormProjectVersion,
-    dd: DistributeData,
+    dd: distribution.Data,
     staging: bool | None = None,
 ) -> tuple[sql.Release, sql.Committee, str] | htpy.Element:
     release, committee = await _release_validated_and_committee(
