@@ -584,10 +584,7 @@ async def projects_list() -> DictResponse:
 
 
 @api.BLUEPRINT.route("/publisher/distribution/record", methods=["POST"])
-@jwtoken.require
-@quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.PublisherDistributionRecordArgs)
-@quart_schema.validate_response(models.api.PublisherDistributionRecordResults, 200)
 async def publisher_distribution_record(data: models.api.PublisherDistributionRecordArgs) -> DictResponse:
     """
     Record a distribution with a corroborating Trusted Publisher JWT.
