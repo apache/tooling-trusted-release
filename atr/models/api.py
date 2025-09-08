@@ -81,6 +81,20 @@ class DistributionRecordArgs(schema.Strict):
     staging: bool = schema.Field(..., **example(False))
     details: bool = schema.Field(..., **example(False))
 
+    @pydantic.field_validator("platform", mode="before")
+    @classmethod
+    def platform_to_enum(cls, v):
+        if isinstance(v, str):
+            try:
+                return sql.DistributionPlatform.__members__[v]
+            except KeyError:
+                raise ValueError(f"'{v}' is not a valid DistributionPlatform")
+        return v
+
+    @pydantic.field_serializer("platform")
+    def serialise_platform(self, v):
+        return v.name if isinstance(v, sql.DistributionPlatform) else v
+
 
 class DistributionRecordResults(schema.Strict):
     endpoint: Literal["/distribution/record"] = schema.Field(alias="endpoint")
@@ -211,6 +225,38 @@ class ProjectReleasesResults(schema.Strict):
 class ProjectsListResults(schema.Strict):
     endpoint: Literal["/projects/list"] = schema.Field(alias="endpoint")
     projects: Sequence[sql.Project]
+
+
+class PublisherDistributionRecordArgs(schema.Strict):
+    publisher: str = schema.Field(..., **example("user"))
+    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
+    project: str = schema.Field(..., **example("example"))
+    version: str = schema.Field(..., **example("0.0.1"))
+    platform: sql.DistributionPlatform = schema.Field(..., **example(sql.DistributionPlatform.ARTIFACT_HUB))
+    distribution_owner_namespace: str | None = schema.Field(default=None, **example("example"))
+    distribution_package: str = schema.Field(..., **example("example"))
+    distribution_version: str = schema.Field(..., **example("0.0.1"))
+    staging: bool = schema.Field(..., **example(False))
+    details: bool = schema.Field(..., **example(False))
+
+    @pydantic.field_validator("platform", mode="before")
+    @classmethod
+    def platform_to_enum(cls, v):
+        if isinstance(v, str):
+            try:
+                return sql.DistributionPlatform.__members__[v]
+            except KeyError:
+                raise ValueError(f"'{v}' is not a valid DistributionPlatform")
+        return v
+
+    @pydantic.field_serializer("platform")
+    def serialise_platform(self, v):
+        return v.name if isinstance(v, sql.DistributionPlatform) else v
+
+
+class PublisherDistributionRecordResults(schema.Strict):
+    endpoint: Literal["/publisher/distribution/record"] = schema.Field(alias="endpoint")
+    success: Literal[True] = schema.Field(..., **example(True))
 
 
 class PublisherReleaseAnnounceArgs(schema.Strict):
@@ -482,6 +528,7 @@ Results = Annotated[
     | CommitteeKeysResults
     | CommitteeProjectsResults
     | CommitteesListResults
+    | DistributionRecordResults
     | IgnoreAddResults
     | IgnoreDeleteResults
     | IgnoreListResults
@@ -494,6 +541,7 @@ Results = Annotated[
     | ProjectGetResults
     | ProjectReleasesResults
     | ProjectsListResults
+    | PublisherDistributionRecordResults
     | PublisherReleaseAnnounceResults
     | PublisherSshRegisterResults
     | PublisherVoteResolveResults
@@ -537,6 +585,7 @@ validate_committee_get = validator(CommitteeGetResults)
 validate_committee_keys = validator(CommitteeKeysResults)
 validate_committee_projects = validator(CommitteeProjectsResults)
 validate_committees_list = validator(CommitteesListResults)
+validate_distribution_record = validator(DistributionRecordResults)
 validate_ignore_add = validator(IgnoreAddResults)
 validate_ignore_delete = validator(IgnoreDeleteResults)
 validate_ignore_list = validator(IgnoreListResults)
@@ -549,6 +598,7 @@ validate_keys_user = validator(KeysUserResults)
 validate_project_get = validator(ProjectGetResults)
 validate_project_releases = validator(ProjectReleasesResults)
 validate_projects_list = validator(ProjectsListResults)
+validate_publisher_distribution_record = validator(PublisherDistributionRecordResults)
 validate_publisher_release_announce = validator(PublisherReleaseAnnounceResults)
 validate_publisher_ssh_register = validator(PublisherSshRegisterResults)
 validate_publisher_vote_resolve = validator(PublisherVoteResolveResults)

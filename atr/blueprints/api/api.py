@@ -270,9 +270,8 @@ async def distribution_record(data: models.api.DistributionRecordArgs) -> DictRe
         ).demand(exceptions.NotFound(f"Release {release_name} not found"))
     if release.committee is None:
         raise exceptions.NotFound(f"Release {release_name} has no committee")
-    platform = data.platform
     dd = models.distribution.Data(
-        platform=platform,
+        platform=data.platform,
         owner_namespace=data.distribution_owner_namespace,
         package=data.distribution_package,
         version=data.distribution_version,
@@ -584,11 +583,54 @@ async def projects_list() -> DictResponse:
     ).model_dump(), 200
 
 
+@api.BLUEPRINT.route("/publisher/distribution/record", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.PublisherDistributionRecordArgs)
+@quart_schema.validate_response(models.api.PublisherDistributionRecordResults, 200)
+async def publisher_distribution_record(data: models.api.PublisherDistributionRecordArgs) -> DictResponse:
+    """
+    Record a distribution with a corroborating Trusted Publisher JWT.
+    """
+    _payload, asf_uid, project = await interaction.trusted_jwt(
+        data.publisher,
+        data.jwt,
+        interaction.TrustedProjectPhase.FINISH,
+    )
+    async with db.session() as db_data:
+        release_name = models.sql.release_name(project.name, data.version)
+        release = await db_data.release(
+            project_name=project.name,
+            version=data.version,
+        ).demand(exceptions.NotFound(f"Release {release_name} not found"))
+    if release.committee is None:
+        raise exceptions.NotFound(f"Release {release_name} has no committee")
+    dd = models.distribution.Data(
+        platform=data.platform,
+        owner_namespace=data.distribution_owner_namespace,
+        package=data.distribution_package,
+        version=data.distribution_version,
+        details=data.details,
+    )
+    async with storage.write(asf_uid) as write:
+        wacm = write.as_committee_member(release.committee.name)
+        await wacm.distributions.record_from_data(
+            release,
+            data.staging,
+            dd,
+        )
+
+    return models.api.PublisherDistributionRecordResults(
+        endpoint="/publisher/distribution/record",
+        success=True,
+    ).model_dump(), 200
+
+
 @api.BLUEPRINT.route("/publisher/release/announce", methods=["POST"])
 @quart_schema.validate_request(models.api.PublisherReleaseAnnounceArgs)
 async def publisher_release_announce(data: models.api.PublisherReleaseAnnounceArgs) -> DictResponse:
     """
-    Announce a release with a corroborating GitHub OIDC JWT.
+    Announce a release with a corroborating Trusted Publisher JWT.
     """
     _payload, asf_uid, project = await interaction.trusted_jwt(
         data.publisher,
@@ -623,7 +665,7 @@ async def publisher_release_announce(data: models.api.PublisherReleaseAnnounceAr
 @quart_schema.validate_request(models.api.PublisherSshRegisterArgs)
 async def publisher_ssh_register(data: models.api.PublisherSshRegisterArgs) -> DictResponse:
     """
-    Register an SSH key sent with a corroborating GitHub OIDC JWT.
+    Register an SSH key sent with a corroborating Trusted Publisher JWT.
     """
     payload, asf_uid, project = await interaction.trusted_jwt(
         data.publisher, data.jwt, interaction.TrustedProjectPhase.COMPOSE
@@ -648,7 +690,7 @@ async def publisher_ssh_register(data: models.api.PublisherSshRegisterArgs) -> D
 @quart_schema.validate_request(models.api.PublisherVoteResolveArgs)
 async def publisher_vote_resolve(data: models.api.PublisherVoteResolveArgs) -> DictResponse:
     """
-    Resolve a vote with a corroborating GitHub OIDC JWT.
+    Resolve a vote with a corroborating Trusted Publisher JWT.
     """
     # TODO: Need to be able to resolve and make the release immutable
     _payload, asf_uid, project = await interaction.trusted_jwt(
