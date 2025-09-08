@@ -478,7 +478,7 @@ async def _record_form_process_page(fpv: FormProjectVersion, /, staging: bool = 
 
     async with storage.write_as_committee_member(committee_name=committee.name) as w:
         try:
-            dist, added, metadata = await w.distributions.add_distribution_from_data(
+            dist, added, metadata = await w.distributions.record_from_data(
                 release=release,
                 staging=staging,
                 dd=dd,

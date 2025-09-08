@@ -91,7 +91,7 @@ class CommitteeMember(CommitteeParticipant):
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
 
-    async def add_distribution(
+    async def record(
         self,
         release_name: str,
         platform: sql.DistributionPlatform,
@@ -142,7 +142,7 @@ class CommitteeMember(CommitteeParticipant):
             raise e
         return distribution, True
 
-    async def add_distribution_from_data(
+    async def record_from_data(
         self,
         release: sql.Release,
         staging: bool,
@@ -170,7 +170,7 @@ class CommitteeMember(CommitteeParticipant):
             upload_date=upload_date,
             web_url=web_url,
         )
-        dist, added = await self.add_distribution(
+        dist, added = await self.record(
             release_name=release.name,
             platform=dd.platform,
             owner_namespace=dd.owner_namespace,

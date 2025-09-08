@@ -27,7 +27,6 @@ import pgpy
 import quart
 import quart_schema
 import sqlalchemy
-import sqlalchemy.ext.asyncio
 import sqlmodel
 import werkzeug.exceptions as exceptions
 
@@ -253,87 +252,42 @@ async def committees_list() -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/github/release/announce", methods=["POST"])
-@quart_schema.validate_request(models.api.GithubReleaseAnnounceArgs)
-async def github_release_announce(data: models.api.GithubReleaseAnnounceArgs) -> DictResponse:
+@api.BLUEPRINT.route("/distribution/record", methods=["POST"])
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_request(models.api.DistributionRecordArgs)
+@quart_schema.validate_response(models.api.DistributionRecordResults, 200)
+async def distribution_record(data: models.api.DistributionRecordArgs) -> DictResponse:
     """
-    Announce a release with a corroborating GitHub OIDC JWT.
+    Record a distribution.
     """
-    _payload, asf_uid, project = await interaction.github_trusted_jwt(
-        data.jwt,
-        interaction.TrustedProjectPhase.FINISH,
+    asf_uid = _jwt_asf_uid()
+    async with db.session() as db_data:
+        release_name = models.sql.release_name(data.project, data.version)
+        release = await db_data.release(
+            project_name=data.project,
+            version=data.version,
+        ).demand(exceptions.NotFound(f"Release {release_name} not found"))
+    if release.committee is None:
+        raise exceptions.NotFound(f"Release {release_name} has no committee")
+    platform = data.platform
+    dd = models.distribution.Data(
+        platform=platform,
+        owner_namespace=data.distribution_owner_namespace,
+        package=data.distribution_package,
+        version=data.distribution_version,
+        details=data.details,
     )
-    try:
-        # TODO: Add defaults
-        committee = util.unwrap(project.committee)
-        async with storage.write_as_committee_member(committee.name, asf_uid) as wacm:
-            await wacm.announce.release(
-                project.name,
-                data.version,
-                data.revision,
-                data.email_to,
-                data.subject,
-                data.body,
-                data.path_suffix,
-                asf_uid,
-                asf_uid,
-            )
-    except storage.AccessError as e:
-        raise exceptions.BadRequest(str(e))
-
-    return models.api.GithubReleaseAnnounceResults(
-        endpoint="/github/release/announce",
-        success=True,
-    ).model_dump(), 200
-
-
-@api.BLUEPRINT.route("/github/ssh/register", methods=["POST"])
-@quart_schema.validate_request(models.api.GithubSshRegisterArgs)
-async def github_ssh_register(data: models.api.GithubSshRegisterArgs) -> DictResponse:
-    """
-    Register an SSH key sent with a corroborating GitHub OIDC JWT.
-    """
-    payload, asf_uid, project = await interaction.github_trusted_jwt(data.jwt, interaction.TrustedProjectPhase.COMPOSE)
-    async with storage.write_as_committee_member(util.unwrap(project.committee).name, asf_uid) as wacm:
-        fingerprint, expires = await wacm.ssh.add_workflow_key(
-            payload["actor"],
-            payload["actor_id"],
-            project.name,
-            data.ssh_key,
+    async with storage.write(asf_uid) as write:
+        wacm = write.as_committee_member(release.committee.name)
+        await wacm.distributions.record_from_data(
+            release,
+            data.staging,
+            dd,
         )
 
-    return models.api.GithubSshRegisterResults(
-        endpoint="/github/ssh/register",
-        fingerprint=fingerprint,
-        project=project.name,
-        expires=expires,
-    ).model_dump(), 200
-
-
-@api.BLUEPRINT.route("/github/vote/resolve", methods=["POST"])
-@quart_schema.validate_request(models.api.GithubVoteResolveArgs)
-async def github_vote_resolve(data: models.api.GithubVoteResolveArgs) -> DictResponse:
-    """
-    Resolve a vote with a corroborating GitHub OIDC JWT.
-    """
-    # TODO: Need to be able to resolve and make the release immutable
-    _payload, asf_uid, project = await interaction.github_trusted_jwt(
-        data.jwt,
-        interaction.TrustedProjectPhase.VOTE,
-    )
-    async with storage.write_as_project_committee_member(project.name, asf_uid) as wacm:
-        # TODO: Get fullname and use instead of asf_uid
-        # TODO: Add resolution templating to atr.construct
-        _release, _voting_round, _success_message, _error_message = await wacm.vote.resolve(
-            project.name,
-            data.version,
-            data.resolution,
-            asf_uid,
-            f"The vote {data.resolution}.",
-        )
-
-    return models.api.GithubVoteResolveResults(
-        endpoint="/github/vote/resolve",
+    return models.api.DistributionRecordResults(
+        endpoint="/distribution/record",
         success=True,
     ).model_dump(), 200
 
@@ -627,6 +581,95 @@ async def projects_list() -> DictResponse:
     return models.api.ProjectsListResults(
         endpoint="/projects/list",
         projects=projects,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/publisher/release/announce", methods=["POST"])
+@quart_schema.validate_request(models.api.PublisherReleaseAnnounceArgs)
+async def publisher_release_announce(data: models.api.PublisherReleaseAnnounceArgs) -> DictResponse:
+    """
+    Announce a release with a corroborating GitHub OIDC JWT.
+    """
+    _payload, asf_uid, project = await interaction.trusted_jwt(
+        data.publisher,
+        data.jwt,
+        interaction.TrustedProjectPhase.FINISH,
+    )
+    try:
+        # TODO: Add defaults
+        committee = util.unwrap(project.committee)
+        async with storage.write_as_committee_member(committee.name, asf_uid) as wacm:
+            await wacm.announce.release(
+                project.name,
+                data.version,
+                data.revision,
+                data.email_to,
+                data.subject,
+                data.body,
+                data.path_suffix,
+                asf_uid,
+                asf_uid,
+            )
+    except storage.AccessError as e:
+        raise exceptions.BadRequest(str(e))
+
+    return models.api.PublisherReleaseAnnounceResults(
+        endpoint="/publisher/release/announce",
+        success=True,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/publisher/ssh/register", methods=["POST"])
+@quart_schema.validate_request(models.api.PublisherSshRegisterArgs)
+async def publisher_ssh_register(data: models.api.PublisherSshRegisterArgs) -> DictResponse:
+    """
+    Register an SSH key sent with a corroborating GitHub OIDC JWT.
+    """
+    payload, asf_uid, project = await interaction.trusted_jwt(
+        data.publisher, data.jwt, interaction.TrustedProjectPhase.COMPOSE
+    )
+    async with storage.write_as_committee_member(util.unwrap(project.committee).name, asf_uid) as wacm:
+        fingerprint, expires = await wacm.ssh.add_workflow_key(
+            payload["actor"],
+            payload["actor_id"],
+            project.name,
+            data.ssh_key,
+        )
+
+    return models.api.PublisherSshRegisterResults(
+        endpoint="/publisher/ssh/register",
+        fingerprint=fingerprint,
+        project=project.name,
+        expires=expires,
+    ).model_dump(), 200
+
+
+@api.BLUEPRINT.route("/publisher/vote/resolve", methods=["POST"])
+@quart_schema.validate_request(models.api.PublisherVoteResolveArgs)
+async def publisher_vote_resolve(data: models.api.PublisherVoteResolveArgs) -> DictResponse:
+    """
+    Resolve a vote with a corroborating GitHub OIDC JWT.
+    """
+    # TODO: Need to be able to resolve and make the release immutable
+    _payload, asf_uid, project = await interaction.trusted_jwt(
+        data.publisher,
+        data.jwt,
+        interaction.TrustedProjectPhase.VOTE,
+    )
+    async with storage.write_as_project_committee_member(project.name, asf_uid) as wacm:
+        # TODO: Get fullname and use instead of asf_uid
+        # TODO: Add resolution templating to atr.construct
+        _release, _voting_round, _success_message, _error_message = await wacm.vote.resolve(
+            project.name,
+            data.version,
+            data.resolution,
+            asf_uid,
+            f"The vote {data.resolution}.",
+        )
+
+    return models.api.PublisherVoteResolveResults(
+        endpoint="/publisher/vote/resolve",
+        success=True,
     ).model_dump(), 200
 
 

@@ -30,7 +30,7 @@ import quart
 import atr.config as config
 
 _ALGORITHM: Final[str] = "HS256"
-_GITHUB_OIDC_AUDIENCE: Final[str] = "atr-test"
+_GITHUB_OIDC_AUDIENCE: Final[str] = "atr-test-v1"
 _GITHUB_OIDC_EXPECTED: Final[dict[str, str]] = {
     "enterprise": "the-asf",
     "enterprise_id": "212555",

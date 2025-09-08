@@ -71,46 +71,19 @@ class CommitteesListResults(schema.Strict):
     committees: Sequence[sql.Committee]
 
 
-class GithubReleaseAnnounceArgs(schema.Strict):
-    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
-    version: str = schema.Field(..., **example("0.0.1"))
-    revision: str = schema.Field(..., **example("00005"))
-    email_to: str = schema.Field(..., **example("dev@example.apache.org"))
-    subject: str = schema.Field(..., **example("[ANNOUNCE] Apache Example 1.0.0 release"))
-    body: str = schema.Field(
-        ...,
-        **example("The Apache Example team is pleased to announce the release of Example 1.0.0..."),
-    )
-    path_suffix: str = schema.Field(..., **example("example/1.0.0"))
-
-
-class GithubReleaseAnnounceResults(schema.Strict):
-    endpoint: Literal["/github/release/announce"] = schema.Field(alias="endpoint")
-    success: Literal[True] = schema.Field(..., **example(True))
-
-
-class GithubSshRegisterArgs(schema.Strict):
-    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
-    ssh_key: str = schema.Field(
-        ..., **example("ssh-ed25519 AAAAC3NzaC1lZDI1NTEgH5C9okWi0dh25AAAAIOMqqnkVzrm0SdG6UOoqKLsabl9GKJl")
-    )
-
-
-class GithubSshRegisterResults(schema.Strict):
-    endpoint: Literal["/github/ssh/register"] = schema.Field(alias="endpoint")
-    fingerprint: str = schema.Field(..., **example("SHA256:0123456789abcdef0123456789abcdef01234567"))
+class DistributionRecordArgs(schema.Strict):
     project: str = schema.Field(..., **example("example"))
-    expires: int = schema.Field(..., **example(1713547200))
-
-
-class GithubVoteResolveArgs(schema.Strict):
-    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
     version: str = schema.Field(..., **example("0.0.1"))
-    resolution: Literal["passed", "failed"] = schema.Field(..., **example("passed"))
+    platform: sql.DistributionPlatform = schema.Field(..., **example(sql.DistributionPlatform.ARTIFACT_HUB))
+    distribution_owner_namespace: str | None = schema.Field(default=None, **example("example"))
+    distribution_package: str = schema.Field(..., **example("example"))
+    distribution_version: str = schema.Field(..., **example("0.0.1"))
+    staging: bool = schema.Field(..., **example(False))
+    details: bool = schema.Field(..., **example(False))
 
 
-class GithubVoteResolveResults(schema.Strict):
-    endpoint: Literal["/github/vote/resolve"] = schema.Field(alias="endpoint")
+class DistributionRecordResults(schema.Strict):
+    endpoint: Literal["/distribution/record"] = schema.Field(alias="endpoint")
     success: Literal[True] = schema.Field(..., **example(True))
 
 
@@ -238,6 +211,52 @@ class ProjectReleasesResults(schema.Strict):
 class ProjectsListResults(schema.Strict):
     endpoint: Literal["/projects/list"] = schema.Field(alias="endpoint")
     projects: Sequence[sql.Project]
+
+
+class PublisherReleaseAnnounceArgs(schema.Strict):
+    publisher: str = schema.Field(..., **example("user"))
+    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
+    version: str = schema.Field(..., **example("0.0.1"))
+    revision: str = schema.Field(..., **example("00005"))
+    email_to: str = schema.Field(..., **example("dev@example.apache.org"))
+    subject: str = schema.Field(..., **example("[ANNOUNCE] Apache Example 1.0.0 release"))
+    body: str = schema.Field(
+        ...,
+        **example("The Apache Example team is pleased to announce the release of Example 1.0.0..."),
+    )
+    path_suffix: str = schema.Field(..., **example("example/1.0.0"))
+
+
+class PublisherReleaseAnnounceResults(schema.Strict):
+    endpoint: Literal["/publisher/release/announce"] = schema.Field(alias="endpoint")
+    success: Literal[True] = schema.Field(..., **example(True))
+
+
+class PublisherSshRegisterArgs(schema.Strict):
+    publisher: str = schema.Field(..., **example("user"))
+    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
+    ssh_key: str = schema.Field(
+        ..., **example("ssh-ed25519 AAAAC3NzaC1lZDI1NTEgH5C9okWi0dh25AAAAIOMqqnkVzrm0SdG6UOoqKLsabl9GKJl")
+    )
+
+
+class PublisherSshRegisterResults(schema.Strict):
+    endpoint: Literal["/publisher/ssh/register"] = schema.Field(alias="endpoint")
+    fingerprint: str = schema.Field(..., **example("SHA256:0123456789abcdef0123456789abcdef01234567"))
+    project: str = schema.Field(..., **example("example"))
+    expires: int = schema.Field(..., **example(1713547200))
+
+
+class PublisherVoteResolveArgs(schema.Strict):
+    publisher: str = schema.Field(..., **example("user"))
+    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
+    version: str = schema.Field(..., **example("0.0.1"))
+    resolution: Literal["passed", "failed"] = schema.Field(..., **example("passed"))
+
+
+class PublisherVoteResolveResults(schema.Strict):
+    endpoint: Literal["/publisher/vote/resolve"] = schema.Field(alias="endpoint")
+    success: Literal[True] = schema.Field(..., **example(True))
 
 
 class ReleaseAnnounceArgs(schema.Strict):
@@ -463,9 +482,6 @@ Results = Annotated[
     | CommitteeKeysResults
     | CommitteeProjectsResults
     | CommitteesListResults
-    | GithubReleaseAnnounceResults
-    | GithubSshRegisterResults
-    | GithubVoteResolveResults
     | IgnoreAddResults
     | IgnoreDeleteResults
     | IgnoreListResults
@@ -478,6 +494,9 @@ Results = Annotated[
     | ProjectGetResults
     | ProjectReleasesResults
     | ProjectsListResults
+    | PublisherReleaseAnnounceResults
+    | PublisherSshRegisterResults
+    | PublisherVoteResolveResults
     | ReleaseAnnounceResults
     | ReleaseCreateResults
     | ReleaseDeleteResults
@@ -518,9 +537,6 @@ validate_committee_get = validator(CommitteeGetResults)
 validate_committee_keys = validator(CommitteeKeysResults)
 validate_committee_projects = validator(CommitteeProjectsResults)
 validate_committees_list = validator(CommitteesListResults)
-validate_github_release_announce = validator(GithubReleaseAnnounceResults)
-validate_github_ssh_register = validator(GithubSshRegisterResults)
-validate_github_vote_resolve = validator(GithubVoteResolveResults)
 validate_ignore_add = validator(IgnoreAddResults)
 validate_ignore_delete = validator(IgnoreDeleteResults)
 validate_ignore_list = validator(IgnoreListResults)
@@ -533,6 +549,9 @@ validate_keys_user = validator(KeysUserResults)
 validate_project_get = validator(ProjectGetResults)
 validate_project_releases = validator(ProjectReleasesResults)
 validate_projects_list = validator(ProjectsListResults)
+validate_publisher_release_announce = validator(PublisherReleaseAnnounceResults)
+validate_publisher_ssh_register = validator(PublisherSshRegisterResults)
+validate_publisher_vote_resolve = validator(PublisherVoteResolveResults)
 validate_release_announce = validator(ReleaseAnnounceResults)
 validate_release_create = validator(ReleaseCreateResults)
 validate_release_delete = validator(ReleaseDeleteResults)

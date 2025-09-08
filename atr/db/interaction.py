@@ -97,7 +97,9 @@ async def full_releases(project: sql.Project) -> list[sql.Release]:
     return await releases_by_phase(project, sql.ReleasePhase.RELEASE)
 
 
-async def github_trusted_jwt(jwt: str, phase: TrustedProjectPhase) -> tuple[dict[str, Any], str, sql.Project]:
+async def trusted_jwt(publisher: str, jwt: str, phase: TrustedProjectPhase) -> tuple[dict[str, Any], str, sql.Project]:
+    if publisher != "github":
+        raise InteractionError(f"Publisher {publisher} not supported")
     payload = await jwtoken.verify_github_oidc(jwt)
     asf_uid = await ldap.github_to_apache(payload["actor_id"])
     project = await _trusted_project(payload["repository"], payload["workflow_ref"], phase)
