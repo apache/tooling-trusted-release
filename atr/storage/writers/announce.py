@@ -109,7 +109,7 @@ class CommitteeMember(CommitteeParticipant):
         asf_uid: str,
         fullname: str,
     ) -> None:
-        if recipient not in util.permitted_recipients(asf_uid):
+        if recipient not in util.permitted_announce_recipients(asf_uid):
             raise storage.AccessError(f"You are not permitted to send announcements to {recipient}")
 
         unfinished_dir: str = ""

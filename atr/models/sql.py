@@ -552,7 +552,9 @@ On behalf of the Apache [COMMITTEE] project team,
         return """Hello [COMMITTEE],
 
 I'd like to call a vote on releasing the following artifacts as
-Apache [PROJECT] [VERSION].
+Apache [PROJECT] [VERSION]. This vote is being conducted using an
+Alpha version of the Apache Trusted Release(s) (ATR) platform.
+Please report any bugs or issues to the ASF Tooling team.
 
 The release candidate page, including downloads, can be found at:
 

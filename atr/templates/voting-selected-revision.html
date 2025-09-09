@@ -62,7 +62,7 @@
         <div class="row mb-3 pb-3 border-bottom">
           {{ forms.label(form.mailing_list, col="md3-high") }}
           <div class="col-md-9">
-            <div class="d-flex gap-4 mb-2">
+            <div class="d-flex flex-wrap gap-2 mb-2">
               {% for subfield in form.mailing_list %}
                 <div class="form-check">
                   {{ subfield(class_='form-check-input') }}

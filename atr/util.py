@@ -642,10 +642,19 @@ async def paths_recursive_all(base_path: pathlib.Path) -> AsyncGenerator[pathlib
                     queue.append(entry_abs_path)
 
 
-def permitted_recipients(asf_uid: str) -> list[str]:
+def permitted_announce_recipients(asf_uid: str) -> list[str]:
     return [
         # f"dev@{committee.name}.apache.org",
         # f"private@{committee.name}.apache.org",
+        USER_TESTS_ADDRESS,
+        f"{asf_uid}@apache.org",
+    ]
+
+
+def permitted_voting_recipients(asf_uid: str, committee_name: str) -> list[str]:
+    return [
+        f"dev@{committee_name}.apache.org",
+        f"private@{committee_name}.apache.org",
         USER_TESTS_ADDRESS,
         f"{asf_uid}@apache.org",
     ]

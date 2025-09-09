@@ -20,7 +20,6 @@ import atr.mail as mail
 import atr.models.results as results
 import atr.models.schema as schema
 import atr.tasks.checks as checks
-import atr.util as util
 
 
 class Send(schema.Strict):
@@ -46,8 +45,11 @@ async def send(args: Send) -> results.Results | None:
     else:
         raise SendError(f"Invalid email sender: {args.email_sender}")
 
-    if args.email_recipient not in util.permitted_recipients(sender_asf_uid):
-        raise SendError(f"You are not permitted to send announcements to {args.email_recipient}")
+    recipient_domain = args.email_recipient.split("@")[-1]
+    sending_to_self = recipient_domain == f"{sender_asf_uid}@apache.org"
+    sending_to_committee = recipient_domain.endswith(".apache.org")
+    if not (sending_to_self or sending_to_committee):
+        raise SendError(f"You are not permitted to send emails to {args.email_recipient}")
 
     message = mail.Message(
         email_sender=args.email_sender,

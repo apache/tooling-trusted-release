@@ -164,10 +164,11 @@ async def _form(
     # Hidden field
     form.release_name.data = release.name
     # Description
-    form.mailing_list.description = f"""\
-NOTE: The limited options above are provided for testing purposes.
-In the finished version of ATR, you will be able to send to your own specified mailing lists, i.e.
-{release_policy_mailto_addresses}."""
+    form.mailing_list.description = """\
+NOTE: The options to send to the user-tests mailing
+list and yourself are provided for testing purposes
+only, and will not be available in the finished
+version of ATR."""
 
     return form
 
@@ -194,6 +195,10 @@ async def _selected_revision_data(
     data: db.Session,
     session: routes.CommitterSession,
 ) -> response.Response | str | VoteInitiateForm:
+    committee = release.committee
+    if committee is None:
+        raise base.ASFQuartException("Release has no associated committee", errorcode=400)
+
     if release.project.policy_strict_checking:
         if await interaction.has_failing_checks(release, revision, caller_data=data):
             return await session.redirect(
@@ -207,7 +212,7 @@ async def _selected_revision_data(
     # Check that the user is on the project committee for the release
     # TODO: Consider relaxing this to all committers
     # Otherwise we must not show the vote form
-    if not (user.is_committee_member(release.committee, session.uid) or user.is_admin(session.uid)):
+    if not (user.is_committee_member(committee, session.uid) or user.is_admin(session.uid)):
         return await session.redirect(
             compose.selected,
             error="You must be on the PMC of this project to start a vote",
@@ -217,7 +222,7 @@ async def _selected_revision_data(
         )
 
     # committee = util.unwrap(release.committee)
-    permitted_recipients = util.permitted_recipients(session.uid)
+    permitted_recipients = util.permitted_voting_recipients(session.uid, committee.name)
     if release.release_policy:
         min_hours = release.release_policy.min_hours if (release.release_policy.min_hours is not None) else 72
     else:
@@ -253,9 +258,7 @@ async def _selected_revision_data(
         vote_duration_choice: int = util.unwrap(form.vote_duration.data)
         subject_data: str = util.unwrap(form.subject.data)
         body_data: str = util.unwrap(form.body.data)
-        if release.committee is None:
-            raise base.ASFQuartException("Release has no associated committee", errorcode=400)
-        async with storage.write_as_committee_member(release.committee.name) as wacm:
+        async with storage.write_as_committee_member(committee.name) as wacm:
             _task = await wacm.vote.start(
                 email_to,
                 project_name,

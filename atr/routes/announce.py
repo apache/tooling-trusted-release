@@ -68,7 +68,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     release = await session.release(
         project_name, version_name, with_committee=True, phase=sql.ReleasePhase.RELEASE_PREVIEW
     )
-    announce_form = await _create_announce_form_instance(util.permitted_recipients(session.uid))
+    announce_form = await _create_announce_form_instance(util.permitted_announce_recipients(session.uid))
     # Hidden fields
     announce_form.preview_name.data = release.name
     # There must be a revision to announce
@@ -112,8 +112,11 @@ async def selected_post(
     """Handle the announcement form submission and promote the preview to release."""
     await session.check_access(project_name)
 
-    permitted_recipients = util.permitted_recipients(session.uid)
-    announce_form = await _create_announce_form_instance(permitted_recipients, data=await quart.request.form)
+    permitted_recipients = util.permitted_announce_recipients(session.uid)
+    announce_form = await _create_announce_form_instance(
+        permitted_recipients,
+        data=await quart.request.form,
+    )
 
     if not (await announce_form.validate_on_submit()):
         error_message = "Invalid submission"

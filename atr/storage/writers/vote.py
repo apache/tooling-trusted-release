@@ -300,7 +300,7 @@ class CommitteeMember(CommitteeParticipant):
                 _committee=True,
             ).demand(storage.AccessError("Release not found"))
         if permitted_recipients is None:
-            permitted_recipients = util.permitted_recipients(asf_uid)
+            permitted_recipients = util.permitted_voting_recipients(asf_uid, self.__committee_name)
         if email_to not in permitted_recipients:
             # This will be checked again by tasks/vote.py for extra safety
             log.info(f"Invalid mailing list choice: {email_to} not in {permitted_recipients}")
