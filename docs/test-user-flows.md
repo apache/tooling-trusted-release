@@ -4,7 +4,7 @@ To test the ATR, here are some example command line and GitHub user flows.
 
 ## Command line
 
-To install the `atr` command, use the [the instructions in the client `README.md`](https://github.com/apache/tooling-releases-client/tree/main?tab=readme-ov-file#quick-start), or simply use `uv run atr` instead of `atr`.
+To install the `atr` command, use the [instructions in the client `README.md`](https://github.com/apache/tooling-releases-client/tree/main?tab=readme-ov-file#quick-start), or simply use `uv run atr` instead of `atr`.
 
 [Create a PAT](https://release-test.apache.org/tokens) using the UI, then store the value in `atr` configuration.
 
@@ -60,7 +60,7 @@ We use [the `tooling-asf-example`](https://github.com/apache/tooling-asf-example
 
 First, [start a new release in the ATR web UI](https://release-test.apache.org/).
 
-You can then use the [`build-and-rsync-to-atr.yaml`](https://github.com/apache/tooling-asf-example/actions/workflows/build-and-rsync-to-atr.yaml) workflow to build Python wheel files an upload them to the ATR.
+You can then use the [`build-and-rsync-to-atr.yaml`](https://github.com/apache/tooling-asf-example/actions/workflows/build-and-rsync-to-atr.yaml) workflow to build Python wheel files and upload them to the ATR.
 
 Then, start a vote in the ATR web UI. This cannot be linked here because the URL will depend on which project and version you use.
 
