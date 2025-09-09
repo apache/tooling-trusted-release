@@ -589,11 +589,19 @@ async def publisher_distribution_record(data: models.api.PublisherDistributionRe
     """
     Record a distribution with a corroborating Trusted Publisher JWT.
     """
-    _payload, asf_uid, project = await interaction.trusted_jwt(
-        data.publisher,
-        data.jwt,
-        interaction.TrustedProjectPhase.FINISH,
-    )
+    try:
+        _payload, asf_uid, project = await interaction.trusted_jwt(
+            data.publisher,
+            data.jwt,
+            interaction.TrustedProjectPhase.FINISH,
+        )
+    except interaction.ReleasePolicyNotFoundError:
+        # TODO: We could perform a more advanced query with multiple in_ statements
+        _payload, asf_uid, project = await interaction.trusted_jwt(
+            data.publisher,
+            data.jwt,
+            interaction.TrustedProjectPhase.COMPOSE,
+        )
     async with db.session() as db_data:
         release_name = models.sql.release_name(project.name, data.version)
         release = await db_data.release(

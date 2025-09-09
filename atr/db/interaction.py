@@ -69,6 +69,10 @@ class PublicKeyError(RuntimeError):
     pass
 
 
+class ReleasePolicyNotFoundError(RuntimeError):
+    pass
+
+
 class TrustedProjectPhase(enum.Enum):
     COMPOSE = "compose"
     VOTE = "vote"
@@ -472,29 +476,32 @@ async def _delete_release_data_filesystem(release_dir: pathlib.Path, release_nam
 async def _trusted_project(repository: str, workflow_ref: str, phase: TrustedProjectPhase) -> sql.Project:
     # Debugging
     log.info(f"GitHub OIDC JWT payload: {repository} {workflow_ref}")
-    repository_name, workflow_path = _trusted_project_checks(repository, workflow_ref, phase)
+    repository_name, workflow_path = _trusted_project_checks(repository, workflow_ref)
 
-    value_error = ValueError(
+    rpnf_error = ReleasePolicyNotFoundError(
         f"Release policy for repository {repository_name} and {phase.value} workflow path {workflow_path} not found"
     )
     # TODO: If a policy is reused between projects, we can't get the project
     async with db.session() as db_data:
         match phase:
             case TrustedProjectPhase.COMPOSE:
+                # Searches in github_*compose*_workflow_path
                 policy = await db_data.release_policy(
                     github_repository_name=repository_name,
                     github_compose_workflow_path_has=workflow_path,
-                ).demand(value_error)
+                ).demand(rpnf_error)
             case TrustedProjectPhase.VOTE:
+                # Searches in github_*vote*_workflow_path
                 policy = await db_data.release_policy(
                     github_repository_name=repository_name,
                     github_vote_workflow_path_has=workflow_path,
-                ).demand(value_error)
+                ).demand(rpnf_error)
             case TrustedProjectPhase.FINISH:
+                # Searches in github_*finish*_workflow_path
                 policy = await db_data.release_policy(
                     github_repository_name=repository_name,
                     github_finish_workflow_path_has=workflow_path,
-                ).demand(value_error)
+                ).demand(rpnf_error)
         project = await db_data.project(release_policy_id=policy.id).demand(
             InteractionError(f"Project for release policy {policy.id} not found")
         )
@@ -502,12 +509,10 @@ async def _trusted_project(repository: str, workflow_ref: str, phase: TrustedPro
         raise InteractionError(f"Project {project.name} has no committee")
     if project.committee.name not in registry.GITHUB_AUTOMATED_RELEASE_COMMITTEES:
         raise InteractionError(f"Project {project.name} is not in a committee that can make releases")
-    log.info(f"Release policy: {policy}")
-    log.info(f"Project: {project}")
     return project
 
 
-def _trusted_project_checks(repository: str, workflow_ref: str, phase: TrustedProjectPhase) -> tuple[str, str]:
+def _trusted_project_checks(repository: str, workflow_ref: str) -> tuple[str, str]:
     if not repository.startswith("apache/"):
         raise InteractionError("Repository must start with 'apache/'")
     repository_name = repository.removeprefix("apache/")
