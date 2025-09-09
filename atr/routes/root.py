@@ -64,6 +64,12 @@ _POLICIES: Final = htpy.div[
 ]
 
 
+@routes.committer("/about")
+async def about(session: routes.CommitterSession) -> str:
+    """About page."""
+    return await template.render("about.html")
+
+
 @routes.public("/")
 async def index() -> response.Response | str:
     """Show public info or an entry portal for participants."""

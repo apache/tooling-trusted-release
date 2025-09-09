@@ -1,0 +1,140 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}
+  About ATR ~ ATR
+{% endblock title %}
+
+{% block stylesheets %}
+  {{ super() }}
+  <style>
+      img {
+          border: 1px solid #cccccc;
+          box-shadow: 0 0 1rem rgba(0, 0, 0, 0.2);
+          margin: 1rem 0;
+          max-width: 50%;
+      }
+
+      table {
+          border: 1px solid #eeeeee;
+      }
+
+      th.step {
+          width: 15%;
+      }
+
+      td {
+          width: 28.333%;
+      }
+  </style>
+{% endblock stylesheets %}
+
+{% block content %}
+  <h1>About ATR</h1>
+
+  <p>
+    The following table compares the UI, CLI, and GitHub actions for each step in the release process. Variables <code>P</code>, <code>V</code>, and <code>R</code> represent the project, version, and revision of a release, respectively.
+  </p>
+
+  <table class="table table-bordered table-striped">
+    <tr>
+      <th>Step</th>
+      <th>UI</th>
+      <th>CLI</th>
+      <th>GitHub</th>
+    </tr>
+    <tr>
+      <th class="step">Start a release</th>
+      <td class="ui">
+        <code>/start/P</code>
+      </td>
+      <td class="cli">
+        <code>atr release start P V</code>
+      </td>
+      <td class="github">-</td>
+    </tr>
+    <tr>
+      <th class="step">Upload files</th>
+      <td class="ui">
+        <code>/upload/P/V</code>
+      </td>
+      <td class="cli">
+        <code>atr upload P V path file</code>
+      </td>
+      <td class="github">tooling-actions/upload-to-atr</td>
+    </tr>
+    <tr>
+      <th class="step">Wait for checks</th>
+      <td class="ui">-</td>
+      <td class="cli">
+        <code>atr check wait P V</code>
+      </td>
+      <td class="github">-</td>
+    </tr>
+    <tr>
+      <th class="step">Review checks</th>
+      <td class="ui">
+        <code>/compose/P/V</code>
+      </td>
+      <td class="cli">
+        <code>atr check status P V</code>
+      </td>
+      <td class="github">-</td>
+    </tr>
+    <tr>
+      <th class="step">Record test distribution</th>
+      <td class="ui">
+        <code>/distribution/stage/P/V</code>
+      </td>
+      <td class="cli">-</td>
+      <td class="github">-</td>
+    </tr>
+    <tr>
+      <th class="step">Start voting</th>
+      <td class="ui">
+        <code>/voting/P/V/R</code>
+      </td>
+      <td class="cli">
+        <code>atr vote start P V R -m email</code>
+      </td>
+      <td class="github">-</td>
+    </tr>
+    <tr>
+      <th class="step">Resolve vote</th>
+      <td class="ui">
+        <code>/resolve/tabulated/P/V</code>
+      </td>
+      <td class="cli">
+        <code>atr vote resolve P V passed</code>
+      </td>
+      <td class="github">tooling-actions/release-on-atr</td>
+    </tr>
+    <tr>
+      <th class="step">Record distribution</th>
+      <td class="ui">
+        <code>/distribution/record/P/V</code>
+      </td>
+      <td class="cli">
+        <code>atr distribution record P V plat owner pkg ver stg details</code>
+      </td>
+      <td class="github">tooling-actions/record-atr-distribution</td>
+    </tr>
+    <tr>
+      <th class="step">Announce release</th>
+      <td class="ui">
+        <code>/announce/P/V</code>
+      </td>
+      <td class="cli">
+        <code>atr announce P V R -m email -s subject -b body</code>
+      </td>
+      <td class="github">tooling-actions/release-on-atr</td>
+    </tr>
+    <!--
+    <tr>
+      <th class="step"></th>
+      <td class="ui"><code></code></td>
+      <td class="cli"><code></code></td>
+      <td class="github"></td>
+    </tr>
+    -->
+  </table>
+{% endblock content %}
