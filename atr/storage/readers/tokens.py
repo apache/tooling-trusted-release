@@ -50,5 +50,6 @@ class FoundationCommitter(GeneralPublic):
             .where(sql.PersonalAccessToken.asfuid == asf_uid)
             .where(via(sql.PersonalAccessToken.last_used).is_not(None))
             .order_by(via(sql.PersonalAccessToken.last_used).desc())
+            .limit(1)
         )
         return await self.__data.query_one_or_none(stmt)
