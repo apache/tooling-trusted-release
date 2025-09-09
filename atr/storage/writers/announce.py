@@ -203,6 +203,8 @@ class CommitteeMember(CommitteeParticipant):
             raise storage.AccessError(f"Database updated, but error moving files: {e!s}. Manual cleanup needed.")
 
         # TODO: Add an audit log entry here
+        # TODO: We should consider copying the files instead of hard linking
+        # That way, we can write protect the pristine ATR files
         await self.__hard_link_downloads(
             committee,
             finished_path,

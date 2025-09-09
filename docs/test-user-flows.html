@@ -1,0 +1,45 @@
+<h1>Test user flows</h1>
+<p>To test the ATR, here are some example command line and GitHub user flows.</p>
+<h2>Command line</h2>
+<p>To install the <code>atr</code> command, use the <a href="https://github.com/apache/tooling-releases-client/tree/main?tab=readme-ov-file#quick-start">the instructions in the client <code>README.md</code></a>, or simply use <code>uv run atr</code> instead of <code>atr</code>.</p>
+<p><a href="https://release-test.apache.org/tokens">Create a PAT</a> using the UI, then store the value in <code>atr</code> configuration.</p>
+<pre><code>atr set tokens.pat &quot;$PAT_FROM_UI&quot;
+</code></pre>
+<p>You can view the configuration file to check that the value is set. <strong>This will write secret values to stdout.</strong></p>
+<pre><code>atr config file
+</code></pre>
+<p>The following commands constitute roughly an entire flow, which will be reflected in the UI. We are using <code>tooling-test-example</code> as the project name. Don't forget to <a href="https://release-test.apache.org/project/add/tooling">create this or another project</a>, or <a href="https://release-test.apache.org/committees">use an existing project</a> as applicable. Use your ASF UID <code>@apache.org</code> instead of <code>example</code>.</p>
+<pre><code>atr release start tooling-test-example 0.1+demo
+
+atr upload tooling-test-example 0.1+demo example.txt ../example.txt
+
+atr check wait tooling-test-example 0.1+demo -i 25
+
+atr check status tooling-test-example 0.1+demo
+
+atr release info tooling-test-example 0.1+demo
+
+atr vote start tooling-test-example 0.1+demo 00002 -m example@apache.org
+
+atr vote resolve tooling-test-example 0.1+demo passed
+
+atr distribution record tooling-test-example 0.1+demo NPM None react 18.2.0 False False
+
+atr release info tooling-test-example 0.1+demo
+
+atr announce tooling-test-example 0.1+demo 00003 -m example@apache.org -s Subject -b Body
+</code></pre>
+<p>When finished with an example flow, it is recommended that you delete the version.</p>
+<pre><code>atr dev delete tooling-test-example 0.1+demo
+</code></pre>
+<p>If there is ever a problem with a JWT verification, try refreshing your JWT.</p>
+<pre><code>atr jwt refresh | wc
+</code></pre>
+<h2>GitHub actions</h2>
+<p>We use <a href="https://github.com/apache/tooling-asf-example">the <code>tooling-asf-example</code></a> repository to check our GitHub actions.</p>
+<p>First, <a href="https://release-test.apache.org/">start a new release in the ATR web UI</a>.</p>
+<p>You can then use the <a href="https://github.com/apache/tooling-asf-example/actions/workflows/build-and-rsync-to-atr.yaml"><code>build-and-rsync-to-atr.yaml</code></a> workflow to build Python wheel files an upload them to the ATR.</p>
+<p>Then, start a vote in the ATR web UI. This cannot be linked here because the URL will depend on which project and version you use.</p>
+<p>Use the <a href="https://github.com/apache/tooling-asf-example/actions/workflows/resolve-vote-on-atr.yaml"><code>resolve-vote-on-atr.yaml</code></a> workflow to resolve the vote.</p>
+<p>Use the <a href="https://github.com/apache/tooling-asf-example/actions/workflows/record-distribution-on-atr.yaml"><code>record-distribution-on-atr.yaml</code></a> workflow to record an external distribution. The external distribution <em>must exist</em> on the distribution platform, because the ATR fetches real metadata.</p>
+<p>Use the <a href="https://github.com/apache/tooling-asf-example/actions/workflows/announce-release-on-atr.yaml"><code>announce-release-on-atr.yaml</code></a> workflow to announce the release and copy the files into the download area.</p>

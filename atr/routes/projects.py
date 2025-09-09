@@ -537,10 +537,10 @@ async def _policy_edit(
                 util.unwrap(policy_form.github_vote_workflow_path.data)
             )
             release_policy.mailto_addresses = [util.unwrap(policy_form.mailto_addresses.data)]
-            _set_default_min_hours(policy_form, project, release_policy)  # TODO
+            _set_default_min_hours(policy_form, project, release_policy)
             release_policy.pause_for_rm = util.unwrap(policy_form.pause_for_rm.data)
             release_policy.release_checklist = util.unwrap(policy_form.release_checklist.data)
-            _set_default_start_vote_template(policy_form, project, release_policy)  # TODO
+            _set_default_start_vote_template(policy_form, project, release_policy)
         elif project.committee and project.committee.is_podling:
             # The caller ensures that project.committee is not None
             await quart.flash("Manual voting is not allowed for podlings.", "error")
@@ -550,7 +550,7 @@ async def _policy_edit(
         release_policy.github_finish_workflow_path = _parse_artifact_paths(
             util.unwrap(policy_form.github_finish_workflow_path.data)
         )
-        _set_default_announce_release_template(policy_form, project, release_policy)  # TODO
+        _set_default_announce_release_template(policy_form, project, release_policy)
         release_policy.preserve_download_files = util.unwrap(policy_form.preserve_download_files.data)
 
         await data.commit()
