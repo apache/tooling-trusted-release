@@ -239,6 +239,17 @@
               </div>
             </div>
 
+            <div class="mb-3 pb-3 row border-bottom">
+              {{ forms.label(policy_form.preserve_download_files, col="md3-high") }}
+              <div class="col-sm-8">
+                <div class="form-check">
+                  {{ forms.widget(policy_form.preserve_download_files, classes="form-check-input", boolean_label="Enable") }}
+                  {{ forms.errors(policy_form.preserve_download_files, classes="invalid-feedback d-block") }}
+                </div>
+                {{ forms.description(policy_form.preserve_download_files) }}
+              </div>
+            </div>
+
             <div class="row">
               <div class="col-sm-9 offset-sm-3">{{ policy_form.submit_policy(class_="btn btn-primary mt-2") }}</div>
             </div>

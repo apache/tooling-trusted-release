@@ -153,6 +153,10 @@ class ReleasePolicyForm(forms.Typed):
         description="The full paths to the GitHub workflows to use for the release,"
         " including the .github/workflows/ prefix.",
     )
+    preserve_download_files = forms.boolean(
+        "Preserve download files",
+        description="If enabled, existing download files will not be overwritten.",
+    )
 
     submit_policy = forms.submit("Save")
 
@@ -520,32 +524,34 @@ async def _policy_edit(
             util.unwrap(policy_form.binary_artifact_paths.data)
         )
         release_policy.github_repository_name = util.unwrap(policy_form.github_repository_name.data)
+        # TODO: Change to paths, plural
         release_policy.github_compose_workflow_path = _parse_artifact_paths(
             util.unwrap(policy_form.github_compose_workflow_path.data)
-        )
-        release_policy.github_vote_workflow_path = _parse_artifact_paths(
-            util.unwrap(policy_form.github_vote_workflow_path.data)
-        )
-        release_policy.github_finish_workflow_path = _parse_artifact_paths(
-            util.unwrap(policy_form.github_finish_workflow_path.data)
         )
         release_policy.strict_checking = util.unwrap(policy_form.strict_checking.data)
 
         # Vote section
         release_policy.manual_vote = policy_form.manual_vote.data or False
         if not release_policy.manual_vote:
+            release_policy.github_vote_workflow_path = _parse_artifact_paths(
+                util.unwrap(policy_form.github_vote_workflow_path.data)
+            )
             release_policy.mailto_addresses = [util.unwrap(policy_form.mailto_addresses.data)]
-            _set_default_min_hours(policy_form, project, release_policy)
+            _set_default_min_hours(policy_form, project, release_policy)  # TODO
             release_policy.pause_for_rm = util.unwrap(policy_form.pause_for_rm.data)
             release_policy.release_checklist = util.unwrap(policy_form.release_checklist.data)
-            _set_default_start_vote_template(policy_form, project, release_policy)
+            _set_default_start_vote_template(policy_form, project, release_policy)  # TODO
         elif project.committee and project.committee.is_podling:
             # The caller ensures that project.committee is not None
             await quart.flash("Manual voting is not allowed for podlings.", "error")
             return False, policy_form
 
         # Finish section
-        _set_default_announce_release_template(policy_form, project, release_policy)
+        release_policy.github_finish_workflow_path = _parse_artifact_paths(
+            util.unwrap(policy_form.github_finish_workflow_path.data)
+        )
+        _set_default_announce_release_template(policy_form, project, release_policy)  # TODO
+        release_policy.preserve_download_files = util.unwrap(policy_form.preserve_download_files.data)
 
         await data.commit()
         await quart.flash("Release policy updated successfully.", "success")
@@ -576,6 +582,7 @@ async def _policy_form_create(project: sql.Project) -> ReleasePolicyForm:
     policy_form.github_compose_workflow_path.data = "\n".join(project.policy_github_compose_workflow_path)
     policy_form.github_vote_workflow_path.data = "\n".join(project.policy_github_vote_workflow_path)
     policy_form.github_finish_workflow_path.data = "\n".join(project.policy_github_finish_workflow_path)
+    policy_form.preserve_download_files.data = project.policy_preserve_download_files
 
     # Set the hashes and value of the current defaults
     policy_form.default_start_vote_template_hash.data = util.compute_sha3_256(

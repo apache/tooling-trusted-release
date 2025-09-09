@@ -151,7 +151,9 @@ class CommitteeMember(CommitteeParticipant):
             raise storage.AccessError("Release already exists")
         # TODO: This is not reliable because of race conditions
         # But it adds a layer of protection in most cases
-        await self.__hard_link_downloads(committee, unfinished_path, download_path_suffix, dry_run=True)
+        preserve = release.project.policy_preserve_download_files
+        if preserve is True:
+            await self.__hard_link_downloads(committee, unfinished_path, download_path_suffix, dry_run=True)
 
         try:
             task = sql.Task(
@@ -201,7 +203,12 @@ class CommitteeMember(CommitteeParticipant):
             raise storage.AccessError(f"Database updated, but error moving files: {e!s}. Manual cleanup needed.")
 
         # TODO: Add an audit log entry here
-        await self.__hard_link_downloads(committee, finished_path, download_path_suffix)
+        await self.__hard_link_downloads(
+            committee,
+            finished_path,
+            download_path_suffix,
+            preserve=preserve,
+        )
 
     async def __hard_link_downloads(
         self,
@@ -209,16 +216,20 @@ class CommitteeMember(CommitteeParticipant):
         unfinished_path: pathlib.Path,
         download_path_suffix: str,
         dry_run: bool = False,
+        preserve: bool = False,
     ) -> None:
         """Hard link the release files to the downloads directory."""
         # TODO: Rename *_dir functions to _path functions
         downloads_base_path = util.get_downloads_dir()
         downloads_path = downloads_base_path / committee.name / download_path_suffix.removeprefix("/")
+        # The "exist_ok" parameter means to overwrite files if True
+        # We only overwrite if we're not preserving, so we supply "not preserve"
+        # TODO: Add a test for this
         await util.create_hard_link_clone(
             unfinished_path,
             downloads_path,
             do_not_create_dest_dir=dry_run,
-            exist_ok=True,
+            exist_ok=not preserve,
             dry_run=dry_run,
         )
 

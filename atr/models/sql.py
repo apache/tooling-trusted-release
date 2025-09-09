@@ -676,6 +676,12 @@ Thanks,
             return []
         return policy.github_finish_workflow_path or []
 
+    @property
+    def policy_preserve_download_files(self) -> bool:
+        if (policy := self.release_policy) is None:
+            return False
+        return policy.preserve_download_files
+
 
 # Release: Project ReleasePolicy Revision CheckResult
 class Release(sqlmodel.SQLModel, table=True):
@@ -990,6 +996,7 @@ class ReleasePolicy(sqlmodel.SQLModel, table=True):
     github_finish_workflow_path: list[str] = sqlmodel.Field(
         default_factory=list, sa_column=sqlalchemy.Column(sqlalchemy.JSON, nullable=False)
     )
+    preserve_download_files: bool = sqlmodel.Field(default=False)
 
     # 1-1: ReleasePolicy -> Project
     # 1-1: Project -C-> ReleasePolicy
