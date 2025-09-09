@@ -137,6 +137,8 @@ def app_setup_context(app: base.QuartApp) -> None:
             "is_committee_member_fn": user.is_committee_member,
             "routes": modules,
             "unfinished_releases_fn": interaction.unfinished_releases,
+            # "user_committees_fn": interaction.user_committees,
+            "user_projects_fn": interaction.user_projects,
             "release_as_url": mapping.release_as_url,
             "version": metadata.version,
         }

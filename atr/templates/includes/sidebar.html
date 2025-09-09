@@ -55,6 +55,27 @@
         {% endfor %}
       {% endif %}
     {% endif %}
+
+    {% set user_projects = user_projects_fn(current_user.uid) %}
+    {% if user_projects %}
+      {% set max_projects = 10 %}
+      <h3>Start a release</h3>
+      <ul>
+        {% for project_name, project_full_name in user_projects[:max_projects] %}
+          <li>
+            <i class="bi bi-plus-circle"></i>
+            <a href="{{ as_url(routes.start.selected, project_name=project_name) }}">{{ project_full_name.removeprefix("Apache ").removesuffix(" (Incubating)") }}</a>
+          </li>
+        {% endfor %}
+        {% if user_projects|length > max_projects %}
+          <li class="text-muted">
+            <i class="bi bi-three-dots"></i>
+            ({{ user_projects|length - max_projects }} more)
+          </li>
+        {% endif %}
+      </ul>
+    {% endif %}
+
     <h3>Releases</h3>
     <ul>
       {% if current_user %}

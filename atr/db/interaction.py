@@ -411,6 +411,13 @@ async def unfinished_releases(asfuid: str) -> list[tuple[str, str, list[sql.Rele
     return releases
 
 
+async def user_committees(asf_uid: str) -> list[tuple[str, str]]:
+    results = []
+    for committee in await user_committees_participant(asf_uid):
+        results.append((committee.name, committee.full_name))
+    return results
+
+
 # This function cannot go in user.py because it causes a circular import
 async def user_committees_committer(asf_uid: str, caller_data: db.Session | None = None) -> Sequence[sql.Committee]:
     async with db.ensure_session(caller_data) as data:
@@ -427,6 +434,11 @@ async def user_committees_member(asf_uid: str, caller_data: db.Session | None = 
 async def user_committees_participant(asf_uid: str, caller_data: db.Session | None = None) -> Sequence[sql.Committee]:
     async with db.ensure_session(caller_data) as data:
         return await data.committee(has_participant=asf_uid).all()
+
+
+async def user_projects(asf_uid: str, caller_data: db.Session | None = None) -> list[tuple[str, str]]:
+    projects = await user.projects(asf_uid)
+    return [(p.name, p.display_name) for p in projects]
 
 
 async def _delete_release_data_downloads(release: sql.Release) -> None:
