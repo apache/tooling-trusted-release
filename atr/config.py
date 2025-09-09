@@ -53,7 +53,7 @@ class AppConfig:
     DEBUG = False
     TEMPLATES_AUTO_RELOAD = False
     USE_BLOCKBUSTER = False
-    JWT_SECRET_KEY = decouple.config("JWT_SECRET_KEY", default=secrets.token_hex(128 // 8))
+    JWT_SECRET_KEY = _config_secrets("JWT_SECRET_KEY", STATE_DIR, default=None, cast=str) or secrets.token_hex(128 // 8)
     SECRET_KEY = decouple.config("SECRET_KEY", default=secrets.token_hex(128 // 8))
     WTF_CSRF_ENABLED = decouple.config("WTF_CSRF_ENABLED", default=True, cast=bool)
     DOWNLOADS_STORAGE_DIR = os.path.join(STATE_DIR, "downloads")
