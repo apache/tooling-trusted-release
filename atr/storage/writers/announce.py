@@ -120,6 +120,7 @@ class CommitteeMember(CommitteeParticipant):
             version=version_name,
             phase=sql.ReleasePhase.RELEASE_PREVIEW,
             latest_revision_number=preview_revision_number,
+            _release_policy=True,
             _revisions=True,
         ).demand(
             storage.AccessError(
