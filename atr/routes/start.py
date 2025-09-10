@@ -22,6 +22,7 @@ import quart
 import werkzeug.wrappers.response as response
 
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.models.sql as sql
 import atr.revision as revision
@@ -128,5 +129,8 @@ async def selected(session: routes.CommitterSession, project_name: str) -> respo
             # Flash the error and let the code fall through to render the template below
             await quart.flash(str(e), "error")
 
+    # Get all releases for the project
+    releases = await interaction.all_releases(project)
+
     # Render the template for GET requests or POST requests with validation errors
-    return await template.render("start-selected.html", project=project, form=form, routes=routes)
+    return await template.render("start-selected.html", project=project, form=form, routes=routes, releases=releases)

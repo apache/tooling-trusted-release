@@ -25,6 +25,7 @@ from typing import Any, Final
 import aiofiles.os
 import aioshutil
 import asfquart.base as base
+import packaging.version as version
 import quart
 import sqlalchemy
 import sqlmodel
@@ -77,6 +78,23 @@ class TrustedProjectPhase(enum.Enum):
     COMPOSE = "compose"
     VOTE = "vote"
     FINISH = "finish"
+
+
+async def all_releases(project: sql.Project) -> list[sql.Release]:
+    """Get all releases for the project, sorted by version."""
+    query = sqlmodel.select(sql.Release).where(sql.Release.project_name == project.name)
+
+    results = []
+    async with db.session() as data:
+        for result in (await data.execute(query)).all():
+            release = result[0]
+            results.append(release)
+
+    for release in results:
+        release.project = project
+
+    results.sort(key=lambda r: version.Version(r.version), reverse=True)
+    return results
 
 
 async def candidate_drafts(project: sql.Project) -> list[sql.Release]:

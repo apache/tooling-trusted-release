@@ -39,4 +39,41 @@
     </div>
   </form>
 
+  {% if releases %}
+    {% set max_revisions = 18 %}
+    <div class="mt-5">
+      <h2>Existing releases</h2>
+      <div class="row">
+        <div class="col-12">
+          <ul class="list-unstyled row g-3">
+            {% for release in releases[:max_revisions] %}
+              <li class="col-6 col-sm-4 col-md-3 col-lg-2">
+                <div class="text-nowrap">
+                  {% if release.phase.value == "release_candidate_draft" %}
+                    <span class="atr-phase-one atr-phase-symbol fs-6">{{ "①" }}</span>
+                  {% elif release.phase.value == "release_candidate" %}
+                    <span class="atr-phase-two atr-phase-symbol fs-6">{{ "②" }}</span>
+                  {% elif release.phase.value == "release_preview" %}
+                    <span class="atr-phase-three atr-phase-symbol fs-6">{{ "③" }}</span>
+                  {% elif release.phase.value == "release" %}
+                    <span class="atr-phase-symbol fs-6">{{ "Ⓡ" }}</span>
+                  {% endif %}
+                  {{ release.version }}
+                </div>
+              </li>
+            {% endfor %}
+            {% if releases|length > max_revisions %}
+              <li class="col-6 col-sm-4 col-md-3 col-lg-2">
+                <div class="text-center">
+                  <strong>...</strong>
+                  <span class="text-muted ms-1">{{ releases|length - max_revisions }} more</span>
+                </div>
+              </li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
 {% endblock content %}
