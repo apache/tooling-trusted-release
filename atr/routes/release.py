@@ -25,49 +25,13 @@ import werkzeug.wrappers.response as response
 
 import atr.db as db
 import atr.db.interaction as interaction
-import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
-import atr.routes.root as root
 import atr.template as template
 import atr.util as util
 
 if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
-
-
-@routes.committer("/release/bulk/<int:task_id>", methods=["GET"])
-async def bulk_status(session: routes.CommitterSession, task_id: int) -> str | response.Response:
-    """Show status for a bulk download task."""
-    if asfquart.APP is not ...:
-        raise RuntimeError("Bulk download is not supported")
-
-    async with db.session() as data:
-        # Query for the task with the given ID
-        task = await data.task(id=task_id).get()
-        if not task:
-            return await session.redirect(root.index, error=f"Task with ID {task_id} not found.")
-
-        # Verify this is a bulk download task
-        # if task.task_type != "package_bulk_download":
-        #     return await session.redirect(root.index, error=f"Task with ID {task_id} is not a bulk download task.")
-
-        # Get the release associated with this task if available
-        release = None
-        # Debug print the task.task_args using the logger
-        log.debug(f"Task args: {task.task_args}")
-        if task.task_args and isinstance(task.task_args, dict) and ("release_name" in task.task_args):
-            release = await data.release(name=task.task_args["release_name"], _committee=True).get()
-
-            # Check whether the user has permission to view this task
-            # Either they're a PMC member or committer for the release's PMC
-            if release and release.committee:
-                if (session.uid not in release.committee.committee_members) and (
-                    session.uid not in release.committee.committers
-                ):
-                    return await session.redirect(root.index, error="You don't have permission to view this task.")
-
-    return await template.render("release-bulk.html", task=task, release=release, TaskStatus=sql.TaskStatus)
 
 
 @routes.public("/releases/finished/<project_name>")
