@@ -265,6 +265,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     if not project_name:
         return await session.redirect(projects, error="Missing project name for deletion.")
 
+    # TODO: Move this to the storage interface
     async with db.session() as data:
         project = await data.project(
             name=project_name, status=sql.ProjectStatus.ACTIVE, _releases=True, _distribution_channels=True
@@ -331,6 +332,7 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
     metadata_form = None
     can_edit = False
 
+    # TODO: Move this to the storage interface
     async with db.session() as data:
         project = await data.project(
             name=name, _committee=True, _committee_public_signing_keys=True, _release_policy=True
@@ -353,12 +355,12 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
 
         if metadata_form is None:
             metadata_form = await ProjectMetadataForm.create_form(data={"project_name": project.name})
-        if policy_form is None:
-            policy_form = await _policy_form_create(project)
-        candidate_drafts = await interaction.candidate_drafts(project)
-        candidates = await interaction.candidates(project)
-        previews = await interaction.previews(project)
-        full_releases = await interaction.full_releases(project)
+    if policy_form is None:
+        policy_form = await _policy_form_create(project)
+    candidate_drafts = await interaction.candidate_drafts(project)
+    candidates = await interaction.candidates(project)
+    previews = await interaction.previews(project)
+    full_releases = await interaction.full_releases(project)
 
     return await template.render(
         "project-view.html",
@@ -602,6 +604,7 @@ async def _project_add(form: AddForm, asf_id: str) -> response.Response:
     committee_name, display_name, label = form_values
 
     super_project = None
+    # TODO: Move this to the storage interface
     async with db.session() as data:
         # Get the base project to derive from
         # We're allowing derivation from a retired project here

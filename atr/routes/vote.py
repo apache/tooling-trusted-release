@@ -175,6 +175,7 @@ async def _send_vote(
     body_text = "\n\n".join(body)
     in_reply_to = vote_thread_mid
 
+    # TODO: Move this to the storage interface
     task = sql.Task(
         status=sql.TaskStatus.QUEUED,
         task_type=sql.TaskType.MESSAGE_SEND,

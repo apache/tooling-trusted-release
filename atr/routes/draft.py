@@ -299,6 +299,7 @@ async def sbomgen(
             raise routes.FlashError("Internal error: New revision not found")
 
         # Create and queue the task, using paths within the new revision
+        # TODO: Move this to the storage interface
         async with db.session() as data:
             # We still need release.name for the task metadata
             sbom_task = sql.Task(
@@ -364,6 +365,7 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
             "version_name": version_name,
             "asf_uid": session.uid,
         }
+        # TODO: Move this to the storage interface
         async with db.session() as data:
             svn_import_task = sql.Task(
                 task_type=sql.TaskType.SVN_IMPORT_FILES,

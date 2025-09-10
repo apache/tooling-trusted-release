@@ -129,9 +129,9 @@ async def select(session: routes.CommitterSession, project_name: str) -> str:
             base.ASFQuartException(f"Project {project_name} not found", errorcode=404)
         )
         releases = await interaction.releases_in_progress(project)
-        return await template.render(
-            "release-select.html", project=project, releases=releases, format_datetime=util.format_datetime
-        )
+    return await template.render(
+        "release-select.html", project=project, releases=releases, format_datetime=util.format_datetime
+    )
 
 
 @routes.public("/release/view/<project_name>/<version_name>")

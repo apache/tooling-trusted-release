@@ -202,6 +202,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         return await session.redirect(keys, error="Missing key fingerprint for deletion.")
 
     # Try to delete an SSH key first
+    # TODO: Use the storage interface instead
     async with db.session() as data:
         ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=session.uid).get()
         if ssh_key:
@@ -229,19 +230,21 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 async def details(session: routes.CommitterSession, fingerprint: str) -> str | response.Response:
     """Display details for a specific OpenPGP key."""
     fingerprint = fingerprint.lower()
+    user_committees = []
     async with db.session() as data:
         key, is_owner = await _key_and_is_owner(data, session, fingerprint)
         form = None
         if is_owner:
             project_list = session.committees + session.projects
             user_committees = await data.committee(name_in=project_list).all()
-            committee_choices: forms.Choices = [(c.name, c.display_name or c.name) for c in user_committees]
+    if is_owner:
+        committee_choices: forms.Choices = [(c.name, c.display_name or c.name) for c in user_committees]
 
-            # TODO: Probably need to do data in a separate phase
-            form = await UpdateKeyCommitteesForm.create_form(
-                data=await quart.request.form if (quart.request.method == "POST") else None
-            )
-            forms.choices(form.selected_committees, committee_choices)
+        # TODO: Probably need to do data in a separate phase
+        form = await UpdateKeyCommitteesForm.create_form(
+            data=await quart.request.form if (quart.request.method == "POST") else None
+        )
+        forms.choices(form.selected_committees, committee_choices)
 
     if form and await form.validate_on_submit():
         async with db.session() as data:

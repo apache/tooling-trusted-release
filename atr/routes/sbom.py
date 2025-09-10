@@ -66,6 +66,7 @@ async def augment(
             if revision_number is None:
                 raise RuntimeError("No revision number found for new revision creation")
             log.info(f"Augmenting SBOM for {project_name} {version_name} {revision_number} {rel_path}")
+            # TODO: Move this to the storage interface
             sbom_task = sql.Task(
                 task_type=sql.TaskType.SBOM_AUGMENT,
                 task_args=tasks.sbom.FileArgs(

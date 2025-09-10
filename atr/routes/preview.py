@@ -17,19 +17,17 @@
 
 """preview.py"""
 
-import aiofiles.os
-import aioshutil
 import asfquart
 import quart
 import werkzeug.wrappers.response as response
 
 import atr.construct as construct
-import atr.db as db
 import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.root as root
+import atr.storage as storage
 import atr.template as template
 import atr.util as util
 
@@ -103,30 +101,11 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         return await session.redirect(root.index, error="Missing required parameters")
 
     # Check that the user has access to the project
-    async with db.session() as data:
-        project = await data.project(name=project_name, status=sql.ProjectStatus.ACTIVE).get()
-        if not project or not any(
-            (
-                (c.name == project.committee_name)
-                and ((session.uid in c.committee_members) or (session.uid in c.committers))
-            )
-            for c in (await session.user_committees)
-        ):
-            return await session.redirect(root.index, error="You do not have access to this project")
-
-        # Delete the metadata from the database
-        async with data.begin():
-            try:
-                await _delete_preview(data, release_name)
-            except Exception as e:
-                log.exception("Error deleting preview:")
-                return await session.redirect(root.index, error=f"Error deleting preview: {e!s}")
-
-    # Delete the files on disk, including all revisions
-    # We can't use util.release_directory_base here because we don't have the release object
-    preview_dir = util.get_unfinished_dir() / project_name / version_name
-    if await aiofiles.os.path.exists(preview_dir):
-        await aioshutil.rmtree(preview_dir)
+    async with storage.write(session.uid) as write:
+        wacp = await write.as_project_committee_member(project_name)
+        await wacp.release.delete(
+            project_name, version_name, phase=sql.ReleasePhase.RELEASE_PREVIEW, include_downloads=False
+        )
 
     return await session.redirect(root.index, success="Preview deleted successfully")
 
@@ -188,16 +167,3 @@ async def view_path(
         phase_key="preview",
         content_listing=content_listing,
     )
-
-
-async def _delete_preview(data: db.Session, release_name: str) -> None:
-    """Delete a release preview and all its associated files."""
-    # Check that the release exists
-    release = await data.release(name=release_name, _project=True).get()
-    if not release:
-        raise routes.FlashError("Preview not found")
-    if release.phase != sql.ReleasePhase.RELEASE_PREVIEW:
-        raise routes.FlashError("Release is not in the preview phase")
-
-    # Delete the release record
-    await data.delete(release)

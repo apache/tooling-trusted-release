@@ -112,6 +112,7 @@ async def manual_selected_post(
     vote_result_url = util.unwrap(resolve_form.vote_result_url.data)
     await _committees_check(vote_thread_url, vote_result_url)
 
+    # TODO: Move this to the storage interface
     async with db.session() as data:
         release = await data.merge(release)
         if vote_result == "passed":
