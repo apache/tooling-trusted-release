@@ -19,6 +19,7 @@ import atr.storage.writers.announce as announce
 import atr.storage.writers.checks as checks
 import atr.storage.writers.distributions as distributions
 import atr.storage.writers.keys as keys
+import atr.storage.writers.release as release
 import atr.storage.writers.ssh as ssh
 import atr.storage.writers.tokens as tokens
 import atr.storage.writers.vote as vote
@@ -28,6 +29,7 @@ __all__ = [
     "checks",
     "distributions",
     "keys",
+    "release",
     "ssh",
     "tokens",
     "vote",

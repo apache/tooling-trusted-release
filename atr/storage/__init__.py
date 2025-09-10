@@ -138,6 +138,7 @@ class WriteAsGeneralPublic(WriteAs):
         self.announce = writers.announce.GeneralPublic(write, self, data)
         self.checks = writers.checks.GeneralPublic(write, self, data)
         self.keys = writers.keys.GeneralPublic(write, self, data)
+        self.release = writers.release.GeneralPublic(write, self, data)
         self.ssh = writers.ssh.GeneralPublic(write, self, data)
         self.tokens = writers.tokens.GeneralPublic(write, self, data)
         self.vote = writers.vote.GeneralPublic(write, self, data)
@@ -150,6 +151,7 @@ class WriteAsFoundationCommitter(WriteAsGeneralPublic):
         self.announce = writers.announce.FoundationCommitter(write, self, data)
         self.checks = writers.checks.FoundationCommitter(write, self, data)
         self.keys = writers.keys.FoundationCommitter(write, self, data)
+        self.release = writers.release.FoundationCommitter(write, self, data)
         self.ssh = writers.ssh.FoundationCommitter(write, self, data)
         self.tokens = writers.tokens.FoundationCommitter(write, self, data)
         self.vote = writers.vote.FoundationCommitter(write, self, data)
@@ -168,6 +170,7 @@ class WriteAsCommitteeParticipant(WriteAsFoundationCommitter):
         self.announce = writers.announce.CommitteeParticipant(write, self, data, committee_name)
         self.checks = writers.checks.CommitteeParticipant(write, self, data, committee_name)
         self.keys = writers.keys.CommitteeParticipant(write, self, data, committee_name)
+        self.release = writers.release.CommitteeParticipant(write, self, data, committee_name)
         self.ssh = writers.ssh.CommitteeParticipant(write, self, data, committee_name)
         self.tokens = writers.tokens.CommitteeParticipant(write, self, data, committee_name)
         self.vote = writers.vote.CommitteeParticipant(write, self, data, committee_name)
@@ -191,6 +194,7 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
         self.checks = writers.checks.CommitteeMember(write, self, data, committee_name)
         self.distributions = writers.distributions.CommitteeMember(write, self, data, committee_name)
         self.keys = writers.keys.CommitteeMember(write, self, data, committee_name)
+        self.release = writers.release.CommitteeMember(write, self, data, committee_name)
         self.ssh = writers.ssh.CommitteeMember(write, self, data, committee_name)
         self.tokens = writers.tokens.CommitteeMember(write, self, data, committee_name)
         self.vote = writers.vote.CommitteeMember(write, self, data, committee_name)
@@ -213,6 +217,7 @@ class WriteAsFoundationAdmin(WriteAsCommitteeMember):
         # self.announce = writers.announce.FoundationAdmin(write, self, data, committee_name)
         # self.checks = writers.checks.FoundationAdmin(write, self, data, committee_name)
         self.keys = writers.keys.FoundationAdmin(write, self, data, committee_name)
+        # self.release = writers.release.FoundationAdmin(write, self, data, committee_name)
         # self.ssh = writers.ssh.FoundationAdmin(write, self, data, committee_name)
         # self.tokens = writers.tokens.FoundationAdmin(write, self, data, committee_name)
         # self.vote = writers.vote.FoundationAdmin(write, self, data, committee_name)
@@ -318,6 +323,28 @@ class Write:
         except Exception as e:
             return outcome.Error(e)
         return outcome.Result(wacm)
+
+    async def as_project_committee_participant(self, project_name: str) -> WriteAsCommitteeParticipant:
+        write_as_outcome = await self.as_project_committee_participant_outcome(project_name)
+        return write_as_outcome.result_or_raise()
+
+    async def as_project_committee_participant_outcome(
+        self, project_name: str
+    ) -> outcome.Outcome[WriteAsCommitteeParticipant]:
+        project = await self.__data.project(project_name, _committee=True).demand(
+            AccessError(f"Project not found: {project_name}")
+        )
+        if project.committee is None:
+            return outcome.Error(AccessError("No committee found for project"))
+        if self.__authorisation.asf_uid is None:
+            return outcome.Error(AccessError("No ASF UID"))
+        if not self.__authorisation.is_participant_of(project.committee.name):
+            return outcome.Error(AccessError(f"Not a participant of {project.committee.name}"))
+        try:
+            wacp = WriteAsCommitteeParticipant(self, self.__data, project.committee.name)
+        except Exception as e:
+            return outcome.Error(e)
+        return outcome.Result(wacp)
 
     @property
     def member_of(self) -> frozenset[str]:

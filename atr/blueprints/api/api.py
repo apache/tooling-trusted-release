@@ -38,8 +38,6 @@ import atr.jwtoken as jwtoken
 import atr.models as models
 import atr.models.sql as sql
 import atr.revision as revision
-import atr.routes as routes
-import atr.routes.start as start
 import atr.storage as storage
 import atr.storage.outcome as outcome
 import atr.storage.types as types
@@ -773,13 +771,11 @@ async def release_create(data: models.api.ReleaseCreateArgs) -> DictResponse:
     asf_uid = _jwt_asf_uid()
 
     try:
-        release, _project = await start.create_release_draft(
-            project_name=data.project,
-            version=data.version,
-            asf_uid=asf_uid,
-        )
-    except routes.FlashError as exc:
-        raise exceptions.BadRequest(str(exc))
+        async with storage.write(asf_uid) as write:
+            wacp = await write.as_project_committee_participant(data.project)
+            release, _project = await wacp.release.start(data.project, data.version)
+    except storage.AccessError as e:
+        raise exceptions.BadRequest(str(e))
 
     return models.api.ReleaseCreateResults(
         endpoint="/release/create",
