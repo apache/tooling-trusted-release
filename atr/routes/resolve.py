@@ -117,7 +117,10 @@ async def manual_selected_post(
         release = await data.merge(release)
         if vote_result == "passed":
             release.phase = sql.ReleasePhase.RELEASE_PREVIEW
+            await data.commit()
+            await data.refresh(release)
             success_message = "Vote marked as passed"
+
             description = "Create a preview revision from the last candidate draft"
             async with revision.create_and_manage(
                 project_name, release.version, session.uid, description=description
@@ -125,8 +128,9 @@ async def manual_selected_post(
                 pass
         else:
             release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+            await data.commit()
+            await data.refresh(release)
             success_message = "Vote marked as failed"
-        await data.commit()
     if vote_result == "passed":
         destination = finish.selected
     else:

@@ -185,6 +185,8 @@ class CommitteeMember(CommitteeParticipant):
             success_message = "Project PPMC vote marked as passed, and Incubator PMC vote automatically started"
         elif vote_result == "passed":
             release.phase = sql.ReleasePhase.RELEASE_PREVIEW
+            await self.__data.commit()
+            await self.__data.refresh(release)
             success_message = "Vote marked as passed"
 
             description = "Create a preview revision from the last candidate draft"
@@ -199,8 +201,9 @@ class CommitteeMember(CommitteeParticipant):
                 extra_destination = (round_one_email_address, round_one_message_id)
         else:
             release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+            await self.__data.commit()
+            await self.__data.refresh(release)
             success_message = "Vote marked as failed"
-        await self.__data.commit()
 
         error_message = await self.send_resolution(
             release,
