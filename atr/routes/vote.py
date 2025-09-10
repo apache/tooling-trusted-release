@@ -117,12 +117,34 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
     """Handle submission of a vote."""
     await session.check_access(project_name)
 
+    # Ensure the release exists and is in the correct phase
+    release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE)
+
+    if release.committee is None:
+        raise ValueError("Release has no committee")
+
+    # Set up form choices
+    async with storage.write() as write:
+        try:
+            if release.committee.is_podling:
+                _wacm = write.as_committee_member("incubator")
+            else:
+                _wacm = write.as_committee_member(release.committee.name)
+            potency = "Binding"
+        except storage.AccessError:
+            potency = "Non-binding"
+
     form = await CastVoteForm.create_form(data=await quart.request.form)
+    forms.choices(
+        form.vote_value,
+        choices=[
+            ("+1", f"+1 ({potency})"),
+            ("0", "0"),
+            ("-1", f"-1 ({potency})"),
+        ],
+    )
 
     if await form.validate_on_submit():
-        # Ensure the release exists and is in the correct phase
-        release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE)
-
         vote = str(form.vote_value.data)
         comment = str(form.vote_comment.data)
         email_recipient, error_message = await _send_vote(session, release, vote, comment)
