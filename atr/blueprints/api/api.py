@@ -37,7 +37,6 @@ import atr.db.interaction as interaction
 import atr.jwtoken as jwtoken
 import atr.models as models
 import atr.models.sql as sql
-import atr.revision as revision
 import atr.storage as storage
 import atr.storage.outcome as outcome
 import atr.storage.types as types
@@ -878,11 +877,11 @@ async def release_upload(data: models.api.ReleaseUploadArgs) -> DictResponse:
     """
     asf_uid = _jwt_asf_uid()
 
-    async with db.session() as db_data:
-        project = await db_data.project(name=data.project, _committee=True).demand(exceptions.NotFound())
-        # TODO: user.is_participant(project, asf_uid)
-        if not (user.is_committee_member(project.committee, asf_uid) or user.is_admin(asf_uid)):
-            raise exceptions.Forbidden("You do not have permission to upload to this project")
+    # async with db.session() as db_data:
+    #     project = await db_data.project(name=data.project, _committee=True).demand(exceptions.NotFound())
+    #     # TODO: user.is_participant(project, asf_uid)
+    #     if not (user.is_committee_member(project.committee, asf_uid) or user.is_admin(asf_uid)):
+    #         raise exceptions.Forbidden("You do not have permission to upload to this project")
 
     revision = await _upload_process_file(data, asf_uid)
     return models.api.ReleaseUploadResults(
@@ -1331,11 +1330,15 @@ async def _upload_process_file(args: models.api.ReleaseUploadArgs, asf_uid: str)
     file_bytes = base64.b64decode(args.content, validate=True)
     file_path = args.relpath.lstrip("/")
     description = f"Upload via API: {file_path}"
-    async with revision.create_and_manage(args.project, args.version, asf_uid, description=description) as creating:
-        target_path = pathlib.Path(creating.interim_path) / file_path
-        await aiofiles.os.makedirs(target_path.parent, exist_ok=True)
-        async with aiofiles.open(target_path, "wb") as f:
-            await f.write(file_bytes)
+    async with storage.write(asf_uid) as write:
+        wacm = await write.as_project_committee_participant(args.project)
+        async with wacm.release.create_and_manage_revision(args.project, args.version, description) as creating:
+            target_path = pathlib.Path(creating.interim_path) / file_path
+            await aiofiles.os.makedirs(target_path.parent, exist_ok=True)
+            if target_path.exists():
+                raise exceptions.BadRequest("File already exists")
+            async with aiofiles.open(target_path, "wb") as f:
+                await f.write(file_bytes)
     if creating.new is None:
         raise exceptions.InternalServerError("Failed to create revision")
     async with db.session() as data:

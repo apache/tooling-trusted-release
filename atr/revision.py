@@ -64,8 +64,6 @@ class SafeSession:
         return False
 
 
-# NOTE: The create_directory parameter is not used anymore
-# The temporary directory will always be created
 @contextlib.asynccontextmanager
 async def create_and_manage(
     project_name: str,

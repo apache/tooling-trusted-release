@@ -18,6 +18,7 @@
 # Removing this will cause circular imports
 from __future__ import annotations
 
+import contextlib
 import datetime
 from typing import TYPE_CHECKING
 
@@ -33,6 +34,7 @@ import atr.util as util
 
 if TYPE_CHECKING:
     import pathlib
+    from collections.abc import AsyncGenerator
 
 
 class GeneralPublic:
@@ -77,6 +79,15 @@ class CommitteeParticipant(FoundationCommitter):
             raise storage.AccessError("No ASF UID")
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
+
+    @contextlib.asynccontextmanager
+    async def create_and_manage_revision(
+        self, project_name: str, version: str, description: str
+    ) -> AsyncGenerator[revision.Creating]:
+        async with revision.create_and_manage(
+            project_name, version, self.__asf_uid, description=description
+        ) as _creating:
+            yield _creating
 
     async def start(self, project_name: str, version: str) -> tuple[sql.Release, sql.Project]:
         """Creates the initial release draft record and revision directory."""
