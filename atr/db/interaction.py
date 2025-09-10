@@ -18,15 +18,10 @@
 import contextlib
 import datetime
 import enum
-import pathlib
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any, Final
 
-import aiofiles.os
-import aioshutil
-import asfquart.base as base
 import packaging.version as version
-import quart
 import sqlalchemy
 import sqlmodel
 
@@ -213,44 +208,6 @@ async def promote_release(
         return "A newer revision appeared, please refresh and try again."
     await data.commit()
     return None
-
-
-async def release_delete(
-    release_name: str, phase: db.Opt[sql.ReleasePhase] = db.NOT_SET, include_downloads: bool = True
-) -> None:
-    """Handle the deletion of database records and filesystem data for a release."""
-    async with db.session() as data:
-        release = await data.release(name=release_name, phase=phase, _project=True).demand(
-            base.ASFQuartException(f"Release '{release_name}' not found.", 404)
-        )
-        release_dir = util.release_directory_base(release)
-
-        # Delete from the database
-        log.info("Deleting database records for release: %s", release_name)
-        # Cascade should handle this, but we delete manually anyway
-        tasks_to_delete = await data.task(project_name=release.project.name, version_name=release.version).all()
-        for task in tasks_to_delete:
-            await data.delete(task)
-        log.debug("Deleted %d tasks for %s", len(tasks_to_delete), release_name)
-
-        checks_to_delete = await data.check_result(release_name=release_name).all()
-        for check in checks_to_delete:
-            await data.delete(check)
-        log.debug("Deleted %d check results for %s", len(checks_to_delete), release_name)
-
-        # TODO: Ensure that revisions are not deleted
-        # But this makes testing difficult
-        # Perhaps delete revisions if associated with test accounts only
-        # But we want to test actual mechanisms, not special case tests
-        # We could create uniquely named releases in tests
-        # Currently part of the discussion in #171, but should be its own issue
-        await data.delete(release)
-        log.info("Deleted release record: %s", release_name)
-        await data.commit()
-
-    if include_downloads:
-        await _delete_release_data_downloads(release)
-    await _delete_release_data_filesystem(release_dir, release_name)
 
 
 async def release_latest_vote_task(release: sql.Release) -> sql.Task | None:
@@ -457,50 +414,6 @@ async def user_committees_participant(asf_uid: str, caller_data: db.Session | No
 async def user_projects(asf_uid: str, caller_data: db.Session | None = None) -> list[tuple[str, str]]:
     projects = await user.projects(asf_uid)
     return [(p.name, p.display_name) for p in projects]
-
-
-async def _delete_release_data_downloads(release: sql.Release) -> None:
-    # Delete hard links from the downloads directory
-    finished_dir = util.release_directory(release)
-    if await aiofiles.os.path.isdir(finished_dir):
-        release_inodes = set()
-        async for file_path in util.paths_recursive(finished_dir):
-            try:
-                stat_result = await aiofiles.os.stat(finished_dir / file_path)
-                release_inodes.add(stat_result.st_ino)
-            except FileNotFoundError:
-                continue
-
-        if release_inodes:
-            downloads_dir = util.get_downloads_dir()
-            async for link_path in util.paths_recursive(downloads_dir):
-                full_link_path = downloads_dir / link_path
-                try:
-                    link_stat = await aiofiles.os.stat(full_link_path)
-                    if link_stat.st_ino in release_inodes:
-                        await aiofiles.os.remove(full_link_path)
-                        log.info(f"Deleted hard link: {full_link_path}")
-                except FileNotFoundError:
-                    continue
-
-
-async def _delete_release_data_filesystem(release_dir: pathlib.Path, release_name: str) -> None:
-    # Delete from the filesystem
-    try:
-        if await aiofiles.os.path.isdir(release_dir):
-            log.info("Deleting filesystem directory: %s", release_dir)
-            # Believe this to be another bug in mypy Protocol handling
-            # TODO: Confirm that this is a bug, and report upstream
-            await aioshutil.rmtree(release_dir)  # type: ignore[call-arg]
-            log.info("Successfully deleted directory: %s", release_dir)
-        else:
-            log.warning("Filesystem directory not found, skipping deletion: %s", release_dir)
-    except Exception as e:
-        log.exception("Error deleting filesystem directory %s:", release_dir)
-        await quart.flash(
-            f"Database records for '{release_name}' deleted, but failed to delete filesystem directory: {e!s}",
-            "warning",
-        )
 
 
 async def _trusted_project(repository: str, workflow_ref: str, phase: TrustedProjectPhase) -> sql.Project:

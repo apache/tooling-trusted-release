@@ -797,54 +797,12 @@ async def release_delete(data: models.api.ReleaseDeleteArgs) -> DictResponse:
     if not user.is_admin(asf_uid):
         raise exceptions.Forbidden("You do not have permission to create a release")
 
-    async with db.session() as db_data:
-        release_name = sql.release_name(data.project, data.version)
-        await interaction.release_delete(release_name, include_downloads=True)
-        await db_data.commit()
+    async with storage.write(asf_uid) as write:
+        wafa = write.as_foundation_admin(data.project)
+        await wafa.release.delete(data.project, data.version)
     return models.api.ReleaseDeleteResults(
         endpoint="/release/delete",
         deleted=True,
-    ).model_dump(), 200
-
-
-# TODO: Duplicates the above
-@api.BLUEPRINT.route("/release/draft/delete", methods=["POST"])
-@jwtoken.require
-@quart_schema.security_scheme([{"BearerAuth": []}])
-@quart_schema.validate_request(models.api.ReleaseDraftDeleteArgs)
-@quart_schema.validate_response(models.api.ReleaseDraftDeleteResults, 200)
-async def release_draft_delete(data: models.api.ReleaseDraftDeleteArgs) -> DictResponse:
-    """
-    Delete a draft release.
-
-    The draft release is deleted, and all of its associated metadata and files
-    are removed from the database and the filesystem. This cannot be undone.
-
-    Warning: we plan to change how draft deletion works.
-    """
-    asf_uid = _jwt_asf_uid()
-
-    async with db.session() as db_data:
-        release_name = sql.release_name(data.project, data.version)
-        release = await db_data.release(
-            name=release_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, _committee=True
-        ).demand(exceptions.NotFound(f"Draft release '{release_name}' not found"))
-        if release.project.committee is None:
-            raise exceptions.NotFound("Project has no committee")
-        _committee_member_or_admin(release.project.committee, asf_uid)
-
-        # TODO: This causes "A transaction is already begun on this Session"
-        # async with data.begin():
-        # Probably due to autobegin in data.release above
-        # We pass the phase again to guard against races
-        # But the removal is not actually locked
-        await interaction.release_delete(
-            release_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
-        )
-        await db_data.commit()
-    return models.api.ReleaseDraftDeleteResults(
-        endpoint="/release/draft/delete",
-        success=True,
     ).model_dump(), 200
 
 

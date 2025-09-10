@@ -217,7 +217,7 @@ class WriteAsFoundationAdmin(WriteAsCommitteeMember):
         # self.announce = writers.announce.FoundationAdmin(write, self, data, committee_name)
         # self.checks = writers.checks.FoundationAdmin(write, self, data, committee_name)
         self.keys = writers.keys.FoundationAdmin(write, self, data, committee_name)
-        # self.release = writers.release.FoundationAdmin(write, self, data, committee_name)
+        self.release = writers.release.FoundationAdmin(write, self, data, committee_name)
         # self.ssh = writers.ssh.FoundationAdmin(write, self, data, committee_name)
         # self.tokens = writers.tokens.FoundationAdmin(write, self, data, committee_name)
         # self.vote = writers.vote.FoundationAdmin(write, self, data, committee_name)

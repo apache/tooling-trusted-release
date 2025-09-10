@@ -33,7 +33,6 @@ import quart
 import atr.analysis as analysis
 import atr.construct as construct
 import atr.db as db
-import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
@@ -42,6 +41,7 @@ import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.root as root
 import atr.routes.upload as upload
+import atr.storage as storage
 import atr.tasks.sbom as sbom
 import atr.template as template
 import atr.util as util
@@ -103,15 +103,11 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     await session.check_access(project_name)
 
     # Delete the metadata from the database
-    async with db.session() as data:
-        async with data.begin():
-            try:
-                await interaction.release_delete(
-                    release_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
-                )
-            except Exception as e:
-                log.exception("Error deleting candidate draft:")
-                return await session.redirect(root.index, error=f"Error deleting candidate draft: {e!s}")
+    async with storage.write(session.uid) as write:
+        wacp = await write.as_project_committee_member(project_name)
+        await wacp.release.delete(
+            project_name, version_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
+        )
 
     # Delete the files on disk, including all revisions
     # We can't use util.release_directory_base here because we don't have the release object

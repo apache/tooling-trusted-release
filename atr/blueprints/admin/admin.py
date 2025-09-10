@@ -315,6 +315,13 @@ async def admin_delete_release() -> str | response.Response:
     """Page to delete selected releases and their associated data and files."""
     form = await DeleteReleaseForm.create_form()
 
+    web_session = await session.read()
+    if web_session is None:
+        raise base.ASFQuartException("Not authenticated", 401)
+    asf_uid = web_session.uid
+    if asf_uid is None:
+        raise base.ASFQuartException("Invalid session, uid is None", 500)
+
     if quart.request.method == "POST":
         if await form.validate_on_submit():
             form_data = await quart.request.form
@@ -324,28 +331,7 @@ async def admin_delete_release() -> str | response.Response:
                 await quart.flash("No releases selected for deletion.", "warning")
                 return quart.redirect(quart.url_for("admin.admin_delete_release"))
 
-            success_count = 0
-            fail_count = 0
-            error_messages = []
-
-            for release_name in releases_to_delete:
-                try:
-                    await interaction.release_delete(release_name)
-                    success_count += 1
-                except base.ASFQuartException as e:
-                    log.error("Error deleting release %s: %s", release_name, e)
-                    fail_count += 1
-                    error_messages.append(f"{release_name}: {e}")
-                except Exception as e:
-                    log.exception("Unexpected error deleting release %s:", release_name)
-                    fail_count += 1
-                    error_messages.append(f"{release_name}: Unexpected error ({e})")
-
-            if success_count > 0:
-                await quart.flash(f"Successfully deleted {success_count} release(s).", "success")
-            if fail_count > 0:
-                errors_str = "\n".join(error_messages)
-                await quart.flash(f"Failed to delete {fail_count} release(s):\n{errors_str}", "error")
+            await _delete_releases(releases_to_delete, asf_uid)
 
             # Redirecting back to the deletion page will refresh the list of releases too
             return quart.redirect(quart.url_for("admin.admin_delete_release"))
@@ -758,6 +744,39 @@ async def _check_keys(fix: bool = False) -> str:
     if bad_keys:
         message += f"\nFound {len(bad_keys)} bad keys:\n{'\n'.join(bad_keys)}"
     return message
+
+
+async def _delete_releases(releases_to_delete: list[str], asf_uid: str) -> None:
+    success_count = 0
+    fail_count = 0
+    error_messages = []
+
+    for release_name in releases_to_delete:
+        try:
+            async with db.session() as data:
+                release = await data.release(name=release_name, _committee=True, _project=True).demand(
+                    RuntimeError(f"Release {release_name} not found")
+                )
+                if release.committee is None:
+                    raise RuntimeError(f"Release {release_name} has no committee")
+            async with storage.write(asf_uid) as write:
+                wafa = write.as_foundation_admin(release.committee.name)
+                await wafa.release.delete(release.project.name, release.version)
+            success_count += 1
+        except base.ASFQuartException as e:
+            log.error(f"Error deleting release {release_name}: {e}")
+            fail_count += 1
+            error_messages.append(f"{release_name}: {e}")
+        except Exception as e:
+            log.exception(f"Unexpected error deleting release {release_name}:")
+            fail_count += 1
+            error_messages.append(f"{release_name}: Unexpected error ({e})")
+
+    if success_count > 0:
+        await quart.flash(f"Successfully deleted {success_count} release(s).", "success")
+    if fail_count > 0:
+        errors_str = "\n".join(error_messages)
+        await quart.flash(f"Failed to delete {fail_count} release(s):\n{errors_str}", "error")
 
 
 async def _get_filesystem_dirs() -> list[str]:
