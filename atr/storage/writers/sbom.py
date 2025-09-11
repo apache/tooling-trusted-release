@@ -18,15 +18,18 @@
 # Removing this will cause circular imports
 from __future__ import annotations
 
+import asyncio
 import datetime
-import hashlib
-
-import sqlmodel
+from typing import TYPE_CHECKING
 
 import atr.db as db
-import atr.jwtoken as jwtoken
 import atr.models.sql as sql
 import atr.storage as storage
+import atr.tasks.sbom as sbom
+import atr.util as util
+
+if TYPE_CHECKING:
+    import pathlib
 
 
 class GeneralPublic:
@@ -53,41 +56,6 @@ class FoundationCommitter(GeneralPublic):
             raise storage.AccessError("No ASF UID")
         self.__asf_uid = asf_uid
 
-    async def add_token(
-        self, uid: str, token_hash: str, created: datetime.datetime, expires: datetime.datetime, label: str | None
-    ) -> sql.PersonalAccessToken:
-        pat = sql.PersonalAccessToken(
-            asfuid=uid,
-            token_hash=token_hash,
-            created=created,
-            expires=expires,
-            label=label,
-        )
-        self.__data.add(pat)
-        await self.__data.commit()
-        return pat
-
-    async def issue_jwt(self, pat_text: str) -> str:
-        pat_hash = hashlib.sha3_256(pat_text.encode()).hexdigest()
-        pat = await self.__data.query_one_or_none(
-            sqlmodel.select(sql.PersonalAccessToken).where(
-                sql.PersonalAccessToken.asfuid == self.__asf_uid,
-                sql.PersonalAccessToken.token_hash == pat_hash,
-            )
-        )
-        if pat is None:
-            raise storage.AccessError("Invalid PAT")
-        if pat.expires < datetime.datetime.now(datetime.UTC):
-            raise storage.AccessError("Expired PAT")
-        issued_jwt = jwtoken.issue(self.__asf_uid)
-        pat.last_used = datetime.datetime.now(datetime.UTC)
-        await self.__data.commit()
-        self.__write_as.append_to_audit_log(
-            asf_uid=self.__asf_uid,
-            pat_hash=pat_hash,
-        )
-        return issued_jwt
-
 
 class CommitteeParticipant(FoundationCommitter):
     def __init__(
@@ -106,6 +74,47 @@ class CommitteeParticipant(FoundationCommitter):
             raise storage.AccessError("No ASF UID")
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
+
+    async def generate_cyclonedx(
+        self,
+        project_name: str,
+        version_name: str,
+        revision_number: str,
+        path_in_new_revision: pathlib.Path,
+        sbom_path_in_new_revision: pathlib.Path,
+    ) -> sql.Task:
+        # Create and queue the task, using paths within the new revision
+        # TODO: Move this to the storage interface
+        # We still need release.name for the task metadata
+        sbom_task = sql.Task(
+            task_type=sql.TaskType.SBOM_GENERATE_CYCLONEDX,
+            task_args=sbom.GenerateCycloneDX(
+                artifact_path=str(path_in_new_revision.resolve()),
+                output_path=str(sbom_path_in_new_revision.resolve()),
+            ).model_dump(),
+            asf_uid=util.unwrap(self.__asf_uid),
+            added=datetime.datetime.now(datetime.UTC),
+            status=sql.TaskStatus.QUEUED,
+            project_name=project_name,
+            version_name=version_name,
+            revision_number=revision_number,
+        )
+        self.__data.add(sbom_task)
+        await self.__data.commit()
+        await self.__data.refresh(sbom_task)
+        return sbom_task
+
+    # TODO: This is not a writer
+    # Move this to the readers
+    async def generate_cyclonedx_wait(self, sbom_task: sql.Task) -> None:
+        # We must wait until the sbom_task is complete before we can queue checks
+        # Maximum wait time is 60 * 100ms = 6000ms
+        for _attempt in range(60):
+            await self.__data.refresh(sbom_task)
+            if sbom_task.status != sql.TaskStatus.QUEUED:
+                break
+            # Wait 100ms before checking again
+            await asyncio.sleep(0.1)
 
 
 class CommitteeMember(CommitteeParticipant):

@@ -19,7 +19,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import datetime
 import hashlib
 import pathlib
@@ -42,7 +41,6 @@ import atr.routes.compose as compose
 import atr.routes.root as root
 import atr.routes.upload as upload
 import atr.storage as storage
-import atr.tasks.sbom as sbom
 import atr.template as template
 import atr.util as util
 
@@ -299,33 +297,12 @@ async def sbomgen(
             raise routes.FlashError("Internal error: New revision not found")
 
         # Create and queue the task, using paths within the new revision
-        # TODO: Move this to the storage interface
-        async with db.session() as data:
-            # We still need release.name for the task metadata
-            sbom_task = sql.Task(
-                task_type=sql.TaskType.SBOM_GENERATE_CYCLONEDX,
-                task_args=sbom.GenerateCycloneDX(
-                    artifact_path=str(path_in_new_revision.resolve()),
-                    output_path=str(sbom_path_in_new_revision.resolve()),
-                ).model_dump(),
-                asf_uid=util.unwrap(session.uid),
-                added=datetime.datetime.now(datetime.UTC),
-                status=sql.TaskStatus.QUEUED,
-                project_name=project_name,
-                version_name=version_name,
-                revision_number=creating.new.number,
+        async with storage.write(session.uid) as write:
+            wacp = await write.as_project_committee_member(project_name)
+            sbom_task = await wacp.sbom.generate_cyclonedx(
+                project_name, version_name, creating.new.number, path_in_new_revision, sbom_path_in_new_revision
             )
-            data.add(sbom_task)
-            await data.commit()
-
-            # We must wait until the sbom_task is complete before we can queue checks
-            # Maximum wait time is 60 * 100ms = 6000ms
-            for _attempt in range(60):
-                await data.refresh(sbom_task)
-                if sbom_task.status != sql.TaskStatus.QUEUED:
-                    break
-                # Wait 100ms before checking again
-                await asyncio.sleep(0.1)
+            await wacp.sbom.generate_cyclonedx_wait(sbom_task)
 
     except Exception as e:
         log.exception("Error generating SBOM:")
