@@ -86,7 +86,7 @@
         {% if release.vote_manual %}
           <a href="{{ as_url(routes.resolve.manual_selected, project_name=release.project.name, version_name=release.version) }}"
              class="btn btn-success"><i class="bi bi-clipboard-check me-1"></i> Resolve vote</a>
-        {% else %}
+        {% elif hidden_form %}
           <form action="{{ as_url(routes.resolve.tabulated_selected_post, project_name=release.project.name, version_name=release.version) }}"
                 method="post"
                 class="mb-0">

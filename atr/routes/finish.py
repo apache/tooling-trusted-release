@@ -21,6 +21,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Final
 
 import aiofiles.os
+import asfquart.base as base
 import quart
 import quart.wrappers.response as quart_response
 import werkzeug.datastructures as datastructures
@@ -35,6 +36,7 @@ import atr.log as log
 import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
+import atr.routes.mapping as mapping
 import atr.routes.root as root
 import atr.template as template
 import atr.util as util
@@ -126,8 +128,14 @@ async def selected(
         return await session.redirect(selected, project_name=project_name, version_name=version_name)
 
     async with db.session() as data:
-        release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_PREVIEW, data=data)
-        user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
+        release = await data.release(
+            project_name=project_name,
+            version=version_name,
+            _committee=True,
+        ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
+    if release.phase != sql.ReleasePhase.RELEASE_PREVIEW:
+        return await mapping.release_as_redirect(session, release)
+    user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
 
     latest_revision_dir = util.release_directory(release)
     try:

@@ -15,7 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from collections.abc import Callable
+
+import werkzeug.wrappers.response as response
+
 import atr.models.sql as sql
+import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.finish as finish
 import atr.routes.release as routes_release
@@ -23,14 +28,27 @@ import atr.routes.vote as vote
 import atr.util as util
 
 
-def release_as_url(release: sql.Release) -> str:
+async def release_as_redirect(session: routes.CommitterSession, release: sql.Release) -> response.Response:
+    route = release_as_route(release)
+    if route is routes_release.finished:
+        return await session.redirect(route, project_name=release.project.name)
+    return await session.redirect(route, project_name=release.project.name, version_name=release.version)
+
+
+def release_as_route(release: sql.Release) -> Callable:
     match release.phase:
         case sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-            return util.as_url(compose.selected, project_name=release.project.name, version_name=release.version)
+            return compose.selected
         case sql.ReleasePhase.RELEASE_CANDIDATE:
-            return util.as_url(vote.selected, project_name=release.project.name, version_name=release.version)
+            return vote.selected
         case sql.ReleasePhase.RELEASE_PREVIEW:
-            return util.as_url(finish.selected, project_name=release.project.name, version_name=release.version)
+            return finish.selected
         case sql.ReleasePhase.RELEASE:
-            finished = routes_release.finished  # type: ignore[has-type]
-            return util.as_url(finished, project_name=release.project.name)
+            return routes_release.finished
+
+
+def release_as_url(release: sql.Release) -> str:
+    route = release_as_route(release)
+    if route is routes_release.finished:
+        return util.as_url(route, project_name=release.project.name)
+    return util.as_url(route, project_name=release.project.name, version_name=release.version)

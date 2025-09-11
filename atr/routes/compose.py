@@ -17,6 +17,7 @@
 
 from typing import TYPE_CHECKING
 
+import asfquart.base as base
 import werkzeug.wrappers.response as response
 import wtforms
 
@@ -28,6 +29,7 @@ import atr.models.sql as sql
 import atr.revision as revision
 import atr.routes as routes
 import atr.routes.draft as draft
+import atr.routes.mapping as mapping
 import atr.storage as storage
 import atr.template as template
 import atr.util as util
@@ -122,7 +124,15 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     """Show the contents of the release candidate draft."""
     await session.check_access(project_name)
 
-    release = await session.release(project_name, version_name, with_committee=True, with_project_release_policy=True)
+    async with db.session() as data:
+        release = await data.release(
+            project_name=project_name,
+            version=version_name,
+            _committee=True,
+            _project_release_policy=True,
+        ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
+    if release.phase != sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+        return await mapping.release_as_redirect(session, release)
     return await check(session, release)
 
 

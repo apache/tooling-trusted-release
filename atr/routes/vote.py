@@ -15,9 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asfquart.base as base
 import quart
 import werkzeug.wrappers.response as response
 
+import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.log as log
@@ -25,6 +27,7 @@ import atr.models.results as results
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.compose as compose
+import atr.routes.mapping as mapping
 import atr.storage as storage
 import atr.util as util
 
@@ -42,13 +45,15 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     """Show the contents of the release candidate draft."""
     await session.check_access(project_name)
 
-    release = await session.release(
-        project_name,
-        version_name,
-        with_committee=True,
-        phase=sql.ReleasePhase.RELEASE_CANDIDATE,
-        with_project_release_policy=True,
-    )
+    async with db.session() as data:
+        release = await data.release(
+            project_name=project_name,
+            version=version_name,
+            _committee=True,
+            _project_release_policy=True,
+        ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
+    if release.phase != sql.ReleasePhase.RELEASE_CANDIDATE:
+        return await mapping.release_as_redirect(session, release)
     latest_vote_task = await interaction.release_latest_vote_task(release)
     archive_url = None
     task_mid = None
