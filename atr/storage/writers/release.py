@@ -89,6 +89,31 @@ class CommitteeParticipant(FoundationCommitter):
         ) as _creating:
             yield _creating
 
+    async def import_from_svn(
+        self, project_name: str, version_name: str, svn_url: str, revision: str, target_subdirectory: str | None
+    ) -> sql.Task:
+        task_args = {
+            "svn_url": svn_url,
+            "revision": revision,
+            "target_subdirectory": target_subdirectory,
+            "project_name": project_name,
+            "version_name": version_name,
+            "asf_uid": self.__asf_uid,
+        }
+        svn_import_task = sql.Task(
+            task_type=sql.TaskType.SVN_IMPORT_FILES,
+            task_args=task_args,
+            asf_uid=util.unwrap(self.__asf_uid),
+            added=datetime.datetime.now(datetime.UTC),
+            status=sql.TaskStatus.QUEUED,
+            project_name=project_name,
+            version_name=version_name,
+        )
+        self.__data.add(svn_import_task)
+        await self.__data.commit()
+        await self.__data.refresh(svn_import_task)
+        return svn_import_task
+
     async def start(self, project_name: str, version: str) -> tuple[sql.Release, sql.Project]:
         """Creates the initial release draft record and revision directory."""
         # Get the project from the project name

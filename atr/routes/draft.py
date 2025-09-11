@@ -31,7 +31,6 @@ import quart
 
 import atr.analysis as analysis
 import atr.construct as construct
-import atr.db as db
 import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
@@ -334,27 +333,15 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
         )
 
     try:
-        task_args = {
-            "svn_url": str(form.svn_url.data),
-            "revision": str(form.revision.data),
-            "target_subdirectory": str(form.target_subdirectory.data) if form.target_subdirectory.data else None,
-            "project_name": project_name,
-            "version_name": version_name,
-            "asf_uid": session.uid,
-        }
-        # TODO: Move this to the storage interface
-        async with db.session() as data:
-            svn_import_task = sql.Task(
-                task_type=sql.TaskType.SVN_IMPORT_FILES,
-                task_args=task_args,
-                asf_uid=util.unwrap(session.uid),
-                added=datetime.datetime.now(datetime.UTC),
-                status=sql.TaskStatus.QUEUED,
-                project_name=project_name,
-                version_name=version_name,
+        async with storage.write(session.uid) as write:
+            wacp = await write.as_project_committee_member(project_name)
+            await wacp.release.import_from_svn(
+                project_name,
+                version_name,
+                str(form.svn_url.data),
+                str(form.revision.data),
+                str(form.target_subdirectory.data) if form.target_subdirectory.data else None,
             )
-            data.add(svn_import_task)
-            await data.commit()
 
     except Exception:
         log.exception("Error queueing SVN import task:")
