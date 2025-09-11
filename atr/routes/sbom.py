@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import datetime
 import json
 import pathlib
 from typing import TYPE_CHECKING
@@ -35,7 +34,7 @@ import atr.models.results as results
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.sbomtool as sbomtool
-import atr.tasks as tasks
+import atr.storage as storage
 import atr.template as template
 import atr.util as util
 
@@ -66,26 +65,8 @@ async def augment(
             if revision_number is None:
                 raise RuntimeError("No revision number found for new revision creation")
             log.info(f"Augmenting SBOM for {project_name} {version_name} {revision_number} {rel_path}")
-            # TODO: Move this to the storage interface
-            sbom_task = sql.Task(
-                task_type=sql.TaskType.SBOM_AUGMENT,
-                task_args=tasks.sbom.FileArgs(
-                    project_name=project_name,
-                    version_name=version_name,
-                    revision_number=revision_number,
-                    file_path=str(rel_path),
-                    asf_uid=util.unwrap(session.uid),
-                ).model_dump(),
-                asf_uid=util.unwrap(session.uid),
-                added=datetime.datetime.now(datetime.UTC),
-                status=sql.TaskStatus.QUEUED,
-                project_name=project_name,
-                version_name=version_name,
-                revision_number=revision_number,
-            )
-            data.add(sbom_task)
-            await data.commit()
-            await data.refresh(sbom_task)
+        async with storage.write_as_project_committee_member(project_name) as wacm:
+            sbom_task = await wacm.sbom.augment_cyclonedx(project_name, version_name, revision_number, rel_path)
 
     except Exception as e:
         log.exception("Error augmenting SBOM:")

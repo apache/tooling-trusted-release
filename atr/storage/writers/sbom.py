@@ -75,6 +75,34 @@ class CommitteeParticipant(FoundationCommitter):
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
 
+    async def augment_cyclonedx(
+        self,
+        project_name: str,
+        version_name: str,
+        revision_number: str,
+        rel_path: pathlib.Path,
+    ) -> sql.Task:
+        sbom_task = sql.Task(
+            task_type=sql.TaskType.SBOM_AUGMENT,
+            task_args=sbom.FileArgs(
+                project_name=project_name,
+                version_name=version_name,
+                revision_number=revision_number,
+                file_path=str(rel_path),
+                asf_uid=util.unwrap(self.__asf_uid),
+            ).model_dump(),
+            asf_uid=util.unwrap(self.__asf_uid),
+            added=datetime.datetime.now(datetime.UTC),
+            status=sql.TaskStatus.QUEUED,
+            project_name=project_name,
+            version_name=version_name,
+            revision_number=revision_number,
+        )
+        self.__data.add(sbom_task)
+        await self.__data.commit()
+        await self.__data.refresh(sbom_task)
+        return sbom_task
+
     async def generate_cyclonedx(
         self,
         project_name: str,
