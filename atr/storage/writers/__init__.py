@@ -19,6 +19,7 @@ import atr.storage.writers.announce as announce
 import atr.storage.writers.checks as checks
 import atr.storage.writers.distributions as distributions
 import atr.storage.writers.keys as keys
+import atr.storage.writers.policy as policy
 import atr.storage.writers.project as project
 import atr.storage.writers.release as release
 import atr.storage.writers.sbom as sbom
@@ -31,6 +32,7 @@ __all__ = [
     "checks",
     "distributions",
     "keys",
+    "policy",
     "project",
     "release",
     "sbom",
