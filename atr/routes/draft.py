@@ -20,7 +20,6 @@
 from __future__ import annotations
 
 import datetime
-import hashlib
 import pathlib
 from typing import TYPE_CHECKING, TypeVar
 
@@ -100,8 +99,8 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
     # Delete the metadata from the database
     async with storage.write(session.uid) as write:
-        wacp = await write.as_project_committee_member(project_name)
-        await wacp.release.delete(
+        wacm = await write.as_project_committee_member(project_name)
+        await wacm.release.delete(
             project_name, version_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
         )
 
@@ -131,7 +130,7 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
 
     try:
         async with storage.write(session.uid) as write:
-            wacp = await write.as_project_committee_member(project_name)
+            wacp = await write.as_project_committee_participant(project_name)
             metadata_files_deleted = await wacp.release.delete_file(project_name, version_name, rel_path_to_delete)
     except Exception as e:
         log.exception("Error deleting file:")
@@ -191,34 +190,9 @@ async def hashgen(
     rel_path = pathlib.Path(file_path)
 
     try:
-        description = "Hash generation through web interface"
-        async with revision.create_and_manage(
-            project_name, version_name, session.uid, description=description
-        ) as creating:
-            # Uses new_revision_number for logging only
-            path_in_new_revision = creating.interim_path / rel_path
-            hash_path_rel = rel_path.name + f".{hash_type}"
-            hash_path_in_new_revision = creating.interim_path / rel_path.parent / hash_path_rel
-
-            # Check that the source file exists in the new revision
-            if not await aiofiles.os.path.exists(path_in_new_revision):
-                log.error(f"Source file {rel_path} not found in new revision for hash generation.")
-                raise routes.FlashError("Source file not found in the new revision.")
-
-            # Check that the hash file does not already exist in the new revision
-            if await aiofiles.os.path.exists(hash_path_in_new_revision):
-                raise base.ASFQuartException(f"{hash_type} file already exists", errorcode=400)
-
-            # Read the source file from the new revision and compute the hash
-            hash_obj = hashlib.sha256() if hash_type == "sha256" else hashlib.sha512()
-            async with aiofiles.open(path_in_new_revision, "rb") as f:
-                while chunk := await f.read(8192):
-                    hash_obj.update(chunk)
-
-            # Write the hash file into the new revision
-            hash_value = hash_obj.hexdigest()
-            async with aiofiles.open(hash_path_in_new_revision, "w") as f:
-                await f.write(f"{hash_value}  {rel_path.name}\n")
+        async with storage.write(session.uid) as write:
+            wacp = await write.as_project_committee_participant(project_name)
+            await wacp.release.generate_hash_file(project_name, version_name, rel_path, hash_type)
 
     except Exception as e:
         log.exception("Error generating hash file:")
@@ -271,7 +245,7 @@ async def sbomgen(
 
         # Create and queue the task, using paths within the new revision
         async with storage.write(session.uid) as write:
-            wacp = await write.as_project_committee_member(project_name)
+            wacp = await write.as_project_committee_participant(project_name)
             sbom_task = await wacp.sbom.generate_cyclonedx(
                 project_name, version_name, creating.new.number, path_in_new_revision, sbom_path_in_new_revision
             )
@@ -308,7 +282,7 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
 
     try:
         async with storage.write(session.uid) as write:
-            wacp = await write.as_project_committee_member(project_name)
+            wacp = await write.as_project_committee_participant(project_name)
             await wacp.release.import_from_svn(
                 project_name,
                 version_name,

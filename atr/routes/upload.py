@@ -110,6 +110,7 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
 
 
 async def _save_file(file: datastructures.FileStorage, target_path: pathlib.Path) -> None:
+    # TODO: Move to the storage interface
     async with aiofiles.open(target_path, "wb") as f:
         while chunk := await asyncio.to_thread(file.stream.read, 8192):
             await f.write(chunk)

@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import datetime
+import hashlib
 import pathlib
 from typing import TYPE_CHECKING, Final
 
@@ -138,6 +139,36 @@ class CommitteeParticipant(FoundationCommitter):
             # Delete the file
             await aiofiles.os.remove(path_in_new_revision)
         return metadata_files_deleted
+
+    async def generate_hash_file(
+        self, project_name: str, version_name: str, rel_path: pathlib.Path, hash_type: str
+    ) -> None:
+        description = "Hash generation through web interface"
+        async with self.create_and_manage_revision(project_name, version_name, description) as creating:
+            # Uses new_revision_number for logging only
+            path_in_new_revision = creating.interim_path / rel_path
+            hash_path_rel = rel_path.name + f".{hash_type}"
+            hash_path_in_new_revision = creating.interim_path / rel_path.parent / hash_path_rel
+
+            # Check that the source file exists in the new revision
+            if not await aiofiles.os.path.exists(path_in_new_revision):
+                log.error(f"Source file {rel_path} not found in new revision for hash generation.")
+                raise storage.AccessError("Source file not found in the new revision.")
+
+            # Check that the hash file does not already exist in the new revision
+            if await aiofiles.os.path.exists(hash_path_in_new_revision):
+                raise storage.AccessError(f"{hash_type} file already exists")
+
+            # Read the source file from the new revision and compute the hash
+            hash_obj = hashlib.sha256() if hash_type == "sha256" else hashlib.sha512()
+            async with aiofiles.open(path_in_new_revision, "rb") as f:
+                while chunk := await f.read(8192):
+                    hash_obj.update(chunk)
+
+            # Write the hash file into the new revision
+            hash_value = hash_obj.hexdigest()
+            async with aiofiles.open(hash_path_in_new_revision, "w") as f:
+                await f.write(f"{hash_value}  {rel_path.name}\n")
 
     async def import_from_svn(
         self, project_name: str, version_name: str, svn_url: str, revision: str, target_subdirectory: str | None
