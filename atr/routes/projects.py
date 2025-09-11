@@ -438,27 +438,6 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
     )
 
 
-# def _form_append(obj: wtforms.Field, msg: str) -> None:
-#     if not isinstance(obj.errors, list):
-#         obj.errors = list(obj.errors)
-#     obj.errors.append(msg)
-
-
-# def _form_clear(obj: wtforms.Field) -> None:
-#     if not isinstance(obj.errors, list):
-#         obj.errors = list(obj.errors)
-#     obj.errors[:] = []
-
-
-# def _form_setdefault_append(obj: util.QuartFormTyped, key: str, default: list[str], msg: str) -> None:
-#     obj.errors.setdefault(key, default)
-#     errors = obj.errors[key]
-#     if isinstance(errors, list):
-#         errors.append(msg)
-#     else:
-#         obj.errors[key] = [repr(errors), msg]
-
-
 async def _metadata_category_edit(
     metadata_form: ProjectMetadataForm,
     project: sql.Project,
@@ -557,12 +536,6 @@ async def _metadata_edit(
             await data.commit()
             return True, metadata_form
     return False, metadata_form
-
-
-# def _parse_artifact_paths(artifact_paths: str) -> list[str]:
-#     if not artifact_paths:
-#         return []
-#     return [path.strip() for path in artifact_paths.split("\n") if path.strip()]
 
 
 async def _policy_edit(
