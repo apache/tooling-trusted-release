@@ -135,6 +135,34 @@ class CommitteeMember(CommitteeParticipant):
             resolution_body,
         )
 
+    async def resolve_manually(
+        self,
+        project_name: str,
+        release: sql.Release,
+        vote_result: Literal["passed", "failed"],
+    ) -> str:
+        # Attach the existing release to the session
+        release = await self.__data.merge(release)
+
+        if vote_result == "passed":
+            release.phase = sql.ReleasePhase.RELEASE_PREVIEW
+            await self.__data.commit()
+            await self.__data.refresh(release)
+            success_message = "Vote marked as passed"
+
+            description = "Create a preview revision from the last candidate draft"
+            async with revision.create_and_manage(
+                project_name, release.version, self.__asf_uid, description=description
+            ) as _creating:
+                pass
+        else:
+            release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
+            await self.__data.commit()
+            await self.__data.refresh(release)
+            success_message = "Vote marked as failed"
+
+        return success_message
+
     async def resolve_release(
         self,
         project_name: str,

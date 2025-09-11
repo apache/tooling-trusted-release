@@ -19,10 +19,8 @@
 import quart
 import werkzeug.wrappers.response as response
 
-import atr.db as db
 import atr.forms as forms
 import atr.models.sql as sql
-import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.routes.finish as finish
@@ -112,25 +110,8 @@ async def manual_selected_post(
     vote_result_url = util.unwrap(resolve_form.vote_result_url.data)
     await _committees_check(vote_thread_url, vote_result_url)
 
-    # TODO: Move this to the storage interface
-    async with db.session() as data:
-        release = await data.merge(release)
-        if vote_result == "passed":
-            release.phase = sql.ReleasePhase.RELEASE_PREVIEW
-            await data.commit()
-            await data.refresh(release)
-            success_message = "Vote marked as passed"
-
-            description = "Create a preview revision from the last candidate draft"
-            async with revision.create_and_manage(
-                project_name, release.version, session.uid, description=description
-            ) as _creating:
-                pass
-        else:
-            release.phase = sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
-            await data.commit()
-            await data.refresh(release)
-            success_message = "Vote marked as failed"
+    async with storage.write_as_project_committee_member(project_name) as wacm:
+        success_message = await wacm.vote.resolve_manually(project_name, release, vote_result)
     if vote_result == "passed":
         destination = finish.selected
     else:
