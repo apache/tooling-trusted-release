@@ -17,26 +17,31 @@
 
 """project.py"""
 
+from __future__ import annotations
+
 import datetime
 import http.client
 import re
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import asfquart.base as base
+import pydantic
 import quart
-import werkzeug.wrappers.response as response
-import wtforms
 
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.log as log
+import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.storage as storage
 import atr.template as template
 import atr.user as user
 import atr.util as util
+
+if TYPE_CHECKING:
+    import werkzeug.wrappers.response as response
 
 _FORBIDDEN_CATEGORIES: Final[set[str]] = {
     "retired",
@@ -95,9 +100,12 @@ class ReleasePolicyForm(forms.Typed):
     )
 
     # Vote section
-    manual_vote = forms.boolean(
-        "Manual voting process",
-        description="If this is set then the vote will be completely manual and following policy is ignored.",
+    github_vote_workflow_path = forms.textarea(
+        "GitHub vote workflow paths",
+        optional=True,
+        rows=5,
+        description="The full paths to the GitHub workflows to use for the release,"
+        " including the .github/workflows/ prefix.",
     )
     mailto_addresses = forms.string(
         "Email",
@@ -106,6 +114,10 @@ class ReleasePolicyForm(forms.Typed):
         description="Note: This field determines where vote and finished release announcement"
         "emails are sent. You can set this value to your own mailing list, but ATR will "
         f"currently only let you send to {util.USER_TESTS_ADDRESS}.",
+    )
+    manual_vote = forms.boolean(
+        "Manual voting process",
+        description="If this is set then the vote will be completely manual and following policy is ignored.",
     )
     default_min_hours_value_at_render = forms.hidden()
     min_hours = forms.integer(
@@ -130,13 +142,6 @@ class ReleasePolicyForm(forms.Typed):
         optional=True,
         rows=10,
         description="Email template for messages to start a vote on a release.",
-    )
-    github_vote_workflow_path = forms.textarea(
-        "GitHub vote workflow paths",
-        optional=True,
-        rows=5,
-        description="The full paths to the GitHub workflows to use for the release,"
-        " including the .github/workflows/ prefix.",
     )
 
     # Finish section
@@ -165,70 +170,142 @@ class ReleasePolicyForm(forms.Typed):
         await super().validate(extra_validators=extra_validators)
 
         if self.manual_vote.data:
-            optional_fields = (
+            for field_name in (
                 "mailto_addresses",
                 "min_hours",
                 "pause_for_rm",
                 "release_checklist",
                 "start_vote_template",
-            )
-            for field_name in optional_fields:
+            ):
                 field = getattr(self, field_name, None)
-                if field is None:
-                    continue
-                _form_clear(field)
-                if hasattr(field, "entries"):
-                    for entry in field.entries:
-                        _form_clear(entry)
+                if field is not None:
+                    forms.clear_errors(field)
                 self.errors.pop(field_name, None)
 
         if self.manual_vote.data and self.strict_checking.data:
             msg = "Manual voting process and strict checking cannot be enabled simultaneously."
-            _form_append(self.manual_vote, msg)
-            _form_append(self.strict_checking, msg)
-            # _form_setdefault_append(self, "manual_vote", [], msg)
-            # _form_setdefault_append(self, "strict_checking", [], msg)
+            forms.error(self.manual_vote, msg)
+            forms.error(self.strict_checking, msg)
 
-        grn = self.github_repository_name.data
-        compose = self.github_compose_workflow_path.data
-        vote = self.github_vote_workflow_path.data
-        finish = self.github_finish_workflow_path.data
+        github_repository_name = (self.github_repository_name.data or "").strip()
+        compose_raw = self.github_compose_workflow_path.data or ""
+        vote_raw = self.github_vote_workflow_path.data or ""
+        finish_raw = self.github_finish_workflow_path.data or ""
+        compose = [p.strip() for p in compose_raw.split("\n") if p.strip()]
+        vote = [p.strip() for p in vote_raw.split("\n") if p.strip()]
+        finish = [p.strip() for p in finish_raw.split("\n") if p.strip()]
 
         any_path = bool(compose or vote or finish)
-        if any_path and (not grn):
-            _form_append(
-                self.github_repository_name, "GitHub repository name is required when any workflow path is set."
+        if any_path and (not github_repository_name):
+            forms.error(
+                self.github_repository_name,
+                "GitHub repository name is required when any workflow path is set.",
             )
 
-        if grn:
-            if "/" in grn:
-                _form_append(self.github_repository_name, "GitHub repository name must not contain a slash.")
-            if compose:
-                for p in _parse_artifact_paths(compose):
-                    if not p.startswith(".github/workflows/"):
-                        _form_append(
-                            self.github_compose_workflow_path,
-                            "GitHub workflow paths must start with '.github/workflows/'.",
-                        )
-                        break
-            if vote:
-                for p in _parse_artifact_paths(vote):
-                    if not p.startswith(".github/workflows/"):
-                        _form_append(
-                            self.github_vote_workflow_path,
-                            "GitHub workflow paths must start with '.github/workflows/'.",
-                        )
-                        break
-            if finish:
-                for p in _parse_artifact_paths(finish):
-                    if not p.startswith(".github/workflows/"):
-                        _form_append(
-                            self.github_finish_workflow_path,
-                            "GitHub workflow paths must start with '.github/workflows/'.",
-                        )
-                        break
+        if github_repository_name and ("/" in github_repository_name):
+            forms.error(self.github_repository_name, "GitHub repository name must not contain a slash.")
+
+        if compose:
+            for p in compose:
+                if not p.startswith(".github/workflows/"):
+                    forms.error(
+                        self.github_compose_workflow_path,
+                        "GitHub workflow paths must start with '.github/workflows/'.",
+                    )
+                    break
+        if vote:
+            for p in vote:
+                if not p.startswith(".github/workflows/"):
+                    forms.error(
+                        self.github_vote_workflow_path,
+                        "GitHub workflow paths must start with '.github/workflows/'.",
+                    )
+                    break
+        if finish:
+            for p in finish:
+                if not p.startswith(".github/workflows/"):
+                    forms.error(
+                        self.github_finish_workflow_path,
+                        "GitHub workflow paths must start with '.github/workflows/'.",
+                    )
+                    break
 
         return not self.errors
+
+
+# TODO: Maybe it's easier to use quart_schema for all our forms
+# We can use source=DataSource.FORM
+# But do all form input types have a pydantic counterpart?
+class ReleasePolicyData(schema.Lax):
+    """Pydantic model for release policy form data."""
+
+    project_name: str
+
+    # Compose section
+    source_artifact_paths: list[str] = pydantic.Field(default_factory=list)
+    binary_artifact_paths: list[str] = pydantic.Field(default_factory=list)
+    github_repository_name: str = ""
+    github_compose_workflow_path: list[str] = pydantic.Field(default_factory=list)
+    strict_checking: bool = False
+
+    # Vote section
+    mailto_addresses: list[str] = pydantic.Field(default_factory=list)
+    manual_vote: bool = False
+    default_min_hours_value_at_render: str = ""
+    min_hours: int = 72
+    pause_for_rm: bool = False
+    release_checklist: str = ""
+    default_start_vote_template_hash: str = ""
+    start_vote_template: str = ""
+    github_vote_workflow_path: list[str] = pydantic.Field(default_factory=list)
+
+    # Finish section
+    default_announce_release_template_hash: str = ""
+    announce_release_template: str = ""
+    github_finish_workflow_path: list[str] = pydantic.Field(default_factory=list)
+    preserve_download_files: bool = False
+
+    @pydantic.field_validator(
+        "source_artifact_paths",
+        "binary_artifact_paths",
+        "github_compose_workflow_path",
+        "github_vote_workflow_path",
+        "github_finish_workflow_path",
+        mode="before",
+    )
+    @classmethod
+    def parse_artifact_paths(cls, v: Any) -> list[str]:
+        if (v is None) or (v == ""):
+            return []
+        if isinstance(v, str):
+            return [path.strip() for path in v.split("\n") if path.strip()]
+        if isinstance(v, list):
+            return v
+        return []
+
+    @pydantic.field_validator("mailto_addresses", mode="before")
+    @classmethod
+    def parse_mailto_addresses(cls, v: Any) -> list[str]:
+        if (v is None) or (v == ""):
+            return []
+        if isinstance(v, str):
+            return [v.strip()] if v.strip() else []
+        if isinstance(v, list):
+            return v
+        return []
+
+    @pydantic.field_validator(
+        "github_repository_name",
+        "release_checklist",
+        "start_vote_template",
+        "announce_release_template",
+        mode="before",
+    )
+    @classmethod
+    def unwrap_values(cls, v: Any) -> Any:
+        if v is None:
+            return ""
+        return v
 
 
 @routes.committer("/project/add/<committee_name>", methods=["GET", "POST"])
@@ -361,16 +438,16 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
     )
 
 
-def _form_append(obj: wtforms.Field, msg: str) -> None:
-    if not isinstance(obj.errors, list):
-        obj.errors = list(obj.errors)
-    obj.errors.append(msg)
+# def _form_append(obj: wtforms.Field, msg: str) -> None:
+#     if not isinstance(obj.errors, list):
+#         obj.errors = list(obj.errors)
+#     obj.errors.append(msg)
 
 
-def _form_clear(obj: wtforms.Field) -> None:
-    if not isinstance(obj.errors, list):
-        obj.errors = list(obj.errors)
-    obj.errors[:] = []
+# def _form_clear(obj: wtforms.Field) -> None:
+#     if not isinstance(obj.errors, list):
+#         obj.errors = list(obj.errors)
+#     obj.errors[:] = []
 
 
 # def _form_setdefault_append(obj: util.QuartFormTyped, key: str, default: list[str], msg: str) -> None:
@@ -482,66 +559,66 @@ async def _metadata_edit(
     return False, metadata_form
 
 
-def _parse_artifact_paths(artifact_paths: str) -> list[str]:
-    if not artifact_paths:
-        return []
-    return [path.strip() for path in artifact_paths.split("\n") if path.strip()]
+# def _parse_artifact_paths(artifact_paths: str) -> list[str]:
+#     if not artifact_paths:
+#         return []
+#     return [path.strip() for path in artifact_paths.split("\n") if path.strip()]
 
 
 async def _policy_edit(
     data: db.Session, project: sql.Project, form_data: dict[str, str]
 ) -> tuple[bool, ReleasePolicyForm]:
     policy_form = await ReleasePolicyForm.create_form(data=form_data)
-    if await policy_form.validate_on_submit():
-        release_policy = project.release_policy
-        if release_policy is None:
-            release_policy = sql.ReleasePolicy(project=project)
-            project.release_policy = release_policy
-            data.add(release_policy)
-
-        # Compose section
-        release_policy.source_artifact_paths = _parse_artifact_paths(
-            util.unwrap(policy_form.source_artifact_paths.data)
-        )
-        release_policy.binary_artifact_paths = _parse_artifact_paths(
-            util.unwrap(policy_form.binary_artifact_paths.data)
-        )
-        release_policy.github_repository_name = util.unwrap(policy_form.github_repository_name.data)
-        # TODO: Change to paths, plural
-        release_policy.github_compose_workflow_path = _parse_artifact_paths(
-            util.unwrap(policy_form.github_compose_workflow_path.data)
-        )
-        release_policy.strict_checking = util.unwrap(policy_form.strict_checking.data)
-
-        # Vote section
-        release_policy.manual_vote = policy_form.manual_vote.data or False
-        if not release_policy.manual_vote:
-            release_policy.github_vote_workflow_path = _parse_artifact_paths(
-                util.unwrap(policy_form.github_vote_workflow_path.data)
-            )
-            release_policy.mailto_addresses = [util.unwrap(policy_form.mailto_addresses.data)]
-            _set_default_min_hours(policy_form, project, release_policy)
-            release_policy.pause_for_rm = util.unwrap(policy_form.pause_for_rm.data)
-            release_policy.release_checklist = util.unwrap(policy_form.release_checklist.data)
-            _set_default_start_vote_template(policy_form, project, release_policy)
-        elif project.committee and project.committee.is_podling:
-            # The caller ensures that project.committee is not None
-            await quart.flash("Manual voting is not allowed for podlings.", "error")
-            return False, policy_form
-
-        # Finish section
-        release_policy.github_finish_workflow_path = _parse_artifact_paths(
-            util.unwrap(policy_form.github_finish_workflow_path.data)
-        )
-        _set_default_announce_release_template(policy_form, project, release_policy)
-        release_policy.preserve_download_files = util.unwrap(policy_form.preserve_download_files.data)
-
-        await data.commit()
-        await quart.flash("Release policy updated successfully.", "success")
-        return True, policy_form
-    else:
+    validated = await policy_form.validate_on_submit()
+    if not validated:
         log.info(f"policy_form.errors: {policy_form.errors}")
-    return False, policy_form
+        return False, policy_form
+
+    # Use ReleasePolicyData to parse and validate the processed form data
+    try:
+        policy_data = ReleasePolicyData.model_validate(policy_form.data)
+    except Exception as e:
+        # If pydantic validation fails, log it and fall back to form validation
+        log.error(f"ReleasePolicyData validation failed: {e}")
+        log.info(f"policy_form.errors: {policy_form.errors}")
+        return False, policy_form
+
+    release_policy = project.release_policy
+    if release_policy is None:
+        release_policy = sql.ReleasePolicy(project=project)
+        project.release_policy = release_policy
+        data.add(release_policy)
+
+    # Compose section
+    release_policy.source_artifact_paths = policy_data.source_artifact_paths
+    release_policy.binary_artifact_paths = policy_data.binary_artifact_paths
+    release_policy.github_repository_name = policy_data.github_repository_name
+    # TODO: Change to paths, plural
+    release_policy.github_compose_workflow_path = policy_data.github_compose_workflow_path
+    release_policy.strict_checking = policy_data.strict_checking
+
+    # Vote section
+    release_policy.manual_vote = policy_data.manual_vote
+    if not release_policy.manual_vote:
+        release_policy.github_vote_workflow_path = policy_data.github_vote_workflow_path
+        release_policy.mailto_addresses = policy_data.mailto_addresses
+        _set_default_min_hours(policy_form, project, release_policy)
+        release_policy.pause_for_rm = policy_data.pause_for_rm
+        release_policy.release_checklist = policy_data.release_checklist
+        _set_default_start_vote_template(policy_form, project, release_policy)
+    elif project.committee and project.committee.is_podling:
+        # The caller ensures that project.committee is not None
+        await quart.flash("Manual voting is not allowed for podlings.", "error")
+        return False, policy_form
+
+    # Finish section
+    release_policy.github_finish_workflow_path = policy_data.github_finish_workflow_path
+    _set_default_announce_release_template(policy_form, project, release_policy)
+    release_policy.preserve_download_files = policy_data.preserve_download_files
+
+    await data.commit()
+    await quart.flash("Release policy updated successfully.", "success")
+    return True, policy_form
 
 
 async def _policy_form_create(project: sql.Project) -> ReleasePolicyForm:

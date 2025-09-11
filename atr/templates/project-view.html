@@ -144,6 +144,15 @@
               <h3 class="col-md-3 col-form-label text-md-end fs-4">Vote options</h3>
             </div>
 
+            <div class="mb-3 pb-3 row border-bottom">
+              {{ forms.label(policy_form.github_vote_workflow_path, col="md3") }}
+              <div class="col-sm-8">
+                {{ forms.widget(policy_form.github_vote_workflow_path, classes="form-control font-monospace") }}
+                {{ forms.errors(policy_form.github_vote_workflow_path) }}
+                {{ forms.description(policy_form.github_vote_workflow_path) }}
+              </div>
+            </div>
+
             {% if not project.committee.is_podling %}
               <div class="mb-3 pb-3 row border-bottom">
                 {{ forms.label(policy_form.manual_vote, col="md3-high") }}
@@ -156,15 +165,6 @@
                 </div>
               </div>
             {% endif %}
-
-            <div class="mb-3 pb-3 row border-bottom">
-              {{ forms.label(policy_form.github_vote_workflow_path, col="md3") }}
-              <div class="col-sm-8">
-                {{ forms.widget(policy_form.github_vote_workflow_path, classes="form-control font-monospace") }}
-                {{ forms.errors(policy_form.github_vote_workflow_path) }}
-                {{ forms.description(policy_form.github_vote_workflow_path) }}
-              </div>
-            </div>
 
             <div id="vote-options-extra">
 

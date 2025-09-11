@@ -179,6 +179,23 @@ def error(field: wtforms.Field, message: str) -> Literal[False]:
     return False
 
 
+def clear_errors(field: wtforms.Field) -> None:
+    if not isinstance(field.errors, list):
+        try:
+            field.errors = list(field.errors)
+        except Exception:
+            field.errors = []
+    field.errors[:] = []
+    entries = getattr(field, "entries", None)
+    if isinstance(entries, list):
+        for entry in entries:
+            entry_errors = getattr(entry, "errors", None)
+            if isinstance(entry_errors, list):
+                entry_errors[:] = []
+            else:
+                setattr(entry, "errors", [])
+
+
 def file(label: str, optional: bool = False, validators: list[Any] | None = None, **kwargs: Any) -> wtforms.FileField:
     if validators is None:
         validators = []
