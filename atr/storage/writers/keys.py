@@ -96,7 +96,10 @@ class FoundationCommitter(GeneralPublic):
         self.__write = write
         self.__write_as = write_as
         self.__data = data
-        self.__asf_uid = write.authorisation.asf_uid
+        asf_uid = write.authorisation.asf_uid
+        if asf_uid is None:
+            raise storage.AccessError("No ASF UID")
+        self.__asf_uid = asf_uid
 
         # Specific to this module
         self.__key_block_models_cache = {}
@@ -636,7 +639,10 @@ class CommitteeMember(CommitteeParticipant):
         self.__write = write
         self.__write_as = write_as
         self.__data = data
-        self.__asf_uid = write.authorisation.asf_uid
+        asf_uid = write.authorisation.asf_uid
+        if asf_uid is None:
+            raise storage.AccessError("No ASF UID")
+        self.__asf_uid = asf_uid
         self.__committee_name = committee_name
 
 
@@ -652,7 +658,10 @@ class FoundationAdmin(CommitteeMember):
         self.__write = write
         self.__write_as = write_as
         self.__data = data
-        self.__asf_uid = write.authorisation.asf_uid
+        asf_uid = write.authorisation.asf_uid
+        if asf_uid is None:
+            raise storage.AccessError("No ASF UID")
+        self.__asf_uid = asf_uid
         self.__committee_name = committee_name
 
     @property
