@@ -17,7 +17,11 @@
 
 from typing import Final
 
-# TODO: The metadata in this module should be moved to the Catalogue Server
+# TODO: Most of the metadata in this module should be moved to the Catalogue Server
+
+FORBIDDEN_PROJECT_CATEGORIES: Final[set[str]] = {
+    "retired",
+}
 
 # Committees which are allowed by Infra to make releases via GitHub Actions
 # TODO: This should actually be at the project level, not committee level

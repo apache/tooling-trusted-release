@@ -112,7 +112,6 @@ class CommitteeParticipant(FoundationCommitter):
         sbom_path_in_new_revision: pathlib.Path,
     ) -> sql.Task:
         # Create and queue the task, using paths within the new revision
-        # TODO: Move this to the storage interface
         # We still need release.name for the task metadata
         sbom_task = sql.Task(
             task_type=sql.TaskType.SBOM_GENERATE_CYCLONEDX,

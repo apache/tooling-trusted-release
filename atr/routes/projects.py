@@ -22,7 +22,7 @@ from __future__ import annotations
 import datetime
 import http.client
 import re
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any
 
 import asfquart.base as base
 import quart
@@ -33,6 +33,7 @@ import atr.forms as forms
 import atr.log as log
 import atr.models.policy as policy
 import atr.models.sql as sql
+import atr.registry as registry
 import atr.routes as routes
 import atr.storage as storage
 import atr.template as template
@@ -41,11 +42,6 @@ import atr.util as util
 
 if TYPE_CHECKING:
     import werkzeug.wrappers.response as response
-
-# TODO: Duplicates atr.storage.writers.project._FORBIDDEN_CATEGORIES
-_FORBIDDEN_CATEGORIES: Final[set[str]] = {
-    "retired",
-}
 
 
 class AddForm(forms.Typed):
@@ -372,7 +368,7 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
         policy_form=policy_form,
         can_edit=can_edit,
         metadata_form=metadata_form,
-        forbidden_categories=_FORBIDDEN_CATEGORIES,
+        forbidden_categories=registry.FORBIDDEN_PROJECT_CATEGORIES,
     )
 
 

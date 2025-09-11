@@ -19,16 +19,12 @@
 from __future__ import annotations
 
 import datetime
-from typing import Final
 
 import atr.db as db
 import atr.models.sql as sql
+import atr.registry as registry
 import atr.storage as storage
 import atr.util as util
-
-_FORBIDDEN_CATEGORIES: Final[set[str]] = {
-    "retired",
-}
 
 
 class GeneralPublic:
@@ -100,7 +96,7 @@ class CommitteeMember(CommitteeParticipant):
         if new_category and (new_category not in current_categories):
             if ":" in new_category:
                 raise ValueError(f"Category '{new_category}' contains a colon")
-            if new_category in _FORBIDDEN_CATEGORIES:
+            if new_category in registry.FORBIDDEN_PROJECT_CATEGORIES:
                 raise ValueError(f"Category '{new_category}' may not be added or removed")
             current_categories.append(new_category)
             current_categories.sort()
@@ -115,7 +111,7 @@ class CommitteeMember(CommitteeParticipant):
         project = await self.__data.merge(project)
         current_categories = self.__current_categories(project)
         if action_value in current_categories:
-            if action_value in _FORBIDDEN_CATEGORIES:
+            if action_value in registry.FORBIDDEN_PROJECT_CATEGORIES:
                 raise ValueError(f"Category '{action_value}' may not be added or removed")
             current_categories.remove(action_value)
             project.category = ", ".join(current_categories)
