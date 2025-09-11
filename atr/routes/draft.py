@@ -153,10 +153,12 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
                     # Construct full path within the new revision
                     metadata_path_obj = creating.interim_path / p
                     if p.name.startswith(rel_path_to_delete.name + "."):
+                        # TODO: Move to the storage interface
                         await aiofiles.os.remove(metadata_path_obj)
                         metadata_files_deleted += 1
 
             # Delete the file
+            # TODO: Move to the storage interface
             await aiofiles.os.remove(path_in_new_revision)
 
     except Exception as e:

@@ -274,6 +274,7 @@ async def _delete_empty_directory(
                 raise revision.FailedError(f"Path '{dir_to_delete_rel}' is not a directory.")
             if await aiofiles.os.listdir(path_to_remove):
                 raise revision.FailedError(f"Directory '{dir_to_delete_rel}' is not empty.")
+            # TODO: Move to the storage interface
             await aiofiles.os.rmdir(path_to_remove)
 
     except Exception:
@@ -410,6 +411,7 @@ async def _remove_rc_tags_revision(
             try:
                 if not await aiofiles.os.path.exists(full_stripped_path.parent):
                     # This could happen if e.g. a file is in an RC tagged directory
+                    # TODO: Move to the storage interface
                     await aiofiles.os.makedirs(full_stripped_path.parent, exist_ok=True)
 
                 if await aiofiles.os.path.exists(full_stripped_path):
@@ -418,6 +420,7 @@ async def _remove_rc_tags_revision(
                     )
                     continue
 
+                # TODO: Move to the storage interface
                 await aiofiles.os.rename(full_original_path, full_stripped_path)
                 renamed_count_local += 1
             except Exception as e:
@@ -441,6 +444,7 @@ async def _remove_rc_tags_revision_item(
                 if not await aiofiles.os.listdir(full_original_path):
                     # This means we probably moved files out of the RC tagged directory
                     # In any case, we can't move it, so we have to delete it
+                    # TODO: Move to the storage interface
                     await aiofiles.os.rmdir(full_original_path)
                     renamed_count_local += 1
                 else:
@@ -474,6 +478,7 @@ async def _setup_revision(
                 raise revision.FailedError("Segments must not contain '..'")
 
         try:
+            # TODO: Move to the storage interface
             await aiofiles.os.makedirs(target_path)
         except OSError:
             raise revision.FailedError("Failed to create target directory")
@@ -510,6 +515,7 @@ async def _setup_revision_item(
         if await aiofiles.os.path.exists(final_target_for_item):
             raise revision.FailedError("Target name already exists")
 
+        # TODO: Move to the storage interface
         await aiofiles.os.rename(full_source_item_path, final_target_for_item)
         moved_files_names.append(source_file_rel.name)
     else:
@@ -524,6 +530,7 @@ async def _setup_revision_item(
             raise revision.FailedError("A related file already exists in the target directory")
 
         for f in bundle:
+            # TODO: Move to the storage interface
             await aiofiles.os.rename(creating.interim_path / f, target_path / f.name)
             if f == source_file_rel:
                 moved_files_names.append(f.name)
