@@ -138,6 +138,7 @@ class WriteAsGeneralPublic(WriteAs):
         self.announce = writers.announce.GeneralPublic(write, self, data)
         self.checks = writers.checks.GeneralPublic(write, self, data)
         self.keys = writers.keys.GeneralPublic(write, self, data)
+        self.project = writers.project.GeneralPublic(write, self, data)
         self.release = writers.release.GeneralPublic(write, self, data)
         self.sbom = writers.sbom.GeneralPublic(write, self, data)
         self.ssh = writers.ssh.GeneralPublic(write, self, data)
@@ -152,6 +153,7 @@ class WriteAsFoundationCommitter(WriteAsGeneralPublic):
         self.announce = writers.announce.FoundationCommitter(write, self, data)
         self.checks = writers.checks.FoundationCommitter(write, self, data)
         self.keys = writers.keys.FoundationCommitter(write, self, data)
+        self.project = writers.project.FoundationCommitter(write, self, data)
         self.release = writers.release.FoundationCommitter(write, self, data)
         self.sbom = writers.sbom.FoundationCommitter(write, self, data)
         self.ssh = writers.ssh.FoundationCommitter(write, self, data)
@@ -172,6 +174,7 @@ class WriteAsCommitteeParticipant(WriteAsFoundationCommitter):
         self.announce = writers.announce.CommitteeParticipant(write, self, data, committee_name)
         self.checks = writers.checks.CommitteeParticipant(write, self, data, committee_name)
         self.keys = writers.keys.CommitteeParticipant(write, self, data, committee_name)
+        self.project = writers.project.CommitteeParticipant(write, self, data, committee_name)
         self.release = writers.release.CommitteeParticipant(write, self, data, committee_name)
         self.sbom = writers.sbom.CommitteeParticipant(write, self, data, committee_name)
         self.ssh = writers.ssh.CommitteeParticipant(write, self, data, committee_name)
@@ -197,6 +200,7 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
         self.checks = writers.checks.CommitteeMember(write, self, data, committee_name)
         self.distributions = writers.distributions.CommitteeMember(write, self, data, committee_name)
         self.keys = writers.keys.CommitteeMember(write, self, data, committee_name)
+        self.project = writers.project.CommitteeMember(write, self, data, committee_name)
         self.release = writers.release.CommitteeMember(write, self, data, committee_name)
         self.sbom = writers.sbom.CommitteeMember(write, self, data, committee_name)
         self.ssh = writers.ssh.CommitteeMember(write, self, data, committee_name)
@@ -218,13 +222,8 @@ class WriteAsFoundationAdmin(WriteAsCommitteeMember):
     def __init__(self, write: Write, data: db.Session, committee_name: str):
         self.__asf_uid = write.authorisation.asf_uid
         self.__committee_name = committee_name
-        # self.announce = writers.announce.FoundationAdmin(write, self, data, committee_name)
-        # self.checks = writers.checks.FoundationAdmin(write, self, data, committee_name)
         self.keys = writers.keys.FoundationAdmin(write, self, data, committee_name)
         self.release = writers.release.FoundationAdmin(write, self, data, committee_name)
-        # self.ssh = writers.ssh.FoundationAdmin(write, self, data, committee_name)
-        # self.tokens = writers.tokens.FoundationAdmin(write, self, data, committee_name)
-        # self.vote = writers.vote.FoundationAdmin(write, self, data, committee_name)
 
     @property
     def asf_uid(self) -> str:

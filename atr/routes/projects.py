@@ -33,6 +33,7 @@ import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
 import atr.routes as routes
+import atr.storage as storage
 import atr.template as template
 import atr.user as user
 import atr.util as util
@@ -265,32 +266,12 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     if not project_name:
         return await session.redirect(projects, error="Missing project name for deletion.")
 
-    # TODO: Move this to the storage interface
-    async with db.session() as data:
-        project = await data.project(
-            name=project_name, status=sql.ProjectStatus.ACTIVE, _releases=True, _distribution_channels=True
-        ).get()
-
-        if not project:
-            return await session.redirect(projects, error=f"Project '{project_name}' not found.")
-
-        # Check for ownership or admin status
-        is_owner = project.created_by == session.uid
-        is_privileged = util.is_user_viewing_as_admin(session.uid)
-
-        if not (is_owner or is_privileged):
-            return await session.redirect(
-                projects, error=f"You do not have permission to delete project '{project_name}'."
-            )
-
-        # Prevent deletion if there are associated releases or channels
-        if project.releases:
-            return await session.redirect(
-                projects, error=f"Cannot delete project '{project_name}' because it has associated releases."
-            )
-
-        await data.delete(project)
-        await data.commit()
+    async with storage.write(session.uid) as write:
+        wacm = await write.as_project_committee_member(project_name)
+        try:
+            await wacm.project.delete(project_name)
+        except storage.AccessError as e:
+            return await session.redirect(projects, error=f"Error deleting project: {e}")
 
     return await session.redirect(projects, success=f"Project '{project_name}' deleted successfully.")
 
