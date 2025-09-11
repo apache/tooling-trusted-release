@@ -86,14 +86,12 @@ class CommitteeMember(CommitteeParticipant):
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
 
-    async def edit(
-        self, data: db.Session, project: models.sql.Project, policy_data: models.policy.ReleasePolicyData
-    ) -> None:
+    async def edit(self, project: models.sql.Project, policy_data: models.policy.ReleasePolicyData) -> None:
         release_policy = project.release_policy
         if release_policy is None:
             release_policy = models.sql.ReleasePolicy(project=project)
             project.release_policy = release_policy
-            data.add(release_policy)
+            self.__data.add(release_policy)
 
         # Compose section
         release_policy.source_artifact_paths = policy_data.source_artifact_paths
@@ -121,7 +119,7 @@ class CommitteeMember(CommitteeParticipant):
         self.__set_default_announce_release_template(policy_data, project, release_policy)
         release_policy.preserve_download_files = policy_data.preserve_download_files
 
-        await data.commit()
+        await self.__data.commit()
 
     def __set_default_announce_release_template(
         self,

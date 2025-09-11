@@ -42,6 +42,7 @@ import atr.util as util
 if TYPE_CHECKING:
     import werkzeug.wrappers.response as response
 
+# TODO: Duplicates atr.storage.writers.project._FORBIDDEN_CATEGORIES
 _FORBIDDEN_CATEGORIES: Final[set[str]] = {
     "retired",
 }
@@ -56,8 +57,8 @@ class AddForm(forms.Typed):
 
 class ProjectMetadataForm(forms.Typed):
     project_name = forms.hidden()
-    category_to_add = forms.string("New category name")
-    language_to_add = forms.string("New language name")
+    category_to_add = forms.optional("New category name")
+    language_to_add = forms.optional("New language name")
 
 
 class ReleasePolicyForm(forms.Typed):
@@ -314,38 +315,40 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
     metadata_form = None
     can_edit = False
 
-    # TODO: Move this to the storage interface
     async with db.session() as data:
         project = await data.project(
             name=name, _committee=True, _committee_public_signing_keys=True, _release_policy=True
         ).demand(http.client.HTTPException(404))
 
-        is_committee_member = project.committee and (user.is_committee_member(project.committee, session.uid))
-        is_privileged = user.is_admin(session.uid)
-        can_edit = is_committee_member or is_privileged
+    is_committee_member = project.committee and (user.is_committee_member(project.committee, session.uid))
+    is_privileged = user.is_admin(session.uid)
+    can_edit = is_committee_member or is_privileged
 
-        if can_edit and (quart.request.method == "POST"):
-            form_data = await quart.request.form
-            if "submit_metadata" in form_data:
-                edited_metadata, metadata_form = await _metadata_edit(data, project, form_data)
-                if edited_metadata is True:
+    if can_edit and (quart.request.method == "POST"):
+        form_data = await quart.request.form
+        asf_uid = util.unwrap(session.uid)
+        if "submit_metadata" in form_data:
+            edited_metadata, metadata_form = await _metadata_edit(asf_uid, project, form_data)
+            if edited_metadata is True:
+                return quart.redirect(util.as_url(view, name=project.name))
+        elif "submit_policy" in form_data:
+            policy_form = await ReleasePolicyForm.create_form(data=form_data)
+            if await policy_form.validate_on_submit():
+                policy_data = policy.ReleasePolicyData.model_validate(policy_form.data)
+                async with storage.write(asf_uid) as write:
+                    wacm = await write.as_project_committee_member(project.name)
+                    try:
+                        await wacm.policy.edit(project, policy_data)
+                    except storage.AccessError as e:
+                        return await session.redirect(view, name=project.name, error=f"Error editing policy: {e}")
                     return quart.redirect(util.as_url(view, name=project.name))
-            elif "submit_policy" in form_data:
-                policy_form = await ReleasePolicyForm.create_form(data=form_data)
-                if await policy_form.validate_on_submit():
-                    policy_data = policy.ReleasePolicyData.model_validate(policy_form.data)
-                    async with storage.write(session.uid) as write:
-                        wacm = await write.as_project_committee_member(project.name)
-                        try:
-                            await wacm.policy.edit(data, project, policy_data)
-                        except storage.AccessError as e:
-                            return await session.redirect(view, name=project.name, error=f"Error editing policy: {e}")
-                        return quart.redirect(util.as_url(view, name=project.name))
-                else:
-                    log.info(f"policy_form.errors: {policy_form.errors}")
+            else:
+                log.info(f"policy_form.errors: {policy_form.errors}")
+        else:
+            log.info(f"Unknown form data: {form_data}")
 
-        if metadata_form is None:
-            metadata_form = await ProjectMetadataForm.create_form(data={"project_name": project.name})
+    if metadata_form is None:
+        metadata_form = await ProjectMetadataForm.create_form(data={"project_name": project.name})
     if policy_form is None:
         policy_form = await _policy_form_create(project)
     candidate_drafts = await interaction.candidate_drafts(project)
@@ -371,104 +374,102 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
     )
 
 
-async def _metadata_category_edit(
-    metadata_form: ProjectMetadataForm,
-    project: sql.Project,
-    action_type: str,
-    action_value: str,
-    current_categories: list[str],
-    current_languages: list[str],
+async def _metadata_category_add(
+    wacm: storage.WriteAsCommitteeMember, project: sql.Project, category_to_add: str
 ) -> bool:
-    # TODO: Add error handling
     modified = False
-    if (action_type == "add_category") and metadata_form.category_to_add.data:
-        modified = await _metadata_category_edit_add(metadata_form, project, current_categories)
-    elif (action_type == "remove_category") and action_value and (action_value in current_categories):
-        modified = await _metadata_category_edit_remove(action_value, project, current_categories)
-    elif (action_type == "add_language") and metadata_form.language_to_add.data:
-        new_lang = metadata_form.language_to_add.data.strip()
-        if new_lang and (new_lang not in current_languages):
-            if ":" in new_lang:
-                raise ValueError(f"Language '{new_lang}' contains a colon")
-            current_languages.append(new_lang)
-            current_languages.sort()
-            project.programming_languages = ", ".join(current_languages)
-            await quart.flash(f"Language '{new_lang}' added.", "success")
-            modified = True
-    elif (action_type == "remove_language") and action_value and (action_value in current_languages):
-        current_languages.remove(action_value)
-        project.programming_languages = ", ".join(current_languages)
-        await quart.flash(f"Language '{action_value}' removed.", "success")
-        modified = True
+    try:
+        modified = await wacm.project.category_add(project, category_to_add.strip())
+    except storage.AccessError as e:
+        await quart.flash(f"Error adding category: {e}", "error")
+    if modified:
+        await quart.flash(f"Category '{category_to_add}' added.", "success")
+    else:
+        await quart.flash(f"Category '{category_to_add}' already exists.", "error")
     return modified
 
 
-async def _metadata_category_edit_add(
-    metadata_form: ProjectMetadataForm, project: sql.Project, current_categories: list[str]
+async def _metadata_category_remove(
+    wacm: storage.WriteAsCommitteeMember, project: sql.Project, action_value: str
 ) -> bool:
-    new_cat = util.unwrap(metadata_form.category_to_add.data).strip()
-    if new_cat and (new_cat not in current_categories):
-        if ":" in new_cat:
-            raise ValueError(f"Category '{new_cat}' contains a colon")
-        if new_cat in _FORBIDDEN_CATEGORIES:
-            raise ValueError(f"Category '{new_cat}' may not be added or removed")
-        current_categories.append(new_cat)
-        current_categories.sort()
-        project.category = ", ".join(current_categories)
-        await quart.flash(f"Category '{new_cat}' added.", "success")
-        return True
-    return False
-
-
-async def _metadata_category_edit_remove(
-    action_value: str, project: sql.Project, current_categories: list[str]
-) -> bool:
-    if action_value in _FORBIDDEN_CATEGORIES:
-        raise ValueError(f"Category '{action_value}' may not be added or removed")
-    current_categories.remove(action_value)
-    project.category = ", ".join(current_categories)
-    await quart.flash(f"Category '{action_value}' removed.", "success")
-    return True
+    modified = False
+    try:
+        modified = await wacm.project.category_remove(project, action_value)
+    except storage.AccessError as e:
+        await quart.flash(f"Error removing category: {e}", "error")
+    if modified:
+        await quart.flash(f"Category '{action_value}' removed.", "success")
+    else:
+        await quart.flash(f"Category '{action_value}' does not exist.", "error")
+    return modified
 
 
 async def _metadata_edit(
-    data: db.Session, project: sql.Project, form_data: dict[str, str]
+    asf_uid: str, project: sql.Project, form_data: dict[str, str]
 ) -> tuple[bool, ProjectMetadataForm]:
     metadata_form = await ProjectMetadataForm.create_form(data=form_data)
 
-    if await metadata_form.validate_on_submit():
-        current_categories = (
-            [category.strip() for category in (project.category or "").split(",") if category.strip()]
-            if project.category
-            else []
-        )
-        current_languages = (
-            [language.strip() for language in (project.programming_languages or "").split(",") if language.strip()]
-            if project.programming_languages
-            else []
-        )
+    validated = await metadata_form.validate_on_submit()
+    if not validated:
+        return False, metadata_form
 
-        form_data = await quart.request.form
-        action_full = form_data.get("action", "")
-        action_type = ""
-        action_value = ""
-        if ":" in action_full:
-            action_type, action_value = action_full.split(":", 1)
-        else:
-            action_type = action_full
+    form_data = await quart.request.form
+    action_full = form_data.get("action", "")
+    action_type = ""
+    action_value = ""
+    if ":" in action_full:
+        action_type, action_value = action_full.split(":", 1)
+    else:
+        action_type = action_full
 
-        modified = await _metadata_category_edit(
-            metadata_form, project, action_type, action_value, current_categories, current_languages
-        )
+    # TODO: Add error handling
+    modified = False
+    category_to_add = metadata_form.category_to_add.data
+    language_to_add = metadata_form.language_to_add.data
 
-        if modified:
-            if project.category == "":
-                project.category = None
-            if project.programming_languages == "":
-                project.programming_languages = None
-            await data.commit()
-            return True, metadata_form
-    return False, metadata_form
+    async with storage.write(asf_uid) as write:
+        wacm = await write.as_project_committee_member(project.name)
+
+        if (action_type == "add_category") and category_to_add:
+            modified = await _metadata_category_add(wacm, project, category_to_add)
+        elif (action_type == "remove_category") and action_value:
+            modified = await _metadata_category_remove(wacm, project, action_value)
+        elif (action_type == "add_language") and language_to_add:
+            modified = await _metadata_language_add(wacm, project, language_to_add)
+        elif (action_type == "remove_language") and action_value:
+            modified = await _metadata_language_remove(wacm, project, action_value)
+
+    return modified, metadata_form
+
+
+async def _metadata_language_add(
+    wacm: storage.WriteAsCommitteeMember, project: sql.Project, language_to_add: str
+) -> bool:
+    modified = False
+    try:
+        modified = await wacm.project.language_add(project, language_to_add)
+    except storage.AccessError as e:
+        await quart.flash(f"Error adding language: {e}", "error")
+    if modified:
+        await quart.flash(f"Language '{language_to_add}' added.", "success")
+    else:
+        await quart.flash(f"Language '{language_to_add}' already exists.", "error")
+    return modified
+
+
+async def _metadata_language_remove(
+    wacm: storage.WriteAsCommitteeMember, project: sql.Project, action_value: str
+) -> bool:
+    modified = False
+    try:
+        modified = await wacm.project.language_remove(project, action_value)
+    except storage.AccessError as e:
+        await quart.flash(f"Error removing language: {e}", "error")
+    if modified:
+        await quart.flash(f"Language '{action_value}' removed.", "success")
+    else:
+        await quart.flash(f"Language '{action_value}' does not exist.", "error")
+    return modified
 
 
 async def _policy_form_create(project: sql.Project) -> ReleasePolicyForm:

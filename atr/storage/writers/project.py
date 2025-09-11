@@ -18,10 +18,16 @@
 # Removing this will cause circular imports
 from __future__ import annotations
 
+from typing import Final
+
 import atr.db as db
 import atr.models.sql as sql
 import atr.storage as storage
 import atr.util as util
+
+_FORBIDDEN_CATEGORIES: Final[set[str]] = {
+    "retired",
+}
 
 
 class GeneralPublic:
@@ -86,6 +92,38 @@ class CommitteeMember(CommitteeParticipant):
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
 
+    async def category_add(self, project: sql.Project, new_category: str) -> bool:
+        project = await self.__data.merge(project)
+        new_category = new_category.strip()
+        current_categories = self.__current_categories(project)
+        if new_category and (new_category not in current_categories):
+            if ":" in new_category:
+                raise ValueError(f"Category '{new_category}' contains a colon")
+            if new_category in _FORBIDDEN_CATEGORIES:
+                raise ValueError(f"Category '{new_category}' may not be added or removed")
+            current_categories.append(new_category)
+            current_categories.sort()
+            project.category = ", ".join(current_categories)
+            if project.category == "":
+                project.category = None
+            await self.__data.commit()
+            return True
+        return False
+
+    async def category_remove(self, project: sql.Project, action_value: str) -> bool:
+        project = await self.__data.merge(project)
+        current_categories = self.__current_categories(project)
+        if action_value in current_categories:
+            if action_value in _FORBIDDEN_CATEGORIES:
+                raise ValueError(f"Category '{action_value}' may not be added or removed")
+            current_categories.remove(action_value)
+            project.category = ", ".join(current_categories)
+            if project.category == "":
+                project.category = None
+            await self.__data.commit()
+            return True
+        return False
+
     async def delete(self, project_name: str) -> None:
         project = await self.__data.project(
             name=project_name, status=sql.ProjectStatus.ACTIVE, _releases=True, _distribution_channels=True
@@ -113,3 +151,45 @@ class CommitteeMember(CommitteeParticipant):
             project_name=project_name,
         )
         return None
+
+    async def language_add(self, project: sql.Project, new_language: str) -> bool:
+        project = await self.__data.merge(project)
+        new_language = new_language.strip()
+        current_languages = self.__current_languages(project)
+        if new_language and (new_language not in current_languages):
+            if ":" in new_language:
+                raise ValueError(f"Language '{new_language}' contains a colon")
+            current_languages.append(new_language)
+            current_languages.sort()
+            project.programming_languages = ", ".join(current_languages)
+            if project.programming_languages == "":
+                project.programming_languages = None
+            await self.__data.commit()
+            return True
+        return False
+
+    async def language_remove(self, project: sql.Project, action_value: str) -> bool:
+        project = await self.__data.merge(project)
+        current_languages = self.__current_languages(project)
+        if action_value in current_languages:
+            current_languages.remove(action_value)
+            project.programming_languages = ", ".join(current_languages)
+            if project.programming_languages == "":
+                project.programming_languages = None
+            await self.__data.commit()
+            return True
+        return False
+
+    def __current_categories(self, project: sql.Project) -> list[str]:
+        return (
+            [category.strip() for category in (project.category or "").split(",") if category.strip()]
+            if project.category
+            else []
+        )
+
+    def __current_languages(self, project: sql.Project) -> list[str]:
+        return (
+            [language.strip() for language in (project.programming_languages or "").split(",") if language.strip()]
+            if project.programming_languages
+            else []
+        )
