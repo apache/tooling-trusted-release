@@ -15,22 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import asyncio
 import pathlib
-from collections.abc import Sequence
 
-import aiofiles
 import quart
-import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
 import atr.forms as forms
 import atr.log as log
-import atr.revision as revision
 import atr.routes as routes
 import atr.routes.compose as compose
+import atr.storage as storage
 import atr.template as template
 
 
@@ -78,7 +74,9 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
                 file_name = pathlib.Path(form.file_name.data)
             file_data = form.file_data.data
 
-            number_of_files = await _upload_files(project_name, version_name, session.uid, file_name, file_data)
+            async with storage.write(session.uid) as write:
+                wacp = await write.as_project_committee_participant(project_name)
+                number_of_files = await wacp.release.upload_files(project_name, version_name, file_name, file_data)
             return await session.redirect(
                 compose.selected,
                 success=f"{number_of_files} file{'' if number_of_files == 1 else 's'} added successfully",
@@ -107,49 +105,3 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
         svn_form=svn_form,
         user_ssh_keys=user_ssh_keys,
     )
-
-
-async def _save_file(file: datastructures.FileStorage, target_path: pathlib.Path) -> None:
-    # TODO: Move to the storage interface
-    async with aiofiles.open(target_path, "wb") as f:
-        while chunk := await asyncio.to_thread(file.stream.read, 8192):
-            await f.write(chunk)
-
-
-async def _upload_files(
-    project_name: str,
-    version_name: str,
-    asf_uid: str,
-    file_name: pathlib.Path | None,
-    files: Sequence[datastructures.FileStorage],
-) -> int:
-    """Process and save the uploaded files into a new draft revision."""
-    number_of_files = len(files)
-    description = f"Upload of {number_of_files} file{'' if number_of_files == 1 else 's'} through web interface"
-    async with revision.create_and_manage(project_name, version_name, asf_uid, description=description) as creating:
-
-        def get_target_path(file: datastructures.FileStorage) -> pathlib.Path:
-            # Determine the target path within the new revision directory
-            relative_file_path: pathlib.Path
-            if not file_name:
-                if not file.filename:
-                    raise routes.FlashError("No filename provided")
-                # Use the original name
-                relative_file_path = pathlib.Path(file.filename)
-            else:
-                # Use the provided name, relative to its anchor
-                # In other words, ignore the leading "/"
-                relative_file_path = file_name.relative_to(file_name.anchor)
-
-            # Construct path inside the new revision directory
-            target_path = creating.interim_path / relative_file_path
-            return target_path
-
-        # Save each uploaded file to the new revision directory
-        for file in files:
-            target_path = get_target_path(file)
-            # Ensure parent directories exist within the new revision
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            await _save_file(file, target_path)
-
-    return len(files)

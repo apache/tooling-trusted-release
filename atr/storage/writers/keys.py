@@ -428,7 +428,7 @@ class CommitteeParticipant(FoundationCommitter):
             return outcome.Error(e)
 
         try:
-            await asyncio.to_thread(committee_keys_dir.mkdir, parents=True, exist_ok=True)
+            await aiofiles.os.makedirs(committee_keys_dir, exist_ok=True)
             await asyncio.to_thread(util.chmod_directories, committee_keys_dir, permissions=0o755)
             await asyncio.to_thread(committee_keys_path.write_text, full_keys_file_content, encoding="utf-8")
         except OSError as e:

@@ -19,7 +19,7 @@ from typing import Any
 
 import pydantic
 
-from atr.models import schema
+from . import schema
 
 
 # TODO: Maybe it's easier to use quart_schema for all our forms

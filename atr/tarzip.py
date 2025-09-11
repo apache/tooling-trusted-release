@@ -15,10 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import contextlib
 import tarfile
 import zipfile
 from collections.abc import Generator, Iterator
-from contextlib import contextmanager
 from typing import IO, TypeVar
 from typing import Protocol as TypingProtocol
 
@@ -134,7 +134,7 @@ ZipArchive = ArchiveContext[zipfile.ZipFile]
 Archive = TarArchive | ZipArchive
 
 
-@contextmanager
+@contextlib.contextmanager
 def open_archive(archive_path: str) -> Generator[Archive]:
     archive_file: tarfile.TarFile | zipfile.ZipFile | None = None
     try:

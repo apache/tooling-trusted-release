@@ -18,6 +18,7 @@
 # Removing this will cause circular imports
 from __future__ import annotations
 
+import asyncio
 import base64
 import contextlib
 import datetime
@@ -38,8 +39,9 @@ import atr.storage as storage
 import atr.util as util
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
+    from collections.abc import AsyncGenerator, Sequence
 
+    import werkzeug.datastructures as datastructures
 
 SPECIAL_SUFFIXES: Final[frozenset[str]] = frozenset({".asc", ".sha256", ".sha512"})
 
@@ -298,6 +300,38 @@ class CommitteeParticipant(FoundationCommitter):
                 number=creating.new.number,
             ).demand(storage.AccessError("Revision not found"))
 
+    async def upload_files(
+        self,
+        project_name: str,
+        version_name: str,
+        file_name: pathlib.Path | None,
+        files: Sequence[datastructures.FileStorage],
+    ) -> int:
+        """Process and save the uploaded files into a new draft revision."""
+        number_of_files = len(files)
+        description = f"Upload of {number_of_files} file{'' if number_of_files == 1 else 's'} through web interface"
+        async with self.create_and_manage_revision(project_name, version_name, description) as creating:
+            # Save each uploaded file to the new revision directory
+            for file in files:
+                # Determine the target path within the new revision directory
+                relative_file_path: pathlib.Path
+                if not file_name:
+                    if not file.filename:
+                        raise storage.AccessError("No filename provided")
+                    # Use the original name
+                    relative_file_path = pathlib.Path(file.filename)
+                else:
+                    # Use the provided name, relative to its anchor
+                    # In other words, ignore the leading "/"
+                    relative_file_path = file_name.relative_to(file_name.anchor)
+
+                # Construct path inside the new revision directory
+                target_path = creating.interim_path / relative_file_path
+                # Ensure parent directories exist within the new revision
+                await aiofiles.os.makedirs(target_path.parent, exist_ok=True)
+                await self.__save_file(file, target_path)
+        return len(files)
+
     async def __current_paths(self, creating: revision.Creating) -> list[pathlib.Path]:
         all_current_paths_interim: list[pathlib.Path] = []
         async for p_rel_interim in util.paths_recursive_all(creating.interim_path):
@@ -388,6 +422,11 @@ class CommitteeParticipant(FoundationCommitter):
                     error_messages.append(f"Error removing source RC directory '{path_rel_original_interim}': {e}")
                 return True, renamed_count_local
         return False, renamed_count_local
+
+    async def __save_file(self, file: datastructures.FileStorage, target_path: pathlib.Path) -> None:
+        async with aiofiles.open(target_path, "wb") as f:
+            while chunk := await asyncio.to_thread(file.stream.read, 8192):
+                await f.write(chunk)
 
     async def __setup_revision(
         self,
