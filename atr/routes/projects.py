@@ -273,8 +273,10 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         try:
             await wacm.project.delete(project_name)
         except storage.AccessError as e:
+            # TODO: Redirect to committees
             return await session.redirect(projects, error=f"Error deleting project: {e}")
 
+    # TODO: Redirect to committees
     return await session.redirect(projects, success=f"Project '{project_name}' deleted successfully.")
 
 
@@ -512,40 +514,13 @@ async def _project_add(form: AddForm, asf_id: str) -> response.Response:
         return quart.redirect(util.as_url(add_project, committee_name=form.committee_name.data))
     committee_name, display_name, label = form_values
 
-    super_project = None
-    # TODO: Move this to the storage interface
-    async with db.session() as data:
-        # Get the base project to derive from
-        # We're allowing derivation from a retired project here
-        # TODO: Should we disallow this instead?
-        committee_projects = await data.project(committee_name=committee_name, _committee=True).all()
-        for committee_project in committee_projects:
-            if label.startswith(committee_project.name + "-"):
-                if (super_project is None) or (len(super_project.name) < len(committee_project.name)):
-                    super_project = committee_project
-
-        # Check whether the project already exists
-        if await data.project(name=label).get():
-            await quart.flash(f"Project {label} already exists", "error")
+    async with storage.write(asf_id) as write:
+        wacm = await write.as_project_committee_member(committee_name)
+        try:
+            await wacm.project.create(committee_name, display_name, label)
+        except storage.AccessError as e:
+            await quart.flash(f"Error adding project: {e}", "error")
             return quart.redirect(util.as_url(add_project, committee_name=committee_name))
-
-        # TODO: Fix the potential race condition here
-        project = sql.Project(
-            name=label,
-            full_name=display_name,
-            status=sql.ProjectStatus.ACTIVE,
-            super_project_name=super_project.name if super_project else None,
-            description=super_project.description if super_project else None,
-            category=super_project.category if super_project else None,
-            programming_languages=super_project.programming_languages if super_project else None,
-            committee_name=committee_name,
-            release_policy_id=super_project.release_policy_id if super_project else None,
-            created=datetime.datetime.now(datetime.UTC),
-            created_by=asf_id,
-        )
-
-        data.add(project)
-        await data.commit()
 
     return quart.redirect(util.as_url(view, name=label))
 

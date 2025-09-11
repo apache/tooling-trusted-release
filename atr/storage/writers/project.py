@@ -18,6 +18,7 @@
 # Removing this will cause circular imports
 from __future__ import annotations
 
+import datetime
 from typing import Final
 
 import atr.db as db
@@ -123,6 +124,39 @@ class CommitteeMember(CommitteeParticipant):
             await self.__data.commit()
             return True
         return False
+
+    async def create(self, committee_name: str, display_name: str, label: str) -> None:
+        super_project = None
+        # Get the base project to derive from
+        # We're allowing derivation from a retired project here
+        # TODO: Should we disallow this instead?
+        committee_projects = await self.__data.project(committee_name=committee_name, _committee=True).all()
+        for committee_project in committee_projects:
+            if label.startswith(committee_project.name + "-"):
+                if (super_project is None) or (len(super_project.name) < len(committee_project.name)):
+                    super_project = committee_project
+
+        # Check whether the project already exists
+        if await self.__data.project(name=label).get():
+            raise storage.AccessError(f"Project {label} already exists")
+
+        # TODO: Fix the potential race condition here
+        project = sql.Project(
+            name=label,
+            full_name=display_name,
+            status=sql.ProjectStatus.ACTIVE,
+            super_project_name=super_project.name if super_project else None,
+            description=super_project.description if super_project else None,
+            category=super_project.category if super_project else None,
+            programming_languages=super_project.programming_languages if super_project else None,
+            committee_name=committee_name,
+            release_policy_id=super_project.release_policy_id if super_project else None,
+            created=datetime.datetime.now(datetime.UTC),
+            created_by=self.__asf_uid,
+        )
+
+        self.__data.add(project)
+        await self.__data.commit()
 
     async def delete(self, project_name: str) -> None:
         project = await self.__data.project(
