@@ -110,7 +110,8 @@
       <a class="btn btn-primary"
          href="{{ as_url(routes.distribution.stage, project=release.project.name, version=release.version) }}">Record a distribution</a>
     </p>
-    <h2>Ignored checks</h2>
+    <h2 id="more-actions">More actions</h2>
+    <h3 id="ignored-checks" class="mt-4">Ignored checks</h3>
     {% if info.ignored_errors or info.ignored_warnings %}
       {% set ignored_errors_count = info.ignored_errors|length %}
       {% set ignored_warnings_count = info.ignored_warnings|length %}
@@ -164,11 +165,11 @@
       You can also <a href="{{ as_url(routes.ignores.ignores, committee_name=release.committee.name) }}">manage which check results are ignored</a>.
     </p>
 
-    <h2>Debugging</h2>
+    <h3 id="debugging" class="mt-4">Debugging</h3>
     <div class="mb-2">
       <p>The following form is for debugging purposes only. It will create a new revision.</p>
     </div>
-    <div>
+    <div class="mb-3">
       <form method="post"
             action="{{ as_url(routes.draft.fresh, project_name=release.project.name, version_name=release.version) }}"
             class="mb-0">
@@ -178,6 +179,29 @@
       </form>
     </div>
 
+    <h3 id="delete-draft" class="mt-4">Delete this draft</h3>
+    <div>
+      <form method="post"
+            action="{{ as_url(routes.draft.delete, project_name=release.project.name, version_name=release.version) }}"
+            class="mb-0">
+        {{ delete_form.hidden_tag() }}
+
+        <div class="mb-3">
+          <label for="confirm_delete_draft" class="form-label">
+            Type <strong>DELETE</strong> to confirm:
+          </label>
+          <input class="form-control mt-2"
+                 id="confirm_delete_draft"
+                 name="confirm_delete"
+                 placeholder="DELETE"
+                 required=""
+                 type="text"
+                 value=""
+                 onkeyup="updateDeleteButton(this, 'delete-draft-button')" />
+        </div>
+        {{ delete_form.submit(class_="btn btn-danger", id_="delete-draft-button", disabled=True) }}
+      </form>
+    </div>
   {% endif %}
   {% if phase == "release_candidate" %}
     {% include "check-selected-candidate-forms.html" %}
