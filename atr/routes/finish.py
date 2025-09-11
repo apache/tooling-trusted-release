@@ -18,7 +18,7 @@
 import dataclasses
 import pathlib
 from collections.abc import Awaitable, Callable
-from typing import Any, Final
+from typing import Any
 
 import aiofiles.os
 import asfquart.base as base
@@ -41,9 +41,6 @@ import atr.routes.root as root
 import atr.storage as storage
 import atr.template as template
 import atr.util as util
-
-SPECIAL_SUFFIXES: Final[frozenset[str]] = frozenset({".asc", ".sha256", ".sha512"})
-
 
 Respond = Callable[[int, str], Awaitable[tuple[quart_response.Response, int] | response.Response]]
 
@@ -267,13 +264,13 @@ async def _delete_empty_directory(
     try:
         async with storage.write(session.uid) as write:
             wacp = await write.as_project_committee_member(project_name)
-            created_error = await wacp.release.delete_empty_directory(project_name, version_name, dir_to_delete_rel)
+            creation_error = await wacp.release.delete_empty_directory(project_name, version_name, dir_to_delete_rel)
     except Exception:
         log.exception(f"Unexpected error deleting directory {dir_to_delete_rel} for {project_name}/{version_name}")
         return await respond(500, "An unexpected error occurred.")
 
-    if created_error is not None:
-        return await respond(400, created_error)
+    if creation_error is not None:
+        return await respond(400, creation_error)
     return await respond(200, f"Deleted empty directory '{dir_to_delete_rel}'.")
 
 
@@ -286,23 +283,14 @@ async def _move_file_to_revision(
     respond: Respond,
 ) -> tuple[quart_response.Response, int] | response.Response:
     try:
-        description = "File move through web interface"
-        moved_files_names: list[str] = []
-        skipped_files_names: list[str] = []
-
-        async with revision.create_and_manage(
-            project_name, version_name, session.uid, description=description
-        ) as creating:
-            await _setup_revision(
-                source_files_rel,
-                target_dir_rel,
-                creating,
-                moved_files_names,
-                skipped_files_names,
+        async with storage.write(session.uid) as write:
+            wacp = await write.as_project_committee_member(project_name)
+            creation_error, moved_files_names, skipped_files_names = await wacp.release.move_file(
+                project_name, version_name, source_files_rel, target_dir_rel
             )
 
-        if creating.failed is not None:
-            return await respond(409, str(creating.failed))
+        if creation_error is not None:
+            return await respond(409, creation_error)
 
         response_messages = []
         if moved_files_names:
@@ -327,18 +315,6 @@ async def _move_file_to_revision(
     except Exception as e:
         log.exception("Unexpected error during file move")
         return await respond(500, f"ERROR: {e!s}")
-
-
-def _related_files(path: pathlib.Path) -> list[pathlib.Path]:
-    base_path = path.with_suffix("") if (path.suffix in SPECIAL_SUFFIXES) else path
-    parent_dir = base_path.parent
-    name_without_ext = base_path.name
-    return [
-        parent_dir / name_without_ext,
-        parent_dir / f"{name_without_ext}.asc",
-        parent_dir / f"{name_without_ext}.sha256",
-        parent_dir / f"{name_without_ext}.sha512",
-    ]
 
 
 async def _remove_rc_tags(
@@ -444,87 +420,6 @@ async def _remove_rc_tags_revision_item(
                 error_messages.append(f"Error removing source RC directory '{path_rel_original_interim}': {e}")
             return True, renamed_count_local
     return False, renamed_count_local
-
-
-async def _setup_revision(
-    source_files_rel: list[pathlib.Path],
-    target_dir_rel: pathlib.Path,
-    creating: revision.Creating,
-    moved_files_names: list[str],
-    skipped_files_names: list[str],
-) -> None:
-    target_path = creating.interim_path / target_dir_rel
-    try:
-        target_path.resolve().relative_to(creating.interim_path.resolve())
-    except ValueError:
-        # Path traversal detected
-        raise revision.FailedError("Paths must be restricted to the release directory")
-
-    if not await aiofiles.os.path.exists(target_path):
-        for part in target_path.parts:
-            # TODO: This .prefix check could include some existing directory segment
-            if part.startswith("."):
-                raise revision.FailedError("Segments must not start with '.'")
-            if ".." in part:
-                raise revision.FailedError("Segments must not contain '..'")
-
-        try:
-            # TODO: Move to the storage interface
-            await aiofiles.os.makedirs(target_path)
-        except OSError:
-            raise revision.FailedError("Failed to create target directory")
-    elif not await aiofiles.os.path.isdir(target_path):
-        raise revision.FailedError("Target path is not a directory")
-
-    for source_file_rel in source_files_rel:
-        await _setup_revision_item(
-            source_file_rel, target_dir_rel, creating, moved_files_names, skipped_files_names, target_path
-        )
-
-
-async def _setup_revision_item(
-    source_file_rel: pathlib.Path,
-    target_dir_rel: pathlib.Path,
-    creating: revision.Creating,
-    moved_files_names: list[str],
-    skipped_files_names: list[str],
-    target_path: pathlib.Path,
-) -> None:
-    if source_file_rel.parent == target_dir_rel:
-        skipped_files_names.append(source_file_rel.name)
-        return
-
-    full_source_item_path = creating.interim_path / source_file_rel
-
-    if await aiofiles.os.path.isdir(full_source_item_path):
-        if (target_dir_rel == source_file_rel) or (creating.interim_path / target_dir_rel).resolve().is_relative_to(
-            full_source_item_path.resolve()
-        ):
-            raise revision.FailedError("Cannot move a directory into itself or a subdirectory of itself")
-
-        final_target_for_item = target_path / source_file_rel.name
-        if await aiofiles.os.path.exists(final_target_for_item):
-            raise revision.FailedError("Target name already exists")
-
-        # TODO: Move to the storage interface
-        await aiofiles.os.rename(full_source_item_path, final_target_for_item)
-        moved_files_names.append(source_file_rel.name)
-    else:
-        related_files = _related_files(source_file_rel)
-        bundle = [f for f in related_files if await aiofiles.os.path.exists(creating.interim_path / f)]
-        for f_check in bundle:
-            if await aiofiles.os.path.isdir(creating.interim_path / f_check):
-                raise revision.FailedError("A related 'file' is actually a directory")
-
-        collisions = [f.name for f in bundle if await aiofiles.os.path.exists(target_path / f.name)]
-        if collisions:
-            raise revision.FailedError("A related file already exists in the target directory")
-
-        for f in bundle:
-            # TODO: Move to the storage interface
-            await aiofiles.os.rename(creating.interim_path / f, target_path / f.name)
-            if f == source_file_rel:
-                moved_files_names.append(f.name)
 
 
 async def _sources_and_targets(latest_revision_dir: pathlib.Path) -> tuple[list[pathlib.Path], set[pathlib.Path]]:
