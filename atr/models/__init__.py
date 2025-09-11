@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from . import api, distribution, helpers, results, schema, sql, tabulate
+from . import api, distribution, helpers, policy, results, schema, sql, tabulate
 
 # If we use .__name__, pyright gives a warning
-__all__ = ["api", "distribution", "helpers", "results", "schema", "sql", "tabulate"]
+__all__ = ["api", "distribution", "helpers", "policy", "results", "schema", "sql", "tabulate"]

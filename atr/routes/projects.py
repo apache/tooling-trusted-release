@@ -25,14 +25,13 @@ import re
 from typing import TYPE_CHECKING, Any, Final
 
 import asfquart.base as base
-import pydantic
 import quart
 
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.log as log
-import atr.models.schema as schema
+import atr.models.policy as policy
 import atr.models.sql as sql
 import atr.routes as routes
 import atr.storage as storage
@@ -233,81 +232,6 @@ class ReleasePolicyForm(forms.Typed):
         return not self.errors
 
 
-# TODO: Maybe it's easier to use quart_schema for all our forms
-# We can use source=DataSource.FORM
-# But do all form input types have a pydantic counterpart?
-class ReleasePolicyData(schema.Lax):
-    """Pydantic model for release policy form data."""
-
-    project_name: str
-
-    # Compose section
-    source_artifact_paths: list[str] = pydantic.Field(default_factory=list)
-    binary_artifact_paths: list[str] = pydantic.Field(default_factory=list)
-    github_repository_name: str = ""
-    github_compose_workflow_path: list[str] = pydantic.Field(default_factory=list)
-    strict_checking: bool = False
-
-    # Vote section
-    mailto_addresses: list[str] = pydantic.Field(default_factory=list)
-    manual_vote: bool = False
-    default_min_hours_value_at_render: int = 72
-    min_hours: int = 72
-    pause_for_rm: bool = False
-    release_checklist: str = ""
-    default_start_vote_template_hash: str = ""
-    start_vote_template: str = ""
-    github_vote_workflow_path: list[str] = pydantic.Field(default_factory=list)
-
-    # Finish section
-    default_announce_release_template_hash: str = ""
-    announce_release_template: str = ""
-    github_finish_workflow_path: list[str] = pydantic.Field(default_factory=list)
-    preserve_download_files: bool = False
-
-    @pydantic.field_validator(
-        "source_artifact_paths",
-        "binary_artifact_paths",
-        "github_compose_workflow_path",
-        "github_vote_workflow_path",
-        "github_finish_workflow_path",
-        mode="before",
-    )
-    @classmethod
-    def parse_artifact_paths(cls, v: Any) -> list[str]:
-        if (v is None) or (v == ""):
-            return []
-        if isinstance(v, str):
-            return [path.strip() for path in v.split("\n") if path.strip()]
-        if isinstance(v, list):
-            return v
-        return []
-
-    @pydantic.field_validator("mailto_addresses", mode="before")
-    @classmethod
-    def parse_mailto_addresses(cls, v: Any) -> list[str]:
-        if (v is None) or (v == ""):
-            return []
-        if isinstance(v, str):
-            return [v.strip()] if v.strip() else []
-        if isinstance(v, list):
-            return v
-        return []
-
-    @pydantic.field_validator(
-        "github_repository_name",
-        "release_checklist",
-        "start_vote_template",
-        "announce_release_template",
-        mode="before",
-    )
-    @classmethod
-    def unwrap_values(cls, v: Any) -> Any:
-        if v is None:
-            return ""
-        return v
-
-
 @routes.committer("/project/add/<committee_name>", methods=["GET", "POST"])
 async def add_project(session: routes.CommitterSession, committee_name: str) -> response.Response | str:
     await session.check_access_committee(committee_name)
@@ -407,9 +331,18 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
                 if edited_metadata is True:
                     return quart.redirect(util.as_url(view, name=project.name))
             elif "submit_policy" in form_data:
-                edited_policy, policy_form = await _policy_edit(data, project, form_data)
-                if edited_policy:
-                    return quart.redirect(util.as_url(view, name=project.name))
+                policy_form = await ReleasePolicyForm.create_form(data=form_data)
+                if await policy_form.validate_on_submit():
+                    policy_data = policy.ReleasePolicyData.model_validate(policy_form.data)
+                    async with storage.write(session.uid) as write:
+                        wacm = await write.as_project_committee_member(project.name)
+                        try:
+                            await wacm.policy.edit(data, project, policy_data)
+                        except storage.AccessError as e:
+                            return await session.redirect(view, name=project.name, error=f"Error editing policy: {e}")
+                        return quart.redirect(util.as_url(view, name=project.name))
+                else:
+                    log.info(f"policy_form.errors: {policy_form.errors}")
 
         if metadata_form is None:
             metadata_form = await ProjectMetadataForm.create_form(data={"project_name": project.name})
@@ -536,62 +469,6 @@ async def _metadata_edit(
             await data.commit()
             return True, metadata_form
     return False, metadata_form
-
-
-async def _policy_edit(
-    data: db.Session, project: sql.Project, form_data: dict[str, str]
-) -> tuple[bool, ReleasePolicyForm]:
-    policy_form = await ReleasePolicyForm.create_form(data=form_data)
-    validated = await policy_form.validate_on_submit()
-    if not validated:
-        log.info(f"policy_form.errors: {policy_form.errors}")
-        return False, policy_form
-
-    # Use ReleasePolicyData to parse and validate the processed form data
-    try:
-        policy_data = ReleasePolicyData.model_validate(policy_form.data)
-    except Exception as e:
-        # If pydantic validation fails, log it and fall back to form validation
-        log.error(f"ReleasePolicyData validation failed: {e}")
-        log.info(f"policy_form.errors: {policy_form.errors}")
-        return False, policy_form
-
-    release_policy = project.release_policy
-    if release_policy is None:
-        release_policy = sql.ReleasePolicy(project=project)
-        project.release_policy = release_policy
-        data.add(release_policy)
-
-    # Compose section
-    release_policy.source_artifact_paths = policy_data.source_artifact_paths
-    release_policy.binary_artifact_paths = policy_data.binary_artifact_paths
-    release_policy.github_repository_name = policy_data.github_repository_name
-    # TODO: Change to paths, plural
-    release_policy.github_compose_workflow_path = policy_data.github_compose_workflow_path
-    release_policy.strict_checking = policy_data.strict_checking
-
-    # Vote section
-    release_policy.manual_vote = policy_data.manual_vote
-    if not release_policy.manual_vote:
-        release_policy.github_vote_workflow_path = policy_data.github_vote_workflow_path
-        release_policy.mailto_addresses = policy_data.mailto_addresses
-        _set_default_min_hours(policy_data, project, release_policy)
-        release_policy.pause_for_rm = policy_data.pause_for_rm
-        release_policy.release_checklist = policy_data.release_checklist
-        _set_default_start_vote_template(policy_data, project, release_policy)
-    elif project.committee and project.committee.is_podling:
-        # The caller ensures that project.committee is not None
-        await quart.flash("Manual voting is not allowed for podlings.", "error")
-        return False, policy_form
-
-    # Finish section
-    release_policy.github_finish_workflow_path = policy_data.github_finish_workflow_path
-    _set_default_announce_release_template(policy_data, project, release_policy)
-    release_policy.preserve_download_files = policy_data.preserve_download_files
-
-    await data.commit()
-    await quart.flash("Release policy updated successfully.", "success")
-    return True, policy_form
 
 
 async def _policy_form_create(project: sql.Project) -> ReleasePolicyForm:
@@ -744,53 +621,3 @@ async def _project_add_validate_display_name(display_name: str) -> bool:
             await quart.flash(must_use_correct_case, "error")
             return False
     return True
-
-
-def _set_default_announce_release_template(
-    policy_data: ReleasePolicyData, project: sql.Project, release_policy: sql.ReleasePolicy
-) -> None:
-    submitted_announce_template = policy_data.announce_release_template
-    submitted_announce_template = submitted_announce_template.replace("\r\n", "\n")
-    rendered_default_announce_hash = policy_data.default_announce_release_template_hash
-    current_default_announce_text = project.policy_announce_release_default
-    current_default_announce_hash = util.compute_sha3_256(current_default_announce_text.encode())
-    submitted_announce_hash = util.compute_sha3_256(submitted_announce_template.encode())
-
-    if (submitted_announce_hash == rendered_default_announce_hash) or (
-        submitted_announce_hash == current_default_announce_hash
-    ):
-        release_policy.announce_release_template = ""
-    else:
-        release_policy.announce_release_template = submitted_announce_template
-
-
-def _set_default_min_hours(
-    policy_data: ReleasePolicyData, project: sql.Project, release_policy: sql.ReleasePolicy
-) -> None:
-    submitted_min_hours = policy_data.min_hours
-    default_value_seen_on_page_min_hours = policy_data.default_min_hours_value_at_render
-    current_system_default_min_hours = project.policy_default_min_hours
-
-    if (
-        submitted_min_hours == default_value_seen_on_page_min_hours
-        or submitted_min_hours == current_system_default_min_hours
-    ):
-        release_policy.min_hours = None
-    else:
-        release_policy.min_hours = submitted_min_hours
-
-
-def _set_default_start_vote_template(
-    policy_data: ReleasePolicyData, project: sql.Project, release_policy: sql.ReleasePolicy
-) -> None:
-    submitted_start_template = policy_data.start_vote_template
-    submitted_start_template = submitted_start_template.replace("\r\n", "\n")
-    rendered_default_start_hash = policy_data.default_start_vote_template_hash
-    current_default_start_text = project.policy_start_vote_default
-    current_default_start_hash = util.compute_sha3_256(current_default_start_text.encode())
-    submitted_start_hash = util.compute_sha3_256(submitted_start_template.encode())
-
-    if (submitted_start_hash == rendered_default_start_hash) or (submitted_start_hash == current_default_start_hash):
-        release_policy.start_vote_template = ""
-    else:
-        release_policy.start_vote_template = submitted_start_template
