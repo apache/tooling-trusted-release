@@ -18,7 +18,6 @@
 import quart
 import werkzeug.wrappers.response as response
 
-import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.log as log
@@ -27,7 +26,6 @@ import atr.models.sql as sql
 import atr.routes as routes
 import atr.routes.compose as compose
 import atr.storage as storage
-import atr.tasks.message as message
 import atr.util as util
 
 
@@ -147,7 +145,8 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
     if await form.validate_on_submit():
         vote = str(form.vote_value.data)
         comment = str(form.vote_comment.data)
-        email_recipient, error_message = await _send_vote(session, release, vote, comment)
+        async with storage.write_as_committee_participant(release.committee.name) as wacm:
+            email_recipient, error_message = await wacm.vote.send_user_vote(release, vote, comment, session.fullname)
         if error_message:
             return await session.redirect(
                 selected, project_name=project_name, version_name=version_name, error=error_message
@@ -166,55 +165,3 @@ async def selected_post(session: routes.CommitterSession, project_name: str, ver
         return await session.redirect(
             selected, project_name=project_name, version_name=version_name, error=error_message
         )
-
-
-async def _send_vote(
-    session: routes.CommitterSession,
-    release: sql.Release,
-    vote: str,
-    comment: str,
-) -> tuple[str, str]:
-    # Get the email thread
-    latest_vote_task = await interaction.release_latest_vote_task(release)
-    if latest_vote_task is None:
-        return "", "No vote task found."
-    vote_thread_mid = interaction.task_mid_get(latest_vote_task)
-    if vote_thread_mid is None:
-        return "", "No vote thread found."
-
-    # Construct the reply email
-    original_subject = latest_vote_task.task_args["subject"]
-
-    # Arguments for the task to cast a vote
-    email_recipient = latest_vote_task.task_args["email_to"]
-    email_sender = f"{session.uid}@apache.org"
-    subject = f"Re: {original_subject}"
-    body = [f"{vote.lower()} ({session.uid}) {session.fullname}"]
-    if comment:
-        body.append(f"{comment}")
-        # Only include the signature if there is a comment
-        body.append(f"-- \n{session.fullname} ({session.uid})")
-    body_text = "\n\n".join(body)
-    in_reply_to = vote_thread_mid
-
-    # TODO: Move this to the storage interface
-    task = sql.Task(
-        status=sql.TaskStatus.QUEUED,
-        task_type=sql.TaskType.MESSAGE_SEND,
-        task_args=message.Send(
-            email_sender=email_sender,
-            email_recipient=email_recipient,
-            subject=subject,
-            body=body_text,
-            in_reply_to=in_reply_to,
-        ).model_dump(),
-        asf_uid=util.unwrap(session.uid),
-        project_name=release.project.name,
-        version_name=release.version,
-    )
-    async with db.session() as data:
-        data.add(task)
-        await data.flush()
-        await data.commit()
-
-    return email_recipient, ""

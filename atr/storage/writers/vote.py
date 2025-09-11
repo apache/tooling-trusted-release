@@ -29,7 +29,6 @@ import atr.revision as revision
 import atr.storage as storage
 import atr.tasks.message as message
 import atr.tasks.vote as tasks_vote
-import atr.user as user
 import atr.util as util
 
 
@@ -75,6 +74,57 @@ class CommitteeParticipant(FoundationCommitter):
             raise storage.AccessError("No ASF UID")
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
+
+    async def send_user_vote(
+        self,
+        release: sql.Release,
+        vote: str,
+        comment: str,
+        fullname: str,
+    ) -> tuple[str, str]:
+        # Get the email thread
+        latest_vote_task = await interaction.release_latest_vote_task(release)
+        if latest_vote_task is None:
+            return "", "No vote task found."
+        vote_thread_mid = interaction.task_mid_get(latest_vote_task)
+        if vote_thread_mid is None:
+            return "", "No vote thread found."
+
+        # Construct the reply email
+        original_subject = latest_vote_task.task_args["subject"]
+
+        # Arguments for the task to cast a vote
+        email_recipient = latest_vote_task.task_args["email_to"]
+        email_sender = f"{self.__asf_uid}@apache.org"
+        subject = f"Re: {original_subject}"
+        body = [f"{vote.lower()} ({self.__asf_uid}) {fullname}"]
+        if comment:
+            body.append(f"{comment}")
+            # Only include the signature if there is a comment
+            body.append(f"-- \n{fullname} ({self.__asf_uid})")
+        body_text = "\n\n".join(body)
+        in_reply_to = vote_thread_mid
+
+        # TODO: Move this to the storage interface
+        task = sql.Task(
+            status=sql.TaskStatus.QUEUED,
+            task_type=sql.TaskType.MESSAGE_SEND,
+            task_args=message.Send(
+                email_sender=email_sender,
+                email_recipient=email_recipient,
+                subject=subject,
+                body=body_text,
+                in_reply_to=in_reply_to,
+            ).model_dump(),
+            asf_uid=self.__asf_uid,
+            project_name=release.project.name,
+            version_name=release.version,
+        )
+        self.__data.add(task)
+        await self.__data.flush()
+        await self.__data.commit()
+
+        return email_recipient, ""
 
 
 class CommitteeMember(CommitteeParticipant):
@@ -377,6 +427,6 @@ class CommitteeMember(CommitteeParticipant):
         # (The message should be shown on the vote resolution page)
         return task
 
-    def __committee_member_or_admin(self, committee: sql.Committee, asf_uid: str) -> None:
-        if not (user.is_committee_member(committee, asf_uid) or user.is_admin(asf_uid)):
-            raise storage.AccessError("You do not have permission to perform this action")
+    # def __committee_member_or_admin(self, committee: sql.Committee, asf_uid: str) -> None:
+    #     if not (user.is_committee_member(committee, asf_uid) or user.is_admin(asf_uid)):
+    #         raise storage.AccessError("You do not have permission to perform this action")
