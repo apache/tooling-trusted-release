@@ -202,28 +202,23 @@ async def delete(session: routes.CommitterSession) -> response.Response:
         return await session.redirect(keys, error="Missing key fingerprint for deletion.")
 
     # Try to delete an SSH key first
-    # TODO: Use the storage interface instead
-    async with db.session() as data:
-        ssh_key = await data.ssh_key(fingerprint=fingerprint, asf_uid=session.uid).get()
-        if ssh_key:
-            # Delete the SSH key
-            await data.delete(ssh_key)
-            await data.commit()
-            return await session.redirect(keys, success="SSH key deleted successfully")
-
     # Otherwise, delete an OpenPGP key
+    # TODO: Unmerge this, or identify the key type
     async with storage.write() as write:
-        wafc = write.as_foundation_committer_outcome().result_or_none()
-        if wafc is None:
-            return await session.redirect(keys, error="Key not found or not owned by you")
+        wafc = write.as_foundation_committer()
+        try:
+            await wafc.ssh.delete_key(fingerprint)
+        except storage.AccessError:
+            pass
+        else:
+            return await session.redirect(keys, success="SSH key deleted successfully")
         oc: outcome.Outcome[sql.PublicSigningKey] = await wafc.keys.delete_key(fingerprint)
-        match oc:
-            case outcome.Result():
-                return await session.redirect(keys, success="Key deleted successfully")
-            case outcome.Error(error):
-                return await session.redirect(keys, error=f"Error deleting key: {error}")
 
-    return await session.redirect(keys, error="Key not found or not owned by you")
+    match oc:
+        case outcome.Result():
+            return await session.redirect(keys, success="Key deleted successfully")
+        case outcome.Error(error):
+            return await session.redirect(keys, error=f"Error deleting key: {error}")
 
 
 @routes.committer("/keys/details/<fingerprint>", methods=["GET", "POST"])
