@@ -251,7 +251,7 @@ class ReleasePolicyData(schema.Lax):
     # Vote section
     mailto_addresses: list[str] = pydantic.Field(default_factory=list)
     manual_vote: bool = False
-    default_min_hours_value_at_render: str = ""
+    default_min_hours_value_at_render: int = 72
     min_hours: int = 72
     pause_for_rm: bool = False
     release_checklist: str = ""
@@ -575,10 +575,10 @@ async def _policy_edit(
     if not release_policy.manual_vote:
         release_policy.github_vote_workflow_path = policy_data.github_vote_workflow_path
         release_policy.mailto_addresses = policy_data.mailto_addresses
-        _set_default_min_hours(policy_form, project, release_policy)
+        _set_default_min_hours(policy_data, project, release_policy)
         release_policy.pause_for_rm = policy_data.pause_for_rm
         release_policy.release_checklist = policy_data.release_checklist
-        _set_default_start_vote_template(policy_form, project, release_policy)
+        _set_default_start_vote_template(policy_data, project, release_policy)
     elif project.committee and project.committee.is_podling:
         # The caller ensures that project.committee is not None
         await quart.flash("Manual voting is not allowed for podlings.", "error")
@@ -586,7 +586,7 @@ async def _policy_edit(
 
     # Finish section
     release_policy.github_finish_workflow_path = policy_data.github_finish_workflow_path
-    _set_default_announce_release_template(policy_form, project, release_policy)
+    _set_default_announce_release_template(policy_data, project, release_policy)
     release_policy.preserve_download_files = policy_data.preserve_download_files
 
     await data.commit()
@@ -747,11 +747,11 @@ async def _project_add_validate_display_name(display_name: str) -> bool:
 
 
 def _set_default_announce_release_template(
-    form: ReleasePolicyForm, project: sql.Project, release_policy: sql.ReleasePolicy
+    policy_data: ReleasePolicyData, project: sql.Project, release_policy: sql.ReleasePolicy
 ) -> None:
-    submitted_announce_template = str(util.unwrap(form.announce_release_template.data))
+    submitted_announce_template = policy_data.announce_release_template
     submitted_announce_template = submitted_announce_template.replace("\r\n", "\n")
-    rendered_default_announce_hash = str(util.unwrap(form.default_announce_release_template_hash.data))
+    rendered_default_announce_hash = policy_data.default_announce_release_template_hash
     current_default_announce_text = project.policy_announce_release_default
     current_default_announce_hash = util.compute_sha3_256(current_default_announce_text.encode())
     submitted_announce_hash = util.compute_sha3_256(submitted_announce_template.encode())
@@ -764,9 +764,11 @@ def _set_default_announce_release_template(
         release_policy.announce_release_template = submitted_announce_template
 
 
-def _set_default_min_hours(form: ReleasePolicyForm, project: sql.Project, release_policy: sql.ReleasePolicy) -> None:
-    submitted_min_hours = int(util.unwrap(form.min_hours.data) or 0)
-    default_value_seen_on_page_min_hours = int(util.unwrap(form.default_min_hours_value_at_render.data))
+def _set_default_min_hours(
+    policy_data: ReleasePolicyData, project: sql.Project, release_policy: sql.ReleasePolicy
+) -> None:
+    submitted_min_hours = policy_data.min_hours
+    default_value_seen_on_page_min_hours = policy_data.default_min_hours_value_at_render
     current_system_default_min_hours = project.policy_default_min_hours
 
     if (
@@ -779,11 +781,11 @@ def _set_default_min_hours(form: ReleasePolicyForm, project: sql.Project, releas
 
 
 def _set_default_start_vote_template(
-    form: ReleasePolicyForm, project: sql.Project, release_policy: sql.ReleasePolicy
+    policy_data: ReleasePolicyData, project: sql.Project, release_policy: sql.ReleasePolicy
 ) -> None:
-    submitted_start_template = str(util.unwrap(form.start_vote_template.data))
+    submitted_start_template = policy_data.start_vote_template
     submitted_start_template = submitted_start_template.replace("\r\n", "\n")
-    rendered_default_start_hash = str(util.unwrap(form.default_start_vote_template_hash.data))
+    rendered_default_start_hash = policy_data.default_start_vote_template_hash
     current_default_start_text = project.policy_start_vote_default
     current_default_start_hash = util.compute_sha3_256(current_default_start_text.encode())
     submitted_start_hash = util.compute_sha3_256(submitted_start_template.encode())
