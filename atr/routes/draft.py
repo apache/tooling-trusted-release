@@ -29,7 +29,6 @@ import aioshutil
 import asfquart.base as base
 import quart
 
-import atr.analysis as analysis
 import atr.construct as construct
 import atr.forms as forms
 import atr.log as log
@@ -129,38 +128,11 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
         return await session.redirect(compose.selected, project_name=project_name, version_name=version_name)
 
     rel_path_to_delete = pathlib.Path(str(form.file_path.data))
-    metadata_files_deleted = 0
 
     try:
-        description = "File deletion through web interface"
-        async with revision.create_and_manage(
-            project_name, version_name, session.uid, description=description
-        ) as creating:
-            # Uses new_revision_number for logging only
-            # Path to delete within the new revision directory
-            path_in_new_revision = creating.interim_path / rel_path_to_delete
-
-            # Check that the file exists in the new revision
-            if not await aiofiles.os.path.exists(path_in_new_revision):
-                # This indicates a potential severe issue with hard linking or logic
-                log.error(f"SEVERE ERROR! File {rel_path_to_delete} not found in new revision before deletion")
-                raise routes.FlashError("File to delete was not found in the new revision")
-
-            # Check whether the file is an artifact
-            if analysis.is_artifact(path_in_new_revision):
-                # If so, delete all associated metadata files in the new revision
-                async for p in util.paths_recursive(path_in_new_revision.parent):
-                    # Construct full path within the new revision
-                    metadata_path_obj = creating.interim_path / p
-                    if p.name.startswith(rel_path_to_delete.name + "."):
-                        # TODO: Move to the storage interface
-                        await aiofiles.os.remove(metadata_path_obj)
-                        metadata_files_deleted += 1
-
-            # Delete the file
-            # TODO: Move to the storage interface
-            await aiofiles.os.remove(path_in_new_revision)
-
+        async with storage.write(session.uid) as write:
+            wacp = await write.as_project_committee_member(project_name)
+            metadata_files_deleted = await wacp.release.delete_file(project_name, version_name, rel_path_to_delete)
     except Exception as e:
         log.exception("Error deleting file:")
         await quart.flash(f"Error deleting file: {e!s}", "error")

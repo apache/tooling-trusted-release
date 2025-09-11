@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 import aiofiles.os
 import aioshutil
 
+import atr.analysis as analysis
 import atr.db as db
 import atr.log as log
 import atr.models.api as api
@@ -90,6 +91,34 @@ class CommitteeParticipant(FoundationCommitter):
             project_name, version, self.__asf_uid, description=description
         ) as _creating:
             yield _creating
+
+    async def delete_file(self, project_name: str, version: str, rel_path_to_delete: pathlib.Path) -> int:
+        metadata_files_deleted = 0
+        description = "File deletion through web interface"
+        async with self.create_and_manage_revision(project_name, version, description) as creating:
+            # Uses new_revision_number for logging only
+            # Path to delete within the new revision directory
+            path_in_new_revision = creating.interim_path / rel_path_to_delete
+
+            # Check that the file exists in the new revision
+            if not await aiofiles.os.path.exists(path_in_new_revision):
+                # This indicates a potential severe issue with hard linking or logic
+                log.error(f"SEVERE ERROR! File {rel_path_to_delete} not found in new revision before deletion")
+                raise storage.AccessError("File to delete was not found in the new revision")
+
+            # Check whether the file is an artifact
+            if analysis.is_artifact(path_in_new_revision):
+                # If so, delete all associated metadata files in the new revision
+                async for p in util.paths_recursive(path_in_new_revision.parent):
+                    # Construct full path within the new revision
+                    metadata_path_obj = creating.interim_path / p
+                    if p.name.startswith(rel_path_to_delete.name + "."):
+                        await aiofiles.os.remove(metadata_path_obj)
+                        metadata_files_deleted += 1
+
+            # Delete the file
+            await aiofiles.os.remove(path_in_new_revision)
+        return metadata_files_deleted
 
     async def import_from_svn(
         self, project_name: str, version_name: str, svn_url: str, revision: str, target_subdirectory: str | None
