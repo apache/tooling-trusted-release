@@ -38,6 +38,7 @@ import atr.revision as revision
 import atr.routes as routes
 import atr.routes.mapping as mapping
 import atr.routes.root as root
+import atr.storage as storage
 import atr.template as template
 import atr.util as util
 
@@ -264,25 +265,15 @@ async def _delete_empty_directory(
     respond: Respond,
 ) -> tuple[quart_response.Response, int] | response.Response:
     try:
-        description = f"Delete empty directory {dir_to_delete_rel} via web interface"
-        async with revision.create_and_manage(
-            project_name, version_name, session.uid, description=description
-        ) as creating:
-            path_to_remove = creating.interim_path / dir_to_delete_rel
-            path_to_remove.resolve().relative_to(creating.interim_path.resolve())
-            if not await aiofiles.os.path.isdir(path_to_remove):
-                raise revision.FailedError(f"Path '{dir_to_delete_rel}' is not a directory.")
-            if await aiofiles.os.listdir(path_to_remove):
-                raise revision.FailedError(f"Directory '{dir_to_delete_rel}' is not empty.")
-            # TODO: Move to the storage interface
-            await aiofiles.os.rmdir(path_to_remove)
-
+        async with storage.write(session.uid) as write:
+            wacp = await write.as_project_committee_member(project_name)
+            created_error = await wacp.release.delete_empty_directory(project_name, version_name, dir_to_delete_rel)
     except Exception:
         log.exception(f"Unexpected error deleting directory {dir_to_delete_rel} for {project_name}/{version_name}")
         return await respond(500, "An unexpected error occurred.")
 
-    if creating.failed is not None:
-        return await respond(400, str(creating.failed))
+    if created_error is not None:
+        return await respond(400, created_error)
     return await respond(200, f"Deleted empty directory '{dir_to_delete_rel}'.")
 
 

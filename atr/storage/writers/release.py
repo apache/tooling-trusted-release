@@ -92,6 +92,23 @@ class CommitteeParticipant(FoundationCommitter):
         ) as _creating:
             yield _creating
 
+    async def delete_empty_directory(
+        self, project_name: str, version_name: str, dir_to_delete_rel: pathlib.Path
+    ) -> str | None:
+        description = f"Delete empty directory {dir_to_delete_rel} via web interface"
+        async with self.create_and_manage_revision(project_name, version_name, description) as creating:
+            path_to_remove = creating.interim_path / dir_to_delete_rel
+            path_to_remove.resolve().relative_to(creating.interim_path.resolve())
+            if not await aiofiles.os.path.isdir(path_to_remove):
+                raise revision.FailedError(f"Path '{dir_to_delete_rel}' is not a directory.")
+            if await aiofiles.os.listdir(path_to_remove):
+                raise revision.FailedError(f"Directory '{dir_to_delete_rel}' is not empty.")
+            # TODO: Move to the storage interface
+            await aiofiles.os.rmdir(path_to_remove)
+        if creating.failed is not None:
+            return str(creating.failed)
+        return None
+
     async def delete_file(self, project_name: str, version: str, rel_path_to_delete: pathlib.Path) -> int:
         metadata_files_deleted = 0
         description = "File deletion through web interface"
