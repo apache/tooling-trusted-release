@@ -182,6 +182,15 @@ class CommitteeParticipant(FoundationCommitter):
         creation_error = str(creating.failed) if (creating.failed is not None) else None
         return creation_error, moved_files_names, skipped_files_names
 
+    async def remove_rc_tags(self, project_name: str, version_name: str) -> tuple[str | None, int, list[str]]:
+        description = "Remove RC tags from paths via web interface"
+        error_messages: list[str] = []
+
+        async with self.create_and_manage_revision(project_name, version_name, description) as creating:
+            renamed_count = await self.__remove_rc_tags_revision(creating, error_messages)
+        creation_error = str(creating.failed) if (creating.failed is not None) else None
+        return creation_error, renamed_count, error_messages
+
     async def start(self, project_name: str, version: str) -> tuple[sql.Release, sql.Project]:
         """Creates the initial release draft record and revision directory."""
         # Get the project from the project name
@@ -258,6 +267,15 @@ class CommitteeParticipant(FoundationCommitter):
                 number=creating.new.number,
             ).demand(storage.AccessError("Revision not found"))
 
+    async def __current_paths(self, creating: revision.Creating) -> list[pathlib.Path]:
+        all_current_paths_interim: list[pathlib.Path] = []
+        async for p_rel_interim in util.paths_recursive_all(creating.interim_path):
+            all_current_paths_interim.append(p_rel_interim)
+
+        # This manner of sorting is necessary to ensure that directories are removed after their contents
+        all_current_paths_interim.sort(key=lambda p: (-len(p.parts), str(p)))
+        return all_current_paths_interim
+
     def __related_files(self, path: pathlib.Path) -> list[pathlib.Path]:
         base_path = path.with_suffix("") if (path.suffix in SPECIAL_SUFFIXES) else path
         parent_dir = base_path.parent
@@ -268,6 +286,77 @@ class CommitteeParticipant(FoundationCommitter):
             parent_dir / f"{name_without_ext}.sha256",
             parent_dir / f"{name_without_ext}.sha512",
         ]
+
+    async def __remove_rc_tags_revision(
+        self,
+        creating: revision.Creating,
+        error_messages: list[str],
+    ) -> int:
+        all_current_paths_interim = await self.__current_paths(creating)
+        renamed_count_local = 0
+        for path_rel_original_interim in all_current_paths_interim:
+            path_rel_stripped_interim = analysis.candidate_removed(path_rel_original_interim)
+
+            if path_rel_original_interim != path_rel_stripped_interim:
+                # Absolute paths of the source and destination
+                full_original_path = creating.interim_path / path_rel_original_interim
+                full_stripped_path = creating.interim_path / path_rel_stripped_interim
+
+                skip, renamed_count_local = await self.__remove_rc_tags_revision_item(
+                    path_rel_original_interim,
+                    full_original_path,
+                    full_stripped_path,
+                    error_messages,
+                    renamed_count_local,
+                )
+                if skip:
+                    continue
+
+                try:
+                    if not await aiofiles.os.path.exists(full_stripped_path.parent):
+                        # This could happen if e.g. a file is in an RC tagged directory
+                        await aiofiles.os.makedirs(full_stripped_path.parent, exist_ok=True)
+
+                    if await aiofiles.os.path.exists(full_stripped_path):
+                        error_messages.append(
+                            f"Skipped '{path_rel_original_interim}':"
+                            f" target '{path_rel_stripped_interim}' already exists."
+                        )
+                        continue
+
+                    await aiofiles.os.rename(full_original_path, full_stripped_path)
+                    renamed_count_local += 1
+                except Exception as e:
+                    error_messages.append(f"Error renaming '{path_rel_original_interim}': {e}")
+        return renamed_count_local
+
+    async def __remove_rc_tags_revision_item(
+        self,
+        path_rel_original_interim: pathlib.Path,
+        full_original_path: pathlib.Path,
+        full_stripped_path: pathlib.Path,
+        error_messages: list[str],
+        renamed_count_local: int,
+    ) -> tuple[bool, int]:
+        if await aiofiles.os.path.isdir(full_original_path):
+            # If moving an RC tagged directory to an existing directory...
+            is_target_dir_and_exists = await aiofiles.os.path.isdir(full_stripped_path)
+            if is_target_dir_and_exists and (full_stripped_path != full_original_path):
+                try:
+                    # And the source directory is empty...
+                    if not await aiofiles.os.listdir(full_original_path):
+                        # This means we probably moved files out of the RC tagged directory
+                        # In any case, we can't move it, so we have to delete it
+                        await aiofiles.os.rmdir(full_original_path)
+                        renamed_count_local += 1
+                    else:
+                        error_messages.append(
+                            f"Source RC directory '{path_rel_original_interim}' is not empty, skipping."
+                        )
+                except OSError as e:
+                    error_messages.append(f"Error removing source RC directory '{path_rel_original_interim}': {e}")
+                return True, renamed_count_local
+        return False, renamed_count_local
 
     async def __setup_revision(
         self,
