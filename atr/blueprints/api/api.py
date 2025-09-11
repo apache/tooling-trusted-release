@@ -16,7 +16,6 @@
 # under the License.
 
 
-import base64
 import hashlib
 import pathlib
 from typing import Any
@@ -883,7 +882,9 @@ async def release_upload(data: models.api.ReleaseUploadArgs) -> DictResponse:
     #     if not (user.is_committee_member(project.committee, asf_uid) or user.is_admin(asf_uid)):
     #         raise exceptions.Forbidden("You do not have permission to upload to this project")
 
-    revision = await _upload_process_file(data, asf_uid)
+    async with storage.write(asf_uid) as write:
+        wacp = await write.as_project_committee_participant(data.project)
+        revision = await wacp.release.upload_file(data)
     return models.api.ReleaseUploadResults(
         endpoint="/release/upload",
         revision=revision,
@@ -1324,23 +1325,3 @@ def _simple_check(*args: str | None) -> None:
     for arg in args:
         if arg == "None":
             raise exceptions.BadRequest("Argument cannot be the string 'None'")
-
-
-async def _upload_process_file(args: models.api.ReleaseUploadArgs, asf_uid: str) -> sql.Revision:
-    file_bytes = base64.b64decode(args.content, validate=True)
-    file_path = args.relpath.lstrip("/")
-    description = f"Upload via API: {file_path}"
-    async with storage.write(asf_uid) as write:
-        wacm = await write.as_project_committee_participant(args.project)
-        async with wacm.release.create_and_manage_revision(args.project, args.version, description) as creating:
-            target_path = pathlib.Path(creating.interim_path) / file_path
-            await aiofiles.os.makedirs(target_path.parent, exist_ok=True)
-            if target_path.exists():
-                raise exceptions.BadRequest("File already exists")
-            async with aiofiles.open(target_path, "wb") as f:
-                await f.write(file_bytes)
-    if creating.new is None:
-        raise exceptions.InternalServerError("Failed to create revision")
-    async with db.session() as data:
-        release_name = sql.release_name(args.project, args.version)
-        return await data.revision(release_name=release_name, number=creating.new.number).demand(exceptions.NotFound())

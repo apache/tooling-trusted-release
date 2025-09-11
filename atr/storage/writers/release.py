@@ -18,8 +18,10 @@
 # Removing this will cause circular imports
 from __future__ import annotations
 
+import base64
 import contextlib
 import datetime
+import pathlib
 from typing import TYPE_CHECKING
 
 import aiofiles.os
@@ -27,13 +29,13 @@ import aioshutil
 
 import atr.db as db
 import atr.log as log
+import atr.models.api as api
 import atr.models.sql as sql
 import atr.revision as revision
 import atr.storage as storage
 import atr.util as util
 
 if TYPE_CHECKING:
-    import pathlib
     from collections.abc import AsyncGenerator
 
 
@@ -169,6 +171,26 @@ class CommitteeParticipant(FoundationCommitter):
             created=release.created.isoformat(),
         )
         return release, project
+
+    async def upload_file(self, args: api.ReleaseUploadArgs) -> sql.Revision:
+        file_bytes = base64.b64decode(args.content, validate=True)
+        file_path = args.relpath.lstrip("/")
+        description = f"Upload via API: {file_path}"
+        async with self.create_and_manage_revision(args.project, args.version, description) as creating:
+            target_path = pathlib.Path(creating.interim_path) / file_path
+            await aiofiles.os.makedirs(target_path.parent, exist_ok=True)
+            if target_path.exists():
+                raise storage.AccessError("File already exists")
+            async with aiofiles.open(target_path, "wb") as f:
+                await f.write(file_bytes)
+        if creating.new is None:
+            raise storage.AccessError("Failed to create revision")
+        async with db.session() as data:
+            release_name = sql.release_name(args.project, args.version)
+            return await data.revision(
+                release_name=release_name,
+                number=creating.new.number,
+            ).demand(storage.AccessError("Revision not found"))
 
 
 class CommitteeMember(CommitteeParticipant):
