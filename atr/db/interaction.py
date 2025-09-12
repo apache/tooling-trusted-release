@@ -91,12 +91,15 @@ async def all_releases(project: sql.Project) -> list[sql.Release]:
     try:
         # This rejects any non PEP 440 versions
         results.sort(key=lambda r: version.Version(r.version), reverse=True)
-    except Exception:
+    except Exception as e:
+        # Usually packaging.version.InvalidVersion
+        if not isinstance(e, version.InvalidVersion):
+            log.warning(f"Error sorting releases: {type(e)}: {e!s}")
 
         def sort_key(release: sql.Release) -> tuple[tuple[int, int | str], ...]:
             parts = []
-            version = release.version.replace("+", ".").replace("-", ".")
-            for part in version.split("."):
+            v = release.version.replace("+", ".").replace("-", ".")
+            for part in v.split("."):
                 try:
                     # Numeric parts: (0, number) to sort before strings
                     parts.append((0, int(part)))

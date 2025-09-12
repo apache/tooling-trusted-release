@@ -62,7 +62,7 @@ class NotSet:
 
     _instance = None
 
-    def __new__(cls):  # type: ignore
+    def __new__(cls) -> NotSet:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
@@ -70,11 +70,11 @@ class NotSet:
     def __repr__(self) -> str:
         return "<NotSet>"
 
-    def __copy__(self):  # type: ignore
-        return NotSet
+    def __copy__(self) -> NotSet:
+        return NotSet()
 
-    def __deepcopy__(self, memo: dict[int, Any]):  # type: ignore
-        return NotSet
+    def __deepcopy__(self, memo: dict[int, Any]) -> NotSet:
+        return NotSet()
 
 
 NOT_SET: Final[NotSet] = NotSet()
