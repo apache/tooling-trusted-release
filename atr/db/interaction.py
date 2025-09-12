@@ -88,7 +88,24 @@ async def all_releases(project: sql.Project) -> list[sql.Release]:
     for release in results:
         release.project = project
 
-    results.sort(key=lambda r: version.Version(r.version), reverse=True)
+    try:
+        # This rejects any non PEP 440 versions
+        results.sort(key=lambda r: version.Version(r.version), reverse=True)
+    except Exception:
+
+        def sort_key(release: sql.Release) -> tuple[tuple[int, int | str], ...]:
+            parts = []
+            version = release.version.replace("+", ".").replace("-", ".")
+            for part in version.split("."):
+                try:
+                    # Numeric parts: (0, number) to sort before strings
+                    parts.append((0, int(part)))
+                except ValueError:
+                    # String parts: (1, string) to sort after numbers
+                    parts.append((1, part))
+            return tuple(parts)
+
+        results.sort(key=sort_key, reverse=True)
     return results
 
 
