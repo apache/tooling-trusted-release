@@ -100,7 +100,7 @@
 
   <div class="mb-3">
     {% if primary_results %}
-      <table class="table table-bordered table-striped border mb-3">
+      <table class="table table-bordered border mb-3">
         <thead class="table-light">
           <tr>
             <th scope="col" class="w-15">Check</th>
@@ -381,18 +381,29 @@
           }
           if (type === "member") {
               updateMemberStriping();
+          } else if (type === "primary") {
+              updatePrimaryStriping();
           }
       }
 
-      function updateMemberStriping() {
+      function restripeVisibleRows(rowSelector, stripeClass) {
           let visibleIdx = 0;
-          document.querySelectorAll(".atr-result-member").forEach(r => {
-              r.classList.remove("page-member-visible-odd");
-              if (!r.classList.contains("atr-hide") && !r.classList.contains("page-member-path-hide")) {
-                  if (visibleIdx % 2 === 0) r.classList.add("page-member-visible-odd");
+          document.querySelectorAll(rowSelector).forEach(row => {
+              row.classList.remove(stripeClass);
+              const hidden = row.classList.contains("atr-hide") || row.classList.contains("page-member-path-hide");
+              if (!hidden) {
+                  if (visibleIdx % 2 === 0) row.classList.add(stripeClass);
                   visibleIdx++;
               }
           });
+      }
+
+      function updatePrimaryStriping() {
+          restripeVisibleRows(".atr-result-primary", "page-member-visible-odd");
+      }
+
+      function updateMemberStriping() {
+          restripeVisibleRows(".atr-result-member", "page-member-visible-odd");
       }
 
       const mpfInput = document.getElementById("member-path-filter");
@@ -412,6 +423,7 @@
               updateMemberStriping();
           });
       }
+      updatePrimaryStriping();
       updateMemberStriping();
   </script>
 {% endblock javascripts %}
