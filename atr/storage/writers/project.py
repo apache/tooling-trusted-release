@@ -177,7 +177,7 @@ class CommitteeMember(CommitteeParticipant):
         await self.__data.delete(project)
         await self.__data.commit()
         self.__write_as.append_to_audit_log(
-            action="project.delete",
+            asf_uid=self.__asf_uid,
             project_name=project_name,
         )
         return None

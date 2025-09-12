@@ -273,7 +273,7 @@ class CommitteeParticipant(FoundationCommitter):
         ) as _creating:
             pass
         self.__write_as.append_to_audit_log(
-            action="release.start",
+            asf_uid=self.__asf_uid,
             project_name=project_name,
             version=version,
             created=release.created.isoformat(),
@@ -565,7 +565,7 @@ class CommitteeMember(CommitteeParticipant):
             await self.__delete_release_data_downloads(release)
         warning = await self.__delete_release_data_filesystem(release_dir, project_name, version)
         self.__write_as.append_to_audit_log(
-            action="release.delete",
+            asf_uid=self.__asf_uid,
             project_name=project_name,
             version=version,
             warning=warning,

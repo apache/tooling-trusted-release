@@ -192,7 +192,7 @@ class CommitteeMember(CommitteeParticipant):
             # TODO: Set permissions to help enforce this, or find alternative methods
             await aioshutil.move(unfinished_dir, finished_dir)
             self.__write_as.append_to_audit_log(
-                action="announce.release",
+                asf_uid=self.__asf_uid,
                 project_name=project_name,
                 version_name=version_name,
                 revision_number=preview_revision_number,
