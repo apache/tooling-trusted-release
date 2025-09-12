@@ -297,13 +297,13 @@ async def task_archive_url_cached(task_mid: str | None) -> str | None:
         if url is not None:
             return url
 
-    url = await util.task_archive_url(task_mid)
-    if url is not None:
-        await data.ns_text_set(
-            "mid-url-cache",
-            task_mid,
-            url,
-        )
+        url = await util.task_archive_url(task_mid)
+        if url is not None:
+            await data.ns_text_set(
+                "mid-url-cache",
+                task_mid,
+                url,
+            )
 
     return url
 
