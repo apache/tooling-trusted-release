@@ -184,7 +184,6 @@ async def _step_02_handle_safely(process: asyncssh.SSHServerProcess) -> None:
     if not process.command:
         raise RsyncArgsError("No command specified")
 
-    _output_stderr(process, f"Received command: {process.command}")
     log.info(f"Received command: {process.command}")
     # TODO: Use shlex.split or similar if commands can contain quoted arguments
     argv = process.command.split()
@@ -208,6 +207,7 @@ async def _step_02_handle_safely(process: asyncssh.SSHServerProcess) -> None:
         ####################################################
         await _step_07a_process_validated_rsync_read(process, argv, release_obj)
     else:
+        _output_stderr(process, f"Received write command: {process.command}")
         log.info(f"Processing WRITE request for {release_name}")
         #####################################################
         ### Calls _step_07b_process_validated_rsync_write ###
@@ -522,7 +522,10 @@ async def _step_08_execute_rsync(process: asyncssh.SSHServerProcess, argv: list[
     )
     # Redirect the client's streams to the rsync process
     # TODO: Do we instead need send_eof=False on stderr only?
-    await process.redirect(stdin=proc.stdin, stdout=proc.stdout, stderr=proc.stderr, send_eof=False)
+    # , stdout=proc.stdout
+    # , stderr=proc.stderr
+    # , send_eof=False
+    await process.redirect(stdin=proc.stdin, stdout=proc.stdout, send_eof=False)
     # Wait for rsync to finish and get its exit status
     exit_status = await proc.wait()
     log.info(f"Rsync finished with exit status {exit_status}")
