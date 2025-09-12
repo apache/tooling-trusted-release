@@ -116,6 +116,14 @@
   </div>
 
   <h2 id="rsync-upload">Rsync upload</h2>
+  {% set key_count = user_ssh_keys|length %}
+  {% if key_count == 0 %}
+    <div class="alert alert-warning">
+      <p class="mb-0">
+        We have no SSH keys on file for you, so you cannot yet use this command. Please <a href="{{ as_url(routes.keys.ssh_add) }}">add your SSH key</a>.
+      </p>
+    </div>
+  {% endif %}
   <p>Import files from a remote server using rsync with the following command:</p>
   <!-- TODO: Add a button to copy the command to the clipboard -->
   <pre class="bg-light p-3 mb-3">

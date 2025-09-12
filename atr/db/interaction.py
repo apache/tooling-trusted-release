@@ -342,7 +342,7 @@ async def tasks_ongoing_revision(
     project_name: str,
     version_name: str,
     revision_number: str | None = None,
-) -> tuple[int, str]:
+) -> tuple[int, str | None]:
     via = sql.validate_instrumented_attribute
     subquery = (
         sqlalchemy.select(via(sql.Revision.number))

@@ -1,15 +1,11 @@
+{% set key_count = user_ssh_keys|length %}
 <p>
   The ATR server should be compatible with long obsolete versions of rsync, as long as you use the command as shown, but as of May 2025 the only rsync version line without <a href="https://github.com/google/security-research/security/advisories/GHSA-p5pg-x43v-mvqj">known CVEs</a> is 3.4.*. Your package manager may have backports.
 </p>
 <p>
   If you find that you receive errors from ATR when using rsync, please <a href="https://github.com/apache/tooling-trusted-release/issues/new?template=BLANK_ISSUE">open an issue</a> and we will try our best to make ATR compatible.
 </p>
-{% set key_count = user_ssh_keys|length %}
-{% if key_count == 0 %}
-  <p>
-    We have no SSH keys on file for you, so you cannot yet use this command. Please <a href="{{ as_url(routes.keys.ssh_add) }}">add your SSH key</a>.
-  </p>
-{% elif key_count == 1 %}
+{% if key_count == 1 %}
   {% set key = user_ssh_keys[0] %}
   {% set key_parts = key.key.split(' ', 2) %}
   {% set key_comment = key_parts[2] if key_parts|length > 2 else 'key' %}
@@ -17,7 +13,7 @@
     We have the SSH key <a href="{{ as_url(routes.keys.keys, _anchor='ssh-key-' + key.fingerprint) }}"
     title="{{ key.fingerprint }}"><code>{{- key_comment | trim -}}</code></a> on file for you. You can also <a href="{{ as_url(routes.keys.ssh_add) }}">add another SSH key</a>.
   </p>
-{% else %}
+{% elif key_count > 1 %}
   <p>We have the following SSH keys on file for you:</p>
   <ul>
     {% for key in user_ssh_keys %}
