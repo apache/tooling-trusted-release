@@ -124,6 +124,10 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
 
     form = await DeleteFileForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
+        error_summary = []
+        for key, value in form.errors.items():
+            error_summary.append(f"{key}: {value}")
+        await quart.flash("; ".join(error_summary), "error")
         return await session.redirect(compose.selected, project_name=project_name, version_name=version_name)
 
     rel_path_to_delete = pathlib.Path(str(form.file_path.data))

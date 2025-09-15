@@ -69,6 +69,7 @@
           </p>
           <form method="post" action="{{ action }}">
             {{ form.hidden_tag() }}
+            <input type="hidden" name="{{ field_name }}" value="{{ id }}" />
 
             {{ form.submit(class_="btn btn-danger", id_="delete-button-" + element_id) }}
           </form>
