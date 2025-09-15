@@ -35,7 +35,7 @@ if asfquart.APP is ...:
 
 
 @routes.public("/releases/finished/<project_name>")
-async def finished(project_name: str) -> str:
+async def finished(session: routes.CommitterSession | None, project_name: str) -> str:
     """View all finished releases for a project."""
     async with db.session() as data:
         project = await data.project(name=project_name, status=sql.ProjectStatus.ACTIVE).demand(
@@ -59,7 +59,7 @@ async def finished(project_name: str) -> str:
 
 
 @routes.public("/releases")
-async def releases() -> str:
+async def releases(session: routes.CommitterSession | None) -> str:
     """View all releases."""
     # Releases are public, so we don't need to filter by user
     async with db.session() as data:
@@ -99,7 +99,9 @@ async def select(session: routes.CommitterSession, project_name: str) -> str:
 
 
 @routes.public("/release/view/<project_name>/<version_name>")
-async def view(project_name: str, version_name: str) -> response.Response | str:
+async def view(
+    session: routes.CommitterSession | None, project_name: str, version_name: str
+) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
     async with db.session() as data:
         release_name = sql.release_name(project_name, version_name)
@@ -126,7 +128,9 @@ async def view(project_name: str, version_name: str) -> response.Response | str:
 
 
 @routes.public("/release/view/<project_name>/<version_name>/<path:file_path>")
-async def view_path(project_name: str, version_name: str, file_path: str) -> response.Response | str:
+async def view_path(
+    session: routes.CommitterSession | None, project_name: str, version_name: str, file_path: str
+) -> response.Response | str:
     """View the content of a specific file in the final release."""
     async with db.session() as data:
         release_name = sql.release_name(project_name, version_name)

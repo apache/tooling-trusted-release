@@ -33,7 +33,7 @@ class UpdateCommitteeKeysForm(forms.Typed):
 
 
 @routes.public("/committees")
-async def directory() -> str:
+async def directory(session: routes.CommitterSession | None) -> str:
     """Main committee directory page."""
     async with db.session() as data:
         committees = await data.committee(_projects=True).order_by(sql.Committee.name).all()
@@ -45,7 +45,7 @@ async def directory() -> str:
 
 
 @routes.public("/committees/<name>")
-async def view(name: str) -> str:
+async def view(session: routes.CommitterSession | None, name: str) -> str:
     # TODO: Could also import this from keys.py
     async with db.session() as data:
         committee = await data.committee(

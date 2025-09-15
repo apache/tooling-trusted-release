@@ -71,7 +71,7 @@ async def about(session: routes.CommitterSession) -> str:
 
 
 @routes.public("/")
-async def index() -> response.Response | str:
+async def index(session: routes.CommitterSession | None) -> response.Response | str:
     """Show public info or an entry portal for participants."""
     session_data = await asfquart.session.read()
     if session_data:
@@ -146,7 +146,7 @@ async def index() -> response.Response | str:
 
 
 @routes.public("/policies")
-async def policies() -> str:
+async def policies(session: routes.CommitterSession | None) -> str:
     return await template.blank("Policies", content=_POLICIES)
 
 

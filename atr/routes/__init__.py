@@ -21,7 +21,7 @@ import asyncio
 import functools
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Final, NoReturn, ParamSpec, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Concatenate, Final, NoReturn, ParamSpec, Protocol, TypeVar
 
 import aiofiles
 import aiofiles.os
@@ -483,12 +483,14 @@ async def get_form(request: quart.Request) -> datastructures.MultiDict:
 
 def public(
     path: str, methods: list[str] | None = None, measure_performance: bool = True
-) -> Callable[[RouteHandler[R]], RouteHandler[R]]:
+) -> Callable[[Callable[Concatenate[CommitterSession | None, P], Awaitable[R]]], RouteHandler[R]]:
     """Decorator for public GET routes that provides an enhanced session object."""
 
-    def decorator(func: RouteHandler[R]) -> RouteHandler[R]:
-        async def wrapper(*args: Any, **kwargs: Any) -> R:
-            return await func(*args, **kwargs)
+    def decorator(func: Callable[Concatenate[CommitterSession | None, P], Awaitable[R]]) -> RouteHandler[R]:
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            web_session = await session.read()
+            enhanced_session = CommitterSession(web_session) if web_session else None
+            return await func(enhanced_session, *args, **kwargs)
 
         # Generate a unique endpoint name
         endpoint = func.__module__ + "_" + func.__name__

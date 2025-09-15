@@ -277,7 +277,7 @@ async def delete(session: routes.CommitterSession) -> response.Response:
 
 
 @routes.public("/projects")
-async def projects() -> str:
+async def projects(session: routes.CommitterSession | None) -> str:
     """Main project directory page."""
     async with db.session() as data:
         projects = await data.project(_committee=True).order_by(sql.Project.full_name).all()

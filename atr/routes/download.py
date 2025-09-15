@@ -65,19 +65,25 @@ async def all_selected(
 
 
 @routes.public("/download/path/<project_name>/<version_name>/<path:file_path>")
-async def path(project_name: str, version_name: str, file_path: str) -> response.Response | quart.Response:
+async def path(
+    session: routes.CommitterSession | None, project_name: str, version_name: str, file_path: str
+) -> response.Response | quart.Response:
     """Download a file or list a directory from a release in any phase."""
     return await _download_or_list(project_name, version_name, file_path)
 
 
 @routes.public("/download/path/<project_name>/<version_name>/")
-async def path_empty(project_name: str, version_name: str) -> response.Response | quart.Response:
+async def path_empty(
+    session: routes.CommitterSession | None, project_name: str, version_name: str
+) -> response.Response | quart.Response:
     """List files at the root of a release directory for download."""
     return await _download_or_list(project_name, version_name, ".")
 
 
 @routes.public("/download/sh/<project_name>/<version_name>")
-async def sh_selected(project_name: str, version_name: str) -> response.Response | quart.Response:
+async def sh_selected(
+    session: routes.CommitterSession | None, project_name: str, version_name: str
+) -> response.Response | quart.Response:
     """Shell script to download a release."""
     conf = config.get()
     app_host = conf.APP_HOST
@@ -92,10 +98,12 @@ async def sh_selected(project_name: str, version_name: str) -> response.Response
 
 
 @routes.public("/download/urls/<project_name>/<version_name>")
-async def urls_selected(project_name: str, version_name: str) -> response.Response | quart.Response:
+async def urls_selected(
+    session: routes.CommitterSession | None, project_name: str, version_name: str
+) -> response.Response | quart.Response:
     try:
-        async with db.session() as session:
-            release = await session.release(project_name=project_name, version=version_name).demand(
+        async with db.session() as data:
+            release = await data.release(project_name=project_name, version=version_name).demand(
                 ValueError("Release not found")
             )
         url_list_str = await _generate_file_url_list(release)
@@ -149,8 +157,8 @@ async def _download_or_list(project_name: str, version_name: str, file_path: str
         raise routes.FlashError("Path must be relative")
 
     # We allow downloading files from any phase
-    async with db.session() as session:
-        release = await session.release(project_name=project_name, version=version_name).demand(
+    async with db.session() as data:
+        release = await data.release(project_name=project_name, version=version_name).demand(
             base.ASFQuartException("Release does not exist", errorcode=404)
         )
     full_path = util.release_directory(release) / file_path
