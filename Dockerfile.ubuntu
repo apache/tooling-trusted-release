@@ -9,8 +9,9 @@ ENV PIP_DEFAULT_TIMEOUT=100 \
 
 RUN apt-get update && \
     apt-get install -y \
-      make \
       git \
+      make \
+      patch \
       software-properties-common
 
 RUN add-apt-repository ppa:deadsnakes/ppa && \
@@ -32,6 +33,9 @@ RUN make sync
 
 # generate a version.py module from git information
 RUN make generate-version
+
+WORKDIR /opt/atr/.venv/lib/python3.13/site-packages
+RUN patch -p2 < /opt/atr/patches/generics.py.patch
 
 # final image
 FROM ubuntu:24.04

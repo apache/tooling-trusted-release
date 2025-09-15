@@ -1,0 +1,31 @@
+diff --git a/src/asfquart/generics.py b/src/asfquart/generics.py
+index 452656d..361cdfc 100644
+--- a/src/asfquart/generics.py
++++ b/src/asfquart/generics.py
+@@ -3,6 +3,7 @@
+
+ import secrets
+ import urllib
++import urllib.parse
+ import time
+
+ import quart
+@@ -118,6 +119,17 @@ def enforce_login(app, redirect_uri=DEFAULT_OAUTH_URI):
+             and not quart.request.authorization
+             and not await asfquart.session.read()
+         ):
+-            return quart.redirect(f"{redirect_uri}?login={quart.request.full_path}")
++            # The werkzeug.sansio.request.full_path property returns:
++            # f"{self.path}?{self.query_string.decode()}"
++            # Therefore it contains a "?" even if there is no query string
++            full_path = quart.request.full_path
++            # Strip the trailing "?" when the query string is empty
++            if full_path.endswith("?"):
++                parsed = urllib.parse.urlsplit(full_path)
++                if not parsed.query:
++                    # The query string is empty
++                    full_path = full_path[:-1]
++            quoted_path = urllib.parse.quote(full_path)
++            return quart.redirect(f"{redirect_uri}?login={quoted_path}")
+         # If we have a session, but still no access, just say so in plain text.
+         return quart.Response(status=error.errorcode, response=error.message)

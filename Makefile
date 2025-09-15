@@ -1,6 +1,7 @@
 .PHONY: build build-alpine build-playwright build-ts build-ubuntu certs \
   check check-extra check-light commit docs generate-version ipython \
-  run-playwright run-playwright-slow serve serve-local sync update-deps
+  run-playwright run-playwright-slow serve serve-local sync sync-all \
+  update-deps
 
 BIND ?= 127.0.0.1:8080
 IMAGE ?= tooling-trusted-release
@@ -80,6 +81,9 @@ serve-local:
 
 sync:
 	uv sync --no-dev
+
+sync-all:
+	uv sync --all-groups
 
 update-deps:
 	uv lock --upgrade

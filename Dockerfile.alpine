@@ -8,8 +8,9 @@ ENV PIP_DEFAULT_TIMEOUT=100 \
 
 RUN apk update && \
     apk add --no-cache \
+      git \
       make \
-      git
+      patch
 
 RUN pip3 install uv==${UV_VERSION}
 
@@ -24,6 +25,9 @@ RUN make sync
 
 # generate a version.py module from git information
 RUN make generate-version
+
+WORKDIR /opt/atr/.venv/lib/python3.13/site-packages
+RUN patch -p2 < /opt/atr/patches/generics.py.patch
 
 # final image
 FROM python:3.13.7-alpine3.22
