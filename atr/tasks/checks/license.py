@@ -262,6 +262,7 @@ def _files_check_core_logic_license(archive: tarzip.Archive, member: tarzip.Memb
     apache_license_2_0 = apache_license_2_0.removesuffix("\n")
     content = f.read()
     package_license = content.decode("utf-8", errors="replace")
+    package_license = package_license.replace("\r\n", "\n")
     package_license = package_license.removeprefix("\n")
     package_license = package_license[: len(apache_license_2_0)]
     if package_license != apache_license_2_0:
