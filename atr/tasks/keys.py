@@ -35,7 +35,7 @@ async def import_file(args: ImportFile) -> results.Results | None:
     async with storage.write(args.asf_uid) as write:
         wacm = await write.as_project_committee_member(args.project_name)
         outcomes = await wacm.keys.import_keys_file(args.project_name, args.version_name)
-        if outcomes.any_exception:
+        if outcomes.any_error:
             # TODO: Log this? This code is unused anyway
             pass
     return None

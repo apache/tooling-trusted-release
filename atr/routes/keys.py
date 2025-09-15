@@ -475,7 +475,7 @@ async def upload(session: routes.CommitterSession) -> str:
             outcomes = await wacm.keys.ensure_associated(keys_text)
         results = outcomes
         success_count = outcomes.result_count
-        error_count = outcomes.exception_count
+        error_count = outcomes.error_count
         total_count = success_count + error_count
 
         await quart.flash(

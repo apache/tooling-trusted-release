@@ -103,9 +103,9 @@ async def keys_import(conf: config.AppConfig, asf_uid: str) -> None:
             keys_file_text = content.decode("utf-8", errors="replace")
             outcomes = await wafa.keys.ensure_associated(keys_file_text)
             yes = outcomes.result_count
-            no = outcomes.exception_count
+            no = outcomes.error_count
             if no:
-                outcomes.exceptions_print()
+                outcomes.errors_print()
 
             # Print and record the number of keys that were okay and failed
             print_and_flush(f"{committee_name} {yes} {no}")

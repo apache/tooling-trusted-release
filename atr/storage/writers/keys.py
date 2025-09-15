@@ -25,8 +25,7 @@ import asyncio
 import datetime
 import tempfile
 import textwrap
-import time
-from typing import TYPE_CHECKING, Any, Final, NoReturn
+from typing import NoReturn
 
 import aiofiles
 import aiofiles.os
@@ -42,39 +41,6 @@ import atr.storage.outcome as outcome
 import atr.storage.types as types
 import atr.user as user
 import atr.util as util
-
-if TYPE_CHECKING:
-    from collections.abc import Callable, Coroutine
-
-PERFORMANCES: Final[dict[int, tuple[str, int]]] = {}
-_MEASURE_PERFORMANCE: Final[bool] = False
-
-
-def performance(func: Callable[..., Any]) -> Callable[..., Any]:
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        if not _MEASURE_PERFORMANCE:
-            return func(*args, **kwargs)
-
-        start = time.perf_counter_ns()
-        result = func(*args, **kwargs)
-        end = time.perf_counter_ns()
-        PERFORMANCES[time.time_ns()] = (func.__name__, end - start)
-        return result
-
-    return wrapper
-
-
-def performance_async(func: Callable[..., Coroutine[Any, Any, Any]]) -> Callable[..., Coroutine[Any, Any, Any]]:
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        if not _MEASURE_PERFORMANCE:
-            return await func(*args, **kwargs)
-        start = time.perf_counter_ns()
-        result = await func(*args, **kwargs)
-        end = time.perf_counter_ns()
-        PERFORMANCES[time.time_ns()] = (func.__name__, end - start)
-        return result
-
-    return wrapper
 
 
 class GeneralPublic:
@@ -104,7 +70,6 @@ class FoundationCommitter(GeneralPublic):
         # Specific to this module
         self.__key_block_models_cache = {}
 
-    @performance_async
     async def delete_key(self, fingerprint: str) -> outcome.Outcome[sql.PublicSigningKey]:
         try:
             key = await self.__data.public_signing_key(
@@ -123,11 +88,9 @@ class FoundationCommitter(GeneralPublic):
         except Exception as e:
             return outcome.Error(e)
 
-    @performance_async
     async def ensure_stored_one(self, key_file_text: str) -> outcome.Outcome[types.Key]:
         return await self.__ensure_one(key_file_text, associate=False)
 
-    @performance
     def keyring_fingerprint_model(
         self, keyring: pgpy.PGPKeyring, fingerprint: str, ldap_data: dict[str, str]
     ) -> sql.PublicSigningKey | None:
@@ -163,7 +126,6 @@ class FoundationCommitter(GeneralPublic):
                 ascii_armored_key=str(key),
             )
 
-    @performance_async
     async def keys_file_text(self, committee_name: str) -> str:
         committee = await self.__data.committee(name=committee_name, _public_signing_keys=True).demand(
             storage.AccessError(f"Committee not found: {committee_name}")
@@ -207,7 +169,6 @@ class FoundationCommitter(GeneralPublic):
             key_blocks_str=key_blocks_str,
         )
 
-    @performance
     def __block_model(self, key_block: str, ldap_data: dict[str, str]) -> types.Key:
         # This cache is only held for the session
         if key_block in self.__key_block_models_cache:
@@ -239,7 +200,6 @@ class FoundationCommitter(GeneralPublic):
         self.__key_block_models_cache[key_block] = [key]
         return key
 
-    @performance_async
     async def __database_add_model(
         self,
         key: types.Key,
@@ -264,7 +224,6 @@ class FoundationCommitter(GeneralPublic):
         # TODO: PARSED now acts as "ALREADY_ADDED"
         return outcome.Result(types.Key(status=types.KeyStatus.INSERTED, key_model=key.key_model))
 
-    @performance_async
     async def __ensure_one(self, key_file_text: str, associate: bool = True) -> outcome.Outcome[types.Key]:
         try:
             key_blocks = util.parse_key_blocks(key_file_text)
@@ -281,7 +240,6 @@ class FoundationCommitter(GeneralPublic):
         oc = await self.__database_add_model(key)
         return oc
 
-    @performance_async
     async def __keys_file_format(
         self,
         committee_name: str,
@@ -329,7 +287,6 @@ and was published by the committee.\
         full_keys_file_content = header_content + key_blocks_str
         return full_keys_file_content
 
-    @performance
     def __uids_asf_uid(self, uids: list[str], ldap_data: dict[str, str]) -> str | None:
         # Test data
         test_key_uids = [
@@ -379,7 +336,6 @@ class CommitteeParticipant(FoundationCommitter):
         # Specific to this module
         self.__key_block_models_cache = {}
 
-    @performance_async
     async def associate_fingerprint(self, fingerprint: str) -> outcome.Outcome[types.LinkedCommittee]:
         via = sql.validate_instrumented_attribute
         link_values = [{"committee_name": self.__committee_name, "key_fingerprint": fingerprint}]
@@ -408,7 +364,6 @@ class CommitteeParticipant(FoundationCommitter):
             )
         )
 
-    @performance_async
     async def autogenerate_keys_file(
         self,
     ) -> outcome.Outcome[str]:
@@ -418,7 +373,7 @@ class CommitteeParticipant(FoundationCommitter):
             committee = await self.committee()
             is_podling = committee.is_podling
 
-            full_keys_file_content = await self.keys_file_text()
+            full_keys_file_content = await self.keys_file_text(self.__committee_name)
             if is_podling:
                 committee_keys_dir = base_downloads_dir / "incubator" / self.__committee_name
             else:
@@ -440,7 +395,6 @@ class CommitteeParticipant(FoundationCommitter):
             return outcome.Error(storage.AccessError(error_msg))
         return outcome.Result(str(committee_keys_path))
 
-    @performance_async
     async def committee(self) -> sql.Committee:
         return await self.__data.committee(name=self.__committee_name, _public_signing_keys=True).demand(
             storage.AccessError(f"Committee not found: {self.__committee_name}")
@@ -450,21 +404,18 @@ class CommitteeParticipant(FoundationCommitter):
     def committee_name(self) -> str:
         return self.__committee_name
 
-    @performance_async
     async def ensure_associated(self, keys_file_text: str) -> outcome.List[types.Key]:
         outcomes: outcome.List[types.Key] = await self.__ensure(keys_file_text, associate=True)
         if outcomes.any_result:
             await self.autogenerate_keys_file()
         return outcomes
 
-    @performance_async
     async def ensure_stored(self, keys_file_text: str) -> outcome.List[types.Key]:
         outcomes: outcome.List[types.Key] = await self.__ensure(keys_file_text, associate=False)
         if outcomes.any_result:
             await self.autogenerate_keys_file()
         return outcomes
 
-    @performance_async
     async def import_keys_file(self, project_name: str, version_name: str) -> outcome.List[types.Key]:
         import atr.revision as revision
 
@@ -485,7 +436,7 @@ class CommitteeParticipant(FoundationCommitter):
 
         outcomes = await self.ensure_associated(keys_file_text)
         # Remove the KEYS file if 100% imported
-        if (outcomes.result_count > 0) and (outcomes.exception_count == 0):
+        if (outcomes.result_count > 0) and (outcomes.error_count == 0):
             description = "Removed KEYS file after successful import through web interface"
             async with revision.create_and_manage(
                 project_name, version_name, self.__asf_uid, description=description
@@ -494,7 +445,6 @@ class CommitteeParticipant(FoundationCommitter):
                 await aiofiles.os.remove(path_in_new_revision)
         return outcomes
 
-    @performance
     def __block_models(self, key_block: str, ldap_data: dict[str, str]) -> list[types.Key | Exception]:
         # This cache is only held for the session
         if key_block in self.__key_block_models_cache:
@@ -519,7 +469,6 @@ class CommitteeParticipant(FoundationCommitter):
         self.__key_block_models_cache[key_block] = key_list
         return key_list
 
-    @performance_async
     async def __database_add_models(
         self, outcomes: outcome.List[types.Key], associate: bool = True
     ) -> outcome.List[types.Key]:
@@ -539,7 +488,6 @@ class CommitteeParticipant(FoundationCommitter):
             outcomes.update_roes(Exception, raise_post_parse_error)
         return outcomes
 
-    @performance_async
     async def __database_add_models_core(
         self,
         outcomes: outcome.List[types.Key],
@@ -602,7 +550,6 @@ class CommitteeParticipant(FoundationCommitter):
         await self.__data.commit()
         return outcomes
 
-    @performance_async
     async def __ensure(self, keys_file_text: str, associate: bool = True) -> outcome.List[types.Key]:
         outcomes = outcome.List[types.Key]()
         try:
@@ -620,11 +567,7 @@ class CommitteeParticipant(FoundationCommitter):
                 outcomes.append_error(e)
         # Try adding the keys to the database
         # If not, all keys will be replaced with a PostParseError
-        outcomes = await self.__database_add_models(outcomes, associate=associate)
-        if _MEASURE_PERFORMANCE:
-            for key, value in PERFORMANCES.items():
-                log.info(f"{key}: {value}")
-        return outcomes
+        return await self.__database_add_models(outcomes, associate=associate)
 
 
 class CommitteeMember(CommitteeParticipant):
