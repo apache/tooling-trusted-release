@@ -21,6 +21,8 @@ from typing import TYPE_CHECKING, Any
 
 import htpy
 
+from . import log
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -73,18 +75,34 @@ class Block:
         match eob:
             case Block():
                 # TODO: Does not support separator
-                self.elements.append(eob.collect())
+                self.elements.append(eob.collect(depth=2))
             case htpy.Element():
                 self.elements.append(eob)
 
-    def collect(self, separator: str | None = None) -> htpy.Element:
+    def collect(self, separator: str | None = None, depth: int = 1) -> htpy.Element:
+        src = log.caller_name(depth=depth)
+
         if separator is not None:
             separated: list[htpy.Element | str] = [separator] * (2 * len(self.elements) - 1)
             separated[::2] = self.elements
-            self.elements = separated
+            elements = separated
+        else:
+            elements = self.elements
+
         if self.element is None:
-            return htpy.div[*self.elements]
-        return self.element[*self.elements]
+            return htpy.div(data_src=src)[*elements]
+
+        new_element = self.element.__class__(
+            self.element._name,
+            self.element._attrs,
+            self.element._children,
+        )
+        if ' data-src="' not in new_element._attrs:
+            if new_element._attrs:
+                new_element._attrs = new_element._attrs + f' data-src="{src}"'
+            else:
+                new_element._attrs = f' data-src="{src}"'
+        return new_element[*elements]
 
     @property
     def a(self) -> BlockElementCallable:
