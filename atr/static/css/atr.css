@@ -221,7 +221,7 @@ form.atr-canary {
 
 .site-title {
     text-decoration: none;
-    color: inherit;
+    color: inherit !important;
 }
 
 span.warning {
