@@ -33,7 +33,7 @@ import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
 import atr.revision as revision
-import atr.routes as routes
+import atr.route as route
 import atr.routes.compose as compose
 import atr.routes.root as root
 import atr.routes.upload as upload
@@ -73,8 +73,8 @@ class VotePreviewForm(forms.Typed):
     vote_duration = forms.integer("Vote duration")
 
 
-@routes.committer("/draft/delete", methods=["POST"])
-async def delete(session: routes.CommitterSession) -> response.Response:
+@route.committer("/draft/delete", methods=["POST"])
+async def delete(session: route.CommitterSession) -> response.Response:
     """Delete a candidate draft and all its associated files."""
     form = await DeleteForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
@@ -117,8 +117,8 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     return await session.redirect(root.index, success="Candidate draft deleted successfully")
 
 
-@routes.committer("/draft/delete-file/<project_name>/<version_name>", methods=["POST"])
-async def delete_file(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
+@route.committer("/draft/delete-file/<project_name>/<version_name>", methods=["POST"])
+async def delete_file(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response:
     """Delete a specific file from the release candidate, creating a new revision."""
     await session.check_access(project_name)
 
@@ -152,8 +152,8 @@ async def delete_file(session: routes.CommitterSession, project_name: str, versi
     )
 
 
-@routes.committer("/draft/fresh/<project_name>/<version_name>", methods=["POST"])
-async def fresh(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
+@route.committer("/draft/fresh/<project_name>/<version_name>", methods=["POST"])
+async def fresh(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response:
     """Restart all checks for a whole release candidate draft."""
     # Admin only button, but it's okay if users find and use this manually
     await session.check_access(project_name)
@@ -176,9 +176,9 @@ async def fresh(session: routes.CommitterSession, project_name: str, version_nam
     )
 
 
-@routes.committer("/draft/hashgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+@route.committer("/draft/hashgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
 async def hashgen(
-    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
+    session: route.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
     """Generate an sha256 or sha512 hash file for a candidate draft file, creating a new revision."""
     await session.check_access(project_name)
@@ -211,9 +211,9 @@ async def hashgen(
     )
 
 
-@routes.committer("/draft/sbomgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+@route.committer("/draft/sbomgen/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
 async def sbomgen(
-    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
+    session: route.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
     """Generate a CycloneDX SBOM file for a candidate draft file, creating a new revision."""
     await session.check_access(project_name)
@@ -238,14 +238,14 @@ async def sbomgen(
             # Check that the source file exists in the new revision
             if not await aiofiles.os.path.exists(path_in_new_revision):
                 log.error(f"Source file {rel_path} not found in new revision for SBOM generation.")
-                raise routes.FlashError("Source artifact file not found in the new revision.")
+                raise route.FlashError("Source artifact file not found in the new revision.")
 
             # Check that the SBOM file does not already exist in the new revision
             if await aiofiles.os.path.exists(sbom_path_in_new_revision):
                 raise base.ASFQuartException("SBOM file already exists", errorcode=400)
 
         if creating.new is None:
-            raise routes.FlashError("Internal error: New revision not found")
+            raise route.FlashError("Internal error: New revision not found")
 
         # Create and queue the task, using paths within the new revision
         async with storage.write(session.uid) as write:
@@ -268,8 +268,8 @@ async def sbomgen(
     )
 
 
-@routes.committer("/draft/svnload/<project_name>/<version_name>", methods=["POST"])
-async def svnload(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+@route.committer("/draft/svnload/<project_name>/<version_name>", methods=["POST"])
+async def svnload(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Import files from SVN into a draft."""
     await session.check_access(project_name)
 
@@ -312,8 +312,8 @@ async def svnload(session: routes.CommitterSession, project_name: str, version_n
     )
 
 
-@routes.committer("/draft/tools/<project_name>/<version_name>/<path:file_path>")
-async def tools(session: routes.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
+@route.committer("/draft/tools/<project_name>/<version_name>/<path:file_path>")
+async def tools(session: route.CommitterSession, project_name: str, version_name: str, file_path: str) -> str:
     """Show the tools for a specific file."""
     await session.check_access(project_name)
 
@@ -348,8 +348,8 @@ async def tools(session: routes.CommitterSession, project_name: str, version_nam
 
 # TODO: Should we deprecate this and ensure compose covers it all?
 # If we did that, we'd lose the exhaustive use of the abstraction
-@routes.committer("/draft/view/<project_name>/<version_name>")
-async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+@route.committer("/draft/view/<project_name>/<version_name>")
+async def view(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
     await session.check_access(project_name)
 
@@ -379,9 +379,9 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     )
 
 
-@routes.committer("/draft/vote/preview/<project_name>/<version_name>", methods=["POST"])
+@route.committer("/draft/vote/preview/<project_name>/<version_name>", methods=["POST"])
 async def vote_preview(
-    session: routes.CommitterSession, project_name: str, version_name: str
+    session: route.CommitterSession, project_name: str, version_name: str
 ) -> quart.wrappers.response.Response | response.Response | str:
     """Show the vote email preview for a release."""
 
@@ -391,7 +391,7 @@ async def vote_preview(
 
     release = await session.release(project_name, version_name)
     if release.committee is None:
-        raise routes.FlashError("Release has no associated committee")
+        raise route.FlashError("Release has no associated committee")
 
     form_body: str = util.unwrap(form.body.data)
     asfuid = session.uid

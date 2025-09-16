@@ -27,7 +27,7 @@ import atr.forms as forms
 import atr.models.results as results
 import atr.models.sql as sql
 import atr.revision as revision
-import atr.routes as routes
+import atr.route as route
 import atr.routes.draft as draft
 import atr.routes.mapping as mapping
 import atr.storage as storage
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 
 
 async def check(
-    session: routes.CommitterSession,
+    session: route.CommitterSession,
     release: sql.Release,
     task_mid: str | None = None,
     form: wtforms.Form | None = None,
@@ -119,8 +119,8 @@ async def check(
     )
 
 
-@routes.committer("/compose/<project_name>/<version_name>")
-async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+@route.committer("/compose/<project_name>/<version_name>")
+async def selected(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show the contents of the release candidate draft."""
     await session.check_access(project_name)
 

@@ -31,13 +31,13 @@ import atr.forms as forms
 import atr.models.schema as schema
 import atr.models.sql as sql
 import atr.revision as revision
-import atr.routes as routes
+import atr.route as route
 import atr.template as template
 import atr.util as util
 
 
-@routes.committer("/revisions/<project_name>/<version_name>")
-async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
+@route.committer("/revisions/<project_name>/<version_name>")
+async def selected(session: route.CommitterSession, project_name: str, version_name: str) -> str:
     """Show the revision history for a release candidate draft or release preview."""
     await session.check_access(project_name)
 
@@ -92,8 +92,8 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     )
 
 
-@routes.committer("/revisions/<project_name>/<version_name>", methods=["POST"])
-async def selected_post(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
+@route.committer("/revisions/<project_name>/<version_name>", methods=["POST"])
+async def selected_post(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response:
     """Set a specific revision as the latest for a candidate draft or release preview."""
     await session.check_access(project_name)
 

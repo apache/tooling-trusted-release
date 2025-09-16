@@ -25,7 +25,7 @@ import atr.config as config
 import atr.construct as construct
 import atr.forms as forms
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.routes.release as routes_release
 import atr.storage as storage
 import atr.template as template
@@ -60,8 +60,8 @@ class DeleteForm(forms.Typed):
     submit = forms.submit("Delete preview")
 
 
-@routes.committer("/announce/<project_name>/<version_name>")
-async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> str | response.Response:
+@route.committer("/announce/<project_name>/<version_name>")
+async def selected(session: route.CommitterSession, project_name: str, version_name: str) -> str | response.Response:
     """Allow the user to announce a release preview."""
     await session.check_access(project_name)
 
@@ -105,9 +105,9 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     )
 
 
-@routes.committer("/announce/<project_name>/<version_name>", methods=["POST"])
+@route.committer("/announce/<project_name>/<version_name>", methods=["POST"])
 async def selected_post(
-    session: routes.CommitterSession, project_name: str, version_name: str
+    session: route.CommitterSession, project_name: str, version_name: str
 ) -> str | response.Response:
     """Handle the announcement form submission and promote the preview to release."""
     await session.check_access(project_name)

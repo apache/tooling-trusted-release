@@ -33,7 +33,7 @@ from htpy import (
 
 import atr.forms as forms
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.storage as storage
 import atr.template as template
 import atr.util as util
@@ -104,8 +104,8 @@ class UpdateIgnoreForm(forms.Typed):
     submit = forms.submit("Update ignore")
 
 
-@routes.committer("/ignores/<committee_name>", methods=["GET", "POST"])
-async def ignores(session: routes.CommitterSession, committee_name: str) -> str | response.Response:
+@route.committer("/ignores/<committee_name>", methods=["GET", "POST"])
+async def ignores(session: route.CommitterSession, committee_name: str) -> str | response.Response:
     async with storage.read() as read:
         ragp = read.as_general_public()
         ignores = await ragp.checks.ignores(committee_name)
@@ -121,8 +121,8 @@ async def ignores(session: routes.CommitterSession, committee_name: str) -> str 
     return await template.blank("Ignored checks", content)
 
 
-@routes.committer("/ignores/<committee_name>/add", methods=["POST"])
-async def ignores_committee_add(session: routes.CommitterSession, committee_name: str) -> str | response.Response:
+@route.committer("/ignores/<committee_name>/add", methods=["POST"])
+async def ignores_committee_add(session: route.CommitterSession, committee_name: str) -> str | response.Response:
     data = await quart.request.form
     form = await AddIgnoreForm.create_form(data=data)
     if not (await form.validate_on_submit()):
@@ -149,8 +149,8 @@ async def ignores_committee_add(session: routes.CommitterSession, committee_name
     )
 
 
-@routes.committer("/ignores/<committee_name>/delete", methods=["POST"])
-async def ignores_committee_delete(session: routes.CommitterSession, committee_name: str) -> str | response.Response:
+@route.committer("/ignores/<committee_name>/delete", methods=["POST"])
+async def ignores_committee_delete(session: route.CommitterSession, committee_name: str) -> str | response.Response:
     data = await quart.request.form
     form = await DeleteIgnoreForm.create_form(data=data)
     if not (await form.validate_on_submit()):
@@ -179,8 +179,8 @@ async def ignores_committee_delete(session: routes.CommitterSession, committee_n
     )
 
 
-@routes.committer("/ignores/<committee_name>/update", methods=["POST"])
-async def ignores_committee_update(session: routes.CommitterSession, committee_name: str) -> str | response.Response:
+@route.committer("/ignores/<committee_name>/update", methods=["POST"])
+async def ignores_committee_update(session: route.CommitterSession, committee_name: str) -> str | response.Response:
     data = await quart.request.form
     form = await UpdateIgnoreForm.create_form(data=data)
     if not (await form.validate_on_submit()):

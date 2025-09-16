@@ -28,7 +28,7 @@ import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.routes.compose as compose
 import atr.routes.root as root
 import atr.routes.vote as vote
@@ -55,9 +55,9 @@ class VoteInitiateForm(forms.Typed):
     submit = forms.submit("Send vote email")
 
 
-@routes.committer("/voting/<project_name>/<version_name>/<revision>", methods=["GET", "POST"])
+@route.committer("/voting/<project_name>/<version_name>/<revision>", methods=["GET", "POST"])
 async def selected_revision(
-    session: routes.CommitterSession, project_name: str, version_name: str, revision: str
+    session: route.CommitterSession, project_name: str, version_name: str, revision: str
 ) -> response.Response | str:
     """Show the vote initiation form for a release."""
     await session.check_access(project_name)
@@ -114,7 +114,7 @@ async def selected_revision(
 async def start_vote_manual(
     release: sql.Release,
     selected_revision_number: str,
-    session: routes.CommitterSession,
+    session: route.CommitterSession,
     data: db.Session,
 ) -> response.Response | str:
     # This verifies the state and sets the phase to RELEASE_CANDIDATE
@@ -193,7 +193,7 @@ async def _selected_revision_data(
     version_name: str,
     revision: str,
     data: db.Session,
-    session: routes.CommitterSession,
+    session: route.CommitterSession,
 ) -> response.Response | str | VoteInitiateForm:
     committee = release.committee
     if committee is None:

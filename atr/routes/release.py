@@ -26,7 +26,7 @@ import werkzeug.wrappers.response as response
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.template as template
 import atr.util as util
 
@@ -34,8 +34,8 @@ if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
 
 
-@routes.public("/releases/finished/<project_name>")
-async def finished(session: routes.CommitterSession | None, project_name: str) -> str:
+@route.public("/releases/finished/<project_name>")
+async def finished(session: route.CommitterSession | None, project_name: str) -> str:
     """View all finished releases for a project."""
     async with db.session() as data:
         project = await data.project(name=project_name, status=sql.ProjectStatus.ACTIVE).demand(
@@ -58,8 +58,8 @@ async def finished(session: routes.CommitterSession | None, project_name: str) -
     )
 
 
-@routes.public("/releases")
-async def releases(session: routes.CommitterSession | None) -> str:
+@route.public("/releases")
+async def releases(session: route.CommitterSession | None) -> str:
     """View all releases."""
     # Releases are public, so we don't need to filter by user
     async with db.session() as data:
@@ -83,8 +83,8 @@ async def releases(session: routes.CommitterSession | None) -> str:
     )
 
 
-@routes.committer("/release/select/<project_name>")
-async def select(session: routes.CommitterSession, project_name: str) -> str:
+@route.committer("/release/select/<project_name>")
+async def select(session: route.CommitterSession, project_name: str) -> str:
     """Show releases in progress for a project."""
     await session.check_access(project_name)
 
@@ -98,10 +98,8 @@ async def select(session: routes.CommitterSession, project_name: str) -> str:
     )
 
 
-@routes.public("/release/view/<project_name>/<version_name>")
-async def view(
-    session: routes.CommitterSession | None, project_name: str, version_name: str
-) -> response.Response | str:
+@route.public("/release/view/<project_name>/<version_name>")
+async def view(session: route.CommitterSession | None, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
     async with db.session() as data:
         release_name = sql.release_name(project_name, version_name)
@@ -127,9 +125,9 @@ async def view(
     )
 
 
-@routes.public("/release/view/<project_name>/<version_name>/<path:file_path>")
+@route.public("/release/view/<project_name>/<version_name>/<path:file_path>")
 async def view_path(
-    session: routes.CommitterSession | None, project_name: str, version_name: str, file_path: str
+    session: route.CommitterSession | None, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:
     """View the content of a specific file in the final release."""
     async with db.session() as data:

@@ -20,7 +20,7 @@ from collections.abc import Callable
 import werkzeug.wrappers.response as response
 
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.routes.compose as compose
 import atr.routes.finish as finish
 import atr.routes.release as routes_release
@@ -28,7 +28,7 @@ import atr.routes.vote as vote
 import atr.util as util
 
 
-async def release_as_redirect(session: routes.CommitterSession, release: sql.Release) -> response.Response:
+async def release_as_redirect(session: route.CommitterSession, release: sql.Release) -> response.Response:
     route = release_as_route(release)
     if route is routes_release.finished:
         return await session.redirect(route, project_name=release.project.name)

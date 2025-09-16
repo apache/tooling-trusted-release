@@ -32,7 +32,7 @@ import atr.htm as htm
 import atr.log as log
 import atr.models.results as results
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.sbomtool as sbomtool
 import atr.storage as storage
 import atr.template as template
@@ -42,9 +42,9 @@ if TYPE_CHECKING:
     import werkzeug.wrappers.response as response
 
 
-@routes.committer("/sbom/augment/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
+@route.committer("/sbom/augment/<project_name>/<version_name>/<path:file_path>", methods=["POST"])
 async def augment(
-    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
+    session: route.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response:
     """Augment a CycloneDX SBOM file."""
     await session.check_access(project_name)
@@ -87,8 +87,8 @@ async def augment(
     )
 
 
-@routes.committer("/sbom/report/<project>/<version>/<path:file_path>")
-async def report(session: routes.CommitterSession, project: str, version: str, file_path: str) -> str:
+@route.committer("/sbom/report/<project>/<version>/<path:file_path>")
+async def report(session: route.CommitterSession, project: str, version: str, file_path: str) -> str:
     await session.check_access(project)
     await session.release(project, version)
     async with db.session() as data:

@@ -25,7 +25,7 @@ import atr.construct as construct
 import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.routes.root as root
 import atr.storage as storage
 import atr.template as template
@@ -52,9 +52,9 @@ class DeleteForm(forms.Typed):
     submit = forms.submit("Delete preview")
 
 
-@routes.committer("/preview/announce/<project_name>/<version_name>", methods=["POST"])
+@route.committer("/preview/announce/<project_name>/<version_name>", methods=["POST"])
 async def announce_preview(
-    session: routes.CommitterSession, project_name: str, version_name: str
+    session: route.CommitterSession, project_name: str, version_name: str
 ) -> quart.wrappers.response.Response | str:
     """Generate a preview of the announcement email body."""
 
@@ -83,8 +83,8 @@ async def announce_preview(
         return quart.Response(f"Error generating preview: {e!s}", status=500, mimetype="text/plain")
 
 
-@routes.committer("/preview/delete", methods=["POST"])
-async def delete(session: routes.CommitterSession) -> response.Response:
+@route.committer("/preview/delete", methods=["POST"])
+async def delete(session: route.CommitterSession) -> response.Response:
     """Delete a preview and all its associated files."""
     form = await DeleteForm.create_form(data=await quart.request.form)
 
@@ -110,8 +110,8 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     return await session.redirect(root.index, success="Preview deleted successfully")
 
 
-@routes.committer("/preview/view/<project_name>/<version_name>")
-async def view(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+@route.committer("/preview/view/<project_name>/<version_name>")
+async def view(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
     await session.check_access(project_name)
 
@@ -141,9 +141,9 @@ async def view(session: routes.CommitterSession, project_name: str, version_name
     )
 
 
-@routes.committer("/preview/view/<project_name>/<version_name>/<path:file_path>")
+@route.committer("/preview/view/<project_name>/<version_name>/<path:file_path>")
 async def view_path(
-    session: routes.CommitterSession, project_name: str, version_name: str, file_path: str
+    session: route.CommitterSession, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:
     """View the content of a specific file in the release preview."""
     await session.check_access(project_name)

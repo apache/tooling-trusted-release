@@ -34,7 +34,7 @@ import atr.db as db
 import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.routes.mapping as mapping
 import atr.routes.root as root
 import atr.storage as storage
@@ -81,7 +81,7 @@ class RemoveRCTagsForm(forms.Typed):
 @dataclasses.dataclass
 class ProcessFormDataArgs:
     formdata: datastructures.MultiDict
-    session: routes.CommitterSession
+    session: route.CommitterSession
     project_name: str
     version_name: str
     move_form: MoveFileForm
@@ -99,9 +99,9 @@ class RCTagAnalysisResult:
     total_paths: int
 
 
-@routes.committer("/finish/<project_name>/<version_name>", methods=["GET", "POST"])
+@route.committer("/finish/<project_name>/<version_name>", methods=["GET", "POST"])
 async def selected(
-    session: routes.CommitterSession, project_name: str, version_name: str
+    session: route.CommitterSession, project_name: str, version_name: str
 ) -> tuple[quart_response.Response, int] | response.Response | str:
     """Finish a release preview."""
     await session.check_access(project_name)
@@ -245,7 +245,7 @@ async def _deletable_choices(latest_revision_dir: pathlib.Path, target_dirs: set
 
 async def _delete_empty_directory(
     dir_to_delete_rel: pathlib.Path,
-    session: routes.CommitterSession,
+    session: route.CommitterSession,
     project_name: str,
     version_name: str,
     respond: Respond,
@@ -266,7 +266,7 @@ async def _delete_empty_directory(
 async def _move_file_to_revision(
     source_files_rel: list[pathlib.Path],
     target_dir_rel: pathlib.Path,
-    session: routes.CommitterSession,
+    session: route.CommitterSession,
     project_name: str,
     version_name: str,
     respond: Respond,
@@ -307,7 +307,7 @@ async def _move_file_to_revision(
 
 
 async def _remove_rc_tags(
-    session: routes.CommitterSession,
+    session: route.CommitterSession,
     project_name: str,
     version_name: str,
     respond: Respond,

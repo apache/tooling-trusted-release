@@ -24,7 +24,7 @@ import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.routes.compose as compose
 import atr.storage as storage
 import atr.template as template
@@ -40,8 +40,8 @@ class StartReleaseForm(forms.Typed):
     submit = forms.submit("Start new release")
 
 
-@routes.committer("/start/<project_name>", methods=["GET", "POST"])
-async def selected(session: routes.CommitterSession, project_name: str) -> response.Response | str:
+@route.committer("/start/<project_name>", methods=["GET", "POST"])
+async def selected(session: route.CommitterSession, project_name: str) -> response.Response | str:
     """Allow the user to start a new release draft, or handle its submission."""
     await session.check_access(project_name)
 
@@ -71,7 +71,7 @@ async def selected(session: routes.CommitterSession, project_name: str) -> respo
                 version_name=new_release.version,
                 success="Release candidate draft created successfully",
             )
-        except (routes.FlashError, base.ASFQuartException) as e:
+        except (route.FlashError, base.ASFQuartException) as e:
             # Flash the error and let the code fall through to render the template below
             await quart.flash(str(e), "error")
 
@@ -79,4 +79,4 @@ async def selected(session: routes.CommitterSession, project_name: str) -> respo
     releases = await interaction.all_releases(project)
 
     # Render the template for GET requests or POST requests with validation errors
-    return await template.render("start-selected.html", project=project, form=form, routes=routes, releases=releases)
+    return await template.render("start-selected.html", project=project, form=form, releases=releases)

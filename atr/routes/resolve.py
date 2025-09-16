@@ -21,7 +21,7 @@ import werkzeug.wrappers.response as response
 
 import atr.forms as forms
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.routes.compose as compose
 import atr.routes.finish as finish
 import atr.routes.vote as vote
@@ -60,8 +60,8 @@ class ResolveVoteManualForm(forms.Typed):
     submit = forms.submit("Resolve vote")
 
 
-@routes.committer("/resolve/manual/<project_name>/<version_name>")
-async def manual_selected(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
+@route.committer("/resolve/manual/<project_name>/<version_name>")
+async def manual_selected(session: route.CommitterSession, project_name: str, version_name: str) -> str:
     """Get the manual vote resolution page."""
     await session.check_access(project_name)
 
@@ -82,9 +82,9 @@ async def manual_selected(session: routes.CommitterSession, project_name: str, v
     )
 
 
-@routes.committer("/resolve/manual/<project_name>/<version_name>", methods=["POST"])
+@route.committer("/resolve/manual/<project_name>/<version_name>", methods=["POST"])
 async def manual_selected_post(
-    session: routes.CommitterSession, project_name: str, version_name: str
+    session: route.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
     """Post the manual vote resolution page."""
     await session.check_access(project_name)
@@ -122,9 +122,9 @@ async def manual_selected_post(
     )
 
 
-@routes.committer("/resolve/submit/<project_name>/<version_name>", methods=["POST"])
+@route.committer("/resolve/submit/<project_name>/<version_name>", methods=["POST"])
 async def submit_selected(
-    session: routes.CommitterSession, project_name: str, version_name: str
+    session: route.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
     """Resolve a vote."""
     await session.check_access(project_name)
@@ -164,8 +164,8 @@ async def submit_selected(
     )
 
 
-@routes.committer("/resolve/tabulated/<project_name>/<version_name>", methods=["POST"])
-async def tabulated_selected_post(session: routes.CommitterSession, project_name: str, version_name: str) -> str:
+@route.committer("/resolve/tabulated/<project_name>/<version_name>", methods=["POST"])
+async def tabulated_selected_post(session: route.CommitterSession, project_name: str, version_name: str) -> str:
     """Tabulate votes."""
     await session.check_access(project_name)
     asf_uid = session.uid

@@ -125,8 +125,8 @@ def app_setup_context(app: base.QuartApp) -> None:
     @app.context_processor
     async def app_wide() -> dict[str, Any]:
         import atr.metadata as metadata
+        import atr.routes as routes
         import atr.routes.mapping as mapping
-        import atr.routes.modules as modules
 
         return {
             "as_url": util.as_url,
@@ -135,7 +135,7 @@ def app_setup_context(app: base.QuartApp) -> None:
             "is_admin_fn": user.is_admin,
             "is_viewing_as_admin_fn": util.is_user_viewing_as_admin,
             "is_committee_member_fn": user.is_committee_member,
-            "routes": modules,
+            "routes": routes,
             "unfinished_releases_fn": interaction.unfinished_releases,
             # "user_committees_fn": interaction.user_committees,
             "user_projects_fn": interaction.user_projects,
@@ -313,7 +313,7 @@ def main() -> None:
 
 def register_routes(app: base.QuartApp) -> ModuleType:
     # NOTE: These imports are for their side effects only
-    import atr.routes.modules as modules
+    import atr.routes as routes
 
     # Add a global error handler to show helpful error messages with tracebacks
     @app.errorhandler(Exception)
@@ -350,7 +350,7 @@ def register_routes(app: base.QuartApp) -> ModuleType:
             return quart.jsonify({"error": "404 Not Found"}), 404
         return await template.render("notfound.html", error="404 Not Found", traceback="", status_code=404), 404
 
-    return modules
+    return routes
 
 
 # FIXME: when running in SSL mode, you will receive these exceptions upon termination at times:

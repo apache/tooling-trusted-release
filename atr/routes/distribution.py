@@ -29,7 +29,7 @@ import atr.forms as forms
 import atr.htm as htm
 import atr.models.distribution as distribution
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.routes.compose as compose
 import atr.routes.finish as finish
 import atr.storage as storage
@@ -93,8 +93,8 @@ class FormProjectVersion:
     version: str
 
 
-@routes.committer("/distribution/delete/<project>/<version>", methods=["POST"])
-async def delete(session: routes.CommitterSession, project: str, version: str) -> response.Response:
+@route.committer("/distribution/delete/<project>/<version>", methods=["POST"])
+async def delete(session: route.CommitterSession, project: str, version: str) -> response.Response:
     form = await DeleteForm.create_form(data=await quart.request.form)
     dd = distribution.DeleteData.model_validate(form.data)
 
@@ -122,8 +122,8 @@ async def delete(session: routes.CommitterSession, project: str, version: str) -
     )
 
 
-@routes.committer("/distributions/list/<project>/<version>", methods=["GET"])
-async def list_get(session: routes.CommitterSession, project: str, version: str) -> str:
+@route.committer("/distributions/list/<project>/<version>", methods=["GET"])
+async def list_get(session: route.CommitterSession, project: str, version: str) -> str:
     async with db.session() as data:
         distributions = await data.distribution(
             release_name=sql.release_name(project, version),
@@ -205,15 +205,15 @@ async def list_get(session: routes.CommitterSession, project: str, version: str)
     return await template.blank(title, content=block.collect())
 
 
-@routes.committer("/distribution/record/<project>/<version>", methods=["GET"])
-async def record(session: routes.CommitterSession, project: str, version: str) -> str:
+@route.committer("/distribution/record/<project>/<version>", methods=["GET"])
+async def record(session: route.CommitterSession, project: str, version: str) -> str:
     form = await DistributeForm.create_form(data={"package": project, "version": version})
     fpv = FormProjectVersion(form=form, project=project, version=version)
     return await _record_form_page(fpv)
 
 
-@routes.committer("/distribution/record/<project>/<version>", methods=["POST"])
-async def record_post(session: routes.CommitterSession, project: str, version: str) -> str:
+@route.committer("/distribution/record/<project>/<version>", methods=["POST"])
+async def record_post(session: route.CommitterSession, project: str, version: str) -> str:
     form = await DistributeForm.create_form(data=await quart.request.form)
     fpv = FormProjectVersion(form=form, project=project, version=version)
     if await form.validate():
@@ -229,15 +229,15 @@ async def record_post(session: routes.CommitterSession, project: str, version: s
     return await _record_form_page(fpv)
 
 
-@routes.committer("/distribution/stage/<project>/<version>", methods=["GET"])
-async def stage(session: routes.CommitterSession, project: str, version: str) -> str:
+@route.committer("/distribution/stage/<project>/<version>", methods=["GET"])
+async def stage(session: route.CommitterSession, project: str, version: str) -> str:
     form = await DistributeForm.create_form(data={"package": project, "version": version})
     fpv = FormProjectVersion(form=form, project=project, version=version)
     return await _record_form_page(fpv, staging=True)
 
 
-@routes.committer("/distribution/stage/<project>/<version>", methods=["POST"])
-async def stage_post(session: routes.CommitterSession, project: str, version: str) -> str:
+@route.committer("/distribution/stage/<project>/<version>", methods=["POST"])
+async def stage_post(session: route.CommitterSession, project: str, version: str) -> str:
     form = await DistributeForm.create_form(data=await quart.request.form)
     fpv = FormProjectVersion(form=form, project=project, version=version)
     if await form.validate():

@@ -33,7 +33,7 @@ import atr.db as db
 import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.routes.compose as compose
 import atr.storage as storage
 import atr.storage.outcome as outcome
@@ -133,8 +133,8 @@ class UploadKeyFormBase(forms.Typed):
         return True
 
 
-@routes.committer("/keys/add", methods=["GET", "POST"])
-async def add(session: routes.CommitterSession) -> str:
+@route.committer("/keys/add", methods=["GET", "POST"])
+async def add(session: route.CommitterSession) -> str:
     """Add a new public signing key to the user's account."""
     key_info = None
 
@@ -172,7 +172,7 @@ async def add(session: routes.CommitterSession) -> str:
             form = await AddOpenPGPKeyForm.create_form()
             forms.choices(form.selected_committees, committee_choices)
 
-        except routes.FlashError as e:
+        except route.FlashError as e:
             log.warning("FlashError adding OpenPGP key: %s", e)
             await quart.flash(str(e), "error")
         except Exception as e:
@@ -185,12 +185,12 @@ async def add(session: routes.CommitterSession) -> str:
         user_committees=participant_of_committees,
         form=form,
         key_info=key_info,
-        algorithms=routes.algorithms,
+        algorithms=route.algorithms,
     )
 
 
-@routes.committer("/keys/delete", methods=["POST"])
-async def delete(session: routes.CommitterSession) -> response.Response:
+@route.committer("/keys/delete", methods=["POST"])
+async def delete(session: route.CommitterSession) -> response.Response:
     """Delete a public signing key or SSH key from the user's account."""
     form = await DeleteKeyForm.create_form(data=await quart.request.form)
 
@@ -221,8 +221,8 @@ async def delete(session: routes.CommitterSession) -> response.Response:
             return await session.redirect(keys, error=f"Error deleting key: {error}")
 
 
-@routes.committer("/keys/details/<fingerprint>", methods=["GET", "POST"])
-async def details(session: routes.CommitterSession, fingerprint: str) -> str | response.Response:
+@route.committer("/keys/details/<fingerprint>", methods=["GET", "POST"])
+async def details(session: route.CommitterSession, fingerprint: str) -> str | response.Response:
     """Display details for a specific OpenPGP key."""
     fingerprint = fingerprint.lower()
     user_committees = []
@@ -274,14 +274,14 @@ async def details(session: routes.CommitterSession, fingerprint: str) -> str | r
         "keys-details.html",
         key=key,
         form=form,
-        algorithms=routes.algorithms,
+        algorithms=route.algorithms,
         now=datetime.datetime.now(datetime.UTC),
         asf_id=session.uid,
     )
 
 
-@routes.committer("/keys/export/<committee_name>")
-async def export(session: routes.CommitterSession, committee_name: str) -> quart.Response:
+@route.committer("/keys/export/<committee_name>")
+async def export(session: route.CommitterSession, committee_name: str) -> quart.Response:
     """Export a KEYS file for a specific committee."""
     async with storage.write() as write:
         wafc = write.as_foundation_committer()
@@ -290,9 +290,9 @@ async def export(session: routes.CommitterSession, committee_name: str) -> quart
     return quart.Response(keys_file_text, mimetype="text/plain")
 
 
-@routes.committer("/keys/import/<project_name>/<version_name>", methods=["POST"])
+@route.committer("/keys/import/<project_name>/<version_name>", methods=["POST"])
 async def import_selected_revision(
-    session: routes.CommitterSession, project_name: str, version_name: str
+    session: route.CommitterSession, project_name: str, version_name: str
 ) -> response.Response:
     await util.validate_empty_form()
 
@@ -311,8 +311,8 @@ async def import_selected_revision(
     )
 
 
-@routes.committer("/keys")
-async def keys(session: routes.CommitterSession) -> str:
+@route.committer("/keys")
+async def keys(session: route.CommitterSession) -> str:
     """View all keys associated with the user's account."""
     committees_to_query = list(set(session.committees + session.projects))
 
@@ -335,7 +335,7 @@ async def keys(session: routes.CommitterSession) -> str:
         user_keys=user_keys,
         user_ssh_keys=user_ssh_keys,
         committees=user_committees_with_keys,
-        algorithms=routes.algorithms,
+        algorithms=route.algorithms,
         status_message=status_message,
         status_type=status_type,
         now=datetime.datetime.now(datetime.UTC),
@@ -346,8 +346,8 @@ async def keys(session: routes.CommitterSession) -> str:
     )
 
 
-@routes.committer("/keys/ssh/add", methods=["GET", "POST"])
-async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
+@route.committer("/keys/ssh/add", methods=["GET", "POST"])
+async def ssh_add(session: route.CommitterSession) -> response.Response | str:
     """Add a new SSH key to the user's account."""
     # TODO: Make an auth.require wrapper that gives the session automatically
     # And the form if it's a POST handler? Might be hard to type
@@ -379,8 +379,8 @@ async def ssh_add(session: routes.CommitterSession) -> response.Response | str:
     )
 
 
-@routes.committer("/keys/update-committee-keys/<committee_name>", methods=["POST"])
-async def update_committee_keys(session: routes.CommitterSession, committee_name: str) -> response.Response:
+@route.committer("/keys/update-committee-keys/<committee_name>", methods=["POST"])
+async def update_committee_keys(session: route.CommitterSession, committee_name: str) -> response.Response:
     """Generate and save the KEYS file for a specific committee."""
     form = await UpdateCommitteeKeysForm.create_form()
     if not await form.validate_on_submit():
@@ -399,8 +399,8 @@ async def update_committee_keys(session: routes.CommitterSession, committee_name
     return await session.redirect(keys)
 
 
-@routes.committer("/keys/upload", methods=["GET", "POST"])
-async def upload(session: routes.CommitterSession) -> str:
+@route.committer("/keys/upload", methods=["GET", "POST"])
+async def upload(session: route.CommitterSession) -> str:
     """Upload a KEYS file containing multiple OpenPGP keys."""
     async with storage.write() as write:
         participant_of_committees = await write.participant_of_committees()
@@ -447,7 +447,7 @@ async def upload(session: routes.CommitterSession) -> str:
             committee_map=committee_map,
             form=form,
             results=results,
-            algorithms=routes.algorithms,
+            algorithms=route.algorithms,
             submitted_committees=submitted_committees,
         )
 
@@ -503,7 +503,7 @@ async def _get_keys_text(keys_url: str, render: Callable[[str], Awaitable[str]])
 
 
 async def _key_and_is_owner(
-    data: db.Session, session: routes.CommitterSession, fingerprint: str
+    data: db.Session, session: route.CommitterSession, fingerprint: str
 ) -> tuple[sql.PublicSigningKey, bool]:
     key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
     if not key:

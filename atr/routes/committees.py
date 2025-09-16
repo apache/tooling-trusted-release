@@ -23,7 +23,7 @@ import http.client
 import atr.db as db
 import atr.forms as forms
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.template as template
 import atr.util as util
 
@@ -32,8 +32,8 @@ class UpdateCommitteeKeysForm(forms.Typed):
     submit = forms.submit("Regenerate KEYS file")
 
 
-@routes.public("/committees")
-async def directory(session: routes.CommitterSession | None) -> str:
+@route.public("/committees")
+async def directory(session: route.CommitterSession | None) -> str:
     """Main committee directory page."""
     async with db.session() as data:
         committees = await data.committee(_projects=True).order_by(sql.Committee.name).all()
@@ -44,8 +44,8 @@ async def directory(session: routes.CommitterSession | None) -> str:
         )
 
 
-@routes.public("/committees/<name>")
-async def view(session: routes.CommitterSession | None, name: str) -> str:
+@route.public("/committees/<name>")
+async def view(session: route.CommitterSession | None, name: str) -> str:
     # TODO: Could also import this from keys.py
     async with db.session() as data:
         committee = await data.committee(
@@ -61,7 +61,7 @@ async def view(session: routes.CommitterSession | None, name: str) -> str:
         "committee-view.html",
         committee=committee,
         projects=project_list,
-        algorithms=routes.algorithms,
+        algorithms=route.algorithms,
         now=datetime.datetime.now(datetime.UTC),
         email_from_key=util.email_from_uid,
         update_committee_keys_form=await UpdateCommitteeKeysForm.create_form(),

@@ -34,7 +34,7 @@ import atr.log as log
 import atr.models.policy as policy
 import atr.models.sql as sql
 import atr.registry as registry
-import atr.routes as routes
+import atr.route as route
 import atr.storage as storage
 import atr.template as template
 import atr.user as user
@@ -229,8 +229,8 @@ class ReleasePolicyForm(forms.Typed):
         return not self.errors
 
 
-@routes.committer("/project/add/<committee_name>", methods=["GET", "POST"])
-async def add_project(session: routes.CommitterSession, committee_name: str) -> response.Response | str:
+@route.committer("/project/add/<committee_name>", methods=["GET", "POST"])
+async def add_project(session: route.CommitterSession, committee_name: str) -> response.Response | str:
     await session.check_access_committee(committee_name)
 
     async with db.session() as data:
@@ -254,8 +254,8 @@ You must start with your committee label, and you must use lower case.
     return await template.render("project-add-project.html", form=form, committee_name=committee.display_name)
 
 
-@routes.committer("/project/delete", methods=["POST"])
-async def delete(session: routes.CommitterSession) -> response.Response:
+@route.committer("/project/delete", methods=["POST"])
+async def delete(session: route.CommitterSession) -> response.Response:
     """Delete a project created by the user."""
     # TODO: This is not truly empty, so make a form object for this
     await util.validate_empty_form()
@@ -276,16 +276,16 @@ async def delete(session: routes.CommitterSession) -> response.Response:
     return await session.redirect(projects, success=f"Project '{project_name}' deleted successfully.")
 
 
-@routes.public("/projects")
-async def projects(session: routes.CommitterSession | None) -> str:
+@route.public("/projects")
+async def projects(session: route.CommitterSession | None) -> str:
     """Main project directory page."""
     async with db.session() as data:
         projects = await data.project(_committee=True).order_by(sql.Project.full_name).all()
         return await template.render("projects.html", projects=projects, empty_form=await forms.Empty.create_form())
 
 
-@routes.committer("/project/select")
-async def select(session: routes.CommitterSession) -> str:
+@route.committer("/project/select")
+async def select(session: route.CommitterSession) -> str:
     """Select a project to work on."""
     user_projects = []
     if session.uid:
@@ -307,8 +307,8 @@ async def select(session: routes.CommitterSession) -> str:
     return await template.render("project-select.html", user_projects=user_projects)
 
 
-@routes.committer("/projects/<name>", methods=["GET", "POST"])
-async def view(session: routes.CommitterSession, name: str) -> response.Response | str:
+@route.committer("/projects/<name>", methods=["GET", "POST"])
+async def view(session: route.CommitterSession, name: str) -> response.Response | str:
     policy_form = None
     metadata_form = None
     can_edit = False
@@ -357,7 +357,7 @@ async def view(session: routes.CommitterSession, name: str) -> response.Response
     return await template.render(
         "project-view.html",
         project=project,
-        algorithms=routes.algorithms,
+        algorithms=route.algorithms,
         candidate_drafts=candidate_drafts,
         candidates=candidates,
         previews=previews,

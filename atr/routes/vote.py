@@ -25,7 +25,7 @@ import atr.forms as forms
 import atr.log as log
 import atr.models.results as results
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.routes.compose as compose
 import atr.routes.mapping as mapping
 import atr.storage as storage
@@ -40,8 +40,8 @@ class CastVoteForm(forms.Typed):
     submit = forms.submit("Submit vote")
 
 
-@routes.committer("/vote/<project_name>/<version_name>")
-async def selected(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+@route.committer("/vote/<project_name>/<version_name>")
+async def selected(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
     """Show the contents of the release candidate draft."""
     await session.check_access(project_name)
 
@@ -115,8 +115,8 @@ async def selected(session: routes.CommitterSession, project_name: str, version_
     )
 
 
-@routes.committer("/vote/<project_name>/<version_name>", methods=["POST"])
-async def selected_post(session: routes.CommitterSession, project_name: str, version_name: str) -> response.Response:
+@route.committer("/vote/<project_name>/<version_name>", methods=["POST"])
+async def selected_post(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response:
     """Handle submission of a vote."""
     await session.check_access(project_name)
 

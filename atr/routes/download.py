@@ -30,16 +30,16 @@ import zipstream
 import atr.config as config
 import atr.db as db
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.routes.mapping as mapping
 import atr.routes.root as root
 import atr.template as template
 import atr.util as util
 
 
-@routes.committer("/download/all/<project_name>/<version_name>")
+@route.committer("/download/all/<project_name>/<version_name>")
 async def all_selected(
-    session: routes.CommitterSession, project_name: str, version_name: str
+    session: route.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | str:
     """Display download commands for a release."""
     async with db.session() as data:
@@ -64,25 +64,25 @@ async def all_selected(
     )
 
 
-@routes.public("/download/path/<project_name>/<version_name>/<path:file_path>")
+@route.public("/download/path/<project_name>/<version_name>/<path:file_path>")
 async def path(
-    session: routes.CommitterSession | None, project_name: str, version_name: str, file_path: str
+    session: route.CommitterSession | None, project_name: str, version_name: str, file_path: str
 ) -> response.Response | quart.Response:
     """Download a file or list a directory from a release in any phase."""
     return await _download_or_list(project_name, version_name, file_path)
 
 
-@routes.public("/download/path/<project_name>/<version_name>/")
+@route.public("/download/path/<project_name>/<version_name>/")
 async def path_empty(
-    session: routes.CommitterSession | None, project_name: str, version_name: str
+    session: route.CommitterSession | None, project_name: str, version_name: str
 ) -> response.Response | quart.Response:
     """List files at the root of a release directory for download."""
     return await _download_or_list(project_name, version_name, ".")
 
 
-@routes.public("/download/sh/<project_name>/<version_name>")
+@route.public("/download/sh/<project_name>/<version_name>")
 async def sh_selected(
-    session: routes.CommitterSession | None, project_name: str, version_name: str
+    session: route.CommitterSession | None, project_name: str, version_name: str
 ) -> response.Response | quart.Response:
     """Shell script to download a release."""
     conf = config.get()
@@ -97,9 +97,9 @@ async def sh_selected(
     return quart.Response(content, mimetype="text/x-shellscript")
 
 
-@routes.public("/download/urls/<project_name>/<version_name>")
+@route.public("/download/urls/<project_name>/<version_name>")
 async def urls_selected(
-    session: routes.CommitterSession | None, project_name: str, version_name: str
+    session: route.CommitterSession | None, project_name: str, version_name: str
 ) -> response.Response | quart.Response:
     try:
         async with db.session() as data:
@@ -114,9 +114,9 @@ async def urls_selected(
         return quart.Response(f"Internal server error: {e}", status=500, mimetype="text/plain")
 
 
-@routes.committer("/download/zip/<project_name>/<version_name>")
+@route.committer("/download/zip/<project_name>/<version_name>")
 async def zip_selected(
-    session: routes.CommitterSession, project_name: str, version_name: str
+    session: route.CommitterSession, project_name: str, version_name: str
 ) -> response.Response | quart.wrappers.response.Response:
     try:
         release = await session.release(project_name=project_name, version_name=version_name, phase=None)
@@ -154,7 +154,7 @@ async def _download_or_list(project_name: str, version_name: str, file_path: str
     # Check that path is relative
     original_path = pathlib.Path(file_path)
     if (file_path != ".") and (not original_path.is_relative_to(original_path.anchor)):
-        raise routes.FlashError("Path must be relative")
+        raise route.FlashError("Path must be relative")
 
     # We allow downloading files from any phase
     async with db.session() as data:

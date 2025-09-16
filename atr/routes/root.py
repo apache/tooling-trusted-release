@@ -27,7 +27,7 @@ import sqlmodel
 
 import atr.db as db
 import atr.models.sql as sql
-import atr.routes as routes
+import atr.route as route
 import atr.template as template
 import atr.user as user
 import atr.util as util
@@ -64,14 +64,14 @@ _POLICIES: Final = htpy.div[
 ]
 
 
-@routes.committer("/about")
-async def about(session: routes.CommitterSession) -> str:
+@route.committer("/about")
+async def about(session: route.CommitterSession) -> str:
     """About page."""
     return await template.render("about.html")
 
 
-@routes.public("/")
-async def index(session: routes.CommitterSession | None) -> response.Response | str:
+@route.public("/")
+async def index(session: route.CommitterSession | None) -> response.Response | str:
     """Show public info or an entry portal for participants."""
     session_data = await asfquart.session.read()
     if session_data:
@@ -145,18 +145,18 @@ async def index(session: routes.CommitterSession | None) -> response.Response | 
     return await template.render("index-public.html")
 
 
-@routes.public("/policies")
-async def policies(session: routes.CommitterSession | None) -> str:
+@route.public("/policies")
+async def policies(session: route.CommitterSession | None) -> str:
     return await template.blank("Policies", content=_POLICIES)
 
 
-@routes.committer("/todo", methods=["POST"])
-async def todo(session: routes.CommitterSession) -> str:
+@route.committer("/todo", methods=["POST"])
+async def todo(session: route.CommitterSession) -> str:
     """POST target for development."""
     return await template.render("todo.html")
 
 
-@routes.committer("/tutorial")
-async def tutorial(session: routes.CommitterSession) -> str:
+@route.committer("/tutorial")
+async def tutorial(session: route.CommitterSession) -> str:
     """Tutorial page."""
     return await template.render("tutorial.html")
