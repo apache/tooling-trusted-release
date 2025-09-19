@@ -40,28 +40,33 @@ LDAP_TOOLING_BASE = "cn=tooling,ou=groups,ou=services,dc=apache,dc=org"
 
 
 class AuthenticationError(Exception):
-    """Simple exception with a message and an optional origin exception (WIP)"""
-
     def __init__(self, message, origin=None):
         super().__init__(message)
         self.origin = origin
 
 
 class CommitterError(Exception):
-    """Simple exception with a message and an optional origin exception (WIP)"""
-
     def __init__(self, message, origin=None):
         super().__init__(message)
         self.origin = origin
 
 
 def attr_to_list(attr):
-    """Converts a list of bytestring attribute values to a unique list of strings"""
+    """Converts a list of bytestring attribute values to a unique list of strings."""
     return list(set([value for value in attr or []]))
 
 
+def get_ldap_bind_dn_and_password() -> tuple[str, str]:
+    conf = config.get()
+    bind_dn = conf.LDAP_BIND_DN
+    bind_password = conf.LDAP_BIND_PASSWORD
+    if (not bind_dn) or (not bind_password):
+        raise CommitterError("LDAP bind DN or password not set")
+    return bind_dn, bind_password
+
+
 class Committer:
-    """Verifies and loads a committers credentials via LDAP"""
+    """Verifies and loads a committer's credentials via LDAP."""
 
     def __init__(self, user: str) -> None:
         if not re.match(r"^[-_a-z0-9]+$", user):
@@ -79,7 +84,7 @@ class Committer:
         self.pmcs: list[str] = []
         self.projects: list[str] = []
 
-        self.__bind_dn, self.__bind_password = self._get_ldap_bind_dn_and_password()
+        self.__bind_dn, self.__bind_password = get_ldap_bind_dn_and_password()
 
     def verify(self) -> dict[str, Any]:
         with ldap.Search(self.__bind_dn, self.__bind_password) as ldap_search:
@@ -175,14 +180,6 @@ class Committer:
         if len(members) < min_members:
             raise CommitterError("Common backend assertions failed, LDAP corruption?")
         return members
-
-    def _get_ldap_bind_dn_and_password(self) -> tuple[str, str]:
-        conf = config.AppConfig()
-        bind_dn = conf.LDAP_BIND_DN
-        bind_password = conf.LDAP_BIND_PASSWORD
-        if (not bind_dn) or (not bind_password):
-            raise CommitterError("LDAP bind DN or password not set")
-        return bind_dn, bind_password
 
     def _get_project_memberships(self, ldap_search: ldap.Search, ldap_filter: str) -> list[str]:
         try:

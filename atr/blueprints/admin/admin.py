@@ -44,6 +44,7 @@ import atr.forms as forms
 import atr.ldap as ldap
 import atr.log as log
 import atr.models.sql as sql
+import atr.principal as principal
 import atr.routes.mapping as mapping
 import atr.storage as storage
 import atr.storage.outcome as outcome
@@ -110,8 +111,7 @@ async def admin_browse_as() -> str | response.Response:
     if not (current_session := await session.read()):
         raise base.ASFQuartException("Not authenticated", 401)
 
-    bind_dn = quart.current_app.config.get("LDAP_BIND_DN")
-    bind_password = quart.current_app.config.get("LDAP_BIND_PASSWORD")
+    bind_dn, bind_password = principal.get_ldap_bind_dn_and_password()
     ldap_params = ldap.SearchParameters(
         uid_query=new_uid,
         bind_dn_from_config=bind_dn,
@@ -127,7 +127,15 @@ async def admin_browse_as() -> str | response.Response:
     committee_data = await apache.get_active_committee_data()
     ldap_data = ldap_params.results_list[0]
     log.info("Current ASFQuart session data: %s", current_session)
-    new_session_data = _session_data(ldap_data, new_uid, current_session, ldap_projects_data, committee_data)
+    new_session_data = _session_data(
+        ldap_data,
+        new_uid,
+        current_session,
+        ldap_projects_data,
+        committee_data,
+        bind_dn,
+        bind_password,
+    )
     log.info("New Quart cookie (not ASFQuart session) data: %s", new_session_data)
     session.write(new_session_data)
 
@@ -812,6 +820,29 @@ async def _get_filesystem_dirs_unfinished(filesystem_dirs: list[str]) -> None:
                         filesystem_dirs.append(version_dir_path)
 
 
+def _get_user_committees_from_ldap(uid: str, bind_dn: str, bind_password: str) -> set[str]:
+    with ldap.Search(bind_dn, bind_password) as ldap_search:
+        result = ldap_search.search(
+            ldap_base="ou=project,ou=groups,dc=apache,dc=org",
+            ldap_scope="SUBTREE",
+            ldap_query=f"(|(ownerUid={uid})(owner=uid={uid},ou=people,dc=apache,dc=org))",
+            ldap_attrs=["cn"],
+        )
+
+    committees = set()
+    for hit in result:
+        if not isinstance(hit, dict):
+            continue
+        pmc = hit.get("cn")
+        if not (isinstance(pmc, list) and (len(pmc) == 1)):
+            continue
+        project_name = pmc[0]
+        if project_name and isinstance(project_name, str):
+            committees.add(project_name)
+
+    return committees
+
+
 async def _process_undiscovered(data: db.Session) -> tuple[int, int]:
     added_count = 0
     updated_count = 0
@@ -855,16 +886,14 @@ def _session_data(
     current_session: session.ClientSession,
     ldap_projects: apache.LDAPProjectsData,
     committee_data: apache.CommitteeData,
+    bind_dn: str,
+    bind_password: str,
 ) -> dict[str, Any]:
     # This is not quite accurate
     # For example, this misses "tooling" for tooling members
     projects = {p.name for p in ldap_projects.projects if (new_uid in p.members) or (new_uid in p.owners)}
     # And this adds "incubator", which is not in the OAuth data
-    committees = set()
-    for c in committee_data.committees:
-        for user in c.roster:
-            if user.id == new_uid:
-                committees.add(c.name)
+    committees = _get_user_committees_from_ldap(new_uid, bind_dn, bind_password)
 
     # Or asf-member-status?
     is_member = bool(projects or committees)
