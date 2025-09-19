@@ -250,18 +250,13 @@ class AuthoriserASFQuart:
     async def cache_refresh(self, asf_uid: str, asfquart_session: session.ClientSession) -> None:
         if not self.__cache.outdated():
             return
+        if not isinstance(asfquart_session, session.ClientSession):
+            # Defense in depth runtime check, already validated by the type checker
+            raise AuthenticationError("ASFQuart session is not a ClientSession")
         # We do not check that the ASF UID is the same as the one in the session
         # It is the caller's responsibility to ensure this
-        self.__cache.member_of[asf_uid] = frozenset(asfquart_session.get("committees", []))
-
-        # TODO: The code previously used "pmcs" above, which was incorrect
-        # The following is a defense in depth check until the reason for this is investigated
-        # If there is no evidence to the contrary, we can assume that it was a simple typo
-        if ("pmcs" in asfquart_session) and ("committees" not in asfquart_session):
-            asfquart_session["committees"] = asfquart_session["pmcs"]
-        # End of defense in depth check
-
-        self.__cache.participant_of[asf_uid] = frozenset(asfquart_session.get("projects", []))
+        self.__cache.member_of[asf_uid] = frozenset(asfquart_session.committees)
+        self.__cache.participant_of[asf_uid] = frozenset(asfquart_session.projects)
         self.__cache.last_refreshed = int(time.time())
 
 
@@ -324,7 +319,7 @@ class Authorisation(AsyncObject):
                 if asfquart_session is None:
                     raise AuthenticationError("No ASFQuart session found")
                 self.__authoriser = authoriser_asfquart
-                self.__asf_uid = asfquart_session.get("uid")
+                self.__asf_uid = asfquart_session.uid
                 if not isinstance(self.__asf_uid, str | None):
                     raise AuthenticationError("ASFQuart session has no uid")
                 self.__authenticated = True

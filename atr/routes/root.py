@@ -75,7 +75,7 @@ async def index(session: route.CommitterSession | None) -> response.Response | s
     """Show public info or an entry portal for participants."""
     session_data = await asfquart.session.read()
     if session_data:
-        uid = session_data.get("uid")
+        uid = session_data.uid
         if not uid:
             return await template.render("index-public.html")
 

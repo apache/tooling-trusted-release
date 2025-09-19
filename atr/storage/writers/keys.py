@@ -500,14 +500,19 @@ class CommitteeParticipant(FoundationCommitter):
         committee = await self.committee()
 
         key_values = [key.key_model.model_dump(exclude={"committees"}) for key in key_list]
-        key_insert_result = await self.__data.execute(
-            sqlite.insert(sql.PublicSigningKey)
-            .values(key_values)
-            .on_conflict_do_nothing(index_elements=["fingerprint"])
-            .returning(via(sql.PublicSigningKey.fingerprint))
-        )
-        key_inserts = {row.fingerprint for row in key_insert_result}
-        log.info(f"Inserted {len(key_inserts)} keys")
+        if key_values:
+            key_insert_result = await self.__data.execute(
+                sqlite.insert(sql.PublicSigningKey)
+                .values(key_values)
+                .on_conflict_do_nothing(index_elements=["fingerprint"])
+                .returning(via(sql.PublicSigningKey.fingerprint))
+            )
+            key_inserts = {row.fingerprint for row in key_insert_result}
+            log.info(f"Inserted {len(key_inserts)} keys")
+        else:
+            # TODO: Warn the user about any keys that were already inserted
+            key_inserts = set()
+            log.info("Inserted 0 keys (no keys to insert)")
 
         def replace_with_inserted(key: types.Key) -> types.Key:
             if key.key_model.fingerprint in key_inserts:

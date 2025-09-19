@@ -126,9 +126,9 @@ async def admin_browse_as() -> str | response.Response:
     ldap_projects_data = await apache.get_ldap_projects_data()
     committee_data = await apache.get_active_committee_data()
     ldap_data = ldap_params.results_list[0]
-    log.info("Current session data: %s", current_session)
+    log.info("Current ASFQuart session data: %s", current_session)
     new_session_data = _session_data(ldap_data, new_uid, current_session, ldap_projects_data, committee_data)
-    log.info("New session data: %s", new_session_data)
+    log.info("New Quart cookie (not ASFQuart session) data: %s", new_session_data)
     session.write(new_session_data)
 
     await quart.flash(
@@ -881,6 +881,8 @@ def _session_data(
         "isMember": is_member,
         "isChair": is_chair,
         "isRoot": is_root,
+        # WARNING: ASFQuart session.ClientSession uses "committees"
+        # But this is cookie, not ClientSession, data, and requires "pmcs"
         "pmcs": sorted(list(committees)),
         "projects": sorted(list(projects)),
         "mfa": current_session.mfa,

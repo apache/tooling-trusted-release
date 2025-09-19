@@ -116,7 +116,7 @@ def _caller_logger(depth: int = 1) -> logging.Logger:
 
 
 def _event(level: int, msg: str, *args: Any, stacklevel: int = 3, **kwargs: Any) -> None:
-    logger = _caller_logger(depth=2)
+    logger = _caller_logger(depth=3)
     # Stack level 1 is *here*, 2 is the caller, 3 is the caller of the caller
     # I.e. _event (1), log.* (2), actual caller (3)
     logger.log(level, msg, *args, stacklevel=stacklevel, **kwargs)
