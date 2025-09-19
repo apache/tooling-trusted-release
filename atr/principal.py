@@ -252,7 +252,15 @@ class AuthoriserASFQuart:
             return
         # We do not check that the ASF UID is the same as the one in the session
         # It is the caller's responsibility to ensure this
-        self.__cache.member_of[asf_uid] = frozenset(asfquart_session.get("pmcs", []))
+        self.__cache.member_of[asf_uid] = frozenset(asfquart_session.get("committees", []))
+
+        # TODO: The code previously used "pmcs" above, which was incorrect
+        # The following is a defense in depth check until the reason for this is investigated
+        # If there is no evidence to the contrary, we can assume that it was a simple typo
+        if ("pmcs" in asfquart_session) and ("committees" not in asfquart_session):
+            asfquart_session["committees"] = asfquart_session["pmcs"]
+        # End of defense in depth check
+
         self.__cache.participant_of[asf_uid] = frozenset(asfquart_session.get("projects", []))
         self.__cache.last_refreshed = int(time.time())
 
