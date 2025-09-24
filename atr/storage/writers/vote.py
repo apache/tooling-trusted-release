@@ -125,6 +125,75 @@ class CommitteeParticipant(FoundationCommitter):
 
         return email_recipient, ""
 
+    async def start(
+        self,
+        email_to: str,
+        project_name: str,
+        version_name: str,
+        selected_revision_number: str,
+        vote_duration_choice: int,
+        subject_data: str,
+        body_data: str,
+        asf_uid: str,
+        asf_fullname: str,
+        release: sql.Release | None = None,
+        promote: bool = True,
+        permitted_recipients: list[str] | None = None,
+    ) -> sql.Task:
+        if release is None:
+            release = await self.__data.release(
+                project_name=project_name,
+                version=version_name,
+                _project=True,
+                _committee=True,
+            ).demand(storage.AccessError("Release not found"))
+        if permitted_recipients is None:
+            permitted_recipients = util.permitted_voting_recipients(asf_uid, self.__committee_name)
+        if email_to not in permitted_recipients:
+            # This will be checked again by tasks/vote.py for extra safety
+            log.info(f"Invalid mailing list choice: {email_to} not in {permitted_recipients}")
+            raise storage.AccessError("Invalid mailing list choice")
+
+        if promote is True:
+            # This verifies the state and sets the phase to RELEASE_CANDIDATE
+            error = await interaction.promote_release(
+                self.__data, release.name, selected_revision_number, vote_manual=False
+            )
+            if error:
+                raise storage.AccessError(error)
+
+        # TODO: We also need to store the duration of the vote
+        # We can't allow resolution of the vote until the duration has elapsed
+        # But we allow the user to specify in the form
+        # And yet we also have ReleasePolicy.min_hours
+        # Presumably this sets the default, and the form takes precedence?
+        # ReleasePolicy.min_hours can also be 0, though
+
+        # Create a task for vote initiation
+        task = sql.Task(
+            status=sql.TaskStatus.QUEUED,
+            task_type=sql.TaskType.VOTE_INITIATE,
+            task_args=tasks_vote.Initiate(
+                release_name=release.name,
+                email_to=email_to,
+                vote_duration=vote_duration_choice,
+                initiator_id=asf_uid,
+                initiator_fullname=asf_fullname,
+                subject=subject_data,
+                body=body_data,
+            ).model_dump(),
+            asf_uid=asf_uid,
+            project_name=project_name,
+            version_name=version_name,
+        )
+        self.__data.add(task)
+        await self.__data.commit()
+
+        # TODO: We should log all outgoing email and the session so that users can confirm
+        # And can be warned if there was a failure
+        # (The message should be shown on the vote resolution page)
+        return task
+
 
 class CommitteeMember(CommitteeParticipant):
     def __init__(
@@ -356,75 +425,6 @@ class CommitteeMember(CommitteeParticipant):
         await self.__data.flush()
         await self.__data.commit()
         return None
-
-    async def start(
-        self,
-        email_to: str,
-        project_name: str,
-        version_name: str,
-        selected_revision_number: str,
-        vote_duration_choice: int,
-        subject_data: str,
-        body_data: str,
-        asf_uid: str,
-        asf_fullname: str,
-        release: sql.Release | None = None,
-        promote: bool = True,
-        permitted_recipients: list[str] | None = None,
-    ) -> sql.Task:
-        if release is None:
-            release = await self.__data.release(
-                project_name=project_name,
-                version=version_name,
-                _project=True,
-                _committee=True,
-            ).demand(storage.AccessError("Release not found"))
-        if permitted_recipients is None:
-            permitted_recipients = util.permitted_voting_recipients(asf_uid, self.__committee_name)
-        if email_to not in permitted_recipients:
-            # This will be checked again by tasks/vote.py for extra safety
-            log.info(f"Invalid mailing list choice: {email_to} not in {permitted_recipients}")
-            raise storage.AccessError("Invalid mailing list choice")
-
-        if promote is True:
-            # This verifies the state and sets the phase to RELEASE_CANDIDATE
-            error = await interaction.promote_release(
-                self.__data, release.name, selected_revision_number, vote_manual=False
-            )
-            if error:
-                raise storage.AccessError(error)
-
-        # TODO: We also need to store the duration of the vote
-        # We can't allow resolution of the vote until the duration has elapsed
-        # But we allow the user to specify in the form
-        # And yet we also have ReleasePolicy.min_hours
-        # Presumably this sets the default, and the form takes precedence?
-        # ReleasePolicy.min_hours can also be 0, though
-
-        # Create a task for vote initiation
-        task = sql.Task(
-            status=sql.TaskStatus.QUEUED,
-            task_type=sql.TaskType.VOTE_INITIATE,
-            task_args=tasks_vote.Initiate(
-                release_name=release.name,
-                email_to=email_to,
-                vote_duration=vote_duration_choice,
-                initiator_id=asf_uid,
-                initiator_fullname=asf_fullname,
-                subject=subject_data,
-                body=body_data,
-            ).model_dump(),
-            asf_uid=asf_uid,
-            project_name=project_name,
-            version_name=version_name,
-        )
-        self.__data.add(task)
-        await self.__data.commit()
-
-        # TODO: We should log all outgoing email and the session so that users can confirm
-        # And can be warned if there was a failure
-        # (The message should be shown on the vote resolution page)
-        return task
 
     # def __committee_member_or_admin(self, committee: sql.Committee, asf_uid: str) -> None:
     #     if not (user.is_committee_member(committee, asf_uid) or user.is_admin(asf_uid)):

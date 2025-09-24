@@ -258,8 +258,8 @@ async def _selected_revision_data(
         vote_duration_choice: int = util.unwrap(form.vote_duration.data)
         subject_data: str = util.unwrap(form.subject.data)
         body_data: str = util.unwrap(form.body.data)
-        async with storage.write_as_committee_member(committee.name) as wacm:
-            _task = await wacm.vote.start(
+        async with storage.write_as_committee_participant(committee.name) as wacp:
+            _task = await wacp.vote.start(
                 email_to,
                 project_name,
                 version_name,

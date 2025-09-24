@@ -1180,12 +1180,12 @@ async def vote_start(data: models.api.VoteStartArgs) -> DictResponse:
 
     try:
         async with storage.write(asf_uid) as write:
-            wacm = await write.as_project_committee_member(data.project)
-            permitted_recipients = util.permitted_voting_recipients(asf_uid, wacm.committee_name)
+            wacp = await write.as_project_committee_participant(data.project)
+            permitted_recipients = util.permitted_voting_recipients(asf_uid, wacp.committee_name)
             if data.email_to not in permitted_recipients:
                 raise exceptions.Forbidden("Invalid mailing list choice")
             # TODO: Get fullname and use instead of asf_uid
-            task = await wacm.vote.start(
+            task = await wacp.vote.start(
                 data.email_to,
                 data.project,
                 data.version,
