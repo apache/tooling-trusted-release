@@ -1,7 +1,7 @@
 .PHONY: build build-alpine build-playwright build-ts build-ubuntu certs \
   check check-extra check-light commit docs generate-version ipython \
-  run-playwright run-playwright-slow serve serve-local sync sync-all \
-  update-deps
+  manual run-playwright run-playwright-slow serve serve-local sync \
+  sync-all update-deps
 
 BIND ?= 127.0.0.1:8080
 IMAGE ?= tooling-trusted-release
@@ -61,6 +61,12 @@ generate-version:
 
 ipython:
 	uv run --frozen --with ipython ipython
+
+manual:
+	for fn in atr/manual/*.md; \
+	do \
+	  cmark "$$fn" > "$${fn%.md}.html"; \
+	done
 
 run-playwright:
 	docker run --net=host -it atr-playwright python3 test.py --skip-slow

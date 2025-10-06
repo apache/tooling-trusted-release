@@ -26,6 +26,7 @@ import atr.routes.file as file
 import atr.routes.finish as finish
 import atr.routes.ignores as ignores
 import atr.routes.keys as keys
+import atr.routes.manual as manual
 import atr.routes.preview as preview
 import atr.routes.projects as projects
 import atr.routes.published as published
@@ -53,6 +54,7 @@ __all__ = [
     "finish",
     "ignores",
     "keys",
+    "manual",
     "preview",
     "projects",
     "published",
