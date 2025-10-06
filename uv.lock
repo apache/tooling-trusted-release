@@ -1666,7 +1666,7 @@ wheels = [
 ]
 
 [[package]]
-name = "tooling-trusted-release"
+name = "tooling-trusted-releases"
 version = "0.0.1"
 source = { virtual = "." }
 dependencies = [

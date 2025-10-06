@@ -22,6 +22,7 @@ import dataclasses
 import datetime
 import enum
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -40,7 +41,112 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 # TODO: Simple cache to avoid rate limiting, not thread safe
+
 CACHE_PATH = pathlib.Path("/tmp/sbomtool-cache.json")
+
+CATEGORY_A_LICENSES: Final[frozenset[str]] = frozenset(
+    {
+        "0BSD",
+        "AFL-3.0",
+        "Apache-1.1",
+        "Apache-2.0",
+        "APAFML",
+        "Bitstream-Vera",
+        "BlueOak-1.0.0",
+        "BSD-2-Clause",
+        "BSD-3-Clause-LBNL",
+        "BSD-3-Clause",
+        "BSL-1.0",
+        "CC-PDDC",
+        "CC0-1.0",
+        "DOC",
+        "EDL-1.0",
+        "EPICS",
+        "FSFAP",
+        "HPND",
+        "ICU",
+        "ISC",
+        "Libpng-2.0",
+        "MIT-0",
+        "MIT",
+        "MS-PL",
+        "MulanPSL-2.0",
+        "NCSA",
+        "OGL-UK-3.0",
+        "PHP-3.01",
+        "PostgreSQL",
+        "Python-2.0",
+        "SMLNJ",
+        "TCL",
+        "Unicode-DFS-2016",
+        "Unlicense",
+        "UPL-1.0",
+        "W3C",
+        "WTFPL",
+        "Xnet",
+        "Zlib",
+        "ZPL-2.0",
+    }
+)
+
+CATEGORY_B_LICENSES: Final[frozenset[str]] = frozenset(
+    {
+        "CC-BY-2.5",
+        "CC-BY-3.0",
+        "CC-BY-4.0",
+        "CC-BY-SA-2.5",
+        "CC-BY-SA-3.0",
+        "CC-BY-SA-4.0",
+        "CDDL-1.0",
+        "CDDL-1.1",
+        "CPL-1.0",
+        "EPL-1.0",
+        "EPL-2.0",
+        "ErlPL-1.1",
+        "IPA",
+        "IPL-1.0",
+        "MPL-1.0",
+        "MPL-1.1",
+        "MPL-2.0",
+        "OFL-1.1",
+        "OSL-3.0",
+        "Ruby",
+        "SPL-1.0",
+        "Ubuntu-1.0",
+        "UnRAR",
+    }
+)
+
+CATEGORY_X_LICENSES: Final[frozenset[str]] = frozenset(
+    {
+        # "Apache-1.0",
+        "AGPL-3.0-only",
+        "BSD-4-Clause-UC",
+        "BSD-4-Clause",
+        "BUSL-1.1",
+        "CC-BY-NC-4.0",
+        "CC-BY-NC-ND-4.0",
+        "CC-BY-NC-SA-4.0",
+        "CPOL-1.02",
+        "GPL-1.0-only",
+        "GPL-2.0-only",
+        "GPL-3.0-only",
+        "JSON",
+        "LGPL-2.0-only",
+        "LGPL-2.1-only",
+        "LGPL-3.0-only",
+        "NPL-1.0",
+        "NPL-1.1",
+        "QPL-1.0",
+        "Sleepycat",
+        "SSPL-1.0",
+    }
+)
+
+_CATEGORY_A_LICENSES_FOLD: Final[frozenset[str]] = frozenset(value.casefold() for value in CATEGORY_A_LICENSES)
+_CATEGORY_B_LICENSES_FOLD: Final[frozenset[str]] = frozenset(value.casefold() for value in CATEGORY_B_LICENSES)
+_CATEGORY_X_LICENSES_FOLD: Final[frozenset[str]] = frozenset(value.casefold() for value in CATEGORY_X_LICENSES)
+
 KNOWN_PURL_PREFIXES: Final[dict[str, tuple[str, str]]] = {
     "pkg:maven/com.atlassian.": ("Atlassian", "https://www.atlassian.com/"),
     "pkg:maven/concurrent/concurrent@": (
@@ -49,12 +155,14 @@ KNOWN_PURL_PREFIXES: Final[dict[str, tuple[str, str]]] = {
     ),
     "pkg:maven/net.shibboleth.": ("The Shibboleth Consortium", "https://www.shibboleth.net/"),
 }
+
 KNOWN_PURL_SUPPLIERS: Final[dict[tuple[str, str], tuple[str, str]]] = {
     ("pkg:maven", "jakarta-regexp"): ("The Apache Software Foundation", "https://apache.org/"),
     ("pkg:maven", "javax.servlet.jsp"): ("Sun Microsystems", "https://sun.com/"),
     ("pkg:maven", "org.opensaml"): ("The Shibboleth Consortium", "https://www.shibboleth.net/"),
     ("pkg:maven", "org.osgi"): ("OSGi Working Group, The Eclipse Foundation", "https://www.osgi.org/"),
 }
+
 # TODO: Manually updated for now
 # Use GITHUB_TOKEN=... uv run python3 scripts/github_tag_dates.py CycloneDX/cyclonedx-maven-plugin
 MAVEN_PLUGIN_VERSIONS: Final[dict[str, str]] = {
@@ -111,7 +219,27 @@ MAVEN_PLUGIN_VERSIONS: Final[dict[str, str]] = {
     "2018-05-24T23:24:10Z": "1.0.1",
     "2018-05-02T16:34:05Z": "1.0.0",
 }
+
+
+SPDX_TOKEN: Final[re.Pattern[str]] = re.compile(
+    r"""
+        (?P<WS>\s+)
+      | (?P<LPAREN>\()
+      | (?P<RPAREN>\))
+      | (?P<AND>AND|and)
+      | (?P<OR>OR|or)
+      | (?P<WITH>WITH|with)
+      | (?P<PLUS>\+)
+      | (?P<DOCREF>DocumentRef-[A-Za-z0-9.-]+:LicenseRef-[A-Za-z0-9.-]+)
+      | (?P<LICREF>LicenseRef-[A-Za-z0-9.-]+)
+      | (?P<ADDREF>AdditionRef-[A-Za-z0-9.-]+)
+      | (?P<ID>[A-Za-z0-9.-]+)
+    """,
+    re.ASCII | re.VERBOSE,
+)
+
 THE_APACHE_SOFTWARE_FOUNDATION: Final[str] = "The Apache Software Foundation"
+
 VERSION: Final[str] = "0.0.1-dev1"
 
 # We include some sections from other files to make this standalone
@@ -186,6 +314,17 @@ class Supplier(Lax):
     name: str | None = None
 
 
+class License(Lax):
+    id: str | None = None
+    name: str | None = None
+    url: str | None = None
+
+
+class LicenseChoice(Lax):
+    license: License | None = None
+    expression: str | None = None
+
+
 class Component(Lax):
     bom_ref: str | None = pydantic.Field(default=None, alias="bom-ref")
     name: str | None = None
@@ -194,6 +333,8 @@ class Component(Lax):
     purl: str | None = None
     cpe: str | None = None
     swid: Swid | None = None
+    licenses: list[LicenseChoice] | None = None
+    scope: str | None = None
 
 
 class ToolComponent(Lax):
@@ -246,6 +387,12 @@ class ComponentProperty(enum.Enum):
     NAME = enum.auto()
     VERSION = enum.auto()
     IDENTIFIER = enum.auto()
+
+
+class LicenseCategory(enum.Enum):
+    A = enum.auto()
+    B = enum.auto()
+    X = enum.auto()
 
 
 # Missing* is for NTIA 2021 conformance only
@@ -315,6 +462,81 @@ Outdated = Annotated[
     pydantic.Field(discriminator="kind"),
 ]
 OutdatedAdapter = pydantic.TypeAdapter(Outdated)
+
+
+class LicenseIssue(Strict):
+    component_name: str
+    component_version: str | None
+    license_expression: str
+    category: LicenseCategory
+    any_unknown: bool = False
+    scope: str | None = None
+
+
+class SPDXLicenseExpressionParser:
+    def __init__(self, items: list[tuple[str, str]], text: str) -> None:
+        self.items = items
+        self.text = text
+        self.position = 0
+
+    def parse(self) -> set[str]:
+        atoms, _ = self.parse_expression()
+        if self.position != len(self.items):
+            raise ValueError(self.text)
+        return atoms
+
+    def parse_conjunction(self) -> tuple[set[str], bool]:
+        atoms, simple = self.parse_with()
+        while self.peek("AND"):
+            self.position += 1
+            atoms |= self.parse_with()[0]
+            simple = False
+        return atoms, simple
+
+    def parse_expression(self) -> tuple[set[str], bool]:
+        atoms, simple = self.parse_conjunction()
+        while self.peek("OR"):
+            self.position += 1
+            atoms |= self.parse_conjunction()[0]
+            simple = False
+        return atoms, simple
+
+    def parse_primary(self, for_addition: bool) -> tuple[set[str], bool]:
+        if self.position >= len(self.items):
+            raise ValueError(self.text)
+        kind, value = self.items[self.position]
+        if kind == "LPAREN":
+            self.position += 1
+            atoms, _ = self.parse_expression()
+            if not self.peek("RPAREN"):
+                raise ValueError(self.text)
+            self.position += 1
+            return atoms, False
+        if (not for_addition) and (kind in {"ID", "LICREF", "DOCREF"}):
+            self.position += 1
+            base = value
+            if self.peek("PLUS"):
+                self.position += 1
+            return {base}, True
+        if for_addition and (kind in {"ID", "LICREF", "DOCREF", "ADDREF"}):
+            self.position += 1
+            return set(), True
+        raise ValueError(self.text)
+
+    def parse_with(self) -> tuple[set[str], bool]:
+        atoms, simple = self.parse_primary(False)
+        while self.peek("WITH"):
+            if not simple:
+                raise ValueError(self.text)
+            self.position += 1
+            _, right_simple = self.parse_primary(True)
+            if not right_simple:
+                raise ValueError(self.text)
+            simple = False
+        return atoms, simple
+
+    def peek(self, kind: str) -> bool:
+        return (self.position < len(self.items)) and (self.items[self.position][0] == kind)
 
 
 @dataclasses.dataclass
@@ -531,6 +753,83 @@ def bundle_to_patch(bundle: Bundle) -> Patch:
     return patch_ops
 
 
+def check_licenses(bom: Bom) -> tuple[list[LicenseIssue], list[LicenseIssue]]:
+    warnings: list[LicenseIssue] = []
+    errors: list[LicenseIssue] = []
+
+    components = bom.components or []
+    if bom.metadata and bom.metadata.component:
+        components = [bom.metadata.component, *components]
+
+    for component in components:
+        name = component.name or "unknown"
+        version = component.version
+        scope = component.scope
+
+        if not component.licenses:
+            continue
+
+        for license_choice in component.licenses:
+            license_expr = None
+
+            if license_choice.expression:
+                license_expr = license_choice.expression
+            elif license_choice.license and license_choice.license.id:
+                license_expr = license_choice.license.id
+
+            if not license_expr:
+                continue
+
+            parse_failed = False
+            if license_choice.expression:
+                try:
+                    atoms = spdx_license_expression_atoms(license_expr)
+                except ValueError:
+                    parse_failed = True
+                    atoms = {license_expr}
+            else:
+                atoms = {license_expr}
+            got_warning = False
+            got_error = False
+            any_unknown = parse_failed
+            for atom in atoms:
+                folded = atom.casefold()
+                if folded in _CATEGORY_A_LICENSES_FOLD:
+                    continue
+                if folded in _CATEGORY_B_LICENSES_FOLD:
+                    got_warning = True
+                    continue
+                if folded in _CATEGORY_X_LICENSES_FOLD:
+                    got_error = True
+                    continue
+                got_error = True
+                any_unknown = True
+            if got_error:
+                errors.append(
+                    LicenseIssue(
+                        component_name=name,
+                        component_version=version,
+                        license_expression=license_expr,
+                        category=LicenseCategory.X,
+                        any_unknown=any_unknown,
+                        scope=scope,
+                    )
+                )
+            elif got_warning:
+                warnings.append(
+                    LicenseIssue(
+                        component_name=name,
+                        component_version=version,
+                        license_expression=license_expr,
+                        category=LicenseCategory.B,
+                        any_unknown=False,
+                        scope=scope,
+                    )
+                )
+
+    return warnings, errors
+
+
 def get_pointer(doc: yyjson.Document, path: str) -> Any | None:
     try:
         return doc.get_pointer(path)
@@ -609,13 +908,34 @@ def main() -> None:
                         print()
                     case MissingComponentProperty():
                         components = bundle.bom.components
-                        primary_component = bundle.bom.metadata and bundle.bom.metadata.component
+                        primary_component = bundle.bom.metadata.component if bundle.bom.metadata else None
                         if (error.index is not None) and (components is not None):
                             print(components[error.index].model_dump_json(indent=2))
                             print()
                         elif primary_component is not None:
                             print(primary_component.model_dump_json(indent=2))
                             print()
+        case "license":
+            warnings, errors = check_licenses(bundle.bom)
+            if warnings:
+                print("WARNINGS (Category B):")
+                for warning in warnings:
+                    version_str = f" {warning.component_version}" if warning.component_version else ""
+                    scope_str = f" [scope: {warning.scope}]" if warning.scope else ""
+                    print(f"  - {warning.component_name}{version_str}: {warning.license_expression}{scope_str}")
+                print()
+            if errors:
+                print("ERRORS (Category X):")
+                for error in errors:
+                    version_str = f" {error.component_version}" if error.component_version else ""
+                    scope_str = f" [scope: {error.scope}]" if error.scope else ""
+                    unknown_suffix = " (Category X due to unknown license identifiers)" if error.any_unknown else ""
+                    name_str = f"{error.component_name}{version_str}"
+                    license_str = f"{error.license_expression}{scope_str}{unknown_suffix}"
+                    print(f"  - {name_str}: {license_str}")
+                print()
+            if not warnings and not errors:
+                print("All licenses are approved (Category A)")
         case _:
             print(f"unknown command: {sys.argv[1]}")
             sys.exit(1)
@@ -875,6 +1195,22 @@ def sbomqs_total_score(value: pathlib.Path | str | yyjson.Document) -> float:
         raise RuntimeError(err)
     report = SBOMQSReport.model_validate_json(proc.stdout)
     return report.summary.total_score
+
+
+def spdx_license_expression_atoms(expr: str) -> set[str]:
+    pos = 0
+    tokens: list[tuple[str, str]] = []
+    for match in SPDX_TOKEN.finditer(expr):
+        if match.start() != pos:
+            raise ValueError(expr)
+        pos = match.end()
+        kind = match.lastgroup
+        if (kind) and (kind != "WS"):
+            tokens.append((kind, match.group(kind)))
+    if pos != len(expr):
+        raise ValueError(expr)
+
+    return SPDXLicenseExpressionParser(tokens, expr).parse()
 
 
 def validate_cyclonedx_cli(bundle: Bundle) -> list[str] | None:
