@@ -104,7 +104,7 @@ def app_setup_api_docs(app: base.QuartApp) -> None:
         app,
         info=quart_schema.Info(
             title="ATR API",
-            description="OpenAPI documentation for the Apache Trusted Release Platform.",
+            description="OpenAPI documentation for the Apache Trusted Releases (ATR) platform.",
             version=metadata.version,
         ),
         openapi_provider_class=ApiOnlyOpenAPIProvider,

@@ -1,5 +1,5 @@
 github:
-  description: "Apache Trusted Release Platform"
+  description: "Apache Trusted Releases"
   homepage: https://tooling.apache.org/
   del_branch_on_merge: true
   features:

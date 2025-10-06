@@ -1,7 +1,7 @@
 [project]
-name = "tooling-trusted-release"
+name = "tooling-trusted-releases"
 version = "0.0.1"
-description = "Apache Trusted Release Platform"
+description = "Apache Trusted Releases"
 authors = [
   { name = "ASF Tooling", email = "dev@tooling.apache.org" }
 ]

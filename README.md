@@ -1,4 +1,4 @@
-# Apache Trusted Release (ATR)
+# Apache Trusted Releases (ATR)
 
 <a href="https://github.com/apache/tooling-trusted-release/actions/workflows/build.yml?query=branch%3Amain"><img alt="Build & Tests" src="https://github.com/apache/tooling-trusted-release/actions/workflows/build.yml/badge.svg?branch=main" /></a>
 <a href="https://github.com/apache/tooling-trusted-release/blob/main/LICENSE"><img alt="Apache License" src="https://img.shields.io/github/license/apache/tooling-trusted-release" /></a>
@@ -17,7 +17,7 @@ The code is provided without guarantees regarding stability, security, or backwa
 
 ## Purpose
 
-This code is intended to help ASF Tooling develop the [Apache Trusted Release](https://github.com/apache/tooling-docs/blob/main/apache-trusted-release/requirements.md) platform.
+This code is intended to help ASF Tooling develop the [Apache Trusted Releases](https://github.com/apache/tooling-docs/blob/main/apache-trusted-releases/requirements.md) platform.
 
 ## License
 

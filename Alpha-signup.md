@@ -5,7 +5,7 @@ that we are properly considering every project's release policies and workflows 
 continue development.
 
 You can provide feedback via
-1. https://github.com/apache/tooling-trusted-release/issues
+1. https://github.com/apache/tooling-trusted-releases/issues
 2. mailto:dev@tooling.apache.org
 3. asf slack - #apache-trusted-releases
 
