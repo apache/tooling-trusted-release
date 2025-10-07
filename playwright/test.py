@@ -32,9 +32,8 @@ from collections.abc import Callable
 from typing import Any, Final
 
 import netifaces
-import rich.logging
-
 import playwright.sync_api as sync_api
+import rich.logging
 
 _SSH_KEY_COMMENT: Final[str] = "atr-playwright-test@127.0.0.1"
 _SSH_KEY_PATH: Final[str] = "/root/.ssh/id_ed25519"
