@@ -44,8 +44,8 @@ if TYPE_CHECKING:
 
 CACHE_PATH = pathlib.Path("/tmp/sbomtool-cache.json")
 
-CATEGORY_A_LICENSES: Final[frozenset[str]] = frozenset(
-    {
+LICENSES: Final[dict[str, list[str]]] = {
+    "CATEGORY_A_LICENSES": [
         "0BSD",
         "AFL-3.0",
         "Apache-1.1",
@@ -60,13 +60,20 @@ CATEGORY_A_LICENSES: Final[frozenset[str]] = frozenset(
         "CC-PDDC",
         "CC0-1.0",
         "DOC",
-        "EDL-1.0",
         "EPICS",
         "FSFAP",
         "HPND",
         "ICU",
         "ISC",
-        "Libpng-2.0",
+        "libpng-2.0",
+        "LicenseRef-Arev-1.0",
+        "LicenseRef-ECMA-OOXML-XSD",
+        "LicenseRef-Google-AIPG",
+        "LicenseRef-MX4J",
+        "LicenseRef-Open-Grid-Forum",
+        "LicenseRef-Romantic-WTFPL",
+        "LicenseRef-SCA-Spec",
+        "LicenseRef-W3C-CCLA",
         "MIT-0",
         "MIT",
         "MS-PL",
@@ -74,6 +81,7 @@ CATEGORY_A_LICENSES: Final[frozenset[str]] = frozenset(
         "NCSA",
         "OGL-UK-3.0",
         "PHP-3.01",
+        "Plexus",
         "PostgreSQL",
         "Python-2.0",
         "SMLNJ",
@@ -86,11 +94,8 @@ CATEGORY_A_LICENSES: Final[frozenset[str]] = frozenset(
         "Xnet",
         "Zlib",
         "ZPL-2.0",
-    }
-)
-
-CATEGORY_B_LICENSES: Final[frozenset[str]] = frozenset(
-    {
+    ],
+    "CATEGORY_B_LICENSES": [
         "CC-BY-2.5",
         "CC-BY-3.0",
         "CC-BY-4.0",
@@ -105,6 +110,7 @@ CATEGORY_B_LICENSES: Final[frozenset[str]] = frozenset(
         "ErlPL-1.1",
         "IPA",
         "IPL-1.0",
+        "LicenseRef-UnRAR",
         "MPL-1.0",
         "MPL-1.1",
         "MPL-2.0",
@@ -112,40 +118,72 @@ CATEGORY_B_LICENSES: Final[frozenset[str]] = frozenset(
         "OSL-3.0",
         "Ruby",
         "SPL-1.0",
-        "Ubuntu-1.0",
-        "UnRAR",
-    }
-)
-
-CATEGORY_X_LICENSES: Final[frozenset[str]] = frozenset(
-    {
-        # "Apache-1.0",
+        "Ubuntu-font-1.0",
+    ],
+    "CATEGORY_X_LICENSES": [
         "AGPL-3.0-only",
+        "AGPL-3.0-or-later",
         "BSD-4-Clause-UC",
         "BSD-4-Clause",
         "BUSL-1.1",
+        "CC-BY-NC-2.5",
+        "CC-BY-NC-3.0",
         "CC-BY-NC-4.0",
+        "CC-BY-NC-ND-2.5",
+        "CC-BY-NC-ND-3.0",
         "CC-BY-NC-ND-4.0",
+        "CC-BY-NC-SA-2.5",
+        "CC-BY-NC-SA-3.0",
         "CC-BY-NC-SA-4.0",
         "CPOL-1.02",
         "GPL-1.0-only",
+        "GPL-1.0-or-later",
+        "GPL-2.0-only WITH Classpath-exception-2.0",
         "GPL-2.0-only",
+        "GPL-2.0-or-later WITH Classpath-exception-2.0",
+        "GPL-2.0-or-later",
+        "GPL-3.0-only WITH Classpath-exception-2.0",
         "GPL-3.0-only",
+        "GPL-3.0-or-later WITH Classpath-exception-2.0",
+        "GPL-3.0-or-later",
         "JSON",
         "LGPL-2.0-only",
+        "LGPL-2.0-or-later",
         "LGPL-2.1-only",
+        "LGPL-2.1-or-later",
         "LGPL-3.0-only",
+        "LGPL-3.0-or-later",
+        "LicenseRef-Amazon-Software-License",
+        "LicenseRef-BCL",
+        "LicenseRef-Booz-Allen-Public-License",
+        "LicenseRef-Commons-Clause-1.0",
+        "LicenseRef-Confluent-Community-1.0",
+        "LicenseRef-DBAD",
+        "LicenseRef-Facebook-BSD-Patents",
+        "LicenseRef-Intel-SSL",
+        "LicenseRef-Java-SDK-for-Satori-RTM",
+        "LicenseRef-JSR-275",
+        "LicenseRef-MS-LPL",
+        "LicenseRef-Redis-Source-Available",
+        "LicenseRef-Solipsistic-Eclipse-Public-License",
+        "LicenseRef-Sun-Community-Source-3.0",
         "NPL-1.0",
         "NPL-1.1",
         "QPL-1.0",
         "Sleepycat",
         "SSPL-1.0",
-    }
-)
+    ],
+}
 
-_CATEGORY_A_LICENSES_FOLD: Final[frozenset[str]] = frozenset(value.casefold() for value in CATEGORY_A_LICENSES)
-_CATEGORY_B_LICENSES_FOLD: Final[frozenset[str]] = frozenset(value.casefold() for value in CATEGORY_B_LICENSES)
-_CATEGORY_X_LICENSES_FOLD: Final[frozenset[str]] = frozenset(value.casefold() for value in CATEGORY_X_LICENSES)
+_CATEGORY_A_LICENSES_FOLD: Final[frozenset[str]] = frozenset(
+    value.casefold() for value in LICENSES["CATEGORY_A_LICENSES"]
+)
+_CATEGORY_B_LICENSES_FOLD: Final[frozenset[str]] = frozenset(
+    value.casefold() for value in LICENSES["CATEGORY_B_LICENSES"]
+)
+_CATEGORY_X_LICENSES_FOLD: Final[frozenset[str]] = frozenset(
+    value.casefold() for value in LICENSES["CATEGORY_X_LICENSES"]
+)
 
 KNOWN_PURL_PREFIXES: Final[dict[str, tuple[str, str]]] = {
     "pkg:maven/com.atlassian.": ("Atlassian", "https://www.atlassian.com/"),
