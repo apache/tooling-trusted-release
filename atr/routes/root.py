@@ -17,14 +17,17 @@
 
 """root.py"""
 
+import pathlib
 from typing import Final
 
+import aiofiles
 import asfquart.session
 import htpy
 import quart.wrappers.response as response
 import sqlalchemy.orm as orm
 import sqlmodel
 
+import atr.config as config
 import atr.db as db
 import atr.models.sql as sql
 import atr.route as route
@@ -143,6 +146,14 @@ async def index(session: route.CommitterSession | None) -> response.Response | s
 
     # Public view
     return await template.render("index-public.html")
+
+
+@route.public("/miscellaneous/resolved.json")
+async def resolved_json(session: route.CommitterSession | None) -> response.Response:
+    json_path = pathlib.Path(config.get().PROJECT_ROOT) / "atr" / "static" / "json" / "resolved.json"
+    async with aiofiles.open(json_path) as f:
+        content = await f.read()
+    return response.Response(content, mimetype="application/json")
 
 
 @route.public("/policies")
