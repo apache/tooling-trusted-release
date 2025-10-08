@@ -58,7 +58,7 @@
 
     {% set user_projects = user_projects_fn(current_user.uid) %}
     {% if user_projects %}
-      {% set max_projects = 10 %}
+      {% set max_projects = 8 %}
       <h3>Start a release</h3>
       <ul>
         {% for project_name, project_full_name in user_projects[:max_projects] %}
@@ -68,9 +68,9 @@
           </li>
         {% endfor %}
         {% if user_projects|length > max_projects %}
-          <li class="text-muted">
+          <li>
             <i class="bi bi-three-dots"></i>
-            ({{ user_projects|length - max_projects }} more)
+            (<a href="{{ as_url(routes.root.index) }}">{{ user_projects|length - max_projects }} more</a>)
           </li>
         {% endif %}
       </ul>
