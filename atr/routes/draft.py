@@ -99,8 +99,8 @@ async def delete(session: route.CommitterSession) -> response.Response:
 
     # Delete the metadata from the database
     async with storage.write(session.uid) as write:
-        wacm = await write.as_project_committee_member(project_name)
-        await wacm.release.delete(
+        wacp = await write.as_project_committee_participant(project_name)
+        await wacp.release.delete(
             project_name, version_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
         )
 
