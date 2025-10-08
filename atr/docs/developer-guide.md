@@ -63,12 +63,42 @@ Pick one or the other, because logging into the site on one host does not log yo
 
 ## Understanding the code
 
-Once you have the server running, you can test it. At this point, it is useful to understand how the ATR works in general.
+Once you have the server running, you can test it. At this point, it is useful to understand how the ATR works in general. References to symbols in this section are given without their `atr.` prefix, for brevity, and are linked to the respective source code. You should understand e.g. [`server.app`](/ref/atr/server.py:app) to mean `atr.server.app`.
 
-ATR is an [ASFQuart](https://github.com/apache/infrastructure-asfquart) application, running in [Hypercorn](https://hypercorn.readthedocs.io/en/latest/index.html). The entry point for Hypercorn is [`atr.server:app`](/ref/atr/server.py:app), which is then called with a few standard arguments [as per the ASGI specification](https://asgi.readthedocs.io/en/latest/specs/main.html#overview). We create the `app` object using the following code:
+### Hypercorn and ASGI
+
+ATR is an [ASFQuart](https://github.com/apache/infrastructure-asfquart) application, running in [Hypercorn](https://hypercorn.readthedocs.io/en/latest/index.html). The entry point for Hypercorn is [`server.app`](/ref/atr/server.py:app), which is then called with a few standard arguments [as per the ASGI specification](https://asgi.readthedocs.io/en/latest/specs/main.html#overview). We create the `app` object using the following code:
 
 ```python
 app = create_app(config.get())
 ```
 
-The [`create_app`](/ref/atr/server.py:create_app) function performs a lot of setup, and if you're interested in how the server works then you can read it and the functions it calls to understand the process further. In general, however, when developing ATR we do not work at the ASFQuart, Quart, and Hypercorn levels very often.
+The [`server.create_app`](/ref/atr/server.py:create_app) function performs a lot of setup, and if you're interested in how the server works then you can read it and the functions it calls to understand the process further. In general, however, when developing ATR we do not make modifications at the ASFQuart, Quart, and Hypercorn levels very often.
+
+### Routes and database
+
+Users request ATR pages over HTTPS, and the ATR server processes those requests in route handlers. Most of those handlers are in [`routes`](/ref/atr/routes/), but not all. What each handler does varies, of course, from handler to handler, but most perform at least one access to the ATR SQLite database.
+
+The path of the SQLite database is configured in [`config.AppConfig.SQLITE_DB_PATH`](/ref/atr/config.py:SQLITE_DB_PATH) by default, and will usually appear as `state/atr.db` with related `shm` and `wal` files. We do not expect ATR to have so many users that we need to scale beyond SQLite.
+
+We use [SQLModel](https://sqlmodel.tiangolo.com/), an ORM utilising [Pydantic](https://docs.pydantic.dev/latest/) and [SQLAlchemy](https://www.sqlalchemy.org/), to create Python models for the ATR database. The core models file is [`models.sql`](/ref/atr/models/sql.py). The most important individual SQLite models in this module are [`Committee`](/ref/atr/models/sql.py:Committee), [`Project`](/ref/atr/models/sql.py:Project), and [`Release`](/ref/atr/models/sql.py:Release).
+
+It is technically possible to interact with SQLite directly, but we do not do that in the ATR source. We use various interfaces in [`db`](/ref/atr/db/__init__.py) for reads, and interfaces in [`storage`](/ref/atr/storage/) for writes. We plan to move the `db` code into `storage` too eventually, because `storage` is designed to have read components and write components. There is also a legacy [`db.interaction`](/ref/atr/db/interaction.py) module which we plan to migrate into `storage`.
+
+These three interfaces, [`routes`](/ref/atr/routes/), [`models.sql`](/ref/atr/models/sql.py), and [`storage`](/ref/atr/storage/), are where the majority of activity happens when developing ATR.
+
+### User interface
+
+ATR provides a web interface for users to interact with the platform, and the implementation of that interface is split across several modules. The web interface uses server-side rendering almost entirely, where HTML is generated on the server and sent to the browser.
+
+The template system in ATR is [Jinja2](https://jinja.palletsprojects.com/), always accessed through the ATR [`template`](/ref/atr/template.py) module. Template files in Jinja2 syntax are stored in [`templates/`](/ref/atr/templates/), and route handlers render them using the asynchronous [`template.render`](/ref/atr/template.py:render) function.
+
+Template rendering can be slow if templates are loaded from disk on every request. To address this, we use [`preload`](/ref/atr/preload.py) to load all templates into memory before the server starts serving requests. The [`preload.setup_template_preloading`](/ref/atr/preload.py:setup_template_preloading) function registers a startup hook that finds and caches every template file.
+
+The ATR user interface includes many HTML forms. We use [WTForms](https://wtforms.readthedocs.io/) for form handling, accessed through the ATR [`forms`](/ref/atr/forms.py) module. The [`forms.Typed`](/ref/atr/forms.py:Typed) base class extends the standard `QuartForm` class in [Quart-WTF](https://quart-wtf.readthedocs.io/). Each form field is created using helper functions such as [`forms.string`](/ref/atr/forms.py:string), [`forms.select`](/ref/atr/forms.py:select), and [`forms.submit`](/ref/atr/forms.py:submit), which handle validation automatically. Forms are rendered in templates, but the ATR `forms` module also provides programmatic rendering through functions that generate HTML styled with Bootstrap.
+
+In addition to templates, we sometimes need to generate HTML programmatically in Python. For this we use [htpy](https://htpy.dev/), another third party library, for building HTML using Python syntax. The ATR [`htm`](/ref/atr/htm.py) module extends htpy with a [`Block`](/ref/atr/htm.py:Block) class that makes it easier to build complex HTML structures incrementally. Using htpy means that we get type checking for our HTML generation, and can compose HTML elements just like any other Python objects. The generated HTML can be embedded in Jinja2 templates or returned directly from route handlers.
+
+### Other important interfaces
+
+The server configuration in [`config`](/ref/atr/config.py) determines a lot of global state, and the [`util`](/ref/atr/util.py) module contains lots of useful code which is used throughout ATR.
