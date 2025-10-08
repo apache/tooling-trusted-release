@@ -20,16 +20,17 @@ import atr.routes.candidate as candidate
 import atr.routes.committees as committees
 import atr.routes.compose as compose
 import atr.routes.distribution as distribution
+import atr.routes.docs as docs
 import atr.routes.download as download
 import atr.routes.draft as draft
 import atr.routes.file as file
 import atr.routes.finish as finish
 import atr.routes.ignores as ignores
 import atr.routes.keys as keys
-import atr.routes.manual as manual
 import atr.routes.preview as preview
 import atr.routes.projects as projects
 import atr.routes.published as published
+import atr.routes.ref as ref
 import atr.routes.release as release
 import atr.routes.report as report
 import atr.routes.resolve as resolve
@@ -48,16 +49,17 @@ __all__ = [
     "committees",
     "compose",
     "distribution",
+    "docs",
     "download",
     "draft",
     "file",
     "finish",
     "ignores",
     "keys",
-    "manual",
     "preview",
     "projects",
     "published",
+    "ref",
     "release",
     "report",
     "resolve",

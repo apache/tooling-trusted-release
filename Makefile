@@ -48,25 +48,21 @@ commit:
 	git push
 
 docs:
-	for fn in docs/*.md; \
+	rm -f atr/docs/*.html docs/*.html
+	for fn in atr/docs/*.md docs/*.md; \
 	do \
 	  cmark "$$fn" > "$${fn%.md}.html"; \
 	done
+	uv run python3 scripts/docs_post_process.py atr/docs/*.html docs/*.html
 
 generate-version:
 	@rm -f atr/version.py
-	@uv run python atr/metadata.py > /tmp/version.py
+	@uv run python3 atr/metadata.py > /tmp/version.py
 	@mv /tmp/version.py atr/version.py
 	@cat atr/version.py
 
 ipython:
 	uv run --frozen --with ipython ipython
-
-manual:
-	for fn in atr/manual/*.md; \
-	do \
-	  cmark "$$fn" > "$${fn%.md}.html"; \
-	done
 
 run-playwright:
 	docker run --net=host -it atr-playwright python3 test.py --skip-slow

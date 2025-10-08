@@ -1,0 +1,44 @@
+<h1 id="developer-guide">2. Developer guide</h1>
+<p><strong>Up</strong>: <a href=".">Apache Trusted Releases documentation</a>
+<strong>Prev</strong>: 1. <a href="introduction-to-atr">Introduction to ATR</a></p>
+<p>This is a guide for developers of ATR, explaining how to make changes to the ATR source code. For more information about how to contribute those changes back to us, please read the <a href="contribution-guide">contribution guide</a> instead.</p>
+<h2 id="running-the-server">Running the server</h2>
+<p>To develop ATR locally, we manage dependencies using <a href="https://docs.astral.sh/uv/">uv</a>. To run ATR on ASF hardware, we run it in containers managed by Puppet, but since this guide is about development, we focus on using uv.</p>
+<h3 id="get-the-source">Get the source</h3>
+<p><a href="https://github.com/apache/tooling-trusted-releases/fork">Fork the source code</a> of <a href="https://github.com/apache/tooling-trusted-releases">ATR on GitHub</a>, and then <a href="https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository">clone your fork locally</a>.</p>
+<p>There are lots of files and directories in the root of the ATR Git repository. The most important thing to know is that <code>atr/</code> contains the source code. ATR is a Python application based on <a href="https://github.com/apache/infrastructure-asfquart">ASFQuart</a>, which is based on <a href="https://github.com/pallets/quart">Quart</a>. The Quart web framework is an asynchronous version of <a href="https://github.com/pallets/flask">Flask</a>, a very widely used synchronous web framework. In addition to Python, we use small amounts of JavaScript and TypeScript for the front end.</p>
+<h3 id="install-dependencies">Install dependencies</h3>
+<p>To run ATR locally after cloning the source, you will need to install the following dependencies:</p>
+<ul>
+<li>Any <a href="https://en.wikipedia.org/wiki/POSIX">POSIX</a> compliant <a href="https://frippery.org/make/">make</a></li>
+<li><a href="https://github.com/FiloSottile/mkcert">mkcert</a></li>
+<li><a href="https://www.python.org/downloads/release/python-3138/">Python 3.13</a></li>
+<li><a href="https://docs.astral.sh/uv/#installation">uv</a></li>
+</ul>
+<p>You can install Python 3.13 through your package manager or through uv. Here is how to install these dependencies on <a href="https://en.wikipedia.org/wiki/Alpine_Linux">Alpine Linux</a>:</p>
+<pre><code class="language-shell">apk add curl git make mkcert@testing
+curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
+uv python install 3.13
+</code></pre>
+<p>You do not need to have Alpine Linux to develop ATR. It should work in any POSIX style environment.</p>
+<h3 id="run-the-server">Run the server</h3>
+<p>Then, to run the server:</p>
+<pre><code class="language-shell">cd tooling-trusted-releases/
+mkdir state
+make certs-local
+make serve-local
+</code></pre>
+<p>The <code>certs-local</code> step runs <code>mkcert localhost.apache.org localhost 127.0.0.1 ::1</code> to generate a locally trusted TLS certificate. If the certificate is not trusted, you may have to follow the <a href="https://github.com/FiloSottile/mkcert/blob/master/README.md">mkcert guide</a> to resolve the issue.</p>
+<p>ATR requires TLS even for development because login is performed through the actual ASF OAuth server. This way, the development behavior aligns closely with the production behavior. We try to minimize differences between development and production environments.</p>
+<h3 id="load-the-site">Load the site</h3>
+<p>ATR will then be served on various hosts, but we recommend using only <code>localhost.apache.org</code>. This requires adding an entry to your <code>/etc/hosts</code> and potentially restarting your DNS server. If you do this, the following link should work:</p>
+<p><a href="https://localhost.apache.org:8080/"><code>https://localhost.apache.org:8080/</code></a></p>
+<p>If you do not want to change your <code>/etc/hosts</code>, you can use <code>127.0.0.1</code>. You should not use <code>localhost</code>. The following link should work:</p>
+<p><a href="https://127.0.0.1:8080/"><code>https://127.0.0.1:8080/</code></a></p>
+<p>Pick one or the other, because logging into the site on one host does not log you in to the site on any other host.</p>
+<h2 id="understanding-the-code">Understanding the code</h2>
+<p>Once you have the server running, you can test it. At this point, it is useful to understand how the ATR works in general.</p>
+<p>ATR is an <a href="https://github.com/apache/infrastructure-asfquart">ASFQuart</a> application, running in <a href="https://hypercorn.readthedocs.io/en/latest/index.html">Hypercorn</a>. The entry point for Hypercorn is <a href="/ref/atr/server.py:app"><code>atr.server:app</code></a>, which is then called with a few standard arguments <a href="https://asgi.readthedocs.io/en/latest/specs/main.html#overview">as per the ASGI specification</a>. We create the <code>app</code> object using the following code:</p>
+<pre><code class="language-python">app = create_app(config.get())
+</code></pre>
+<p>The <a href="/ref/atr/server.py:create_app"><code>create_app</code></a> function performs a lot of setup, and if you're interested in how the server works then you can read it and the functions it calls to understand the process further. In general, however, when developing ATR we do not work at the ASFQuart, Quart, and Hypercorn levels very often.</p>

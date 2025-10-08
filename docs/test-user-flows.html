@@ -1,9 +1,9 @@
-<h1>Test user flows</h1>
+<h1 id="test-user-flows">Test user flows</h1>
 <p>To test the ATR, here are some example command line and GitHub user flows.</p>
-<h2>Command line</h2>
+<h2 id="command-line">Command line</h2>
 <p>To install the <code>atr</code> command, use the <a href="https://github.com/apache/tooling-releases-client/tree/main?tab=readme-ov-file#quick-start">instructions in the client <code>README.md</code></a>, or simply use <code>uv run atr</code> instead of <code>atr</code>.</p>
 <p><a href="https://release-test.apache.org/tokens">Create a PAT</a> using the UI, then store the value in <code>atr</code> configuration.</p>
-<pre><code>atr set tokens.pat &quot;$PAT_FROM_UI&quot;
+<pre><code>atr set tokens.pat "$PAT_FROM_UI"
 </code></pre>
 <p>You can view the configuration file to check that the value is set. <strong>This will write secret values to stdout.</strong></p>
 <pre><code>atr config file
@@ -35,7 +35,7 @@ atr announce tooling-test-example 0.1+demo 00003 -m example@apache.org -s Subjec
 <p>If there is ever a problem with a JWT verification, try refreshing your JWT.</p>
 <pre><code>atr jwt refresh | wc
 </code></pre>
-<h2>GitHub actions</h2>
+<h2 id="github-actions">GitHub actions</h2>
 <p>We use <a href="https://github.com/apache/tooling-asf-example">the <code>tooling-asf-example</code></a> repository to check our GitHub actions.</p>
 <p>First, <a href="https://release-test.apache.org/">start a new release in the ATR web UI</a>.</p>
 <p>You can then use the <a href="https://github.com/apache/tooling-asf-example/actions/workflows/build-and-rsync-to-atr.yaml"><code>build-and-rsync-to-atr.yaml</code></a> workflow to build Python wheel files and upload them to the ATR.</p>

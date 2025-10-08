@@ -1,10 +1,10 @@
-<h1>Project conventions</h1>
+<h1 id="project-conventions">Project conventions</h1>
 <p><strong>STATUS: Draft.</strong></p>
 <p>This document does not yet reflect the consensus of the ASF Tooling team, and, unlike the rest of this codebase, is provided for internal ASF Tooling discussion only.</p>
-<h2>Python code</h2>
+<h2 id="python-code">Python code</h2>
 <p>Follow <a href="https://peps.python.org/pep-0008/#constants">PEP 8</a> unless otherwise indicated in this document. Some of the conventions listed below recapitulate or add exceptions to PEP 8 rules.</p>
 <p>Obey all project local lints, e.g. the use of <code>ruff</code> and specific <code>ruff</code> rules.</p>
-<h3>Prefix private interfaces with a single underscore</h3>
+<h3 id="prefix-private-interfaces-with-a-single-underscore">Prefix private interfaces with a single underscore</h3>
 <p>Prefix all private interfaces, e.g. functions, classes, constants, variables, with a single underscore. An interface is private when used exclusively within its containing module and not referenced by external code, templates, or processes.</p>
 <p>Exceptions to this rule include:</p>
 <ul>
@@ -14,14 +14,14 @@
 <li>Nested functions, i.e. functions appearing in other functions</li>
 </ul>
 <p>Scripts are explicitly <em>not</em> an exception. Underscores should be used to prefix private interfaces in scripts for consistency, e.g. so that linters don't need to carry exceptions, and to ease potential migration to modules.</p>
-<h3>Use UPPERCASE for top level constants</h3>
+<h3 id="use-uppercase-for-top-level-constants">Use UPPERCASE for top level constants</h3>
 <p>Define top level constants using <code>UPPERCASE</code> letters. Don't forget to apply an underscore prefix to constants which are private to their module.</p>
 <p>Do not use uppercase for constants within functions and methods.</p>
-<h3>Use the <code>Final</code> type with all constants</h3>
+<code></code><h3 id="use-the-final-type-with-all-constants">Use the Final type with all constants</h3>
 <p>This pattern must be followed for top level constants, and should be followed for function and method level constants too. The longer the function, the more important the use of <code>Final</code>.</p>
-<h3>Prefix global variables with <code>global_</code></h3>
+<code></code><h3 id="prefix-global-variables-with-global">Prefix global variables with global_</h3>
 <p>Top level variables should be avoided. When their use is necessary, prefix them with <code>global_</code>, using lowercase letters, to ensure clear identification of their scope. Use an underscore prefix too, <code>_global_</code>, when the variable is private.</p>
-<h3>Import modules as their least significant name part</h3>
+<h3 id="import-modules-as-their-least-significant-name-part">Import modules as their least significant name part</h3>
 <p>Import modules using their least significant name component:</p>
 <pre><code class="language-python"># Preferred
 import a.b.c as c
@@ -45,10 +45,10 @@ import aiofiles.os.path as path
 <p>It's possible to use <code>from a.b import c</code> instead of <code>import a.b.c as c</code> when <code>c</code> is a module, but we prefer the latter form because it makes it clear that <code>c</code> must be a module, whereas in the former <code>from a.b import c</code> form, <code>c</code> could be any interface.</p>
 <p>TODO: There's a question as to whether we could actually use <code>import aiofiles.os.path as path</code> since we import <code>os.path</code> as <code>os.path</code> and not <code>path</code>.</p>
 <p>TODO: Sometimes we're using <code>as</code> for standard library modules. We should decide what to do about this.</p>
-<h3>Avoid duplicated module names</h3>
+<h3 id="avoid-duplicated-module-names">Avoid duplicated module names</h3>
 <p>Try to avoid using, for example, <code>baking/apple/pie.py</code> and <code>baking/cherry/pie.py</code> because these will both be imported as <code>pie</code> and one will have to be renamed.</p>
 <p>If there are duplicates imported within a single file, they should be disambiguated by the next level up. In the pie example, that would be <code>import baking.apple as apple</code> and then <code>apple.pie</code>, and <code>import baking.cherry as cherry</code> and <code>cherry.pie</code>.</p>
-<h3>Never import names directly from modules</h3>
+<h3 id="never-import-names-directly-from-modules">Never import names directly from modules</h3>
 <p>Avoid importing specific names from modules:</p>
 <pre><code class="language-python"># Preferred
 import p.q.r as r
@@ -62,30 +62,30 @@ s()
 <pre><code class="language-python"># Preferred
 from typing import Final
 
-CONSTANT: Final = &quot;CONSTANT&quot;
+CONSTANT: Final = "CONSTANT"
 
 # Avoid
 import typing
 
-CONSTANT: typing.Final = &quot;CONSTANT&quot;
+CONSTANT: typing.Final = "CONSTANT"
 </code></pre>
-<h3>Use concise typing patterns</h3>
+<h3 id="use-concise-typing-patterns">Use concise typing patterns</h3>
 <p>Do not use <code>List</code> or <code>Optional</code> etc. from the typing module.</p>
 <pre><code class="language-python"># Preferred
-def example() -&gt; list[str | None]:
-    return [&quot;a&quot;, &quot;c&quot;, None]
+def example() -> list[str | None]:
+    return ["a", "c", None]
 
 # Avoid
 from typing import List, Optional
 
-def example() -&gt; List[Optional[str]]:
-    return [&quot;a&quot;, &quot;c&quot;, None]
+def example() -> List[Optional[str]]:
+    return ["a", "c", None]
 </code></pre>
-<h3>Never name interfaces after their module</h3>
+<h3 id="never-name-interfaces-after-their-module">Never name interfaces after their module</h3>
 <p>Do not name interfaces with the same identifier as their containing module. For example, in a module named <code>example</code>, the function names <code>example</code> and <code>example_function</code> are prohibited.</p>
-<h3>Keep modules small and focused</h3>
+<h3 id="keep-modules-small-and-focused">Keep modules small and focused</h3>
 <p>Maintain modules with a reasonable number of interfaces. Though no strict limits are enforced, modules containing numerous classes, constants, or functions should be considered for logical subdivision. Exceptions may be made when closely related functionality necessitates grouping multiple interfaces within a single module.</p>
-<h3>Name functions to group related items together alphabetically</h3>
+<h3 id="name-functions-to-group-related-items-together-alphabetically">Name functions to group related items together alphabetically</h3>
 <p>Modules should, in general, be split into small collections of code items. If this is unavoidable, large groups of functions should be named hierarchically, with the most general category first, followed by increasingly specific details. This makes related functions group together naturally when sorted alphabetically, making code navigation and discovery easier.</p>
 <p><strong>Example</strong>:</p>
 <p>Instead of scattered, hard to find related functions:</p>
@@ -106,7 +106,7 @@ def db_record_update():
 <p><strong>Example</strong>:</p>
 <p>Another example with license files, the wrong way:</p>
 <pre><code class="language-python"># Avoid
-def check_root_license_file():      # Lost among other &quot;check_&quot; functions
+def check_root_license_file():      # Lost among other "check_" functions
 def validate_package_license():     # Separated from other license functions
 def verify_license_files():         # Yet another scattered license function
 </code></pre>
@@ -119,7 +119,7 @@ def license_files_verify():         # sorted alphabetically
 <p>Note how verbs tend to come last, so that function names now read in an object oriented style, like a module, object, and action.</p>
 <p>While this approach can lead to slightly longer function names, the benefits of improved code organisation and discoverability outweigh the verbosity.</p>
 <p>Classes should always be placed before functions. Private, underscored, classes should be placed after all public classes, and likewise for functions.</p>
-<h3>Use numbers in function names with long, linear flow</h3>
+<h3 id="use-numbers-in-function-names-with-long-linear-flow">Use numbers in function names with long, linear flow</h3>
 <p>In some cases, such as testing, computation proceeds through a predictable, linear path and is implemented across many functions. In such cases, use numbers in the function names to make the order clear. One disadvantage to this style is the requirement to renumber all subsequent functions when inserting a new function in the middle.</p>
 <p><strong>Example:</strong></p>
 <pre><code class="language-python">def example_01_start():
@@ -129,7 +129,7 @@ def example_04_filter():
 def example_05_process():
 def example_06_clean_up():
 </code></pre>
-<h3>Give helper functions the same prefix as their parent function</h3>
+<h3 id="give-helper-functions-the-same-prefix-as-their-parent-function">Give helper functions the same prefix as their parent function</h3>
 <p>This makes it easier to find all the functions related to a specific task.</p>
 <p><strong>Example</strong>:</p>
 <p>Instead of:</p>
@@ -143,10 +143,10 @@ def _verify_archive_integrity():
 def _verify_archive_integrity_do_something():
 </code></pre>
 <p>This makes it easier to find all the functions related to a specific task, and means that they sort together.</p>
-<h3>Keep cyclomatic complexity below 10</h3>
+<h3 id="keep-cyclomatic-complexity-below-10">Keep cyclomatic complexity below 10</h3>
 <p>We limit function complexity to a score of 10. If the linter complains, your function is doing too much.</p>
 <p>Cyclomatic complexity counts the number of independent paths through code: more if/else branches, loops, and exception handlers means higher complexity. Complex code is harder to test, maintain, and understand. The easiest way to fix high complexity is usually to refactor a chunk of related logic into a separate helper function.</p>
-<h3>Replace synchronous calls with asynchronous counterparts in async code</h3>
+<h3 id="replace-synchronous-calls-with-asynchronous-counterparts-in-async-code">Replace synchronous calls with asynchronous counterparts in async code</h3>
 <p>Our use of blockbuster enables automatic detection of synchronous function calls within asynchronous code. When detected, replace these calls with their asynchronous equivalents without performance testing. The conversion process typically requires minimal, trivial effort.</p>
 <p>Exceptions to this rule apply only in these scenarios:</p>
 <ul>
@@ -154,19 +154,19 @@ def _verify_archive_integrity_do_something():
 <li>When the asynchronous equivalent function is unknown</li>
 </ul>
 <p>If either exception applies, either submit a brief issue with the blockbuster traceback, notify the team via Slack, or add a code comment if part of another commit. An ATR Tooling engineer will address the issue without requiring significant time investment from you.</p>
-<h3>Always use parentheses to group subexpressions in boolean expressions</h3>
+<h3 id="always-use-parentheses-to-group-subexpressions-in-boolean-expressions">Always use parentheses to group subexpressions in boolean expressions</h3>
 <p>Instead of this:</p>
 <pre><code class="language-python">a or b and c == d or e
 </code></pre>
 <p>Do:</p>
 <pre><code class="language-python">(a or b) and (c == d) or e
 </code></pre>
-<h3>Use terse comments on their own lines</h3>
+<h3 id="use-terse-comments-on-their-own-lines">Use terse comments on their own lines</h3>
 <p>Place comments on dedicated lines preceding the relevant code block. Comments at the ends of lines are strictly reserved for linter or type checker directives. This convention enhances code scannability for such directives. General comments must not appear at the end of code lines. Keep comments concise, using sentence case without terminal punctuation. Each sentence forming a comment must occupy its own line.</p>
-<h3>Prefer explicit checks over <code>assert</code></h3>
+<code></code><h3 id="prefer-explicit-checks-over-assert">Prefer explicit checks over assert</h3>
 <p>We do not use <code>assert</code>. If you need to guard against invalid states or inputs, use standard <code>if</code> checks and raise appropriate exceptions. If you need to help type checkers understand the type of a variable within a specific code block, in other words if you need to narrow a type, then use <code>if isinstance(...)</code> or <code>if not isinstance(...)</code> as appropriate.</p>
-<h2>HTML</h2>
-<h3>Use sentence case for headings, form labels, and submission buttons</h3>
-<p>We write headings, form labels, and submission buttons in the form &quot;This is some text&quot;, and not &quot;This is Some Text&quot; or &quot;This Is Some Text&quot;. This follows the <a href="https://en.wikipedia.org/wiki/Wikipedia:Manual_of_Style#Section_headings">Wikipedia style for headings</a>.</p>
-<h3>Use Bootstrap classes for all style</h3>
-<p>We use Bootstrap classes for style, and avoid custom classes unless absolutely necessary. If you think that you have to resort to a custom class, consult the list of <a href="https://bootstrapclasses.com/">Bootstrap classes</a> for guidance. There is usually a class for what you want to achieve, and if there isn't then you may be making things too complicated. Complicated, custom style is difficult for a team to maintain. If you still believe that a new class is strictly warranted, then the class must be prefixed with <code>atr-</code>. Classes can go in <code>&lt;style&gt;</code> elements in <code>stylesheet</code> template blocks in such cases. The use of the <code>style</code> attribute on any HTML element is forbidden.</p>
+<h2 id="html">HTML</h2>
+<h3 id="use-sentence-case-for-headings-form-labels-and-submission-buttons">Use sentence case for headings, form labels, and submission buttons</h3>
+<p>We write headings, form labels, and submission buttons in the form "This is some text", and not "This is Some Text" or "This Is Some Text". This follows the <a href="https://en.wikipedia.org/wiki/Wikipedia:Manual_of_Style#Section_headings">Wikipedia style for headings</a>.</p>
+<h3 id="use-bootstrap-classes-for-all-style">Use Bootstrap classes for all style</h3>
+<p>We use Bootstrap classes for style, and avoid custom classes unless absolutely necessary. If you think that you have to resort to a custom class, consult the list of <a href="https://bootstrapclasses.com/">Bootstrap classes</a> for guidance. There is usually a class for what you want to achieve, and if there isn't then you may be making things too complicated. Complicated, custom style is difficult for a team to maintain. If you still believe that a new class is strictly warranted, then the class must be prefixed with <code>atr-</code>. Classes can go in <code><style></code> elements in <code>stylesheet</code> template blocks in such cases. The use of the <code>style</code> attribute on any HTML element is forbidden.</p>

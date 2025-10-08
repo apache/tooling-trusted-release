@@ -63,6 +63,12 @@ h2 {
     margin-bottom: 1.5rem;
 }
 
+h3 {
+    font-size: 1.3333rem;
+    margin-top: 1.5rem;
+    font-weight: 525 !important;
+}
+
 img {
     max-width: 100%;
     height: auto;
@@ -73,6 +79,21 @@ pre {
 
     /* word-wrap: anywhere; */
     word-break: break-all;
+    margin-bottom: 1rem;
+    background-color: #f6f7f8;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #d1d2d3;
+}
+
+p code { color: #aa0033; }
+
+a:has(code) {
+    text-decoration-color: #aa0033;
+}
+
+a code {
+    color: #aa0033;
 }
 
 summary {

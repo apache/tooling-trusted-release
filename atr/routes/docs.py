@@ -47,31 +47,31 @@ class H1Parser(HTMLParser):
             self.h1_content = data.strip()
 
 
-@route.public("/manual/")
+@route.public("/docs/")
 async def index(session: route.CommitterSession | None) -> str:
-    return await _serve_manual_page("index")
+    return await _serve_docs_page("index")
 
 
-@route.public("/manual/<path:page>")
+@route.public("/docs/<path:page>")
 async def page(session: route.CommitterSession | None, page: str) -> str:
-    return await _serve_manual_page(page)
+    return await _serve_docs_page(page)
 
 
-async def _serve_manual_page(page: str) -> str:
-    manual_dir = pathlib.Path(config.get().PROJECT_ROOT) / "atr" / "manual"
+async def _serve_docs_page(page: str) -> str:
+    docs_dir = pathlib.Path(config.get().PROJECT_ROOT) / "atr" / "docs"
 
     if not page.endswith(".html"):
         page = f"{page}.html"
 
-    file_path = manual_dir / page
+    file_path = docs_dir / page
 
-    manual_root = manual_dir.resolve()
+    docs_root = docs_dir.resolve()
     try:
         resolved_file = file_path.resolve()
     except FileNotFoundError:
         quart.abort(404)
     try:
-        resolved_file.relative_to(manual_root)
+        resolved_file.relative_to(docs_root)
     except ValueError:
         quart.abort(404)
 
