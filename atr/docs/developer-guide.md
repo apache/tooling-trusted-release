@@ -99,6 +99,18 @@ The ATR user interface includes many HTML forms. We use [WTForms](https://wtform
 
 In addition to templates, we sometimes need to generate HTML programmatically in Python. For this we use [htpy](https://htpy.dev/), another third party library, for building HTML using Python syntax. The ATR [`htm`](/ref/atr/htm.py) module extends htpy with a [`Block`](/ref/atr/htm.py:Block) class that makes it easier to build complex HTML structures incrementally. Using htpy means that we get type checking for our HTML generation, and can compose HTML elements just like any other Python objects. The generated HTML can be embedded in Jinja2 templates or returned directly from route handlers.
 
+### Scheduling and tasks
+
+Many operations in ATR are too slow to run during an HTTP request, so we run them asynchronously in background worker processes. The task scheduling system in ATR is built from three components: a task queue stored in the SQLite database, a worker manager that spawns and monitors worker processes, and the worker processes themselves that claim and execute tasks.
+
+The task queue is stored in a table defined by the [`Task`](/ref/atr/models/sql.py:Task) model in [`models.sql`](/ref/atr/models/sql.py). Each task has a status, a type, arguments encoded as JSON, and metadata such as when it was added and which user created it. When route handlers need to perform slow operations, they create a new `Task` row with status `QUEUED` and commit it to the database.
+
+The ATR [`manager`](/ref/atr/manager.py) module provides the [`WorkerManager`](/ref/atr/manager.py:WorkerManager) class, which maintains a pool of worker processes. When the ATR server starts, the manager spawns a configurable number of worker processes and monitors them continuously. The manager checks every few seconds whether workers are still running, whether any tasks have exceeded their time limits, and whether the worker pool needs to be replenished. If a worker process exits after completing its tasks, the manager spawns a new one automatically. If a task runs for too long, the manager terminates it and marks the task as failed. Worker processes are represented by [`WorkerProcess`](/ref/atr/manager.py:WorkerProcess) objects.
+
+The ATR [`worker`](/ref/atr/worker.py) module implements the workers. Each worker process runs in a loop. It claims the oldest queued task from the database, executes it, records the result, and then claims the next task atomically using an `UPDATE ... WHERE` statement. After a worker has processed a fixed number of tasks, it exits voluntarily to help to avoid memory leaks. The manager then spawns a fresh worker to replace it. Task execution happens in the [`_task_process`](/ref/atr/worker.py:_task_process) function, which resolves the task type to a handler function and calls it with the appropriate arguments.
+
+Tasks themselves are defined in the ATR [`tasks`](/ref/atr/tasks/) directory. The [`tasks`](/ref/atr/tasks/__init__.py) module contains functions for queueing tasks and resolving task types to their handler functions. Task types include operations such as importing keys, generating SBOMs, sending messages, and importing files from SVN. The most common category of task is automated checks on release artifacts. These checks are implemented in [`tasks/checks/`](/ref/atr/tasks/checks/), and include verifying file hashes, checking digital signatures, validating licenses, running Apache RAT, and checking archive integrity.
+
 ### Other important interfaces
 
 The server configuration in [`config`](/ref/atr/config.py) determines a lot of global state, and the [`util`](/ref/atr/util.py) module contains lots of useful code which is used throughout ATR.
