@@ -1,6 +1,7 @@
 # 2. Developer guide
 
 **Up**: [Apache Trusted Releases documentation](.)
+
 **Prev**: 1. [Introduction to ATR](introduction-to-atr)
 
 This is a guide for developers of ATR, explaining how to make changes to the ATR source code. For more information about how to contribute those changes back to us, please read the [contribution guide](contribution-guide) instead.
@@ -110,6 +111,16 @@ The ATR [`manager`](/ref/atr/manager.py) module provides the [`WorkerManager`](/
 The ATR [`worker`](/ref/atr/worker.py) module implements the workers. Each worker process runs in a loop. It claims the oldest queued task from the database, executes it, records the result, and then claims the next task atomically using an `UPDATE ... WHERE` statement. After a worker has processed a fixed number of tasks, it exits voluntarily to help to avoid memory leaks. The manager then spawns a fresh worker to replace it. Task execution happens in the [`_task_process`](/ref/atr/worker.py:_task_process) function, which resolves the task type to a handler function and calls it with the appropriate arguments.
 
 Tasks themselves are defined in the ATR [`tasks`](/ref/atr/tasks/) directory. The [`tasks`](/ref/atr/tasks/__init__.py) module contains functions for queueing tasks and resolving task types to their handler functions. Task types include operations such as importing keys, generating SBOMs, sending messages, and importing files from SVN. The most common category of task is automated checks on release artifacts. These checks are implemented in [`tasks/checks/`](/ref/atr/tasks/checks/), and include verifying file hashes, checking digital signatures, validating licenses, running Apache RAT, and checking archive integrity.
+
+### Authentication
+
+ATR uses ASF OAuth for user login, and then determines what actions each user can perform based on their committee memberships. The ATR [`principal`](/ref/atr/principal.py) module handles authorization by checking whether users are members of relevant committees. It queries and caches LDAP to get committee membership information. The [`Authorisation`](/ref/atr/principal.py:Authorisation) class provides methods to check whether a user is a member of a committee or a project participant, which can result in different levels of access.
+
+### API
+
+The ATR API provides programmatic access to most ATR functionality. API endpoints are defined in [`blueprints.api.api`](/ref/atr/blueprints/api/api.py), and their URL paths are prefixed with `/api/`. The API uses [OpenAPI](https://www.openapis.org/) for documentation, which is automatically generated from the endpoint definitions and served at `/api/docs`. Users send requests with a [JWT](https://en.wikipedia.org/wiki/JSON_Web_Token) created from a [PAT](https://en.wikipedia.org/wiki/Personal_access_token). The [`jwtoken`](/ref/atr/jwtoken.py) module handles issuing and verifying these tokens. API endpoints that require authentication use the [`@jwtoken.require`](/ref/atr/jwtoken.py:require) decorator, which automatically extracts and verifies the JWT.
+
+API request and response models are defined in [`models.api`](/ref/atr/models/api.py) using Pydantic. Each endpoint has an associated request model that validates incoming data, and a response model that validates outgoing data. The API returns JSON in all cases, with appropriate HTTP status codes.
 
 ### Other important interfaces
 
