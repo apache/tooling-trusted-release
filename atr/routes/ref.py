@@ -31,29 +31,51 @@ import atr.route as route
 
 @route.public("/ref/<path:ref_path>")
 async def resolve(session: route.CommitterSession | None, ref_path: str) -> response.Response:
-    if ":" not in ref_path:
-        quart.abort(404)
-
-    file_path_str, symbol = ref_path.rsplit(":", 1)
-
     project_root = pathlib.Path(config.get().PROJECT_ROOT)
-    file_path = project_root / file_path_str
+
+    if ":" in ref_path:
+        file_path_str, symbol = ref_path.rsplit(":", 1)
+        file_path = project_root / file_path_str
+
+        try:
+            resolved_file = file_path.resolve()
+            resolved_file.relative_to(project_root)
+        except (FileNotFoundError, ValueError):
+            quart.abort(404)
+
+        if (not resolved_file.exists()) or (not resolved_file.is_file()):
+            quart.abort(404)
+
+        line_number = await _resolve_symbol_to_line(resolved_file, symbol)
+
+        if line_number is None:
+            quart.abort(404)
+
+        github_url = f"https://github.com/apache/tooling-trusted-releases/blob/main/{file_path_str}#L{line_number}"
+        return quart.redirect(github_url, code=303)
+
+    is_directory = ref_path.endswith("/")
+    path_str = ref_path.rstrip("/")
+
+    file_path = project_root / path_str
 
     try:
-        resolved_file = file_path.resolve()
-        resolved_file.relative_to(project_root)
+        resolved_path = file_path.resolve()
+        resolved_path.relative_to(project_root)
     except (FileNotFoundError, ValueError):
         quart.abort(404)
 
-    if not resolved_file.exists() or not resolved_file.is_file():
+    if not resolved_path.exists():
         quart.abort(404)
 
-    line_number = await _resolve_symbol_to_line(resolved_file, symbol)
-
-    if line_number is None:
-        quart.abort(404)
-
-    github_url = f"https://github.com/apache/tooling-trusted-releases/blob/main/{file_path_str}#L{line_number}"
+    if is_directory:
+        if not resolved_path.is_dir():
+            quart.abort(404)
+        github_url = f"https://github.com/apache/tooling-trusted-releases/tree/main/{path_str}"
+    else:
+        if not resolved_path.is_file():
+            quart.abort(404)
+        github_url = f"https://github.com/apache/tooling-trusted-releases/blob/main/{path_str}"
 
     return quart.redirect(github_url, code=303)
 
@@ -71,10 +93,10 @@ async def _resolve_symbol_to_line(file_path: pathlib.Path, symbol: str) -> int |
                 return node.lineno
         elif isinstance(node, ast.Assign):
             for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == symbol:
+                if isinstance(target, ast.Name) and (target.id == symbol):
                     return node.lineno
         elif isinstance(node, ast.AnnAssign):
-            if isinstance(node.target, ast.Name) and node.target.id == symbol:
+            if isinstance(node.target, ast.Name) and (node.target.id == symbol):
                 return node.lineno
 
     return None
