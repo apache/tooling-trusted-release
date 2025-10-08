@@ -31,7 +31,13 @@ def _config_secrets(key: str, state_dir: str, default: str | None = None, cast: 
     try:
         repo_ini = decouple.RepositoryIni(secrets_path)
         config_obj = decouple.Config(repo_ini)
-        return config_obj.get(key, default=default, cast=cast)
+        sentinel = object()
+        value = config_obj.get(key, default=sentinel, cast=cast)
+        if value is sentinel:
+            return decouple.config(key, default=default, cast=cast)
+        if isinstance(value, str) or (value is None):
+            return value
+        return None
     except FileNotFoundError:
         return decouple.config(key, default=default, cast=cast)
 
@@ -54,7 +60,7 @@ class AppConfig:
     TEMPLATES_AUTO_RELOAD = False
     USE_BLOCKBUSTER = False
     JWT_SECRET_KEY = _config_secrets("JWT_SECRET_KEY", STATE_DIR, default=None, cast=str) or secrets.token_hex(128 // 8)
-    SECRET_KEY = decouple.config("SECRET_KEY", default=secrets.token_hex(128 // 8))
+    SECRET_KEY = _config_secrets("SECRET_KEY", STATE_DIR, default=None, cast=str) or secrets.token_hex(128 // 8)
     WTF_CSRF_ENABLED = decouple.config("WTF_CSRF_ENABLED", default=True, cast=bool)
     DOWNLOADS_STORAGE_DIR = os.path.join(STATE_DIR, "downloads")
     FINISHED_STORAGE_DIR = os.path.join(STATE_DIR, "finished")
