@@ -33,7 +33,31 @@
       <ul>
         <li>
           <i class="bi bi-play-circle"></i>
-          <a href="{{ as_url(routes.root.index) }}">Select release</a>
+          <a href="{{ as_url(routes.root.index) }}">Make releases</a>
+        </li>
+        {% if current_user %}
+          <li>
+            <i class="bi bi-view-list"></i>
+            <a href="{{ as_url(routes.release.releases) }}">Browse catalog</a>
+          </li>
+        {% endif %}
+        <li>
+          <i class="bi bi-collection"></i>
+          <a href="{{ as_url(routes.committees.directory) }}">Search committees</a>
+        </li>
+        {% if current_user.uid == "sbp" %}
+          <!--
+        <li>
+          <i class="bi bi-collection"></i>
+          <a href="{{ as_url(routes.projects.projects) }}">Browse projects</a>
+        </li>
+      -->
+        {% endif %}
+        <li>
+          <i class="bi bi-download"></i>
+          {# This path is handled by the frontend proxy server #}
+          {# https://djlint.com/docs/ignoring-code/ #}
+          {# djlint:off J018 #} <a href="/downloads/">Download artifacts</a> {# djlint:on #}
         </li>
       </ul>
 
@@ -76,21 +100,6 @@
       </ul>
     {% endif %}
 
-    <h3>Releases</h3>
-    <ul>
-      {% if current_user %}
-        <li>
-          <i class="bi bi-view-list"></i>
-          <a href="{{ as_url(routes.release.releases) }}">View releases</a>
-        </li>
-      {% endif %}
-      <li>
-        <i class="bi bi-download"></i>
-        {# This path is handled by the frontend proxy server #}
-        {# https://djlint.com/docs/ignoring-code/ #}
-        {# djlint:off J018 #} <a href="/downloads/">View downloads</a> {# djlint:on #}
-      </li>
-    </ul>
     {% if current_user %}
       <h3>Keys and tokens</h3>
       <ul>
@@ -102,20 +111,6 @@
           <i class="bi bi-key"></i>
           <a href="{{ as_url(routes.tokens.tokens) }}">Manage tokens</a>
         </li>
-      </ul>
-
-      <h3>Browse</h3>
-      <ul>
-        <li>
-          <i class="bi bi-collection"></i>
-          <a href="{{ as_url(routes.committees.directory) }}">Committees</a>
-        </li>
-        {% if current_user.uid == "sbp" %}
-          <li>
-            <i class="bi bi-collection"></i>
-            <a href="{{ as_url(routes.projects.projects) }}">Projects</a>
-          </li>
-        {% endif %}
       </ul>
 
       <h3>Documentation</h3>
