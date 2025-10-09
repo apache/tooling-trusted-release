@@ -48,16 +48,17 @@ LICENSES: Final[dict[str, list[str]]] = {
     "CATEGORY_A_LICENSES": [
         "0BSD",
         "AFL-3.0",
+        "APAFML",
         "Apache-1.1",
         "Apache-2.0",
-        "APAFML",
+        "BSD-2-Clause",
+        "BSD-3-Clause",
+        "BSD-3-Clause-LBNL",
+        "BSL-1.0",
         "Bitstream-Vera",
         "BlueOak-1.0.0",
-        "BSD-2-Clause",
-        "BSD-3-Clause-LBNL",
-        "BSD-3-Clause",
-        "BSL-1.0",
         "CC-PDDC",
+        "CC-PDM-1.0",
         "CC0-1.0",
         "DOC",
         "EPICS",
@@ -65,35 +66,37 @@ LICENSES: Final[dict[str, list[str]]] = {
         "HPND",
         "ICU",
         "ISC",
-        "libpng-2.0",
-        "LicenseRef-Arev-1.0",
+        "Libpng",
+        "LicenseRef-COLT-CERN",
+        "LicenseRef-CupPG",
+        "LicenseRef-DOM4J",
         "LicenseRef-ECMA-OOXML-XSD",
         "LicenseRef-Google-AIPG",
         "LicenseRef-MX4J",
         "LicenseRef-Open-Grid-Forum",
+        "LicenseRef-PIL",
         "LicenseRef-Romantic-WTFPL",
         "LicenseRef-SCA-Spec",
         "LicenseRef-W3C-CCLA",
-        "MIT-0",
         "MIT",
+        "MIT-0",
         "MS-PL",
         "MulanPSL-2.0",
         "NCSA",
         "OGL-UK-3.0",
         "PHP-3.01",
-        "Plexus",
         "PostgreSQL",
         "Python-2.0",
         "SMLNJ",
         "TCL",
+        "UPL-1.0",
         "Unicode-DFS-2016",
         "Unlicense",
-        "UPL-1.0",
         "W3C",
         "WTFPL",
         "Xnet",
-        "Zlib",
         "ZPL-2.0",
+        "Zlib",
     ],
     "CATEGORY_B_LICENSES": [
         "CC-BY-2.5",
@@ -110,7 +113,11 @@ LICENSES: Final[dict[str, list[str]]] = {
         "ErlPL-1.1",
         "IPA",
         "IPL-1.0",
+        "LicenseRef-CMaps-Fonts",
+        "LicenseRef-JARs-Additional",
+        "LicenseRef-JCR-API",
         "LicenseRef-UnRAR",
+        "LicenseRef-WSDL-SFL",
         "MPL-1.0",
         "MPL-1.1",
         "MPL-2.0",
@@ -123,29 +130,21 @@ LICENSES: Final[dict[str, list[str]]] = {
     "CATEGORY_X_LICENSES": [
         "AGPL-3.0-only",
         "AGPL-3.0-or-later",
-        "BSD-4-Clause-UC",
         "BSD-4-Clause",
+        "BSD-4-Clause-UC",
         "BUSL-1.1",
-        "CC-BY-NC-2.5",
-        "CC-BY-NC-3.0",
         "CC-BY-NC-4.0",
-        "CC-BY-NC-ND-2.5",
-        "CC-BY-NC-ND-3.0",
-        "CC-BY-NC-ND-4.0",
-        "CC-BY-NC-SA-2.5",
-        "CC-BY-NC-SA-3.0",
-        "CC-BY-NC-SA-4.0",
         "CPOL-1.02",
         "GPL-1.0-only",
         "GPL-1.0-or-later",
-        "GPL-2.0-only WITH Classpath-exception-2.0",
         "GPL-2.0-only",
-        "GPL-2.0-or-later WITH Classpath-exception-2.0",
+        "GPL-2.0-only WITH Classpath-exception-2.0",
         "GPL-2.0-or-later",
-        "GPL-3.0-only WITH Classpath-exception-2.0",
+        "GPL-2.0-or-later WITH Classpath-exception-2.0",
         "GPL-3.0-only",
-        "GPL-3.0-or-later WITH Classpath-exception-2.0",
+        "GPL-3.0-only WITH Classpath-exception-2.0",
         "GPL-3.0-or-later",
+        "GPL-3.0-or-later WITH Classpath-exception-2.0",
         "JSON",
         "LGPL-2.0-only",
         "LGPL-2.0-or-later",
@@ -161,27 +160,29 @@ LICENSES: Final[dict[str, list[str]]] = {
         "LicenseRef-DBAD",
         "LicenseRef-Facebook-BSD-Patents",
         "LicenseRef-Intel-SSL",
-        "LicenseRef-Java-SDK-for-Satori-RTM",
         "LicenseRef-JSR-275",
-        "LicenseRef-MS-LPL",
+        "LicenseRef-Java-SDK-for-Satori-RTM",
         "LicenseRef-Redis-Source-Available",
         "LicenseRef-Solipsistic-Eclipse-Public-License",
         "LicenseRef-Sun-Community-Source-3.0",
+        "MS-LPL",
         "NPL-1.0",
         "NPL-1.1",
         "QPL-1.0",
-        "Sleepycat",
         "SSPL-1.0",
+        "Sleepycat",
     ],
 }
 
-_CATEGORY_A_LICENSES_FOLD: Final[frozenset[str]] = frozenset(
+CATEGORY_A_LICENSES_FOLD: Final[frozenset[str]] = frozenset(
     value.casefold() for value in LICENSES["CATEGORY_A_LICENSES"]
 )
-_CATEGORY_B_LICENSES_FOLD: Final[frozenset[str]] = frozenset(
+
+CATEGORY_B_LICENSES_FOLD: Final[frozenset[str]] = frozenset(
     value.casefold() for value in LICENSES["CATEGORY_B_LICENSES"]
 )
-_CATEGORY_X_LICENSES_FOLD: Final[frozenset[str]] = frozenset(
+
+CATEGORY_X_LICENSES_FOLD: Final[frozenset[str]] = frozenset(
     value.casefold() for value in LICENSES["CATEGORY_X_LICENSES"]
 )
 
@@ -832,12 +833,12 @@ def check_licenses(bom: Bom) -> tuple[list[LicenseIssue], list[LicenseIssue]]:
             any_unknown = parse_failed
             for atom in atoms:
                 folded = atom.casefold()
-                if folded in _CATEGORY_A_LICENSES_FOLD:
+                if folded in CATEGORY_A_LICENSES_FOLD:
                     continue
-                if folded in _CATEGORY_B_LICENSES_FOLD:
+                if folded in CATEGORY_B_LICENSES_FOLD:
                     got_warning = True
                     continue
-                if folded in _CATEGORY_X_LICENSES_FOLD:
+                if folded in CATEGORY_X_LICENSES_FOLD:
                     got_error = True
                     continue
                 got_error = True
