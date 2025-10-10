@@ -1,0 +1,46 @@
+<h1 id="1-running-the-server">3.1. Running the server</h1>
+<p><strong>Up</strong>: <code>3.</code> <a href="developer-guide">Developer guide</a></p>
+<p><strong>Prev</strong>: (none)</p>
+<p><strong>Next</strong>: <code>3.2.</code> <a href="overview-of-the-code">Overview of the code</a></p>
+<p><strong>Sections</strong>:</p>
+<ul>
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#get-the-source">Get the source</a></li>
+<li><a href="#install-dependencies">Install dependencies</a></li>
+<li><a href="#run-the-server">Run the server</a></li>
+<li><a href="#load-the-site">Load the site</a></li>
+</ul>
+<h2 id="introduction">Introduction</h2>
+<p>To develop ATR locally, we manage dependencies using <a href="https://docs.astral.sh/uv/">uv</a>. To run ATR on ASF hardware, we run it in containers managed by Puppet, but since this guide is about development, we focus on using uv.</p>
+<h2 id="get-the-source">Get the source</h2>
+<p><a href="https://github.com/apache/tooling-trusted-releases/fork">Fork the source code</a> of <a href="https://github.com/apache/tooling-trusted-releases">ATR on GitHub</a>, and then <a href="https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository">clone your fork locally</a>.</p>
+<p>There are lots of files and directories in the root of the ATR Git repository. The most important thing to know is that <code>atr/</code> contains the source code. ATR is a Python application based on <a href="https://github.com/apache/infrastructure-asfquart">ASFQuart</a>, which is based on <a href="https://github.com/pallets/quart">Quart</a>. The Quart web framework is an asynchronous version of <a href="https://github.com/pallets/flask">Flask</a>, a very widely used synchronous web framework. In addition to Python, we use small amounts of JavaScript and TypeScript for the front end.</p>
+<h2 id="install-dependencies">Install dependencies</h2>
+<p>To run ATR locally after cloning the source, you will need to install the following dependencies:</p>
+<ul>
+<li>Any <a href="https://en.wikipedia.org/wiki/POSIX">POSIX</a> compliant <a href="https://frippery.org/make/">make</a></li>
+<li><a href="https://github.com/FiloSottile/mkcert">mkcert</a></li>
+<li><a href="https://www.python.org/downloads/release/python-3138/">Python 3.13</a></li>
+<li><a href="https://docs.astral.sh/uv/#installation">uv</a></li>
+</ul>
+<p>You can install Python 3.13 through your package manager or through uv. Here is how to install these dependencies on <a href="https://en.wikipedia.org/wiki/Alpine_Linux">Alpine Linux</a>:</p>
+<pre><code class="language-shell">apk add curl git make mkcert@testing
+curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
+uv python install 3.13
+</code></pre>
+<p>You do not need to have Alpine Linux to develop ATR. It should work in any POSIX style environment.</p>
+<h2 id="run-the-server">Run the server</h2>
+<p>Then, to run the server:</p>
+<pre><code class="language-shell">cd tooling-trusted-releases/
+mkdir state
+make certs-local
+make serve-local
+</code></pre>
+<p>The <code>certs-local</code> step runs <code>mkcert localhost.apache.org localhost 127.0.0.1 ::1</code> to generate a locally trusted TLS certificate. If the certificate is not trusted, you may have to follow the <a href="https://github.com/FiloSottile/mkcert/blob/master/README.md">mkcert guide</a> to resolve the issue.</p>
+<p>ATR requires TLS even for development because login is performed through the actual ASF OAuth server. This way, the development behavior aligns closely with the production behavior. We try to minimize differences between development and production environments.</p>
+<h2 id="load-the-site">Load the site</h2>
+<p>ATR will then be served on various hosts, but we recommend using only <code>localhost.apache.org</code>. This requires adding an entry to your <code>/etc/hosts</code> and potentially restarting your DNS server. If you do this, the following link should work:</p>
+<p><a href="https://localhost.apache.org:8080/"><code>https://localhost.apache.org:8080/</code></a></p>
+<p>If you do not want to change your <code>/etc/hosts</code>, you can use <code>127.0.0.1</code>. You should not use <code>localhost</code>. The following link should work:</p>
+<p><a href="https://127.0.0.1:8080/"><code>https://127.0.0.1:8080/</code></a></p>
+<p>Pick one or the other, because logging into the site on one host does not log you in to the site on any other host.</p>

@@ -1,8 +1,12 @@
 # 1. Introduction to ATR
 
-**Up**: [Apache Trusted Releases documentation](.)
+**Up**: [Documentation](.)
 
-**Next**: 2. [Developer guide](developer-guide)
+**Prev**: (none)
+
+**Next**: `2.` [User guide](user-guide)
+
+**Sections**:
 
 * [What is ATR?](#what-is-atr)
 * [Who are ATR users?](#who-are-atr-users)

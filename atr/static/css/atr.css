@@ -86,7 +86,7 @@ pre {
     border: 1px solid #d1d2d3;
 }
 
-p code { color: #aa0033; }
+p code, li code { color: #aa0033; }
 
 a:has(code) {
     text-decoration-color: #aa0033;

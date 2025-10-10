@@ -49,6 +49,7 @@ commit:
 
 docs:
 	rm -f atr/docs/*.html docs/*.html
+	uv run python3 scripts/build_docs.py
 	for fn in atr/docs/*.md docs/*.md; \
 	do \
 	  cmark "$$fn" > "$${fn%.md}.html"; \

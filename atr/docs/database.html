@@ -1,0 +1,10 @@
+<h1 id="3-database">3.3. Database</h1>
+<p><strong>Up</strong>: <code>3.</code> <a href="developer-guide">Developer guide</a></p>
+<p><strong>Prev</strong>: <code>3.2.</code> <a href="overview-of-the-code">Overview of the code</a></p>
+<p><strong>Next</strong>: <code>3.4.</code> <a href="build-processes">Build processes</a></p>
+<p><strong>Sections</strong>:</p>
+<ul>
+<li><a href="#introduction">Introduction</a></li>
+</ul>
+<h2 id="introduction">Introduction</h2>
+<p>ATR stores all of its data in a SQLite database. The database schema is defined in <a href="/ref/atr/models/sql.py"><code>models.sql</code></a> using <a href="https://sqlmodel.tiangolo.com/">SQLModel</a>, which uses <a href="https://docs.pydantic.dev/latest/">Pydantic</a> for data validation and <a href="https://www.sqlalchemy.org/">SQLAlchemy</a> for database operations. This page explains the main features of the database schema to help you understand how data is structured in ATR.</p>
