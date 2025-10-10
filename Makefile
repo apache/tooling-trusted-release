@@ -48,13 +48,15 @@ commit:
 	git push
 
 docs:
+	uv run python3 scripts/docs_check.py
 	rm -f atr/docs/*.html docs/*.html
-	uv run python3 scripts/build_docs.py
+	uv run python3 scripts/docs_build.py
 	for fn in atr/docs/*.md docs/*.md; \
 	do \
 	  cmark "$$fn" > "$${fn%.md}.html"; \
 	done
 	uv run python3 scripts/docs_post_process.py atr/docs/*.html docs/*.html
+	uv run python3 scripts/docs_check.py
 
 generate-version:
 	@rm -f atr/version.py

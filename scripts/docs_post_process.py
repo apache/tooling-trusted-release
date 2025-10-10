@@ -22,6 +22,15 @@ import re
 import sys
 
 
+def generate_heading_id(text: str) -> str:
+    text = re.sub(r"^\d+\.\s*", "", text)
+    text = text.lower()
+    text = re.sub(r"[^\w\s-]", "", text)
+    text = re.sub(r"[\s_]+", "-", text)
+    text = text.strip("-")
+    return text
+
+
 class HeadingProcessor(parser.HTMLParser):
     def __init__(self) -> None:
         super().__init__()
@@ -68,12 +77,7 @@ class HeadingProcessor(parser.HTMLParser):
             self.output.append(text)
 
     def _generate_id(self, text: str) -> str:
-        text = re.sub(r"^\d+\.\s*", "", text)
-        text = text.lower()
-        text = re.sub(r"[^\w\s-]", "", text)
-        text = re.sub(r"[\s_]+", "-", text)
-        text = text.strip("-")
-        return text
+        return generate_heading_id(text)
 
     def get_html(self) -> str:
         return "".join(self.output)
