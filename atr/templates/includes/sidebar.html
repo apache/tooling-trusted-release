@@ -101,15 +101,15 @@
     {% endif %}
 
     {% if current_user %}
-      <h3>Keys and tokens</h3>
+      <h3>Security</h3>
       <ul>
         <li>
           <i class="bi bi-key"></i>
-          <a href="{{ as_url(routes.keys.keys) }}">Manage keys</a>
+          <a href="{{ as_url(routes.keys.keys) }}">Public keys</a>
         </li>
         <li>
           <i class="bi bi-key"></i>
-          <a href="{{ as_url(routes.tokens.tokens) }}">Manage tokens</a>
+          <a href="{{ as_url(routes.tokens.tokens) }}">API tokens</a>
         </li>
       </ul>
 
