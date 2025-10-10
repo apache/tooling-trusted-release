@@ -2,46 +2,61 @@
 
 Many of these scripts are intended to be used by other scripts, or by `Makefile` targets.
 
+## build
+
+Builds a Docker image for the application. Accepts optional Dockerfile path (default `Dockerfile.alpine`) and image tag (default `tooling-trusted-releases`) arguments.
+
+## check\_user.py
+
+Reports committee memberships for an ASF user. Takes a username as an argument and displays which committees the user is a member of and which committees the user is a participant of. Useful for debugging authorisation issues.
+
+## docs\_build.py
+
+Generates navigation headers for documentation files. Reads the table of contents from `atr/docs/index.md` and rewrites each documentation file with a heading and navigation block (Up/Prev/Next/Pages/Sections) based on the TOC structure.
+
+## docs\_check.py
+
+Validates internal documentation links. Scans Markdown files in `atr/docs/` to ensure links point to existing files and that anchor fragments match heading IDs. Returns a non-zero exit code if validation fails.
+
+## docs\_post\_process.py
+
+Adds heading IDs to HTML documentation files. Processes CommonMark-generated HTML to add `id` attributes to headings that lack them, deriving IDs from the heading text after stripping leading section numbers.
+
+## extract\_spdx\_identifiers.py
+
+Extracts SPDX license identifiers from an HTML license list. Parses anchor `title` attributes to collect identifiers categorised as A, B, or X, and outputs the results as JSON.
+
 ## generate-certificates
 
 Generates self signed SSL certificates for development and testing purposes. It creates a private RSA key and a certificate valid for `127.0.0.1` with a one year expiration period, and stores them in the state directory as `cert.pem` and `key.pem`.
 
-## poetry/add-dev
+## github\_tag\_dates.py
 
-Provides a wrapper around Poetry's package management system, allowing the user to add development dependencies. It executes the `poetry add --group dev` command with the specified package. This script can be used to add new development tools, test libraries, or other dependencies that are only needed during development and not in production environments.
+Retrieves CycloneDX Maven Plugin release dates from GitHub. Queries the GitHub GraphQL API for tags prefixed with `cyclonedx-maven-plugin-` and outputs a JSON mapping of commit dates to version numbers.
 
-## poetry/add
+## integrity\_check.py
 
-Wraps Poetry's package management system, allowing the user to add main, i.e. non-development, dependencies to the project. It executes the `poetry add` command with the specified package name.
+Validates the integrity of all data in the ATR database. Runs validation checks across all stored data and reports any divergences or errors found.
 
-## poetry/sync-dev
+## interface\_order.py
 
-Configures and synchronises the Poetry development environment by ensuring that the correct Python interpreter is used, updating the lock file, and synchronising all dependencies. It also generates VSCode configuration settings if a `.vscode` directory exists, adding the Poetry virtual environment to its Python path and setting its default interpreter.
+Checks that Python module interfaces are alphabetically ordered. Verifies that top-level functions and classes are defined in alphabetical order, reports private class names (those starting with `_`), and flags misordered definitions.
 
-## poetry/up
+## interface\_privacy.py
 
-Updates all dependencies in the Poetry environment to their latest versions according to the specified constraints. It first ensures the correct Python interpreter is being used, and then executes `poetry update` to refresh all packages.
+Detects external access to private interfaces in Python modules. Reports any accesses to single underscore attributes (e.g. `obj._private_attr`) where the object is not `self` or `cls`.
 
-## poetry/build
+## keys\_import.py
 
-Verifies that the application can be successfully containerised by building Docker images using both Alpine and Ubuntu base images. It runs the Docker build process with the tag `tooling-trusted-releases` for each Dockerfile, ensuring that the application builds correctly across different Linux distributions.
+Imports OpenPGP public keys from ASF committee KEYS files into the ATR database. Downloads each committee's `KEYS` file from `https://downloads.apache.org/{committee}/KEYS`, parses the keys, and updates the database. Logs all activity to `state/keys_import.log`.
 
-## poetry/run
+## lint/jinja\_route\_checker.py
 
-Executes commands within the Poetry managed virtual environment by passing all provided arguments to the `poetry run` command. This allows developers to run any command or script in the context of the project's virtual environment without having to activate it manually, providing a consistent execution context regardless of the developer's system setup. When committing to the project, for example, it is necessary to run `git commit` as `poetry run git commit` in order to use consistent pre-commit hook dependencies.
-
-## poetry/sync
-
-Configures and synchronises the main Poetry dependencies, only, for production environments. It ensures that the correct Python interpreter is used, updates the lock file, and then synchronises the main dependencies, without development packages, using `poetry sync --only main`. This results in a smaller environment, suitable for production deployments.
-
-## build
-
-Builds a Docker container for the application using an Alpine Linux base image, and configures it to listen on port `4443` across all network interfaces (`0.0.0.0`). The resulting image is tagged as `tooling-trusted-releases`.
-
+Validates that Jinja templates only reference routes that exist. Scans all templates in `atr/templates/` for `as_url(routes.<name>)` calls and reports any references to routes not found in `state/routes.json`.
 
 ## release\_path\_parse.py
 
-Parses a list of filename paths obtained from running `find -type f | sort | sed 's%^[.]/%%'` in `https://dist.apache.org/repos/dist/release/` into a form where heuristically detected elements are replaced with `VARIABLE` names. The complete list of element variables is: `ASF`, `SUB`, `VERSION`, `CORE`, `VARIANT`, `TAG`, `ARCH`, `EXT`, and (when `LABEL_MODE=1` is set) `LABEL`.
+Analyses release artifact path patterns from Apache distribution repositories. Reads a list of paths and applies heuristic parsing to identify components (`ASF`, `CORE`, `SUB`, `VERSION`, `VARIANT`, `TAG`, `ARCH`, `EXT`, and optionally `LABEL`), outputting a summary of detected patterns grouped by project.
 
 Excerpt from example output:
 
@@ -66,6 +81,6 @@ Excerpt from example output:
     5 SUB-VERSION-VARIANT.EXT
 ```
 
-## run
+## vote\_initiate\_convert.py
 
-Runs the application, configured for production use, in a Docker container. It launches a detached container that removes itself when stopped, mounts a state directory from the host system to persist data, and uses host networking to simplify port access.
+Upgrades legacy vote initiation task results to the current format. Queries the database for `vote_initiate` tasks, converts legacy JSON formats to the current `VoteInitiate` model, and commits the upgraded results.
