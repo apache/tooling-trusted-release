@@ -44,6 +44,11 @@ if TYPE_CHECKING:
 
 CACHE_PATH = pathlib.Path("/tmp/sbomtool-cache.json")
 
+# TODO: This data is a copy of atr/policy/third-party-licenses.json
+# Ultimately, we expect ASF Legal to be responsible for this data
+# But we have drafted this machine readable version as a proposal
+# Therefore, there is not yet a stable generation process for that file
+# As such, we are copying this data manually from that file for now
 LICENSES: Final[dict[str, list[str]]] = {
     "CATEGORY_A_LICENSES": [
         "0BSD",
