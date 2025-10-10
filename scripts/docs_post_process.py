@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import html
 import html.parser as parser
 import pathlib
 import re
@@ -59,7 +60,7 @@ class HeadingProcessor(parser.HTMLParser):
         if self.in_heading:
             self.heading_content += data
         else:
-            self.output.append(data)
+            self.output.append(html.escape(data, quote=False))
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         text = self.get_starttag_text()

@@ -1,14 +1,68 @@
-# Project conventions
+# 3.5. Code conventions
 
-**STATUS: Draft.**
+**Up**: `3.` [Developer guide](developer-guide)
 
-This document does not yet reflect the consensus of the ASF Tooling team, and, unlike the rest of this codebase, is provided for internal ASF Tooling discussion only.
+**Prev**: `3.4.` [Build processes](build-processes)
+
+**Next**: `3.6.` [How to contribute](how-to-contribute)
+
+**Sections**:
+
+* [Python code](#python-code)
+* [HTML](#html)
+* [Markdown](#markdown)
 
 ## Python code
 
-Follow [PEP 8](https://peps.python.org/pep-0008/#constants) unless otherwise indicated in this document. Some of the conventions listed below recapitulate or add exceptions to PEP 8 rules.
+### Follow PEP 8 rules by default
+
+Follow [PEP 8](https://peps.python.org/pep-0008/) unless otherwise indicated in this document. Some of the conventions listed below recapitulate or add exceptions to PEP 8 rules.
 
 Obey all project local lints, e.g. the use of `ruff` and specific `ruff` rules.
+
+### Keep the primary execution path to the left
+
+Structure code so that the most likely, normal, successful execution path remains at the level of least indentation. Handle error cases and edge conditions early with guard clauses, and then continue with the main logic. This makes it easier to identify the primary execution flow.
+
+```python
+# Avoid
+def process_data(data):
+    if data is not None:
+        if len(data) > 0:
+            if validate(data):
+                return transform(data)
+            else:
+                raise ValueError("Invalid data")
+        else:
+            raise ValueError("Empty data")
+    else:
+        raise ValueError("No data")
+
+# Prefer
+def process_data(data):
+    if data is None:
+        raise ValueError("No data")
+    if len(data) == 0:
+        raise ValueError("Empty data")
+    if not validate(data):
+        raise ValueError("Invalid data")
+
+    return transform(data)
+```
+
+### Avoid excessive indentation
+
+When you find yourself nesting code more than two or three levels deep, extract the nested logic into separate functions. This improves readability, testability, and maintainability. Each function should handle a single, well defined piece of logic.
+
+### Do not use lint or type checker ignore statements
+
+You must not use `# noqa`, `# type: ignore`, or equivalents, even to ignore specific errors. The single exception to this is when there is a bug in the linter or type checker.
+
+File level lint ignores can be added to the project's `pyproject.toml`, but they must be used sparingly.
+
+### Use double quotes for all strings
+
+This includes triple quoted strings.
 
 ### Prefix private interfaces with a single underscore
 
@@ -19,9 +73,13 @@ Exceptions to this rule include:
 - Type variables
 - Enumerations
 - Methods requiring interface compatibility with their superclass
-- Nested functions, i.e. functions appearing in other functions
+- Nested functions (which should generally be avoided)
 
 Scripts are explicitly _not_ an exception. Underscores should be used to prefix private interfaces in scripts for consistency, e.g. so that linters don't need to carry exceptions, and to ease potential migration to modules.
+
+### Avoid nested functions
+
+All function definitions should be at the top level. This is not a hard rule, but should only be broken when absolutely necessary.
 
 ### Use UPPERCASE for top level constants
 
@@ -42,7 +100,7 @@ Top level variables should be avoided. When their use is necessary, prefix them 
 Import modules using their least significant name component:
 
 ```python
-# Preferred
+# Prefer
 import a.b.c as c
 
 # Avoid
@@ -56,7 +114,7 @@ This only applies to modules outside of the Python standard library. The standar
 Furthermore, if a third party module to be imported would conflict with a Python standard library module, then that third party module must be imported with one extra level.
 
 ```python
-# Preferred
+# Prefer
 import asyncio.subprocess
 import sqlalchemy.ext as ext
 import aiofiles.os
@@ -84,7 +142,7 @@ If there are duplicates imported within a single file, they should be disambigua
 Avoid importing specific names from modules:
 
 ```python
-# Preferred
+# Prefer
 import p.q.r as r
 r.s()
 
@@ -96,7 +154,7 @@ s()
 The `collections.abc`, `types`, and `typing` modules are an exception to this rule. Always import `collections.abc`, `types` and `typing` interfaces directly using the `from` syntax:
 
 ```python
-# Preferred
+# Prefer
 from typing import Final
 
 CONSTANT: Final = "CONSTANT"
@@ -112,7 +170,7 @@ CONSTANT: typing.Final = "CONSTANT"
 Do not use `List` or `Optional` etc. from the typing module.
 
 ```python
-# Preferred
+# Prefer
 def example() -> list[str | None]:
     return ["a", "c", None]
 
@@ -150,7 +208,7 @@ def update_db_record():
 Use hierarchical naming that groups related functionality:
 
 ```python
-# Preferred
+# Prefer
 def db_user_get():
 def db_record_insert():
 def db_user_settings_query():
@@ -165,7 +223,7 @@ Another example with license files, the wrong way:
 
 ```python
 # Avoid
-def check_root_license_file():      # Lost among other "check_" functions
+def check_root_license_file():      # Lost amongst other "check_" functions
 def validate_package_license():     # Separated from other license functions
 def verify_license_files():         # Yet another scattered license function
 ```
@@ -173,8 +231,8 @@ def verify_license_files():         # Yet another scattered license function
 The right way:
 
 ```python
-# Preferred
-def license_root_file_check():      # All license-related functions
+# Prefer
+def license_root_file_check():      # All license related functions
 def license_package_validate():     # will appear together when
 def license_files_verify():         # sorted alphabetically
 ```
@@ -217,7 +275,7 @@ def _do_something_in_verify_archive_integrity():
 Use the same prefix:
 
 ```python
-# Preferred
+# Prefer
 def _verify_archive_integrity():
 def _verify_archive_integrity_do_something():
 ```
@@ -228,7 +286,7 @@ This makes it easier to find all the functions related to a specific task, and m
 
 We limit function complexity to a score of 10. If the linter complains, your function is doing too much.
 
-Cyclomatic complexity counts the number of independent paths through code: more if/else branches, loops, and exception handlers means higher complexity. Complex code is harder to test, maintain, and understand. The easiest way to fix high complexity is usually to refactor a chunk of related logic into a separate helper function.
+Cyclomatic complexity counts the number of independent paths through code: more if and else branches, loops, and exception handlers means higher complexity. Complex code is harder to test, maintain, and understand. The easiest way to fix high complexity is usually to refactor a chunk of related logic into a separate helper function.
 
 ### Replace synchronous calls with asynchronous counterparts in async code
 
@@ -241,18 +299,28 @@ Exceptions to this rule apply only in these scenarios:
 
 If either exception applies, either submit a brief issue with the blockbuster traceback, notify the team via Slack, or add a code comment if part of another commit. An ATR Tooling engineer will address the issue without requiring significant time investment from you.
 
-### Always use parentheses to group subexpressions in boolean expressions
+### Always use parentheses to group complex nested subexpressions
 
-Instead of this:
+Complex subexpressions are those which contain a keyword or operator.
 
 ```python
-a or b and c == d or e
+# Avoid
+a or b and c == d or not e or f
+
+# Prefer
+(a or b) and (c == d) or (not e) or f
 ```
 
-Do:
+Because `f` is not a complex expression, it does not get parenthesised. Also because this rule is about subexpressions only, we do not put parethenses around the top level.
 
 ```python
-(a or b) and (c == d) or e
+# Avoid
+if (a or b):
+    ...
+
+# Prefer
+if a or b:
+    ...
 ```
 
 ### Use terse comments on their own lines
@@ -264,6 +332,10 @@ Place comments on dedicated lines preceding the relevant code block. Comments at
 
 We do not use `assert`. If you need to guard against invalid states or inputs, use standard `if` checks and raise appropriate exceptions. If you need to help type checkers understand the type of a variable within a specific code block, in other words if you need to narrow a type, then use `if isinstance(...)` or `if not isinstance(...)` as appropriate.
 
+### Never use `case _` when pattern matching exhausive types
+
+Using `case _` breaks type checking in such situations.
+
 ## HTML
 
 ### Use sentence case for headings, form labels, and submission buttons
@@ -272,4 +344,10 @@ We write headings, form labels, and submission buttons in the form "This is some
 
 ### Use Bootstrap classes for all style
 
-We use Bootstrap classes for style, and avoid custom classes unless absolutely necessary. If you think that you have to resort to a custom class, consult the list of [Bootstrap classes](https://bootstrapclasses.com/) for guidance. There is usually a class for what you want to achieve, and if there isn't then you may be making things too complicated. Complicated, custom style is difficult for a team to maintain. If you still believe that a new class is strictly warranted, then the class must be prefixed with `atr-`. Classes can go in `<style>` elements in `stylesheet` template blocks in such cases. The use of the `style` attribute on any HTML element is forbidden.
+We use Bootstrap classes for style, and avoid custom classes unless absolutely necessary. If you think that you have to resort to a custom class, consult the list of [Bootstrap classes](https://bootstrapclasses.com/) for guidance. There is usually a class for what you want to achieve, and if there isn't then you may be making things too complicated. Complicated, custom style is difficult for a team to maintain. If you still believe that a new class is strictly warranted, then the class must be prefixed with a project label, e.g. `example-` if the project is called `example`. Classes can go in `<style>` elements in `stylesheet` template blocks in such cases. The use of the `style` attribute on any HTML element is forbidden.
+
+## Markdown
+
+### Use `_` for emphasis and `**` for strong emphasis
+
+Do not use `*` for emphasis or `__` for strong emphasis.

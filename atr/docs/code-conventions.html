@@ -1,9 +1,50 @@
-<h1 id="project-conventions">Project conventions</h1>
-<p><strong>STATUS: Draft.</strong></p>
-<p>This document does not yet reflect the consensus of the ASF Tooling team, and, unlike the rest of this codebase, is provided for internal ASF Tooling discussion only.</p>
+<h1 id="5-code-conventions">3.5. Code conventions</h1>
+<p><strong>Up</strong>: <code>3.</code> <a href="developer-guide">Developer guide</a></p>
+<p><strong>Prev</strong>: <code>3.4.</code> <a href="build-processes">Build processes</a></p>
+<p><strong>Next</strong>: <code>3.6.</code> <a href="how-to-contribute">How to contribute</a></p>
+<p><strong>Sections</strong>:</p>
+<ul>
+<li><a href="#python-code">Python code</a></li>
+<li><a href="#html">HTML</a></li>
+<li><a href="#markdown">Markdown</a></li>
+</ul>
 <h2 id="python-code">Python code</h2>
-<p>Follow <a href="https://peps.python.org/pep-0008/#constants">PEP 8</a> unless otherwise indicated in this document. Some of the conventions listed below recapitulate or add exceptions to PEP 8 rules.</p>
+<h3 id="follow-pep-8-rules-by-default">Follow PEP 8 rules by default</h3>
+<p>Follow <a href="https://peps.python.org/pep-0008/">PEP 8</a> unless otherwise indicated in this document. Some of the conventions listed below recapitulate or add exceptions to PEP 8 rules.</p>
 <p>Obey all project local lints, e.g. the use of <code>ruff</code> and specific <code>ruff</code> rules.</p>
+<h3 id="keep-the-primary-execution-path-to-the-left">Keep the primary execution path to the left</h3>
+<p>Structure code so that the most likely, normal, successful execution path remains at the level of least indentation. Handle error cases and edge conditions early with guard clauses, and then continue with the main logic. This makes it easier to identify the primary execution flow.</p>
+<pre><code class="language-python"># Avoid
+def process_data(data):
+    if data is not None:
+        if len(data) &gt; 0:
+            if validate(data):
+                return transform(data)
+            else:
+                raise ValueError("Invalid data")
+        else:
+            raise ValueError("Empty data")
+    else:
+        raise ValueError("No data")
+
+# Prefer
+def process_data(data):
+    if data is None:
+        raise ValueError("No data")
+    if len(data) == 0:
+        raise ValueError("Empty data")
+    if not validate(data):
+        raise ValueError("Invalid data")
+
+    return transform(data)
+</code></pre>
+<h3 id="avoid-excessive-indentation">Avoid excessive indentation</h3>
+<p>When you find yourself nesting code more than two or three levels deep, extract the nested logic into separate functions. This improves readability, testability, and maintainability. Each function should handle a single, well defined piece of logic.</p>
+<h3 id="do-not-use-lint-or-type-checker-ignore-statements">Do not use lint or type checker ignore statements</h3>
+<p>You must not use <code># noqa</code>, <code># type: ignore</code>, or equivalents, even to ignore specific errors. The single exception to this is when there is a bug in the linter or type checker.</p>
+<p>File level lint ignores can be added to the project's <code>pyproject.toml</code>, but they must be used sparingly.</p>
+<h3 id="use-double-quotes-for-all-strings">Use double quotes for all strings</h3>
+<p>This includes triple quoted strings.</p>
 <h3 id="prefix-private-interfaces-with-a-single-underscore">Prefix private interfaces with a single underscore</h3>
 <p>Prefix all private interfaces, e.g. functions, classes, constants, variables, with a single underscore. An interface is private when used exclusively within its containing module and not referenced by external code, templates, or processes.</p>
 <p>Exceptions to this rule include:</p>
@@ -11,9 +52,11 @@
 <li>Type variables</li>
 <li>Enumerations</li>
 <li>Methods requiring interface compatibility with their superclass</li>
-<li>Nested functions, i.e. functions appearing in other functions</li>
+<li>Nested functions (which should generally be avoided)</li>
 </ul>
 <p>Scripts are explicitly <em>not</em> an exception. Underscores should be used to prefix private interfaces in scripts for consistency, e.g. so that linters don't need to carry exceptions, and to ease potential migration to modules.</p>
+<h3 id="avoid-nested-functions">Avoid nested functions</h3>
+<p>All function definitions should be at the top level. This is not a hard rule, but should only be broken when absolutely necessary.</p>
 <h3 id="use-uppercase-for-top-level-constants">Use UPPERCASE for top level constants</h3>
 <p>Define top level constants using <code>UPPERCASE</code> letters. Don't forget to apply an underscore prefix to constants which are private to their module.</p>
 <p>Do not use uppercase for constants within functions and methods.</p>
@@ -23,7 +66,7 @@
 <p>Top level variables should be avoided. When their use is necessary, prefix them with <code>global_</code>, using lowercase letters, to ensure clear identification of their scope. Use an underscore prefix too, <code>_global_</code>, when the variable is private.</p>
 <h3 id="import-modules-as-their-least-significant-name-part">Import modules as their least significant name part</h3>
 <p>Import modules using their least significant name component:</p>
-<pre><code class="language-python"># Preferred
+<pre><code class="language-python"># Prefer
 import a.b.c as c
 
 # Avoid
@@ -32,7 +75,7 @@ import a.b.c
 <p>This convention aligns with Go's package naming practices. Follow <a href="https://go.dev/blog/package-names">Go naming rules</a> for all modules.</p>
 <p>This only applies to modules outside of the Python standard library. The standard library module <code>os.path</code>, for example, must always be imported using the form <code>import os.path</code>, and <em>not</em> <code>import os.path as path</code>.</p>
 <p>Furthermore, if a third party module to be imported would conflict with a Python standard library module, then that third party module must be imported with one extra level.</p>
-<pre><code class="language-python"># Preferred
+<pre><code class="language-python"># Prefer
 import asyncio.subprocess
 import sqlalchemy.ext as ext
 import aiofiles.os
@@ -50,7 +93,7 @@ import aiofiles.os.path as path
 <p>If there are duplicates imported within a single file, they should be disambiguated by the next level up. In the pie example, that would be <code>import baking.apple as apple</code> and then <code>apple.pie</code>, and <code>import baking.cherry as cherry</code> and <code>cherry.pie</code>.</p>
 <h3 id="never-import-names-directly-from-modules">Never import names directly from modules</h3>
 <p>Avoid importing specific names from modules:</p>
-<pre><code class="language-python"># Preferred
+<pre><code class="language-python"># Prefer
 import p.q.r as r
 r.s()
 
@@ -59,7 +102,7 @@ from p.q.r import s
 s()
 </code></pre>
 <p>The <code>collections.abc</code>, <code>types</code>, and <code>typing</code> modules are an exception to this rule. Always import <code>collections.abc</code>, <code>types</code> and <code>typing</code> interfaces directly using the <code>from</code> syntax:</p>
-<pre><code class="language-python"># Preferred
+<pre><code class="language-python"># Prefer
 from typing import Final
 
 CONSTANT: Final = "CONSTANT"
@@ -71,14 +114,14 @@ CONSTANT: typing.Final = "CONSTANT"
 </code></pre>
 <h3 id="use-concise-typing-patterns">Use concise typing patterns</h3>
 <p>Do not use <code>List</code> or <code>Optional</code> etc. from the typing module.</p>
-<pre><code class="language-python"># Preferred
-def example() -> list[str | None]:
+<pre><code class="language-python"># Prefer
+def example() -&gt; list[str | None]:
     return ["a", "c", None]
 
 # Avoid
 from typing import List, Optional
 
-def example() -> List[Optional[str]]:
+def example() -&gt; List[Optional[str]]:
     return ["a", "c", None]
 </code></pre>
 <h3 id="never-name-interfaces-after-their-module">Never name interfaces after their module</h3>
@@ -96,7 +139,7 @@ def query_user_settings():
 def update_db_record():
 </code></pre>
 <p>Use hierarchical naming that groups related functionality:</p>
-<pre><code class="language-python"># Preferred
+<pre><code class="language-python"># Prefer
 def db_user_get():
 def db_record_insert():
 def db_user_settings_query():
@@ -106,13 +149,13 @@ def db_record_update():
 <p><strong>Example</strong>:</p>
 <p>Another example with license files, the wrong way:</p>
 <pre><code class="language-python"># Avoid
-def check_root_license_file():      # Lost among other "check_" functions
+def check_root_license_file():      # Lost amongst other "check_" functions
 def validate_package_license():     # Separated from other license functions
 def verify_license_files():         # Yet another scattered license function
 </code></pre>
 <p>The right way:</p>
-<pre><code class="language-python"># Preferred
-def license_root_file_check():      # All license-related functions
+<pre><code class="language-python"># Prefer
+def license_root_file_check():      # All license related functions
 def license_package_validate():     # will appear together when
 def license_files_verify():         # sorted alphabetically
 </code></pre>
@@ -138,14 +181,14 @@ def _verify_archive_integrity():
 def _do_something_in_verify_archive_integrity():
 </code></pre>
 <p>Use the same prefix:</p>
-<pre><code class="language-python"># Preferred
+<pre><code class="language-python"># Prefer
 def _verify_archive_integrity():
 def _verify_archive_integrity_do_something():
 </code></pre>
 <p>This makes it easier to find all the functions related to a specific task, and means that they sort together.</p>
 <h3 id="keep-cyclomatic-complexity-below-10">Keep cyclomatic complexity below 10</h3>
 <p>We limit function complexity to a score of 10. If the linter complains, your function is doing too much.</p>
-<p>Cyclomatic complexity counts the number of independent paths through code: more if/else branches, loops, and exception handlers means higher complexity. Complex code is harder to test, maintain, and understand. The easiest way to fix high complexity is usually to refactor a chunk of related logic into a separate helper function.</p>
+<p>Cyclomatic complexity counts the number of independent paths through code: more if and else branches, loops, and exception handlers means higher complexity. Complex code is harder to test, maintain, and understand. The easiest way to fix high complexity is usually to refactor a chunk of related logic into a separate helper function.</p>
 <h3 id="replace-synchronous-calls-with-asynchronous-counterparts-in-async-code">Replace synchronous calls with asynchronous counterparts in async code</h3>
 <p>Our use of blockbuster enables automatic detection of synchronous function calls within asynchronous code. When detected, replace these calls with their asynchronous equivalents without performance testing. The conversion process typically requires minimal, trivial effort.</p>
 <p>Exceptions to this rule apply only in these scenarios:</p>
@@ -154,19 +197,34 @@ def _verify_archive_integrity_do_something():
 <li>When the asynchronous equivalent function is unknown</li>
 </ul>
 <p>If either exception applies, either submit a brief issue with the blockbuster traceback, notify the team via Slack, or add a code comment if part of another commit. An ATR Tooling engineer will address the issue without requiring significant time investment from you.</p>
-<h3 id="always-use-parentheses-to-group-subexpressions-in-boolean-expressions">Always use parentheses to group subexpressions in boolean expressions</h3>
-<p>Instead of this:</p>
-<pre><code class="language-python">a or b and c == d or e
+<h3 id="always-use-parentheses-to-group-complex-nested-subexpressions">Always use parentheses to group complex nested subexpressions</h3>
+<p>Complex subexpressions are those which contain a keyword or operator.</p>
+<pre><code class="language-python"># Avoid
+a or b and c == d or not e or f
+
+# Prefer
+(a or b) and (c == d) or (not e) or f
 </code></pre>
-<p>Do:</p>
-<pre><code class="language-python">(a or b) and (c == d) or e
+<p>Because <code>f</code> is not a complex expression, it does not get parenthesised. Also because this rule is about subexpressions only, we do not put parethenses around the top level.</p>
+<pre><code class="language-python"># Avoid
+if (a or b):
+    ...
+
+# Prefer
+if a or b:
+    ...
 </code></pre>
 <h3 id="use-terse-comments-on-their-own-lines">Use terse comments on their own lines</h3>
 <p>Place comments on dedicated lines preceding the relevant code block. Comments at the ends of lines are strictly reserved for linter or type checker directives. This convention enhances code scannability for such directives. General comments must not appear at the end of code lines. Keep comments concise, using sentence case without terminal punctuation. Each sentence forming a comment must occupy its own line.</p>
 <code></code><h3 id="prefer-explicit-checks-over-assert">Prefer explicit checks over assert</h3>
 <p>We do not use <code>assert</code>. If you need to guard against invalid states or inputs, use standard <code>if</code> checks and raise appropriate exceptions. If you need to help type checkers understand the type of a variable within a specific code block, in other words if you need to narrow a type, then use <code>if isinstance(...)</code> or <code>if not isinstance(...)</code> as appropriate.</p>
+<code></code><h3 id="never-use-case-when-pattern-matching-exhausive-types">Never use case _ when pattern matching exhausive types</h3>
+<p>Using <code>case _</code> breaks type checking in such situations.</p>
 <h2 id="html">HTML</h2>
 <h3 id="use-sentence-case-for-headings-form-labels-and-submission-buttons">Use sentence case for headings, form labels, and submission buttons</h3>
 <p>We write headings, form labels, and submission buttons in the form "This is some text", and not "This is Some Text" or "This Is Some Text". This follows the <a href="https://en.wikipedia.org/wiki/Wikipedia:Manual_of_Style#Section_headings">Wikipedia style for headings</a>.</p>
 <h3 id="use-bootstrap-classes-for-all-style">Use Bootstrap classes for all style</h3>
-<p>We use Bootstrap classes for style, and avoid custom classes unless absolutely necessary. If you think that you have to resort to a custom class, consult the list of <a href="https://bootstrapclasses.com/">Bootstrap classes</a> for guidance. There is usually a class for what you want to achieve, and if there isn't then you may be making things too complicated. Complicated, custom style is difficult for a team to maintain. If you still believe that a new class is strictly warranted, then the class must be prefixed with <code>atr-</code>. Classes can go in <code><style></code> elements in <code>stylesheet</code> template blocks in such cases. The use of the <code>style</code> attribute on any HTML element is forbidden.</p>
+<p>We use Bootstrap classes for style, and avoid custom classes unless absolutely necessary. If you think that you have to resort to a custom class, consult the list of <a href="https://bootstrapclasses.com/">Bootstrap classes</a> for guidance. There is usually a class for what you want to achieve, and if there isn't then you may be making things too complicated. Complicated, custom style is difficult for a team to maintain. If you still believe that a new class is strictly warranted, then the class must be prefixed with a project label, e.g. <code>example-</code> if the project is called <code>example</code>. Classes can go in <code>&lt;style&gt;</code> elements in <code>stylesheet</code> template blocks in such cases. The use of the <code>style</code> attribute on any HTML element is forbidden.</p>
+<h2 id="markdown">Markdown</h2>
+<code></code><code></code><h3 id="use-for-emphasis-and-for-strong-emphasis">Use _ for emphasis and ** for strong emphasis</h3>
+<p>Do not use <code>*</code> for emphasis or <code>__</code> for strong emphasis.</p>

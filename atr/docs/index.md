@@ -13,4 +13,5 @@ NOTE: This documentation is a work in progress.
   * `3.2.` [Overview of the code](overview-of-the-code)
   * `3.3.` [Database](database)
   * `3.4.` [Build processes](build-processes)
-  * `3.5.` [How to contribute](how-to-contribute)
+  * `3.5.` [Code conventions](code-conventions)
+  * `3.6.` [How to contribute](how-to-contribute)

@@ -4,7 +4,7 @@
 
 **Prev**: `3.3.` [Database](database)
 
-**Next**: `3.5.` [How to contribute](how-to-contribute)
+**Next**: `3.5.` [Code conventions](code-conventions)
 
 **Sections**:
 
