@@ -2,6 +2,6 @@
 set -eu
 
 DOCKERFILE="${1:-Dockerfile.alpine}"
-IMAGE="${2:-tooling-trusted-release}"
+IMAGE="${2:-tooling-trusted-releases}"
 
 docker build -t "${IMAGE}" -f "${DOCKERFILE}" .

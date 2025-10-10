@@ -1086,7 +1086,7 @@ async def _update_projects(data: db.Session, projects: apache.ProjectsData) -> t
         # This is not detected by us as incubating, because we create those above
         # ("Create the associated podling project")
         # Since the Annotator project is in ldap_projects, we can just skip it here
-        # Originally reported in https://github.com/apache/tooling-trusted-release/issues/35
+        # Originally reported in https://github.com/apache/tooling-trusted-releases/issues/35
         # Ideally it would be removed from the upstream data source, which is:
         # https://projects.apache.org/json/foundation/projects.json
         if project_name == "incubator-annotator":

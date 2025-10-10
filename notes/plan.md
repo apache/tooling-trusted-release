@@ -122,7 +122,7 @@ These tasks are dependent on the task scheduler above.
    - Ensure that release managers are made aware of SBOM quality and contents in the UI
    - Add ability to upload existing SBOMs
    - Add ability to validate uploaded SBOMs
-   - [Export data through the Transparency Exchange API](https://github.com/apache/tooling-trusted-release/issues/8)
+   - [Export data through the Transparency Exchange API](https://github.com/apache/tooling-trusted-releases/issues/8)
 
 ## Advanced RC validation
 

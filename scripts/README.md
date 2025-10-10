@@ -24,7 +24,7 @@ Updates all dependencies in the Poetry environment to their latest versions acco
 
 ## poetry/build
 
-Verifies that the application can be successfully containerised by building Docker images using both Alpine and Ubuntu base images. It runs the Docker build process with the tag `tooling-trusted-release` for each Dockerfile, ensuring that the application builds correctly across different Linux distributions.
+Verifies that the application can be successfully containerised by building Docker images using both Alpine and Ubuntu base images. It runs the Docker build process with the tag `tooling-trusted-releases` for each Dockerfile, ensuring that the application builds correctly across different Linux distributions.
 
 ## poetry/run
 
@@ -36,7 +36,7 @@ Configures and synchronises the main Poetry dependencies, only, for production e
 
 ## build
 
-Builds a Docker container for the application using an Alpine Linux base image, and configures it to listen on port `4443` across all network interfaces (`0.0.0.0`). The resulting image is tagged as `tooling-trusted-release`.
+Builds a Docker container for the application using an Alpine Linux base image, and configures it to listen on port `4443` across all network interfaces (`0.0.0.0`). The resulting image is tagged as `tooling-trusted-releases`.
 
 
 ## release\_path\_parse.py
