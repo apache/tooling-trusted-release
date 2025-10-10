@@ -4,7 +4,7 @@
 
 **Prev**: `3.2.` [Overview of the code](overview-of-the-code)
 
-**Next**: `3.4.` [Build processes](build-processes)
+**Next**: `3.4.` [Storage interface](storage-interface)
 
 **Sections**:
 

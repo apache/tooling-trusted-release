@@ -23,7 +23,7 @@ import sys
 
 
 def generate_heading_id(text: str) -> str:
-    text = re.sub(r"^\d+\.\s*", "", text)
+    text = re.sub(r"^[\d.]+\s*", "", text)
     text = text.lower()
     text = re.sub(r"[^\w\s-]", "", text)
     text = re.sub(r"[\s_]+", "-", text)

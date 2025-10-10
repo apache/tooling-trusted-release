@@ -1,0 +1,100 @@
+<h1 id="storage-interface">3.4. Storage interface</h1>
+<p><strong>Up</strong>: <code>3.</code> <a href="developer-guide">Developer guide</a></p>
+<p><strong>Prev</strong>: <code>3.3.</code> <a href="database">Database</a></p>
+<p><strong>Next</strong>: <code>3.5.</code> <a href="build-processes">Build processes</a></p>
+<p><strong>Sections</strong>:</p>
+<ul>
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#how-do-we-read-from-storage">How do we read from storage?</a></li>
+<li><a href="#how-do-we-write-to-storage">How do we write to storage?</a></li>
+<li><a href="#how-do-we-add-new-storage-functionality">How do we add new storage functionality?</a></li>
+<li><a href="#how-do-we-use-outcomes">How do we use outcomes?</a></li>
+<li><a href="#what-about-audit-logging">What about audit logging?</a></li>
+</ul>
+<h2 id="introduction">Introduction</h2>
+<p>All database writes, and some reads, in ATR go through the <a href="/ref/atr/storage/__init__.py"><code>storage</code></a> interface. This interface <strong>enforces permissions</strong>, <strong>centralizes audit logging</strong>, and <strong>provides type-safe access</strong> to the database. In other words, avoid calling <a href="/ref/atr/db/__init__.py"><code>db</code></a> directly in route handlers if possible.</p>
+<p>The storage interface recognizes several permission levels: general public (unauthenticated visitors), foundation committer (any ASF account), committee participant (committers and PMC members), committee member (PMC members only), and foundation admin (infrastructure administrators). Each level inherits from the previous one, so for example committee members can do everything committee participants can do, plus additional operations.</p>
+<p>The storage interface does not make it impossible to bypass authorization, because you can always import <code>db</code> directly and write to the database. But it makes bypassing authorization an explicit choice that requires deliberate action, and it makes the safer path the easier path. This is a pragmatic approach to security: we cannot prevent all mistakes, but we can make it harder to make them accidentally.</p>
+<h2 id="how-do-we-read-from-storage">How do we read from storage?</h2>
+<p>Reading from storage is a work in progress. There are some existing methods, but most of the functionality is currently in <code>db</code> or <code>db.interaction</code>, and much work is required to migrate this to the storage interface. We have given this less priority because reads are generally safe, with the exception of a few components such as user tokens, which should be given greater migration priority.</p>
+<h2 id="how-do-we-write-to-storage">How do we write to storage?</h2>
+<p>To write to storage we open a write session, request specific permissions, use the exposed functionality, and then handle the outcome. Here is an actual example from <a href="/ref/atr/routes/start.py"><code>routes/start.py</code></a>:</p>
+<pre><code class="language-python">async with storage.write(session.uid) as write:
+    wacp = await write.as_project_committee_participant(project_name)
+    new_release, _project = await wacp.release.start(project_name, version)
+</code></pre>
+<p>The <code>wacp</code> object, short for <code>w</code>rite <code>a</code>s <code>c</code>ommittee <code>p</code>articipant, provides access to domain-specific writers: <code>announce</code>, <code>checks</code>, <code>distributions</code>, <code>keys</code>, <code>policy</code>, <code>project</code>, <code>release</code>, <code>sbom</code>, <code>ssh</code>, <code>tokens</code>, and <code>vote</code>.</p>
+<p>The write session takes an optional ASF UID, typically <code>session.uid</code> from the logged-in user. If you omit the UID, the session determines it automatically from the current request context. The write object checks LDAP memberships and raises <a href="/ref/atr/storage/__init__.py:AccessError"><code>storage.AccessError</code></a> if the user is not authorized for the requested permission level.</p>
+<p>Because projects belong to committees, we provide <a href="/ref/atr/storage/__init__.py:as_project_committee_member"><code>write.as_project_committee_member(project_name)</code></a> and <a href="/ref/atr/storage/__init__.py:as_project_committee_participant"><code>write.as_project_committee_participant(project_name)</code></a>, which look up the project's committee and authenticate the user as a member or participant of that committee. This is convenient when, for example, the URL provides a project name.</p>
+<p>Here is a more complete example from <a href="/ref/atr/blueprints/api/api.py"><code>blueprints/api/api.py</code></a> that shows the classic three step pattern:</p>
+<pre><code class="language-python">async with storage.write(asf_uid) as write:
+    # 1. Request permissions
+    wafc = write.as_foundation_committer()
+
+    # 2. Use the exposed functionality
+    outcome = await wafc.keys.ensure_stored_one(data.key)
+
+    # 3. Handle the outcome
+    key = outcome.result_or_raise()
+</code></pre>
+<p>In this case we decide to raise as soon as there is any error. We could also choose to display a warning, ignore the error, collect multiple outcomes for batch processing, or handle it in any other way appropriate for the situation.</p>
+<h2 id="how-do-we-add-new-storage-functionality">How do we add new storage functionality?</h2>
+<p>Add methods to classes in the <a href="/ref/atr/storage/writers/"><code>storage/writers</code></a> or <a href="/ref/atr/storage/readers/"><code>storage/readers</code></a> directories. Code to perform any action associated with public keys that involves writing to storage, for example, goes in <a href="/ref/atr/storage/writers/keys.py"><code>storage/writers/keys.py</code></a>.</p>
+<p>Classes in writer and reader modules must be named to match the permission hierarchy:</p>
+<pre><code class="language-python">class GeneralPublic:
+    def __init__(
+        self,
+        write: storage.Write,
+        write_as: storage.WriteAsGeneralPublic,
+        data: db.Session,
+    ) -&gt; None:
+        self.__write = write
+        self.__write_as = write_as
+        self.__data = data
+
+class FoundationCommitter(GeneralPublic):
+    def __init__(
+        self,
+        write: storage.Write,
+        write_as: storage.WriteAsFoundationCommitter,
+        data: db.Session
+    ) -&gt; None:
+        super().__init__(write, write_as, data)
+        self.__write = write
+        self.__write_as = write_as
+        self.__data = data
+
+class CommitteeParticipant(FoundationCommitter):
+    def __init__(
+        self,
+        write: storage.Write,
+        write_as: storage.WriteAsCommitteeParticipant,
+        data: db.Session,
+        committee_name: str,
+    ) -&gt; None:
+        super().__init__(write, write_as, data)
+        self.__committee_name = committee_name
+
+class CommitteeMember(CommitteeParticipant):
+    ...
+</code></pre>
+<p>This hierarchy that this creates is: <code>GeneralPublic</code> → <code>FoundationCommitter</code> → <code>CommitteeParticipant</code> → <code>CommitteeMember</code>. You can add methods at any level. A method on <code>CommitteeMember</code> is only available to committee members, while a method on <code>FoundationCommitter</code> is available to everyone who has logged in.</p>
+<p>Use <code>__private_methods</code> for helper code that is not part of the public interface. Use <code>public_methods</code> for operations that should be available to callers at the appropriate permission level. Consider returning <a href="/ref/atr/storage/outcome.py:Outcome"><code>Outcome</code></a> types to allow callers flexibility in error handling. Refer to the <a href="#how-do-we-use-outcomes">section on using outcomes</a> for more details.</p>
+<p>After adding a new writer module, register it in the appropriate <code>WriteAs*</code> classes in <a href="/ref/atr/storage/__init__.py"><code>storage/__init__.py</code></a>. For example, when adding the <code>distributions</code> writer, it was necessary to add <code>self.distributions = writers.distributions.CommitteeMember(write, self, data, committee_name)</code> to the <a href="/ref/atr/storage/__init__.py:WriteAsCommitteeMember"><code>WriteAsCommitteeMember</code></a> class.</p>
+<h2 id="how-do-we-use-outcomes">How do we use outcomes?</h2>
+<p>Consider using <strong>outcome types</strong> from <a href="/ref/atr/storage/outcome.py"><code>storage.outcome</code></a> when returning results from writer methods. Outcomes let you represent both success and failure without raising exceptions, which gives callers flexibility in how they handle errors.</p>
+<p>An <a href="/ref/atr/storage/outcome.py:Outcome"><code>Outcome[T]</code></a> is either a <a href="/ref/atr/storage/outcome.py:Result"><code>Result[T]</code></a> wrapping a successful value, or an <a href="/ref/atr/storage/outcome.py:Error"><code>Error[T]</code></a> wrapping an exception. You can check which it is with the <code>ok</code> property or pattern matching, extract the value with <code>result_or_raise()</code>, or extract the error with <code>error_or_raise()</code>.</p>
+<p>Here is an example from <a href="/ref/atr/routes/keys.py"><code>routes/keys.py</code></a> that processes multiple keys and collects outcomes:</p>
+<pre><code class="language-python">async with storage.write() as write:
+    wacm = write.as_committee_member(selected_committee)
+    outcomes = await wacm.keys.ensure_associated(keys_text)
+
+success_count = outcomes.result_count
+error_count = outcomes.error_count
+</code></pre>
+<p>The <code>ensure_associated</code> method returns an <a href="/ref/atr/storage/outcome.py:List"><code>outcome.List</code></a>, which is a collection of outcomes. Some keys might import successfully, and others might fail because they are malformed or already exist. The caller can inspect the list to see how many succeeded and how many failed, and present that information to the user.</p>
+<p>The <code>outcome.List</code> class provides many useful methods: <a href="/ref/atr/storage/outcome.py:results"><code>results()</code></a> to get only the successful values, <a href="/ref/atr/storage/outcome.py:errors"><code>errors()</code></a> to get only the exceptions, <a href="/ref/atr/storage/outcome.py:result_count"><code>result_count</code></a> and <a href="/ref/atr/storage/outcome.py:error_count"><code>error_count</code></a> to count them, and <a href="/ref/atr/storage/outcome.py:results_or_raise"><code>results_or_raise()</code></a> to extract all values or raise on the first error.</p>
+<p>Use outcomes when an operation might fail for some items but succeed for others, or when you want to give the caller control over error handling. Do not use them when failure should always raise an exception, such as authorization failures or database connection errors. Those should be raised immediately.</p>
+<h2 id="what-about-audit-logging">What about audit logging?</h2>
+<p>Storage write operations can be logged to <a href="/ref/atr/config.py:STORAGE_AUDIT_LOG_FILE"><code>config.AppConfig.STORAGE_AUDIT_LOG_FILE</code></a>, which is <code>state/storage-audit.log</code> by default. Each log entry is a JSON object containing the timestamp, the action name, and relevant parameters. When you write a storage method that should be audited, call <code>self.__write_as.append_to_audit_log(**kwargs)</code> with whatever parameters are relevant to that specific operation. The action name is extracted automatically from the call stack using <a href="/ref/atr/log.py:caller_name"><code>log.caller_name()</code></a>, so if the method is called <a href="https://datatracker.ietf.org/doc/html/rfc2324"><code>i_am_a_teapot</code></a>, the audit log will show <code>i_am_a_teapot</code> without you having to pass the name explicitly.</p>
+<p>Audit logging must be done manually because the values to log are often those computed during method execution, not just those passed as arguments which could be logged automatically. When deleting a release, for example, we log <code>asf_uid</code> (instance attribute), <code>project_name</code> (argument), and <code>version</code> (argument), but when issuing a JWT from a PAT, we log <code>asf_uid</code> (instance attribute) and <code>pat_hash</code> (<em>computed</em>). Each operation logs what makes sense for that operation.</p>
