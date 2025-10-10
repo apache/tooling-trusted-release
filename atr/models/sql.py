@@ -280,6 +280,7 @@ class ResultsJSON(sqlalchemy.types.TypeDecorator):
         try:
             return results.ResultsAdapter.validate_python(value)
         except pydantic.ValidationError:
+            # TODO: Should we make this more strict?
             return None
 
 
