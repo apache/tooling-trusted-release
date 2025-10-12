@@ -1,10 +1,10 @@
-# 3.5. Build processes
+# 3.6. Build processes
 
 **Up**: `3.` [Developer guide](developer-guide)
 
-**Prev**: `3.4.` [Storage interface](storage-interface)
+**Prev**: `3.5.` [User interface](user-interface)
 
-**Next**: `3.6.` [Code conventions](code-conventions)
+**Next**: `3.7.` [Code conventions](code-conventions)
 
 **Sections**:
 

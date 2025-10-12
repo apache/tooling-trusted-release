@@ -54,6 +54,8 @@ The ATR user interface includes many HTML forms. We use [WTForms](https://wtform
 
 In addition to templates, we sometimes need to generate HTML programmatically in Python. For this we use [htpy](https://htpy.dev/), another third party library, for building HTML using Python syntax. The ATR [`htm`](/ref/atr/htm.py) module extends htpy with a [`Block`](/ref/atr/htm.py:Block) class that makes it easier to build complex HTML structures incrementally. Using htpy means that we get type checking for our HTML generation, and can compose HTML elements just like any other Python objects. The generated HTML can be embedded in Jinja2 templates or returned directly from route handlers.
 
+Refer to the [full user interface development guide](user-interface) for more information about this topic.
+
 ## Scheduling and tasks
 
 Many operations in ATR are too slow to run during an HTTP request, so we run them asynchronously in background worker processes. The task scheduling system in ATR is built from three components: a task queue stored in the SQLite database, a worker manager that spawns and monitors worker processes, and the worker processes themselves that claim and execute tasks.

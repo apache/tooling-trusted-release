@@ -1,0 +1,112 @@
+<h1 id="user-interface">3.5. User interface</h1>
+<p><strong>Up</strong>: <code>3.</code> <a href="developer-guide">Developer guide</a></p>
+<p><strong>Prev</strong>: <code>3.4.</code> <a href="storage-interface">Storage interface</a></p>
+<p><strong>Next</strong>: <code>3.6.</code> <a href="build-processes">Build processes</a></p>
+<p><strong>Sections</strong>:</p>
+<ul>
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#jinja2-templates">Jinja2 templates</a></li>
+<li><a href="#forms">Forms</a></li>
+<li><a href="#programmatic-html">Programmatic HTML</a></li>
+<li><a href="#the-htmblock-class">The htm.Block class</a></li>
+<li><a href="#how-a-route-renders-ui">How a route renders UI</a></li>
+</ul>
+<h2 id="introduction">Introduction</h2>
+<p>ATR uses server-side rendering almost exclusively: the server generates HTML and sends it to the browser, which displays it. We try to avoid client-side scripting, and in the rare cases where we need dynamic front end components we use plain TypeScript without recourse to any third party framework. (We have some JavaScript too, but we aim to use TypeScript only.) Sometimes we incur a full page load where perhaps it would be more ideal to update a fragment of the DOM in place, but page loads are very fast in modern browsers, so this is less of an issue than it would have been a decade ago.</p>
+<p>The UI is built from three main pieces: <a href="https://jinja.palletsprojects.com/">Jinja2</a> for templates, <a href="https://wtforms.readthedocs.io/">WTForms</a> for HTML forms, and <a href="https://htpy.dev/">htpy</a> for programmatic HTML generation. We style everything with <a href="https://getbootstrap.com/">Bootstrap</a>, which we customize slightly.</p>
+<h2 id="jinja2-templates">Jinja2 templates</h2>
+<p>Templates live in <a href="/ref/atr/templates/"><code>templates/</code></a>. Each template is a Jinja2 file that defines HTML structure with placeholders for dynamic content. Route handlers render templates by calling <a href="/ref/atr/template.py:render"><code>template.render</code></a>, which is an alias for <a href="/ref/atr/template.py:render_sync"><code>template.render_sync</code></a>. The function is asynchronous and takes a template name plus keyword arguments for the template variables.</p>
+<p>Here is an example from <a href="/ref/atr/routes/keys.py:add"><code>routes/keys.py</code></a>:</p>
+<pre><code class="language-python">return await template.render(
+    "keys-add.html",
+    asf_id=session.uid,
+    user_committees=participant_of_committees,
+    form=form,
+    key_info=key_info,
+    algorithms=route.algorithms,
+)
+</code></pre>
+<p>The template receives these variables and can access them directly. If you pass a variable called <code>form</code>, the template can use <code>{{ form }}</code> to render it. <a href="https://jinja.palletsprojects.com/en/stable/templates/#list-of-control-structures">Jinja2 has control structures</a> like <code>{% for %}</code> and <code>{% if %}</code>, which you use when iterating over data or conditionally showing content.</p>
+<p>Templates are loaded into memory at server startup by <a href="/ref/atr/preload.py:setup_template_preloading"><code>preload.setup_template_preloading</code></a>. This means that changing a template requires restarting the server in development, which can be configured to happen automatically, but it also means that rendering is fast because we never do a disk read during request handling. The preloading scans <a href="/ref/atr/templates/"><code>templates/</code></a> recursively and caches every file.</p>
+<p>Template rendering happens in a thread pool to avoid blocking the async event loop. The function <a href="/ref/atr/template.py:_render_in_thread"><code>_render_in_thread</code></a> uses <code>asyncio.to_thread</code> to execute Jinja2's synchronous <code>render</code> method.</p>
+<h2 id="forms">Forms</h2>
+<p>HTML forms in ATR are handled by <a href="https://wtforms.readthedocs.io/">WTForms</a>, accessed through our <a href="/ref/atr/forms.py"><code>forms</code></a> module. Each form is a class that inherits from <a href="/ref/atr/forms.py:Typed"><code>forms.Typed</code></a>, which itself inherits from <code>QuartForm</code> in <a href="https://quart-wtf.readthedocs.io/">Quart-WTF</a>. Form fields are class attributes created using helper functions from the <code>forms</code> module.</p>
+<p>Here is a typical form definition from <a href="/ref/atr/routes/keys.py:AddOpenPGPKeyForm"><code>routes/keys.py</code></a>:</p>
+<pre><code class="language-python">class AddOpenPGPKeyForm(forms.Typed):
+    public_key = forms.textarea(
+        "Public OpenPGP key",
+        placeholder="Paste your ASCII-armored public OpenPGP key here...",
+        description="Your public key should be in ASCII-armored format, starting with"
+        ' "-----BEGIN PGP PUBLIC KEY BLOCK-----"',
+    )
+    selected_committees = forms.checkboxes(
+        "Associate key with committees",
+        description="Select the committees with which to associate your key.",
+    )
+    submit = forms.submit("Add OpenPGP key")
+</code></pre>
+<p>The helper functions like <a href="/ref/atr/forms.py:textarea"><code>forms.textarea</code></a>, <a href="/ref/atr/forms.py:checkboxes"><code>forms.checkboxes</code></a>, and <a href="/ref/atr/forms.py:submit"><code>forms.submit</code></a> create WTForms field objects with appropriate validators. The first argument is always the label text. Optional fields take <code>optional=True</code>, and you can provide placeholders, descriptions, and other field-specific options. If you do not pass <code>optional=True</code>, the field is required by default. The <a href="/ref/atr/forms.py:string"><code>forms.string</code></a> function adds <code>REQUIRED</code> to the validators, while <a href="/ref/atr/forms.py:optional"><code>forms.optional</code></a> adds <code>OPTIONAL</code>.</p>
+<p>To use a form in a route, create it with <code>await FormClass.create_form()</code>. For POST requests, pass <code>data=await quart.request.form</code> to populate it with the submitted data. Then validate with <code>await form.validate_on_submit()</code>. If validation passes, you extract data from <code>form.field_name.data</code> and proceed. If validation fails, re-render the template with the form object, which will then display error messages.</p>
+<p>The <a href="/ref/atr/forms.py"><code>forms</code></a> module also provides rendering functions that generate Bootstrap-styled HTML. The function <a href="/ref/atr/forms.py:render_columns"><code>forms.render_columns</code></a> creates a two-column layout with labels on the left and inputs on the right. The function <a href="/ref/atr/forms.py:render_simple"><code>forms.render_simple</code></a> creates a simpler vertical layout. The function <a href="/ref/atr/forms.py:render_table"><code>forms.render_table</code></a> puts the form inside a table. All three functions return htpy elements, which you can embed in templates or return directly from route handlers.</p>
+<h2 id="programmatic-html">Programmatic HTML</h2>
+<p>Sometimes you need to generate HTML in Python rather than in a template. For this we use <a href="https://htpy.dev/">htpy</a>, which provides a Python API for building HTML elements. You import <code>htpy</code> and then use it like this:</p>
+<pre><code class="language-python">import htpy
+
+element = htpy.div(".container")[
+    htpy.h1["Release Candidate"],
+    htpy.p["This is a release candidate."],
+]
+</code></pre>
+<p>The square brackets syntax is how htpy accepts children. The parentheses syntax is for attributes. If you want a div with an id, you write <code>htpy.div(id="content")</code>. If you want a div with a class, you can use CSS selector syntax like <code>htpy.div(".my-class")</code> or you can use <code>htpy.div(class_="my-class")</code>, remembering to use the underscore in <code>class_</code>.</p>
+<p>You can nest elements arbitrarily, mix strings and elements, and pass lists of elements. Converting an htpy element to a string renders it as HTML. Templates can therefore render htpy elements directly by passing them as variables.</p>
+<p>The htpy library provides type annotations for HTML elements. It does not validate attribute names or values, so you can pass nonsensical attributes without error. We plan to fix this by adding stricter types in our <code>htm</code> wrapper. The main benefit to using <code>htpy</code> (via <code>htm</code>) is having a clean Python API for HTML generation rather than concatenating strings or using templating.</p>
+<h2 id="the-htmblock-class">The htm.Block class</h2>
+<p>The ATR <a href="/ref/atr/htm.py"><code>htm</code></a> module extends htpy with a <a href="/ref/atr/htm.py:Block"><code>Block</code></a> class that makes it easier to build complex HTML structures incrementally. You create a block, append elements to it, and then collect them into a final element. Here is the typical usage pattern:</p>
+<pre><code class="language-python">import atr.htm as htm
+
+div = htm.Block()
+div.h1["Release Information"]
+div.p["The release was created on ", release.created.isoformat(), "."]
+if release.released:
+    div.p["It was published on ", release.released.isoformat(), "."]
+return div.collect()
+</code></pre>
+<p>The block class provides properties for common HTML elements like <code>h1</code>, <code>h2</code>, <code>p</code>, <code>div</code>, <code>ul</code>, and so on. When you access these properties, you get back a <a href="/ref/atr/htm.py:BlockElementCallable"><code>BlockElementCallable</code></a>, which you can call to create an element with attributes or use square brackets to add grandchildren of the block. The element is automatically appended to the block's internal list of children.</p>
+<p>The <code>collect</code> method assembles all of the elements into a single htpy element. If you created the block with an outer element like <code>htm.Block(htpy.div(".container"))</code>, that element wraps all the children. If you created the block with no outer element, <code>collect</code> wraps everything in a div. You can also pass a <code>separator</code> argument to <code>collect</code>, which inserts a text separator between elements.</p>
+<p>The block class is useful when you are building HTML in a loop or when you have conditional elements. Instead of managing a list of elements manually, you can let the block class do it for you: append elements as you go, and at the end call <code>collect</code> to get the final result. This is cleaner than concatenating strings or maintaining lists yourself.</p>
+<p>The block class also adds a <code>data-src</code> attribute to elements, which records which function created the element. If you see an element in the browser inspector with <code>data-src="atr.routes.keys:selected"</code>, you know that it came from the <code>selected</code> function in <code>routes/keys.py</code>. The source is extracted automatically using <a href="/ref/atr/log.py:caller_name"><code>log.caller_name</code></a>.</p>
+<h2 id="how-a-route-renders-ui">How a route renders UI</h2>
+<p>A typical route that renders UI first authenticates the user, loads data from the database, creates and validates a form if necessary, and renders a template with the data and form. Here is a simplified example from <a href="/ref/atr/routes/keys.py:add"><code>routes/keys.py</code></a>:</p>
+<pre><code class="language-python">@route.committer("/keys/add", methods=["GET", "POST"])
+async def add(session: route.CommitterSession) -&gt; str:
+    async with storage.write() as write:
+        participant_of_committees = await write.participant_of_committees()
+
+    committee_choices: forms.Choices = [
+        (c.name, c.display_name or c.name)
+        for c in participant_of_committees
+    ]
+
+    form = await AddOpenPGPKeyForm.create_form(
+        data=(await quart.request.form) if (quart.request.method == "POST") else None
+    )
+    forms.choices(form.selected_committees, committee_choices)
+
+    if await form.validate_on_submit():
+        # Process the form data
+        # ...
+        await quart.flash(f"OpenPGP key added successfully.", "success")
+        form = await AddOpenPGPKeyForm.create_form()
+        forms.choices(form.selected_committees, committee_choices)
+
+    return await template.render(
+        "keys-add.html",
+        asf_id=session.uid,
+        user_committees=participant_of_committees,
+        form=form,
+    )
+</code></pre>
+<p>The route is decorated with <code>@route.committer</code>, which ensures that the route fails before the function is even entered if authentication fails. The function receives a <code>session</code> object, which is an instance of <a href="/ref/atr/route.py:CommitterSession"><code>route.CommitterSession</code></a> with a range of useful properties and methods. The function then loads data, creates a form, checks if the request is a POST, and either processes the form or displays it. After successful processing, it creates a fresh form to clear the data. At the end, it renders a template with all of the variables that the template needs.</p>
+<p>The template receives the form object and renders it by passing it to one of the <code>forms.render_*</code> functions. We previously used Jinja2 macros for this, but are migrating to the new rendering functions in Python (e.g. in <a href="/ref/atr/routes/distribution.py"><code>routes/distribution.py</code></a> and <a href="/ref/atr/routes/ignores.py"><code>routes/ignores.py</code></a>). The template also receives other data like <code>asf_id</code> and <code>user_committees</code>, which it uses to display information or make decisions about what to show.</p>
+<p>If you use the programmatic rendering functions from <a href="/ref/atr/forms.py"><code>forms</code></a>, you can skip the template entirely. These functions return htpy elements, which you can combine with other htpy elements and return directly from the route, which is often useful for admin routes, for example. You can also use <a href="/ref/atr/template.py:blank"><code>template.blank</code></a>, which renders a minimal template with just a title and content area. This is useful for simple pages that do not need the full template machinery.</p>
+<p>Bootstrap CSS classes are applied automatically by the form rendering functions. The functions use classes like <code>form-control</code>, <code>form-select</code>, <code>btn-primary</code>, <code>is-invalid</code>, and <code>invalid-feedback</code>. We currently use Bootstrap 5. If you generate HTML manually with htpy, you can apply Bootstrap classes yourself by using the CSS selector syntax like <code>htpy.div(".container")</code> or the class attribute like <code>htpy.div(class_="container")</code>.</p>

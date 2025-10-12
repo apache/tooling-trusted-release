@@ -144,7 +144,7 @@ async def add(session: route.CommitterSession) -> str:
     committee_choices: forms.Choices = [(c.name, c.display_name or c.name) for c in participant_of_committees]
 
     form = await AddOpenPGPKeyForm.create_form(
-        data=await quart.request.form if quart.request.method == "POST" else None
+        data=(await quart.request.form) if (quart.request.method == "POST") else None
     )
     forms.choices(form.selected_committees, committee_choices)
 

@@ -1,8 +1,8 @@
-# 3.7. How to contribute
+# 3.8. How to contribute
 
 **Up**: `3.` [Developer guide](developer-guide)
 
-**Prev**: `3.6.` [Code conventions](code-conventions)
+**Prev**: `3.7.` [Code conventions](code-conventions)
 
 **Next**: (none)
 
