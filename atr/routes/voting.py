@@ -117,8 +117,10 @@ async def start_vote_manual(
     session: route.CommitterSession,
     data: db.Session,
 ) -> response.Response | str:
-    # This verifies the state and sets the phase to RELEASE_CANDIDATE
-    error = await interaction.promote_release(data, release.name, selected_revision_number, vote_manual=True)
+    async with storage.write(session.uid) as write:
+        wacp = await write.as_project_committee_participant(release.project_name)
+        # This verifies the state and sets the phase to RELEASE_CANDIDATE
+        error = await wacp.release.promote_to_candidate(release.name, selected_revision_number, vote_manual=True)
     if error:
         return await session.redirect(root.index, error=error)
     return await session.redirect(

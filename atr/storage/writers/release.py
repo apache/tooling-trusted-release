@@ -28,6 +28,8 @@ from typing import TYPE_CHECKING, Final
 
 import aiofiles.os
 import aioshutil
+import sqlalchemy
+import sqlmodel
 
 import atr.analysis as analysis
 import atr.db as db
@@ -261,6 +263,66 @@ class CommitteeParticipant(FoundationCommitter):
             )
         creation_error = str(creating.failed) if (creating.failed is not None) else None
         return creation_error, moved_files_names, skipped_files_names
+
+    async def promote_to_candidate(
+        self,
+        release_name: str,
+        selected_revision_number: str,
+        vote_manual: bool = False,
+    ) -> str | None:
+        """Promote a release candidate draft to a new phase."""
+        release_for_pre_checks = await self.__data.release(name=release_name, _project=True).demand(
+            storage.AccessError("Release candidate draft not found")
+        )
+        project_name = release_for_pre_checks.project.name
+        version_name = release_for_pre_checks.version
+
+        # Check for ongoing tasks
+        ongoing_tasks = await self.__tasks_ongoing(project_name, version_name, selected_revision_number)
+        if ongoing_tasks > 0:
+            return "All checks must be completed before starting a vote"
+
+        # Verify that it's in the correct phase
+        if release_for_pre_checks.phase != sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
+            return "This release is not in the candidate draft phase"
+
+        # Check that the revision number is the latest
+        if release_for_pre_checks.latest_revision_number != selected_revision_number:
+            return "The selected revision number does not match the latest revision number"
+
+        # Check that there is at least one file in the draft
+        file_count = await util.number_of_release_files(release_for_pre_checks)
+        if file_count == 0:
+            return "This candidate draft is empty, containing no files"
+
+        # Promote it to RELEASE_CANDIDATE
+        via = sql.validate_instrumented_attribute
+        stmt = (
+            sqlmodel.update(sql.Release)
+            .where(
+                via(sql.Release.name) == release_name,
+                via(sql.Release.phase) == sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
+                sql.latest_revision_number_query() == selected_revision_number,
+            )
+            .values(
+                phase=sql.ReleasePhase.RELEASE_CANDIDATE,
+                vote_started=datetime.datetime.now(datetime.UTC),
+                vote_manual=vote_manual,
+            )
+        )
+
+        result = await self.__data.execute(stmt)
+        if result.rowcount != 1:
+            await self.__data.rollback()
+            return "A newer revision appeared, please refresh and try again."
+        await self.__data.commit()
+        self.__write_as.append_to_audit_log(
+            asf_uid=self.__asf_uid,
+            release_name=release_name,
+            selected_revision_number=selected_revision_number,
+            vote_manual=vote_manual,
+        )
+        return None
 
     async def remove_rc_tags(self, project_name: str, version_name: str) -> tuple[str | None, int, list[str]]:
         description = "Remove RC tags from paths via web interface"
@@ -597,6 +659,18 @@ class CommitteeParticipant(FoundationCommitter):
                 await aiofiles.os.rename(creating.interim_path / f, target_path / f.name)
                 if f == source_file_rel:
                     moved_files_names.append(f.name)
+
+    async def __tasks_ongoing(self, project_name: str, version_name: str, revision_number: str | None = None) -> int:
+        tasks = sqlmodel.select(sqlalchemy.func.count()).select_from(sql.Task)
+        query = tasks.where(
+            sql.Task.project_name == project_name,
+            sql.Task.version_name == version_name,
+            sql.Task.revision_number
+            == (sql.RELEASE_LATEST_REVISION_NUMBER if (revision_number is None) else revision_number),
+            sql.validate_instrumented_attribute(sql.Task.status).in_([sql.TaskStatus.QUEUED, sql.TaskStatus.ACTIVE]),
+        )
+        result = await self.__data.execute(query)
+        return result.scalar_one()
 
 
 class CommitteeMember(CommitteeParticipant):

@@ -156,8 +156,8 @@ class CommitteeParticipant(FoundationCommitter):
 
         if promote is True:
             # This verifies the state and sets the phase to RELEASE_CANDIDATE
-            error = await interaction.promote_release(
-                self.__data, release.name, selected_revision_number, vote_manual=False
+            error = await self.__write_as.release.promote_to_candidate(
+                release.name, selected_revision_number, vote_manual=False
             )
             if error:
                 raise storage.AccessError(error)
@@ -302,7 +302,7 @@ class CommitteeMember(CommitteeParticipant):
             # Then we automatically start the Incubator PMC vote
             # TODO: Note on the resolve vote page that resolving the Project PPMC vote starts the Incubator PMC vote
             task_mid = interaction.task_mid_get(latest_vote_task)
-            archive_url = await interaction.task_archive_url_cached(task_mid)
+            archive_url = await self.__write_as.cache.get_message_archive_url(task_mid)
             if archive_url is None:
                 raise ValueError("No archive URL found for podling vote")
             thread_id = archive_url.split("/")[-1]

@@ -136,6 +136,7 @@ class Read:
 class WriteAsGeneralPublic(WriteAs):
     def __init__(self, write: Write, data: db.Session):
         self.announce = writers.announce.GeneralPublic(write, self, data)
+        self.cache = writers.cache.GeneralPublic(write, self, data)
         self.checks = writers.checks.GeneralPublic(write, self, data)
         self.keys = writers.keys.GeneralPublic(write, self, data)
         self.policy = writers.policy.GeneralPublic(write, self, data)
@@ -152,6 +153,7 @@ class WriteAsFoundationCommitter(WriteAsGeneralPublic):
         # TODO: We need a definitive list of ASF UIDs
         self.__asf_uid = write.authorisation.asf_uid
         self.announce = writers.announce.FoundationCommitter(write, self, data)
+        self.cache = writers.cache.FoundationCommitter(write, self, data)
         self.checks = writers.checks.FoundationCommitter(write, self, data)
         self.keys = writers.keys.FoundationCommitter(write, self, data)
         self.policy = writers.policy.FoundationCommitter(write, self, data)
@@ -174,6 +176,7 @@ class WriteAsCommitteeParticipant(WriteAsFoundationCommitter):
         self.__asf_uid = write.authorisation.asf_uid
         self.__committee_name = committee_name
         self.announce = writers.announce.CommitteeParticipant(write, self, data, committee_name)
+        self.cache = writers.cache.CommitteeParticipant(write, self, data, committee_name)
         self.checks = writers.checks.CommitteeParticipant(write, self, data, committee_name)
         self.keys = writers.keys.CommitteeParticipant(write, self, data, committee_name)
         self.policy = writers.policy.CommitteeParticipant(write, self, data, committee_name)
@@ -200,6 +203,7 @@ class WriteAsCommitteeMember(WriteAsCommitteeParticipant):
         self.__asf_uid = write.authorisation.asf_uid
         self.__committee_name = committee_name
         self.announce = writers.announce.CommitteeMember(write, self, data, committee_name)
+        self.cache = writers.cache.CommitteeMember(write, self, data, committee_name)
         self.checks = writers.checks.CommitteeMember(write, self, data, committee_name)
         self.distributions = writers.distributions.CommitteeMember(write, self, data, committee_name)
         self.keys = writers.keys.CommitteeMember(write, self, data, committee_name)
@@ -307,6 +311,16 @@ class Write:
         except Exception as e:
             return outcome.Error(e)
         return outcome.Result(wafa)
+
+    def as_general_public(self) -> WriteAsGeneralPublic:
+        return self.as_general_public_outcome().result_or_raise()
+
+    def as_general_public_outcome(self) -> outcome.Outcome[WriteAsGeneralPublic]:
+        try:
+            wagp = WriteAsGeneralPublic(self, self.__data)
+        except Exception as e:
+            return outcome.Error(e)
+        return outcome.Result(wagp)
 
     # async def as_key_owner(self) -> types.Outcome[WriteAsKeyOwner]:
     #     ...

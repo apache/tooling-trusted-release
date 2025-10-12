@@ -74,7 +74,9 @@ async def selected(session: route.CommitterSession, project_name: str, version_n
 
         # Move task_mid_get here?
         task_mid = interaction.task_mid_get(latest_vote_task)
-        archive_url = await interaction.task_archive_url_cached(task_mid)
+        async with storage.write() as write:
+            wagp = write.as_general_public()
+            archive_url = await wagp.cache.get_message_archive_url(task_mid)
 
     # Special form for the [ Resolve vote ] button, to make it POST
     hidden_form = await forms.Hidden.create_form()

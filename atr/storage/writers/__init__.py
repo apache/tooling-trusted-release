@@ -16,6 +16,7 @@
 # under the License.
 
 import atr.storage.writers.announce as announce
+import atr.storage.writers.cache as cache
 import atr.storage.writers.checks as checks
 import atr.storage.writers.distributions as distributions
 import atr.storage.writers.keys as keys
@@ -29,6 +30,7 @@ import atr.storage.writers.vote as vote
 
 __all__ = [
     "announce",
+    "cache",
     "checks",
     "distributions",
     "keys",

@@ -16,7 +16,6 @@
 # under the License.
 
 import contextlib
-import datetime
 import enum
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any, Final
@@ -170,66 +169,6 @@ async def previews(project: sql.Project) -> list[sql.Release]:
     return await releases_by_phase(project, sql.ReleasePhase.RELEASE_PREVIEW)
 
 
-async def promote_release(
-    data: db.Session,
-    release_name: str,
-    selected_revision_number: str,
-    vote_manual: bool = False,
-) -> str | None:
-    """Promote a release candidate draft to a new phase."""
-    # TODO: Use session.release here
-    release_for_pre_checks = await data.release(name=release_name, _project=True).demand(
-        InteractionError("Release candidate draft not found")
-    )
-    project_name = release_for_pre_checks.project.name
-    version_name = release_for_pre_checks.version
-
-    # Check for ongoing tasks
-    ongoing_tasks = await tasks_ongoing(project_name, version_name, selected_revision_number)
-    if ongoing_tasks > 0:
-        return "All checks must be completed before starting a vote"
-
-    # Verify that it's in the correct phase
-    # The atomic update below will also check this
-    if release_for_pre_checks.phase != sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-        return "This release is not in the candidate draft phase"
-
-    # Check that the revision number is the latest
-    if release_for_pre_checks.latest_revision_number != selected_revision_number:
-        return "The selected revision number does not match the latest revision number"
-
-    # Check that there is at least one file in the draft
-    # This is why we require _project=True above
-    file_count = await util.number_of_release_files(release_for_pre_checks)
-    if file_count == 0:
-        return "This candidate draft is empty, containing no files"
-
-    # Promote it to RELEASE_CANDIDATE
-    # NOTE: We previously allowed skipping phases, but removed that functionality
-    # We don't need a lock here because we use an atomic update
-    via = sql.validate_instrumented_attribute
-    stmt = (
-        sqlmodel.update(sql.Release)
-        .where(
-            via(sql.Release.name) == release_name,
-            via(sql.Release.phase) == sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT,
-            sql.latest_revision_number_query() == selected_revision_number,
-        )
-        .values(
-            phase=sql.ReleasePhase.RELEASE_CANDIDATE,
-            vote_started=datetime.datetime.now(datetime.UTC),
-            vote_manual=vote_manual,
-        )
-    )
-
-    result = await data.execute(stmt)
-    if result.rowcount != 1:
-        await data.rollback()
-        return "A newer revision appeared, please refresh and try again."
-    await data.commit()
-    return None
-
-
 async def release_latest_vote_task(release: sql.Release) -> sql.Task | None:
     """Find the most recent VOTE_INITIATE task for this release."""
     disallowed_statuses = [sql.TaskStatus.QUEUED, sql.TaskStatus.ACTIVE]
@@ -281,34 +220,6 @@ async def releases_in_progress(project: sql.Project) -> list[sql.Release]:
     cands = await candidates(project)
     prevs = await previews(project)
     return drafts + cands + prevs
-
-
-async def task_archive_url_cached(task_mid: str | None) -> str | None:
-    if task_mid in _THREAD_URLS_FOR_DEVELOPMENT:
-        return _THREAD_URLS_FOR_DEVELOPMENT[task_mid]
-
-    if task_mid is None:
-        return None
-    if "@" not in task_mid:
-        return None
-
-    async with db.session() as data:
-        url = await data.ns_text_get(
-            "mid-url-cache",
-            task_mid,
-        )
-        if url is not None:
-            return url
-
-        url = await util.task_archive_url(task_mid)
-        if url is not None:
-            await data.ns_text_set(
-                "mid-url-cache",
-                task_mid,
-                url,
-            )
-
-    return url
 
 
 def task_mid_get(latest_vote_task: sql.Task) -> str | None:
