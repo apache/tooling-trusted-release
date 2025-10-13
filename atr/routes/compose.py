@@ -26,7 +26,6 @@ import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.models.results as results
 import atr.models.sql as sql
-import atr.revision as revision
 import atr.route as route
 import atr.routes.draft as draft
 import atr.routes.mapping as mapping
@@ -64,7 +63,7 @@ async def check(
 
     # Get the number of ongoing tasks for the current revision
     ongoing_tasks_count = 0
-    match await revision.latest_info(release.project.name, release.version):
+    match await interaction.latest_info(release.project.name, release.version):
         case (revision_number, revision_editor, revision_timestamp):
             ongoing_tasks_count = await interaction.tasks_ongoing(
                 release.project.name,

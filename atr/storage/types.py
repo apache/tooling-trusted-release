@@ -83,3 +83,15 @@ class PublicKeyError(Exception):
     @property
     def original_error(self) -> Exception:
         return self.__original_error
+
+
+class FailedError(Exception):
+    pass
+
+
+@dataclasses.dataclass
+class Creating:
+    old: sql.Revision | None
+    interim_path: pathlib.Path
+    new: sql.Revision | None
+    failed: FailedError | None = None

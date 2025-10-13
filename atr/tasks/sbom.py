@@ -30,8 +30,8 @@ import atr.config as config
 import atr.log as log
 import atr.models.results as results
 import atr.models.schema as schema
-import atr.revision as revision
 import atr.sbomtool as sbomtool
+import atr.storage as storage
 import atr.tasks.checks as checks
 import atr.tasks.checks.targz as targz
 import atr.util as util
@@ -86,18 +86,20 @@ async def augment(args: FileArgs) -> results.Results | None:
         patch_data = sbomtool.patch_to_data(patch_ops)
         merged = bundle.doc.patch(yyjson.Document(patch_data))
         description = "SBOM augmentation through web interface"
-        async with revision.create_and_manage(
-            args.project_name, args.version_name, args.asf_uid or "unknown", description=description
-        ) as creating:
-            new_full_path = os.path.join(str(creating.interim_path), args.file_path)
-            # Write to the new revision
-            log.info(f"Writing augmented SBOM to {new_full_path}")
-            await aiofiles.os.remove(new_full_path)
-            async with aiofiles.open(new_full_path, "w", encoding="utf-8") as f:
-                await f.write(merged.dumps())
+        async with storage.write(args.asf_uid) as write:
+            wacp = await write.as_project_committee_participant(args.project_name)
+            async with wacp.revision.create_and_manage(
+                args.project_name, args.version_name, args.asf_uid or "unknown", description=description
+            ) as creating:
+                new_full_path = os.path.join(str(creating.interim_path), args.file_path)
+                # Write to the new revision
+                log.info(f"Writing augmented SBOM to {new_full_path}")
+                await aiofiles.os.remove(new_full_path)
+                async with aiofiles.open(new_full_path, "w", encoding="utf-8") as f:
+                    await f.write(merged.dumps())
 
-        if creating.new is None:
-            raise RuntimeError("Internal error: New revision not found")
+            if creating.new is None:
+                raise RuntimeError("Internal error: New revision not found")
 
     return results.SBOMAugment(
         kind="sbom_augment",

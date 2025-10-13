@@ -417,8 +417,6 @@ class CommitteeParticipant(FoundationCommitter):
         return outcomes
 
     async def import_keys_file(self, project_name: str, version_name: str) -> outcome.List[types.Key]:
-        import atr.revision as revision
-
         release = await self.__data.release(
             project_name=project_name,
             version=version_name,
@@ -438,7 +436,7 @@ class CommitteeParticipant(FoundationCommitter):
         # Remove the KEYS file if 100% imported
         if (outcomes.result_count > 0) and (outcomes.error_count == 0):
             description = "Removed KEYS file after successful import through web interface"
-            async with revision.create_and_manage(
+            async with self.__write_as.revision.create_and_manage(
                 project_name, version_name, self.__asf_uid, description=description
             ) as creating:
                 path_in_new_revision = creating.interim_path / "KEYS"

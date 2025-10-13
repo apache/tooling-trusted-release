@@ -30,8 +30,8 @@ import atr.db as db
 import atr.forms as forms
 import atr.models.schema as schema
 import atr.models.sql as sql
-import atr.revision as revision
 import atr.route as route
+import atr.storage as storage
 import atr.template as template
 import atr.util as util
 
@@ -121,19 +121,23 @@ async def selected_post(session: route.CommitterSession, project_name: str, vers
             )
 
     description = f"Copy of revision {selected_revision_number} through web interface"
-    async with revision.create_and_manage(project_name, version_name, session.uid, description=description) as creating:
-        # TODO: Stop create_and_manage from hard linking the parent first
-        await aioshutil.rmtree(creating.interim_path)  # type: ignore[call-arg]
-        await util.create_hard_link_clone(selected_revision_dir, creating.interim_path)
+    async with storage.write(session.uid) as write:
+        wacp = await write.as_project_committee_participant(project_name)
+        async with wacp.revision.create_and_manage(
+            project_name, version_name, session.uid, description=description
+        ) as creating:
+            # TODO: Stop create_and_manage from hard linking the parent first
+            await aioshutil.rmtree(creating.interim_path)  # type: ignore[call-arg]
+            await util.create_hard_link_clone(selected_revision_dir, creating.interim_path)
 
-    if creating.new is None:
-        raise base.ASFQuartException("Internal error: New revision not found", errorcode=500)
-    return await session.redirect(
-        selected,
-        success=f"Copied revision {selected_revision_number} to new latest revision, {creating.new.number}",
-        project_name=project_name,
-        version_name=version_name,
-    )
+        if creating.new is None:
+            raise base.ASFQuartException("Internal error: New revision not found", errorcode=500)
+        return await session.redirect(
+            selected,
+            success=f"Copied revision {selected_revision_number} to new latest revision, {creating.new.number}",
+            project_name=project_name,
+            version_name=version_name,
+        )
 
 
 class FilesDiff(schema.Strict):

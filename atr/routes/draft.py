@@ -32,7 +32,6 @@ import atr.construct as construct
 import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
-import atr.revision as revision
 import atr.route as route
 import atr.routes.compose as compose
 import atr.routes.root as root
@@ -163,10 +162,12 @@ async def fresh(session: route.CommitterSession, project_name: str, version_name
     # This doesn't make sense unless the checks themselves have been updated
     # Therefore we only show the button for this to admins
     description = "Empty revision to restart all checks for the whole release candidate draft"
-    async with revision.create_and_manage(
-        project_name, version_name, session.uid, description=description
-    ) as _creating:
-        pass
+    async with storage.write(session.uid) as write:
+        wacp = await write.as_project_committee_participant(project_name)
+        async with wacp.revision.create_and_manage(
+            project_name, version_name, session.uid, description=description
+        ) as _creating:
+            pass
 
     return await session.redirect(
         compose.selected,
@@ -227,29 +228,29 @@ async def sbomgen(
 
     try:
         description = "SBOM generation through web interface"
-        async with revision.create_and_manage(
-            project_name, version_name, session.uid, description=description
-        ) as creating:
-            # Uses new_revision_number in a functional way
-            path_in_new_revision = creating.interim_path / rel_path
-            sbom_path_rel = rel_path.with_suffix(rel_path.suffix + ".cdx.json").name
-            sbom_path_in_new_revision = creating.interim_path / rel_path.parent / sbom_path_rel
-
-            # Check that the source file exists in the new revision
-            if not await aiofiles.os.path.exists(path_in_new_revision):
-                log.error(f"Source file {rel_path} not found in new revision for SBOM generation.")
-                raise route.FlashError("Source artifact file not found in the new revision.")
-
-            # Check that the SBOM file does not already exist in the new revision
-            if await aiofiles.os.path.exists(sbom_path_in_new_revision):
-                raise base.ASFQuartException("SBOM file already exists", errorcode=400)
-
-        if creating.new is None:
-            raise route.FlashError("Internal error: New revision not found")
-
-        # Create and queue the task, using paths within the new revision
         async with storage.write(session.uid) as write:
             wacp = await write.as_project_committee_participant(project_name)
+            async with wacp.revision.create_and_manage(
+                project_name, version_name, session.uid, description=description
+            ) as creating:
+                # Uses new_revision_number in a functional way
+                path_in_new_revision = creating.interim_path / rel_path
+                sbom_path_rel = rel_path.with_suffix(rel_path.suffix + ".cdx.json").name
+                sbom_path_in_new_revision = creating.interim_path / rel_path.parent / sbom_path_rel
+
+                # Check that the source file exists in the new revision
+                if not await aiofiles.os.path.exists(path_in_new_revision):
+                    log.error(f"Source file {rel_path} not found in new revision for SBOM generation.")
+                    raise route.FlashError("Source artifact file not found in the new revision.")
+
+                # Check that the SBOM file does not already exist in the new revision
+                if await aiofiles.os.path.exists(sbom_path_in_new_revision):
+                    raise base.ASFQuartException("SBOM file already exists", errorcode=400)
+
+            if creating.new is None:
+                raise route.FlashError("Internal error: New revision not found")
+
+            # Create and queue the task, using paths within the new revision
             sbom_task = await wacp.sbom.generate_cyclonedx(
                 project_name, version_name, creating.new.number, path_in_new_revision, sbom_path_in_new_revision
             )

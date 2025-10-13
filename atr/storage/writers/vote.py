@@ -25,7 +25,6 @@ import atr.db as db
 import atr.db.interaction as interaction
 import atr.log as log
 import atr.models.sql as sql
-import atr.revision as revision
 import atr.storage as storage
 import atr.tasks.message as message
 import atr.tasks.vote as tasks_vote
@@ -269,7 +268,7 @@ class CommitteeMember(CommitteeParticipant):
             success_message = "Vote marked as passed"
 
             description = "Create a preview revision from the last candidate draft"
-            async with revision.create_and_manage(
+            async with self.__write_as.revision.create_and_manage(
                 project_name, release.version, self.__asf_uid, description=description
             ) as _creating:
                 pass
@@ -336,7 +335,7 @@ class CommitteeMember(CommitteeParticipant):
             success_message = "Vote marked as passed"
 
             description = "Create a preview revision from the last candidate draft"
-            async with revision.create_and_manage(
+            async with self.__write_as.revision.create_and_manage(
                 project_name, release.version, self.__asf_uid, description=description
             ) as _creating:
                 pass

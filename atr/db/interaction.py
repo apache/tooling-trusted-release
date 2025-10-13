@@ -16,6 +16,7 @@
 # under the License.
 
 import contextlib
+import datetime
 import enum
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any, Final
@@ -155,6 +156,23 @@ async def has_failing_checks(release: sql.Release, revision_number: str, caller_
         )
         result = await data.execute(query)
         return result.scalar_one() > 0
+
+
+async def latest_info(project_name: str, version_name: str) -> tuple[str, str, datetime.datetime] | None:
+    """Get the name, editor, and timestamp of the latest revision."""
+    release_name = sql.release_name(project_name, version_name)
+    async with db.session() as data:
+        # TODO: No need to get release here
+        # Just use maximum seq from revisions
+        release = await data.release(name=release_name, _project=True).demand(
+            RuntimeError(f"Release {release_name} does not exist")
+        )
+        if release.latest_revision_number is None:
+            return None
+        revision = await data.revision(release_name=release_name, number=release.latest_revision_number).get()
+        if not revision:
+            return None
+    return revision.number, revision.asfuid, revision.created
 
 
 async def latest_revision(release: sql.Release) -> sql.Revision | None:

@@ -33,7 +33,8 @@ import atr.config as config
 import atr.db as db
 import atr.log as log
 import atr.models.sql as sql
-import atr.revision as revision
+import atr.storage as storage
+import atr.storage.types as types
 import atr.user as user
 import atr.util as util
 
@@ -446,42 +447,46 @@ async def _step_07b_process_validated_rsync_write(
 
     # Create the draft revision directory structure
     description = "File synchronisation through ssh, using rsync"
-    async with revision.create_and_manage(project_name, version_name, asf_uid, description=description) as creating:
-        # Uses new_revision_number for logging only
-        if creating.old is not None:
-            log.info(f"Using old revision {creating.old.number} and interim path {creating.interim_path}")
-        # Update the rsync command path to the new revision directory
-        argv[-1] = str(creating.interim_path)
-
-        ###################################################
-        ### Calls _step_08_execute_rsync_upload_command ###
-        ###################################################
-        exit_status = await _step_08_execute_rsync(process, argv)
-        if exit_status != 0:
+    async with storage.write(asf_uid) as write:
+        wacp = await write.as_project_committee_participant(project_name)
+        async with wacp.revision.create_and_manage(
+            project_name, version_name, asf_uid, description=description
+        ) as creating:
+            # Uses new_revision_number for logging only
             if creating.old is not None:
-                for_revision = f"successor of revision {creating.old.number}"
-            else:
-                for_revision = f"initial revision for release {release_name}"
-            log.error(
-                f"rsync upload failed with exit status {exit_status} for {for_revision}. "
-                f"Command: {process.command} (run as {' '.join(argv)})"
-            )
-            raise revision.FailedError(f"rsync upload failed with exit status {exit_status} for {for_revision}")
+                log.info(f"Using old revision {creating.old.number} and interim path {creating.interim_path}")
+            # Update the rsync command path to the new revision directory
+            argv[-1] = str(creating.interim_path)
 
-    if creating.new is not None:
-        log.info(f"rsync upload successful for revision {creating.new.number}")
-        host = config.get().APP_HOST
-        message = f"\nATR: Created revision {creating.new.number} of {project_name} {version_name}\n"
-        message += f"ATR: https://{host}/compose/{project_name}/{version_name}\n"
-        if not process.stderr.is_closing():
-            process.stderr.write(message.encode())
-            await process.stderr.drain()
-    else:
-        log.info(f"rsync upload unsuccessful for release {release_name}")
+            ###################################################
+            ### Calls _step_08_execute_rsync_upload_command ###
+            ###################################################
+            exit_status = await _step_08_execute_rsync(process, argv)
+            if exit_status != 0:
+                if creating.old is not None:
+                    for_revision = f"successor of revision {creating.old.number}"
+                else:
+                    for_revision = f"initial revision for release {release_name}"
+                log.error(
+                    f"rsync upload failed with exit status {exit_status} for {for_revision}. "
+                    f"Command: {process.command} (run as {' '.join(argv)})"
+                )
+                raise types.FailedError(f"rsync upload failed with exit status {exit_status} for {for_revision}")
 
-    # If we got here, there was no exception
-    if not process.is_closing():
-        process.exit(exit_status)
+        if creating.new is not None:
+            log.info(f"rsync upload successful for revision {creating.new.number}")
+            host = config.get().APP_HOST
+            message = f"\nATR: Created revision {creating.new.number} of {project_name} {version_name}\n"
+            message += f"ATR: https://{host}/compose/{project_name}/{version_name}\n"
+            if not process.stderr.is_closing():
+                process.stderr.write(message.encode())
+                await process.stderr.drain()
+        else:
+            log.info(f"rsync upload unsuccessful for release {release_name}")
+
+        # If we got here, there was no exception
+        if not process.is_closing():
+            process.exit(exit_status)
 
 
 async def _step_07c_ensure_release_object_for_write(project_name: str, version_name: str) -> None:

@@ -23,6 +23,7 @@ import atr.storage.writers.keys as keys
 import atr.storage.writers.policy as policy
 import atr.storage.writers.project as project
 import atr.storage.writers.release as release
+import atr.storage.writers.revision as revision
 import atr.storage.writers.sbom as sbom
 import atr.storage.writers.ssh as ssh
 import atr.storage.writers.tokens as tokens
@@ -37,6 +38,7 @@ __all__ = [
     "policy",
     "project",
     "release",
+    "revision",
     "sbom",
     "ssh",
     "tokens",

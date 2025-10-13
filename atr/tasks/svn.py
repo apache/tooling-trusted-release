@@ -25,7 +25,7 @@ import aioshutil
 import atr.log as log
 import atr.models.results as results
 import atr.models.schema as schema
-import atr.revision as revision
+import atr.storage as storage
 import atr.tasks.checks as checks
 
 
@@ -72,57 +72,60 @@ async def _import_files_core(args: SvnImport) -> str:
     temp_export_dir_name = ".svn-export.tmp"
 
     description = "Import of files from subversion"
-    async with revision.create_and_manage(
-        args.project_name, args.version_name, args.asf_uid, description=description
-    ) as creating:
-        # Uses creating.new after this block
-        log.debug(f"Created revision directory: {creating.interim_path}")
+    async with storage.write(args.asf_uid) as write:
+        wacp = await write.as_project_committee_participant(args.project_name)
+        async with wacp.revision.create_and_manage(
+            args.project_name, args.version_name, args.asf_uid, description=description
+        ) as creating:
+            # Uses creating.new after this block
+            log.debug(f"Created revision directory: {creating.interim_path}")
 
-        final_target_path = creating.interim_path
-        if args.target_subdirectory:
-            final_target_path = creating.interim_path / args.target_subdirectory
-            # Validate that final_target_path is a subdirectory of new_revision_dir
-            if not final_target_path.is_relative_to(creating.interim_path):
-                raise SvnImportError(
-                    f"Target subdirectory {args.target_subdirectory} is not a subdirectory of {creating.interim_path}"
-                )
-            await aiofiles.os.makedirs(final_target_path, exist_ok=True)
+            final_target_path = creating.interim_path
+            if args.target_subdirectory:
+                final_target_path = creating.interim_path / args.target_subdirectory
+                # Validate that final_target_path is a subdirectory of new_revision_dir
+                if not final_target_path.is_relative_to(creating.interim_path):
+                    raise SvnImportError(
+                        f"Target subdirectory {args.target_subdirectory}"
+                        f" is not a subdirectory of {creating.interim_path}"
+                    )
+                await aiofiles.os.makedirs(final_target_path, exist_ok=True)
 
-        temp_export_path = creating.interim_path / temp_export_dir_name
+            temp_export_path = creating.interim_path / temp_export_dir_name
 
-        svn_command = [
-            "svn",
-            "export",
-            "--non-interactive",
-            "--trust-server-cert-failures",
-            "unknown-ca,cn-mismatch",
-            "-r",
-            args.revision,
-            "--",
-            args.svn_url,
-            str(temp_export_path),
-        ]
+            svn_command = [
+                "svn",
+                "export",
+                "--non-interactive",
+                "--trust-server-cert-failures",
+                "unknown-ca,cn-mismatch",
+                "-r",
+                args.revision,
+                "--",
+                args.svn_url,
+                str(temp_export_path),
+            ]
 
-        await _import_files_core_run_svn_export(svn_command, temp_export_path)
+            await _import_files_core_run_svn_export(svn_command, temp_export_path)
 
-        # Move files from temp export path to final target path
-        # We only have to do this to avoid the SVN pegged revision issue
-        log.info(f"Moving exported files from {temp_export_path} to {final_target_path}")
-        for item_name in await aiofiles.os.listdir(temp_export_path):
-            source_item = temp_export_path / item_name
-            destination_item = final_target_path / item_name
-            try:
-                await aioshutil.move(str(source_item), str(destination_item))
-            except FileExistsError:
-                log.warning(f"Item {destination_item} already exists, skipping move for {item_name}")
-            except Exception as move_err:
-                log.error(f"Error moving {source_item} to {destination_item}: {move_err}")
-        await aiofiles.os.rmdir(temp_export_path)
-        log.info(f"Removed temporary export directory: {temp_export_path}")
+            # Move files from temp export path to final target path
+            # We only have to do this to avoid the SVN pegged revision issue
+            log.info(f"Moving exported files from {temp_export_path} to {final_target_path}")
+            for item_name in await aiofiles.os.listdir(temp_export_path):
+                source_item = temp_export_path / item_name
+                destination_item = final_target_path / item_name
+                try:
+                    await aioshutil.move(str(source_item), str(destination_item))
+                except FileExistsError:
+                    log.warning(f"Item {destination_item} already exists, skipping move for {item_name}")
+                except Exception as move_err:
+                    log.error(f"Error moving {source_item} to {destination_item}: {move_err}")
+            await aiofiles.os.rmdir(temp_export_path)
+            log.info(f"Removed temporary export directory: {temp_export_path}")
 
-    if creating.new is None:
-        raise SvnImportError("Internal error: New revision not found")
-    return f"Successfully imported files from SVN into revision {creating.new.number}"
+        if creating.new is None:
+            raise SvnImportError("Internal error: New revision not found")
+        return f"Successfully imported files from SVN into revision {creating.new.number}"
 
 
 async def _import_files_core_run_svn_export(svn_command: list[str], temp_export_path: pathlib.Path) -> None:

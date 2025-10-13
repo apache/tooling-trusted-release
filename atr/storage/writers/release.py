@@ -36,8 +36,8 @@ import atr.db as db
 import atr.log as log
 import atr.models.api as api
 import atr.models.sql as sql
-import atr.revision as revision
 import atr.storage as storage
+import atr.storage.types as types
 import atr.util as util
 
 if TYPE_CHECKING:
@@ -94,8 +94,8 @@ class CommitteeParticipant(FoundationCommitter):
     @contextlib.asynccontextmanager
     async def create_and_manage_revision(
         self, project_name: str, version: str, description: str
-    ) -> AsyncGenerator[revision.Creating]:
-        async with revision.create_and_manage(
+    ) -> AsyncGenerator[types.Creating]:
+        async with self.__write_as.revision.create_and_manage(
             project_name, version, self.__asf_uid, description=description
         ) as _creating:
             yield _creating
@@ -155,9 +155,9 @@ class CommitteeParticipant(FoundationCommitter):
             path_to_remove = creating.interim_path / dir_to_delete_rel
             path_to_remove.resolve().relative_to(creating.interim_path.resolve())
             if not await aiofiles.os.path.isdir(path_to_remove):
-                raise revision.FailedError(f"Path '{dir_to_delete_rel}' is not a directory.")
+                raise types.FailedError(f"Path '{dir_to_delete_rel}' is not a directory.")
             if await aiofiles.os.listdir(path_to_remove):
-                raise revision.FailedError(f"Directory '{dir_to_delete_rel}' is not empty.")
+                raise types.FailedError(f"Directory '{dir_to_delete_rel}' is not empty.")
             await aiofiles.os.rmdir(path_to_remove)
         if creating.failed is not None:
             return str(creating.failed)
@@ -377,7 +377,7 @@ class CommitteeParticipant(FoundationCommitter):
         await self.__data.refresh(release)
 
         description = "Creation of empty release candidate draft through web interface"
-        async with revision.create_and_manage(
+        async with self.__write_as.revision.create_and_manage(
             project_name, version, self.__asf_uid, description=description
         ) as _creating:
             pass
@@ -441,7 +441,7 @@ class CommitteeParticipant(FoundationCommitter):
                 await self.__save_file(file, target_path)
         return len(files)
 
-    async def __current_paths(self, creating: revision.Creating) -> list[pathlib.Path]:
+    async def __current_paths(self, creating: types.Creating) -> list[pathlib.Path]:
         all_current_paths_interim: list[pathlib.Path] = []
         async for p_rel_interim in util.paths_recursive_all(creating.interim_path):
             all_current_paths_interim.append(p_rel_interim)
@@ -508,7 +508,7 @@ class CommitteeParticipant(FoundationCommitter):
 
     async def __remove_rc_tags_revision(
         self,
-        creating: revision.Creating,
+        creating: types.Creating,
         error_messages: list[str],
     ) -> int:
         all_current_paths_interim = await self.__current_paths(creating)
@@ -586,7 +586,7 @@ class CommitteeParticipant(FoundationCommitter):
         self,
         source_files_rel: list[pathlib.Path],
         target_dir_rel: pathlib.Path,
-        creating: revision.Creating,
+        creating: types.Creating,
         moved_files_names: list[str],
         skipped_files_names: list[str],
     ) -> None:
@@ -595,22 +595,22 @@ class CommitteeParticipant(FoundationCommitter):
             target_path.resolve().relative_to(creating.interim_path.resolve())
         except ValueError:
             # Path traversal detected
-            raise revision.FailedError("Paths must be restricted to the release directory")
+            raise types.FailedError("Paths must be restricted to the release directory")
 
         if not await aiofiles.os.path.exists(target_path):
             for part in target_path.parts:
                 # TODO: This .prefix check could include some existing directory segment
                 if part.startswith("."):
-                    raise revision.FailedError("Segments must not start with '.'")
+                    raise types.FailedError("Segments must not start with '.'")
                 if ".." in part:
-                    raise revision.FailedError("Segments must not contain '..'")
+                    raise types.FailedError("Segments must not contain '..'")
 
             try:
                 await aiofiles.os.makedirs(target_path)
             except OSError:
-                raise revision.FailedError("Failed to create target directory")
+                raise types.FailedError("Failed to create target directory")
         elif not await aiofiles.os.path.isdir(target_path):
-            raise revision.FailedError("Target path is not a directory")
+            raise types.FailedError("Target path is not a directory")
 
         for source_file_rel in source_files_rel:
             await self.__setup_revision_item(
@@ -621,7 +621,7 @@ class CommitteeParticipant(FoundationCommitter):
         self,
         source_file_rel: pathlib.Path,
         target_dir_rel: pathlib.Path,
-        creating: revision.Creating,
+        creating: types.Creating,
         moved_files_names: list[str],
         skipped_files_names: list[str],
         target_path: pathlib.Path,
@@ -636,11 +636,11 @@ class CommitteeParticipant(FoundationCommitter):
             if (target_dir_rel == source_file_rel) or (creating.interim_path / target_dir_rel).resolve().is_relative_to(
                 full_source_item_path.resolve()
             ):
-                raise revision.FailedError("Cannot move a directory into itself or a subdirectory of itself")
+                raise types.FailedError("Cannot move a directory into itself or a subdirectory of itself")
 
             final_target_for_item = target_path / source_file_rel.name
             if await aiofiles.os.path.exists(final_target_for_item):
-                raise revision.FailedError("Target name already exists")
+                raise types.FailedError("Target name already exists")
 
             await aiofiles.os.rename(full_source_item_path, final_target_for_item)
             moved_files_names.append(source_file_rel.name)
@@ -649,11 +649,11 @@ class CommitteeParticipant(FoundationCommitter):
             bundle = [f for f in related_files if await aiofiles.os.path.exists(creating.interim_path / f)]
             for f_check in bundle:
                 if await aiofiles.os.path.isdir(creating.interim_path / f_check):
-                    raise revision.FailedError("A related 'file' is actually a directory")
+                    raise types.FailedError("A related 'file' is actually a directory")
 
             collisions = [f.name for f in bundle if await aiofiles.os.path.exists(target_path / f.name)]
             if collisions:
-                raise revision.FailedError("A related file already exists in the target directory")
+                raise types.FailedError("A related file already exists in the target directory")
 
             for f in bundle:
                 await aiofiles.os.rename(creating.interim_path / f, target_path / f.name)
