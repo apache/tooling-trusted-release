@@ -58,7 +58,7 @@ def _extract_links(file_path: pathlib.Path) -> list[Link]:
             text = match.group(1)
             target = match.group(2)
 
-            if target.startswith("/ref/"):
+            if target.startswith("/"):
                 continue
 
             if target.startswith("http://") or target.startswith("https://"):

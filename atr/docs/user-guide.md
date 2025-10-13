@@ -12,4 +12,4 @@
 
 ## Introduction
 
-[TODO]
+This is a work in progress. Meanwhile, you can read the [ATR tutorial](/tutorial).

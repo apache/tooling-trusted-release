@@ -31,7 +31,7 @@
 
   <h2 id="compose">Compose</h2>
   <p>
-    Use the <strong>Select release</strong> sidebar link [<code>1</code>], then press the <strong>Start a new release</strong> button for any project [<code>2</code>].
+    Use the <strong>Make releases</strong> sidebar link [<code>1</code>], then press the <strong>Start a new release</strong> button for any project [<code>2</code>].
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-compose-01.png') }}"
@@ -81,14 +81,14 @@
          alt="Illustration: Download the release candidate files." />
   </p>
   <p>
-    A link allows review of the voting thread in the mailing list archives [<code>1</code>]. ATR does not yet tally votes; you must do this manually. A form on the page allows you to cast your vote on the mailing list [<code>2</code>].
+    A link allows review of the voting thread in the mailing list archives [<code>1</code>]. ATR will try to tally votes for you, but you must check the results manually. A form on the page allows you to cast your vote on the mailing list [<code>2</code>].
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-vote-03.png') }}"
          alt="Illustration: Review the voting thread, and cast your own vote." />
   </p>
   <p>
-    When the voting period concludes and the mandate is clear, record the outcome using the vote resolution form. Submitting this form also sends the outcome of the vote to the mailing list. A successful vote promotes the release candidate to the next phase; a failed vote returns it to the <em>Compose</em> phase.
+    When the voting period concludes and the mandate is clear, record the outcome using the vote resolution form, accessed by pressing the <strong>Resolve vote</strong> button. Submitting this form also sends the outcome of the vote to the mailing list. A successful vote promotes the release candidate to the next phase; a failed vote returns it to the <em>Compose</em> phase.
   </p>
   <p>
     <img src="{{ url_for('static', filename='png/tutorial-vote-04.png') }}"
@@ -100,7 +100,7 @@
     If the vote passes, the release enters the <em>Finish</em> phase. This phase may allow minor content adjustments before the announcement and final release. ATR currently supports moving files between directories, preserving filenames. We plan to support more types of adjustments in future.
   </p>
   <p>
-    During this phase you should distribute release artifacts to your package distribution networks such as Maven Central, PyPI, or Docker Hub. We plan to add tools to assist with this.
+    During this phase you should distribute release artifacts to your package distribution networks such as Maven Central, PyPI, or Docker Hub. You currently must do this manually, but you can record the results on ATR.
   </p>
   <p>
     When the release is finished, press the <strong>Announce and distribute</strong> button.

@@ -96,6 +96,8 @@ a code {
     color: #aa0033;
 }
 
+td code { color: #000000; }
+
 summary {
     cursor: pointer;
 }
