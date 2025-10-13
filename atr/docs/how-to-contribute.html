@@ -5,6 +5,99 @@
 <p><strong>Sections</strong>:</p>
 <ul>
 <li><a href="#introduction">Introduction</a></li>
+<li><a href="#finding-something-to-work-on">Finding something to work on</a></li>
+<li><a href="#pull-request-workflow">Pull request workflow</a></li>
+<li><a href="#commit-message-style">Commit message style</a></li>
+<li><a href="#asf-contribution-policies">ASF contribution policies</a></li>
+<li><a href="#special-considerations-for-atr">Special considerations for ATR</a></li>
+<li><a href="#getting-help">Getting help</a></li>
 </ul>
 <h2 id="introduction">Introduction</h2>
-<p>[TODO]</p>
+<p>ATR is developed by ASF Tooling in public as open source code, and we welcome high quality contributions from external contributors. Whether you are fixing a typographical error in documentation, improving an error message, implementing a new feature, or addressing a security issue, your contribution helps to improve ATR for all of our users.</p>
+<p>This page explains how to contribute code and documentation to ATR. We recommend reading the <a href="introduction-to-atr">platform introduction</a> and <a href="overview-of-the-code">overview of the code</a> first to understand the purpose of ATR and how the codebase is structured. You should also read the <a href="code-conventions">code conventions</a> page; we expect all contributions to follow those conventions.</p>
+<h2 id="finding-something-to-work-on">Finding something to work on</h2>
+<p>The easiest way to find something to work on is to look at our <a href="https://github.com/apache/tooling-trusted-releases/issues">issue tracker</a> on GitHub. We label <a href="https://github.com/apache/tooling-trusted-releases/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22">issues that are suitable for new contributors</a> as <code>good first issue</code>. These are typically small, well-defined tasks that do not require deep familiarity with the entire codebase. Working on one of these issues is an excellent way to learn how ATR works and how we develop it.</p>
+<p>If you find a bug that is not already reported in the issue tracker, or if you have an idea for a new feature, please <a href="https://github.com/apache/tooling-trusted-releases/issues/new">create a new issue</a> to discuss it with other developers before you start working on it. This helps to ensure that your contribution will be accepted, and that you do not duplicate work that is already in progress. For small changes such as fixing typographical errors or improving documentation clarity, you do not need to create an issue first.</p>
+<h2 id="pull-request-workflow">Pull request workflow</h2>
+<p>Once you have identified something to work on, the process of contributing is as follows:</p>
+<ol>
+<li>
+<p><strong>Fork the repository.</strong> Create a personal fork of the <a href="https://github.com/apache/tooling-trusted-releases">ATR repository</a> on GitHub.</p>
+</li>
+<li>
+<p><strong>Clone your fork.</strong> Clone your fork to your local machine and set up your development environment. Follow the instructions in the <a href="running-the-server">running the server</a> guide to get ATR running locally. Please <a href="#getting-help">ask us for help</a> if you encounter any problems with this step.</p>
+</li>
+<li>
+<p><strong>Create a branch.</strong> <a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-and-deleting-branches-within-your-repository">Create a new branch</a> for your work. Use a descriptive name that indicates what you are working on, such as <code>fix-typo-in-docs</code> or <code>improve-error-messages</code>.</p>
+</li>
+<li>
+<p><strong>Make your changes.</strong> Implement your fix or feature, following our <a href="code-conventions">code conventions</a>. If you are changing code, ensure that your changes do not break existing functionality. If you are adding a new feature, consider whether tests are appropriate.</p>
+</li>
+<li>
+<p><strong>Commit your changes.</strong> Write clear, concise commit messages following <a href="#commit-message-style">our commit message style</a>. Each commit should represent a logical unit of work, but we are not particularly strict about this.</p>
+</li>
+<li>
+<p><strong>Push your branch.</strong> Push your branch to your fork on GitHub.</p>
+</li>
+<li>
+<p><strong>Create a pull request (PR).</strong> The PR should be from your branch to the <code>main</code> branch of the ATR repository. In the PR description, explain what your changes do and why they are needed. If your PR addresses an existing issue, reference that issue by number.</p>
+</li>
+<li>
+<p><strong>Participate in code review.</strong> A member of the Tooling team will review your PR and may request changes. <em>We strongly recommend enabling the option to allow maintainers to edit your PR when you create it.</em> Even if you allow us to make changes, we may still ask you to make the changes yourself. Also, because of the stringent security and usability requirements for ATR, we accept only <a href="#special-considerations-for-atr">high quality contributions</a>.</p>
+</li>
+</ol>
+<p>You can also <a href="https://lists.apache.org/list.html?dev@tooling.apache.org">email patches</a> if you prefer not to use GitHub. Please use standard Git patch formatting, as if you were e.g. contributing to the Linux Kernel.</p>
+<h2 id="commit-message-style">Commit message style</h2>
+<p>We follow a consistent style for commit messages. The first line of the commit message is called the subject line, and should follow these guidelines:</p>
+<ul>
+<li><strong>Use the imperative mood.</strong> The subject line should complete the sentence "If applied, this commit will...".</li>
+<li><strong>Use sentence case.</strong> Start with a capital letter, but do not use a full stop at the end.</li>
+<li><strong>Use articles as appropriate before nouns</strong>. Write about "a feature" not just "feature". Say, for example, "fix a bug", and not "fix bug".</li>
+<li><strong>Be specific and descriptive.</strong> Prefer "Fix a bug in vote resolution for tied votes" to "Fix a bug" or "Update the vote code".</li>
+<li><strong>Keep it concise.</strong> Aim for 50 to 72 characters. If you need more space to explain your changes, use the commit body.</li>
+</ul>
+<p><strong>Examples of good subject lines:</strong></p>
+<pre><code>Add distribution platform validation to the compose phase
+Fix a bug with sorting version numbers containing release candidates
+Move code to delete releases to the storage interface
+Update dependencies
+</code></pre>
+<p><strong>Examples of poor subject lines:</strong></p>
+<pre><code>fixed stuff
+Updated the code.
+refactoring vote resolution logic
+</code></pre>
+<p>Most commits do not need a body. The subject line alone is sufficient for small, focused changes. If, however, your commit is complex or requires additional explanation, add a body separated from the subject line by a blank line. In the body, explain what the change does and why it was necessary. We typically use itemized lists for this, using asterisks. You do not need to explain how the change works.</p>
+<h2 id="asf-contribution-policies">ASF contribution policies</h2>
+<p>As an Apache Software Foundation project, ATR follows the standard ASF contribution and licensing policies. These policies ensure that the ASF has the necessary rights to distribute your contributions, and that contributors retain their rights to use their contributions for other purposes.</p>
+<h3 id="contributor-license-agreement">Contributor License Agreement</h3>
+<p>Before we can accept your first contribution as an individual contributor, you must sign the <a href="https://www.apache.org/licenses/contributor-agreements.html#clas">Apache Individual Contributor License Agreement</a> (ICLA). This is a one-time requirement, and you do not need to sign a new ICLA for each contribution. The ICLA grants the ASF the right to distribute and build upon your work within Apache, while you retain full rights to use your original contributions for any other purpose. The ICLA is not a copyright assignment. You can find detailed instructions for submitting the ICLA in the <a href="https://infra.apache.org/new-committers-guide.html#submitting-your-individual-contributor-license-agreement-icla">ASF new committers guide</a>.</p>
+<p>If your employer holds rights to your work, then you may also need to submit a <a href="https://www.apache.org/licenses/contributor-agreements.html#clas">Corporate Contributor License Agreement</a> (CCLA). Please consult with your employer to determine whether this is necessary.</p>
+<h3 id="licensing">Licensing</h3>
+<p>All contributions to ATR are licensed under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache License 2.0</a>. By submitting a pull request, you agree that your contributions will be licensed under this license. If you include any third party code or dependencies in your contribution, you must ensure that they are compatible with the Apache License 2.0. The ASF maintains a list of <a href="https://www.apache.org/legal/resolved.html#category-a">Category A licenses</a> that are compatible, and <a href="https://www.apache.org/legal/resolved.html#category-x">Category X licenses</a> that are not compatible.</p>
+<h3 id="code-of-conduct">Code of conduct</h3>
+<p>All contributors to ATR are expected to follow the <a href="https://www.apache.org/foundation/policies/conduct.html">ASF Code of Conduct</a>, and any other applicable policies of the ASF.</p>
+<h2 id="special-considerations-for-atr">Special considerations for ATR</h2>
+<p>ATR is developed by ASF Tooling, which is an initiative of the ASF rather than a top-level project (TLP). This means that ATR follows the development processes and governance structure of Tooling, which may differ slightly from those of other ASF projects. There are also significant security considerations for ATR, which places additional requirements on contributions.</p>
+<h3 id="security-focus">Security focus</h3>
+<p>The primary goal of ATR is to deter and minimize supply chain attacks on ASF software releases. Since security is our highest priority, we scrutinize all contributions for potential vulnerabilities. To assist us when you make a contribution, please:</p>
+<ul>
+<li>Follow secure coding practices. Review best practice guidelines to learn how to avoid vulnerabilities such as injection attacks, cross-site scripting, and insecure deserialization.</li>
+<li>Validate all user inputs and sanitize all outputs.</li>
+<li>Use well established, independently audited, and actively maintained libraries rather than implementing cryptographic or security sensitive functionality yourself.</li>
+<li>Always consider the security implications of your changes. If you are unsure of the implications of your changes, ask the team for guidance.</li>
+<li>Report any security issues you discover in ATR responsibly. Do not open a public issue for security vulnerabilities. Instead, follow the <a href="https://www.apache.org/security/">ASF security reporting process</a>.</li>
+</ul>
+<h3 id="high-quality-standards">High quality standards</h3>
+<p>Because of the critical nature of ATR, we maintain very high standards for code quality. This means that the review process may take longer than you expect, and we may request more extensive changes than you are accustomed to. We appreciate your patience and understanding. Our goal is to ensure that ATR remains as secure and reliable as possible.</p>
+<h3 id="access-controls">Access controls</h3>
+<p>We strongly encourage all contributors to enable two-factor authentication on their GitHub accounts, preferably with a <a href="https://en.wikipedia.org/wiki/WebAuthn#Passkey_branding">passkey</a>.</p>
+<h2 id="getting-help">Getting help</h2>
+<p>If you have questions about contributing to ATR, or if you need help with any step of the contribution process, please reach out to the team. You can:</p>
+<ul>
+<li>Ask questions on the <a href="https://lists.apache.org/list.html?dev@tooling.apache.org">dev mailing list</a>, which is the primary forum for ATR development discussions.</li>
+<li>Comment on the relevant issue or pull request in the <a href="https://github.com/apache/tooling-trusted-releases/issues">issue tracker</a>.</li>
+<li>Chat with us in the <a href="https://the-asf.slack.com/archives/C049WADAAQG">#apache-trusted-releases channel</a> on ASF Slack.</li>
+<li>Read the rest of the <a href="developer-guide">developer guide</a> for detailed information about how ATR works and how to make changes to it.</li>
+</ul>
+<p>We welcome all types of contribution, and are happy to help you get started. Thank you for your interest in contributing to ATR.</p>

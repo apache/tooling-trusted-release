@@ -110,7 +110,7 @@ table {
     border-collapse: collapse;
 }
 
-ul {
+ul, ol {
     padding-left: 1rem;
 }
 
