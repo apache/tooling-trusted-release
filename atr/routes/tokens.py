@@ -97,8 +97,8 @@ async def tokens(session: route.CommitterSession) -> str | response.Response:
     issue_form = await IssueJWTForm.create_form(data=request_form if is_post else None)
 
     start = time.perf_counter_ns()
-    tokens_list = await _fetch_tokens(session.uid)
     async with storage.read_as_foundation_committer() as rafc:
+        tokens_list = await rafc.tokens.own_personal_access_tokens()
         most_recent_pat = await rafc.tokens.most_recent_jwt_pat()
     end = time.perf_counter_ns()
     log.info("Tokens list fetched in %dms", (end - start) / 1_000_000)
@@ -251,17 +251,6 @@ async def _delete_token(data: db.Session, uid: str, token_id: int) -> None:
     )
     if pat:
         await data.delete(pat)
-
-
-@db.session_function
-async def _fetch_tokens(data: db.Session, uid: str) -> list[sql.PersonalAccessToken]:
-    via = sql.validate_instrumented_attribute
-    stmt = (
-        sqlmodel.select(sql.PersonalAccessToken)
-        .where(sql.PersonalAccessToken.asfuid == uid)
-        .order_by(via(sql.PersonalAccessToken.created))
-    )
-    return await data.query_all(stmt)
 
 
 async def _handle_post(

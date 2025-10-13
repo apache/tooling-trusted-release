@@ -74,6 +74,7 @@ class SSHServer(asyncssh.SSHServer):
             # Load SSH keys for this user from the database
             async with db.session() as data:
                 user_keys = await data.ssh_key(asf_uid=username).all()
+                # TODO: This should potentially be migrated to the storage interface
                 workflow_keys = await data.workflow_ssh_key(asf_uid=username).all()
                 now = int(time.time())
                 valid_workflow_keys = []

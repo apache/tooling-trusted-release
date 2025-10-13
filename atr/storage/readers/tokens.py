@@ -39,9 +39,22 @@ class FoundationCommitter(GeneralPublic):
         self.__read_as = read_as
         self.__data = data
 
-    async def most_recent_jwt_pat(self, asf_uid: str | None = None) -> sql.PersonalAccessToken | None:
+    async def own_personal_access_tokens(self) -> list[sql.PersonalAccessToken]:
+        asf_uid = self.__read.authorisation.asf_uid
         if asf_uid is None:
-            asf_uid = self.__read.authorisation.asf_uid
+            raise ValueError("An ASF UID is required")
+        via = sql.validate_instrumented_attribute
+        stmt = (
+            sqlmodel.select(sql.PersonalAccessToken)
+            .where(sql.PersonalAccessToken.asfuid == asf_uid)
+            .order_by(via(sql.PersonalAccessToken.created))
+        )
+        return await self.__data.query_all(stmt)
+
+    async def most_recent_jwt_pat(self) -> sql.PersonalAccessToken | None:
+        # , asf_uid: str | None = None
+        # if asf_uid is None:
+        asf_uid = self.__read.authorisation.asf_uid
         if asf_uid is None:
             raise ValueError("An ASF UID is required")
         via = sql.validate_instrumented_attribute
