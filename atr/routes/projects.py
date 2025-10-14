@@ -108,9 +108,9 @@ class ReleasePolicyForm(forms.Typed):
         "Email",
         validators=[forms.REQUIRED, forms.EMAIL],
         placeholder="E.g. dev@project.apache.org",
-        description="Note: This field determines where vote and finished release announcement"
-        "emails are sent. You can set this value to your own mailing list, but ATR will "
-        f"currently only let you send to {util.USER_TESTS_ADDRESS}.",
+        description=f"The mailing list where vote emails are sent. This is usually"
+        "your dev list. ATR will currently only send test announcement emails to"
+        f"{util.USER_TESTS_ADDRESS}.",
     )
     manual_vote = forms.boolean(
         "Manual voting process",
