@@ -39,11 +39,7 @@ class GeneralPublic:
         self.__read = read
         self.__read_as = read_as
         self.__data = data
-        if asf_uid is None:
-            asf_uid = read.authorisation.asf_uid
-        if asf_uid is None:
-            raise ValueError("An ASF UID is required")
-        self.__asf_uid = asf_uid
+        self.__asf_uid = read.authorisation.asf_uid
 
     async def path_info(self, release: sql.Release, paths: list[pathlib.Path]) -> types.PathInfo | None:
         info = types.PathInfo()

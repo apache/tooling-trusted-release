@@ -29,6 +29,7 @@ import atr.route as route
 import atr.routes.compose as compose
 import atr.routes.mapping as mapping
 import atr.storage as storage
+import atr.user as user
 import atr.util as util
 
 
@@ -40,11 +41,11 @@ class CastVoteForm(forms.Typed):
     submit = forms.submit("Submit vote")
 
 
-@route.committer("/vote/<project_name>/<version_name>")
-async def selected(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+@route.public("/vote/<project_name>/<version_name>")
+async def selected(
+    session: route.CommitterSession | None, project_name: str, version_name: str
+) -> response.Response | str:
     """Show the contents of the release candidate draft."""
-    await session.check_access(project_name)
-
     async with db.session() as data:
         release = await data.release(
             project_name=project_name,
@@ -52,8 +53,22 @@ async def selected(session: route.CommitterSession, project_name: str, version_n
             _committee=True,
             _project_release_policy=True,
         ).demand(base.ASFQuartException("Release does not exist", errorcode=404))
+
     if release.phase != sql.ReleasePhase.RELEASE_CANDIDATE:
+        if session is None:
+            raise base.ASFQuartException("Release is not a candidate", errorcode=404)
         return await mapping.release_as_redirect(session, release)
+
+    if release.committee is None:
+        raise ValueError("Release has no committee")
+
+    is_authenticated = session is not None
+    is_committee_member = is_authenticated and (
+        user.is_committee_member(release.committee, session.uid) or user.is_admin(session.uid)
+    )
+    can_vote = is_committee_member
+    can_resolve = is_committee_member
+
     latest_vote_task = await interaction.release_latest_vote_task(release)
     archive_url = None
     task_mid = None
@@ -74,37 +89,38 @@ async def selected(session: route.CommitterSession, project_name: str, version_n
 
         # Move task_mid_get here?
         task_mid = interaction.task_mid_get(latest_vote_task)
-        async with storage.write() as write:
+        asf_uid = session.uid if (session is not None) else None
+        async with storage.write(asf_uid) as write:
             wagp = write.as_general_public()
             archive_url = await wagp.cache.get_message_archive_url(task_mid)
 
-    # Special form for the [ Resolve vote ] button, to make it POST
-    hidden_form = await forms.Hidden.create_form()
-    hidden_form.hidden_field.data = archive_url or ""
-    hidden_form.submit.label.text = "Resolve vote"
+    hidden_form = None
+    if can_resolve:
+        # Special form for the [ Resolve vote ] button, to make it POST
+        hidden_form = await forms.Hidden.create_form()
+        hidden_form.hidden_field.data = archive_url or ""
+        hidden_form.submit.label.text = "Resolve vote"
 
-    if release.committee is None:
-        raise ValueError("Release has no committee")
-
-    # Form to cast a vote
-    form = await CastVoteForm.create_form()
-    async with storage.write() as write:
-        try:
-            if release.committee.is_podling:
-                _wacm = write.as_committee_member("incubator")
-            else:
-                _wacm = write.as_committee_member(release.committee.name)
-            potency = "Binding"
-        except storage.AccessError:
-            potency = "Non-binding"
-    forms.choices(
-        form.vote_value,
-        choices=[
-            ("+1", f"+1 ({potency})"),
-            ("0", "0"),
-            ("-1", f"-1 ({potency})"),
-        ],
-    )
+    form = None
+    if can_vote:
+        form = await CastVoteForm.create_form()
+        async with storage.write() as write:
+            try:
+                if release.committee.is_podling:
+                    _wacm = write.as_committee_member("incubator")
+                else:
+                    _wacm = write.as_committee_member(release.committee.name)
+                potency = "Binding"
+            except storage.AccessError:
+                potency = "Non-binding"
+        forms.choices(
+            form.vote_value,
+            choices=[
+                ("+1", f"+1 ({potency})"),
+                ("0", "0"),
+                ("-1", f"-1 ({potency})"),
+            ],
+        )
 
     return await compose.check(
         session,
@@ -114,6 +130,8 @@ async def selected(session: route.CommitterSession, project_name: str, version_n
         hidden_form=hidden_form,
         archive_url=archive_url,
         vote_task=latest_vote_task,
+        can_vote=can_vote,
+        can_resolve=can_resolve,
     )
 
 
@@ -137,6 +155,7 @@ async def selected_post(session: route.CommitterSession, project_name: str, vers
                 _wacm = write.as_committee_member(release.committee.name)
             potency = "Binding"
         except storage.AccessError:
+            # Participant, due to session.check_access above
             potency = "Non-binding"
 
     form = await CastVoteForm.create_form(data=await quart.request.form)

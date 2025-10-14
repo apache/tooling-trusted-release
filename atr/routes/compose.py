@@ -38,13 +38,15 @@ if TYPE_CHECKING:
 
 
 async def check(
-    session: route.CommitterSession,
+    session: route.CommitterSession | None,
     release: sql.Release,
     task_mid: str | None = None,
     form: wtforms.Form | None = None,
     hidden_form: wtforms.Form | None = None,
     archive_url: str | None = None,
     vote_task: sql.Task | None = None,
+    can_vote: bool = False,
+    can_resolve: bool = False,
 ) -> response.Response | str:
     base_path = util.release_directory(release)
 
@@ -53,13 +55,22 @@ async def check(
     paths = [path async for path in util.paths_recursive(base_path)]
     paths.sort()
 
-    async with storage.read() as read:
+    asf_uid = session.uid if (session is not None) else None
+    async with storage.read(asf_uid) as read:
         ragp = read.as_general_public()
         info = await ragp.releases.path_info(release, paths)
 
     user_ssh_keys: Sequence[sql.SSHKey] = []
-    async with db.session() as data:
-        user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
+    asf_id: str | None = None
+    server_domain: str | None = None
+    server_host: str | None = None
+
+    if session is not None:
+        asf_id = session.uid
+        server_domain = session.app_host.split(":", 1)[0]
+        server_host = session.app_host
+        async with db.session() as data:
+            user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
 
     # Get the number of ongoing tasks for the current revision
     ongoing_tasks_count = 0
@@ -100,9 +111,9 @@ async def check(
         ongoing_tasks_count=ongoing_tasks_count,
         delete_form=delete_draft_form,
         delete_file_form=delete_file_form,
-        asf_id=session.uid,
-        server_domain=session.app_host.split(":", 1)[0],
-        server_host=session.app_host,
+        asf_id=asf_id,
+        server_domain=server_domain,
+        server_host=server_host,
         user_ssh_keys=user_ssh_keys,
         format_datetime=util.format_datetime,
         models=sql,
@@ -115,6 +126,8 @@ async def check(
         hidden_form=hidden_form,
         has_files=has_files,
         strict_checking_errors=strict_checking_errors,
+        can_vote=can_vote,
+        can_resolve=can_resolve,
     )
 
 

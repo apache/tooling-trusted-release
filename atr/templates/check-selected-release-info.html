@@ -77,10 +77,10 @@
            class="btn btn-primary"><i class="bi bi-download me-1"></i> Download files</a>
         <a href="{{ as_url(routes.candidate.view, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-secondary"><i class="bi bi-eye me-1"></i> View files</a>
-        {% if release.vote_manual %}
+        {% if can_resolve and release.vote_manual %}
           <a href="{{ as_url(routes.resolve.manual_selected, project_name=release.project.name, version_name=release.version) }}"
              class="btn btn-success"><i class="bi bi-clipboard-check me-1"></i> Resolve vote</a>
-        {% elif hidden_form %}
+        {% elif can_resolve and hidden_form %}
           <form action="{{ as_url(routes.resolve.tabulated_selected_post, project_name=release.project.name, version_name=release.version) }}"
                 method="post"
                 class="mb-0">

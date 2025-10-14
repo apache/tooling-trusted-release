@@ -30,6 +30,7 @@ class GeneralPublic:
         self.__read = read
         self.__read_as = read_as
         self.__data = data
+        self.__asf_uid = read.authorisation.asf_uid
 
 
 class FoundationCommitter(GeneralPublic):
