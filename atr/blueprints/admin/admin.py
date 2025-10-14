@@ -266,6 +266,37 @@ async def admin_data(model: str = "Committee") -> str:
         )
 
 
+@admin.BLUEPRINT.route("/delete-test-openpgp-keys", methods=["GET", "POST"])
+async def admin_delete_test_openpgp_keys() -> quart.Response | response.Response:
+    """Delete all test user OpenPGP keys and their links."""
+    if not config.get().ALLOW_TESTS:
+        raise base.ASFQuartException("Test key deletion not enabled", errorcode=404)
+
+    test_uid = "test"
+
+    if quart.request.method != "POST":
+        empty_form = await forms.Empty.create_form()
+        return quart.Response(
+            f"""
+<form method="post">
+  <button type="submit">Delete all OpenPGP keys for {test_uid} user</button>
+  {empty_form.hidden_tag()}
+</form>
+""",
+            mimetype="text/html",
+        )
+
+    # This is a POST request
+    await util.validate_empty_form()
+
+    async with storage.write() as write:
+        wafc = write.as_foundation_committer()
+        outcome = await wafc.keys.test_user_delete_all(test_uid)
+        outcome.result_or_raise()
+
+    return quart.redirect("/keys")
+
+
 @admin.BLUEPRINT.route("/delete-committee-keys", methods=["GET", "POST"])
 async def admin_delete_committee_keys() -> str | response.Response:
     form = await DeleteCommitteeKeysForm.create_form()

@@ -39,7 +39,12 @@ async def candidate_drafts(uid: str, user_projects: list[sql.Project] | None = N
 
 @functools.cache
 def get_admin_users() -> set[str]:
-    return set(config.get().ADMIN_USERS)
+    admin_users = set(config.get().ADMIN_USERS)
+    if config.get().ALLOW_TESTS:
+        # TODO: Just for debugging, but ideally we would do this in a targeted way
+        # We need this, for example, for deleting releases
+        admin_users.add("test")
+    return admin_users
 
 
 def is_admin(user_id: str | None) -> bool:
@@ -71,6 +76,13 @@ async def projects(uid: str, committee_only: bool = False, super_project: bool =
         for p in projects:
             if p.committee is None:
                 continue
+
+            # Allow access to test project when ALLOW_TESTS is enabled
+            # This means that the Test project will show in the user interface for everyone
+            if config.get().ALLOW_TESTS and (p.committee.name == "test"):
+                user_projects.append(p)
+                continue
+
             if committee_only:
                 if uid in p.committee.committee_members:
                     user_projects.append(p)

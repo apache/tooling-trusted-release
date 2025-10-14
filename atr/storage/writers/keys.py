@@ -32,7 +32,9 @@ import aiofiles.os
 import pgpy
 import pgpy.constants as constants
 import sqlalchemy.dialects.sqlite as sqlite
+import sqlmodel
 
+import atr.config as config
 import atr.db as db
 import atr.log as log
 import atr.models.sql as sql
@@ -92,7 +94,11 @@ class FoundationCommitter(GeneralPublic):
         return await self.__ensure_one(key_file_text, associate=False)
 
     def keyring_fingerprint_model(
-        self, keyring: pgpy.PGPKeyring, fingerprint: str, ldap_data: dict[str, str]
+        self,
+        keyring: pgpy.PGPKeyring,
+        fingerprint: str,
+        ldap_data: dict[str, str],
+        original_key_block: str | None = None,
     ) -> sql.PublicSigningKey | None:
         with keyring.key(fingerprint) as key:
             if not key.is_primary:
@@ -113,6 +119,9 @@ class FoundationCommitter(GeneralPublic):
             else:
                 raise ValueError(f"Key size is not an integer: {type(key_size)}, {key_size}")
 
+            # Use the original key block if available
+            ascii_armored = original_key_block if original_key_block else str(key)
+
             return sql.PublicSigningKey(
                 fingerprint=str(key.fingerprint).lower(),
                 algorithm=key.key_algorithm.value,
@@ -123,7 +132,7 @@ class FoundationCommitter(GeneralPublic):
                 primary_declared_uid=uids[0],
                 secondary_declared_uids=uids[1:],
                 apache_uid=asf_uid,
-                ascii_armored_key=str(key),
+                ascii_armored_key=ascii_armored,
             )
 
     async def keys_file_text(self, committee_name: str) -> str:
@@ -169,6 +178,30 @@ class FoundationCommitter(GeneralPublic):
             key_blocks_str=key_blocks_str,
         )
 
+    async def test_user_delete_all(self, test_uid: str) -> outcome.Outcome[int]:
+        """Delete all OpenPGP keys and their links for a test user."""
+        if not config.get().ALLOW_TESTS:
+            return outcome.Error(storage.AccessError("Test key deletion not enabled"))
+
+        try:
+            test_user_keys = await self.__data.public_signing_key(apache_uid=test_uid).all()
+
+            deleted_count = 0
+            for key in test_user_keys:
+                keylinks_query = sqlmodel.select(sql.KeyLink).where(sql.KeyLink.key_fingerprint == key.fingerprint)
+                keylinks_result = await self.__data.execute(keylinks_query)
+                keylinks = keylinks_result.all()
+                for keylink_row in keylinks:
+                    await self.__data.delete(keylink_row[0])
+
+                await self.__data.delete(key)
+                deleted_count += 1
+
+            await self.__data.commit()
+            return outcome.Result(deleted_count)
+        except Exception as e:
+            return outcome.Error(e)
+
     def __block_model(self, key_block: str, ldap_data: dict[str, str]) -> types.Key:
         # This cache is only held for the session
         if key_block in self.__key_block_models_cache:
@@ -186,7 +219,9 @@ class FoundationCommitter(GeneralPublic):
             key = None
             for fingerprint in fingerprints:
                 try:
-                    key_model = self.keyring_fingerprint_model(keyring, fingerprint, ldap_data)
+                    key_model = self.keyring_fingerprint_model(
+                        keyring, fingerprint, ldap_data, original_key_block=key_block
+                    )
                     if key_model is None:
                         # Was not a primary key, so skip it
                         continue
@@ -292,12 +327,16 @@ and was published by the committee.\
         test_key_uids = [
             "Apache Tooling (For test use only) <apache-tooling@example.invalid>",
         ]
-        is_admin = user.is_admin(self.__asf_uid)
-        if (uids == test_key_uids) and is_admin:
+
+        if uids == test_key_uids:
             # Allow the test key
-            # TODO: We should fix the test key, not add an exception for it
-            # But the admin check probably makes this safe enough
-            return self.__asf_uid
+            if config.get().ALLOW_TESTS and (self.__asf_uid == "test"):
+                # TODO: "test" is already an admin user
+                # But we want to narrow that down to only actions like this
+                # TODO: Add include_test: bool to user.is_admin?
+                return "test"
+            if user.is_admin(self.__asf_uid):
+                return self.__asf_uid
 
         # Regular data
         emails = []
@@ -456,7 +495,9 @@ class CommitteeParticipant(FoundationCommitter):
             key_list = []
             for fingerprint in fingerprints:
                 try:
-                    key_model = self.keyring_fingerprint_model(keyring, fingerprint, ldap_data)
+                    key_model = self.keyring_fingerprint_model(
+                        keyring, fingerprint, ldap_data, original_key_block=key_block
+                    )
                     if key_model is None:
                         # Was not a primary key, so skip it
                         continue

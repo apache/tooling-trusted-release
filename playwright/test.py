@@ -19,7 +19,6 @@
 
 import argparse
 import dataclasses
-import getpass
 import glob
 import logging
 import os
@@ -35,9 +34,10 @@ import netifaces
 import playwright.sync_api as sync_api
 import rich.logging
 
-_SSH_KEY_COMMENT: Final[str] = "atr-playwright-test@127.0.0.1"
-_SSH_KEY_PATH: Final[str] = "/root/.ssh/id_ed25519"
-_OPENPGP_TEST_UID: Final[str] = "<apache-tooling@example.invalid>"
+OPENPGP_TEST_UID: Final[str] = "<apache-tooling@example.invalid>"
+SSH_KEY_COMMENT: Final[str] = "atr-playwright-test@127.0.0.1"
+SSH_KEY_PATH: Final[str] = "/root/.ssh/id_ed25519"
+TEST_PROJECT: Final[str] = "test"
 
 
 @dataclasses.dataclass
@@ -58,19 +58,23 @@ def esc_id(text: str) -> str:
 
 
 def get_credentials() -> Credentials | None:
-    try:
-        username = input("Enter ASF Username: ")
-        password = getpass.getpass("Enter ASF Password: ")
-    except (EOFError, KeyboardInterrupt):
-        print()
-        logging.error("EOFError: No credentials provided")
-        return None
+    return Credentials(username="test", password="test")
 
-    if (not username) or (not password):
-        logging.error("Username and password cannot be empty")
-        return None
 
-    return Credentials(username=username, password=password)
+# def get_credentials_custom() -> Credentials | None:
+#     try:
+#         username = input("Enter ASF Username: ")
+#         password = getpass.getpass("Enter ASF Password: ")
+#     except (EOFError, KeyboardInterrupt):
+#         print()
+#         logging.error("EOFError: No credentials provided")
+#         return None
+#
+#     if (not username) or (not password):
+#         logging.error("Username and password cannot be empty")
+#         return None
+#
+#     return Credentials(username=username, password=password)
 
 
 def get_default_gateway_ip() -> str | None:
@@ -95,10 +99,12 @@ def go_to_path(page: sync_api.Page, path: str, wait: bool = True) -> None:
 
 def lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
     logging.info("Following link to start a new release")
-    go_to_path(page, "/start/tooling-test-example")
+    go_to_path(page, f"/start/{TEST_PROJECT}")
 
     logging.info("Waiting for the start new release page")
     version_name_locator = page.locator("input#version_name")
+    if not version_name_locator.is_visible(timeout=1000):
+        logging.error(f"Version name input not found. Page content:\n{page.content()}")
     sync_api.expect(version_name_locator).to_be_visible()
     logging.info("Start new release page loaded")
 
@@ -110,24 +116,24 @@ def lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials, versio
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info(f"Waiting for navigation to /compose/tooling-test-example/{version_name} after adding draft")
-    wait_for_path(page, f"/compose/tooling-test-example/{version_name}")
+    logging.info(f"Waiting for navigation to /compose/{TEST_PROJECT}/{version_name} after adding draft")
+    wait_for_path(page, f"/compose/{TEST_PROJECT}/{version_name}")
     logging.info("Add draft actions completed successfully")
 
 
 def lifecycle_02_check_draft_added(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
-    logging.info(f"Checking for draft 'tooling-test-example {version_name}'")
-    go_to_path(page, f"/compose/tooling-test-example/{version_name}")
-    h1_strong_locator = page.locator("h1 strong:has-text('Tooling Test Example')")
+    logging.info(f"Checking for draft '{TEST_PROJECT} {version_name}'")
+    go_to_path(page, f"/compose/{TEST_PROJECT}/{version_name}")
+    h1_strong_locator = page.locator("h1 strong:has-text('Test')")
     sync_api.expect(h1_strong_locator).to_be_visible()
     h1_em_locator = page.locator(f"h1 em:has-text('{esc_id(version_name)}')")
     sync_api.expect(h1_em_locator).to_be_visible()
-    logging.info(f"Draft 'tooling-test-example {version_name}' found successfully")
+    logging.info(f"Draft '{TEST_PROJECT} {version_name}' found successfully")
 
 
 def lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
-    logging.info(f"Navigating to the upload file page for tooling-test-example {version_name}")
-    go_to_path(page, f"/upload/tooling-test-example/{version_name}")
+    logging.info(f"Navigating to the upload file page for {TEST_PROJECT} {version_name}")
+    go_to_path(page, f"/upload/{TEST_PROJECT}/{version_name}")
     logging.info("Upload file page loaded")
 
     logging.info("Locating the file input")
@@ -142,21 +148,21 @@ def lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials, version
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info(f"Waiting for navigation to /compose/tooling-test-example/{version_name} after adding file")
-    wait_for_path(page, f"/compose/tooling-test-example/{version_name}")
+    logging.info(f"Waiting for navigation to /compose/{TEST_PROJECT}/{version_name} after adding file")
+    wait_for_path(page, f"/compose/{TEST_PROJECT}/{version_name}")
     logging.info("Add file actions completed successfully")
 
-    logging.info("Navigating back to /compose/tooling-test-example")
-    go_to_path(page, f"/compose/tooling-test-example/{version_name}")
-    logging.info("Navigation back to /compose/tooling-test-example completed successfully")
+    logging.info(f"Navigating back to /compose/{TEST_PROJECT}/{version_name}")
+    go_to_path(page, f"/compose/{TEST_PROJECT}/{version_name}")
+    logging.info(f"Navigation back to /compose/{TEST_PROJECT}/{version_name} completed successfully")
 
 
 def lifecycle_04_start_vote(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
-    logging.info(f"Navigating to the compose/tooling-test-example page for tooling-test-example {version_name}")
-    go_to_path(page, f"/compose/tooling-test-example/{version_name}")
-    logging.info("Compose/tooling-test-example page loaded successfully")
+    logging.info(f"Navigating to the compose/{TEST_PROJECT} page for {TEST_PROJECT} {version_name}")
+    go_to_path(page, f"/compose/{TEST_PROJECT}/{version_name}")
+    logging.info(f"Compose/{TEST_PROJECT} page loaded successfully")
 
-    logging.info(f"Locating start vote link for tooling-test-example {version_name}")
+    logging.info(f"Locating start vote link for {TEST_PROJECT} {version_name}")
     start_vote_link_locator = page.locator('a[title="Start a vote on this draft"]')
     sync_api.expect(start_vote_link_locator).to_be_visible()
 
@@ -173,15 +179,15 @@ def lifecycle_04_start_vote(page: sync_api.Page, credentials: Credentials, versi
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
-    logging.info(f"Waiting for navigation to /vote/tooling-test-example/{version_name} after submitting vote email")
-    wait_for_path(page, f"/vote/tooling-test-example/{version_name}")
+    logging.info(f"Waiting for navigation to /vote/{TEST_PROJECT}/{version_name} after submitting vote email")
+    wait_for_path(page, f"/vote/{TEST_PROJECT}/{version_name}")
 
     logging.info("Vote initiation actions completed successfully")
 
 
 def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
-    logging.info(f"Navigating to the vote page for tooling-test-example {version_name}")
-    go_to_path(page, f"/vote/tooling-test-example/{version_name}")
+    logging.info(f"Navigating to the vote page for {TEST_PROJECT} {version_name}")
+    go_to_path(page, f"/vote/{TEST_PROJECT}/{version_name}")
     logging.info("Vote page loaded successfully")
 
     # Wait until the vote initiation background task has completed
@@ -202,7 +208,7 @@ def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, ver
         logging.warning("Vote initiation banner not detected after 15s, proceeding anyway")
 
     logging.info("Locating the 'Resolve vote' button")
-    tabulate_form_locator = page.locator(f'form[action="/resolve/tabulated/tooling-test-example/{version_name}"]')
+    tabulate_form_locator = page.locator(f'form[action="/resolve/tabulated/{TEST_PROJECT}/{version_name}"]')
     sync_api.expect(tabulate_form_locator).to_be_visible()
 
     tabulate_button_locator = tabulate_form_locator.locator('button[type="submit"]:has-text("Resolve vote")')
@@ -211,10 +217,10 @@ def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, ver
     tabulate_button_locator.click()
 
     logging.info("Waiting for navigation to tabulated votes page")
-    wait_for_path(page, f"/resolve/tabulated/tooling-test-example/{version_name}")
+    wait_for_path(page, f"/resolve/tabulated/{TEST_PROJECT}/{version_name}")
 
     logging.info("Locating the resolve vote form on the tabulated votes page")
-    resolve_form_locator = page.locator(f'form[action="/resolve/submit/tooling-test-example/{version_name}"]')
+    resolve_form_locator = page.locator(f'form[action="/resolve/submit/{TEST_PROJECT}/{version_name}"]')
     sync_api.expect(resolve_form_locator).to_be_visible()
 
     logging.info("Selecting 'Passed' radio button in resolve form")
@@ -227,25 +233,25 @@ def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, ver
     sync_api.expect(resolve_submit_locator).to_be_enabled()
     resolve_submit_locator.click()
 
-    logging.info(f"Waiting for navigation to /finish/tooling-test-example/{version_name} after resolving the vote")
-    wait_for_path(page, f"/finish/tooling-test-example/{version_name}")
+    logging.info(f"Waiting for navigation to /finish/{TEST_PROJECT}/{version_name} after resolving the vote")
+    wait_for_path(page, f"/finish/{TEST_PROJECT}/{version_name}")
     logging.info("Vote resolution actions completed successfully")
 
 
 def lifecycle_06_announce_preview(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
-    go_to_path(page, f"/finish/tooling-test-example/{version_name}")
+    go_to_path(page, f"/finish/{TEST_PROJECT}/{version_name}")
     logging.info("Finish page loaded successfully")
 
-    logging.info(f"Locating the announce link for tooling-test-example {version_name}")
-    announce_link_locator = page.locator(f'a[href="/announce/tooling-test-example/{esc_id(version_name)}"]')
+    logging.info(f"Locating the announce link for {TEST_PROJECT} {version_name}")
+    announce_link_locator = page.locator(f'a[href="/announce/{TEST_PROJECT}/{esc_id(version_name)}"]')
     sync_api.expect(announce_link_locator).to_be_visible()
     announce_link_locator.click()
 
-    logging.info(f"Waiting for navigation to /announce/tooling-test-example/{version_name} after announcing preview")
-    wait_for_path(page, f"/announce/tooling-test-example/{version_name}")
+    logging.info(f"Waiting for navigation to /announce/{TEST_PROJECT}/{version_name} after announcing preview")
+    wait_for_path(page, f"/announce/{TEST_PROJECT}/{version_name}")
 
-    logging.info(f"Locating the announcement form for tooling-test-example {version_name}")
-    form_locator = page.locator(f'form[action="/announce/tooling-test-example/{esc_id(version_name)}"]')
+    logging.info(f"Locating the announcement form for {TEST_PROJECT} {version_name}")
+    form_locator = page.locator(f'form[action="/announce/{TEST_PROJECT}/{esc_id(version_name)}"]')
     sync_api.expect(form_locator).to_be_visible()
 
     logging.info("Locating the confirmation checkbox within the form")
@@ -261,21 +267,19 @@ def lifecycle_06_announce_preview(page: sync_api.Page, credentials: Credentials,
     submit_button_locator.click()
 
     logging.info("Waiting for navigation to /releases after submitting announcement")
-    wait_for_path(page, "/releases/finished/tooling-test-example")
+    wait_for_path(page, f"/releases/finished/{TEST_PROJECT}")
     logging.info("Preview announcement actions completed successfully")
 
 
 def lifecycle_07_release_exists(page: sync_api.Page, credentials: Credentials, version_name: str) -> None:
-    logging.info(f"Checking for release tooling-test-example {version_name} on /releases/finished/tooling-test-example")
-    go_to_path(page, "/releases/finished/tooling-test-example")
+    logging.info(f"Checking for release {TEST_PROJECT} {version_name} on /releases/finished/{TEST_PROJECT}")
+    go_to_path(page, f"/releases/finished/{TEST_PROJECT}")
     logging.info("Releases finished page loaded successfully")
 
     release_card_locator = page.locator(f'div.card:has(strong.card-title:has-text("{version_name}"))')
     sync_api.expect(release_card_locator).to_be_visible()
-    logging.info(f"Found card for tooling-test-example {version_name} release")
-    logging.info(
-        f"Release tooling-test-example {version_name} confirmed exists on /releases/finished/tooling-test-example"
-    )
+    logging.info(f"Found card for {TEST_PROJECT} {version_name} release")
+    logging.info(f"Release {TEST_PROJECT} {version_name} confirmed exists on /releases/finished/{TEST_PROJECT}")
 
 
 def main() -> None:
@@ -464,7 +468,7 @@ def slow(func: Callable[..., Any]) -> Callable[..., Any]:
 
 
 def ssh_keys_generate() -> None:
-    ssh_key_path = _SSH_KEY_PATH
+    ssh_key_path = SSH_KEY_PATH
     ssh_dir = os.path.dirname(ssh_key_path)
 
     try:
@@ -477,9 +481,9 @@ def ssh_keys_generate() -> None:
 
         os.makedirs(ssh_dir, mode=0o700, exist_ok=True)
 
-        logging.info(f"Generating new SSH key at {ssh_key_path} with comment {_SSH_KEY_COMMENT}")
+        logging.info(f"Generating new SSH key at {ssh_key_path} with comment {SSH_KEY_COMMENT}")
         subprocess.run(
-            ["ssh-keygen", "-t", "ed25519", "-f", ssh_key_path, "-N", "", "-C", _SSH_KEY_COMMENT],
+            ["ssh-keygen", "-t", "ed25519", "-f", ssh_key_path, "-N", "", "-C", SSH_KEY_COMMENT],
             check=True,
             capture_output=True,
             text=True,
@@ -504,7 +508,6 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
     tests["projects"] = [
         test_projects_01_update,
         test_projects_02_check_directory,
-        test_projects_03_add_project,
     ]
     tests["lifecycle"] = [
         test_lifecycle_01_add_draft,
@@ -542,7 +545,7 @@ def test_all(page: sync_api.Page, credentials: Credentials, skip_slow: bool) -> 
 
 
 def test_checks_01_hashing_sha512(page: sync_api.Page, credentials: Credentials) -> None:
-    project_name = "tooling-test-example"
+    project_name = TEST_PROJECT
     version_name = "0.2"
     filename_sha512 = f"apache-{project_name}-{version_name}.tar.gz.sha512"
     compose_path = f"/compose/{project_name}/{version_name}"
@@ -579,7 +582,7 @@ def test_checks_01_hashing_sha512(page: sync_api.Page, credentials: Credentials)
 
 
 def test_checks_02_license_files(page: sync_api.Page, credentials: Credentials) -> None:
-    project_name = "tooling-test-example"
+    project_name = TEST_PROJECT
     version_name = "0.2"
     filename_targz = f"apache-{project_name}-{version_name}.tar.gz"
     compose_path = f"/compose/{project_name}/{version_name}"
@@ -616,7 +619,7 @@ def test_checks_02_license_files(page: sync_api.Page, credentials: Credentials) 
 
 
 def test_checks_03_license_headers(page: sync_api.Page, credentials: Credentials) -> None:
-    project_name = "tooling-test-example"
+    project_name = TEST_PROJECT
     version_name = "0.2"
     filename_targz = f"apache-{project_name}-{version_name}.tar.gz"
     report_file_path = f"/report/{project_name}/{version_name}/{filename_targz}"
@@ -641,7 +644,7 @@ def test_checks_03_license_headers(page: sync_api.Page, credentials: Credentials
 
 
 def test_checks_04_paths(page: sync_api.Page, credentials: Credentials) -> None:
-    project_name = "tooling-test-example"
+    project_name = TEST_PROJECT
     version_name = "0.2"
     filename_sha512 = f"apache-{project_name}-{version_name}.tar.gz.sha512"
     report_file_path = f"/report/{project_name}/{version_name}/{filename_sha512}"
@@ -667,7 +670,7 @@ def test_checks_04_paths(page: sync_api.Page, credentials: Credentials) -> None:
 
 
 def test_checks_05_signature(page: sync_api.Page, credentials: Credentials) -> None:
-    project_name = "tooling-test-example"
+    project_name = TEST_PROJECT
     version_name = "0.2"
     filename_asc = f"apache-{project_name}-{version_name}.tar.gz.asc"
     report_file_path = f"/report/{project_name}/{version_name}/{filename_asc}"
@@ -691,7 +694,7 @@ def test_checks_05_signature(page: sync_api.Page, credentials: Credentials) -> N
 
 
 def test_checks_06_targz(page: sync_api.Page, credentials: Credentials) -> None:
-    project_name = "tooling-test-example"
+    project_name = TEST_PROJECT
     version_name = "0.2"
     filename_targz = f"apache-{project_name}-{version_name}.tar.gz"
     report_file_path = f"/report/{project_name}/{version_name}/{filename_targz}"
@@ -830,6 +833,12 @@ def test_login(page: sync_api.Page, credentials: Credentials) -> None:
 
     if debugging:
         remove_debugging = test_logging_debug(page, credentials)
+
+    if credentials.username == "test":
+        go_to_path(page, "/test-login", wait=False)
+        wait_for_path(page, "/")
+        logging.info("Test login completed successfully")
+        return
 
     go_to_path(page, "/")
     logging.info(f"Initial page title: {page.title()}")
@@ -973,7 +982,7 @@ def test_ssh_01_add_key(page: sync_api.Page, credentials: Credentials) -> None:
     wait_for_path(page, "/keys/ssh/add")
     logging.info("Navigated to Add your SSH key page")
 
-    public_key_path = f"{_SSH_KEY_PATH}.pub"
+    public_key_path = f"{SSH_KEY_PATH}.pub"
     try:
         logging.info(f"Reading public key from {public_key_path}")
         with open(public_key_path, encoding="utf-8") as f:
@@ -1022,7 +1031,7 @@ def test_ssh_01_add_key(page: sync_api.Page, credentials: Credentials) -> None:
 
 
 def test_ssh_02_rsync_upload(page: sync_api.Page, credentials: Credentials) -> None:
-    project_name = "tooling-test-example"
+    project_name = TEST_PROJECT
     version_name = "0.2"
     source_dir_rel = f"apache-{project_name}-{version_name}"
     source_dir_abs = f"/run/tests/{source_dir_rel}"
@@ -1093,16 +1102,29 @@ def test_ssh_02_rsync_upload(page: sync_api.Page, credentials: Credentials) -> N
 
 
 def test_tidy_up(page: sync_api.Page) -> None:
-    # Projects cannot be deleted if they have associated releases
-    # Therefore, we need to delete releases first
     test_tidy_up_releases(page)
-    test_tidy_up_project(page)
     test_tidy_up_ssh_keys(page)
     test_tidy_up_openpgp_keys(page)
 
 
 def test_tidy_up_openpgp_keys(page: sync_api.Page) -> None:
     logging.info("Starting OpenPGP key tidy up")
+
+    # First, delete the test key if it exists with wrong apache_uid
+    # (it may exist from real usage due to on_conflict_do_nothing in the INSERT)
+    # TODO: Don't hardcode this
+    logging.info("Deleting test key from database via admin route")
+
+    # Navigate to the delete route and submit the form
+    go_to_path(page, "/admin/delete-test-openpgp-keys")
+    delete_button = page.locator('button[type="submit"]')
+    if delete_button.is_visible():
+        delete_button.click()
+        page.wait_for_load_state()
+        logging.info("Test key deletion form submitted")
+    else:
+        logging.info("Test key deletion button not found, key may not exist")
+
     go_to_path(page, "/keys")
     logging.info("Navigated to /keys page for OpenPGP key cleanup")
 
@@ -1129,7 +1151,7 @@ def test_tidy_up_openpgp_keys(page: sync_api.Page) -> None:
         sync_api.expect(pre_locator).to_be_visible()
         key_content = pre_locator.inner_text()
 
-        if _OPENPGP_TEST_UID in key_content:
+        if OPENPGP_TEST_UID in key_content:
             logging.info(f"Found test OpenPGP key with fingerprint {fingerprint} for deletion")
             fingerprints_to_delete.append(fingerprint)
 
@@ -1179,7 +1201,7 @@ def test_tidy_up_openpgp_keys_continued(page: sync_api.Page, fingerprints_to_del
 
 
 def test_tidy_up_project(page: sync_api.Page) -> None:
-    project_name = "Apache Tooling Test Example"
+    project_name = "Apache Test"
     logging.info(f"Checking for project '{project_name}' at /projects")
     go_to_path(page, "/projects")
     logging.info("Project directory page loaded")
@@ -1268,7 +1290,7 @@ def test_tidy_up_ssh_keys(page: sync_api.Page) -> None:
             continue
 
         key_content = details_pre_locator.inner_text()
-        if _SSH_KEY_COMMENT in key_content:
+        if SSH_KEY_COMMENT in key_content:
             fingerprint_td_locator = card.locator('td:has-text("SHA256:")')
             if fingerprint_td_locator.is_visible(timeout=500):
                 fingerprint = fingerprint_td_locator.inner_text().strip()
@@ -1280,7 +1302,7 @@ def test_tidy_up_ssh_keys(page: sync_api.Page) -> None:
             else:
                 logging.warning("Could not locate fingerprint td for a test key card")
         else:
-            logging.debug(f"SSH key card: test comment '{_SSH_KEY_COMMENT}' not found in key content")
+            logging.debug(f"SSH key card: test comment '{SSH_KEY_COMMENT}' not found in key content")
 
     # For the complexity linter only
     test_tidy_up_ssh_keys_continued(page, fingerprints_to_delete)
@@ -1331,11 +1353,11 @@ def test_tidy_up_releases(page: sync_api.Page) -> None:
     logging.info("Admin delete release page loaded")
 
     # TODO: Get these names automatically
-    release_remove(page, "tooling-test-example-0.1+draft")
-    release_remove(page, "tooling-test-example-0.1+candidate")
-    release_remove(page, "tooling-test-example-0.1+preview")
-    release_remove(page, "tooling-test-example-0.1+release")
-    release_remove(page, "tooling-test-example-0.2")
+    release_remove(page, f"{TEST_PROJECT}-0.1+draft")
+    release_remove(page, f"{TEST_PROJECT}-0.1+candidate")
+    release_remove(page, f"{TEST_PROJECT}-0.1+preview")
+    release_remove(page, f"{TEST_PROJECT}-0.1+release")
+    release_remove(page, f"{TEST_PROJECT}-0.2")
 
 
 def wait_for_path(page: sync_api.Page, path: str) -> None:

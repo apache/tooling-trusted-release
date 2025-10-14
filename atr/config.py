@@ -43,6 +43,7 @@ def _config_secrets(key: str, state_dir: str, default: str | None = None, cast: 
 
 
 class AppConfig:
+    ALLOW_TESTS = decouple.config("ALLOW_TESTS", default=False, cast=bool)
     APP_HOST = decouple.config("APP_HOST", default="localhost")
     SSH_HOST = decouple.config("SSH_HOST", default="0.0.0.0")
     SSH_PORT = decouple.config("SSH_PORT", default=2222, cast=int)
@@ -132,6 +133,9 @@ def get() -> type[AppConfig]:
         config = _CONFIG_DICT[get_mode()]
     except KeyError:
         exit("Error: Invalid <mode>. Expected values [Debug, Production, Profiling].")
+
+    if config.ALLOW_TESTS and (get_mode() != Mode.Debug):
+        raise RuntimeError("ALLOW_TESTS can only be enabled in Debug mode")
 
     absolute_paths = [
         (config.PROJECT_ROOT, "PROJECT_ROOT"),

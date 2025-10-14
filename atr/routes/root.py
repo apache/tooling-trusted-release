@@ -21,11 +21,13 @@ import pathlib
 from typing import Final
 
 import aiofiles
+import asfquart.base as base
 import asfquart.session
 import htpy
-import quart.wrappers.response as response
+import quart.wrappers.response as quart_response
 import sqlalchemy.orm as orm
 import sqlmodel
+import werkzeug.wrappers.response as response
 
 import atr.config as config
 import atr.db as db
@@ -74,7 +76,7 @@ async def about(session: route.CommitterSession) -> str:
 
 
 @route.public("/")
-async def index(session: route.CommitterSession | None) -> response.Response | str:
+async def index(session: route.CommitterSession | None) -> quart_response.Response | str:
     """Show public info or an entry portal for participants."""
     session_data = await asfquart.session.read()
     if session_data:
@@ -149,16 +151,36 @@ async def index(session: route.CommitterSession | None) -> response.Response | s
 
 
 @route.public("/miscellaneous/resolved.json")
-async def resolved_json(session: route.CommitterSession | None) -> response.Response:
+async def resolved_json(session: route.CommitterSession | None) -> quart_response.Response:
     json_path = pathlib.Path(config.get().PROJECT_ROOT) / "atr" / "static" / "json" / "resolved.json"
     async with aiofiles.open(json_path) as f:
         content = await f.read()
-    return response.Response(content, mimetype="application/json")
+    return quart_response.Response(content, mimetype="application/json")
 
 
 @route.public("/policies")
 async def policies(session: route.CommitterSession | None) -> str:
     return await template.blank("Policies", content=_POLICIES)
+
+
+@route.public("/test-login")
+async def test_login(session: route.CommitterSession | None) -> response.Response:
+    if not config.get().ALLOW_TESTS:
+        raise base.ASFQuartException("Test login not enabled", errorcode=404)
+
+    session_data = {
+        "uid": "test",
+        "fullname": "Test User",
+        "committees": ["test"],
+        "projects": ["test"],
+        "isMember": False,
+        "isChair": False,
+        "isRole": False,
+        "metadata": {},
+    }
+
+    asfquart.session.write(session_data)
+    return await route.redirect(index)
 
 
 @route.committer("/todo", methods=["POST"])

@@ -19,6 +19,7 @@
 
 import asyncio
 import contextlib
+import datetime
 import os
 import queue
 from collections.abc import Iterable
@@ -44,6 +45,7 @@ import atr.db.interaction as interaction
 import atr.filters as filters
 import atr.log as log
 import atr.manager as manager
+import atr.models.sql as sql
 import atr.preload as preload
 import atr.ssh as ssh
 import atr.svn.pubsub as pubsub
@@ -155,6 +157,8 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
 
         worker_manager = manager.get_worker_manager()
         await worker_manager.start()
+
+        await initialise_test_environment()
 
         conf = config.get()
         pubsub_url = conf.PUBSUB_URL
@@ -301,6 +305,38 @@ def create_app(app_config: type[config.AppConfig]) -> base.QuartApp:
             log.info("Blockbuster deactivated")
 
     return app
+
+
+async def initialise_test_environment() -> None:
+    if not config.get().ALLOW_TESTS:
+        return
+
+    async with db.session() as data:
+        test_committee = await data.committee(name="test").get()
+        if not test_committee:
+            test_committee = sql.Committee(
+                name="test",
+                full_name="Test Committee",
+                is_podling=False,
+                committee_members=["test"],
+                committers=["test"],
+                release_managers=["test"],
+            )
+            data.add(test_committee)
+            await data.commit()
+
+        test_project = await data.project(name="test").get()
+        if not test_project:
+            test_project = sql.Project(
+                name="test",
+                full_name="Apache Test",
+                status=sql.ProjectStatus.ACTIVE,
+                committee_name="test",
+                created=datetime.datetime.now(datetime.UTC),
+                created_by="test",
+            )
+            data.add(test_project)
+            await data.commit()
 
 
 def main() -> None:

@@ -79,8 +79,8 @@ serve:
 	  atr.server:app --debug --reload
 
 serve-local:
-	APP_HOST=localhost.apache.org:8080 LOCAL_DEBUG=1 SECRET_KEY=insecure-local-key \
-	  SSH_HOST=127.0.0.1 uv run hypercorn --bind $(BIND) \
+	APP_HOST=localhost.apache.org:8080 SECRET_KEY=insecure-local-key \
+	  ALLOW_TESTS=1 SSH_HOST=127.0.0.1 uv run hypercorn --bind $(BIND) \
 	  --keyfile localhost.apache.org+3-key.pem --certfile localhost.apache.org+3.pem \
 	  atr.server:app --debug --reload
 

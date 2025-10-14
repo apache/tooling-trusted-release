@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any
 import asfquart.base as base
 import quart
 
+import atr.config as config
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
@@ -291,13 +292,16 @@ async def select(session: route.CommitterSession) -> str:
     if session.uid:
         async with db.session() as data:
             # TODO: Move this filtering logic somewhere else
+            # The ALLOW_TESTS line allows test projects to be shown
+            conf = config.get()
             all_projects = await data.project(status=sql.ProjectStatus.ACTIVE, _committee=True).all()
             user_projects = [
                 p
                 for p in all_projects
                 if p.committee
                 and (
-                    (session.uid in p.committee.committee_members)
+                    (conf.ALLOW_TESTS and (p.committee.name == "test"))
+                    or (session.uid in p.committee.committee_members)
                     or (session.uid in p.committee.committers)
                     or (session.uid in p.committee.release_managers)
                 )

@@ -250,10 +250,15 @@ class AuthoriserASFQuart:
         if not isinstance(asfquart_session, session.ClientSession):
             # Defense in depth runtime check, already validated by the type checker
             raise AuthenticationError("ASFQuart session is not a ClientSession")
+
+        committees = frozenset(asfquart_session.committees)
+        projects = frozenset(asfquart_session.projects)
+        committees, projects = _augment_test_membership(committees, projects)
+
         # We do not check that the ASF UID is the same as the one in the session
         # It is the caller's responsibility to ensure this
-        self.__cache.member_of[asf_uid] = frozenset(asfquart_session.committees)
-        self.__cache.participant_of[asf_uid] = frozenset(asfquart_session.projects)
+        self.__cache.member_of[asf_uid] = committees
+        self.__cache.participant_of[asf_uid] = projects
         self.__cache.last_refreshed = int(time.time())
 
 
@@ -279,11 +284,26 @@ class AuthoriserLDAP:
     async def cache_refresh(self, asf_uid: str) -> None:
         if not self.__cache.outdated():
             return
+
+        if config.get().ALLOW_TESTS and (asf_uid == "test"):
+            # The test user does not exist in LDAP, so we hardcode their data
+            committees = frozenset({"test"})
+            projects = frozenset({"test"})
+            self.__cache.member_of[asf_uid] = committees
+            self.__cache.participant_of[asf_uid] = projects
+            self.__cache.last_refreshed = int(time.time())
+            return
+
         try:
             c = Committer(asf_uid)
             await asyncio.to_thread(c.verify)
-            self.__cache.member_of[asf_uid] = frozenset(c.pmcs)
-            self.__cache.participant_of[asf_uid] = frozenset(c.projects)
+
+            committees = frozenset(c.pmcs)
+            projects = frozenset(c.projects)
+            committees, projects = _augment_test_membership(committees, projects)
+
+            self.__cache.member_of[asf_uid] = committees
+            self.__cache.participant_of[asf_uid] = projects
             self.__cache.last_refreshed = int(time.time())
         except CommitterError as e:
             raise AuthenticationError(f"Failed to verify committer: {e}") from e
@@ -371,3 +391,13 @@ class Authorisation(AsyncObject):
         if self.__asf_uid is None:
             return frozenset()
         return self.__authoriser.member_of(self.__asf_uid)
+
+
+def _augment_test_membership(
+    committees: frozenset[str],
+    projects: frozenset[str],
+) -> tuple[frozenset[str], frozenset[str]]:
+    if config.get().ALLOW_TESTS:
+        committees = committees.union({"test"})
+        projects = projects.union({"test"})
+    return committees, projects

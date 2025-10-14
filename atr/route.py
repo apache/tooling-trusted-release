@@ -222,11 +222,7 @@ class CommitterSession:
         self, route: CommitterRouteHandler[R], success: str | None = None, error: str | None = None, **kwargs: Any
     ) -> response.Response:
         """Redirect to a route with a success or error message."""
-        if success is not None:
-            await quart.flash(success, "success")
-        elif error is not None:
-            await quart.flash(error, "error")
-        return quart.redirect(util.as_url(route, **kwargs))
+        return await redirect(route, success, error, **kwargs)
 
     async def release(
         self,
@@ -508,6 +504,17 @@ def public(
         return decorated
 
     return decorator
+
+
+async def redirect[R](
+    route: RouteHandler[R], success: str | None = None, error: str | None = None, **kwargs: Any
+) -> response.Response:
+    """Redirect to a route with a success or error message."""
+    if success is not None:
+        await quart.flash(success, "success")
+    elif error is not None:
+        await quart.flash(error, "error")
+    return quart.redirect(util.as_url(route, **kwargs))
 
 
 def _authentication_failed() -> NoReturn:

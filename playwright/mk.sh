@@ -28,16 +28,17 @@ mv tmp.secret.asc "${_fp}.secret.asc"
 sq key delete --cert-file "${_fp}.secret.asc" --output "${_fp}.asc"
 
 # Enter the directory containing the artifact
-cd apache-tooling-test-example-0.2/
+cd apache-test-0.2/
+rm ./*.asc ./*.sha512
 
 # Generate the SHA-2-512 hash
-sha512sum apache-tooling-test-example-0.2.tar.gz > \
-  apache-tooling-test-example-0.2.tar.gz.sha512
+sha512sum apache-test-0.2.tar.gz > \
+  apache-test-0.2.tar.gz.sha512
 
 # Generate the signature
 sq sign --signer-file "../${_fp}.secret.asc" \
-  --signature-file apache-tooling-test-example-0.2.tar.gz > \
-  apache-tooling-test-example-0.2.tar.gz.asc
+  --signature-file apache-test-0.2.tar.gz.asc \
+  apache-test-0.2.tar.gz
 
 # Remove the secret key
 rm "../${_fp}.secret.asc"
