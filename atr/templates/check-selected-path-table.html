@@ -48,7 +48,7 @@
                title="View file {{ path }}"
                class="text-decoration-none text-reset">
               {% if has_errors or has_warnings %}
-                <strong class="{{ path_style_class }}"><code>{{ path }}</code></strong>
+                <strong><code class="{{ path_style_class }}">{{ path }}</code></strong>
               {% else %}
                 <code>{{ path }}</code>
               {% endif %}
