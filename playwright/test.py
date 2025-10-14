@@ -25,6 +25,7 @@ import os
 import re
 import socket
 import subprocess
+import sys
 import time
 import urllib.parse
 from collections.abc import Callable
@@ -412,7 +413,7 @@ def release_remove(page: sync_api.Page, release_name: str) -> None:
 def run_tests(skip_slow: bool, tidy_after: bool) -> None:
     if (credentials := get_credentials()) is None:
         logging.error("Cannot run tests: no credentials provided")
-        return
+        sys.exit(1)
 
     with sync_api.sync_playwright() as p:
         browser = None
@@ -424,6 +425,7 @@ def run_tests(skip_slow: bool, tidy_after: bool) -> None:
 
         except Exception as e:
             logging.error(f"Error during page interaction: {e}", exc_info=True)
+            sys.exit(1)
         finally:
             if context:
                 context.close()
@@ -792,6 +794,7 @@ def test_lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials) -
     lifecycle_01_add_draft(page, credentials, version_name="0.1+candidate")
     lifecycle_01_add_draft(page, credentials, version_name="0.1+preview")
     lifecycle_01_add_draft(page, credentials, version_name="0.1+release")
+    raise RuntimeError("Deliberate failure to test CI")
 
 
 def test_lifecycle_02_check_draft_added(page: sync_api.Page, credentials: Credentials) -> None:
