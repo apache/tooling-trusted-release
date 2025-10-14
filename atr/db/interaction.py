@@ -23,6 +23,7 @@ from typing import Any, Final
 
 import packaging.version as version
 import sqlalchemy
+import sqlalchemy.orm as orm
 import sqlmodel
 
 import atr.db as db
@@ -31,7 +32,6 @@ import atr.ldap as ldap
 import atr.log as log
 import atr.models.results as results
 import atr.models.sql as sql
-import atr.registry as registry
 import atr.user as user
 import atr.util as util
 
@@ -110,6 +110,55 @@ async def all_releases(project: sql.Project) -> list[sql.Release]:
 
         results.sort(key=sort_key, reverse=True)
     return results
+
+
+async def automated_release_signing_committees(caller_data: db.Session | None = None) -> frozenset[str]:
+    """Get all automated release signing committees."""
+    committees = []
+    async with db.ensure_session(caller_data) as data:
+        via = sql.validate_instrumented_attribute
+        query = (
+            sqlmodel.select(sql.PublicSigningKey)
+            .options(orm.selectinload(via(sql.PublicSigningKey.committees)))
+            .where(
+                sqlalchemy.and_(
+                    sqlalchemy.or_(
+                        via(sql.PublicSigningKey.primary_declared_uid).like("%Automated Release Signing%"),
+                        via(sql.PublicSigningKey.primary_declared_uid).like("%Services RM%"),
+                    ),
+                    via(sql.PublicSigningKey.primary_declared_uid).like("%private@%.apache.org%"),
+                )
+            )
+        )
+        result = await data.execute(query)
+        keys = result.scalars().all()
+
+        for key in keys:
+            for committee in key.committees:
+                committees.append(committee.name)
+
+    # Committees allowed to make automated releases for testing
+    committees.append("test")
+    committees.append("tooling")
+
+    return frozenset(committees)
+
+
+async def automated_release_signing_keys(caller_data: db.Session | None = None) -> Sequence[sql.PublicSigningKey]:
+    """Get all automated release signing keys."""
+    async with db.ensure_session(caller_data) as data:
+        via = sql.validate_instrumented_attribute
+        query = sqlmodel.select(sql.PublicSigningKey).where(
+            sqlalchemy.and_(
+                sqlalchemy.or_(
+                    via(sql.PublicSigningKey.primary_declared_uid).like("%Automated Release Signing%"),
+                    via(sql.PublicSigningKey.primary_declared_uid).like("%Services RM%"),
+                ),
+                via(sql.PublicSigningKey.primary_declared_uid).like("%private@%.apache.org%"),
+            ),
+        )
+        result = await data.execute(query)
+        return result.scalars().all()
 
 
 async def candidate_drafts(project: sql.Project) -> list[sql.Release]:
@@ -399,8 +448,9 @@ async def _trusted_project(repository: str, workflow_ref: str, phase: TrustedPro
         )
     if project.committee is None:
         raise InteractionError(f"Project {project.name} has no committee")
-    if project.committee.name not in registry.GITHUB_AUTOMATED_RELEASE_COMMITTEES:
-        raise InteractionError(f"Project {project.name} is not in a committee that can make releases")
+    github_automated_release_committees = await automated_release_signing_committees()
+    if project.committee.name not in github_automated_release_committees:
+        raise InteractionError(f"Project {project.name} is not in a committee that can make automated releases")
     return project
 
 

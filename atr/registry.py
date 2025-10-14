@@ -25,17 +25,17 @@ FORBIDDEN_PROJECT_CATEGORIES: Final[set[str]] = {
 
 # Committees which are allowed by Infra to make releases via GitHub Actions
 # TODO: This should actually be at the project level, not committee level
-GITHUB_AUTOMATED_RELEASE_COMMITTEES: Final[frozenset[str]] = frozenset(
-    {
-        "arrow",
-        "baremaps",
-        "beam",
-        "daffodil",
-        "directory",
-        "logging",
-        "tooling",
-    }
-)
+# GITHUB_AUTOMATED_RELEASE_COMMITTEES: Final[frozenset[str]] = frozenset(
+#     {
+#         "arrow",
+#         "baremaps",
+#         "beam",
+#         "daffodil",
+#         "directory",
+#         "logging",
+#         "tooling",
+#     }
+# )
 
 # Committees which cannot make releases, by policy
 STANDING_COMMITTEES: Final[frozenset[str]] = frozenset(

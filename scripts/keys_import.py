@@ -80,25 +80,34 @@ async def keys_import(conf: config.AppConfig, asf_uid: str) -> None:
     print_and_flush(f"LDAP search took {(end - start) / 1000000} ms")
     print_and_flush(f"Email addresses from LDAP: {len(email_to_uid)}")
 
-    # Open an ATR database connection
-    async with db.session() as data, storage.write(asf_uid) as write:
-        # Get the KEYS file of each committee
+    # Get the KEYS file of each committee
+    async with db.session() as data:
         committees = await data.committee().all()
-        committees = list(committees)
-        committees.sort(key=lambda c: c.name.lower())
-        urls = [f"https://downloads.apache.org/{committee.name}/KEYS" for committee in committees]
-        total_yes = 0
-        total_no = 0
-        async for url, status, content in util.get_urls_as_completed(urls):
-            # For each remote KEYS file, check that it responded 200 OK
-            committee_name = url.rsplit("/", 2)[-2]
-            if status != 200:
-                print_and_flush(f"{committee_name} error: {status}")
-                continue
+    committees = list(committees)
+    committees.sort(key=lambda c: c.name.lower())
 
-            # Parse the KEYS file and add it to the database
-            # TODO: We could have this return the keys to make it more efficient
-            # Then we could use the bulk upsert query method
+    urls = []
+    for committee in committees:
+        if committee.is_podling:
+            url = f"https://downloads.apache.org/incubator/{committee.name}/KEYS"
+        else:
+            url = f"https://downloads.apache.org/{committee.name}/KEYS"
+        urls.append(url)
+
+    total_yes = 0
+    total_no = 0
+    async for url, status, content in util.get_urls_as_completed(urls):
+        # For each remote KEYS file, check that it responded 200 OK
+        # Extract committee name from URL
+        # This works for both /committee/KEYS and /incubator/committee/KEYS
+        committee_name = url.rsplit("/", 2)[-2]
+        if status != 200:
+            print_and_flush(f"{committee_name} error: {status}")
+            continue
+
+        # Parse the KEYS file and add it to the database
+        # We use a separate storage.write() context for each committee to avoid transaction conflicts
+        async with storage.write(asf_uid) as write:
             wafa = write.as_foundation_admin(committee_name)
             keys_file_text = content.decode("utf-8", errors="replace")
             outcomes = await wafa.keys.ensure_associated(keys_file_text)
@@ -111,8 +120,8 @@ async def keys_import(conf: config.AppConfig, asf_uid: str) -> None:
             print_and_flush(f"{committee_name} {yes} {no}")
             total_yes += yes
             total_no += no
-        print_and_flush(f"Total okay: {total_yes}")
-        print_and_flush(f"Total failed: {total_no}")
+    print_and_flush(f"Total okay: {total_yes}")
+    print_and_flush(f"Total failed: {total_no}")
     end = time.perf_counter_ns()
     print_and_flush(f"Script took {(end - start) / 1000000} ms")
     print_and_flush("")
