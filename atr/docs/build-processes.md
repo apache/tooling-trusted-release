@@ -4,7 +4,7 @@
 
 **Prev**: `3.5.` [User interface](user-interface)
 
-**Next**: `3.7.` [Code conventions](code-conventions)
+**Next**: `3.7.` [Running and creating tests](running-and-creating-tests)
 
 **Sections**:
 

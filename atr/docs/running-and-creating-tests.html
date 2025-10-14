@@ -1,0 +1,28 @@
+<h1 id="running-and-creating-tests">3.7. Running and creating tests</h1>
+<p><strong>Up</strong>: <code>3.</code> <a href="developer-guide">Developer guide</a></p>
+<p><strong>Prev</strong>: <code>3.6.</code> <a href="build-processes">Build processes</a></p>
+<p><strong>Next</strong>: <code>3.8.</code> <a href="code-conventions">Code conventions</a></p>
+<p><strong>Sections</strong>:</p>
+<ul>
+<li><a href="#running-tests">Running tests</a></li>
+<li><a href="#creating-tests">Creating tests</a></li>
+</ul>
+<h2 id="running-tests">Running tests</h2>
+<p>We currently only have end-to-end browser tests, but we plan to expand these as part of <a href="https://github.com/apache/tooling-trusted-releases/issues/209">Issue #209</a>. Meanwhile, these browser tests serve as a simple consistency check when developing ATR.</p>
+<p>To run the tests, you will need Docker. Other OCI runtimes should work, but you will need to edit the <a href="/ref/Makefile"><code>Makefile</code></a> or run your own command. The simple way to run the tests is:</p>
+<pre><code class="language-shell">make build-playwright &amp;&amp; make run-playwright
+</code></pre>
+<p>Where the two <code>make</code> invocations correspond to:</p>
+<pre><code class="language-shell">docker build -t atr-playwright -f tests/Dockerfile.playwright playwright
+docker run --net=host -it atr-playwright python3 test.py --skip-slow
+</code></pre>
+<p>In other words, we build <a href="/ref/tests/Dockerfile.playwright"><code>tests/Dockerfile.playwright</code></a>, and then run <a href="/ref/playwright/test.py"><code>playwright/test.py</code></a> inside that container. The container is called <code>atr-playwright</code>; if you want to give the container a different name, then you'll need to run the manual <code>docker</code> commands. Replace <code>docker</code> with the name of your Docker-compatible OCI runtime to use an alternative runtime.</p>
+<p>The tests should, as of 14 Oct 2025, take about 20 to 25 seconds to run. The last line should be <code>Tests finished successfully</code>, and if the tests do not complete successfully there should be an obvious Python backtrace.</p>
+<h2 id="creating-tests">Creating tests</h2>
+<p>You can add tests to <code>playwright/test.py</code>. If you're feeling particularly adventurous, you can add separate unit tests etc., but it's okay to add tests only to the Playwright test script until <a href="https://github.com/apache/tooling-trusted-releases/issues/209">Issue #209</a> is resolved.</p>
+<h3 id="how-the-tests-work">How the tests work</h3>
+<p>The browser tests use <a href="https://playwright.dev/">Playwright</a>, which is a cross-browser, cross-platform web testing framework. It's a bit like the older <a href="https://en.wikipedia.org/wiki/PhantomJS">PhantomJS</a>, now discontinued, which allows you to operate a browser through scripting. Playwright took the same concept and improved the user experience by adding better methods for polling browser state. Most interactions with a browser take some time to complete, and in PhantomJS the developer had to do that manually. Playwright makes it easier, and has become somewhat of an industry standard for browser tests.</p>
+<p>We use the official Playwright OCI container, install a few dependencies (<code>apt-get</code> is available in the container), and then run <code>test.py</code>.</p>
+<p>The <code>test.py</code> script calls <a href="/ref/playwright/test.py:run_tests"><code>run_tests</code></a> from its <code>main</code>, which sets up all the context, but the main action takes place in <a href="/ref/playwright/test.py:test_all"><code>test_all</code></a>. This function removes any state accidentally left over from a previous run, then runs tests of certain components. Because ATR is stateful, the order of the tests is important. When adding a test, please be careful to ensure that you use the correct state and that you try not to modify that state in such a way that interferes with tests placed afterwards.</p>
+<p>We want to make it more clear which Playwright tests depend on which, and have more isolated tests. Reusing context, however, helps to speed up the tests.</p>
+<p>The actual test cases themselves tend to use helpers such as <a href="/ref/playwright/test.py:go_to_path"><code>go_to_path</code></a> and <a href="/ref/playwright/test.py:wait_for_path"><code>wait_for_path</code></a>, and then call <a href="https://docs.python.org/3/library/logging.html#logging.info"><code>logging.info</code></a> to print information to the console. Try to keep logging messages terse and informative.</p>

@@ -1,10 +1,10 @@
-# 3.7. Code conventions
+# 3.8. Code conventions
 
 **Up**: `3.` [Developer guide](developer-guide)
 
-**Prev**: `3.6.` [Build processes](build-processes)
+**Prev**: `3.7.` [Running and creating tests](running-and-creating-tests)
 
-**Next**: `3.8.` [How to contribute](how-to-contribute)
+**Next**: `3.9.` [How to contribute](how-to-contribute)
 
 **Sections**:
 

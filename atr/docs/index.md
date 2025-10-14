@@ -15,5 +15,6 @@ NOTE: This documentation is a work in progress.
   * `3.4.` [Storage interface](storage-interface)
   * `3.5.` [User interface](user-interface)
   * `3.6.` [Build processes](build-processes)
-  * `3.7.` [Code conventions](code-conventions)
-  * `3.8.` [How to contribute](how-to-contribute)
+  * `3.7.` [Running and creating tests](running-and-creating-tests)
+  * `3.8.` [Code conventions](code-conventions)
+  * `3.9.` [How to contribute](how-to-contribute)

@@ -1,8 +1,8 @@
-# 3.8. How to contribute
+# 3.9. How to contribute
 
 **Up**: `3.` [Developer guide](developer-guide)
 
-**Prev**: `3.7.` [Code conventions](code-conventions)
+**Prev**: `3.8.` [Code conventions](code-conventions)
 
 **Next**: (none)
 
@@ -38,7 +38,7 @@ Once you have identified something to work on, the process of contributing is as
 
 3. **Create a branch.** [Create a new branch](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-and-deleting-branches-within-your-repository) for your work. Use a descriptive name that indicates what you are working on, such as `fix-typo-in-docs` or `improve-error-messages`.
 
-4. **Make your changes.** Implement your fix or feature, following our [code conventions](code-conventions). If you are changing code, ensure that your changes do not break existing functionality. If you are adding a new feature, consider whether tests are appropriate.
+4. **Make your changes.** Implement your fix or feature, following our [code conventions](code-conventions). If you are changing code, ensure that your changes do not break existing functionality. Whenever you change code, and especially if you are adding a new feature, consider [adding a test](running-and-creating-tests).
 
 5. **Commit your changes.** Write clear, concise commit messages following [our commit message style](#commit-message-style). Each commit should represent a logical unit of work, but we are not particularly strict about this.
 
