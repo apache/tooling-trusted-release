@@ -156,6 +156,19 @@ def lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials, version
 
     logging.info(f"Navigating back to /compose/{TEST_PROJECT}/{version_name}")
     go_to_path(page, f"/compose/{TEST_PROJECT}/{version_name}")
+
+    logging.info("Extracting latest revision from compose page")
+    revision_link_locator = page.locator(f'a[href^="/revisions/{TEST_PROJECT}/{version_name}#"]')
+    sync_api.expect(revision_link_locator).to_be_visible()
+    revision_href = revision_link_locator.get_attribute("href")
+    if not revision_href:
+        raise RuntimeError("Could not find revision link href")
+    revision = revision_href.split("#", 1)[-1]
+    logging.info(f"Found revision: {revision}")
+
+    logging.info("Polling for task completion after file upload")
+    poll_for_tasks_completion(page, TEST_PROJECT, version_name, revision)
+
     logging.info(f"Navigation back to /compose/{TEST_PROJECT}/{version_name} completed successfully")
 
 
@@ -794,7 +807,6 @@ def test_lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials) -
     lifecycle_01_add_draft(page, credentials, version_name="0.1+candidate")
     lifecycle_01_add_draft(page, credentials, version_name="0.1+preview")
     lifecycle_01_add_draft(page, credentials, version_name="0.1+release")
-    raise RuntimeError("Deliberate failure to test CI")
 
 
 def test_lifecycle_02_check_draft_added(page: sync_api.Page, credentials: Credentials) -> None:
