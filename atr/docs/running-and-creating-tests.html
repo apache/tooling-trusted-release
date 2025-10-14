@@ -9,15 +9,23 @@
 </ul>
 <h2 id="running-tests">Running tests</h2>
 <p>We currently only have end-to-end browser tests, but we plan to expand these as part of <a href="https://github.com/apache/tooling-trusted-releases/issues/209">Issue #209</a>. Meanwhile, these browser tests serve as a simple consistency check when developing ATR.</p>
-<p>To run the tests, you will need Docker. Other OCI runtimes should work, but you will need to edit the <a href="/ref/Makefile"><code>Makefile</code></a> or run your own command. The simple way to run the tests is:</p>
+<p>To run the tests, you will need Docker. Other OCI runtimes should work, but you will need to edit the test scripts accordingly.</p>
+<h3 id="using-docker-compose">Using Docker Compose</h3>
+<p>The simplest way to run the tests is using Docker Compose, which starts both ATR and the Playwright test container:</p>
+<pre><code class="language-shell">sh tests/run-tests.sh
+</code></pre>
+<p>This uses <a href="/ref/tests/docker-compose.yml"><code>tests/docker-compose.yml</code></a> to orchestrate the test environment. The ATR server runs in one container and the Playwright tests run in another, connected via a Docker network.</p>
+<h3 id="using-host-networking">Using host networking</h3>
+<p>If you already have ATR running locally with <code>make serve-local</code>, you can run the Playwright tests directly against it instead of using Docker Compose:</p>
 <pre><code class="language-shell">make build-playwright &amp;&amp; make run-playwright
 </code></pre>
 <p>Where the two <code>make</code> invocations correspond to:</p>
 <pre><code class="language-shell">docker build -t atr-playwright -f tests/Dockerfile.playwright playwright
 docker run --net=host -it atr-playwright python3 test.py --skip-slow
 </code></pre>
-<p>In other words, we build <a href="/ref/tests/Dockerfile.playwright"><code>tests/Dockerfile.playwright</code></a>, and then run <a href="/ref/playwright/test.py"><code>playwright/test.py</code></a> inside that container. The container is called <code>atr-playwright</code>; if you want to give the container a different name, then you'll need to run the manual <code>docker</code> commands. Replace <code>docker</code> with the name of your Docker-compatible OCI runtime to use an alternative runtime.</p>
-<p>The tests should, as of 14 Oct 2025, take about 20 to 25 seconds to run. The last line should be <code>Tests finished successfully</code>, and if the tests do not complete successfully there should be an obvious Python backtrace.</p>
+<p>In other words, we build <a href="/ref/tests/Dockerfile.playwright"><code>tests/Dockerfile.playwright</code></a>, and then run <a href="/ref/playwright/test.py"><code>playwright/test.py</code></a> inside that container using host networking to access your locally running ATR instance. Replace <code>docker</code> with the name of your Docker-compatible OCI runtime to use an alternative runtime.</p>
+<h3 id="test-duration">Test duration</h3>
+<p>The tests should, as of 14 Oct 2025, take about 40 to 50 seconds to run in Docker Compose, and 20 to 25 seconds to run on the host. The last line of the test output should be <code>Tests finished successfully</code>, and if the tests do not complete successfully there should be an obvious Python backtrace.</p>
 <h2 id="creating-tests">Creating tests</h2>
 <p>You can add tests to <code>playwright/test.py</code>. If you're feeling particularly adventurous, you can add separate unit tests etc., but it's okay to add tests only to the Playwright test script until <a href="https://github.com/apache/tooling-trusted-releases/issues/209">Issue #209</a> is resolved.</p>
 <h3 id="how-the-tests-work">How the tests work</h3>

@@ -15,7 +15,21 @@
 
 We currently only have end-to-end browser tests, but we plan to expand these as part of [Issue #209](https://github.com/apache/tooling-trusted-releases/issues/209). Meanwhile, these browser tests serve as a simple consistency check when developing ATR.
 
-To run the tests, you will need Docker. Other OCI runtimes should work, but you will need to edit the [`Makefile`](/ref/Makefile) or run your own command. The simple way to run the tests is:
+To run the tests, you will need Docker. Other OCI runtimes should work, but you will need to edit the test scripts accordingly.
+
+### Using Docker Compose
+
+The simplest way to run the tests is using Docker Compose, which starts both ATR and the Playwright test container:
+
+```shell
+sh tests/run-tests.sh
+```
+
+This uses [`tests/docker-compose.yml`](/ref/tests/docker-compose.yml) to orchestrate the test environment. The ATR server runs in one container and the Playwright tests run in another, connected via a Docker network.
+
+### Using host networking
+
+If you already have ATR running locally with `make serve-local`, you can run the Playwright tests directly against it instead of using Docker Compose:
 
 ```shell
 make build-playwright && make run-playwright
@@ -28,9 +42,11 @@ docker build -t atr-playwright -f tests/Dockerfile.playwright playwright
 docker run --net=host -it atr-playwright python3 test.py --skip-slow
 ```
 
-In other words, we build [`tests/Dockerfile.playwright`](/ref/tests/Dockerfile.playwright), and then run [`playwright/test.py`](/ref/playwright/test.py) inside that container. The container is called `atr-playwright`; if you want to give the container a different name, then you'll need to run the manual `docker` commands. Replace `docker` with the name of your Docker-compatible OCI runtime to use an alternative runtime.
+In other words, we build [`tests/Dockerfile.playwright`](/ref/tests/Dockerfile.playwright), and then run [`playwright/test.py`](/ref/playwright/test.py) inside that container using host networking to access your locally running ATR instance. Replace `docker` with the name of your Docker-compatible OCI runtime to use an alternative runtime.
 
-The tests should, as of 14 Oct 2025, take about 20 to 25 seconds to run. The last line should be `Tests finished successfully`, and if the tests do not complete successfully there should be an obvious Python backtrace.
+### Test duration
+
+The tests should, as of 14 Oct 2025, take about 40 to 50 seconds to run in Docker Compose, and 20 to 25 seconds to run on the host. The last line of the test output should be `Tests finished successfully`, and if the tests do not complete successfully there should be an obvious Python backtrace.
 
 ## Creating tests
 

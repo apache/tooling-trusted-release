@@ -34,6 +34,7 @@ import netifaces
 import playwright.sync_api as sync_api
 import rich.logging
 
+ATR_BASE_URL: Final[str] = os.environ.get("ATR_BASE_URL", "https://localhost.apache.org:8080")
 OPENPGP_TEST_UID: Final[str] = "<apache-tooling@example.invalid>"
 SSH_KEY_COMMENT: Final[str] = "atr-playwright-test@127.0.0.1"
 SSH_KEY_PATH: Final[str] = "/root/.ssh/id_ed25519"
@@ -92,7 +93,7 @@ def get_default_gateway_ip() -> str | None:
 
 
 def go_to_path(page: sync_api.Page, path: str, wait: bool = True) -> None:
-    page.goto(f"https://localhost.apache.org:8080{path}")
+    page.goto(f"{ATR_BASE_URL}{path}")
     if wait:
         wait_for_path(page, path)
 
@@ -313,21 +314,22 @@ def main() -> None:
     )
 
     logging.debug(f"Log level set to {args.log.upper()}")
-    # Add localhost.apache.org to /etc/hosts
-    default_gateway_ip = get_default_gateway_ip()
-    if default_gateway_ip is not None:
-        with open("/etc/hosts", "a") as f:
-            f.write(f"{default_gateway_ip} localhost.apache.org\n")
-        logging.info(f"Added localhost.apache.org to /etc/hosts with IP {default_gateway_ip}")
-    else:
-        logging.warning("Could not determine default gateway IP, skipping /etc/hosts modification")
+    if "ATR_BASE_URL" not in os.environ:
+        # Add localhost.apache.org to /etc/hosts
+        default_gateway_ip = get_default_gateway_ip()
+        if default_gateway_ip is not None:
+            with open("/etc/hosts", "a") as f:
+                f.write(f"{default_gateway_ip} localhost.apache.org\n")
+            logging.info(f"Added localhost.apache.org to /etc/hosts with IP {default_gateway_ip}")
+        else:
+            logging.warning("Could not determine default gateway IP, skipping /etc/hosts modification")
 
     run_tests(args.skip_slow, args.tidy)
 
 
 def poll_for_tasks_completion(page: sync_api.Page, project_name: str, version_name: str, revision: str) -> None:
     rev_path = f"{project_name}/{version_name}/{revision}"
-    polling_url = f"https://localhost.apache.org:8080/admin/ongoing-tasks/{rev_path}"
+    polling_url = f"{ATR_BASE_URL}/admin/ongoing-tasks/{rev_path}"
     logging.info(f"Polling URL: {polling_url}")
 
     max_wait_seconds = 18
@@ -930,17 +932,17 @@ def test_projects_02_check_directory(page: sync_api.Page, credentials: Credentia
     go_to_path(page, "/projects")
     logging.info("Project directory page loaded")
 
-    logging.info("Checking for the Apache Tooling project card")
-    h3_locator = page.get_by_text("Apache Tooling", exact=True)
-    tooling_card_locator = h3_locator.locator("xpath=ancestor::div[contains(@class, 'project-card')]")
-    sync_api.expect(tooling_card_locator).to_be_visible()
-    logging.info("Apache Tooling project card found successfully")
+    logging.info("Checking for the Apache Test project card")
+    h3_locator = page.get_by_text("Apache Test", exact=True)
+    test_card_locator = h3_locator.locator("xpath=ancestor::div[contains(@class, 'project-card')]")
+    sync_api.expect(test_card_locator).to_be_visible()
+    logging.info("Apache Test project card found successfully")
 
 
 def test_projects_03_add_project(page: sync_api.Page, credentials: Credentials) -> None:
-    base_project_label = "tooling"
-    project_name = "Apache Tooling Test Example"
-    project_label = "tooling-test-example"
+    base_project_label = "test"
+    project_name = "Apache Test Example"
+    project_label = "test-example"
 
     logging.info("Navigating to the add derived project page")
     go_to_path(page, f"/project/add/{base_project_label}")
@@ -1040,14 +1042,18 @@ def test_ssh_02_rsync_upload(page: sync_api.Page, credentials: Credentials) -> N
 
     logging.info(f"Starting rsync upload test for {project_name}-{version_name}")
 
-    gateway_ip = get_default_gateway_ip()
-    if not gateway_ip:
-        raise RuntimeError("Cannot proceed without gateway IP")
+    if "ATR_BASE_URL" in os.environ:
+        ssh_host = os.environ.get("ATR_BASE_URL", "").replace("https://", "").replace(":8080", "")
+    else:
+        gateway_ip = get_default_gateway_ip()
+        if not gateway_ip:
+            raise RuntimeError("Cannot proceed without gateway IP")
+        ssh_host = gateway_ip
 
     username = credentials.username
     ssh_command = "ssh -p 2222 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
     source_path = f"{source_dir_abs}/"
-    destination = f"{username}@{gateway_ip}:/{project_name}/{version_name}/"
+    destination = f"{username}@{ssh_host}:/{project_name}/{version_name}/"
 
     rsync_cmd = [
         "rsync",

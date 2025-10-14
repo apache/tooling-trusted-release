@@ -1,0 +1,36 @@
+services:
+  atr:
+    build:
+      context: ..
+      dockerfile: Dockerfile.alpine
+    environment:
+      - ALLOW_TESTS=1
+      - APP_HOST=atr:8080
+      - BIND=0.0.0.0:8080
+      - SECRET_KEY=insecure-test-key
+      - SSH_HOST=0.0.0.0
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-k", "-f", "https://localhost:8080/"]
+      interval: 2s
+      timeout: 1s
+      retries: 30
+      start_period: 10s
+
+  playwright:
+    build:
+      context: ../playwright
+      dockerfile: ../tests/Dockerfile.playwright
+    depends_on:
+      atr:
+        condition: service_healthy
+    networks:
+      - test-network
+    command: python3 test.py --skip-slow
+    environment:
+      - ATR_BASE_URL=https://atr:8080
+
+networks:
+  test-network:
+    driver: bridge
