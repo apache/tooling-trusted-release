@@ -14,7 +14,7 @@
 <p>The simplest way to run the tests is using Docker Compose, which starts both ATR and the Playwright test container:</p>
 <pre><code class="language-shell">sh tests/run-tests.sh
 </code></pre>
-<p>This uses <a href="/ref/tests/docker-compose.yml"><code>tests/docker-compose.yml</code></a> to orchestrate the test environment. The ATR server runs in one container and the Playwright tests run in another, connected via a Docker network.</p>
+<p>This uses <a href="/ref/tests/docker-compose.yml"><code>tests/docker-compose.yml</code></a> to orchestrate the test environment. The ATR server runs in one container and the Playwright tests run in another, connected via a Docker network. These tests are automatically run in our GitHub CI as part of <a href="/ref/.github/workflows/build.yml"><code>.github/workflows/build.yml</code></a>.</p>
 <h3 id="using-host-networking">Using host networking</h3>
 <p>If you already have ATR running locally with <code>make serve-local</code>, you can run the Playwright tests directly against it instead of using Docker Compose:</p>
 <pre><code class="language-shell">make build-playwright &amp;&amp; make run-playwright
