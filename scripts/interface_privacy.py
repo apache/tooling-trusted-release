@@ -24,6 +24,12 @@ import enum
 import pathlib
 import sys
 
+ALLOWED_PRIVATE_ACCESS: dict[str, set[str]] = {
+    "atr/htm.py": {"new_element._attrs"},
+    "atr/models/sql.py": {"Release._latest_revision_number"},
+    "atr/tarzip.py": {"member_wrapper._original_info"},
+}
+
 
 class ExitCode(enum.IntEnum):
     """Exit codes for the script."""
@@ -42,14 +48,16 @@ class PrivateAccessVisitor(ast.NodeVisitor):
         self.filename: str = filename
         self.violations: list[tuple[int, int, str]] = []
 
-    def visit_attribute(self, node: ast.Attribute) -> None:
+    def visit_Attribute(self, node: ast.Attribute) -> None:
         """Visits ast.Attribute nodes."""
         # Check whether the attribute name starts with a single underscore
         if node.attr.startswith("_") and (not node.attr.startswith("__")):
             # Exclude "cls" and "self"
             if isinstance(node.value, ast.Name) and (node.value.id not in {"cls", "self"}):
                 accessed_name = f"{node.value.id}.{node.attr}"
-                self.violations.append((node.lineno, node.col_offset, accessed_name))
+                allowed_access = ALLOWED_PRIVATE_ACCESS.get(self.filename, set())
+                if accessed_name not in allowed_access:
+                    self.violations.append((node.lineno, node.col_offset, accessed_name))
         self.generic_visit(node)
 
 
