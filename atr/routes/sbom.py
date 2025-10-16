@@ -33,7 +33,7 @@ import atr.log as log
 import atr.models.results as results
 import atr.models.sql as sql
 import atr.route as route
-import atr.sbomtool as sbomtool
+import atr.sbom as sbom
 import atr.storage as storage
 import atr.template as template
 import atr.util as util
@@ -117,8 +117,8 @@ async def report(session: route.CommitterSession, project: str, version: str, fi
     task_result = tasks[0].result
     if not isinstance(task_result, results.SBOMToolScore):
         raise base.ASFQuartException("Invalid SBOM score result", errorcode=500)
-    warnings = [sbomtool.MissingAdapter.validate_python(json.loads(w)) for w in task_result.warnings]
-    errors = [sbomtool.MissingAdapter.validate_python(json.loads(e)) for e in task_result.errors]
+    warnings = [sbom.MissingAdapter.validate_python(json.loads(w)) for w in task_result.warnings]
+    errors = [sbom.MissingAdapter.validate_python(json.loads(e)) for e in task_result.errors]
 
     block.p[
         """This is a report by the sbomtool, for debugging and
@@ -159,7 +159,7 @@ async def report(session: route.CommitterSession, project: str, version: str, fi
 
     outdated = None
     if task_result.outdated:
-        outdated = sbomtool.OutdatedAdapter.validate_python(json.loads(task_result.outdated))
+        outdated = sbom.OutdatedAdapter.validate_python(json.loads(task_result.outdated))
     block.h2["Outdated tool"]
     if outdated:
         if outdated.kind == "tool":
@@ -186,7 +186,7 @@ async def report(session: route.CommitterSession, project: str, version: str, fi
     return await template.blank("SBOM report", content=block.collect())
 
 
-def _missing_table(block: htm.Block, items: list[sbomtool.Missing]) -> None:
+def _missing_table(block: htm.Block, items: list[sbom.Missing]) -> None:
     warning_rows = [
         htpy.tr[
             htpy.td[kind.upper()],
@@ -201,7 +201,7 @@ def _missing_table(block: htm.Block, items: list[sbomtool.Missing]) -> None:
     ]
 
 
-def _missing_tally(items: list[sbomtool.Missing]) -> list[tuple[str, str, int]]:
+def _missing_tally(items: list[sbom.Missing]) -> list[tuple[str, str, int]]:
     counts: dict[tuple[str, str], int] = {}
     for item in items:
         key = (getattr(item, "kind", ""), getattr(getattr(item, "property", None), "name", ""))

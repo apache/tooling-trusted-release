@@ -30,7 +30,7 @@ import atr.config as config
 import atr.log as log
 import atr.models.results as results
 import atr.models.schema as schema
-import atr.sbomtool as sbomtool
+import atr.sbom as sbom
 import atr.storage as storage
 import atr.tasks.checks as checks
 import atr.tasks.checks.targz as targz
@@ -79,11 +79,11 @@ async def augment(args: FileArgs) -> results.Results | None:
     if not (full_path.endswith(".cdx.json") and os.path.isfile(full_path)):
         raise SBOMScoringError("SBOM file does not exist", {"file_path": args.file_path})
     # Read from the old revision
-    bundle = sbomtool.path_to_bundle(pathlib.Path(full_path))
-    patch_ops = sbomtool.bundle_to_patch(bundle)
+    bundle = sbom.path_to_bundle(pathlib.Path(full_path))
+    patch_ops = sbom.bundle_to_patch(bundle)
     new_full_path: str | None = None
     if patch_ops:
-        patch_data = sbomtool.patch_to_data(patch_ops)
+        patch_data = sbom.patch_to_data(patch_ops)
         merged = bundle.doc.patch(yyjson.Document(patch_data))
         description = "SBOM augmentation through web interface"
         async with storage.write(args.asf_uid) as write:
@@ -168,10 +168,10 @@ async def score_tool(args: FileArgs) -> results.Results | None:
     full_path = os.path.join(base_dir, args.file_path)
     if not (full_path.endswith(".cdx.json") and os.path.isfile(full_path)):
         raise SBOMScoringError("SBOM file does not exist", {"file_path": args.file_path})
-    bundle = sbomtool.path_to_bundle(pathlib.Path(full_path))
-    warnings, errors = sbomtool.ntia_2021_conformance_issues(bundle.bom)
-    outdated = sbomtool.maven_plugin_outdated_version(bundle.bom)
-    cli_errors = sbomtool.validate_cyclonedx_cli(bundle)
+    bundle = sbom.path_to_bundle(pathlib.Path(full_path))
+    warnings, errors = sbom.ntia_2021_conformance_issues(bundle.bom)
+    outdated = sbom.maven_plugin_outdated_version(bundle.bom)
+    cli_errors = sbom.validate_cyclonedx_cli(bundle)
     return results.SBOMToolScore(
         kind="sbom_tool_score",
         project_name=args.project_name,

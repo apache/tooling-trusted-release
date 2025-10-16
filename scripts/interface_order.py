@@ -138,6 +138,9 @@ def _verify_names_are_sorted(names: Sequence[str], filename: str, interface_type
             if interface_type == "class":
                 a = names[i]
                 b = names[i + 1]
+                # Too much noise from classes
+                # Dependencies between them makes ordering alphabetically difficult or impossible
+                continue
             else:
                 a = _toggle_sortability(names[i])
                 b = _toggle_sortability(names[i + 1])
