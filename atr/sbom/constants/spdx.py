@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from typing import Final
 
-SPDX_TOKEN: Final[re.Pattern[str]] = re.compile(
+TOKEN: Final[re.Pattern[str]] = re.compile(
     r"""
         (?P<WS>\s+)
       | (?P<LPAREN>\()

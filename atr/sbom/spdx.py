@@ -20,7 +20,7 @@ from __future__ import annotations
 from . import constants
 
 
-class SPDXLicenseExpressionParser:
+class LicenseExpressionParser:
     def __init__(self, items: list[tuple[str, str]], text: str) -> None:
         self.items = items
         self.text = text
@@ -86,10 +86,10 @@ class SPDXLicenseExpressionParser:
         return (self.position < len(self.items)) and (self.items[self.position][0] == kind)
 
 
-def spdx_license_expression_atoms(expr: str) -> set[str]:
+def license_expression_atoms(expr: str) -> set[str]:
     pos = 0
     tokens: list[tuple[str, str]] = []
-    for match in constants.spdx.SPDX_TOKEN.finditer(expr):
+    for match in constants.spdx.TOKEN.finditer(expr):
         if match.start() != pos:
             raise ValueError(expr)
         pos = match.end()
@@ -99,4 +99,4 @@ def spdx_license_expression_atoms(expr: str) -> set[str]:
     if pos != len(expr):
         raise ValueError(expr)
 
-    return SPDXLicenseExpressionParser(tokens, expr).parse()
+    return LicenseExpressionParser(tokens, expr).parse()

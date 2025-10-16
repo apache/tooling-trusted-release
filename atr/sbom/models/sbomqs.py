@@ -20,9 +20,9 @@ from __future__ import annotations
 from .base import Lax
 
 
-class SBOMQSSummary(Lax):
+class Summary(Lax):
     total_score: float
 
 
-class SBOMQSReport(Lax):
-    summary: SBOMQSSummary
+class Report(Lax):
+    summary: Summary

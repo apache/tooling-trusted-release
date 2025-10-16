@@ -26,7 +26,7 @@ import yyjson
 from . import models
 
 
-def sbomqs_total_score(value: pathlib.Path | str | yyjson.Document) -> float:
+def total_score(value: pathlib.Path | str | yyjson.Document) -> float:
     args = ["sbomqs", "compliance", "--ntia", "--json"]
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json") as tf:
         match value:
@@ -47,5 +47,5 @@ def sbomqs_total_score(value: pathlib.Path | str | yyjson.Document) -> float:
     if proc.returncode != 0:
         err = proc.stderr.strip() or "sbomqs failed"
         raise RuntimeError(err)
-    report = models.sbomqs.SBOMQSReport.model_validate_json(proc.stdout)
+    report = models.sbomqs.Report.model_validate_json(proc.stdout)
     return report.summary.total_score

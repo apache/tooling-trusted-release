@@ -25,7 +25,7 @@ import yyjson
 from . import constants, models
 
 
-def maven_cache_read() -> dict[str, Any]:
+def cache_read() -> dict[str, Any]:
     try:
         with open(constants.maven.CACHE_PATH) as file:
             return yyjson.load(file)
@@ -33,7 +33,7 @@ def maven_cache_read() -> dict[str, Any]:
         return {}
 
 
-def maven_cache_write(cache: dict[str, Any]) -> None:
+def cache_write(cache: dict[str, Any]) -> None:
     try:
         with open(constants.maven.CACHE_PATH, "w") as file:
             yyjson.dump(cache, file)
@@ -41,7 +41,7 @@ def maven_cache_write(cache: dict[str, Any]) -> None:
         pass
 
 
-def maven_plugin_outdated_version(bom_value: models.bom.Bom) -> models.maven.Outdated | None:
+def plugin_outdated_version(bom_value: models.bom.Bom) -> models.maven.Outdated | None:
     if bom_value.metadata is None:
         return models.maven.OutdatedMissingMetadata()
     timestamp = bom_value.metadata.timestamp
@@ -66,7 +66,7 @@ def maven_plugin_outdated_version(bom_value: models.bom.Bom) -> models.maven.Out
             continue
         if tool.version is None:
             return models.maven.OutdatedMissingVersion(name=name_or_description)
-        available_version = maven_plugin_outdated_version_core(timestamp, tool.version)
+        available_version = plugin_outdated_version_core(timestamp, tool.version)
         if available_version is not None:
             return models.maven.OutdatedTool(
                 name=name_or_description,
@@ -76,14 +76,14 @@ def maven_plugin_outdated_version(bom_value: models.bom.Bom) -> models.maven.Out
     return None
 
 
-def maven_plugin_outdated_version_core(isotime: str, version: str) -> str | None:
-    expected_version = maven_version_as_of(isotime)
+def plugin_outdated_version_core(isotime: str, version: str) -> str | None:
+    expected_version = version_as_of(isotime)
     if expected_version is None:
         return None
     if version == expected_version:
         return None
-    expected_version_comparable = maven_version_parse(expected_version)
-    version_comparable = maven_version_parse(version)
+    expected_version_comparable = version_parse(expected_version)
+    version_comparable = version_parse(version)
     # If the version used is less than the version available
     if version_comparable < expected_version_comparable:
         # Then note the version available
@@ -92,7 +92,7 @@ def maven_plugin_outdated_version_core(isotime: str, version: str) -> str | None
     return None
 
 
-def maven_version_as_of(isotime: str) -> str | None:
+def version_as_of(isotime: str) -> str | None:
     # Given these mappings:
     # {
     #     t3: v3
@@ -103,12 +103,12 @@ def maven_version_as_of(isotime: str) -> str | None:
     # If the input is between t2 and t1, then the output is v2
     # If the input is between t1 and t2, then the output is v1
     # If the input is before t1, then the output is None
-    for date, version in sorted(constants.maven.MAVEN_PLUGIN_VERSIONS.items(), reverse=True):
+    for date, version in sorted(constants.maven.PLUGIN_VERSIONS.items(), reverse=True):
         if isotime >= date:
             return version
     return None
 
 
-def maven_version_parse(version: str) -> tuple[int, int, int]:
+def version_parse(version: str) -> tuple[int, int, int]:
     parts = version.split(".")
     return int(parts[0]), int(parts[1]), int(parts[2])

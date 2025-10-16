@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from . import models
 
 
-def validate_cyclonedx_cli(bundle_value: models.bundle.Bundle) -> list[str] | None:
+def validate_cli(bundle_value: models.bundle.Bundle) -> list[str] | None:
     args = [
         "cyclonedx",
         "validate",
@@ -53,7 +53,7 @@ def validate_cyclonedx_cli(bundle_value: models.bundle.Bundle) -> list[str] | No
     return None
 
 
-def validate_cyclonedx_py(
+def validate_py(
     bundle_value: models.bundle.Bundle,
 ) -> Iterable[cyclonedx.validation.json.JsonValidationError] | None:
     json_sv = get_pointer(bundle_value.doc, "/specVersion")

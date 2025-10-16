@@ -23,11 +23,11 @@ import sys
 import yyjson
 
 from . import models
-from .conformance import ntia_2021_conformance_issues
-from .cyclonedx import validate_cyclonedx_cli, validate_cyclonedx_py
-from .licenses import check_licenses
-from .maven import maven_plugin_outdated_version
-from .sbomqs import sbomqs_total_score
+from .conformance import ntia_2021_issues
+from .cyclonedx import validate_cli, validate_py
+from .licenses import check
+from .maven import plugin_outdated_version
+from .sbomqs import total_score
 from .utilities import bundle_to_patch, patch_to_data, path_to_bundle
 
 
@@ -44,13 +44,13 @@ def main() -> None:
             else:
                 print(bundle.doc.dumps())
         case "missing":
-            _warnings, errors = ntia_2021_conformance_issues(bundle.bom)
+            _warnings, errors = ntia_2021_issues(bundle.bom)
             for error in errors:
                 print(error)
             # for warning in warnings:
             #     print(warning)
         case "outdated":
-            outdated = maven_plugin_outdated_version(bundle.bom)
+            outdated = plugin_outdated_version(bundle.bom)
             if outdated:
                 print(outdated)
             else:
@@ -67,11 +67,11 @@ def main() -> None:
             if patch_ops:
                 patch_data = patch_to_data(patch_ops)
                 merged = bundle.doc.patch(yyjson.Document(patch_data))
-                print(sbomqs_total_score(bundle.doc), "->", sbomqs_total_score(merged))
+                print(total_score(bundle.doc), "->", total_score(merged))
             else:
-                print(sbomqs_total_score(bundle.doc))
+                print(total_score(bundle.doc))
         case "validate-cli":
-            errors = validate_cyclonedx_cli(bundle)
+            errors = validate_cli(bundle)
             if not errors:
                 print("valid")
             else:
@@ -81,7 +81,7 @@ def main() -> None:
                         print("...")
                         break
         case "validate-py":
-            errors = validate_cyclonedx_py(bundle)
+            errors = validate_py(bundle)
             if not errors:
                 print("valid")
             else:
@@ -91,7 +91,7 @@ def main() -> None:
                         print("...")
                         break
         case "where":
-            _warnings, errors = ntia_2021_conformance_issues(bundle.bom)
+            _warnings, errors = ntia_2021_issues(bundle.bom)
             for error in errors:
                 match error:
                     case models.conformance.MissingProperty():
@@ -107,7 +107,7 @@ def main() -> None:
                             print(primary_component.model_dump_json(indent=2))
                             print()
         case "license":
-            warnings, errors = check_licenses(bundle.bom)
+            warnings, errors = check(bundle.bom)
             if warnings:
                 print("WARNINGS (Category B):")
                 for warning in warnings:

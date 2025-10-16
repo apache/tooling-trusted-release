@@ -22,16 +22,16 @@ import enum
 from .base import Strict
 
 
-class LicenseCategory(enum.Enum):
+class Category(enum.Enum):
     A = enum.auto()
     B = enum.auto()
     X = enum.auto()
 
 
-class LicenseIssue(Strict):
+class Issue(Strict):
     component_name: str
     component_version: str | None
     license_expression: str
-    category: LicenseCategory
+    category: Category
     any_unknown: bool = False
     scope: str | None = None

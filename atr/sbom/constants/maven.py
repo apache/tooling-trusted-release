@@ -22,7 +22,7 @@ from typing import Final
 
 CACHE_PATH: Final[pathlib.Path] = pathlib.Path("/tmp/sbomtool-cache.json")
 
-MAVEN_PLUGIN_VERSIONS: Final[dict[str, str]] = {
+PLUGIN_VERSIONS: Final[dict[str, str]] = {
     "2024-11-28T21:29:12Z": "2.9.1",
     "2024-10-08T04:31:11Z": "2.9.0",
     "2024-09-25T20:08:34Z": "2.8.2",

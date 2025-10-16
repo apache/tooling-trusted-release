@@ -18,14 +18,14 @@
 from __future__ import annotations
 
 from . import constants, models
-from .spdx import spdx_license_expression_atoms
+from .spdx import license_expression_atoms
 
 
-def check_licenses(
+def check(
     bom_value: models.bom.Bom,
-) -> tuple[list[models.licenses.LicenseIssue], list[models.licenses.LicenseIssue]]:
-    warnings: list[models.licenses.LicenseIssue] = []
-    errors: list[models.licenses.LicenseIssue] = []
+) -> tuple[list[models.licenses.Issue], list[models.licenses.Issue]]:
+    warnings: list[models.licenses.Issue] = []
+    errors: list[models.licenses.Issue] = []
 
     components = bom_value.components or []
     if bom_value.metadata and bom_value.metadata.component:
@@ -53,7 +53,7 @@ def check_licenses(
             parse_failed = False
             if license_choice.expression:
                 try:
-                    atoms = spdx_license_expression_atoms(license_expr)
+                    atoms = license_expression_atoms(license_expr)
                 except ValueError:
                     parse_failed = True
                     atoms = {license_expr}
@@ -76,22 +76,22 @@ def check_licenses(
                 any_unknown = True
             if got_error:
                 errors.append(
-                    models.licenses.LicenseIssue(
+                    models.licenses.Issue(
                         component_name=name,
                         component_version=version,
                         license_expression=license_expr,
-                        category=models.licenses.LicenseCategory.X,
+                        category=models.licenses.Category.X,
                         any_unknown=any_unknown,
                         scope=scope,
                     )
                 )
             elif got_warning:
                 warnings.append(
-                    models.licenses.LicenseIssue(
+                    models.licenses.Issue(
                         component_name=name,
                         component_version=version,
                         license_expression=license_expr,
-                        category=models.licenses.LicenseCategory.B,
+                        category=models.licenses.Category.B,
                         any_unknown=False,
                         scope=scope,
                     )

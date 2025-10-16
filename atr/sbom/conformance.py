@@ -25,7 +25,7 @@ import urllib.request
 import yyjson
 
 from . import constants, models
-from .maven import maven_cache_read, maven_cache_write
+from .maven import cache_read, cache_write
 from .utilities import get_pointer
 
 
@@ -112,7 +112,7 @@ def assemble_component_supplier(doc: yyjson.Document, patch_ops: models.patch.Pa
                 url += "/"
             return make_supplier_op(url, url)
 
-        cache = maven_cache_read()
+        cache = cache_read()
 
         if key in cache:
             cached = cache[key]
@@ -128,7 +128,7 @@ def assemble_component_supplier(doc: yyjson.Document, patch_ops: models.patch.Pa
                 data = yyjson.Document(response.read())
         except urllib.error.HTTPError:
             cache[key] = None
-            maven_cache_write(cache)
+            cache_write(cache)
             return
         links = get_pointer(data, "/links") or []
         homepage = None
@@ -141,7 +141,7 @@ def assemble_component_supplier(doc: yyjson.Document, patch_ops: models.patch.Pa
             cache[key] = homepage
         else:
             cache[key] = None
-        maven_cache_write(cache)
+        cache_write(cache)
         return
 
 
@@ -226,7 +226,7 @@ def assemble_metadata_timestamp(doc: yyjson.Document, patch_ops: models.patch.Pa
         )
 
 
-def ntia_2021_conformance_issues(
+def ntia_2021_issues(
     bom_value: models.bom.Bom,
 ) -> tuple[list[models.conformance.Missing], list[models.conformance.Missing]]:
     # 1. Supplier
@@ -341,7 +341,7 @@ def ntia_2021_conformance_issues(
     return warnings, errors
 
 
-def ntia_2021_conformance_patch(doc: yyjson.Document, errors: list[models.conformance.Missing]) -> models.patch.Patch:
+def ntia_2021_patch(doc: yyjson.Document, errors: list[models.conformance.Missing]) -> models.patch.Patch:
     patch_ops: models.patch.Patch = []
     # TODO: Add tool metadata
     for error in errors:

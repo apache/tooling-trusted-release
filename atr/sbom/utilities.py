@@ -28,10 +28,10 @@ from . import models
 
 
 def bundle_to_patch(bundle_value: models.bundle.Bundle) -> models.patch.Patch:
-    from .conformance import ntia_2021_conformance_issues, ntia_2021_conformance_patch
+    from .conformance import ntia_2021_issues, ntia_2021_patch
 
-    _warnings, errors = ntia_2021_conformance_issues(bundle_value.bom)
-    patch_ops = ntia_2021_conformance_patch(bundle_value.doc, errors)
+    _warnings, errors = ntia_2021_issues(bundle_value.bom)
+    patch_ops = ntia_2021_patch(bundle_value.doc, errors)
     return patch_ops
 
 
