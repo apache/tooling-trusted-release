@@ -143,6 +143,35 @@ class CommitteeParticipant(FoundationCommitter):
             # Wait 100ms before checking again
             await asyncio.sleep(0.1)
 
+    async def osv_scan_cyclonedx(
+        self,
+        project_name: str,
+        version_name: str,
+        revision_number: str,
+        rel_path: pathlib.Path,
+    ) -> sql.Task:
+        sbom_task = sql.Task(
+            task_type=sql.TaskType.SBOM_OSV_SCAN,
+            task_args=sbom.FileArgs(
+                project_name=project_name,
+                version_name=version_name,
+                revision_number=revision_number,
+                file_path=str(rel_path),
+                asf_uid=util.unwrap(self.__asf_uid),
+            ).model_dump(),
+            asf_uid=util.unwrap(self.__asf_uid),
+            added=datetime.datetime.now(datetime.UTC),
+            status=sql.TaskStatus.QUEUED,
+            project_name=project_name,
+            version_name=version_name,
+            revision_number=revision_number,
+            primary_rel_path=str(rel_path),
+        )
+        self.__data.add(sbom_task)
+        await self.__data.commit()
+        await self.__data.refresh(sbom_task)
+        return sbom_task
+
 
 class CommitteeMember(CommitteeParticipant):
     def __init__(
