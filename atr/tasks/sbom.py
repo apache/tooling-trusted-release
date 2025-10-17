@@ -54,6 +54,12 @@ class SBOMGenerationError(Exception):
         self.details = details or {}
 
 
+class SBOMScanningError(Exception):
+    """Custom exception for SBOM scanning failures."""
+
+    pass
+
+
 class SBOMScoringError(Exception):
     """Raised on a failure to score an SBOM."""
 
@@ -123,6 +129,28 @@ async def generate_cyclonedx(args: GenerateCycloneDX) -> results.Results | None:
     except (archives.ExtractionError, SBOMGenerationError) as e:
         log.error(f"SBOM generation failed for {args.artifact_path}: {e}")
         raise
+
+
+@checks.with_model(FileArgs)
+async def osv_scan(args: FileArgs) -> results.Results | None:
+    base_dir = util.get_unfinished_dir() / args.project_name / args.version_name / args.revision_number
+    if not os.path.isdir(base_dir):
+        raise SBOMScanningError("Revision directory does not exist", {"base_dir": str(base_dir)})
+    full_path = os.path.join(base_dir, args.file_path)
+    if not (full_path.endswith(".cdx.json") and os.path.isfile(full_path)):
+        raise SBOMScanningError("SBOM file does not exist", {"file_path": args.file_path})
+    bundle = sbom.utilities.path_to_bundle(pathlib.Path(full_path))
+    vulnerabilities, ignored_count = await sbom.osv.scan_bundle(bundle)
+    components = [results.OSVComponent(purl=v.purl, vulnerabilities=v.vulnerabilities) for v in vulnerabilities]
+    return results.SBOMOSVScan(
+        kind="sbom_osv_scan",
+        project_name=args.project_name,
+        version_name=args.version_name,
+        revision_number=args.revision_number,
+        file_path=args.file_path,
+        components=components,
+        ignored_count=ignored_count,
+    )
 
 
 @checks.with_model(FileArgs)

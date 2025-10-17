@@ -175,6 +175,8 @@ def resolve(task_type: sql.TaskType) -> Callable[..., Awaitable[results.Results 
             return sbom.augment
         case sql.TaskType.SBOM_GENERATE_CYCLONEDX:
             return sbom.generate_cyclonedx
+        case sql.TaskType.SBOM_OSV_SCAN:
+            return sbom.osv_scan
         case sql.TaskType.SBOM_QS_SCORE:
             return sbom.score_qs
         case sql.TaskType.SBOM_TOOL_SCORE:

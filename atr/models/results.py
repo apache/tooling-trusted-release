@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 import pydantic
 
@@ -44,6 +44,21 @@ class SBOMGenerateCycloneDX(schema.Strict):
 
     kind: Literal["sbom_generate_cyclonedx"] = schema.Field(alias="kind")
     msg: str = schema.description("The message from the SBOM generation")
+
+
+class OSVComponent(schema.Strict):
+    purl: str = schema.description("Package URL")
+    vulnerabilities: list[dict[str, Any]] = schema.description("Vulnerabilities found")
+
+
+class SBOMOSVScan(schema.Strict):
+    kind: Literal["sbom_osv_scan"] = schema.Field(alias="kind")
+    project_name: str = schema.description("Project name")
+    version_name: str = schema.description("Version name")
+    revision_number: str = schema.description("Revision number")
+    file_path: str = schema.description("Relative path to the scanned SBOM file")
+    components: list[OSVComponent] = schema.description("Components with vulnerabilities")
+    ignored_count: int = schema.description("Number of components ignored")
 
 
 class SbomQsScore(schema.Strict):
@@ -132,6 +147,7 @@ Results = Annotated[
     | MessageSend
     | SBOMAugment
     | SBOMGenerateCycloneDX
+    | SBOMOSVScan
     | SBOMQsScore
     | SBOMToolScore
     | SvnImportFiles

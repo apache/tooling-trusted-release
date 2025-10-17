@@ -17,7 +17,7 @@
 
 from __future__ import annotations
 
-from . import cli, conformance, constants, cyclonedx, licenses, maven, models, sbomqs, spdx, utilities
+from . import cli, conformance, constants, cyclonedx, licenses, maven, models, osv, sbomqs, spdx, utilities
 
 __all__ = [
     "cli",
@@ -27,6 +27,7 @@ __all__ = [
     "licenses",
     "maven",
     "models",
+    "osv",
     "sbomqs",
     "spdx",
     "utilities",

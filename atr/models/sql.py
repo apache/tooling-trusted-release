@@ -183,6 +183,7 @@ class TaskType(str, enum.Enum):
     RAT_CHECK = "rat_check"
     SBOM_AUGMENT = "sbom_augment"
     SBOM_GENERATE_CYCLONEDX = "sbom_generate_cyclonedx"
+    SBOM_OSV_SCAN = "sbom_osv_scan"
     SBOM_QS_SCORE = "sbom_qs_score"
     SBOM_TOOL_SCORE = "sbom_tool_score"
     SIGNATURE_CHECK = "signature_check"
