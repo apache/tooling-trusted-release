@@ -23,7 +23,7 @@ import sys
 
 import yyjson
 
-from . import models
+from . import models, osv
 from .conformance import ntia_2021_issues
 from .cyclonedx import validate_cli, validate_py
 from .licenses import check
@@ -69,6 +69,19 @@ def command_missing(bundle: models.bundle.Bundle) -> None:
     _warnings, errors = ntia_2021_issues(bundle.bom)
     for error in errors:
         print(error)
+
+
+def command_osv(bundle: models.bundle.Bundle) -> None:
+    results, ignored_count = asyncio.run(osv.scan_bundle(bundle))
+    if ignored_count > 0:
+        print(f"Warning: {ignored_count} components ignored (missing purl or version)")
+    for component_result in results:
+        print(component_result.purl)
+        for vuln in component_result.vulnerabilities:
+            vuln_id = vuln.get("id", "unknown")
+            modified = vuln.get("modified", "")
+            summary = vuln.get("summary", "(no summary)")
+            print(f"  {vuln_id} {modified} {summary}")
 
 
 def command_outdated(bundle: models.bundle.Bundle) -> None:
@@ -140,7 +153,7 @@ def command_where(bundle: models.bundle.Bundle) -> None:
                     print()
 
 
-def main() -> None:
+def main() -> None:  # noqa: C901
     path = pathlib.Path(sys.argv[2])
     bundle = path_to_bundle(path)
     match sys.argv[1]:
@@ -150,6 +163,8 @@ def main() -> None:
             command_merge(bundle)
         case "missing":
             command_missing(bundle)
+        case "osv":
+            command_osv(bundle)
         case "outdated":
             command_outdated(bundle)
         case "patch":

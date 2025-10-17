@@ -17,16 +17,16 @@
 
 from __future__ import annotations
 
-from . import base, bom, bundle, conformance, licenses, maven, osv, patch, sbomqs
+from typing import Any
 
-__all__ = [
-    "base",
-    "bom",
-    "bundle",
-    "conformance",
-    "licenses",
-    "maven",
-    "osv",
-    "patch",
-    "sbomqs",
-]
+from .base import Lax
+
+
+class QueryResult(Lax):
+    vulns: list[dict[str, Any]] | None = None
+    next_page_token: str | None = None
+
+
+class ComponentVulnerabilities(Lax):
+    purl: str
+    vulnerabilities: list[dict[str, Any]]
