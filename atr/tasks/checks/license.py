@@ -117,7 +117,7 @@ class MemberSkippedResult(schema.Strict):
     reason: str
 
 
-Result = ArtifactResult | MemberResult | MemberSkippedResult
+type Result = ArtifactResult | MemberResult | MemberSkippedResult
 
 # Tasks
 

@@ -191,7 +191,7 @@ class KeysUploadResult(schema.Strict):
     key: sql.PublicSigningKey
 
 
-KeysUploadOutcome = Annotated[
+type KeysUploadOutcome = Annotated[
     KeysUploadResult | KeysUploadException,
     schema.Field(discriminator="status"),
 ]
@@ -520,7 +520,7 @@ class VoteTabulateResults(schema.Strict):
 
 # This is for *Results classes only
 # We do NOT put *Args classes here
-Results = Annotated[
+type Results = Annotated[
     ChecksListResults
     | ChecksOngoingResults
     | CommitteeGetResults

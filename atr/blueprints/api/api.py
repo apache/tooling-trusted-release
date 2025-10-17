@@ -50,7 +50,7 @@ import atr.util as util
 
 # We implicitly have /api/openapi.json
 
-DictResponse = tuple[dict[str, Any], int]
+type DictResponse = tuple[dict[str, Any], int]
 
 
 @api.BLUEPRINT.route("/checks/list/<project>/<version>")

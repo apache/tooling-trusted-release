@@ -44,7 +44,7 @@ class OutdatedMissingVersion(Strict):
     name: str
 
 
-Outdated = Annotated[
+type Outdated = Annotated[
     OutdatedTool | OutdatedMissingMetadata | OutdatedMissingTimestamp | OutdatedMissingVersion,
     pydantic.Field(discriminator="kind"),
 ]

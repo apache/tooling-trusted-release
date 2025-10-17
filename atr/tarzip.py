@@ -91,7 +91,7 @@ class ZipMember(AbstractArchiveMember[zipfile.ZipInfo]):
         return False
 
 
-Member = TarMember | ZipMember
+type Member = TarMember | ZipMember
 
 
 class ArchiveContext[ArchiveT: (tarfile.TarFile, zipfile.ZipFile)]:
@@ -129,9 +129,9 @@ class ArchiveContext[ArchiveT: (tarfile.TarFile, zipfile.ZipFile)]:
         return self._archive_obj
 
 
-TarArchive = ArchiveContext[tarfile.TarFile]
-ZipArchive = ArchiveContext[zipfile.ZipFile]
-Archive = TarArchive | ZipArchive
+type TarArchive = ArchiveContext[tarfile.TarFile]
+type ZipArchive = ArchiveContext[zipfile.ZipFile]
+type Archive = TarArchive | ZipArchive
 
 
 @contextlib.contextmanager

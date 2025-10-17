@@ -70,7 +70,7 @@ class MissingComponentProperty(Strict):
         return value if isinstance(value, ComponentProperty) else ComponentProperty(value)
 
 
-Missing = Annotated[
+type Missing = Annotated[
     MissingProperty | MissingComponentProperty,
     pydantic.Field(discriminator="kind"),
 ]

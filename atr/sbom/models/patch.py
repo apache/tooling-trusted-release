@@ -59,5 +59,5 @@ class TestOp(Strict):
     value: Any
 
 
-PatchOp = AddOp | RemoveOp | ReplaceOp | MoveOp | CopyOp | TestOp
-Patch = list[PatchOp]
+type PatchOp = AddOp | RemoveOp | ReplaceOp | MoveOp | CopyOp | TestOp
+type Patch = list[PatchOp]

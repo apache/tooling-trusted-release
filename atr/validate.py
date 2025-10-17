@@ -38,15 +38,15 @@ class AnnotatedDivergence(NamedTuple):
     divergence: Divergence
 
 
-Divergences = Generator[Divergence]
-AnnotatedDivergences = Generator[AnnotatedDivergence]
-AsyncAnnotatedDivergences = AsyncGenerator[AnnotatedDivergence]
-CommitteeDivergences = Callable[[sql.Committee], Divergences]
-CommitteeAnnotatedDivergences = Callable[[sql.Committee], AnnotatedDivergences]
-ProjectDivergences = Callable[[sql.Project], Divergences]
-ProjectAnnotatedDivergences = Callable[[sql.Project], AnnotatedDivergences]
-ReleaseDivergences = Callable[[sql.Release], Divergences]
-ReleaseAnnotatedDivergences = Callable[[sql.Release], AnnotatedDivergences]
+type Divergences = Generator[Divergence]
+type AnnotatedDivergences = Generator[AnnotatedDivergence]
+type AsyncAnnotatedDivergences = AsyncGenerator[AnnotatedDivergence]
+type CommitteeDivergences = Callable[[sql.Committee], Divergences]
+type CommitteeAnnotatedDivergences = Callable[[sql.Committee], AnnotatedDivergences]
+type ProjectDivergences = Callable[[sql.Project], Divergences]
+type ProjectAnnotatedDivergences = Callable[[sql.Project], AnnotatedDivergences]
+type ReleaseDivergences = Callable[[sql.Release], Divergences]
+type ReleaseAnnotatedDivergences = Callable[[sql.Release], AnnotatedDivergences]
 
 T = TypeVar("T")
 

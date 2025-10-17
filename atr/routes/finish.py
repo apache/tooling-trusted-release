@@ -41,7 +41,7 @@ import atr.storage as storage
 import atr.template as template
 import atr.util as util
 
-Respond = Callable[[int, str], Awaitable[tuple[quart_response.Response, int] | response.Response]]
+type Respond = Callable[[int, str], Awaitable[tuple[quart_response.Response, int] | response.Response]]
 
 
 class DeleteEmptyDirectoryForm(forms.Typed):
