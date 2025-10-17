@@ -80,7 +80,7 @@ async def augment(args: FileArgs) -> results.Results | None:
         raise SBOMScoringError("SBOM file does not exist", {"file_path": args.file_path})
     # Read from the old revision
     bundle = sbom.utilities.path_to_bundle(pathlib.Path(full_path))
-    patch_ops = sbom.utilities.bundle_to_patch(bundle)
+    patch_ops = await sbom.utilities.bundle_to_patch(bundle)
     new_full_path: str | None = None
     if patch_ops:
         patch_data = sbom.utilities.patch_to_data(patch_ops)

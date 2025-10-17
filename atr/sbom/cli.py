@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import pathlib
 import sys
 
@@ -55,7 +56,7 @@ def command_license(bundle: models.bundle.Bundle) -> None:
 
 
 def command_merge(bundle: models.bundle.Bundle) -> None:
-    patch_ops = bundle_to_patch(bundle)
+    patch_ops = asyncio.run(bundle_to_patch(bundle))
     if patch_ops:
         patch_data = patch_to_data(patch_ops)
         merged = bundle.doc.patch(yyjson.Document(patch_data))
@@ -79,7 +80,7 @@ def command_outdated(bundle: models.bundle.Bundle) -> None:
 
 
 def command_patch(bundle: models.bundle.Bundle) -> None:
-    patch_ops = bundle_to_patch(bundle)
+    patch_ops = asyncio.run(bundle_to_patch(bundle))
     if patch_ops:
         patch_data = patch_to_data(patch_ops)
         print(yyjson.Document(patch_data).dumps())
@@ -88,7 +89,7 @@ def command_patch(bundle: models.bundle.Bundle) -> None:
 
 
 def command_scores(bundle: models.bundle.Bundle) -> None:
-    patch_ops = bundle_to_patch(bundle)
+    patch_ops = asyncio.run(bundle_to_patch(bundle))
     if patch_ops:
         patch_data = patch_to_data(patch_ops)
         merged = bundle.doc.patch(yyjson.Document(patch_data))

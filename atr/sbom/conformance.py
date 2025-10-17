@@ -18,10 +18,9 @@
 from __future__ import annotations
 
 import datetime
-import urllib.error
 import urllib.parse
-import urllib.request
 
+import aiohttp
 import yyjson
 
 from . import constants, models
@@ -39,7 +38,12 @@ def assemble_component_name(doc: yyjson.Document, patch_ops: models.patch.Patch,
     pass
 
 
-def assemble_component_supplier(doc: yyjson.Document, patch_ops: models.patch.Patch, index: int) -> None:
+async def assemble_component_supplier(
+    session: aiohttp.ClientSession,
+    doc: yyjson.Document,
+    patch_ops: models.patch.Patch,
+    index: int,
+) -> None:
     # We need to detect whether this is an ASF component
     # If it is, we can trivially fix it
     # If not, this is much more difficult
@@ -124,9 +128,10 @@ def assemble_component_supplier(doc: yyjson.Document, patch_ops: models.patch.Pa
 
         url = f"https://api.deps.dev/v3/systems/MAVEN/packages/{package}/versions/{version}"
         try:
-            with urllib.request.urlopen(url) as response:
-                data = yyjson.Document(response.read())
-        except urllib.error.HTTPError:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                data = yyjson.Document(await response.read())
+        except aiohttp.ClientResponseError:
             cache[key] = None
             cache_write(cache)
             return
@@ -341,7 +346,11 @@ def ntia_2021_issues(
     return warnings, errors
 
 
-def ntia_2021_patch(doc: yyjson.Document, errors: list[models.conformance.Missing]) -> models.patch.Patch:
+async def ntia_2021_patch(
+    session: aiohttp.ClientSession,
+    doc: yyjson.Document,
+    errors: list[models.conformance.Missing],
+) -> models.patch.Patch:
     patch_ops: models.patch.Patch = []
     # TODO: Add tool metadata
     for error in errors:
@@ -363,7 +372,7 @@ def ntia_2021_patch(doc: yyjson.Document, errors: list[models.conformance.Missin
             case models.conformance.MissingComponentProperty(property=property_value, index=index):
                 match property_value:
                     case models.conformance.ComponentProperty.SUPPLIER if index is not None:
-                        assemble_component_supplier(doc, patch_ops, index)
+                        await assemble_component_supplier(session, doc, patch_ops, index)
                     case models.conformance.ComponentProperty.NAME if index is not None:
                         assemble_component_name(doc, patch_ops, index)
                     case models.conformance.ComponentProperty.VERSION if index is not None:
