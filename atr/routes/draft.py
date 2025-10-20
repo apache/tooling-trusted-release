@@ -190,7 +190,10 @@ async def hashgen(
     form = await quart.request.form
     hash_type = form.get("hash_type")
     if hash_type not in {"sha256", "sha512"}:
-        raise base.ASFQuartException("Invalid hash type", errorcode=400)
+        raise base.ASFQuartException(
+            f"Invalid hash type '{hash_type}'. Supported types: sha256, sha512", 
+            errorcode=400
+        )
 
     rel_path = pathlib.Path(file_path)
 
@@ -224,7 +227,10 @@ async def sbomgen(
 
     # Check that the file is a .tar.gz archive before creating a revision
     if not (file_path.endswith(".tar.gz") or file_path.endswith(".tgz")):
-        raise base.ASFQuartException("SBOM generation is only supported for .tar.gz files", errorcode=400)
+        raise base.ASFQuartException(
+            f"SBOM generation requires .tar.gz or .tgz files. Received: {file_path}",
+            errorcode=400
+        )
 
     try:
         description = "SBOM generation through web interface"
