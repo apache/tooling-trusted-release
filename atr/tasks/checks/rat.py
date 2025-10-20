@@ -246,6 +246,10 @@ def _check_core_logic_execute_rat(
         xml_output_path,
         "--counter-max",
         "UNAPPROVED:-1",
+        "--counter-min",
+        "LICENSE_CATEGORIES:0",
+        "LICENSE_NAMES:0",
+        "STANDARDS:0",
         "--",
         ".",
     ]
