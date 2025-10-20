@@ -24,6 +24,7 @@ import decouple
 
 _MB: Final = 1024 * 1024
 _GB: Final = 1024 * _MB
+_RAT_VERSION: Final = "0.17"
 
 
 def _config_secrets(key: str, state_dir: str, default: str | None = None, cast: type = str) -> str | None:
@@ -73,7 +74,7 @@ class AppConfig:
     STORAGE_AUDIT_LOG_FILE = os.path.join(STATE_DIR, "storage-audit.log")
 
     # Apache RAT configuration
-    APACHE_RAT_JAR_PATH = decouple.config("APACHE_RAT_JAR_PATH", default="/opt/tools/apache-rat-0.16.1.jar")
+    APACHE_RAT_JAR_PATH = decouple.config("APACHE_RAT_JAR_PATH", default=f"/opt/tools/apache-rat-{_RAT_VERSION}.jar")
     # Maximum content length for requests
     MAX_CONTENT_LENGTH: int = decouple.config("MAX_CONTENT_LENGTH", default=512 * _MB, cast=int)
     # Maximum size limit for archive extraction

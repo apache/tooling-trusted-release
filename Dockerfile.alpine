@@ -70,12 +70,13 @@ COPY --from=builder /opt/atr/start-atr.sh .
 RUN chmod +x ./start-atr.sh
 
 # install additional tools
-ENV RAT_VERSION=0.16.1
+ENV RAT_VERSION=0.17
 
 RUN mkdir -p /opt/tools
 RUN mkdir -p /tmp/apache-rat
 WORKDIR /tmp/apache-rat
 # TODO: Check hash
+# TODO: This URL is not permanent, so we need to vendor this to pin it
 RUN curl -L https://dlcdn.apache.org/creadur/apache-rat-${RAT_VERSION}/apache-rat-${RAT_VERSION}-bin.tar.gz -o apache-rat.tar.gz
 RUN tar -xzf apache-rat.tar.gz
 RUN find apache-rat-${RAT_VERSION} -type f -name "*.jar" -exec cp {} . \;

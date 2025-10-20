@@ -232,18 +232,20 @@ def _check_core_logic_execute_rat(
     log.info(f"XML output will be written to: {xml_output_path}")
 
     # Run Apache RAT on the extracted directory
-    # Use -x flag for XML output and -o to specify the output file
     # TODO: From RAT 0.17, --exclude will become --input-exclude
     # TODO: Check whether --exclude NAME works on inner files
+    # (Note that we presently use _rat_apply_exclusions to apply exclusions instead)
     command = [
         "java",
         *_JAVA_MEMORY_ARGS,
         "-jar",
         rat_jar_path,
-        "-x",
-        "-o",
+        "--output-style",
+        "xml",
+        "--output-file",
         xml_output_path,
-        "-d",
+        "--counter-max",
+        "UNAPPROVED:-1",
         "--",
         ".",
     ]
@@ -446,24 +448,28 @@ def _check_core_logic_parse_output_core(xml_file: str, base_dir: str) -> dict[st
             name = name[len(base_dir) :].lstrip("/")
 
         # Get license information
-        license_approval = resource.find("license-approval")
-        license_family = resource.find("license-family")
+        license_elem = resource.find("license")
 
-        is_approved = True
-        if license_approval is not None:
-            if license_approval.get("name") == "false":
-                is_approved = False
-        license_name = license_family.get("name") if (license_family is not None) else "Unknown"
-
-        # Update counters and lists
-        if is_approved:
-            approved_licenses += 1
-        elif license_name == "Unknown license":
-            unknown_licenses += 1
-            unknown_license_files.append({"name": name, "license": license_name})
+        if license_elem is None:
+            resource_type = resource.get("type", "")
+            if resource_type in {"NOTICE", "BINARY", "IGNORED", "ARCHIVE"}:
+                approved_licenses += 1
+            else:
+                unknown_licenses += 1
+                unknown_license_files.append({"name": name, "license": "Unknown license"})
         else:
-            unapproved_licenses += 1
-            unapproved_files.append({"name": name, "license": license_name})
+            approval = license_elem.get("approval", "false")
+            is_approved = approval == "true"
+            license_name = license_elem.get("name", "Unknown")
+
+            if is_approved:
+                approved_licenses += 1
+            elif license_name == "Unknown license":
+                unknown_licenses += 1
+                unknown_license_files.append({"name": name, "license": license_name})
+            else:
+                unapproved_licenses += 1
+                unapproved_files.append({"name": name, "license": license_name})
 
     # Calculate overall validity
     valid = (unapproved_licenses == 0) and (unknown_licenses == 0)
