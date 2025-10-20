@@ -210,15 +210,16 @@ class Committer:
 class Cache:
     def __init__(self, cache_for_at_most_seconds: int = 600):
         self.cache_for_at_most_seconds = cache_for_at_most_seconds
-        self.last_refreshed: int | None = None
+        self.last_refreshed: dict[str, int | None] = {}
         self.member_of: dict[str, frozenset[str]] = {}
         self.participant_of: dict[str, frozenset[str]] = {}
 
-    def outdated(self) -> bool:
-        if self.last_refreshed is None:
+    def outdated(self, asf_uid: str) -> bool:
+        last_refreshed = self.last_refreshed.get(asf_uid)
+        if last_refreshed is None:
             return True
         now = int(time.time())
-        since_last_refresh = now - self.last_refreshed
+        since_last_refresh = now - last_refreshed
         return since_last_refresh > self.cache_for_at_most_seconds
 
 
@@ -245,7 +246,7 @@ class AuthoriserASFQuart:
         return self.__cache.member_of[asf_uid], self.__cache.participant_of[asf_uid]
 
     async def cache_refresh(self, asf_uid: str, asfquart_session: session.ClientSession) -> None:
-        if not self.__cache.outdated():
+        if not self.__cache.outdated(asf_uid):
             return
         if not isinstance(asfquart_session, session.ClientSession):
             # Defense in depth runtime check, already validated by the type checker
@@ -259,7 +260,7 @@ class AuthoriserASFQuart:
         # It is the caller's responsibility to ensure this
         self.__cache.member_of[asf_uid] = committees
         self.__cache.participant_of[asf_uid] = projects
-        self.__cache.last_refreshed = int(time.time())
+        self.__cache.last_refreshed[asf_uid] = int(time.time())
 
 
 class AuthoriserLDAP:
@@ -282,7 +283,7 @@ class AuthoriserLDAP:
         return self.__cache.member_of[asf_uid], self.__cache.participant_of[asf_uid]
 
     async def cache_refresh(self, asf_uid: str) -> None:
-        if not self.__cache.outdated():
+        if not self.__cache.outdated(asf_uid):
             return
 
         if config.get().ALLOW_TESTS and (asf_uid == "test"):
@@ -291,7 +292,7 @@ class AuthoriserLDAP:
             projects = frozenset({"test"})
             self.__cache.member_of[asf_uid] = committees
             self.__cache.participant_of[asf_uid] = projects
-            self.__cache.last_refreshed = int(time.time())
+            self.__cache.last_refreshed[asf_uid] = int(time.time())
             return
 
         try:
@@ -304,7 +305,7 @@ class AuthoriserLDAP:
 
             self.__cache.member_of[asf_uid] = committees
             self.__cache.participant_of[asf_uid] = projects
-            self.__cache.last_refreshed = int(time.time())
+            self.__cache.last_refreshed[asf_uid] = int(time.time())
         except CommitterError as e:
             raise AuthenticationError(f"Failed to verify committer: {e}") from e
 
