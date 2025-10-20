@@ -270,7 +270,7 @@ async def admin_data(model: str = "Committee") -> str:
 async def admin_delete_test_openpgp_keys() -> quart.Response | response.Response:
     """Delete all test user OpenPGP keys and their links."""
     if not config.get().ALLOW_TESTS:
-        raise base.ASFQuartException("Test key deletion not enabled", errorcode=404)
+        raise base.ASFQuartException("Test operations are disabled in this environment", errorcode=403)
 
     test_uid = "test"
 

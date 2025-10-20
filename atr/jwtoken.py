@@ -61,6 +61,10 @@ def require[**P, R](func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Aw
         token = _extract_bearer_token(quart.request)
         try:
             claims = verify(token)
+        except jwt.ExpiredSignatureError as exc:
+            raise base.ASFQuartException("Token has expired", errorcode=401) from exc
+        except jwt.InvalidTokenError as exc:
+            raise base.ASFQuartException("Invalid Bearer JWT format", errorcode=401) from exc
         except jwt.PyJWTError as exc:
             raise base.ASFQuartException(f"Invalid Bearer JWT: {exc}", errorcode=401) from exc
 
@@ -124,5 +128,8 @@ def _extract_bearer_token(request: quart.Request) -> str:
     header = request.headers.get("Authorization", "")
     scheme, _, token = header.partition(" ")
     if scheme.lower() != "bearer" or not token:
-        raise base.ASFQuartException("Bearer JWT missing", errorcode=401)
+        raise base.ASFQuartException(
+            "Authentication required. Please provide a valid Bearer token in the Authorization header",
+            errorcode=401
+        )
     return token
