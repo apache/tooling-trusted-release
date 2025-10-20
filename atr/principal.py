@@ -31,8 +31,8 @@ import atr.log as log
 LDAP_CHAIRS_BASE = "cn=pmc-chairs,ou=groups,ou=services,dc=apache,dc=org"
 LDAP_DN = "uid=%s,ou=people,dc=apache,dc=org"
 LDAP_MEMBER_BASE = "cn=member,ou=groups,dc=apache,dc=org"
-LDAP_MEMBER_FILTER = "(|(memberUid=%s)(member=uid=%s,ou=people,dc=apache,dc=org))"
-LDAP_OWNER_FILTER = "(|(ownerUid=%s)(owner=uid=%s,ou=people,dc=apache,dc=org))"
+LDAP_MEMBER_FILTER = "(member=uid=%s,ou=people,dc=apache,dc=org)"
+LDAP_OWNER_FILTER = "(owner=uid=%s,ou=people,dc=apache,dc=org)"
 LDAP_PEOPLE_BASE = "ou=people,dc=apache,dc=org"
 LDAP_PMCS_BASE = "ou=project,ou=groups,dc=apache,dc=org"
 LDAP_ROOT_BASE = "cn=infrastructure-root,ou=groups,ou=services,dc=apache,dc=org"
@@ -186,25 +186,25 @@ class Committer:
             result = ldap_search.search(
                 ldap_base=LDAP_PMCS_BASE,
                 ldap_scope="SUBTREE",
-                ldap_query=ldap_filter % (self.user, self.user),
+                ldap_query=ldap_filter % (self.user,),
                 ldap_attrs=["cn"],
             )
         except Exception as ex:
             log.exception(f"An unknown error occurred while fetching project memberships: {ex!s}")
             raise CommitterError("An unknown error occurred while fetching project memberships.") from ex
 
-        projects = []
+        committees_or_projects = []
         for hit in result:
             if not isinstance(hit, dict):
                 raise CommitterError("Common backend assertions failed, LDAP corruption?")
-            pmc = hit.get("cn")
-            if not (isinstance(pmc, list) and len(pmc) == 1):
+            cn = hit.get("cn")
+            if not (isinstance(cn, list) and (len(cn) == 1)):
                 raise CommitterError("Common backend assertions failed, LDAP corruption?")
-            project_name = pmc[0]
-            if not (project_name and isinstance(project_name, str)):
+            committee_or_project_name = cn[0]
+            if not (committee_or_project_name and isinstance(committee_or_project_name, str)):
                 raise CommitterError("Common backend assertions failed, LDAP corruption?")
-            projects.append(project_name)
-        return projects
+            committees_or_projects.append(committee_or_project_name)
+        return committees_or_projects
 
 
 class Cache:
