@@ -143,7 +143,7 @@ async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> list
     # Prepend the DKIM signature to the message
     dkim_msg = sig + message_bytes
 
-    log.info("email_send_many")
+    log.info(f"email_send_many: {dkim_msg}")
 
     errors = []
     for addr in to_addrs:
