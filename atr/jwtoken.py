@@ -129,7 +129,6 @@ def _extract_bearer_token(request: quart.Request) -> str:
     scheme, _, token = header.partition(" ")
     if scheme.lower() != "bearer" or not token:
         raise base.ASFQuartException(
-            "Authentication required. Please provide a valid Bearer token in the Authorization header",
-            errorcode=401
+            "Authentication required. Please provide a valid Bearer token in the Authorization header", errorcode=401
         )
     return token

@@ -926,10 +926,7 @@ def validate_as_type[T](value: Any, t: type[T]) -> T:
 async def validate_empty_form() -> None:
     empty_form = await forms.Empty.create_form(data=await quart.request.form)
     if not await empty_form.validate_on_submit():
-        raise base.ASFQuartException(
-            "Invalid form submission. Please check your input and try again.",
-            errorcode=400
-        )
+        raise base.ASFQuartException("Invalid form submission. Please check your input and try again.", errorcode=400)
 
 
 def validate_vote_duration(form: wtforms.Form, field: wtforms.IntegerField) -> None:

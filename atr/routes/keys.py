@@ -497,15 +497,9 @@ async def _get_keys_text(keys_url: str, render: Callable[[str], Awaitable[str]])
                 response.raise_for_status()
                 return await response.text()
     except aiohttp.ClientResponseError as e:
-        raise base.ASFQuartException(
-                f"Unable to fetch keys from remote server: {e.status} {e.message}",
-                errorcode=502
-            )
+        raise base.ASFQuartException(f"Unable to fetch keys from remote server: {e.status} {e.message}", errorcode=502)
     except aiohttp.ClientError as e:
-        raise base.ASFQuartException(
-                f"Network error while fetching keys: {e}",
-                errorcode=503
-            )
+        raise base.ASFQuartException(f"Network error while fetching keys: {e}", errorcode=503)
 
 
 async def _key_and_is_owner(
