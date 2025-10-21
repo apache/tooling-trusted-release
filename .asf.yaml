@@ -19,6 +19,8 @@ github:
     comment_issue: "Re: [I] {title} ({repository})"
     close_issue: "Re: [I] {title} ({repository})"
     catchall: "[GH] {title} ({repository})"
+  protected_branches:
+    main: {}
 
 notifications:
   commits:      commits@tooling.apache.org
