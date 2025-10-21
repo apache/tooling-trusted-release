@@ -34,7 +34,7 @@ class StartReleaseForm(forms.Typed):
     project_name = forms.hidden()
     version_name = forms.string(
         "Version",
-        placeholder="Examples: 1.2.3+rc1 or 2.5",
+        placeholder="Examples: 1.2.3 or 2.5-M1",
         description="Enter the version string for this new release.",
     )
     submit = forms.submit("Start new release")
