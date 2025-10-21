@@ -49,6 +49,7 @@ import atr.models.sql as sql
 import atr.preload as preload
 import atr.ssh as ssh
 import atr.svn.pubsub as pubsub
+import atr.tasks as tasks
 import atr.template as template
 import atr.user as user
 import atr.util as util
@@ -158,6 +159,10 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
         worker_manager = manager.get_worker_manager()
         await worker_manager.start()
 
+        # Start the metadata update scheduler
+        metadata_scheduler_task = asyncio.create_task(_metadata_update_scheduler())
+        app.extensions["metadata_scheduler"] = metadata_scheduler_task
+
         await initialise_test_environment()
 
         conf = config.get()
@@ -193,6 +198,15 @@ def app_setup_lifecycle(app: base.QuartApp) -> None:
         """Clean up services after the app stops serving requests."""
         worker_manager = manager.get_worker_manager()
         await worker_manager.stop()
+
+        # Stop the metadata scheduler
+        metadata_scheduler = app.extensions.get("metadata_scheduler")
+        if metadata_scheduler:
+            metadata_scheduler.cancel()
+            try:
+                await metadata_scheduler
+            except asyncio.CancelledError:
+                ...
 
         ssh_server = app.extensions.get("ssh_server")
         if ssh_server:
@@ -305,6 +319,22 @@ def create_app(app_config: type[config.AppConfig]) -> base.QuartApp:
             log.info("Blockbuster deactivated")
 
     return app
+
+
+async def _metadata_update_scheduler() -> None:
+    """Periodically schedule remote metadata updates."""
+    # Wait one minute to allow the server to start
+    await asyncio.sleep(60)
+
+    while True:
+        try:
+            task = await tasks.metadata_update(asf_uid="system")
+            log.info(f"Scheduled remote metadata update with ID {task.id}")
+        except Exception as e:
+            log.exception(f"Failed to schedule remote metadata update: {e!s}")
+
+        # Schedule next update in 24 hours
+        await asyncio.sleep(86400)
 
 
 async def initialise_test_environment() -> None:

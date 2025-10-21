@@ -179,6 +179,7 @@ class TaskType(str, enum.Enum):
     LICENSE_FILES = "license_files"
     LICENSE_HEADERS = "license_headers"
     MESSAGE_SEND = "message_send"
+    METADATA_UPDATE = "metadata_update"
     PATHS_CHECK = "paths_check"
     RAT_CHECK = "rat_check"
     SBOM_AUGMENT = "sbom_augment"

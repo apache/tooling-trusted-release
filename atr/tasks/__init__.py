@@ -30,6 +30,7 @@ import atr.tasks.checks.targz as targz
 import atr.tasks.checks.zipformat as zipformat
 import atr.tasks.keys as keys
 import atr.tasks.message as message
+import atr.tasks.metadata as metadata
 import atr.tasks.sbom as sbom
 import atr.tasks.svn as svn
 import atr.tasks.vote as vote
@@ -135,6 +136,23 @@ async def keys_import_file(
         await data.commit()
 
 
+async def metadata_update(asf_uid: str, caller_data: db.Session | None = None) -> sql.Task:
+    """Queue a metadata update task."""
+    async with db.ensure_session(caller_data) as data:
+        task = sql.Task(
+            status=sql.TaskStatus.QUEUED,
+            task_type=sql.TaskType.METADATA_UPDATE,
+            task_args=metadata.Update(asf_uid=asf_uid).model_dump(),
+            asf_uid=asf_uid,
+            revision_number=None,
+            primary_rel_path=None,
+        )
+        data.add(task)
+        await data.commit()
+        await data.flush()
+        return task
+
+
 def queued(
     asf_uid: str,
     task_type: sql.TaskType,
@@ -167,6 +185,8 @@ def resolve(task_type: sql.TaskType) -> Callable[..., Awaitable[results.Results 
             return license.headers
         case sql.TaskType.MESSAGE_SEND:
             return message.send
+        case sql.TaskType.METADATA_UPDATE:
+            return metadata.update
         case sql.TaskType.PATHS_CHECK:
             return paths.check
         case sql.TaskType.RAT_CHECK:

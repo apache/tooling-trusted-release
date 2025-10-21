@@ -142,9 +142,18 @@ class VoteInitiate(schema.Strict):
     mail_send_warnings: list[str] = schema.description("Warnings from the mail server")
 
 
+class MetadataUpdate(schema.Strict):
+    """Result of the task to update metadata from Whimsy."""
+
+    kind: Literal["metadata_update"] = schema.Field(alias="kind")
+    added_count: int = schema.description("Number of committees and projects added")
+    updated_count: int = schema.description("Number of committees and projects updated")
+
+
 Results = Annotated[
     HashingCheck
     | MessageSend
+    | MetadataUpdate
     | SBOMAugment
     | SBOMGenerateCycloneDX
     | SBOMOSVScan
