@@ -17,16 +17,14 @@
 
 import dataclasses
 import email.utils as utils
-import os.path
 import ssl
 import time
 import uuid
 from typing import Final
 
-import aiofiles
 import aiosmtplib
-import dkim
 
+# import dkim
 import atr.log as log
 
 # TODO: We should choose a pattern for globals
@@ -35,9 +33,9 @@ import atr.log as log
 # But in many cases we should do so
 # TODO: Get at least global_dkim_domain from configuration
 # And probably global_dkim_selector too
-global_dkim_selector: str = "mail"
+# global_dkim_selector: str = "mail"
 global_dkim_domain: str = "apache.org"
-global_secret_key: str | None = None
+# global_secret_key: str | None = None
 
 _MAIL_RELAY: Final[str] = "mail-relay.apache.org"
 _SMTP_PORT: Final[int] = 587
@@ -102,53 +100,53 @@ async def send(message: Message) -> tuple[str, list[str]]:
     return mid, errors
 
 
-def set_secret_key(key: str) -> None:
-    """Set the secret key for DKIM signing."""
-    global global_secret_key
-    global_secret_key = key
+# def set_secret_key(key: str) -> None:
+#     """Set the secret key for DKIM signing."""
+#     global global_secret_key
+#     global_secret_key = key
 
 
-async def set_secret_key_default() -> None:
-    # TODO: Document this, or improve it
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    dkim_path = os.path.join(project_root, "state", "dkim.private")
+# async def set_secret_key_default() -> None:
+#     # TODO: Document this, or improve it
+#     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+#     dkim_path = os.path.join(project_root, "state", "dkim.private")
 
-    async with aiofiles.open(dkim_path) as f:
-        dkim_key = await f.read()
-        set_secret_key(dkim_key.strip())
-        log.info("DKIM key loaded and set successfully")
+#     async with aiofiles.open(dkim_path) as f:
+#         dkim_key = await f.read()
+#         set_secret_key(dkim_key.strip())
+#         log.info("DKIM key loaded and set successfully")
 
 
 async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> list[str]:
-    """Send an email to multiple recipients with DKIM signing."""
+    """Send an email to multiple recipients."""
     message_bytes = bytes(msg_text, "utf-8")
 
-    if global_secret_key is None:
-        # This is a severe configuration error
-        # It does not count as a send error to only warn about
-        raise ValueError("global_secret_key is not set")
+    # if global_secret_key is None:
+    #     # This is a severe configuration error
+    #     # It does not count as a send error to only warn about
+    #     raise ValueError("global_secret_key is not set")
 
-    # DKIM sign the message
-    private_key = bytes(global_secret_key, "utf-8")
+    # # DKIM sign the message
+    # private_key = bytes(global_secret_key, "utf-8")
 
-    # Create a DKIM signature
-    sig = dkim.sign(
-        message=message_bytes,
-        selector=bytes(global_dkim_selector, "utf-8"),
-        domain=bytes(global_dkim_domain, "utf-8"),
-        privkey=private_key,
-        include_headers=[b"From", b"To", b"Subject", b"Date", b"Message-ID"],
-    )
+    # # Create a DKIM signature
+    # sig = dkim.sign(
+    #     message=message_bytes,
+    #     selector=bytes(global_dkim_selector, "utf-8"),
+    #     domain=bytes(global_dkim_domain, "utf-8"),
+    #     privkey=private_key,
+    #     include_headers=[b"From", b"To", b"Subject", b"Date", b"Message-ID"],
+    # )
 
-    # Prepend the DKIM signature to the message
-    dkim_msg = sig + message_bytes
+    # # Prepend the DKIM signature to the message
+    # dkim_msg = sig + message_bytes
 
-    log.info(f"email_send_many: {dkim_msg}")
+    # log.info(f"email_send_many: {dkim_msg}")
 
     errors = []
     for addr in to_addrs:
         try:
-            await _send_via_relay(from_addr, addr, dkim_msg)
+            await _send_via_relay(from_addr, addr, message_bytes)
         except Exception as e:
             log.exception(f"Failed to send to {addr}:")
             errors.append(f"failed to send to {addr}: {e}")
@@ -156,15 +154,14 @@ async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> list
     return errors
 
 
-async def _send_via_relay(from_addr: str, to_addr: str, dkim_msg_bytes: bytes) -> None:
-    """Send a DKIM signed email to a single recipient via the ASF mail relay."""
+async def _send_via_relay(from_addr: str, to_addr: str, msg_bytes: bytes) -> None:
+    """Send an email to a single recipient via the ASF mail relay."""
     _validate_recipient(to_addr)
 
     # Connect to the ASF mail relay
     # NOTE: Our code is very different from the asfpy code:
     # - Uses types
     # - Uses asyncio
-    # - Performs DKIM signing
     # Due to the divergence, we should probably not contribute upstream
     # In effect, these are two different "packages" of functionality
     # We can't even sign it first and pass it to asfpy, due to its different design
@@ -176,7 +173,7 @@ async def _send_via_relay(from_addr: str, to_addr: str, dkim_msg_bytes: bytes) -
     await smtp.connect()
     log.info(f"Connected to {smtp.hostname}:{smtp.port}")
     await smtp.ehlo()
-    await smtp.sendmail(from_addr, [to_addr], dkim_msg_bytes)
+    await smtp.sendmail(from_addr, [to_addr], msg_bytes)
     await smtp.quit()
 
 

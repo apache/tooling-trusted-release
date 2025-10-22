@@ -442,14 +442,6 @@ wheels = [
 ]
 
 [[package]]
-name = "dkimpy"
-version = "1.1.9+sbp1"
-source = { git = "https://github.com/sbp/dkimpy.git?rev=main#7ed6f94a94719a804bc8351782dbdb77d75b029f" }
-dependencies = [
-    { name = "dnspython" },
-]
-
-[[package]]
 name = "dnspython"
 version = "2.8.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1700,7 +1692,6 @@ dependencies = [
     { name = "blockbuster" },
     { name = "cryptography" },
     { name = "cyclonedx-python-lib", extra = ["json-validation"] },
-    { name = "dkimpy" },
     { name = "dnspython" },
     { name = "dunamai" },
     { name = "email-validator" },
@@ -1754,7 +1745,6 @@ requires-dist = [
     { name = "blockbuster", specifier = ">=1.5.23,<2.0.0" },
     { name = "cryptography", specifier = "~=44.0" },
     { name = "cyclonedx-python-lib", extras = ["json-validation"], specifier = ">=11.0.0" },
-    { name = "dkimpy", git = "https://github.com/sbp/dkimpy.git?rev=main" },
     { name = "dnspython", specifier = ">=2.7.0,<3.0.0" },
     { name = "dunamai", specifier = ">=1.23.0" },
     { name = "email-validator", specifier = "~=2.2.0" },

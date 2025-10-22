@@ -61,7 +61,7 @@ async def send(args: Send) -> results.Results | None:
 
     # Send the email
     # TODO: Move this call into send itself?
-    await mail.set_secret_key_default()
+    # await mail.set_secret_key_default()
     mid, mail_errors = await mail.send(message)
     if mail_errors:
         log.warning(f"Mail sending to {args.email_recipient} for subject '{args.subject}' encountered errors:")

@@ -86,13 +86,13 @@ async def _initiate_core_logic(args: Initiate) -> results.Results | None:
     # Format dates for email
     vote_end_str = vote_end.strftime("%Y-%m-%d %H:%M:%S UTC")
 
-    # Load and set DKIM key
-    try:
-        await mail.set_secret_key_default()
-    except Exception as e:
-        error_msg = f"Failed to load DKIM key: {e}"
-        log.error(error_msg)
-        raise VoteInitiationError(error_msg)
+    # # Load and set DKIM key
+    # try:
+    #     await mail.set_secret_key_default()
+    # except Exception as e:
+    #     error_msg = f"Failed to load DKIM key: {e}"
+    #     log.error(error_msg)
+    #     raise VoteInitiationError(error_msg)
 
     # Get PMC and project details
     if release.committee is None:

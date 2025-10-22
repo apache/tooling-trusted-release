@@ -8,7 +8,6 @@ authors = [
 license = "Apache-2.0"
 readme = "README.md"
 requires-python = "~=3.13.0"
-# https://bugs.launchpad.net/dkimpy/+bug/2024461
 dependencies = [
   "aiofiles>=24.1.0,<25.0.0",
   "aiohttp>=3.11.14",
@@ -22,7 +21,7 @@ dependencies = [
   "blockbuster>=1.5.23,<2.0.0",
   "cryptography~=44.0",
   "cyclonedx-python-lib[json-validation]>=11.0.0",
-  "dkimpy @ git+https://github.com/sbp/dkimpy.git@main",
+  # "dkimpy @ git+https://github.com/sbp/dkimpy.git@main",
   "dnspython>=2.7.0,<3.0.0",
   "dunamai>=1.23.0",
   "email-validator~=2.2.0",
