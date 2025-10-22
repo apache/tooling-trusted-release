@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Final
 import aiofiles.os
 import aioshutil
 import sqlalchemy
+import sqlalchemy.engine as engine
 import sqlmodel
 
 import atr.analysis as analysis
@@ -312,6 +313,9 @@ class CommitteeParticipant(FoundationCommitter):
         )
 
         result = await self.__data.execute(stmt)
+        if not isinstance(result, engine.CursorResult):
+            log.error(f"Expected cursor result, got {type(result)}")
+            return "An error occurred while promoting the release candidate"
         if result.rowcount != 1:
             await self.__data.rollback()
             return "A newer revision appeared, please refresh and try again."

@@ -26,6 +26,7 @@ import os
 import signal
 import sys
 
+import sqlalchemy.engine as engine
 import sqlmodel
 
 import atr.db as db
@@ -335,6 +336,9 @@ class WorkerManager:
                     )
 
                     result = await data.execute(update_stmt)
+                    if not isinstance(result, engine.CursorResult):
+                        log.error(f"Expected cursor result, got {type(result)}")
+                        return
                     if result.rowcount > 0:
                         log.info(f"Reset {result.rowcount} tasks to state 'QUEUED' due to worker issues")
 
