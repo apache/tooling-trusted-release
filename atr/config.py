@@ -93,6 +93,7 @@ class AppConfig:
             "sbp",
             "tn",
             "wave",
+            "akm",
         }
     )
 
