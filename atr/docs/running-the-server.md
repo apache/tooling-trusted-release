@@ -69,3 +69,5 @@ If you do not want to change your `/etc/hosts`, you can use `127.0.0.1`. You sho
 [`https://127.0.0.1:8080/`](https://127.0.0.1:8080/)
 
 Pick one or the other, because logging into the site on one host does not log you in to the site on any other host.
+
+It will take one or two minutes for the server to fetch committee and project information from the ASF website. Until the fetch is complete, no existing committees and projects will show.
