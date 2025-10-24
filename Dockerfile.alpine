@@ -50,7 +50,6 @@ RUN apk update && \
       gpg \
       gpg-agent \
       make \
-      nix \
       openjdk8 \
       rsync \
       subversion
