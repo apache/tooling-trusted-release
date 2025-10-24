@@ -26,19 +26,15 @@ from . import schema, sql, tabulate
 T = TypeVar("T")
 
 
-def example(value: Any) -> dict[Literal["json_schema_extra"], dict[str, Any]]:
-    return {"json_schema_extra": {"example": value}}
-
-
 class ResultsTypeError(TypeError):
     pass
 
 
 class ChecksListResults(schema.Strict):
-    endpoint: Literal["/checks/list"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/checks/list"] = schema.alias("endpoint")
     checks: Sequence[sql.CheckResult]
-    checks_revision: str = schema.Field(..., **example("00005"))
-    current_phase: sql.ReleasePhase = schema.Field(..., **example(sql.ReleasePhase.RELEASE_CANDIDATE))
+    checks_revision: str = schema.example("00005")
+    current_phase: sql.ReleasePhase = schema.example(sql.ReleasePhase.RELEASE_CANDIDATE)
 
     @pydantic.field_validator("current_phase", mode="before")
     @classmethod
@@ -47,39 +43,39 @@ class ChecksListResults(schema.Strict):
 
 
 class ChecksOngoingResults(schema.Strict):
-    endpoint: Literal["/checks/ongoing"] = schema.Field(alias="endpoint")
-    ongoing: int = schema.Field(..., **example(10))
+    endpoint: Literal["/checks/ongoing"] = schema.alias("endpoint")
+    ongoing: int = schema.example(10)
 
 
 class CommitteeGetResults(schema.Strict):
-    endpoint: Literal["/committee/get"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/committee/get"] = schema.alias("endpoint")
     committee: sql.Committee
 
 
 class CommitteeKeysResults(schema.Strict):
-    endpoint: Literal["/committee/keys"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/committee/keys"] = schema.alias("endpoint")
     keys: Sequence[sql.PublicSigningKey]
 
 
 class CommitteeProjectsResults(schema.Strict):
-    endpoint: Literal["/committee/projects"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/committee/projects"] = schema.alias("endpoint")
     projects: Sequence[sql.Project]
 
 
 class CommitteesListResults(schema.Strict):
-    endpoint: Literal["/committees/list"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/committees/list"] = schema.alias("endpoint")
     committees: Sequence[sql.Committee]
 
 
 class DistributionRecordArgs(schema.Strict):
-    project: str = schema.Field(..., **example("example"))
-    version: str = schema.Field(..., **example("0.0.1"))
-    platform: sql.DistributionPlatform = schema.Field(..., **example(sql.DistributionPlatform.ARTIFACT_HUB))
-    distribution_owner_namespace: str | None = schema.Field(default=None, **example("example"))
-    distribution_package: str = schema.Field(..., **example("example"))
-    distribution_version: str = schema.Field(..., **example("0.0.1"))
-    staging: bool = schema.Field(..., **example(False))
-    details: bool = schema.Field(..., **example(False))
+    project: str = schema.example("example")
+    version: str = schema.example("0.0.1")
+    platform: sql.DistributionPlatform = schema.example(sql.DistributionPlatform.ARTIFACT_HUB)
+    distribution_owner_namespace: str | None = schema.default_example(None, "example")
+    distribution_package: str = schema.example("example")
+    distribution_version: str = schema.example("0.0.1")
+    staging: bool = schema.example(False)
+    details: bool = schema.example(False)
 
     @pydantic.field_validator("platform", mode="before")
     @classmethod
@@ -97,146 +93,140 @@ class DistributionRecordArgs(schema.Strict):
 
 
 class DistributionRecordResults(schema.Strict):
-    endpoint: Literal["/distribution/record"] = schema.Field(alias="endpoint")
-    success: Literal[True] = schema.Field(..., **example(True))
+    endpoint: Literal["/distribution/record"] = schema.alias("endpoint")
+    success: Literal[True] = schema.example(True)
 
 
 class IgnoreAddArgs(schema.Strict):
-    committee_name: str = schema.Field(..., **example("example"))
-    release_glob: str | None = schema.Field(default=None, **example("example-0.0.*"))
-    revision_number: str | None = schema.Field(default=None, **example("00001"))
-    checker_glob: str | None = schema.Field(default=None, **example("atr.tasks.checks.license.files"))
-    primary_rel_path_glob: str | None = schema.Field(default=None, **example("apache-example-0.0.1-*.tar.gz"))
-    member_rel_path_glob: str | None = schema.Field(default=None, **example("apache-example-0.0.1/*.xml"))
-    status: sql.CheckResultStatusIgnore | None = schema.Field(
-        default=None, **example(sql.CheckResultStatusIgnore.FAILURE)
-    )
-    message_glob: str | None = schema.Field(default=None, **example("sha512 matches for apache-example-0.0.1/*.xml"))
+    committee_name: str = schema.example("example")
+    release_glob: str | None = schema.default_example(None, "example-0.0.*")
+    revision_number: str | None = schema.default_example(None, "00001")
+    checker_glob: str | None = schema.default_example(None, "atr.tasks.checks.license.files")
+    primary_rel_path_glob: str | None = schema.default_example(None, "apache-example-0.0.1-*.tar.gz")
+    member_rel_path_glob: str | None = schema.default_example(None, "apache-example-0.0.1/*.xml")
+    status: sql.CheckResultStatusIgnore | None = schema.default_example(None, sql.CheckResultStatusIgnore.FAILURE)
+    message_glob: str | None = schema.default_example(None, "sha512 matches for apache-example-0.0.1/*.xml")
 
 
 class IgnoreAddResults(schema.Strict):
-    endpoint: Literal["/ignore/add"] = schema.Field(alias="endpoint")
-    success: Literal[True] = schema.Field(..., **example(True))
+    endpoint: Literal["/ignore/add"] = schema.alias("endpoint")
+    success: Literal[True] = schema.example(True)
 
 
 class IgnoreDeleteArgs(schema.Strict):
-    committee: str = schema.Field(..., **example("example"))
-    id: int = schema.Field(..., **example(1))
+    committee: str = schema.example("example")
+    id: int = schema.example(1)
 
 
 class IgnoreDeleteResults(schema.Strict):
-    endpoint: Literal["/ignore/delete"] = schema.Field(alias="endpoint")
-    success: Literal[True] = schema.Field(..., **example(True))
+    endpoint: Literal["/ignore/delete"] = schema.alias("endpoint")
+    success: Literal[True] = schema.example(True)
 
 
 class IgnoreListResults(schema.Strict):
-    endpoint: Literal["/ignore/list"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/ignore/list"] = schema.alias("endpoint")
     ignores: Sequence[sql.CheckResultIgnore]
 
 
 class JwtCreateArgs(schema.Strict):
-    asfuid: str = schema.Field(..., **example("user"))
-    pat: str = schema.Field(..., **example("8M5t4GCU63EdOy4NNXgXn7o-bc-muK8TRg5W-DeBaWY"))
+    asfuid: str = schema.example("user")
+    pat: str = schema.example("8M5t4GCU63EdOy4NNXgXn7o-bc-muK8TRg5W-DeBaWY")
 
 
 class JwtCreateResults(schema.Strict):
-    endpoint: Literal["/jwt/create"] = schema.Field(alias="endpoint")
-    asfuid: str = schema.Field(..., **example("user"))
-    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
+    endpoint: Literal["/jwt/create"] = schema.alias("endpoint")
+    asfuid: str = schema.example("user")
+    jwt: str = schema.example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI=")
 
 
 class KeyAddArgs(schema.Strict):
-    asfuid: str = schema.Field(..., **example("user"))
-    key: str = schema.Field(
-        ..., **example("-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n...\n-----END PGP PUBLIC KEY BLOCK-----\n")
-    )
-    committees: list[str] = schema.Field(..., **example(["example"]))
+    asfuid: str = schema.example("user")
+    key: str = schema.example("-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n...\n-----END PGP PUBLIC KEY BLOCK-----\n")
+    committees: list[str] = schema.example(["example"])
 
 
 class KeyAddResults(schema.Strict):
-    endpoint: Literal["/key/add"] = schema.Field(alias="endpoint")
-    fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
+    endpoint: Literal["/key/add"] = schema.alias("endpoint")
+    fingerprint: str = schema.example("0123456789abcdef0123456789abcdef01234567")
 
 
 class KeyDeleteArgs(schema.Strict):
-    fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
+    fingerprint: str = schema.example("0123456789abcdef0123456789abcdef01234567")
 
 
 class KeyDeleteResults(schema.Strict):
-    endpoint: Literal["/key/delete"] = schema.Field(alias="endpoint")
-    success: Literal[True] = schema.Field(..., **example(True))
+    endpoint: Literal["/key/delete"] = schema.alias("endpoint")
+    success: Literal[True] = schema.example(True)
 
 
 class KeyGetResults(schema.Strict):
-    endpoint: Literal["/key/get"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/key/get"] = schema.alias("endpoint")
     key: sql.PublicSigningKey
 
 
 class KeysUploadArgs(schema.Strict):
-    filetext: str = schema.Field(
-        ..., **example("-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n...\n-----END PGP PUBLIC KEY BLOCK-----\n")
-    )
-    committee: str = schema.Field(..., **example("example"))
+    filetext: str = schema.example("-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n...\n-----END PGP PUBLIC KEY BLOCK-----\n")
+    committee: str = schema.example("example")
 
 
 class KeysUploadException(schema.Strict):
-    status: Literal["error"] = schema.Field(alias="status")
+    status: Literal["error"] = schema.alias("status")
     key: sql.PublicSigningKey | None
-    error: str = schema.Field(..., **example("Error message"))
-    error_type: str = schema.Field(..., **example("KeysUploadError"))
+    error: str = schema.example("Error message")
+    error_type: str = schema.example("KeysUploadError")
 
 
 class KeysUploadResult(schema.Strict):
-    status: Literal["success"] = schema.Field(alias="status")
+    status: Literal["success"] = schema.alias("status")
     key: sql.PublicSigningKey
 
 
 type KeysUploadOutcome = Annotated[
     KeysUploadResult | KeysUploadException,
-    schema.Field(discriminator="status"),
+    schema.discriminator("status"),
 ]
 
 KeysUploadOutcomeAdapter = pydantic.TypeAdapter(KeysUploadOutcome)
 
 
 class KeysUploadResults(schema.Strict):
-    endpoint: Literal["/keys/upload"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/keys/upload"] = schema.alias("endpoint")
     results: Sequence[KeysUploadResult | KeysUploadException]
-    success_count: int = schema.Field(..., **example(1))
-    error_count: int = schema.Field(..., **example(0))
-    submitted_committee: str = schema.Field(..., **example("example"))
+    success_count: int = schema.example(1)
+    error_count: int = schema.example(0)
+    submitted_committee: str = schema.example("example")
 
 
 class KeysUserResults(schema.Strict):
-    endpoint: Literal["/keys/user"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/keys/user"] = schema.alias("endpoint")
     keys: Sequence[sql.PublicSigningKey]
 
 
 class ProjectGetResults(schema.Strict):
-    endpoint: Literal["/project/get"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/project/get"] = schema.alias("endpoint")
     project: sql.Project
 
 
 class ProjectReleasesResults(schema.Strict):
-    endpoint: Literal["/project/releases"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/project/releases"] = schema.alias("endpoint")
     releases: Sequence[sql.Release]
 
 
 class ProjectsListResults(schema.Strict):
-    endpoint: Literal["/projects/list"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/projects/list"] = schema.alias("endpoint")
     projects: Sequence[sql.Project]
 
 
 class PublisherDistributionRecordArgs(schema.Strict):
-    publisher: str = schema.Field(..., **example("user"))
-    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
-    version: str = schema.Field(..., **example("0.0.1"))
-    platform: sql.DistributionPlatform = schema.Field(..., **example(sql.DistributionPlatform.ARTIFACT_HUB))
-    distribution_owner_namespace: str | None = schema.Field(default=None, **example("example"))
-    distribution_package: str = schema.Field(..., **example("example"))
-    distribution_version: str = schema.Field(..., **example("0.0.1"))
-    staging: bool = schema.Field(..., **example(False))
-    details: bool = schema.Field(..., **example(False))
+    publisher: str = schema.example("user")
+    jwt: str = schema.example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI=")
+    version: str = schema.example("0.0.1")
+    platform: sql.DistributionPlatform = schema.example(sql.DistributionPlatform.ARTIFACT_HUB)
+    distribution_owner_namespace: str | None = schema.default_example(None, "example")
+    distribution_package: str = schema.example("example")
+    distribution_version: str = schema.example("0.0.1")
+    staging: bool = schema.example(False)
+    details: bool = schema.example(False)
 
     @pydantic.field_validator("platform", mode="before")
     @classmethod
@@ -254,106 +244,98 @@ class PublisherDistributionRecordArgs(schema.Strict):
 
 
 class PublisherDistributionRecordResults(schema.Strict):
-    endpoint: Literal["/publisher/distribution/record"] = schema.Field(alias="endpoint")
-    success: Literal[True] = schema.Field(..., **example(True))
+    endpoint: Literal["/publisher/distribution/record"] = schema.alias("endpoint")
+    success: Literal[True] = schema.example(True)
 
 
 class PublisherReleaseAnnounceArgs(schema.Strict):
-    publisher: str = schema.Field(..., **example("user"))
-    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
-    version: str = schema.Field(..., **example("0.0.1"))
-    revision: str = schema.Field(..., **example("00005"))
-    email_to: str = schema.Field(..., **example("dev@example.apache.org"))
-    subject: str = schema.Field(..., **example("[ANNOUNCE] Apache Example 1.0.0 release"))
-    body: str = schema.Field(
-        ...,
-        **example("The Apache Example team is pleased to announce the release of Example 1.0.0..."),
-    )
-    path_suffix: str = schema.Field(..., **example("example/1.0.0"))
+    publisher: str = schema.example("user")
+    jwt: str = schema.example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI=")
+    version: str = schema.example("0.0.1")
+    revision: str = schema.example("00005")
+    email_to: str = schema.example("dev@example.apache.org")
+    subject: str = schema.example("[ANNOUNCE] Apache Example 1.0.0 release")
+    body: str = schema.example("The Apache Example team is pleased to announce the release of Example 1.0.0...")
+    path_suffix: str = schema.example("example/1.0.0")
 
 
 class PublisherReleaseAnnounceResults(schema.Strict):
-    endpoint: Literal["/publisher/release/announce"] = schema.Field(alias="endpoint")
-    success: Literal[True] = schema.Field(..., **example(True))
+    endpoint: Literal["/publisher/release/announce"] = schema.alias("endpoint")
+    success: Literal[True] = schema.example(True)
 
 
 class PublisherSshRegisterArgs(schema.Strict):
-    publisher: str = schema.Field(..., **example("user"))
-    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
-    ssh_key: str = schema.Field(
-        ..., **example("ssh-ed25519 AAAAC3NzaC1lZDI1NTEgH5C9okWi0dh25AAAAIOMqqnkVzrm0SdG6UOoqKLsabl9GKJl")
-    )
+    publisher: str = schema.example("user")
+    jwt: str = schema.example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI=")
+    ssh_key: str = schema.example("ssh-ed25519 AAAAC3NzaC1lZDI1NTEgH5C9okWi0dh25AAAAIOMqqnkVzrm0SdG6UOoqKLsabl9GKJl")
 
 
 class PublisherSshRegisterResults(schema.Strict):
-    endpoint: Literal["/publisher/ssh/register"] = schema.Field(alias="endpoint")
-    fingerprint: str = schema.Field(..., **example("SHA256:0123456789abcdef0123456789abcdef01234567"))
-    project: str = schema.Field(..., **example("example"))
-    expires: int = schema.Field(..., **example(1713547200))
+    endpoint: Literal["/publisher/ssh/register"] = schema.alias("endpoint")
+    fingerprint: str = schema.example("SHA256:0123456789abcdef0123456789abcdef01234567")
+    project: str = schema.example("example")
+    expires: int = schema.example(1713547200)
 
 
 class PublisherVoteResolveArgs(schema.Strict):
-    publisher: str = schema.Field(..., **example("user"))
-    jwt: str = schema.Field(..., **example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI="))
-    version: str = schema.Field(..., **example("0.0.1"))
-    resolution: Literal["passed", "failed"] = schema.Field(..., **example("passed"))
+    publisher: str = schema.example("user")
+    jwt: str = schema.example("eyJhbGciOiJIUzI1[...]mMjLiuyu5CSpyHI=")
+    version: str = schema.example("0.0.1")
+    resolution: Literal["passed", "failed"] = schema.example("passed")
 
 
 class PublisherVoteResolveResults(schema.Strict):
-    endpoint: Literal["/publisher/vote/resolve"] = schema.Field(alias="endpoint")
-    success: Literal[True] = schema.Field(..., **example(True))
+    endpoint: Literal["/publisher/vote/resolve"] = schema.alias("endpoint")
+    success: Literal[True] = schema.example(True)
 
 
 class ReleaseAnnounceArgs(schema.Strict):
-    project: str = schema.Field(..., **example("example"))
-    version: str = schema.Field(..., **example("1.0.0"))
-    revision: str = schema.Field(..., **example("00005"))
-    email_to: str = schema.Field(..., **example("dev@example.apache.org"))
-    subject: str = schema.Field(..., **example("[ANNOUNCE] Apache Example 1.0.0 release"))
-    body: str = schema.Field(
-        ...,
-        **example("The Apache Example team is pleased to announce the release of Example 1.0.0..."),
-    )
-    path_suffix: str = schema.Field(..., **example("example/1.0.0"))
+    project: str = schema.example("example")
+    version: str = schema.example("1.0.0")
+    revision: str = schema.example("00005")
+    email_to: str = schema.example("dev@example.apache.org")
+    subject: str = schema.example("[ANNOUNCE] Apache Example 1.0.0 release")
+    body: str = schema.example("The Apache Example team is pleased to announce the release of Example 1.0.0...")
+    path_suffix: str = schema.example("example/1.0.0")
 
 
 class ReleaseAnnounceResults(schema.Strict):
-    endpoint: Literal["/release/announce"] = schema.Field(alias="endpoint")
-    success: Literal[True] = schema.Field(..., **example(True))
+    endpoint: Literal["/release/announce"] = schema.alias("endpoint")
+    success: Literal[True] = schema.example(True)
 
 
 class ReleaseDraftDeleteArgs(schema.Strict):
-    project: str = schema.Field(..., **example("example"))
-    version: str = schema.Field(..., **example("0.0.1"))
+    project: str = schema.example("example")
+    version: str = schema.example("0.0.1")
 
 
 class ReleaseDraftDeleteResults(schema.Strict):
-    endpoint: Literal["/release/draft/delete"] = schema.Field(alias="endpoint")
-    success: Literal[True] = schema.Field(..., **example(True))
+    endpoint: Literal["/release/draft/delete"] = schema.alias("endpoint")
+    success: Literal[True] = schema.example(True)
 
 
 class ReleaseCreateArgs(schema.Strict):
-    project: str = schema.Field(..., **example("example"))
-    version: str = schema.Field(..., **example("0.0.1"))
+    project: str = schema.example("example")
+    version: str = schema.example("0.0.1")
 
 
 class ReleaseCreateResults(schema.Strict):
-    endpoint: Literal["/release/create"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/release/create"] = schema.alias("endpoint")
     release: sql.Release
 
 
 class ReleaseDeleteArgs(schema.Strict):
-    project: str = schema.Field(..., **example("example"))
-    version: str = schema.Field(..., **example("0.0.1"))
+    project: str = schema.example("example")
+    version: str = schema.example("0.0.1")
 
 
 class ReleaseDeleteResults(schema.Strict):
-    endpoint: Literal["/release/delete"] = schema.Field(alias="endpoint")
-    deleted: Literal[True] = schema.Field(..., **example(True))
+    endpoint: Literal["/release/delete"] = schema.alias("endpoint")
+    deleted: Literal[True] = schema.example(True)
 
 
 class ReleaseGetResults(schema.Strict):
-    endpoint: Literal["/release/get"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/release/get"] = schema.alias("endpoint")
     release: sql.Release
 
     @pydantic.field_validator("release", mode="before")
@@ -371,24 +353,24 @@ class ReleaseGetResults(schema.Strict):
 
 
 class ReleasePathsResults(schema.Strict):
-    endpoint: Literal["/release/paths"] = schema.Field(alias="endpoint")
-    rel_paths: Sequence[str] = schema.Field(..., **example(["example/0.0.1/example-0.0.1-bin.tar.gz"]))
+    endpoint: Literal["/release/paths"] = schema.alias("endpoint")
+    rel_paths: Sequence[str] = schema.example(["example/0.0.1/example-0.0.1-bin.tar.gz"])
 
 
 class ReleaseRevisionsResults(schema.Strict):
-    endpoint: Literal["/release/revisions"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/release/revisions"] = schema.alias("endpoint")
     revisions: Sequence[sql.Revision]
 
 
 class ReleaseUploadArgs(schema.Strict):
-    project: str = schema.Field(..., **example("example"))
-    version: str = schema.Field(..., **example("0.0.1"))
-    relpath: str = schema.Field(..., **example("example/0.0.1/example-0.0.1-bin.tar.gz"))
-    content: str = schema.Field(..., **example("This is the content of the file."))
+    project: str = schema.example("example")
+    version: str = schema.example("0.0.1")
+    relpath: str = schema.example("example/0.0.1/example-0.0.1-bin.tar.gz")
+    content: str = schema.example("This is the content of the file.")
 
 
 class ReleaseUploadResults(schema.Strict):
-    endpoint: Literal["/release/upload"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/release/upload"] = schema.alias("endpoint")
     revision: sql.Revision
 
 
@@ -400,54 +382,50 @@ class ReleasesListQuery:
 
 
 class ReleasesListResults(schema.Strict):
-    endpoint: Literal["/releases/list"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/releases/list"] = schema.alias("endpoint")
     data: Sequence[sql.Release]
     count: int
 
 
 class SignatureProvenanceArgs(schema.Strict):
-    artifact_file_name: str = schema.Field(..., **example("example-0.0.1-bin.tar.gz"))
-    artifact_sha3_256: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
-    signature_file_name: str = schema.Field(..., **example("example-0.0.1-bin.tar.gz.asc"))
-    signature_asc_text: str = schema.Field(
-        ..., **example("-----BEGIN PGP SIGNATURE-----\n\n...\n-----END PGP SIGNATURE-----\n")
-    )
-    signature_sha3_256: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
+    artifact_file_name: str = schema.example("example-0.0.1-bin.tar.gz")
+    artifact_sha3_256: str = schema.example("0123456789abcdef0123456789abcdef01234567")
+    signature_file_name: str = schema.example("example-0.0.1-bin.tar.gz.asc")
+    signature_asc_text: str = schema.example("-----BEGIN PGP SIGNATURE-----\n\n...\n-----END PGP SIGNATURE-----\n")
+    signature_sha3_256: str = schema.example("0123456789abcdef0123456789abcdef01234567")
 
 
 class SignatureProvenanceKey(schema.Strict):
-    committee: str = schema.Field(..., **example("example"))
-    keys_file_url: str = schema.Field(..., **example("https://example.apache.org/example/KEYS"))
-    keys_file_sha3_256: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
+    committee: str = schema.example("example")
+    keys_file_url: str = schema.example("https://example.apache.org/example/KEYS")
+    keys_file_sha3_256: str = schema.example("0123456789abcdef0123456789abcdef01234567")
 
 
 class SignatureProvenanceResults(schema.Strict):
-    endpoint: Literal["/signature/provenance"] = schema.Field(alias="endpoint")
-    fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
-    key_asc_text: str = schema.Field(
-        ..., **example("-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n...\n-----END PGP PUBLIC KEY BLOCK-----\n")
+    endpoint: Literal["/signature/provenance"] = schema.alias("endpoint")
+    fingerprint: str = schema.example("0123456789abcdef0123456789abcdef01234567")
+    key_asc_text: str = schema.example(
+        "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n...\n-----END PGP PUBLIC KEY BLOCK-----\n"
     )
     committees_with_artifact: list[SignatureProvenanceKey]
 
 
 class SshKeyAddArgs(schema.Strict):
-    text: str = schema.Field(
-        ..., **example("ssh-ed25519 AAAAC3NzaC1lZDI1NTEgH5C9okWi0dh25AAAAIOMqqnkVzrm0SdG6UOoqKLsabl9GKJl")
-    )
+    text: str = schema.example("ssh-ed25519 AAAAC3NzaC1lZDI1NTEgH5C9okWi0dh25AAAAIOMqqnkVzrm0SdG6UOoqKLsabl9GKJl")
 
 
 class SshKeyAddResults(schema.Strict):
-    endpoint: Literal["/ssh-key/add"] = schema.Field(alias="endpoint")
-    fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
+    endpoint: Literal["/ssh-key/add"] = schema.alias("endpoint")
+    fingerprint: str = schema.example("0123456789abcdef0123456789abcdef01234567")
 
 
 class SshKeyDeleteArgs(schema.Strict):
-    fingerprint: str = schema.Field(..., **example("0123456789abcdef0123456789abcdef01234567"))
+    fingerprint: str = schema.example("0123456789abcdef0123456789abcdef01234567")
 
 
 class SshKeyDeleteResults(schema.Strict):
-    endpoint: Literal["/ssh-key/delete"] = schema.Field(alias="endpoint")
-    success: Literal[True] = schema.Field(..., **example(True))
+    endpoint: Literal["/ssh-key/delete"] = schema.alias("endpoint")
+    success: Literal[True] = schema.example(True)
 
 
 @dataclasses.dataclass
@@ -457,9 +435,9 @@ class SshKeysListQuery:
 
 
 class SshKeysListResults(schema.Strict):
-    endpoint: Literal["/ssh-keys/list"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/ssh-keys/list"] = schema.alias("endpoint")
     data: Sequence[sql.SSHKey]
-    count: int = schema.Field(..., **example(10))
+    count: int = schema.example(10)
 
 
 @dataclasses.dataclass
@@ -470,51 +448,49 @@ class TasksListQuery:
 
 
 class TasksListResults(schema.Strict):
-    endpoint: Literal["/tasks/list"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/tasks/list"] = schema.alias("endpoint")
     data: Sequence[sql.Task]
-    count: int = schema.Field(..., **example(10))
+    count: int = schema.example(10)
 
 
 class UsersListResults(schema.Strict):
-    endpoint: Literal["/users/list"] = schema.Field(alias="endpoint")
-    users: Sequence[str] = schema.Field(..., **example(["user1", "user2"]))
+    endpoint: Literal["/users/list"] = schema.alias("endpoint")
+    users: Sequence[str] = schema.example(["user1", "user2"])
 
 
 class VoteResolveArgs(schema.Strict):
-    project: str = schema.Field(..., **example("example"))
-    version: str = schema.Field(..., **example("0.0.1"))
-    resolution: Literal["passed", "failed"] = schema.Field(..., **example("passed"))
+    project: str = schema.example("example")
+    version: str = schema.example("0.0.1")
+    resolution: Literal["passed", "failed"] = schema.example("passed")
 
 
 class VoteResolveResults(schema.Strict):
-    endpoint: Literal["/vote/resolve"] = schema.Field(alias="endpoint")
-    success: Literal[True] = schema.Field(..., **example(True))
+    endpoint: Literal["/vote/resolve"] = schema.alias("endpoint")
+    success: Literal[True] = schema.example(True)
 
 
 class VoteStartArgs(schema.Strict):
-    project: str = schema.Field(..., **example("example"))
-    version: str = schema.Field(..., **example("0.0.1"))
-    revision: str = schema.Field(..., **example("00005"))
-    email_to: str = schema.Field(..., **example("dev@example.apache.org"))
-    vote_duration: int = schema.Field(..., **example(10))
-    subject: str = schema.Field(..., **example("[VOTE] Apache Example 0.0.1 release"))
-    body: str = schema.Field(
-        ..., **example("The Apache Example team is pleased to announce the release of Example 0.0.1...")
-    )
+    project: str = schema.example("example")
+    version: str = schema.example("0.0.1")
+    revision: str = schema.example("00005")
+    email_to: str = schema.example("dev@example.apache.org")
+    vote_duration: int = schema.example(10)
+    subject: str = schema.example("[VOTE] Apache Example 0.0.1 release")
+    body: str = schema.example("The Apache Example team is pleased to announce the release of Example 0.0.1...")
 
 
 class VoteStartResults(schema.Strict):
-    endpoint: Literal["/vote/start"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/vote/start"] = schema.alias("endpoint")
     task: sql.Task
 
 
 class VoteTabulateArgs(schema.Strict):
-    project: str = schema.Field(..., **example("example"))
-    version: str = schema.Field(..., **example("0.0.1"))
+    project: str = schema.example("example")
+    version: str = schema.example("0.0.1")
 
 
 class VoteTabulateResults(schema.Strict):
-    endpoint: Literal["/vote/tabulate"] = schema.Field(alias="endpoint")
+    endpoint: Literal["/vote/tabulate"] = schema.alias("endpoint")
     details: tabulate.VoteDetails
 
 
@@ -562,7 +538,7 @@ type Results = Annotated[
     | VoteResolveResults
     | VoteStartResults
     | VoteTabulateResults,
-    schema.Field(discriminator="endpoint"),
+    schema.discriminator("endpoint"),
 ]
 
 ResultsAdapter = pydantic.TypeAdapter(Results)
