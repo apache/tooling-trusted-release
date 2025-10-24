@@ -453,6 +453,12 @@ class TasksListResults(schema.Strict):
     count: int = schema.example(10)
 
 
+class UserInfoResults(schema.Strict):
+    endpoint: Literal["/user/info"] = schema.alias("endpoint")
+    participant_of: list[str] = schema.example(["committee_name_a", "committee_name_b"])
+    member_of: list[str] = schema.example(["committee_name_a"])
+
+
 class UsersListResults(schema.Strict):
     endpoint: Literal["/users/list"] = schema.alias("endpoint")
     users: Sequence[str] = schema.example(["user1", "user2"])
@@ -534,6 +540,7 @@ type Results = Annotated[
     | SshKeyDeleteResults
     | SshKeysListResults
     | TasksListResults
+    | UserInfoResults
     | UsersListResults
     | VoteResolveResults
     | VoteStartResults
@@ -591,6 +598,7 @@ validate_ssh_key_add = validator(SshKeyAddResults)
 validate_ssh_key_delete = validator(SshKeyDeleteResults)
 validate_ssh_keys_list = validator(SshKeysListResults)
 validate_tasks_list = validator(TasksListResults)
+validate_user_info = validator(UserInfoResults)
 validate_users_list = validator(UsersListResults)
 validate_vote_resolve = validator(VoteResolveResults)
 validate_vote_start = validator(VoteStartResults)

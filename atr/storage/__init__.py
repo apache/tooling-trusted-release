@@ -397,16 +397,9 @@ class Write:
 # Context managers
 
 
-class ArgumentNoneType:
-    pass
-
-
-ArgumentNone = ArgumentNoneType()
-
-
 @contextlib.asynccontextmanager
-async def read(asf_uid: str | None | ArgumentNoneType = ArgumentNone) -> AsyncGenerator[Read]:
-    if asf_uid is ArgumentNone:
+async def read(asf_uid: principal.UID = principal.ArgumentNone) -> AsyncGenerator[Read]:
+    if asf_uid is principal.ArgumentNone:
         authorisation = await principal.Authorisation()
     else:
         authorisation = await principal.Authorisation(asf_uid)
@@ -417,7 +410,7 @@ async def read(asf_uid: str | None | ArgumentNoneType = ArgumentNone) -> AsyncGe
 
 @contextlib.asynccontextmanager
 async def read_as_foundation_committer(
-    asf_uid: str | None | ArgumentNoneType = ArgumentNone,
+    asf_uid: principal.UID = principal.ArgumentNone,
 ) -> AsyncGenerator[ReadAsFoundationCommitter]:
     async with read(asf_uid) as r:
         yield r.as_foundation_committer()
@@ -425,15 +418,15 @@ async def read_as_foundation_committer(
 
 @contextlib.asynccontextmanager
 async def read_as_general_public(
-    asf_uid: str | None | ArgumentNoneType = ArgumentNone,
+    asf_uid: principal.UID = principal.ArgumentNone,
 ) -> AsyncGenerator[ReadAsGeneralPublic]:
     async with read(asf_uid) as r:
         yield r.as_general_public()
 
 
 @contextlib.asynccontextmanager
-async def read_and_write(asf_uid: str | None | ArgumentNoneType = ArgumentNone) -> AsyncGenerator[tuple[Read, Write]]:
-    if asf_uid is ArgumentNone:
+async def read_and_write(asf_uid: principal.UID = principal.ArgumentNone) -> AsyncGenerator[tuple[Read, Write]]:
+    if asf_uid is principal.ArgumentNone:
         authorisation = await principal.Authorisation()
     else:
         authorisation = await principal.Authorisation(asf_uid)
@@ -445,8 +438,8 @@ async def read_and_write(asf_uid: str | None | ArgumentNoneType = ArgumentNone) 
 
 
 @contextlib.asynccontextmanager
-async def write(asf_uid: str | None | ArgumentNoneType = ArgumentNone) -> AsyncGenerator[Write]:
-    if asf_uid is ArgumentNone:
+async def write(asf_uid: principal.UID = principal.ArgumentNone) -> AsyncGenerator[Write]:
+    if asf_uid is principal.ArgumentNone:
         authorisation = await principal.Authorisation()
     else:
         authorisation = await principal.Authorisation(asf_uid)
@@ -458,7 +451,7 @@ async def write(asf_uid: str | None | ArgumentNoneType = ArgumentNone) -> AsyncG
 @contextlib.asynccontextmanager
 async def write_as_committee_member(
     committee_name: str,
-    asf_uid: str | None | ArgumentNoneType = ArgumentNone,
+    asf_uid: principal.UID = principal.ArgumentNone,
 ) -> AsyncGenerator[WriteAsCommitteeMember]:
     async with write(asf_uid) as w:
         yield w.as_committee_member(committee_name)
@@ -467,7 +460,7 @@ async def write_as_committee_member(
 @contextlib.asynccontextmanager
 async def write_as_committee_participant(
     committee_name: str,
-    asf_uid: str | None | ArgumentNoneType = ArgumentNone,
+    asf_uid: principal.UID = principal.ArgumentNone,
 ) -> AsyncGenerator[WriteAsCommitteeParticipant]:
     async with write(asf_uid) as w:
         yield w.as_committee_participant(committee_name)
@@ -476,7 +469,7 @@ async def write_as_committee_participant(
 @contextlib.asynccontextmanager
 async def write_as_project_committee_member(
     project_name: str,
-    asf_uid: str | None | ArgumentNoneType = ArgumentNone,
+    asf_uid: principal.UID = principal.ArgumentNone,
 ) -> AsyncGenerator[WriteAsCommitteeMember]:
     async with write(asf_uid) as w:
         yield await w.as_project_committee_member(project_name)

@@ -251,7 +251,7 @@ async def _delete_empty_directory(
     respond: Respond,
 ) -> tuple[quart_response.Response, int] | response.Response:
     try:
-        async with storage.write(session.uid) as write:
+        async with storage.write(session) as write:
             wacp = await write.as_project_committee_member(project_name)
             creation_error = await wacp.release.delete_empty_directory(project_name, version_name, dir_to_delete_rel)
     except Exception:
@@ -272,7 +272,7 @@ async def _move_file_to_revision(
     respond: Respond,
 ) -> tuple[quart_response.Response, int] | response.Response:
     try:
-        async with storage.write(session.uid) as write:
+        async with storage.write(session) as write:
             wacp = await write.as_project_committee_member(project_name)
             creation_error, moved_files_names, skipped_files_names = await wacp.release.move_file(
                 project_name, version_name, source_files_rel, target_dir_rel
@@ -313,7 +313,7 @@ async def _remove_rc_tags(
     respond: Respond,
 ) -> tuple[quart_response.Response, int] | response.Response:
     try:
-        async with storage.write(session.uid) as write:
+        async with storage.write(session) as write:
             wacp = await write.as_project_committee_member(project_name)
             creation_error, renamed_count, error_messages = await wacp.release.remove_rc_tags(
                 project_name, version_name
