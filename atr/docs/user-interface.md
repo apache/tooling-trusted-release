@@ -4,7 +4,7 @@
 
 **Prev**: `3.4.` [Storage interface](storage-interface)
 
-**Next**: `3.6.` [Build processes](build-processes)
+**Next**: `3.6.` [Tasks](tasks)
 
 **Sections**:
 
