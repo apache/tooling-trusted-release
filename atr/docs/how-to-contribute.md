@@ -1,10 +1,10 @@
-# 3.9. How to contribute
+# 3.10. How to contribute
 
 **Up**: `3.` [Developer guide](developer-guide)
 
-**Prev**: `3.8.` [Code conventions](code-conventions)
+**Prev**: `3.9.` [Code conventions](code-conventions)
 
-**Next**: `3.9.1.` [Adding checks](adding-checks)
+**Next**: (none)
 
 **Sections**:
 

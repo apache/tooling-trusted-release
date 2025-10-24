@@ -13,11 +13,11 @@
 * `3.3.` [Database](database)
 * `3.4.` [Storage interface](storage-interface)
 * `3.5.` [User interface](user-interface)
-* `3.6.` [Build processes](build-processes)
-* `3.7.` [Running and creating tests](running-and-creating-tests)
-* `3.8.` [Code conventions](code-conventions)
-* `3.9.` [How to contribute](how-to-contribute)
-  * `3.9.1.` [Adding checks](adding-checks)
+* `3.6.` [Tasks](tasks)
+* `3.7.` [Build processes](build-processes)
+* `3.8.` [Running and creating tests](running-and-creating-tests)
+* `3.9.` [Code conventions](code-conventions)
+* `3.10.` [How to contribute](how-to-contribute)
 
 **Sections**:
 
