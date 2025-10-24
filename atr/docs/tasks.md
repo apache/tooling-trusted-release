@@ -21,13 +21,16 @@ One important subset of task in ATR is the check. Checks are run when a release 
 
 There are several checks for correctness that are already built out, and this how-to provides pointers for developers wishing to add new checks for relevant pieces of a release. Currently as of `alpha-2` ATR has checks for the following:
 
-1. Correct hashing
-1. Compliant license
-1. File paths
-1. RAT results
-1. Correct signature
-1. Well-formed tarballs
-1. Well-formed zip files
+1. Correct hashing (`sql.TaskType.HASHING_CHECK`, `hashing.check`)
+1. Compliant license (`sql.TaskType.LICENSE_FILES`, `license.files`)
+1. Compliant license headers (`sql.TaskType.LICENSE_HEADERS`, `license.headers`)
+1. File paths (`sql.TaskType.PATHS_CHECK`, `paths.check`)
+1. RAT results (`sql.TaskType.RAT_CHECK`, `rat.check`)
+1. Correct signature (`sql.TaskType.SIGNATURE_CHECK`, `signature.check`)
+1. Tarball integrity (`sql.TaskType.TARGZ_INTEGRITY`, `targz.integrity`)
+1. Tarball structure (`sql.TaskType.TARGZ_STRUCTURE`, `targz.structure`)
+1. Zip file integrity (`sql.TaskType.ZIPFORMAT_INTEGRITY`, `zipformat.integrity`)
+1. Zip file structure (`sql.TaskType.ZIPFORMAT_STRUCTURE`, `zipformat.structure`)
 
 ### Adding a task check module
 
