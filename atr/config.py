@@ -19,6 +19,7 @@ import enum
 import os
 import secrets
 from typing import Final
+import atr.log as log
 
 import decouple
 
@@ -82,7 +83,9 @@ class AppConfig:
     # Chunk size for reading files during extraction
     EXTRACT_CHUNK_SIZE: int = decouple.config("EXTRACT_CHUNK_SIZE", default=4 * _MB, cast=int)
 
+    # Default admin users (hardcoded for backward compatibility)
     # FIXME: retrieve the list of admin users from LDAP or oath session / isRoot
+<<<<<<< HEAD
     ADMIN_USERS = frozenset(
         {
             "cwells",
@@ -96,6 +99,25 @@ class AppConfig:
             "akm",
         }
     )
+=======
+    _DEFAULT_ADMIN_USERS = {
+        "cwells",
+        "dfoulks",
+        "fluxo",
+        "gmcdonald",
+        "humbedooh",
+        "sbp",
+        "tn",
+        "wave",
+    }
+
+    # Get additional admin users from environment variable (comma-separated)
+    _additional_admin_users = decouple.config("ADMIN_USERS", default="", cast=str)
+    _env_admin_users = {user.strip() for user in _additional_admin_users.split(",") if user.strip()}
+    
+    # Combine default and environment admin users
+    ADMIN_USERS = frozenset(_DEFAULT_ADMIN_USERS | _env_admin_users)
+>>>>>>> 95f2eb3 (Fixes #264)
 
 
 class DebugConfig(AppConfig):
