@@ -17,6 +17,7 @@
 * `3.7.` [Running and creating tests](running-and-creating-tests)
 * `3.8.` [Code conventions](code-conventions)
 * `3.9.` [How to contribute](how-to-contribute)
+  * `3.9.1.` [Adding checks](adding-checks)
 
 **Sections**:
 
