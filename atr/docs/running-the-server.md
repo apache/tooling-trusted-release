@@ -71,3 +71,5 @@ If you do not want to change your `/etc/hosts`, you can use `127.0.0.1`. You sho
 Pick one or the other, because logging into the site on one host does not log you in to the site on any other host.
 
 It will take one or two minutes for the server to fetch committee and project information from the ASF website. Until the fetch is complete, no existing committees and projects will show.
+
+Developers without LDAP credentials will be unable to perform `rsync` writes and certain tasks may also fail. To enable these actions to succeed, visit `/user/cache` and press the "Cache me!" button. This writes your session information to the ATR state directory, where it will be consulted instead of an LDAP lookup if it exists. The same page also allows you to clear your session cache data. When you clear your session cache data, the `atr/principal.py` module will still likely cache your authorization, so you need to restart the server to clear that. This session caching feature only works in debug mode, which is enabled when using `make serve-local`.
