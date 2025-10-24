@@ -55,8 +55,7 @@ async def check(
     paths = [path async for path in util.paths_recursive(base_path)]
     paths.sort()
 
-    asf_uid = session.uid if (session is not None) else None
-    async with storage.read(asf_uid) as read:
+    async with storage.read(session) as read:
         ragp = read.as_general_public()
         info = await ragp.releases.path_info(release, paths)
 

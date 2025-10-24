@@ -359,7 +359,7 @@ async def ssh_add(session: route.CommitterSession) -> response.Response | str:
     if await form.validate_on_submit():
         key: str = util.unwrap(form.key.data)
         try:
-            async with storage.write(session.uid) as write:
+            async with storage.write(session) as write:
                 wafc = write.as_foundation_committer()
                 fingerprint = await wafc.ssh.add_key(key, session.uid)
         except util.SshFingerprintError as e:

@@ -121,7 +121,7 @@ async def selected_post(session: route.CommitterSession, project_name: str, vers
             )
 
     description = f"Copy of revision {selected_revision_number} through web interface"
-    async with storage.write(session.uid) as write:
+    async with storage.write(session) as write:
         wacp = await write.as_project_committee_participant(project_name)
         async with wacp.revision.create_and_manage(
             project_name, version_name, session.uid, description=description

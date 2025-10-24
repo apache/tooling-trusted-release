@@ -61,7 +61,7 @@ async def selected(session: route.CommitterSession, project_name: str) -> respon
             project_name = str(form.project_name.data)
             version = str(form.version_name.data)
             # We already have the project, so we only need to get the new release
-            async with storage.write(session.uid) as write:
+            async with storage.write(session) as write:
                 wacp = await write.as_project_committee_participant(project_name)
                 new_release, _project = await wacp.release.start(project_name, version)
             # Redirect to the new draft's overview page on success

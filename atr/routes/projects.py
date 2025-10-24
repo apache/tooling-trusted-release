@@ -250,7 +250,7 @@ You must start with your committee label, and you must use lower case.
 """
 
     if await form.validate_on_submit():
-        return await _project_add(form, session.uid)
+        return await _project_add(form, session)
 
     return await template.render("project-add-project.html", form=form, committee_name=committee.display_name)
 
@@ -265,7 +265,7 @@ async def delete(session: route.CommitterSession) -> response.Response:
     if not project_name:
         return await session.redirect(projects, error="Missing project name for deletion.")
 
-    async with storage.write(session.uid) as write:
+    async with storage.write(session) as write:
         wacm = await write.as_project_committee_member(project_name)
         try:
             await wacm.project.delete(project_name)
@@ -328,16 +328,15 @@ async def view(session: route.CommitterSession, name: str) -> response.Response 
 
     if can_edit and (quart.request.method == "POST"):
         form_data = await quart.request.form
-        asf_uid = util.unwrap(session.uid)
         if "submit_metadata" in form_data:
-            edited_metadata, metadata_form = await _metadata_edit(asf_uid, project, form_data)
+            edited_metadata, metadata_form = await _metadata_edit(session, project, form_data)
             if edited_metadata is True:
                 return quart.redirect(util.as_url(view, name=project.name))
         elif "submit_policy" in form_data:
             policy_form = await ReleasePolicyForm.create_form(data=form_data)
             if await policy_form.validate_on_submit():
                 policy_data = policy.ReleasePolicyData.model_validate(policy_form.data)
-                async with storage.write(asf_uid) as write:
+                async with storage.write(session) as write:
                     wacm = await write.as_project_committee_member(project.name)
                     try:
                         await wacm.policy.edit(project, policy_data)
@@ -407,7 +406,7 @@ async def _metadata_category_remove(
 
 
 async def _metadata_edit(
-    asf_uid: str, project: sql.Project, form_data: dict[str, str]
+    session: route.CommitterSession, project: sql.Project, form_data: dict[str, str]
 ) -> tuple[bool, ProjectMetadataForm]:
     metadata_form = await ProjectMetadataForm.create_form(data=form_data)
 
@@ -429,7 +428,7 @@ async def _metadata_edit(
     category_to_add = metadata_form.category_to_add.data
     language_to_add = metadata_form.language_to_add.data
 
-    async with storage.write(asf_uid) as write:
+    async with storage.write(session) as write:
         wacm = await write.as_project_committee_member(project.name)
 
         if (action_type == "add_category") and category_to_add:
@@ -508,13 +507,13 @@ async def _policy_form_create(project: sql.Project) -> ReleasePolicyForm:
     return policy_form
 
 
-async def _project_add(form: AddForm, asf_id: str) -> response.Response:
+async def _project_add(form: AddForm, session: route.CommitterSession) -> response.Response:
     form_values = await _project_add_validate(form)
     if form_values is None:
         return quart.redirect(util.as_url(add_project, committee_name=form.committee_name.data))
     committee_name, display_name, label = form_values
 
-    async with storage.write(asf_id) as write:
+    async with storage.write(session) as write:
         wacm = await write.as_project_committee_member(committee_name)
         try:
             await wacm.project.create(committee_name, display_name, label)

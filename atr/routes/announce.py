@@ -141,7 +141,7 @@ async def selected_post(
     download_path_suffix = _download_path_suffix_validated(announce_form)
 
     try:
-        async with storage.write_as_project_committee_member(project_name, session.uid) as wacm:
+        async with storage.write_as_project_committee_member(project_name, session) as wacm:
             await wacm.announce.release(
                 project_name,
                 version_name,

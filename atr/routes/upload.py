@@ -74,7 +74,7 @@ async def selected(session: route.CommitterSession, project_name: str, version_n
                 file_name = pathlib.Path(form.file_name.data)
             file_data = form.file_data.data
 
-            async with storage.write(session.uid) as write:
+            async with storage.write(session) as write:
                 wacp = await write.as_project_committee_participant(project_name)
                 number_of_files = await wacp.release.upload_files(project_name, version_name, file_name, file_data)
             return await session.redirect(
