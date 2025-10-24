@@ -83,6 +83,7 @@ class AppConfig:
     EXTRACT_CHUNK_SIZE: int = decouple.config("EXTRACT_CHUNK_SIZE", default=4 * _MB, cast=int)
 
     # FIXME: retrieve the list of admin users from LDAP or oath session / isRoot
+    ADMIN_USERS_ADDITIONAL = decouple.config("ADMIN_USERS_ADDITIONAL", default="", cast=str)
     ADMIN_USERS = frozenset(
         {
             "cwells",
@@ -94,6 +95,7 @@ class AppConfig:
             "tn",
             "wave",
         }
+        | set(ADMIN_USERS_ADDITIONAL.split(",") if ADMIN_USERS_ADDITIONAL else [])
     )
 
 
