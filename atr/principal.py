@@ -28,6 +28,7 @@ import atr.config as config
 import atr.ldap as ldap
 import atr.log as log
 import atr.route as route
+import atr.util as util
 
 LDAP_CHAIRS_BASE = "cn=pmc-chairs,ou=groups,ou=services,dc=apache,dc=org"
 LDAP_DN = "uid=%s,ou=people,dc=apache,dc=org"
@@ -304,6 +305,20 @@ class AuthoriserLDAP:
             self.__cache.participant_of[asf_uid] = projects
             self.__cache.last_refreshed[asf_uid] = int(time.time())
             return
+
+        if config.get_mode() == config.Mode.Debug:
+            session_cache = await util.session_cache_read()
+            if asf_uid in session_cache:
+                cached_session = session_cache[asf_uid]
+                committees = frozenset(cached_session.get("pmcs", []))
+                projects = frozenset(cached_session.get("projects", []))
+                committees, projects = _augment_test_membership(committees, projects)
+
+                self.__cache.member_of[asf_uid] = committees
+                self.__cache.participant_of[asf_uid] = projects
+                self.__cache.last_refreshed[asf_uid] = int(time.time())
+                log.info(f"Loaded session data for {asf_uid} from session cache file")
+                return
 
         try:
             c = Committer(asf_uid)
