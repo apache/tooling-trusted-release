@@ -1,10 +1,10 @@
-# 3.7. Running and creating tests
+# 3.8. Running and creating tests
 
 **Up**: `3.` [Developer guide](developer-guide)
 
-**Prev**: `3.6.` [Build processes](build-processes)
+**Prev**: `3.7.` [Build processes](build-processes)
 
-**Next**: `3.8.` [Code conventions](code-conventions)
+**Next**: `3.9.` [Code conventions](code-conventions)
 
 **Sections**:
 

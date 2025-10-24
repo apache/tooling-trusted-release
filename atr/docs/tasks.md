@@ -1,17 +1,23 @@
-# 3.9.1. Adding checks
+# 3.6. Tasks
 
 **Up**: `3.` [Developer guide](developer-guide)
 
-**Prev**: `3.9.` [How to contribute](how-to-contribute)
+**Prev**: `3.5.` [User interface](user-interface)
 
-**Next**: (none)
+**Next**: `3.7.` [Build processes](build-processes)
 
 **Sections**:
 
 * [Introduction](#introduction)
-* [Where to add code](#where-to-add-code)
+* [Checks](#checks)
 
 ## Introduction
+
+Tasks are computations run in the background in dedicated worker processes orchestrated by a manager.
+
+## Checks
+
+One important subset of task in ATR is the check. Checks are run when a release manager adds or modifies files in a release candidate draft. The outputs of the checks alert the release manager to potential issues.
 
 There are several checks for correctness that are already built out, and this how-to provides pointers for developers wishing to add new checks for relevant pieces of a release. Currently as of `alpha-2` ATR has checks for the following:
 
@@ -23,14 +29,11 @@ There are several checks for correctness that are already built out, and this ho
 1. Well-formed tarballs
 1. Well-formed zip files
 
-
-## Where to add code
-
-### Adding your task check module
+### Adding a task check module
 
 In `atr/tasks/checks` you will find several modules that perform these check tasks, including `hashing.py`, `license.py`, etc. To write a new check task, add a module here that performs the checks needed.
 
-### Importing and using your module
+### Importing and using a check module
 
 In `atr/tasks/__init__.py` you will see imports for existing modules where you can add an import for new check task, for example:
 
@@ -54,7 +57,7 @@ def resolve(task_type: sql.TaskType) -> Callable[..., Awaitable[results.Results 
             return license.headers
 ```
 
-### Defining your task type
+### Defining a task type
 
 In `atr/models/sql.py` you will find the `TaskType` class where you can add a new mapping for the task:
 

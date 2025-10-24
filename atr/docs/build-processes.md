@@ -1,10 +1,10 @@
-# 3.6. Build processes
+# 3.7. Build processes
 
 **Up**: `3.` [Developer guide](developer-guide)
 
-**Prev**: `3.5.` [User interface](user-interface)
+**Prev**: `3.6.` [Tasks](tasks)
 
-**Next**: `3.7.` [Running and creating tests](running-and-creating-tests)
+**Next**: `3.8.` [Running and creating tests](running-and-creating-tests)
 
 **Sections**:
 

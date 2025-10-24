@@ -1,0 +1,50 @@
+<h1 id="tasks">3.6. Tasks</h1>
+<p><strong>Up</strong>: <code>3.</code> <a href="developer-guide">Developer guide</a></p>
+<p><strong>Prev</strong>: <code>3.5.</code> <a href="user-interface">User interface</a></p>
+<p><strong>Next</strong>: <code>3.7.</code> <a href="build-processes">Build processes</a></p>
+<p><strong>Sections</strong>:</p>
+<ul>
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#checks">Checks</a></li>
+</ul>
+<h2 id="introduction">Introduction</h2>
+<p>Tasks are computations run in the background in dedicated worker processes orchestrated by a manager.</p>
+<h2 id="checks">Checks</h2>
+<p>One important subset of task in ATR is the check. Checks are run when a release manager adds or modifies files in a release candidate draft. The outputs of the checks alert the release manager to potential issues.</p>
+<p>There are several checks for correctness that are already built out, and this how-to provides pointers for developers wishing to add new checks for relevant pieces of a release. Currently as of <code>alpha-2</code> ATR has checks for the following:</p>
+<ol>
+<li>Correct hashing</li>
+<li>Compliant license</li>
+<li>File paths</li>
+<li>RAT results</li>
+<li>Correct signature</li>
+<li>Well-formed tarballs</li>
+<li>Well-formed zip files</li>
+</ol>
+<h3 id="adding-a-task-check-module">Adding a task check module</h3>
+<p>In <code>atr/tasks/checks</code> you will find several modules that perform these check tasks, including <code>hashing.py</code>, <code>license.py</code>, etc. To write a new check task, add a module here that performs the checks needed.</p>
+<h3 id="importing-and-using-a-check-module">Importing and using a check module</h3>
+<p>In <code>atr/tasks/__init__.py</code> you will see imports for existing modules where you can add an import for new check task, for example:</p>
+<pre><code class="language-python">import atr.tasks.checks.hashing as hashing
+import atr.tasks.checks.license as license
+</code></pre>
+<p>And in the <code>resolve</code> function you will see where those modules are exercised where you can add a <code>case</code> statement for the new task:</p>
+<pre><code class="language-python">def resolve(task_type: sql.TaskType) -&gt; Callable[..., Awaitable[results.Results | None]]:  # noqa: C901
+    match task_type:
+        case sql.TaskType.HASHING_CHECK:
+            return hashing.check
+        case sql.TaskType.KEYS_IMPORT_FILE:
+            return keys.import_file
+        case sql.TaskType.LICENSE_FILES:
+            return license.files
+        case sql.TaskType.LICENSE_HEADERS:
+            return license.headers
+</code></pre>
+<h3 id="defining-a-task-type">Defining a task type</h3>
+<p>In <code>atr/models/sql.py</code> you will find the <code>TaskType</code> class where you can add a new mapping for the task:</p>
+<pre><code class="language-python">class TaskType(str, enum.Enum):
+    HASHING_CHECK = "hashing_check"
+    KEYS_IMPORT_FILE = "keys_import_file"
+    LICENSE_FILES = "license_files"
+    LICENSE_HEADERS = "license_headers"
+</code></pre>
