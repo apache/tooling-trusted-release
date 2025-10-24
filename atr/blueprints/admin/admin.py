@@ -44,6 +44,7 @@ import atr.ldap as ldap
 import atr.log as log
 import atr.models.sql as sql
 import atr.principal as principal
+import atr.route as route
 import atr.routes.mapping as mapping
 import atr.storage as storage
 import atr.storage.outcome as outcome
@@ -370,7 +371,8 @@ async def admin_delete_release() -> str | response.Response:
                 await quart.flash("No releases selected for deletion.", "warning")
                 return quart.redirect(quart.url_for("admin.admin_delete_release"))
 
-            await _delete_releases(releases_to_delete, asf_uid)
+            committer_session = route.CommitterSession(web_session)
+            await _delete_releases(committer_session, releases_to_delete)
 
             # Redirecting back to the deletion page will refresh the list of releases too
             return quart.redirect(quart.url_for("admin.admin_delete_release"))
@@ -787,7 +789,7 @@ async def _check_keys(fix: bool = False) -> str:
     return message
 
 
-async def _delete_releases(releases_to_delete: list[str], asf_uid: str) -> None:
+async def _delete_releases(session: route.CommitterSession, releases_to_delete: list[str]) -> None:
     success_count = 0
     fail_count = 0
     error_messages = []
@@ -800,7 +802,7 @@ async def _delete_releases(releases_to_delete: list[str], asf_uid: str) -> None:
                 )
                 if release.committee is None:
                     raise RuntimeError(f"Release {release_name} has no committee")
-            async with storage.write(asf_uid) as write:
+            async with storage.write(session) as write:
                 wafa = write.as_foundation_admin(release.committee.name)
                 await wafa.release.delete(release.project.name, release.version)
             success_count += 1

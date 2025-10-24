@@ -97,7 +97,7 @@ async def delete(session: route.CommitterSession) -> response.Response:
     await session.check_access(project_name)
 
     # Delete the metadata from the database
-    async with storage.write(session.uid) as write:
+    async with storage.write(session) as write:
         wacp = await write.as_project_committee_participant(project_name)
         await wacp.release.delete(
             project_name, version_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT, include_downloads=False
@@ -132,7 +132,7 @@ async def delete_file(session: route.CommitterSession, project_name: str, versio
     rel_path_to_delete = pathlib.Path(str(form.file_path.data))
 
     try:
-        async with storage.write(session.uid) as write:
+        async with storage.write(session) as write:
             wacp = await write.as_project_committee_participant(project_name)
             metadata_files_deleted = await wacp.release.delete_file(project_name, version_name, rel_path_to_delete)
     except Exception as e:
@@ -162,7 +162,7 @@ async def fresh(session: route.CommitterSession, project_name: str, version_name
     # This doesn't make sense unless the checks themselves have been updated
     # Therefore we only show the button for this to admins
     description = "Empty revision to restart all checks for the whole release candidate draft"
-    async with storage.write(session.uid) as write:
+    async with storage.write(session) as write:
         wacp = await write.as_project_committee_participant(project_name)
         async with wacp.revision.create_and_manage(
             project_name, version_name, session.uid, description=description
@@ -195,7 +195,7 @@ async def hashgen(
     rel_path = pathlib.Path(file_path)
 
     try:
-        async with storage.write(session.uid) as write:
+        async with storage.write(session) as write:
             wacp = await write.as_project_committee_participant(project_name)
             await wacp.release.generate_hash_file(project_name, version_name, rel_path, hash_type)
 
@@ -230,7 +230,7 @@ async def sbomgen(
 
     try:
         description = "SBOM generation through web interface"
-        async with storage.write(session.uid) as write:
+        async with storage.write(session) as write:
             wacp = await write.as_project_committee_participant(project_name)
             async with wacp.revision.create_and_manage(
                 project_name, version_name, session.uid, description=description
@@ -288,7 +288,7 @@ async def svnload(session: route.CommitterSession, project_name: str, version_na
         )
 
     try:
-        async with storage.write(session.uid) as write:
+        async with storage.write(session) as write:
             wacp = await write.as_project_committee_participant(project_name)
             await wacp.release.import_from_svn(
                 project_name,

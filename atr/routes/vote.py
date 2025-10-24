@@ -89,8 +89,7 @@ async def selected(
 
         # Move task_mid_get here?
         task_mid = interaction.task_mid_get(latest_vote_task)
-        asf_uid = session.uid if (session is not None) else None
-        async with storage.write(asf_uid) as write:
+        async with storage.write(session) as write:
             wagp = write.as_general_public()
             archive_url = await wagp.cache.get_message_archive_url(task_mid)
 

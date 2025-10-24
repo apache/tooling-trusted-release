@@ -27,6 +27,7 @@ import asfquart.session as session
 import atr.config as config
 import atr.ldap as ldap
 import atr.log as log
+import atr.route as route
 
 LDAP_CHAIRS_BASE = "cn=pmc-chairs,ou=groups,ou=services,dc=apache,dc=org"
 LDAP_DN = "uid=%s,ou=people,dc=apache,dc=org"
@@ -49,6 +50,15 @@ class CommitterError(Exception):
     def __init__(self, message, origin=None):
         super().__init__(message)
         self.origin = origin
+
+
+class ArgumentNoneType:
+    pass
+
+
+ArgumentNone = ArgumentNoneType()
+
+type UID = route.CommitterSession | str | None | ArgumentNoneType
 
 
 def attr_to_list(attr):
@@ -325,15 +335,15 @@ class AsyncObject:
 
 
 class Authorisation(AsyncObject):
-    class __ArgumentNoneType:
-        pass
-
-    __ArgumentNone = __ArgumentNoneType()
-
-    async def __init__(self, asf_uid: str | None | __ArgumentNoneType = __ArgumentNone):
+    async def __init__(self, asf_uid: UID = ArgumentNone):
         match asf_uid:
-            case Authorisation.__ArgumentNone:
-                asfquart_session = await session.read()
+            case ArgumentNoneType() | route.CommitterSession():
+                match asf_uid:
+                    case route.CommitterSession():
+                        asfquart_session = asf_uid._session
+                    case _:
+                        asfquart_session = await session.read()
+                # asfquart_session = await session.read()
                 if asfquart_session is None:
                     raise AuthenticationError("No ASFQuart session found")
                 self.__authoriser = authoriser_asfquart

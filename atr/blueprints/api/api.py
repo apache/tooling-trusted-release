@@ -36,6 +36,7 @@ import atr.db.interaction as interaction
 import atr.jwtoken as jwtoken
 import atr.models as models
 import atr.models.sql as sql
+import atr.principal as principal
 import atr.storage as storage
 import atr.storage.outcome as outcome
 import atr.storage.types as types
@@ -1094,6 +1095,25 @@ async def tasks_list(query_args: models.api.TasksListQuery) -> DictResponse:
     ).model_dump(), 200
 
 
+@api.BLUEPRINT.route("/user/info")
+@jwtoken.require
+@quart_schema.security_scheme([{"BearerAuth": []}])
+@quart_schema.validate_response(models.api.UserInfoResults, 200)
+async def user_info() -> DictResponse:
+    """
+    Get information about a user.
+    """
+    asf_uid = _jwt_asf_uid()
+    authorisation = await principal.Authorisation(asf_uid)
+    participant_of = authorisation.participant_of()
+    member_of = authorisation.member_of()
+    return models.api.UserInfoResults(
+        endpoint="/user/info",
+        participant_of=list(participant_of),
+        member_of=list(member_of),
+    ).model_dump(), 200
+
+
 @api.BLUEPRINT.route("/users/list")
 @quart_schema.validate_response(models.api.UsersListResults, 200)
 async def users_list() -> DictResponse:
@@ -1265,7 +1285,7 @@ def _jwt_asf_uid() -> str:
     claims = getattr(quart.g, "jwt_claims", {})
     asf_uid = claims.get("sub")
     if not isinstance(asf_uid, str):
-        raise base.ASFQuartException("Invalid token subject", errorcode=401)
+        raise base.ASFQuartException(f"Invalid token subject: {asf_uid!r}, type: {type(asf_uid)}", errorcode=401)
     return asf_uid
 
 

@@ -101,7 +101,7 @@ async def delete(session: route.CommitterSession) -> response.Response:
         return await session.redirect(root.index, error="Missing required parameters")
 
     # Check that the user has access to the project
-    async with storage.write(session.uid) as write:
+    async with storage.write(session) as write:
         wacp = await write.as_project_committee_participant(project_name)
         await wacp.release.delete(
             project_name, version_name, phase=sql.ReleasePhase.RELEASE_PREVIEW, include_downloads=False
