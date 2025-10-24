@@ -12,6 +12,8 @@
 
 ## Documentation build script
 
+To **regenerate the documentation**, run `make docs`.
+
 The ATR documentation that you're reading right now is structured like a book, with numbered chapters, sections, and navigation links between pages. We could maintain all of this by hand, but that would be tedious and error-prone. Instead, we use [`scripts/build_docs.py`](/ref/scripts/build_docs.py) to generate the navigation automatically from a single table of contents.
 
 The script reads the table of contents in [`atr/docs/index.md`](/ref/atr/docs/index.md), extracts the hierarchy of pages, and then updates every referenced page to include the correct navigation links, page numbers, and section listings. This means that when we want to reorganize the documentation (say, inserting a new chapter or moving sections around) we only need to edit the table of contents, run the script, and all the navigation is updated automatically.
