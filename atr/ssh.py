@@ -353,6 +353,7 @@ async def _step_06a_validate_read_permissions(
         sql.ReleasePhase.RELEASE_CANDIDATE,
         sql.ReleasePhase.RELEASE_PREVIEW,
     }
+    print(release)
     if release.phase not in allowed_read_phases:
         raise RsyncArgsError(f"Release '{release.name}' is not in a readable phase ({release.phase.value})")
 

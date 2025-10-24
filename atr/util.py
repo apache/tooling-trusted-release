@@ -774,6 +774,42 @@ def release_directory_version(release: sql.Release) -> pathlib.Path:
     return path
 
 
+async def session_cache_read() -> dict[str, dict]:
+    cache_path = pathlib.Path(config.get().STATE_DIR) / "user_session_cache.json"
+    try:
+        async with aiofiles.open(cache_path) as f:
+            content = await f.read()
+            return json.loads(content)
+    except FileNotFoundError:
+        return {}
+    except json.JSONDecodeError:
+        return {}
+
+
+async def session_cache_write(cache_data: dict[str, dict]) -> None:
+    cache_path = pathlib.Path(config.get().STATE_DIR) / "user_session_cache.json"
+
+    cache_dir = cache_path.parent
+    await asyncio.to_thread(os.makedirs, cache_dir, exist_ok=True)
+
+    # Use the same pattern as update_atomic_symlink for the temporary file name
+    temp_path = cache_dir / f".{cache_path.name}.{uuid.uuid4()}.tmp"
+
+    try:
+        async with aiofiles.open(temp_path, "w") as f:
+            await f.write(json.dumps(cache_data, indent=2))
+            await f.flush()
+            await asyncio.to_thread(os.fsync, f.fileno())
+
+        await aiofiles.os.rename(temp_path, cache_path)
+    except Exception:
+        try:
+            await aiofiles.os.remove(temp_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
 def static_path(*args: str) -> str:
     filename = str(pathlib.PurePosixPath(*args))
     return quart.url_for("static", filename=filename)
