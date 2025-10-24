@@ -13,13 +13,16 @@
 <p>One important subset of task in ATR is the check. Checks are run when a release manager adds or modifies files in a release candidate draft. The outputs of the checks alert the release manager to potential issues.</p>
 <p>There are several checks for correctness that are already built out, and this how-to provides pointers for developers wishing to add new checks for relevant pieces of a release. Currently as of <code>alpha-2</code> ATR has checks for the following:</p>
 <ol>
-<li>Correct hashing</li>
-<li>Compliant license</li>
-<li>File paths</li>
-<li>RAT results</li>
-<li>Correct signature</li>
-<li>Well-formed tarballs</li>
-<li>Well-formed zip files</li>
+<li>Correct hashing (<code>sql.TaskType.HASHING_CHECK</code>, <code>hashing.check</code>)</li>
+<li>Compliant license (<code>sql.TaskType.LICENSE_FILES</code>, <code>license.files</code>)</li>
+<li>Compliant license headers (<code>sql.TaskType.LICENSE_HEADERS</code>, <code>license.headers</code>)</li>
+<li>File paths (<code>sql.TaskType.PATHS_CHECK</code>, <code>paths.check</code>)</li>
+<li>RAT results (<code>sql.TaskType.RAT_CHECK</code>, <code>rat.check</code>)</li>
+<li>Correct signature (<code>sql.TaskType.SIGNATURE_CHECK</code>, <code>signature.check</code>)</li>
+<li>Tarball integrity (<code>sql.TaskType.TARGZ_INTEGRITY</code>, <code>targz.integrity</code>)</li>
+<li>Tarball structure (<code>sql.TaskType.TARGZ_STRUCTURE</code>, <code>targz.structure</code>)</li>
+<li>Zip file integrity (<code>sql.TaskType.ZIPFORMAT_INTEGRITY</code>, <code>zipformat.integrity</code>)</li>
+<li>Zip file structure (<code>sql.TaskType.ZIPFORMAT_STRUCTURE</code>, <code>zipformat.structure</code>)</li>
 </ol>
 <h3 id="adding-a-task-check-module">Adding a task check module</h3>
 <p>In <code>atr/tasks/checks</code> you will find several modules that perform these check tasks, including <code>hashing.py</code>, <code>license.py</code>, etc. To write a new check task, add a module here that performs the checks needed.</p>
