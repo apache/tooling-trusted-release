@@ -47,9 +47,24 @@ def default(default_value: Any) -> Any:
     return Field(default=default_value)
 
 
+def default_example(default_value: Any, example_value: Any) -> Any:
+    """Helper to create a Pydantic FieldInfo object with only a default value and an example value."""
+    return Field(default=default_value, json_schema_extra={"example": example_value})
+
+
 def description(desc_text: str) -> Any:
     """Helper to create a Pydantic FieldInfo object with only a description."""
     return Field(description=desc_text)
+
+
+def discriminator(discriminator_name: str) -> Any:
+    """Helper to create a Pydantic FieldInfo object with only a discriminator."""
+    return Field(discriminator=discriminator_name)
+
+
+def example(example_value: Any) -> Any:
+    """Helper to create a Pydantic FieldInfo object with only an example value."""
+    return Field(..., json_schema_extra={"example": example_value})
 
 
 def factory(cls: Callable[[], Any]) -> Any:
