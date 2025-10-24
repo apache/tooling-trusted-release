@@ -95,7 +95,6 @@ class AppConfig:
             "sbp",
             "tn",
             "wave",
-            "akm",
         }
         | set(ADMIN_USERS_ADDITIONAL.split(",") if ADMIN_USERS_ADDITIONAL else [])
     )
