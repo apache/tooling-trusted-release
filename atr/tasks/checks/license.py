@@ -24,12 +24,12 @@ import re
 from collections.abc import Iterator
 from typing import Any, Final
 
+import atr.constants as constants
 import atr.db as db
 import atr.log as log
 import atr.models.results as results
 import atr.models.schema as schema
 import atr.models.sql as sql
-import atr.static as static
 import atr.tarzip as tarzip
 import atr.tasks.checks as checks
 import atr.util as util
@@ -250,14 +250,14 @@ def _files_check_core_logic_license(archive: tarzip.Archive, member: tarzip.Memb
         return None
 
     sha3e = hashlib.sha3_256()
-    sha3e.update(static.APACHE_LICENSE_2_0.encode("utf-8"))
+    sha3e.update(constants.APACHE_LICENSE_2_0.encode("utf-8"))
     sha3_expected = sha3e.hexdigest()
 
     if sha3_expected != "5efa4839f385df309ffc022ca5ce9763c4bc709dab862ca77d9a894db6598456":
         log.error("SHA3 expected value is incorrect, please update the static.LICENSE constant")
 
     # It is common for the license to be used without the leading blank line
-    apache_license_2_0 = static.APACHE_LICENSE_2_0.removeprefix("\n")
+    apache_license_2_0 = constants.APACHE_LICENSE_2_0.removeprefix("\n")
     # Remove the trailing newline for further normalisation
     apache_license_2_0 = apache_license_2_0.removesuffix("\n")
     content = f.read()
