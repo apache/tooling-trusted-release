@@ -16,11 +16,11 @@
 # under the License.
 
 import atr.blueprints.get as get
-import atr.route as route
+import atr.session as session
 
 
 @get.committer("/example/test")
-async def respond(session: route.CommitterSession) -> str:
+async def respond(session: session.Committer) -> str:
     return f"""\
 <h1>Test route</h1>
 <p>Hello, {session.asf_uid}!</p>

@@ -19,7 +19,9 @@ from __future__ import annotations
 
 import inspect
 import logging
-from typing import Any
+import logging.handlers
+import queue
+from typing import Any, Final
 
 
 def caller_name(depth: int = 1) -> str:
@@ -120,3 +122,33 @@ def _event(level: int, msg: str, *args: Any, stacklevel: int = 3, **kwargs: Any)
     # Stack level 1 is *here*, 2 is the caller, 3 is the caller of the caller
     # I.e. _event (1), log.* (2), actual caller (3)
     logger.log(level, msg, *args, stacklevel=stacklevel, **kwargs)
+
+
+def _performance_logger() -> logging.Logger:
+    import atr.config as config
+
+    class MicrosecondsFormatter(logging.Formatter):
+        # Answers on a postcard if you know why Python decided to use a comma by default
+        default_msec_format = "%s.%03d"
+
+    performance: Final = logging.getLogger("log.performance")
+    # Use custom formatter that properly includes microseconds
+    # TODO: Is this actually UTC?
+    performance_handler: Final = logging.FileHandler(config.get().PERFORMANCE_LOG_FILE, encoding="utf-8")
+    performance_handler.setFormatter(MicrosecondsFormatter("%(asctime)s - %(message)s"))
+    performance_queue = queue.Queue(-1)
+    performance_listener = logging.handlers.QueueListener(performance_queue, performance_handler)
+    performance_listener.start()
+    performance.addHandler(logging.handlers.QueueHandler(performance_queue))
+    performance.setLevel(logging.INFO)
+    # If we don't set propagate to False then it logs to the term as well
+    performance.propagate = False
+
+    return performance
+
+
+PERFORMANCE: Final = _performance_logger()
+
+
+def performance(msg: str, *args: Any, **kwargs: Any) -> None:
+    PERFORMANCE.info(msg, *args, **kwargs)

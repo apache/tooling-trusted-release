@@ -72,6 +72,7 @@ class AppConfig:
     SVN_STORAGE_DIR = os.path.join(STATE_DIR, "svn")
     SQLITE_DB_PATH = decouple.config("SQLITE_DB_PATH", default="atr.db")
     STORAGE_AUDIT_LOG_FILE = os.path.join(STATE_DIR, "storage-audit.log")
+    PERFORMANCE_LOG_FILE = os.path.join(STATE_DIR, "route-performance.log")
 
     # Apache RAT configuration
     APACHE_RAT_JAR_PATH = decouple.config("APACHE_RAT_JAR_PATH", default=f"/opt/tools/apache-rat-{_RAT_VERSION}.jar")
@@ -148,6 +149,7 @@ def get() -> type[AppConfig]:
         (config.UNFINISHED_STORAGE_DIR, "UNFINISHED_STORAGE_DIR"),
         (config.SVN_STORAGE_DIR, "SVN_STORAGE_DIR"),
         (config.STORAGE_AUDIT_LOG_FILE, "STORAGE_AUDIT_LOG_FILE"),
+        (config.PERFORMANCE_LOG_FILE, "PERFORMANCE_LOG_FILE"),
     ]
     relative_paths = [
         (config.SQLITE_DB_PATH, "SQLITE_DB_PATH"),

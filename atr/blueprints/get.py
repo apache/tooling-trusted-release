@@ -15,16 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import time
 from collections.abc import Awaitable, Callable
 from types import ModuleType
 from typing import Any
 
 import asfquart.auth as auth
 import asfquart.base as base
-import asfquart.session as session
+import asfquart.session
 import quart
 
-import atr.route as route
+import atr.log as log
+import atr.session as session
 
 _BLUEPRINT = quart.Blueprint("get_blueprint", __name__)
 
@@ -36,15 +38,33 @@ def register(app: base.QuartApp) -> ModuleType:
     return get
 
 
-def committer(path: str) -> Callable[[route.CommitterRouteHandler[Any]], route.RouteHandler[Any]]:
-    def decorator(func: route.CommitterRouteHandler[Any]) -> route.RouteHandler[Any]:
+def committer(path: str) -> Callable[[session.CommitterRouteFunction[Any]], session.RouteFunction[Any]]:
+    def decorator(func: session.CommitterRouteFunction[Any]) -> session.RouteFunction[Any]:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            web_session = await session.read()
+            web_session = await asfquart.session.read()
             if web_session is None:
                 raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-            enhanced_session = route.CommitterSession(web_session)
-            return await func(enhanced_session, *args, **kwargs)
+            enhanced_session = session.Committer(web_session)
+            start_time_ns = time.perf_counter_ns()
+            response = await func(enhanced_session, *args, **kwargs)
+            end_time_ns = time.perf_counter_ns()
+            total_ns = end_time_ns - start_time_ns
+            total_ms = total_ns // 1_000_000
+
+            # TODO: Make this configurable in config.py
+            log.performance(
+                "%s %s %s %s %s %s %s",
+                "GET",
+                path,
+                func.__name__,
+                "=",
+                0,
+                0,
+                total_ms,
+            )
+
+            return response
 
         wrapper.__name__ = func.__name__
         wrapper.__doc__ = func.__doc__
@@ -59,11 +79,11 @@ def committer(path: str) -> Callable[[route.CommitterRouteHandler[Any]], route.R
     return decorator
 
 
-def public(path: str) -> Callable[[Callable[..., Awaitable[Any]]], route.RouteHandler[Any]]:
-    def decorator(func: Callable[..., Awaitable[Any]]) -> route.RouteHandler[Any]:
+def public(path: str) -> Callable[[Callable[..., Awaitable[Any]]], session.RouteFunction[Any]]:
+    def decorator(func: Callable[..., Awaitable[Any]]) -> session.RouteFunction[Any]:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            web_session = await session.read()
-            enhanced_session = route.CommitterSession(web_session) if web_session else None
+            web_session = await asfquart.session.read()
+            enhanced_session = session.Committer(web_session) if web_session else None
             return await func(enhanced_session, *args, **kwargs)
 
         wrapper.__name__ = func.__name__
