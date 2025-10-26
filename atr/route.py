@@ -24,7 +24,6 @@ import time
 from typing import TYPE_CHECKING, Any, Concatenate, Final, NoReturn, ParamSpec, Protocol, TypeVar
 
 import aiofiles
-import aiofiles.os
 import asfquart
 import asfquart.auth as auth
 import asfquart.base as base

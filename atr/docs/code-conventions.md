@@ -56,7 +56,7 @@ When you find yourself nesting code more than two or three levels deep, extract 
 
 ### Do not use lint or type checker ignore statements
 
-You must not use `# noqa`, `# type: ignore`, or equivalents, even to ignore specific errors. The single exception to this is when there is a bug in the linter or type checker.
+You must not use `# noqa`, `# type: ignore`, or equivalents such as `cast`, even to ignore specific errors. The single exception to this is when there is a bug in the linter or type checker.
 
 File level lint ignores can be added to the project's `pyproject.toml`, but they must be used sparingly.
 

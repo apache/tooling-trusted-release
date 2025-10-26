@@ -15,28 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from types import ModuleType
-from typing import Protocol, runtime_checkable
+from .example_test import respond as example_test
 
-import asfquart.base as base
+ROUTES_MODULE = True
 
-import atr.blueprints.api as api
-import atr.blueprints.get as get
-
-
-@runtime_checkable
-class RoutesModule(Protocol):
-    ROUTES_MODULE: bool = True
-
-
-def check_module(module: ModuleType) -> None:
-    # We need to know that the routes were actually imported
-    # Otherwise ASFQuart will not know about them, even if the blueprint is registered
-    # In other words, registering a blueprint does not automatically import its routes
-    if not isinstance(module, RoutesModule):
-        raise ValueError(f"Module {module} is not a RoutesModule")
-
-
-def register(app: base.QuartApp) -> None:
-    check_module(api.register(app))
-    check_module(get.register(app))
+__all__ = ["example_test"]

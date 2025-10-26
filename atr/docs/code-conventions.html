@@ -41,7 +41,7 @@ def process_data(data):
 <h3 id="avoid-excessive-indentation">Avoid excessive indentation</h3>
 <p>When you find yourself nesting code more than two or three levels deep, extract the nested logic into separate functions. This improves readability, testability, and maintainability. Each function should handle a single, well defined piece of logic.</p>
 <h3 id="do-not-use-lint-or-type-checker-ignore-statements">Do not use lint or type checker ignore statements</h3>
-<p>You must not use <code># noqa</code>, <code># type: ignore</code>, or equivalents, even to ignore specific errors. The single exception to this is when there is a bug in the linter or type checker.</p>
+<p>You must not use <code># noqa</code>, <code># type: ignore</code>, or equivalents such as <code>cast</code>, even to ignore specific errors. The single exception to this is when there is a bug in the linter or type checker.</p>
 <p>File level lint ignores can be added to the project's <code>pyproject.toml</code>, but they must be used sparingly.</p>
 <h3 id="use-double-quotes-for-all-strings">Use double quotes for all strings</h3>
 <p>This includes triple quoted strings.</p>
