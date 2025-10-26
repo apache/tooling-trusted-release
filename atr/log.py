@@ -147,8 +147,14 @@ def _performance_logger() -> logging.Logger:
     return performance
 
 
-PERFORMANCE: Final = _performance_logger()
+PERFORMANCE: logging.Logger | None = None
 
 
 def performance(msg: str, *args: Any, **kwargs: Any) -> None:
-    PERFORMANCE.info(msg, *args, **kwargs)
+    if PERFORMANCE is not None:
+        PERFORMANCE.info(msg, *args, **kwargs)
+
+
+def init_performance() -> None:
+    global PERFORMANCE
+    PERFORMANCE = _performance_logger()
