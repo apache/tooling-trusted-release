@@ -23,6 +23,8 @@ import logging.handlers
 import queue
 from typing import Any, Final
 
+PERFORMANCE: logging.Logger | None = None
+
 
 def caller_name(depth: int = 1) -> str:
     frame = inspect.currentframe()
@@ -87,6 +89,16 @@ def log(level: int, msg: str, *args: Any, **kwargs: Any) -> None:
     _event(level, msg, *args, **kwargs)
 
 
+def performance(msg: str, *args: Any, **kwargs: Any) -> None:
+    if PERFORMANCE is not None:
+        PERFORMANCE.info(msg, *args, **kwargs)
+
+
+def performance_init() -> None:
+    global PERFORMANCE
+    PERFORMANCE = _performance_logger()
+
+
 def secret(msg: str, data: bytes, *args: Any, **kwargs: Any) -> None:
     import base64
 
@@ -145,16 +157,3 @@ def _performance_logger() -> logging.Logger:
     performance.propagate = False
 
     return performance
-
-
-PERFORMANCE: logging.Logger | None = None
-
-
-def performance(msg: str, *args: Any, **kwargs: Any) -> None:
-    if PERFORMANCE is not None:
-        PERFORMANCE.info(msg, *args, **kwargs)
-
-
-def init_performance() -> None:
-    global PERFORMANCE
-    PERFORMANCE = _performance_logger()

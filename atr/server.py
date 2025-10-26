@@ -288,7 +288,7 @@ def create_app(app_config: type[config.AppConfig]) -> base.QuartApp:
     """Create and configure the application."""
     config_mode = config.get_mode()
     app_dirs_setup(app_config)
-    log.init_performance()
+    log.performance_init()
     app = app_create_base(app_config)
 
     app_setup_api_docs(app)
