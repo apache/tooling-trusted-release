@@ -16,6 +16,7 @@
 # under the License.
 
 import sys
+from types import ModuleType
 from typing import Any
 
 import asfquart.base as base
@@ -25,37 +26,46 @@ import quart.blueprints as blueprints
 import quart_schema
 import werkzeug.exceptions as exceptions
 
-BLUEPRINT = quart.Blueprint("api_blueprint", __name__, url_prefix="/api")
+_BLUEPRINT = quart.Blueprint("api_blueprint", __name__, url_prefix="/api")
+
+route = _BLUEPRINT.route
+
+
+def register(app: base.QuartApp) -> ModuleType:
+    import atr.api as api
+
+    app.register_blueprint(_BLUEPRINT)
+    return api
 
 
 def _exempt_blueprint(app: base.QuartApp) -> None:
     csrf = app.extensions.get("csrf")
     if csrf is not None:
-        csrf.exempt(BLUEPRINT)
+        csrf.exempt(_BLUEPRINT)
 
 
-@BLUEPRINT.errorhandler(base.ASFQuartException)
+@_BLUEPRINT.errorhandler(base.ASFQuartException)
 async def _handle_asfquart_exception(err: base.ASFQuartException) -> tuple[quart.Response, int]:
     status = getattr(err, "errorcode", 500)
     return _json_error(str(err), status)
 
 
-@BLUEPRINT.errorhandler(Exception)
+@_BLUEPRINT.errorhandler(Exception)
 async def _handle_generic_exception(err: Exception) -> tuple[quart.Response, int]:
     return _json_error(str(err), 500)
 
 
-@BLUEPRINT.errorhandler(exceptions.HTTPException)
+@_BLUEPRINT.errorhandler(exceptions.HTTPException)
 async def _handle_http_exception(err: exceptions.HTTPException) -> tuple[quart.Response, int]:
     return _json_error(err.description or err.name, err.code)
 
 
-@BLUEPRINT.errorhandler(exceptions.NotFound)
+@_BLUEPRINT.errorhandler(exceptions.NotFound)
 async def _handle_not_found(err: exceptions.NotFound) -> tuple[quart.Response, int]:
     return _json_error(err.description or err.name, 404)
 
 
-@BLUEPRINT.errorhandler(quart_schema.RequestSchemaValidationError)
+@_BLUEPRINT.errorhandler(quart_schema.RequestSchemaValidationError)
 async def _handle_request_validation(err: quart_schema.RequestSchemaValidationError) -> tuple[quart.Response, int]:
     if not isinstance(err.validation_error, pydantic.ValidationError):
         raise err.validation_error
@@ -78,7 +88,7 @@ def _json_error(
     return quart.jsonify(payload), status_code or 500
 
 
-@BLUEPRINT.record_once
+@_BLUEPRINT.record_once
 def _setup(state: blueprints.BlueprintSetupState) -> None:
     if isinstance(state.app, base.QuartApp):
         _exempt_blueprint(state.app)

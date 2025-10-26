@@ -18,7 +18,7 @@
 
 import hashlib
 import pathlib
-from typing import Any
+from typing import Any, Final, Literal
 
 import aiofiles.os
 import asfquart.base as base
@@ -29,7 +29,7 @@ import sqlalchemy
 import sqlmodel
 import werkzeug.exceptions as exceptions
 
-import atr.bps.api as api
+import atr.blueprints.api as api
 import atr.config as config
 import atr.db as db
 import atr.db.interaction as interaction
@@ -53,8 +53,10 @@ import atr.util as util
 
 type DictResponse = tuple[dict[str, Any], int]
 
+ROUTES_MODULE: Final[Literal[True]] = True
 
-@api.BLUEPRINT.route("/checks/list/<project>/<version>")
+
+@api.route("/checks/list/<project>/<version>")
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
 async def checks_list(project: str, version: str) -> DictResponse:
     """
@@ -94,7 +96,7 @@ async def checks_list(project: str, version: str) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/checks/list/<project>/<version>/<revision>")
+@api.route("/checks/list/<project>/<version>/<revision>")
 @quart_schema.validate_response(models.api.ChecksListResults, 200)
 async def checks_list_revision(project: str, version: str, revision: str) -> DictResponse:
     """
@@ -132,8 +134,8 @@ async def checks_list_revision(project: str, version: str, revision: str) -> Dic
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/checks/ongoing/<project>/<version>", defaults={"revision": None})
-@api.BLUEPRINT.route("/checks/ongoing/<project>/<version>/<revision>")
+@api.route("/checks/ongoing/<project>/<version>", defaults={"revision": None})
+@api.route("/checks/ongoing/<project>/<version>/<revision>")
 @quart_schema.validate_response(models.api.ChecksOngoingResults, 200)
 async def checks_ongoing(
     project: str,
@@ -169,7 +171,7 @@ async def checks_ongoing(
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/committee/get/<name>")
+@api.route("/committee/get/<name>")
 @quart_schema.validate_response(models.api.CommitteeGetResults, 200)
 async def committee_get(name: str) -> DictResponse:
     """
@@ -189,7 +191,7 @@ async def committee_get(name: str) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/committee/keys/<name>")
+@api.route("/committee/keys/<name>")
 @quart_schema.validate_response(models.api.CommitteeKeysResults, 200)
 async def committee_keys(name: str) -> DictResponse:
     """
@@ -211,7 +213,7 @@ async def committee_keys(name: str) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/committee/projects/<name>")
+@api.route("/committee/projects/<name>")
 @quart_schema.validate_response(models.api.CommitteeProjectsResults, 200)
 async def committee_projects(name: str) -> DictResponse:
     """
@@ -233,7 +235,7 @@ async def committee_projects(name: str) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/committees/list")
+@api.route("/committees/list")
 @quart_schema.validate_response(models.api.CommitteesListResults, 200)
 async def committees_list() -> DictResponse:
     """
@@ -249,7 +251,7 @@ async def committees_list() -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/distribution/record", methods=["POST"])
+@api.route("/distribution/record", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.DistributionRecordArgs)
@@ -288,7 +290,7 @@ async def distribution_record(data: models.api.DistributionRecordArgs) -> DictRe
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/ignore/add", methods=["POST"])
+@api.route("/ignore/add", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.IgnoreAddArgs)
@@ -317,7 +319,7 @@ async def ignore_add(data: models.api.IgnoreAddArgs) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/ignore/delete", methods=["POST"])
+@api.route("/ignore/delete", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.IgnoreDeleteArgs)
@@ -341,7 +343,7 @@ async def ignore_delete(data: models.api.IgnoreDeleteArgs) -> DictResponse:
 
 
 # TODO: Rename to ignores
-@api.BLUEPRINT.route("/ignore/list/<committee_name>")
+@api.route("/ignore/list/<committee_name>")
 @quart_schema.validate_response(models.api.IgnoreListResults, 200)
 async def ignore_list(committee_name: str) -> DictResponse:
     """
@@ -356,7 +358,7 @@ async def ignore_list(committee_name: str) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/jwt/create", methods=["POST"])
+@api.route("/jwt/create", methods=["POST"])
 @quart_schema.validate_request(models.api.JwtCreateArgs)
 async def jwt_create(data: models.api.JwtCreateArgs) -> DictResponse:
     """
@@ -378,7 +380,7 @@ async def jwt_create(data: models.api.JwtCreateArgs) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/key/add", methods=["POST"])
+@api.route("/key/add", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.KeyAddArgs)
@@ -411,7 +413,7 @@ async def key_add(data: models.api.KeyAddArgs) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/key/delete", methods=["POST"])
+@api.route("/key/delete", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.KeyDeleteArgs)
@@ -444,7 +446,7 @@ async def key_delete(data: models.api.KeyDeleteArgs) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/key/get/<fingerprint>")
+@api.route("/key/get/<fingerprint>")
 @quart_schema.validate_response(models.api.KeyGetResults, 200)
 async def key_get(fingerprint: str) -> DictResponse:
     """
@@ -463,7 +465,7 @@ async def key_get(fingerprint: str) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/keys/upload", methods=["POST"])
+@api.route("/keys/upload", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.KeysUploadArgs)
@@ -520,7 +522,7 @@ async def keys_upload(data: models.api.KeysUploadArgs) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/keys/user/<asf_uid>")
+@api.route("/keys/user/<asf_uid>")
 @quart_schema.validate_response(models.api.KeysUserResults, 200)
 async def keys_user(asf_uid: str) -> DictResponse:
     """
@@ -535,7 +537,7 @@ async def keys_user(asf_uid: str) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/project/get/<name>")
+@api.route("/project/get/<name>")
 @quart_schema.validate_response(models.api.ProjectGetResults, 200)
 async def project_get(name: str) -> DictResponse:
     """
@@ -550,7 +552,7 @@ async def project_get(name: str) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/project/releases/<name>")
+@api.route("/project/releases/<name>")
 @quart_schema.validate_response(models.api.ProjectReleasesResults, 200)
 async def project_releases(name: str) -> DictResponse:
     """
@@ -565,7 +567,7 @@ async def project_releases(name: str) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/projects/list")
+@api.route("/projects/list")
 @quart_schema.validate_response(models.api.ProjectsListResults, 200)
 async def projects_list() -> DictResponse:
     """
@@ -580,7 +582,7 @@ async def projects_list() -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/publisher/distribution/record", methods=["POST"])
+@api.route("/publisher/distribution/record", methods=["POST"])
 @quart_schema.validate_request(models.api.PublisherDistributionRecordArgs)
 async def publisher_distribution_record(data: models.api.PublisherDistributionRecordArgs) -> DictResponse:
     """
@@ -628,7 +630,7 @@ async def publisher_distribution_record(data: models.api.PublisherDistributionRe
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/publisher/release/announce", methods=["POST"])
+@api.route("/publisher/release/announce", methods=["POST"])
 @quart_schema.validate_request(models.api.PublisherReleaseAnnounceArgs)
 async def publisher_release_announce(data: models.api.PublisherReleaseAnnounceArgs) -> DictResponse:
     """
@@ -663,7 +665,7 @@ async def publisher_release_announce(data: models.api.PublisherReleaseAnnounceAr
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/publisher/ssh/register", methods=["POST"])
+@api.route("/publisher/ssh/register", methods=["POST"])
 @quart_schema.validate_request(models.api.PublisherSshRegisterArgs)
 async def publisher_ssh_register(data: models.api.PublisherSshRegisterArgs) -> DictResponse:
     """
@@ -688,7 +690,7 @@ async def publisher_ssh_register(data: models.api.PublisherSshRegisterArgs) -> D
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/publisher/vote/resolve", methods=["POST"])
+@api.route("/publisher/vote/resolve", methods=["POST"])
 @quart_schema.validate_request(models.api.PublisherVoteResolveArgs)
 async def publisher_vote_resolve(data: models.api.PublisherVoteResolveArgs) -> DictResponse:
     """
@@ -717,7 +719,7 @@ async def publisher_vote_resolve(data: models.api.PublisherVoteResolveArgs) -> D
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/release/announce", methods=["POST"])
+@api.route("/release/announce", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.ReleaseAnnounceArgs)
@@ -756,7 +758,7 @@ async def release_announce(data: models.api.ReleaseAnnounceArgs) -> DictResponse
     ).model_dump(), 201
 
 
-@api.BLUEPRINT.route("/release/create", methods=["POST"])
+@api.route("/release/create", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.ReleaseCreateArgs)
@@ -783,7 +785,7 @@ async def release_create(data: models.api.ReleaseCreateArgs) -> DictResponse:
 
 
 # TODO: Duplicates the below
-@api.BLUEPRINT.route("/release/delete", methods=["POST"])
+@api.route("/release/delete", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.ReleaseDeleteArgs)
@@ -805,7 +807,7 @@ async def release_delete(data: models.api.ReleaseDeleteArgs) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/release/get/<project>/<version>")
+@api.route("/release/get/<project>/<version>")
 @quart_schema.validate_response(models.api.ReleaseGetResults, 200)
 async def release_get(project: str, version: str) -> DictResponse:
     """
@@ -821,8 +823,8 @@ async def release_get(project: str, version: str) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/release/paths/<project>/<version>")
-@api.BLUEPRINT.route("/release/paths/<project>/<version>/<revision>")
+@api.route("/release/paths/<project>/<version>")
+@api.route("/release/paths/<project>/<version>/<revision>")
 @quart_schema.validate_response(models.api.ReleasePathsResults, 200)
 async def release_paths(project: str, version: str, revision: str | None = None) -> DictResponse:
     """
@@ -847,7 +849,7 @@ async def release_paths(project: str, version: str, revision: str | None = None)
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/release/revisions/<project>/<version>")
+@api.route("/release/revisions/<project>/<version>")
 @quart_schema.validate_response(models.api.ReleaseRevisionsResults, 200)
 async def release_revisions(project: str, version: str) -> DictResponse:
     """
@@ -866,7 +868,7 @@ async def release_revisions(project: str, version: str) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/release/upload", methods=["POST"])
+@api.route("/release/upload", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.ReleaseUploadArgs)
@@ -892,7 +894,7 @@ async def release_upload(data: models.api.ReleaseUploadArgs) -> DictResponse:
     ).model_dump(), 201
 
 
-@api.BLUEPRINT.route("/releases/list")
+@api.route("/releases/list")
 @quart_schema.validate_querystring(models.api.ReleasesListQuery)
 @quart_schema.validate_response(models.api.ReleasesListResults, 200)
 async def releases_list(query_args: models.api.ReleasesListQuery) -> DictResponse:
@@ -934,7 +936,7 @@ async def releases_list(query_args: models.api.ReleasesListQuery) -> DictRespons
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/signature/provenance", methods=["POST"])
+@api.route("/signature/provenance", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.SignatureProvenanceArgs)
@@ -997,7 +999,7 @@ async def signature_provenance(data: models.api.SignatureProvenanceArgs) -> Dict
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/ssh-key/add", methods=["POST"])
+@api.route("/ssh-key/add", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.SshKeyAddArgs)
@@ -1018,7 +1020,7 @@ async def ssh_key_add(data: models.api.SshKeyAddArgs) -> DictResponse:
     ).model_dump(), 201
 
 
-@api.BLUEPRINT.route("/ssh-key/delete", methods=["POST"])
+@api.route("/ssh-key/delete", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.SshKeyDeleteArgs)
@@ -1039,7 +1041,7 @@ async def ssh_key_delete(data: models.api.SshKeyDeleteArgs) -> DictResponse:
     ).model_dump(), 201
 
 
-@api.BLUEPRINT.route("/ssh-keys/list/<asf_uid>")
+@api.route("/ssh-keys/list/<asf_uid>")
 @quart_schema.validate_querystring(models.api.SshKeysListQuery)
 async def ssh_keys_list(asf_uid: str, query_args: models.api.SshKeysListQuery) -> DictResponse:
     """
@@ -1068,7 +1070,7 @@ async def ssh_keys_list(asf_uid: str, query_args: models.api.SshKeysListQuery) -
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/tasks/list")
+@api.route("/tasks/list")
 @quart_schema.validate_querystring(models.api.TasksListQuery)
 async def tasks_list(query_args: models.api.TasksListQuery) -> DictResponse:
     """
@@ -1095,7 +1097,7 @@ async def tasks_list(query_args: models.api.TasksListQuery) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/user/info")
+@api.route("/user/info")
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_response(models.api.UserInfoResults, 200)
@@ -1114,7 +1116,7 @@ async def user_info() -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/users/list")
+@api.route("/users/list")
 @quart_schema.validate_response(models.api.UsersListResults, 200)
 async def users_list() -> DictResponse:
     """
@@ -1152,7 +1154,7 @@ async def users_list() -> DictResponse:
 
 
 # TODO: Add endpoints to allow users to vote
-@api.BLUEPRINT.route("/vote/resolve", methods=["POST"])
+@api.route("/vote/resolve", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.VoteResolveArgs)
@@ -1187,7 +1189,7 @@ async def vote_resolve(data: models.api.VoteResolveArgs) -> DictResponse:
     ).model_dump(), 200
 
 
-@api.BLUEPRINT.route("/vote/start", methods=["POST"])
+@api.route("/vote/start", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.VoteStartArgs)
@@ -1230,7 +1232,7 @@ async def vote_start(data: models.api.VoteStartArgs) -> DictResponse:
     ).model_dump(), 201
 
 
-@api.BLUEPRINT.route("/vote/tabulate", methods=["POST"])
+@api.route("/vote/tabulate", methods=["POST"])
 @jwtoken.require
 @quart_schema.security_scheme([{"BearerAuth": []}])
 @quart_schema.validate_request(models.api.VoteTabulateArgs)
