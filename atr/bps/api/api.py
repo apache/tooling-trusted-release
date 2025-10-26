@@ -29,7 +29,7 @@ import sqlalchemy
 import sqlmodel
 import werkzeug.exceptions as exceptions
 
-import atr.blueprints.api as api
+import atr.bps.api as api
 import atr.config as config
 import atr.db as db
 import atr.db.interaction as interaction

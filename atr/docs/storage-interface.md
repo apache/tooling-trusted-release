@@ -43,7 +43,7 @@ The write session takes an optional [`CommitterSession`](/ref/atr/route.py:Commi
 
 Because projects belong to committees, we provide [`write.as_project_committee_member(project_name)`](/ref/atr/storage/__init__.py:as_project_committee_member) and [`write.as_project_committee_participant(project_name)`](/ref/atr/storage/__init__.py:as_project_committee_participant), which look up the project's committee and authenticate the user as a member or participant of that committee. This is convenient when, for example, the URL provides a project name.
 
-Here is a more complete example from [`blueprints/api/api.py`](/ref/atr/blueprints/api/api.py) that shows the classic three step pattern:
+Here is a more complete example from [`bps/api/api.py`](/ref/atr/bps/api/api.py) that shows the classic three step pattern:
 
 ```python
 async with storage.write(asf_uid) as write:

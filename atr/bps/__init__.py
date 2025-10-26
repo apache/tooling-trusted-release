@@ -19,9 +19,9 @@ import asfquart.base as base
 
 
 def register(app: base.QuartApp) -> None:
-    import atr.blueprints.admin.admin as admin
-    import atr.blueprints.api.api as api
-    import atr.blueprints.icons as icons
+    import atr.bps.admin.admin as admin
+    import atr.bps.api.api as api
+    import atr.bps.icons as icons
 
     app.register_blueprint(admin.admin.BLUEPRINT)
     app.register_blueprint(api.api.BLUEPRINT)

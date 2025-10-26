@@ -38,7 +38,7 @@ import rich.logging as rich_logging
 import werkzeug.routing as routing
 
 import atr
-import atr.blueprints as blueprints
+import atr.bps as bps
 import atr.config as config
 import atr.db as db
 import atr.db.interaction as interaction
@@ -290,7 +290,7 @@ def create_app(app_config: type[config.AppConfig]) -> base.QuartApp:
     quart_wtf.CSRFProtect(app)
     db.init_database(app)
     register_routes(app)
-    blueprints.register(app)
+    bps.register(app)
     filters.register_filters(app)
     app_setup_context(app)
     app_setup_lifecycle(app)

@@ -34,7 +34,7 @@ import quart
 import sqlalchemy.orm as orm
 import werkzeug.wrappers.response as response
 
-import atr.blueprints.admin as admin
+import atr.bps.admin as admin
 import atr.config as config
 import atr.datasources.apache as apache
 import atr.db as db
