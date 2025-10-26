@@ -69,7 +69,7 @@
           {{ display_name_cleaned }}
           {% if project.committee.is_podling or project.name.startswith("incubator-") %}
             <span class="text-muted fw-normal fs-5">(Incubating)</span>
-            <img src="{{ url_for('static', filename='svg/apache_incubator.svg') }}"
+            <img src="{{ static_url('svg/apache_incubator.svg') }}"
                  alt=""
                  class="float-end ms-3 page-logo"
                  height="24" />

@@ -142,6 +142,7 @@ def app_setup_context(app: base.QuartApp) -> None:
             "is_viewing_as_admin_fn": util.is_user_viewing_as_admin,
             "is_committee_member_fn": user.is_committee_member,
             "routes": routes,
+            "static_url": util.static_url,
             "unfinished_releases_fn": interaction.unfinished_releases,
             # "user_committees_fn": interaction.user_committees,
             "user_projects_fn": interaction.user_projects,

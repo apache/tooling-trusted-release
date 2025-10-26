@@ -815,6 +815,11 @@ def static_path(*args: str) -> str:
     return quart.url_for("static", filename=filename)
 
 
+def static_url(filename: str) -> str:
+    """Return the URL for a static file."""
+    return quart.url_for("static", filename=filename)
+
+
 async def task_archive_url(task_mid: str) -> str | None:
     if "@" not in task_mid:
         return None

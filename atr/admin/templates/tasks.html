@@ -7,7 +7,7 @@
 {% block stylesheets %}
   {{ super() }}
   <link rel="stylesheet"
-        href="{{ url_for('static', filename='css/mermaid.min.css') }}" />
+        href="{{ static_url('css/mermaid.min.css') }}" />
 
   <style>
     .gridjs-pages button {
@@ -24,7 +24,7 @@
 
 {% block javascripts %}
   {{ super() }}
-  <script src="{{ url_for('static', filename='js/gridjs.production.min.js') }}"></script>
+  <script src="{{ static_url('js/gridjs.production.min.js') }}"></script>
 
   <script>
     new gridjs.Grid({

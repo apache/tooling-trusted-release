@@ -14,14 +14,11 @@
           type="image/x-icon"
           href="https://apache.org/favicons/favicon.ico" />
     {% block stylesheets %}
+      <link rel="stylesheet" href="{{ static_url('css/normalize.css') }}" />
+      <link rel="stylesheet" href="{{ static_url('css/atr.css') }}" />
       <link rel="stylesheet"
-            href="{{ url_for('static', filename='css/normalize.css') }}" />
-      <link rel="stylesheet"
-            href="{{ url_for('static', filename='css/atr.css') }}" />
-      <link rel="stylesheet"
-            href="{{ url_for('static', filename='css/bootstrap-icons.min.css') }}" />
-      <link rel="stylesheet"
-            href="{{ url_for('static', filename='css/bootstrap.custom.css') }}" />
+            href="{{ static_url('css/bootstrap-icons.min.css') }}" />
+      <link rel="stylesheet" href="{{ static_url('css/bootstrap.custom.css') }}" />
     {% endblock stylesheets %}
     {% block head_extra %}
     {% endblock head_extra %}
@@ -59,8 +56,8 @@
     </div>
 
     {% block javascripts %}
-      <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
-      <script src="{{ url_for('static', filename='js/atr.js') }}"></script>
+      <script src="{{ static_url('js/bootstrap.bundle.min.js') }}"></script>
+      <script src="{{ static_url('js/atr.js') }}"></script>
     {% endblock javascripts %}
   </body>
 </html>

@@ -226,6 +226,6 @@
 </script>
   {# djlint:on #}
   <script id="main-script-data"
-          src="{{ url_for('static', filename='js/finish-selected-move.js') }}"
+          src="{{ static_url('js/finish-selected-move.js') }}"
           data-csrf-token="{{ form.csrf_token.current_token }}"></script>
 {% endblock javascripts %}

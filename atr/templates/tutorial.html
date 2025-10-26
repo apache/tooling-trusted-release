@@ -34,14 +34,14 @@
     Use the <strong>Make releases</strong> sidebar link [<code>1</code>], then press the <strong>Start a new release</strong> button for any project [<code>2</code>].
   </p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-compose-01.png') }}"
+    <img src="{{ static_url('png/tutorial-compose-01.png') }}"
          alt="Illustration: Follow the sidebar link, and use the button." />
   </p>
   <p>
     Press the <strong>Upload files</strong> button on the empty <em>Compose</em> page to add files.
   </p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-compose-02.png') }}"
+    <img src="{{ static_url('png/tutorial-compose-02.png') }}"
          alt="Illustration: Use the Upload files button to add files." />
   </p>
   <p>
@@ -54,14 +54,14 @@
     When the files are present and the check results are satisfactory, press the <strong>Start voting</strong> button to proceed [<code>2</code>].
   </p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-compose-03.png') }}"
+    <img src="{{ static_url('png/tutorial-compose-03.png') }}"
          alt="Illustration: Review the results of your checks, and use the Start voting button." />
   </p>
   <p>
     This takes you to a form to start the vote. If necessary, use its ability to preview the vote announcement email body. When you submit the form, ATR sends an announcement message in your name to the chosen mailing list.
   </p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-compose-04.png') }}"
+    <img src="{{ static_url('png/tutorial-compose-04.png') }}"
          alt="Illustration: Use the form to start a vote." />
   </p>
 
@@ -70,28 +70,28 @@
     The <em>Vote</em> page is available to all project participants, and displays the report results from the end of the <em>Compose</em> phase to help participants decide how to cast their votes [<code>1</code>]. Press the <strong>Download files</strong> button to download the release candidate files to review them before voting [<code>2</code>].
   </p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-vote-01.png') }}"
+    <img src="{{ static_url('png/tutorial-vote-01.png') }}"
          alt="Illustration: Anybody can review the reports." />
   </p>
   <p>
     Several methods are available to download files: using the browser, <code>curl</code>, <code>rsync</code>, or <code>wget</code>. You must upload an SSH key before you can use <code>rsync</code>.
   </p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-vote-02.png') }}"
+    <img src="{{ static_url('png/tutorial-vote-02.png') }}"
          alt="Illustration: Download the release candidate files." />
   </p>
   <p>
     A link allows review of the voting thread in the mailing list archives [<code>1</code>]. ATR will try to tally votes for you, but you must check the results manually. A form on the page allows you to cast your vote on the mailing list [<code>2</code>].
   </p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-vote-03.png') }}"
+    <img src="{{ static_url('png/tutorial-vote-03.png') }}"
          alt="Illustration: Review the voting thread, and cast your own vote." />
   </p>
   <p>
     When the voting period concludes and the mandate is clear, record the outcome using the vote resolution form, accessed by pressing the <strong>Resolve vote</strong> button. Submitting this form also sends the outcome of the vote to the mailing list. A successful vote promotes the release candidate to the next phase; a failed vote returns it to the <em>Compose</em> phase.
   </p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-vote-04.png') }}"
+    <img src="{{ static_url('png/tutorial-vote-04.png') }}"
          alt="Illustration: Use the vote resolution form to progress to the next phase." />
   </p>
 
@@ -106,21 +106,21 @@
     When the release is finished, press the <strong>Announce and distribute</strong> button.
   </p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-finish-01.png') }}"
+    <img src="{{ static_url('png/tutorial-finish-01.png') }}"
          alt="Illustration: Use the Announce and distribute button." />
   </p>
   <p>
     Submitting the announcement form sends a message to your selected mailing list. Complete the <strong>Download path suffix</strong> field to choose a specific location from which users can download your release artifacts.
   </p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-finish-02.png') }}"
+    <img src="{{ static_url('png/tutorial-finish-02.png') }}"
          alt="Illustration: The announcement form sends a message to your selected mailing list." />
   </p>
 
   <h2 id="releases">Releases</h2>
   <p>When a release is finished, it is listed alongside any other finished releases for a project.</p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-releases-01.png') }}"
+    <img src="{{ static_url('png/tutorial-releases-01.png') }}"
          alt="Illustration: Finished releases are shown for each individual project." />
   </p>
   <p>Each release entry provides a link to download the files in the release.</p>
@@ -134,19 +134,19 @@
     There is a <strong>Create project</strong> button under each committee in your <strong>Committee directory</strong>, accessible from the sidebar.
   </p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-projects-01.png') }}"
+    <img src="{{ static_url('png/tutorial-projects-01.png') }}"
          alt="Illustration: Use the Create project button to create a new project." />
   </p>
   <p>Follow the instructions under each form input carefully, otherwise your new project will not be created.</p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-projects-02.png') }}"
+    <img src="{{ static_url('png/tutorial-projects-02.png') }}"
          alt="Illustration: The create project form has Display name and Label fields." />
   </p>
   <p>
     Every successfully added project is listed on the <strong>Committee directory</strong> page. Press the project button, and the project page will be displayed with its release policy form. Edit the release policy form to your liking, and <strong>Save</strong> your changes.
   </p>
   <p>
-    <img src="{{ url_for('static', filename='png/tutorial-projects-03.png') }}"
+    <img src="{{ static_url('png/tutorial-projects-03.png') }}"
          alt="Illustration: The release policy form is split into three sections." />
   </p>
   <p>
