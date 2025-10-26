@@ -28,7 +28,8 @@ import quart
 import atr.log as log
 import atr.session as session
 
-_BLUEPRINT = quart.Blueprint("get_blueprint", __name__)
+_BLUEPRINT_NAME = "get_blueprint"
+_BLUEPRINT = quart.Blueprint(_BLUEPRINT_NAME, __name__)
 
 
 def register(app: base.QuartApp) -> ModuleType:
@@ -66,10 +67,10 @@ def committer(path: str) -> Callable[[session.CommitterRouteFunction[Any]], sess
 
             return response
 
+        endpoint = func.__module__.replace(".", "_") + "_" + func.__name__
         wrapper.__name__ = func.__name__
         wrapper.__doc__ = func.__doc__
-
-        endpoint = func.__module__.replace(".", "_") + "_" + func.__name__
+        wrapper.__annotations__["endpoint"] = _BLUEPRINT_NAME + "." + endpoint
 
         decorated = auth.require(auth.Requirements.committer)(wrapper)
         _BLUEPRINT.add_url_rule(path, endpoint=endpoint, view_func=decorated, methods=["GET"])
@@ -86,10 +87,10 @@ def public(path: str) -> Callable[[Callable[..., Awaitable[Any]]], session.Route
             enhanced_session = session.Committer(web_session) if web_session else None
             return await func(enhanced_session, *args, **kwargs)
 
+        endpoint = func.__module__.replace(".", "_") + "_" + func.__name__
         wrapper.__name__ = func.__name__
         wrapper.__doc__ = func.__doc__
-
-        endpoint = func.__module__.replace(".", "_") + "_" + func.__name__
+        wrapper.__annotations__["endpoint"] = _BLUEPRINT_NAME + "." + endpoint
 
         _BLUEPRINT.add_url_rule(path, endpoint=endpoint, view_func=wrapper, methods=["GET"])
 

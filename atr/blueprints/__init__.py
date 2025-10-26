@@ -20,6 +20,7 @@ from typing import Protocol, runtime_checkable
 
 import asfquart.base as base
 
+import atr.blueprints.admin as admin
 import atr.blueprints.api as api
 import atr.blueprints.get as get
 
@@ -38,5 +39,6 @@ def check_module(module: ModuleType) -> None:
 
 
 def register(app: base.QuartApp) -> None:
+    check_module(admin.register(app))
     check_module(api.register(app))
     check_module(get.register(app))

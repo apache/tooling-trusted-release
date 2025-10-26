@@ -138,83 +138,83 @@
         <ul>
           <li>
             <i class="bi bi-list-ul"></i>
-            <a href="{{ url_for('admin.admin_all_releases') }}"
-               {% if request.endpoint == 'admin.admin_all_releases' %}class="active"{% endif %}>All releases</a>
+            <a href="{{ as_url(admin.all_releases) }}"
+               {% if request.endpoint == 'atr_admin_all_releases' %}class="active"{% endif %}>All releases</a>
           </li>
           <li>
             <i class="bi bi-person-plus"></i>
-            <a href="{{ url_for('admin.admin_browse_as') }}"
-               {% if request.endpoint == 'admin.admin_browse_as' %}class="active"{% endif %}>Browse as user</a>
+            <a href="{{ as_url(admin.browse_as_get) }}"
+               {% if request.endpoint == 'atr_admin_browse_as_get' %}class="active"{% endif %}>Browse as user</a>
           </li>
           <li>
             <i class="bi bi-arrow-repeat"></i>
-            <a href="{{ url_for('admin.admin_consistency') }}"
-               {% if request.endpoint == 'admin.admin_consistency' %}class="active"{% endif %}>Consistency</a>
+            <a href="{{ as_url(admin.consistency) }}"
+               {% if request.endpoint == 'atr_admin_consistency' %}class="active"{% endif %}>Consistency</a>
           </li>
           <li>
             <i class="bi bi-database"></i>
-            <a href="{{ url_for('admin.admin_data') }}"
-               {% if request.endpoint == 'admin.admin_data' %}class="active"{% endif %}>Browse database</a>
+            <a href="{{ as_url(admin.data) }}"
+               {% if request.endpoint == 'atr_admin_data' %}class="active"{% endif %}>Browse database</a>
           </li>
           <li>
             <i class="bi bi-trash"></i>
-            <a href="{{ url_for('admin.admin_delete_committee_keys') }}"
-               {% if request.endpoint == 'admin.admin_delete_committee_keys' %}class="active"{% endif %}>Delete committee keys</a>
+            <a href="{{ as_url(admin.delete_committee_keys_get) }}"
+               {% if request.endpoint == 'atr_admin_delete_committee_keys_get' %}class="active"{% endif %}>Delete committee keys</a>
           </li>
           <li>
             <i class="bi bi-trash"></i>
-            <a href="{{ url_for('admin.admin_delete_release') }}"
-               {% if request.endpoint == 'admin.admin_delete_release' %}class="active"{% endif %}>Delete release</a>
+            <a href="{{ as_url(admin.delete_release_get) }}"
+               {% if request.endpoint == 'atr_admin_delete_release_get' %}class="active"{% endif %}>Delete release</a>
           </li>
           <li>
             <i class="bi bi-gear"></i>
-            <a href="{{ url_for('admin.admin_env') }}"
-               {% if request.endpoint == 'admin.admin_env' %}class="active"{% endif %}>Environment</a>
+            <a href="{{ as_url(admin.env) }}"
+               {% if request.endpoint == 'atr_admin_env' %}class="active"{% endif %}>Environment</a>
           </li>
           <li>
             <i class="bi bi-key"></i>
-            <a href="{{ url_for('admin.admin_keys_check') }}"
-               {% if request.endpoint == 'admin.admin_keys_check' %}class="active"{% endif %}>Keys check</a>
+            <a href="{{ as_url(admin.keys_check_get) }}"
+               {% if request.endpoint == 'atr_admin_keys_check_get' %}class="active"{% endif %}>Keys check</a>
           </li>
           <li>
             <i class="bi bi-key"></i>
-            <a href="{{ url_for('admin.admin_keys_regenerate_all') }}"
-               {% if request.endpoint == 'admin.admin_keys_regenerate_all' %}class="active"{% endif %}>Regenerate all keys</a>
+            <a href="{{ as_url(admin.keys_regenerate_all_get) }}"
+               {% if request.endpoint == 'atr_admin_keys_regenerate_all_get' %}class="active"{% endif %}>Regenerate all keys</a>
           </li>
           <li>
             <i class="bi bi-key"></i>
-            <a href="{{ url_for('admin.admin_keys_update') }}"
-               {% if request.endpoint == 'admin.admin_keys_update' %}class="active"{% endif %}>Update keys</a>
+            <a href="{{ as_url(admin.keys_update_get) }}"
+               {% if request.endpoint == 'atr_admin_keys_update_get' %}class="active"{% endif %}>Update keys</a>
           </li>
           <li>
             <i class="bi bi-person-plus"></i>
-            <a href="{{ url_for('admin.admin_ldap') }}"
-               {% if request.endpoint == 'admin.admin_ldap' %}class="active"{% endif %}>LDAP search</a>
+            <a href="{{ as_url(admin.ldap_get) }}"
+               {% if request.endpoint == 'atr_admin_ldap_get' %}class="active"{% endif %}>LDAP search</a>
           </li>
           <li>
             <i class="bi bi-speedometer2"></i>
-            <a href="{{ url_for('admin.admin_performance') }}"
-               {% if request.endpoint == 'admin.admin_performance' %}class="active"{% endif %}>Page performance</a>
+            <a href="{{ as_url(admin.performance) }}"
+               {% if request.endpoint == 'atr_admin_performance' %}class="active"{% endif %}>Page performance</a>
           </li>
           <li>
             <i class="bi bi-arrow-repeat"></i>
-            <a href="{{ url_for('admin.admin_projects_update') }}"
-               {% if request.endpoint == 'admin.admin_projects_update' %}class="active"{% endif %}>Update projects</a>
+            <a href="{{ as_url(admin.projects_update_get) }}"
+               {% if request.endpoint == 'atr_admin_projects_update_get' %}class="active"{% endif %}>Update projects</a>
           </li>
           <li>
             <i class="bi bi-list-task"></i>
-            <a href="{{ url_for('admin.admin_tasks') }}"
-               {% if request.endpoint == 'admin.admin_tasks' %}class="active"{% endif %}>Background tasks</a>
+            <a href="{{ as_url(admin.tasks_) }}"
+               {% if request.endpoint == 'atr_admin_tasks_' %}class="active"{% endif %}>Background tasks</a>
           </li>
           <li>
             <i class="bi bi-person-badge"></i>
-            <a href="{{ url_for('admin.admin_toggle_admin_view_page') }}"
-               {% if request.endpoint == 'admin.admin_toggle_admin_view_page' %}class="active"{% endif %}>Toggle admin view</a>
+            <a href="{{ as_url(admin.toggle_view_get) }}"
+               {% if request.endpoint == 'atr_admin_toggle_view_get' %}class="active"{% endif %}>Toggle admin view</a>
           </li>
           <li>
             <i class="bi bi-arrow-repeat"></i>
-            <a href="{{ url_for('admin.admin_validate') }}"
-               {% if request.endpoint == 'admin.admin_validate' %}class="active"{% endif %}>Validate</a>
+            <a href="{{ as_url(admin.validate_) }}"
+               {% if request.endpoint == 'atr_admin_validate_' %}class="active"{% endif %}>Validate</a>
           </li>
         </ul>
       {% endif %}

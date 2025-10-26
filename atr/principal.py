@@ -22,12 +22,14 @@ import re
 import time
 from typing import Any, Final
 
-import asfquart.session as session
+import asfquart.session
 
+# from attr import asdict
 import atr.config as config
 import atr.ldap as ldap
 import atr.log as log
 import atr.route as route
+import atr.session as session
 import atr.util as util
 
 LDAP_CHAIRS_BASE = "cn=pmc-chairs,ou=groups,ou=services,dc=apache,dc=org"
@@ -59,7 +61,7 @@ class ArgumentNoneType:
 
 ArgumentNone = ArgumentNoneType()
 
-type UID = route.CommitterSession | str | None | ArgumentNoneType
+type UID = route.CommitterSession | session.Committer | str | None | ArgumentNoneType
 
 
 def attr_to_list(attr):
@@ -256,10 +258,10 @@ class AuthoriserASFQuart:
     def member_of_and_participant_of(self, asf_uid: str) -> tuple[frozenset[str], frozenset[str]]:
         return self.__cache.member_of[asf_uid], self.__cache.participant_of[asf_uid]
 
-    async def cache_refresh(self, asf_uid: str, asfquart_session: session.ClientSession) -> None:
+    async def cache_refresh(self, asf_uid: str, asfquart_session: asfquart.session.ClientSession) -> None:
         if not self.__cache.outdated(asf_uid):
             return
-        if not isinstance(asfquart_session, session.ClientSession):
+        if not isinstance(asfquart_session, asfquart.session.ClientSession):
             # Defense in depth runtime check, already validated by the type checker
             raise AuthenticationError("ASFQuart session is not a ClientSession")
 
@@ -352,12 +354,12 @@ class AsyncObject:
 class Authorisation(AsyncObject):
     async def __init__(self, asf_uid: UID = ArgumentNone):
         match asf_uid:
-            case ArgumentNoneType() | route.CommitterSession():
+            case ArgumentNoneType() | route.CommitterSession() | session.Committer():
                 match asf_uid:
-                    case route.CommitterSession():
+                    case route.CommitterSession() | session.Committer():
                         asfquart_session = asf_uid._session
                     case _:
-                        asfquart_session = await session.read()
+                        asfquart_session = await asfquart.session.read()
                 # asfquart_session = await session.read()
                 if asfquart_session is None:
                     raise AuthenticationError("No ASFQuart session found")

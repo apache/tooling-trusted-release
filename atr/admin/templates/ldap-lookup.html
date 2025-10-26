@@ -17,7 +17,7 @@
       <h5 class="mb-0">Search criteria</h5>
     </div>
     <div class="card-body">
-      <form method="get" action="{{ url_for('admin.admin_ldap') }}">
+      <form method="get" action="{{ as_url(admin.ldap_get) }}">
         {{ form.csrf_token }}
         <div class="mb-3">
           {{ form.uid.label(class="form-label") }}

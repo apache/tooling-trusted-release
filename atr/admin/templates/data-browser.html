@@ -70,7 +70,7 @@
 
   <div class="page-model-nav">
     {% for model_name in models %}
-      <a href="{{ url_for('admin.admin_data', model=model_name) }}"
+      <a href="{{ as_url(admin.data, model=model_name) }}"
          {% if model == model_name %}class="active"{% endif %}>{{ model_name }}</a>
     {% endfor %}
   </div>

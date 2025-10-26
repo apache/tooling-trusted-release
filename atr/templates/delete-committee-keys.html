@@ -11,7 +11,7 @@
     <h1 class="mb-4">Delete all keys for a committee</h1>
 
     <form method="post"
-          action="{{ url_for('admin.admin_delete_committee_keys') }}"
+          action="{{ as_url(admin.delete_committee_keys_post) }}"
           class="atr-canary py-4 px-5 border rounded">
       {{ form.csrf_token }}
 

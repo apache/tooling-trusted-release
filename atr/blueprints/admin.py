@@ -1,0 +1,83 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+from collections.abc import Callable
+from types import ModuleType
+from typing import Any
+
+import asfquart.base as base
+import asfquart.session
+import quart
+
+import atr.session as session
+import atr.user as user
+
+_BLUEPRINT_NAME = "admin_blueprint"
+_BLUEPRINT = quart.Blueprint(_BLUEPRINT_NAME, __name__, url_prefix="/admin", template_folder="../admin/templates")
+
+
+@_BLUEPRINT.before_request
+async def _check_admin_access() -> None:
+    web_session = await asfquart.session.read()
+    if web_session is None:
+        raise base.ASFQuartException("Not authenticated", errorcode=401)
+
+    if web_session.uid not in user.get_admin_users():
+        raise base.ASFQuartException("You are not authorized to access the admin interface", errorcode=403)
+
+    quart.g.session = session.Committer(web_session)
+
+
+def register(app: base.QuartApp) -> ModuleType:
+    import atr.admin as admin
+
+    app.register_blueprint(_BLUEPRINT)
+    return admin
+
+
+def get(path: str) -> Callable[[session.CommitterRouteFunction[Any]], session.RouteFunction[Any]]:
+    def decorator(func: session.CommitterRouteFunction[Any]) -> session.RouteFunction[Any]:
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            return await func(quart.g.session, *args, **kwargs)
+
+        endpoint = func.__module__.replace(".", "_") + "_" + func.__name__
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        wrapper.__annotations__["endpoint"] = _BLUEPRINT_NAME + "." + endpoint
+
+        _BLUEPRINT.add_url_rule(path, endpoint=endpoint, view_func=wrapper, methods=["GET"])
+
+        return wrapper
+
+    return decorator
+
+
+def post(path: str) -> Callable[[session.CommitterRouteFunction[Any]], session.RouteFunction[Any]]:
+    def decorator(func: session.CommitterRouteFunction[Any]) -> session.RouteFunction[Any]:
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            return await func(quart.g.session, *args, **kwargs)
+
+        endpoint = func.__module__.replace(".", "_") + "_" + func.__name__
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        wrapper.__annotations__["endpoint"] = _BLUEPRINT_NAME + "." + endpoint
+
+        _BLUEPRINT.add_url_rule(path, endpoint=endpoint, view_func=wrapper, methods=["POST"])
+
+        return wrapper
+
+    return decorator

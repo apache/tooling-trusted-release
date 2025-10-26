@@ -23,18 +23,18 @@ import statistics
 import sys
 import time
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import Any, Final, Literal
 
 import aiofiles.os
 import aiohttp
 import asfquart
 import asfquart.base as base
-import asfquart.session as session
+import asfquart.session
 import quart
 import sqlalchemy.orm as orm
 import werkzeug.wrappers.response as response
 
-import atr.bps.admin as admin
+import atr.blueprints.admin as admin
 import atr.config as config
 import atr.datasources.apache as apache
 import atr.db as db
@@ -44,8 +44,8 @@ import atr.ldap as ldap
 import atr.log as log
 import atr.models.sql as sql
 import atr.principal as principal
-import atr.route as route
 import atr.routes.mapping as mapping
+import atr.session as session
 import atr.storage as storage
 import atr.storage.outcome as outcome
 import atr.storage.types as types
@@ -53,6 +53,8 @@ import atr.tasks as tasks
 import atr.template as template
 import atr.util as util
 import atr.validate as validate
+
+ROUTES_MODULE: Final[Literal[True]] = True
 
 
 class BrowseAsUserForm(forms.Typed):
@@ -90,16 +92,25 @@ class LdapLookupForm(forms.Typed):
     submit = forms.submit("Lookup")
 
 
-@admin.BLUEPRINT.route("/all-releases")
-async def admin_all_releases() -> str:
+@admin.get("/all-releases")
+async def all_releases(session: session.Committer) -> str:
     """Display a list of all releases across all phases."""
     async with db.session() as data:
         releases = await data.release(_project=True, _committee=True).order_by(sql.Release.name).all()
     return await template.render("all-releases.html", releases=releases, release_as_url=mapping.release_as_url)
 
 
-@admin.BLUEPRINT.route("/browse-as", methods=["GET", "POST"])
-async def admin_browse_as() -> str | response.Response:
+@admin.get("/browse-as")
+async def browse_as_get(session: session.Committer) -> str | response.Response:
+    return await _browse_as(session)
+
+
+@admin.post("/browse-as")
+async def browse_as_post(session: session.Committer) -> str | response.Response:
+    return await _browse_as(session)
+
+
+async def _browse_as(session: session.Committer) -> str | response.Response:
     """Allows an admin to browse as another user."""
     # TODO: Enable this in debugging mode only?
     from atr.routes import root
@@ -109,7 +120,7 @@ async def admin_browse_as() -> str | response.Response:
         return await template.render("browse-as.html", form=form)
 
     new_uid = str(util.unwrap(form.uid.data))
-    if not (current_session := await session.read()):
+    if not (current_session := await asfquart.session.read()):
         raise base.ASFQuartException("Not authenticated", 401)
 
     bind_dn, bind_password = principal.get_ldap_bind_dn_and_password()
@@ -122,7 +133,7 @@ async def admin_browse_as() -> str | response.Response:
 
     if not ldap_params.results_list:
         await quart.flash(f"User '{new_uid}' not found in LDAP.", "error")
-        return quart.redirect(quart.url_for("admin.admin_browse_as"))
+        return await session.redirect(browse_as_get)
 
     ldap_projects_data = await apache.get_ldap_projects_data()
     committee_data = await apache.get_active_committee_data()
@@ -138,17 +149,17 @@ async def admin_browse_as() -> str | response.Response:
         bind_password,
     )
     log.info("New Quart cookie (not ASFQuart session) data: %s", new_session_data)
-    session.write(new_session_data)
+    asfquart.session.write(new_session_data)
 
     await quart.flash(
         f"You are now browsing as '{new_uid}'. To return to your own account, please log out and log back in.",
         "success",
     )
-    return quart.redirect(util.as_url(root.index))
+    return await session.redirect(root.index)
 
 
-@admin.BLUEPRINT.route("/config")
-async def admin_config() -> quart.wrappers.response.Response:
+@admin.get("/configuration")
+async def configuration(session: session.Committer) -> quart.wrappers.response.Response:
     """Display the current application configuration values."""
 
     conf = config.get()
@@ -170,8 +181,8 @@ async def admin_config() -> quart.wrappers.response.Response:
     return quart.Response("\n".join(values), mimetype="text/plain")
 
 
-@admin.BLUEPRINT.route("/consistency")
-async def admin_consistency() -> quart.Response:
+@admin.get("/consistency")
+async def consistency(session: session.Committer) -> quart.Response:
     """Check for consistency between the database and the filesystem."""
     # Get all releases from the database
     async with db.session() as data:
@@ -218,9 +229,9 @@ Paired correctly:
     )
 
 
-@admin.BLUEPRINT.route("/data")
-@admin.BLUEPRINT.route("/data/<model>")
-async def admin_data(model: str = "Committee") -> str:
+@admin.get("/data")
+@admin.get("/data/<model>")
+async def data(session: session.Committer, model: str = "Committee") -> str:
     """Browse all records in the database."""
     async with db.session() as data:
         # Map of model names to their classes
@@ -267,9 +278,20 @@ async def admin_data(model: str = "Committee") -> str:
         )
 
 
-@admin.BLUEPRINT.route("/delete-test-openpgp-keys", methods=["GET", "POST"])
-async def admin_delete_test_openpgp_keys() -> quart.Response | response.Response:
+@admin.get("/delete-test-openpgp-keys")
+async def delete_test_openpgp_keys_get(session: session.Committer) -> quart.Response | response.Response:
+    return await _delete_test_openpgp_keys(session)
+
+
+@admin.post("/delete-test-openpgp-keys")
+async def delete_test_openpgp_keys_post(session: session.Committer) -> quart.Response | response.Response:
+    return await _delete_test_openpgp_keys(session)
+
+
+async def _delete_test_openpgp_keys(session: session.Committer) -> quart.Response | response.Response:
     """Delete all test user OpenPGP keys and their links."""
+    import atr.routes
+
     if not config.get().ALLOW_TESTS:
         raise base.ASFQuartException("Test operations are disabled in this environment", errorcode=403)
 
@@ -295,11 +317,20 @@ async def admin_delete_test_openpgp_keys() -> quart.Response | response.Response
         outcome = await wafc.keys.test_user_delete_all(test_uid)
         outcome.result_or_raise()
 
-    return quart.redirect("/keys")
+    return await session.redirect(atr.routes.keys.keys)
 
 
-@admin.BLUEPRINT.route("/delete-committee-keys", methods=["GET", "POST"])
-async def admin_delete_committee_keys() -> str | response.Response:
+@admin.get("/delete-committee-keys")
+async def delete_committee_keys_get(session: session.Committer) -> str | response.Response:
+    return await _delete_committee_keys(session)
+
+
+@admin.post("/delete-committee-keys")
+async def delete_committee_keys_post(session: session.Committer) -> str | response.Response:
+    return await _delete_committee_keys(session)
+
+
+async def _delete_committee_keys(session: session.Committer) -> str | response.Response:
     form = await DeleteCommitteeKeysForm.create_form()
     async with db.session() as data:
         all_committees = await data.committee(_public_signing_keys=True).order_by(sql.Committee.name).all()
@@ -320,12 +351,12 @@ async def admin_delete_committee_keys() -> str | response.Response:
 
             if not committee:
                 await quart.flash(f"Committee '{committee_name}' not found.", "error")
-                return quart.redirect(quart.url_for("admin.admin_delete_committee_keys"))
+                return await session.redirect(delete_committee_keys_get)
 
             keys_to_check = list(committee.public_signing_keys)
             if not keys_to_check:
                 await quart.flash(f"Committee '{committee_name}' has no keys.", "info")
-                return quart.redirect(quart.url_for("admin.admin_delete_committee_keys"))
+                return await session.redirect(delete_committee_keys_get)
 
             num_removed = len(committee.public_signing_keys)
             committee.public_signing_keys.clear()
@@ -342,7 +373,7 @@ async def admin_delete_committee_keys() -> str | response.Response:
                 f"Removed {num_removed} key links for '{committee_name}'. Deleted {unused_deleted} unused keys.",
                 "success",
             )
-        return quart.redirect(quart.url_for("admin.admin_delete_committee_keys"))
+        return await session.redirect(delete_committee_keys_get)
 
     elif quart.request.method == "POST":
         await quart.flash("Form validation failed. Select committee and type DELETE KEYS.", "warning")
@@ -350,17 +381,19 @@ async def admin_delete_committee_keys() -> str | response.Response:
     return await template.render("delete-committee-keys.html", form=form)
 
 
-@admin.BLUEPRINT.route("/delete-release", methods=["GET", "POST"])
-async def admin_delete_release() -> str | response.Response:
+@admin.get("/delete-release")
+async def delete_release_get(session: session.Committer) -> str | response.Response:
+    return await _delete_release(session)
+
+
+@admin.post("/delete-release")
+async def delete_release_post(session: session.Committer) -> str | response.Response:
+    return await _delete_release(session)
+
+
+async def _delete_release(session: session.Committer) -> str | response.Response:
     """Page to delete selected releases and their associated data and files."""
     form = await DeleteReleaseForm.create_form()
-
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", 401)
-    asf_uid = web_session.uid
-    if asf_uid is None:
-        raise base.ASFQuartException("Invalid session, uid is None", 500)
 
     if quart.request.method == "POST":
         if await form.validate_on_submit():
@@ -369,13 +402,12 @@ async def admin_delete_release() -> str | response.Response:
 
             if not releases_to_delete:
                 await quart.flash("No releases selected for deletion.", "warning")
-                return quart.redirect(quart.url_for("admin.admin_delete_release"))
+                return await session.redirect(delete_release_get)
 
-            committer_session = route.CommitterSession(web_session)
-            await _delete_releases(committer_session, releases_to_delete)
+            await _delete_releases(session, releases_to_delete)
 
             # Redirecting back to the deletion page will refresh the list of releases too
-            return quart.redirect(quart.url_for("admin.admin_delete_release"))
+            return await session.redirect(delete_release_get)
 
         # It's unlikely that form validation failed due to spurious release names
         # Therefore we assume that the user forgot to type DELETE to confirm
@@ -388,8 +420,8 @@ async def admin_delete_release() -> str | response.Response:
     return await template.render("delete-release.html", form=form, releases=releases, stats=None)
 
 
-@admin.BLUEPRINT.route("/env")
-async def admin_env() -> quart.wrappers.response.Response:
+@admin.get("/env")
+async def env(session: session.Committer) -> quart.wrappers.response.Response:
     """Display the environment variables."""
     env_vars = []
     for key, value in os.environ.items():
@@ -397,8 +429,17 @@ async def admin_env() -> quart.wrappers.response.Response:
     return quart.Response("\n".join(env_vars), mimetype="text/plain")
 
 
-@admin.BLUEPRINT.route("/keys/check", methods=["GET", "POST"])
-async def admin_keys_check() -> quart.Response:
+@admin.get("/keys/check")
+async def keys_check_get(session: session.Committer) -> quart.Response:
+    return await _keys_check(session)
+
+
+@admin.post("/keys/check")
+async def keys_check_post(session: session.Committer) -> quart.Response:
+    return await _keys_check(session)
+
+
+async def _keys_check(session: session.Committer) -> quart.Response:
     """Check public signing key details."""
     if quart.request.method != "POST":
         empty_form = await forms.Empty.create_form()
@@ -420,8 +461,17 @@ async def admin_keys_check() -> quart.Response:
         return quart.Response(f"Exception during key check: {e!s}", mimetype="text/plain")
 
 
-@admin.BLUEPRINT.route("/keys/regenerate-all", methods=["GET", "POST"])
-async def admin_keys_regenerate_all() -> quart.Response:
+@admin.get("/keys/regenerate-all")
+async def keys_regenerate_all_get(session: session.Committer) -> quart.Response:
+    return await _keys_regenerate_all(session)
+
+
+@admin.post("/keys/regenerate-all")
+async def keys_regenerate_all_post(session: session.Committer) -> quart.Response:
+    return await _keys_regenerate_all(session)
+
+
+async def _keys_regenerate_all(session: session.Committer) -> quart.Response:
     """Regenerate the KEYS file for all committees."""
     if quart.request.method != "POST":
         empty_form = await forms.Empty.create_form()
@@ -437,13 +487,6 @@ async def admin_keys_regenerate_all() -> quart.Response:
 
     async with db.session() as data:
         committee_names = [c.name for c in await data.committee().all()]
-
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", 401)
-    asf_uid = web_session.uid
-    if asf_uid is None:
-        raise base.ASFQuartException("Invalid session, uid is None", 500)
 
     outcomes = outcome.List[str]()
     async with storage.write() as write:
@@ -463,8 +506,17 @@ async def admin_keys_regenerate_all() -> quart.Response:
     return quart.Response("\n".join(response_lines), mimetype="text/plain")
 
 
-@admin.BLUEPRINT.route("/keys/update", methods=["GET", "POST"])
-async def admin_keys_update() -> str | response.Response | tuple[Mapping[str, Any], int]:
+@admin.get("/keys/update")
+async def keys_update_get(session: session.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
+    return await _keys_update(session)
+
+
+@admin.post("/keys/update")
+async def keys_update_post(session: session.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
+    return await _keys_update(session)
+
+
+async def _keys_update(session: session.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
     """Update keys from remote data."""
     if quart.request.method != "POST":
         empty_form = await forms.Empty.create_form()
@@ -478,13 +530,7 @@ async def admin_keys_update() -> str | response.Response | tuple[Mapping[str, An
         return await template.render("update-keys.html", empty_form=empty_form, previous_output=previous_output)
 
     try:
-        web_session = await session.read()
-        if web_session is None:
-            raise base.ASFQuartException("Not authenticated", 401)
-        asf_uid = web_session.uid
-        if asf_uid is None:
-            raise base.ASFQuartException("Invalid session, uid is None", 500)
-        pid = await _update_keys(asf_uid)
+        pid = await _update_keys(session.asf_uid)
         return {
             "message": f"Successfully started key update process with PID {pid}",
             "category": "success",
@@ -497,14 +543,18 @@ async def admin_keys_update() -> str | response.Response | tuple[Mapping[str, An
         }, 200
 
 
-@admin.BLUEPRINT.route("/ldap/", methods=["GET"])
-async def admin_ldap() -> str:
-    form = await LdapLookupForm.create_form(data=quart.request.args)
-    asf_id_for_template: str | None = None
+@admin.get("/ldap/")
+async def ldap_get(session: session.Committer) -> str:
+    return await _ldap(session)
 
-    web_session = await session.read()
-    if web_session and web_session.uid:
-        asf_id_for_template = web_session.uid
+
+@admin.post("/ldap/")
+async def ldap_post(session: session.Committer) -> str:
+    return await _ldap(session)
+
+
+async def _ldap(session: session.Committer) -> str:
+    form = await LdapLookupForm.create_form(data=quart.request.args)
 
     uid_query = form.uid.data
     email_query = form.email.data
@@ -530,14 +580,29 @@ async def admin_ldap() -> str:
         "ldap-lookup.html",
         form=form,
         ldap_params=ldap_params,
-        asf_id=asf_id_for_template,
+        asf_id=session.asf_uid,
         ldap_query_performed=ldap_params is not None,
         uid_query=uid_query,
     )
 
 
-@admin.BLUEPRINT.route("/ongoing-tasks/<project_name>/<version_name>/<revision>")
-async def admin_ongoing_tasks(project_name: str, version_name: str, revision: str) -> quart.wrappers.response.Response:
+@admin.get("/ongoing-tasks/<project_name>/<version_name>/<revision>")
+async def ongoing_tasks_get(
+    session: session.Committer, project_name: str, version_name: str, revision: str
+) -> quart.wrappers.response.Response:
+    return await _ongoing_tasks(session, project_name, version_name, revision)
+
+
+@admin.post("/ongoing-tasks/<project_name>/<version_name>/<revision>")
+async def ongoing_tasks_post(
+    session: session.Committer, project_name: str, version_name: str, revision: str
+) -> quart.wrappers.response.Response:
+    return await _ongoing_tasks(session, project_name, version_name, revision)
+
+
+async def _ongoing_tasks(
+    session: session.Committer, project_name: str, version_name: str, revision: str
+) -> quart.wrappers.response.Response:
     try:
         ongoing = await interaction.tasks_ongoing(project_name, version_name, revision)
         return quart.Response(str(ongoing), mimetype="text/plain")
@@ -546,8 +611,8 @@ async def admin_ongoing_tasks(project_name: str, version_name: str, revision: st
         return quart.Response("", mimetype="text/plain")
 
 
-@admin.BLUEPRINT.route("/performance")
-async def admin_performance() -> str:
+@admin.get("/performance")
+async def performance(session: session.Committer) -> str:
     """Display performance statistics for all routes."""
     app = asfquart.APP
 
@@ -627,19 +692,21 @@ async def admin_performance() -> str:
     return await template.render("performance.html", stats=sorted_summary)
 
 
-@admin.BLUEPRINT.route("/projects/update", methods=["GET", "POST"])
-async def admin_projects_update() -> str | response.Response | tuple[Mapping[str, Any], int]:
+@admin.get("/projects/update")
+async def projects_update_get(session: session.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
+    return await _projects_update(session)
+
+
+@admin.post("/projects/update")
+async def projects_update_post(session: session.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
+    return await _projects_update(session)
+
+
+async def _projects_update(session: session.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
     """Update projects from remote data."""
     if quart.request.method == "POST":
         try:
-            web_session = await session.read()
-            if web_session is None:
-                raise base.ASFQuartException("Not authenticated", 401)
-            asf_uid = web_session.uid
-            if asf_uid is None:
-                raise base.ASFQuartException("Invalid session, uid is None", 500)
-
-            task = await tasks.metadata_update(asf_uid)
+            task = await tasks.metadata_update(session.asf_uid)
             return {
                 "message": f"Metadata update task has been queued with ID {task.id}.",
                 "category": "success",
@@ -656,14 +723,14 @@ async def admin_projects_update() -> str | response.Response | tuple[Mapping[str
     return await template.render("update-projects.html", empty_form=empty_form)
 
 
-@admin.BLUEPRINT.route("/tasks")
-async def admin_tasks() -> str:
+@admin.get("/tasks")
+async def tasks_(session: session.Committer) -> str:
     return await template.render("tasks.html")
 
 
-@admin.BLUEPRINT.route("/task-times/<project_name>/<version_name>/<revision_number>")
-async def admin_task_times(
-    project_name: str, version_name: str, revision_number: str
+@admin.get("/task-times/<project_name>/<version_name>/<revision_number>")
+async def task_times(
+    session: session.Committer, project_name: str, version_name: str, revision_number: str
 ) -> quart.wrappers.response.Response:
     values = []
     async with db.session() as data:
@@ -679,8 +746,8 @@ async def admin_task_times(
     return quart.Response("\n".join(values), mimetype="text/plain")
 
 
-@admin.BLUEPRINT.route("/test", methods=["GET"])
-async def admin_test() -> quart.wrappers.response.Response:
+@admin.get("/test")
+async def test(session: session.Committer) -> quart.wrappers.response.Response:
     """Test the storage layer."""
     import atr.storage as storage
 
@@ -689,13 +756,7 @@ async def admin_test() -> quart.wrappers.response.Response:
         async with aiohttp_client_session.get(url) as response:
             keys_file_text = await response.text()
 
-    web_session = await session.read()
-    if web_session is None:
-        raise base.ASFQuartException("Not authenticated", 401)
-    asf_uid = web_session.uid
-    if asf_uid is None:
-        raise base.ASFQuartException("Invalid session, uid is None", 500)
-    async with storage.write() as write:
+    async with storage.write(session) as write:
         wacm = write.as_committee_member("tooling")
         start = time.perf_counter_ns()
         outcomes: outcome.List[types.Key] = await wacm.keys.ensure_stored(keys_file_text)
@@ -718,25 +779,16 @@ async def admin_test() -> quart.wrappers.response.Response:
     return quart.Response(str(wacm), mimetype="text/plain")
 
 
-@admin.BLUEPRINT.route("/toggle-view", methods=["GET"])
-async def admin_toggle_admin_view_page() -> str:
+@admin.get("/toggle-view")
+async def toggle_view_get(session: session.Committer) -> str:
     """Display the page with a button to toggle between admin and user views."""
     empty_form = await forms.Empty.create_form()
     return await template.render("toggle-admin-view.html", empty_form=empty_form)
 
 
-@admin.BLUEPRINT.route("/toggle-admin-view", methods=["POST"])
-async def admin_toggle_view() -> response.Response:
+@admin.post("/toggle-view")
+async def toggle_view_post(session: session.Committer) -> response.Response:
     await util.validate_empty_form()
-
-    web_session = await session.read()
-    if web_session is None:
-        # For the type checker
-        # We should pass this as an argument, then it's guaranteed
-        raise base.ASFQuartException("Not authenticated", 401)
-    user_uid = web_session.uid
-    if user_uid is None:
-        raise base.ASFQuartException("Invalid session, uid is None", 500)
 
     app = asfquart.APP
     if not hasattr(app, "app_id") or not isinstance(app.app_id, str):
@@ -750,11 +802,11 @@ async def admin_toggle_view() -> response.Response:
     message = "Viewing as regular user" if downgrade else "Viewing as admin"
     await quart.flash(message, "success")
     referrer = quart.request.referrer
-    return quart.redirect(referrer or quart.url_for("admin.admin_data"))
+    return quart.redirect(referrer or util.as_url(data))
 
 
-@admin.BLUEPRINT.route("/validate")
-async def admin_validate() -> str:
+@admin.get("/validate")
+async def validate_(session: session.Committer) -> str:
     """Run validators and display any divergences."""
 
     async with db.session() as data:
@@ -789,7 +841,7 @@ async def _check_keys(fix: bool = False) -> str:
     return message
 
 
-async def _delete_releases(session: route.CommitterSession, releases_to_delete: list[str]) -> None:
+async def _delete_releases(session: session.Committer, releases_to_delete: list[str]) -> None:
     success_count = 0
     fail_count = 0
     error_messages = []
@@ -881,7 +933,7 @@ def _get_user_committees_from_ldap(uid: str, bind_dn: str, bind_password: str) -
 def _session_data(
     ldap_data: dict[str, Any],
     new_uid: str,
-    current_session: session.ClientSession,
+    current_session: asfquart.session.ClientSession,
     ldap_projects: apache.LDAPProjectsData,
     committee_data: apache.CommitteeData,
     bind_dn: str,

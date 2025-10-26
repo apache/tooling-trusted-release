@@ -128,11 +128,13 @@ def app_setup_context(app: base.QuartApp) -> None:
 
     @app.context_processor
     async def app_wide() -> dict[str, Any]:
+        import atr.admin as admin
         import atr.metadata as metadata
         import atr.routes as routes
         import atr.routes.mapping as mapping
 
         return {
+            "admin": admin,
             "as_url": util.as_url,
             "commit": metadata.commit,
             "current_user": await asfquart.session.read(),
