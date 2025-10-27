@@ -22,6 +22,7 @@ from datetime import datetime
 import aiofiles.os
 import quart
 
+import atr.htm as htm
 import atr.route as route
 import atr.util as util
 
@@ -41,21 +42,25 @@ async def root(session: route.CommitterSession) -> quart.Response:
 
 
 async def _directory_listing(full_path: pathlib.Path, current_path: str) -> quart.Response:
-    html_parts = [
-        "<!doctype html>",
-        f"<title>Index of /{current_path}</title>",
-        "<style>body { margin: 1rem; }</style>",
-        f"<h1>Index of /{current_path}</h1>",
-        "<pre>",
-    ]
+    html = htm.Block(htm.html)
+    html.title[f"Index of /{current_path}"]
+    html.style["body { margin: 1rem; }"]
+    with html.block(htm.body) as body:
+        htm.h1[f"Index of /{current_path}"]
+        with body.block(htm.pre) as pre:
+            await _directory_listing_pre(full_path, current_path, pre)
+    return quart.Response(html.collect(), mimetype="text/html")
 
+
+async def _directory_listing_pre(full_path: pathlib.Path, current_path: str, pre: htm.Block) -> None:
     if current_path:
         parent_path = pathlib.Path(current_path).parent
         parent_url_path = str(parent_path) if str(parent_path) != "." else ""
         if parent_url_path:
-            html_parts.append(f'<a href="{util.as_url(path, path=parent_url_path)}">../</a>')
+            pre.a(href=util.as_url(path, path=parent_url_path))["../"]
         else:
-            html_parts.append(f'<a href="{util.as_url(root)}">../</a>')
+            pre.a(href=util.as_url(root))["../"]
+        pre.text("\n\n")
 
     entries = []
     dir_contents = await aiofiles.os.listdir(full_path)
@@ -80,11 +85,9 @@ async def _directory_listing(full_path: pathlib.Path, current_path: str) -> quar
             mtime = datetime.fromtimestamp(stat_info.st_mtime).strftime("%Y-%m-%d %H:%M")
             entry_path = str(pathlib.Path(current_path) / entry["name"])
             display_name = f"{entry['name']}/" if is_dir else entry["name"]
-            link = f'<a href="{util.as_url(path, path=entry_path)}">{display_name}</a>'
-            html_parts.append(f"{mode} {nlink} {size} {mtime}  {link}")
-
-    html_parts.append("</pre>")
-    return quart.Response("\n".join(html_parts), mimetype="text/html")
+            pre.text(f"{mode} {nlink} {size} {mtime}  ")
+            pre.a(href=util.as_url(path, path=entry_path))[display_name]
+            pre.text("\n")
 
 
 async def _file_content(full_path: pathlib.Path) -> quart.Response:

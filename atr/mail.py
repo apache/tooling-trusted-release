@@ -31,11 +31,7 @@ import atr.log as log
 # We could e.g. use uppercase instead of global_
 # It's not always worth identifying globals as globals
 # But in many cases we should do so
-# TODO: Get at least global_dkim_domain from configuration
-# And probably global_dkim_selector too
-# global_dkim_selector: str = "mail"
-global_dkim_domain: str = "apache.org"
-# global_secret_key: str | None = None
+global_domain: str = "apache.org"
 
 _MAIL_RELAY: Final[str] = "mail-relay.apache.org"
 _SMTP_PORT: Final[int] = 587
@@ -55,14 +51,14 @@ async def send(message: Message) -> tuple[str, list[str]]:
     """Send an email notification about an artifact or a vote."""
     log.info(f"Sending email for event: {message}")
     from_addr = message.email_sender
-    if not from_addr.endswith(f"@{global_dkim_domain}"):
-        raise ValueError(f"from_addr must end with @{global_dkim_domain}, got {from_addr}")
+    if not from_addr.endswith(f"@{global_domain}"):
+        raise ValueError(f"from_addr must end with @{global_domain}, got {from_addr}")
     to_addr = message.email_recipient
     _validate_recipient(to_addr)
 
     # UUID4 is entirely random, with no timestamp nor namespace
     # It does have 6 version and variant bits, so only 122 bits are random
-    mid = f"{uuid.uuid4()}@{global_dkim_domain}"
+    mid = f"{uuid.uuid4()}@{global_domain}"
     headers = [
         f"From: {from_addr}",
         f"To: {to_addr}",
@@ -100,48 +96,9 @@ async def send(message: Message) -> tuple[str, list[str]]:
     return mid, errors
 
 
-# def set_secret_key(key: str) -> None:
-#     """Set the secret key for DKIM signing."""
-#     global global_secret_key
-#     global_secret_key = key
-
-
-# async def set_secret_key_default() -> None:
-#     # TODO: Document this, or improve it
-#     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-#     dkim_path = os.path.join(project_root, "state", "dkim.private")
-
-#     async with aiofiles.open(dkim_path) as f:
-#         dkim_key = await f.read()
-#         set_secret_key(dkim_key.strip())
-#         log.info("DKIM key loaded and set successfully")
-
-
 async def _send_many(from_addr: str, to_addrs: list[str], msg_text: str) -> list[str]:
     """Send an email to multiple recipients."""
     message_bytes = bytes(msg_text, "utf-8")
-
-    # if global_secret_key is None:
-    #     # This is a severe configuration error
-    #     # It does not count as a send error to only warn about
-    #     raise ValueError("global_secret_key is not set")
-
-    # # DKIM sign the message
-    # private_key = bytes(global_secret_key, "utf-8")
-
-    # # Create a DKIM signature
-    # sig = dkim.sign(
-    #     message=message_bytes,
-    #     selector=bytes(global_dkim_selector, "utf-8"),
-    #     domain=bytes(global_dkim_domain, "utf-8"),
-    #     privkey=private_key,
-    #     include_headers=[b"From", b"To", b"Subject", b"Date", b"Message-ID"],
-    # )
-
-    # # Prepend the DKIM signature to the message
-    # dkim_msg = sig + message_bytes
-
-    # log.info(f"email_send_many: {dkim_msg}")
 
     errors = []
     for addr in to_addrs:

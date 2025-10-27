@@ -24,8 +24,6 @@ import atr.get.compose as compose
 import atr.get.distribution as distribution
 import atr.get.vote as vote
 
-from .example_test import respond as example_test
-
 ROUTES_MODULE: Final[Literal[True]] = True
 
-__all__ = ["announce", "candidate", "committees", "compose", "distribution", "example_test", "vote"]
+__all__ = ["announce", "candidate", "committees", "compose", "distribution", "vote"]

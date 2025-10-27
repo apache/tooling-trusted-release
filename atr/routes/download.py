@@ -24,11 +24,13 @@ import aiofiles
 import aiofiles.os
 import asfquart.base as base
 import quart
+import werkzeug.http
 import werkzeug.wrappers.response as response
 import zipstream
 
 import atr.config as config
 import atr.db as db
+import atr.htm as htm
 import atr.models.sql as sql
 import atr.route as route
 import atr.routes.mapping as mapping
@@ -141,9 +143,10 @@ async def zip_selected(
             yield chunk
 
     headers = {
-        "Content-Disposition": f'attachment; filename="{release.name}.zip"',
+        "Content-Disposition": f"attachment; filename={werkzeug.http.quote_header_value(release.name + '.zip')}",
         "Content-Type": "application/zip",
     }
+    # TODO: Write a type safe wrapper for quart.Response that ensures headers are encoded correctly
     return quart.Response(stream_zip(files_to_zip), headers=headers, mimetype="application/zip")
 
 
@@ -210,7 +213,9 @@ async def _list(
         if is_file or is_dir:
             files.append(file_in_dir)
     files.sort()
-    html = []
+    html = htm.Block(htm.html)
+    html.style["body { margin: 1rem; font: 1.25rem/1.5 serif; }"]
+    div = htm.Block()
 
     # Add link to parent directory if not at root
     if file_path != ".":
@@ -221,7 +226,7 @@ async def _list(
             version_name=version_name,
             file_path=parent_path_str,
         )
-        html.append(f'<a href="{parent_link_url}">../</a>')
+        div.a(href=parent_link_url)["../"]
 
     # List files and directories
     for item_in_dir in files:
@@ -233,7 +238,7 @@ async def _list(
             file_path=relative_path_str,
         )
         display_name = f"{item_in_dir}/" if await aiofiles.os.path.isdir(full_path / item_in_dir) else str(item_in_dir)
-        html.append(f'<a href="{link_url}">{display_name}</a>')
-    head = "<style>body { margin: 1rem; font: 1.25rem/1.5 serif; }</style>"
-    response_body = head + "<br>\n".join(html)
+        div.a(href=link_url)[display_name]
+    html.body[div.collect(separator=htm.br)]
+    response_body = html.collect()
     return quart.Response(response_body, mimetype="text/html")

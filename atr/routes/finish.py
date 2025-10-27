@@ -218,8 +218,7 @@ async def _analyse_rc_tags(latest_revision_dir: pathlib.Path) -> RCTagAnalysisRe
         if len(r.affected_paths_preview) >= 5:
             # Can't break here, because we need to update the counts
             continue
-        highlighted_preview = analysis.candidate_highlight(p_rel)
-        r.affected_paths_preview.append((highlighted_preview, stripped_path_str))
+        r.affected_paths_preview.append((original_path_str, stripped_path_str))
 
     return r
 

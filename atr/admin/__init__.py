@@ -64,6 +64,10 @@ class BrowseAsUserForm(forms.Typed):
     submit = forms.submit("Browse as this user")
 
 
+class CheckKeysForm(forms.Typed):
+    submit = forms.submit("Check public signing key details")
+
+
 class DeleteCommitteeKeysForm(forms.Typed):
     committee_name = forms.select("Committee")
     confirm_delete = forms.string(
@@ -86,10 +90,18 @@ class DeleteReleaseForm(forms.Typed):
     submit = forms.submit("Delete selected releases permanently")
 
 
+class DeleteTestKeysForm(forms.Typed):
+    submit = forms.submit("Delete all OpenPGP keys for test user")
+
+
 class LdapLookupForm(forms.Typed):
     uid = forms.optional("ASF UID (optional)", placeholder="Enter ASF UID, e.g. johnsmith, or * for all")
     email = forms.optional("Email address (optional)", placeholder="Enter email address, e.g. user@example.org")
     submit = forms.submit("Lookup")
+
+
+class RegenerateKeysForm(forms.Typed):
+    submit = forms.submit("Regenerate all KEYS files")
 
 
 @admin.get("/all-releases")
@@ -298,19 +310,14 @@ async def _delete_test_openpgp_keys(session: web.Committer) -> quart.Response | 
     test_uid = "test"
 
     if quart.request.method != "POST":
-        empty_form = await forms.Empty.create_form()
-        return quart.Response(
-            f"""
-<form method="post">
-  <button type="submit">Delete all OpenPGP keys for {test_uid} user</button>
-  {empty_form.hidden_tag()}
-</form>
-""",
-            mimetype="text/html",
-        )
+        delete_form = await DeleteTestKeysForm.create_form()
+        rendered_form = forms.render_simple(delete_form, action="")
+        return quart.Response(str(rendered_form), mimetype="text/html")
 
     # This is a POST request
-    await util.validate_empty_form()
+    delete_form = await DeleteTestKeysForm.create_form()
+    if not await delete_form.validate_on_submit():
+        raise base.ASFQuartException("Invalid form submission. Please check your input and try again.", errorcode=400)
 
     async with storage.write() as write:
         wafc = write.as_foundation_committer()
@@ -442,16 +449,9 @@ async def keys_check_post(session: web.Committer) -> quart.Response:
 async def _keys_check(session: web.Committer) -> quart.Response:
     """Check public signing key details."""
     if quart.request.method != "POST":
-        empty_form = await forms.Empty.create_form()
-        return quart.Response(
-            f"""
-<form method="post">
-  <button type="submit">Check public signing key details</button>
-  {empty_form.hidden_tag()}
-</form>
-""",
-            mimetype="text/html",
-        )
+        check_form = await CheckKeysForm.create_form()
+        rendered_form = forms.render_simple(check_form, action="")
+        return quart.Response(str(rendered_form), mimetype="text/html")
 
     try:
         result = await _check_keys()
@@ -474,16 +474,9 @@ async def keys_regenerate_all_post(session: web.Committer) -> quart.Response:
 async def _keys_regenerate_all(session: web.Committer) -> quart.Response:
     """Regenerate the KEYS file for all committees."""
     if quart.request.method != "POST":
-        empty_form = await forms.Empty.create_form()
-        return quart.Response(
-            f"""
-<form method="post">
-  <button type="submit">Regenerate all KEYS files</button>
-  {empty_form.hidden_tag()}
-</form>
-""",
-            mimetype="text/html",
-        )
+        regenerate_form = await RegenerateKeysForm.create_form()
+        rendered_form = forms.render_simple(regenerate_form, action="")
+        return quart.Response(str(rendered_form), mimetype="text/html")
 
     async with db.session() as data:
         committee_names = [c.name for c in await data.committee().all()]

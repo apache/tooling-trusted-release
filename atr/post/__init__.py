@@ -22,8 +22,6 @@ import atr.post.candidate as candidate
 import atr.post.distribution as distribution
 import atr.post.vote as vote
 
-from .example_test import respond as example_test
-
 ROUTES_MODULE: Final[Literal[True]] = True
 
-__all__ = ["announce", "candidate", "distribution", "example_test", "vote"]
+__all__ = ["announce", "candidate", "distribution", "vote"]
