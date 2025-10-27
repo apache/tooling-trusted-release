@@ -15,8 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from typing import Final, Literal
+
+import atr.post.announce as announce
+import atr.post.candidate as candidate
+
 from .example_test import respond as example_test
 
-ROUTES_MODULE = True
+ROUTES_MODULE: Final[Literal[True]] = True
 
-__all__ = ["example_test"]
+__all__ = ["announce", "candidate", "example_test"]

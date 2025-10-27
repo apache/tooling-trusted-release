@@ -36,6 +36,7 @@ import atr.models.policy as policy
 import atr.models.sql as sql
 import atr.registry as registry
 import atr.route as route
+import atr.shared as shared
 import atr.storage as storage
 import atr.template as template
 import atr.user as user
@@ -360,7 +361,7 @@ async def view(session: route.CommitterSession, name: str) -> response.Response 
     return await template.render(
         "project-view.html",
         project=project,
-        algorithms=route.algorithms,
+        algorithms=shared.algorithms,
         candidate_drafts=candidate_drafts,
         candidates=candidates,
         previews=previews,

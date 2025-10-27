@@ -53,32 +53,6 @@ T = TypeVar("T")
 _MEASURE_PERFORMANCE: Final[bool] = True
 
 
-# |         1 | RSA (Encrypt or Sign) [HAC]                        |
-# |         2 | RSA Encrypt-Only [HAC]                             |
-# |         3 | RSA Sign-Only [HAC]                                |
-# |        16 | Elgamal (Encrypt-Only) [ELGAMAL] [HAC]             |
-# |        17 | DSA (Digital Signature Algorithm) [FIPS186] [HAC]  |
-# |        18 | ECDH public key algorithm                          |
-# |        19 | ECDSA public key algorithm [FIPS186]               |
-# |        20 | Reserved (formerly Elgamal Encrypt or Sign)        |
-# |        21 | Reserved for Diffie-Hellman                        |
-# |           | (X9.42, as defined for IETF-S/MIME)                |
-# |        22 | EdDSA [I-D.irtf-cfrg-eddsa]                        |
-# - https://lists.gnupg.org/pipermail/gnupg-devel/2017-April/032762.html
-# TODO: (Obviously we should move this, but where to?)
-algorithms: Final[dict[int, str]] = {
-    1: "RSA",
-    2: "RSA",
-    3: "RSA",
-    16: "Elgamal",
-    17: "DSA",
-    18: "ECDH",
-    19: "ECDSA",
-    21: "Diffie-Hellman",
-    22: "EdDSA",
-}
-
-
 class AsyncFileHandler(logging.Handler):
     """A logging handler that writes logs asynchronously using aiofiles."""
 

@@ -13,7 +13,7 @@
   {% if phase_key == "draft" %}
     {% set back_url = as_url(routes.draft.view, project_name=release.project.name, version_name=release.version) %}
   {% elif phase_key == "candidate" %}
-    {% set back_url = as_url(routes.candidate.view, project_name=release.project.name, version_name=release.version) %}
+    {% set back_url = as_url(get.candidate.view, project_name=release.project.name, version_name=release.version) %}
   {% elif phase_key == "preview" %}
     {% set back_url = as_url(routes.preview.view, project_name=release.project.name, version_name=release.version) %}
   {% elif phase_key == "release" %}

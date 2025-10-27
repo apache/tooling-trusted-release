@@ -15,14 +15,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Final, Literal
+"""candidate.py"""
 
-import atr.get.announce as announce
-import atr.get.candidate as candidate
-import atr.get.committees as committees
+import werkzeug.wrappers.response as response
 
-from .example_test import respond as example_test
+import atr.blueprints.post as post
+import atr.routes.root as root
+import atr.session as session
 
-ROUTES_MODULE: Final[Literal[True]] = True
 
-__all__ = ["announce", "candidate", "committees", "example_test"]
+@post.committer("/candidate/delete")
+async def delete(session: session.Committer) -> response.Response:
+    """Delete a release candidate."""
+    # TODO: We need to never retire revisions, if allowing release deletion
+    return await session.redirect(root.index, error="Not yet implemented")

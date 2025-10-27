@@ -128,7 +128,9 @@ def app_setup_context(app: base.QuartApp) -> None:
     @app.context_processor
     async def app_wide() -> dict[str, Any]:
         import atr.admin as admin
+        import atr.get as get
         import atr.metadata as metadata
+        import atr.post as post
         import atr.routes as routes
         import atr.routes.mapping as mapping
 
@@ -137,9 +139,11 @@ def app_setup_context(app: base.QuartApp) -> None:
             "as_url": util.as_url,
             "commit": metadata.commit,
             "current_user": await asfquart.session.read(),
+            "get": get,
             "is_admin_fn": user.is_admin,
             "is_viewing_as_admin_fn": util.is_user_viewing_as_admin,
             "is_committee_member_fn": user.is_committee_member,
+            "post": post,
             "routes": routes,
             "static_url": util.static_url,
             "unfinished_releases_fn": interaction.unfinished_releases,

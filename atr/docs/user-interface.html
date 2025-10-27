@@ -23,7 +23,7 @@
     user_committees=participant_of_committees,
     form=form,
     key_info=key_info,
-    algorithms=route.algorithms,
+    algorithms=shared.algorithms,
 )
 </code></pre>
 <p>The template receives these variables and can access them directly. If you pass a variable called <code>form</code>, the template can use <code>{{ form }}</code> to render it. <a href="https://jinja.palletsprojects.com/en/stable/templates/#list-of-control-structures">Jinja2 has control structures</a> like <code>{% for %}</code> and <code>{% if %}</code>, which you use when iterating over data or conditionally showing content.</p>

@@ -15,9 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import atr.routes.announce as announce
-import atr.routes.candidate as candidate
-import atr.routes.committees as committees
 import atr.routes.compose as compose
 import atr.routes.distribution as distribution
 import atr.routes.docs as docs
@@ -45,9 +42,6 @@ import atr.routes.vote as vote
 import atr.routes.voting as voting
 
 __all__ = [
-    "announce",
-    "candidate",
-    "committees",
     "compose",
     "distribution",
     "docs",

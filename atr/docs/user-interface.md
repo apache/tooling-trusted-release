@@ -34,7 +34,7 @@ return await template.render(
     user_committees=participant_of_committees,
     form=form,
     key_info=key_info,
-    algorithms=route.algorithms,
+    algorithms=shared.algorithms,
 )
 ```
 

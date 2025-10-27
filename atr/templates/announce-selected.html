@@ -67,7 +67,7 @@
 
   <form method="post"
         id="announce-release-form"
-        action="{{ as_url(routes.announce.selected_post, project_name=release.project.name, version_name=release.version) }}"
+        action="{{ as_url(post.announce.selected, project_name=release.project.name, version_name=release.version) }}"
         class="atr-canary py-4 px-5 mb-4 border rounded">
     {{ announce_form.hidden_tag() }}
 

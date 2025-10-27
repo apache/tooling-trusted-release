@@ -17,31 +17,20 @@
 
 """candidate.py"""
 
-import asfquart
 import asfquart.base as base
 import werkzeug.wrappers.response as response
 
+import atr.blueprints.get as get
 import atr.db as db
 import atr.log as log
 import atr.models.sql as sql
-import atr.route as route
-import atr.routes.root as root
+import atr.session as session
 import atr.template as template
 import atr.util as util
 
-if asfquart.APP is ...:
-    raise RuntimeError("APP is not set")
 
-
-@route.committer("/candidate/delete", methods=["POST"])
-async def delete(session: route.CommitterSession) -> response.Response:
-    """Delete a release candidate."""
-    # TODO: We need to never retire revisions, if allowing release deletion
-    return await session.redirect(root.index, error="Not yet implemented")
-
-
-@route.committer("/candidate/view/<project_name>/<version_name>")
-async def view(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+@get.committer("/candidate/view/<project_name>/<version_name>")
+async def view(session: session.Committer, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
     await session.check_access(project_name)
 
@@ -75,9 +64,9 @@ async def view(session: route.CommitterSession, project_name: str, version_name:
     )
 
 
-@route.committer("/candidate/view/<project_name>/<version_name>/<path:file_path>")
+@get.committer("/candidate/view/<project_name>/<version_name>/<path:file_path>")
 async def view_path(
-    session: route.CommitterSession, project_name: str, version_name: str, file_path: str
+    session: session.Committer, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:
     """View the content of a specific file in the release candidate."""
     await session.check_access(project_name)

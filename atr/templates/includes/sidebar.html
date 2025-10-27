@@ -43,7 +43,7 @@
         {% endif %}
         <li>
           <i class="bi bi-collection"></i>
-          <a href="{{ as_url(routes.committees.directory) }}">Search committees</a>
+          <a href="{{ as_url(get.committees.directory) }}">Search committees</a>
         </li>
         {% if current_user.uid == "sbp" %}
           <!--

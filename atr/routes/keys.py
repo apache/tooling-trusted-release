@@ -35,6 +35,7 @@ import atr.log as log
 import atr.models.sql as sql
 import atr.route as route
 import atr.routes.compose as compose
+import atr.shared as shared
 import atr.storage as storage
 import atr.storage.outcome as outcome
 import atr.storage.types as types
@@ -185,7 +186,7 @@ async def add(session: route.CommitterSession) -> str:
         user_committees=participant_of_committees,
         form=form,
         key_info=key_info,
-        algorithms=route.algorithms,
+        algorithms=shared.algorithms,
     )
 
 
@@ -274,7 +275,7 @@ async def details(session: route.CommitterSession, fingerprint: str) -> str | re
         "keys-details.html",
         key=key,
         form=form,
-        algorithms=route.algorithms,
+        algorithms=shared.algorithms,
         now=datetime.datetime.now(datetime.UTC),
         asf_id=session.uid,
     )
@@ -335,7 +336,7 @@ async def keys(session: route.CommitterSession) -> str:
         user_keys=user_keys,
         user_ssh_keys=user_ssh_keys,
         committees=user_committees_with_keys,
-        algorithms=route.algorithms,
+        algorithms=shared.algorithms,
         status_message=status_message,
         status_type=status_type,
         now=datetime.datetime.now(datetime.UTC),
@@ -447,7 +448,7 @@ async def upload(session: route.CommitterSession) -> str:
             committee_map=committee_map,
             form=form,
             results=results,
-            algorithms=route.algorithms,
+            algorithms=shared.algorithms,
             submitted_committees=submitted_committees,
         )
 
