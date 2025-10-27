@@ -17,13 +17,13 @@
 
 from __future__ import annotations
 
+import urllib.parse
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 import asfquart.base as base
 import asfquart.session as session
 import quart
 import werkzeug.datastructures.headers
-import werkzeug.http
 
 import atr.config as config
 import atr.db as db
@@ -242,3 +242,25 @@ async def redirect[R](
     elif error is not None:
         await quart.flash(error, "error")
     return quart.redirect(util.as_url(route, **kwargs))
+
+
+def valid_url(
+    url: str,
+    host: str,
+    scheme: str = "https",
+    allow_params: bool = False,
+    allow_query: bool = False,
+    allow_fragment: bool = False,
+) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != scheme:
+        return False
+    if parsed.netloc != host:
+        return False
+    if (not allow_params) and parsed.params:
+        return False
+    if (not allow_query) and parsed.query:
+        return False
+    if (not allow_fragment) and parsed.fragment:
+        return False
+    return True

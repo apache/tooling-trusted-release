@@ -16,6 +16,7 @@
 # under the License.
 
 
+import asfquart.base as base
 import quart
 import werkzeug.wrappers.response as response
 
@@ -29,6 +30,7 @@ import atr.storage as storage
 import atr.tabulate as tabulate
 import atr.template as template
 import atr.util as util
+import atr.web as web
 
 
 class ResolveVoteForm(forms.Typed):
@@ -189,7 +191,13 @@ async def tabulated_selected_post(session: route.CommitterSession, project_name:
     fetch_error = None
     if await hidden_form.validate_on_submit():
         # TODO: Just pass the thread_id itself instead?
+        # TODO: The hidden field is user controlled data, so we should HMAC it
+        # Ideally there would be a concept of authenticated hidden fields
+        # Perhaps all hidden fields should be authenticated
+        # We should also still validate all HMACed fields
         archive_url = hidden_form.hidden_field.data or ""
+        if not web.valid_url(archive_url, "lists.apache.org"):
+            raise base.ASFQuartException("Invalid vote thread URL", errorcode=400)
         thread_id = archive_url.split("/")[-1]
         if thread_id:
             try:
