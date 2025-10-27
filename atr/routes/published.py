@@ -25,6 +25,7 @@ import quart
 import atr.htm as htm
 import atr.route as route
 import atr.util as util
+import atr.web as web
 
 
 @route.committer("/published/<path:path>")
@@ -41,7 +42,7 @@ async def root(session: route.CommitterSession) -> quart.Response:
     return await _path(session, "")
 
 
-async def _directory_listing(full_path: pathlib.Path, current_path: str) -> quart.Response:
+async def _directory_listing(full_path: pathlib.Path, current_path: str) -> web.ElementResponse:
     html = htm.Block(htm.html)
     html.title[f"Index of /{current_path}"]
     html.style["body { margin: 1rem; }"]
@@ -49,7 +50,7 @@ async def _directory_listing(full_path: pathlib.Path, current_path: str) -> quar
         htm.h1[f"Index of /{current_path}"]
         with body.block(htm.pre) as pre:
             await _directory_listing_pre(full_path, current_path, pre)
-    return quart.Response(html.collect(), mimetype="text/html")
+    return web.ElementResponse(html.collect())
 
 
 async def _directory_listing_pre(full_path: pathlib.Path, current_path: str, pre: htm.Block) -> None:

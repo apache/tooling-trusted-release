@@ -194,7 +194,7 @@ async def configuration(session: web.Committer) -> quart.wrappers.response.Respo
 
 
 @admin.get("/consistency")
-async def consistency(session: web.Committer) -> quart.Response:
+async def consistency(session: web.Committer) -> web.TextResponse:
     """Check for consistency between the database and the filesystem."""
     # Get all releases from the database
     async with db.session() as data:
@@ -218,7 +218,7 @@ async def consistency(session: web.Committer) -> quart.Response:
                 database_dirs.remove(database_dir)
                 filesystem_dirs.remove(filesystem_dir)
                 break
-    return quart.Response(
+    return web.TextResponse(
         f"""\
 === BROKEN ===
 
@@ -236,8 +236,7 @@ FILESYSTEM ONLY:
 Paired correctly:
 
 {"\n".join(sorted(paired_dirs or ["-"]))}
-""",
-        mimetype="text/plain",
+"""
     )
 
 
@@ -312,7 +311,7 @@ async def _delete_test_openpgp_keys(session: web.Committer) -> quart.Response | 
     if quart.request.method != "POST":
         delete_form = await DeleteTestKeysForm.create_form()
         rendered_form = forms.render_simple(delete_form, action="")
-        return quart.Response(str(rendered_form), mimetype="text/html")
+        return web.ElementResponse(rendered_form)
 
     # This is a POST request
     delete_form = await DeleteTestKeysForm.create_form()
@@ -451,7 +450,7 @@ async def _keys_check(session: web.Committer) -> quart.Response:
     if quart.request.method != "POST":
         check_form = await CheckKeysForm.create_form()
         rendered_form = forms.render_simple(check_form, action="")
-        return quart.Response(str(rendered_form), mimetype="text/html")
+        return web.ElementResponse(rendered_form)
 
     try:
         result = await _check_keys()
@@ -476,7 +475,7 @@ async def _keys_regenerate_all(session: web.Committer) -> quart.Response:
     if quart.request.method != "POST":
         regenerate_form = await RegenerateKeysForm.create_form()
         rendered_form = forms.render_simple(regenerate_form, action="")
-        return quart.Response(str(rendered_form), mimetype="text/html")
+        return web.ElementResponse(rendered_form)
 
     async with db.session() as data:
         committee_names = [c.name for c in await data.committee().all()]

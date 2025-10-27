@@ -242,4 +242,4 @@ async def _list(
         div.a(href=link_url)[display_name]
     html.body[div.collect(separator=htm.br)]
     response_body = html.collect()
-    return quart.Response(response_body, mimetype="text/html")
+    return web.ElementResponse(response_body)

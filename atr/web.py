@@ -25,6 +25,7 @@ import quart
 
 import atr.config as config
 import atr.db as db
+import atr.htm as htm
 import atr.models.sql as sql
 import atr.user as user
 import atr.util as util
@@ -169,6 +170,11 @@ class Committer:
         if self._projects is None:
             self._projects = await user.projects(self.uid)
         return self._projects[:]
+
+
+class ElementResponse(quart.Response):
+    def __init__(self, element: htm.Element, status: int = 200) -> None:
+        super().__init__(str(element), status=status, mimetype="text/html")
 
 
 class RouteFunction(Protocol[R]):
