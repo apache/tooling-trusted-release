@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 import asfquart.base as base
 import asfquart.session as session
 import quart
+import werkzeug.datastructures.headers
+import werkzeug.http
 
 import atr.config as config
 import atr.db as db
@@ -177,6 +179,30 @@ class ElementResponse(quart.Response):
         super().__init__(str(element), status=status, mimetype="text/html")
 
 
+class HeaderValue:
+    # TODO: There does not appear to be a general HTTP header construction package in Python
+    # The existence of one would help us and others to adhere to the HTTP component of ASVS v5 1.2.1
+    # Our validation is slightly more strict than that of Werkzeug
+
+    def __init__(self, value: str, /, **kwargs: str) -> None:
+        for text in (value, *kwargs.values()):
+            if '"' in text:
+                raise ValueError(f"Header value cannot contain double quotes: {text}")
+            if "\x00" in text:
+                raise ValueError(f"Header value cannot contain null bytes: {text}")
+
+        headers = werkzeug.datastructures.headers.Headers()
+        headers.add("X-Header-Value", value, **kwargs)
+        werkzeug_value = headers.get("X-Header-Value")
+        if werkzeug_value is None:
+            raise ValueError("Header value should not be None after validation")
+
+        self.__value = werkzeug_value
+
+    def __str__(self) -> str:
+        return self.__value
+
+
 class RouteFunction(Protocol[R]):
     """Protocol for @app_route decorated functions."""
 
@@ -189,6 +215,17 @@ class RouteFunction(Protocol[R]):
 class TextResponse(quart.Response):
     def __init__(self, text: str, status: int = 200) -> None:
         super().__init__(text, status=status, mimetype="text/plain")
+
+
+class ZipResponse(quart.Response):
+    def __init__(
+        self,
+        response: Any,
+        headers: dict[str, HeaderValue],
+        status: int = 200,
+    ) -> None:
+        raw_headers = {name: str(value) for name, value in headers.items()}
+        super().__init__(response, status=status, headers=raw_headers, mimetype="application/zip")
 
 
 async def redirect[R](

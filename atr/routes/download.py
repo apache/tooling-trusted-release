@@ -24,7 +24,6 @@ import aiofiles
 import aiofiles.os
 import asfquart.base as base
 import quart
-import werkzeug.http
 import werkzeug.wrappers.response as response
 import zipstream
 
@@ -144,11 +143,10 @@ async def zip_selected(
             yield chunk
 
     headers = {
-        "Content-Disposition": f"attachment; filename={werkzeug.http.quote_header_value(release.name + '.zip')}",
-        "Content-Type": "application/zip",
+        "Content-Disposition": web.HeaderValue("attachment", filename=release.name + ".zip"),
+        "Content-Type": web.HeaderValue("application/zip"),
     }
-    # TODO: Write a type safe wrapper for quart.Response that ensures headers are encoded correctly
-    return quart.Response(stream_zip(files_to_zip), headers=headers, mimetype="application/zip")
+    return web.ZipResponse(stream_zip(files_to_zip), headers=headers)
 
 
 async def _download_or_list(project_name: str, version_name: str, file_path: str) -> response.Response | quart.Response:
