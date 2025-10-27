@@ -18,6 +18,7 @@
 # under the License.
 
 # find atr -name '*.py' -exec python3 scripts/markup_strings.py {} \; | grep -v '^ok '
+# TODO: Detect instances of "| safe" in HTML templates
 
 import ast
 import enum

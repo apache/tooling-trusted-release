@@ -60,15 +60,15 @@
   {% endif %}
 {% endmacro %}
 
-{% macro errors(field, classes="invalid-feedback", item_separator="<br />") %}
-{% if field.errors %}
-  <div class="{{ classes }}">
-    {% for error in field.errors %}
-      {{ error }}
-      {% if not loop.last %}{{ item_separator|safe }}{% endif %}
-    {% endfor %}
-  </div>
-{% endif %}
+{% macro errors(field, classes="invalid-feedback") %}
+  {% if field.errors %}
+    <div class="{{ classes }}">
+      {% for error in field.errors %}
+        {{ error }}
+        {% if not loop.last %}<br />{% endif %}
+      {% endfor %}
+    </div>
+  {% endif %}
 {% endmacro %}
 
 {% macro description(field, classes="form-text text-muted") %}
