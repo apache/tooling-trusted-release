@@ -17,21 +17,13 @@
 
 from typing import Final
 
-import htpy
 import markupsafe
 import quart
 import werkzeug.wrappers.response as response
 import wtforms
-from htpy import (
-    div,
-    h1,
-    h2,
-    h3,
-    p,
-    script,
-)
 
 import atr.forms as forms
+import atr.htm as htm
 import atr.models.sql as sql
 import atr.route as route
 import atr.storage as storage
@@ -110,9 +102,9 @@ async def ignores(session: route.CommitterSession, committee_name: str) -> str |
         ragp = read.as_general_public()
         ignores = await ragp.checks.ignores(committee_name)
 
-    content = div[
-        h1["Ignored checks"],
-        p[f"Manage ignored checks for committee {committee_name}."],
+    content = htm.div[
+        htm.h1["Ignored checks"],
+        htm.p[f"Manage ignored checks for committee {committee_name}."],
         _add_ignore(committee_name),
         _existing_ignores(ignores),
         _script_dom_loaded(_UPDATE_IGNORE_FORM),
@@ -215,11 +207,11 @@ async def ignores_committee_update(session: route.CommitterSession, committee_na
     )
 
 
-def _check_result_ignore_card(cri: sql.CheckResultIgnore) -> htpy.Element:
+def _check_result_ignore_card(cri: sql.CheckResultIgnore) -> htm.Element:
     h3_id = cri.id or ""
     h3_asf_uid = cri.asf_uid
     h3_created = util.format_datetime(cri.created)
-    card_header_h3 = h3(".mt-3.mb-0")[f"{h3_id} - {h3_asf_uid} - {h3_created}"]
+    card_header_h3 = htm.h3(".mt-3.mb-0")[f"{h3_id} - {h3_asf_uid} - {h3_created}"]
 
     form_update = UpdateIgnoreForm(id=cri.id)
 
@@ -247,34 +239,34 @@ def _check_result_ignore_card(cri: sql.CheckResultIgnore) -> htpy.Element:
         submit_classes="btn-danger",
     )
 
-    card = div(".card.mb-5")[
-        div(".card-header.d-flex.justify-content-between")[card_header_h3, form_delete_html],
-        div(".card-body")[form_update_html],
+    card = htm.div(".card.mb-5")[
+        htm.div(".card-header.d-flex.justify-content-between")[card_header_h3, form_delete_html],
+        htm.div(".card-body")[form_update_html],
     ]
 
     return card
 
 
-def _add_ignore(committee_name: str) -> htpy.Element:
+def _add_ignore(committee_name: str) -> htm.Element:
     form_path = util.as_url(ignores_committee_add, committee_name=committee_name)
-    return div[
-        h2["Add ignore"],
-        p["Add a new ignore for a check result."],
+    return htm.div[
+        htm.h2["Add ignore"],
+        htm.p["Add a new ignore for a check result."],
         forms.render_columns(AddIgnoreForm(), form_path),
     ]
 
 
-def _existing_ignores(ignores: list[sql.CheckResultIgnore]) -> htpy.Element:
-    return div[
-        h2["Existing ignores"],
-        [_check_result_ignore_card(cri) for cri in ignores] or p["No ignores found."],
+def _existing_ignores(ignores: list[sql.CheckResultIgnore]) -> htm.Element:
+    return htm.div[
+        htm.h2["Existing ignores"],
+        [_check_result_ignore_card(cri) for cri in ignores] or htm.p["No ignores found."],
     ]
 
 
-def _script_dom_loaded(text: str) -> htpy.Element:
+def _script_dom_loaded(text: str) -> htm.Element:
     script_text = markupsafe.Markup(f"""
 document.addEventListener("DOMContentLoaded", function () {{
 {text}
 }});
 """)
-    return script[script_text]
+    return htm.script[script_text]

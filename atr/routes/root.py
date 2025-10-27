@@ -23,7 +23,6 @@ from typing import Final
 import aiofiles
 import asfquart.base as base
 import asfquart.session
-import htpy
 import quart.wrappers.response as quart_response
 import sqlalchemy.orm as orm
 import sqlmodel
@@ -31,40 +30,39 @@ import werkzeug.wrappers.response as response
 
 import atr.config as config
 import atr.db as db
+import atr.htm as htm
 import atr.models.sql as sql
 import atr.route as route
 import atr.template as template
 import atr.user as user
 import atr.util as util
 
-_POLICIES: Final = htpy.div[
-    htpy.h1["Release policy"],
-    htpy.p[
+_POLICIES: Final = htm.div[
+    htm.h1["Release policy"],
+    htm.p[
         """Note that the ATR platform will replace the use
         dist.apache.org svn repository where mentioned in
         any of the following policies."""
     ],
-    htpy.h2["Standard ASF policies"],
-    htpy.ul[
-        htpy.li[htpy.a(href="https://www.apache.org/legal/release-policy.html")["Release policy"],],
-        htpy.li[htpy.a(href="https://www.apache.org/legal/src-headers.html")["Source headers"],],
-        htpy.li[htpy.a(href="https://www.apache.org/legal/resolved.html")["Third party license"],],
-        htpy.li[htpy.a(href="https://www.apache.org/foundation/voting.html")["Voting process"],],
-        htpy.li[htpy.a(href="https://infra.apache.org/release-publishing.html")["Release process"],],
+    htm.h2["Standard ASF policies"],
+    htm.ul[
+        htm.li[htm.a(href="https://www.apache.org/legal/release-policy.html")["Release policy"],],
+        htm.li[htm.a(href="https://www.apache.org/legal/src-headers.html")["Source headers"],],
+        htm.li[htm.a(href="https://www.apache.org/legal/resolved.html")["Third party license"],],
+        htm.li[htm.a(href="https://www.apache.org/foundation/voting.html")["Voting process"],],
+        htm.li[htm.a(href="https://infra.apache.org/release-publishing.html")["Release process"],],
     ],
-    htpy.h2["Additional incubator policies"],
-    htpy.ul[
-        htpy.li[
-            htpy.a(href="https://incubator.apache.org/policy/incubation.html#releases")["Incubator release process"],
+    htm.h2["Additional incubator policies"],
+    htm.ul[
+        htm.li[
+            htm.a(href="https://incubator.apache.org/policy/incubation.html#releases")["Incubator release process"],
         ],
-        htpy.li[
-            htpy.a(href="https://incubator.apache.org/guides/releasemanagement.html#podling_constraints")[
+        htm.li[
+            htm.a(href="https://incubator.apache.org/guides/releasemanagement.html#podling_constraints")[
                 "Incubator constraints"
             ],
         ],
-        htpy.li[
-            htpy.a(href="https://incubator.apache.org/policy/incubation.html#disclaimers")["Incubation disclaimer"],
-        ],
+        htm.li[htm.a(href="https://incubator.apache.org/policy/incubation.html#disclaimers")["Incubation disclaimer"],],
     ],
 ]
 

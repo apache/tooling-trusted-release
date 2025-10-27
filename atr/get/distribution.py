@@ -17,8 +17,6 @@
 
 from __future__ import annotations
 
-import htpy
-
 import atr.blueprints.get as get
 import atr.db as db
 import atr.forms as forms
@@ -44,7 +42,7 @@ async def list_get(session: web.Committer, project: str, version: str) -> str:
     staging = release.phase == sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
     shared.distribution.html_nav_phase(block, project, version, staging)
 
-    record_a_distribution = htpy.a(
+    record_a_distribution = htm.a(
         ".btn.btn-primary",
         href=util.as_url(
             stage if staging else record,
@@ -54,7 +52,7 @@ async def list_get(session: web.Committer, project: str, version: str) -> str:
     )["Record a distribution"]
 
     # Distribution list for project-version
-    block.h1["Distribution list for ", htpy.em[f"{project}-{version}"]]
+    block.h1["Distribution list for ", htm.em[f"{project}-{version}"]]
     if not distributions:
         block.p["No distributions found."]
         block.p[record_a_distribution]
@@ -65,9 +63,9 @@ async def list_get(session: web.Committer, project: str, version: str) -> str:
     block.p["Here are all of the distributions recorded for this release."]
     block.p[record_a_distribution]
     # Table of contents
-    ul_toc = htm.Block(htpy.ul)
+    ul_toc = htm.Block(htm.ul)
     for dist in distributions:
-        a = htpy.a(href=f"#distribution-{dist.identifier}")[dist.title]
+        a = htm.a(href=f"#distribution-{dist.identifier}")[dist.title]
         ul_toc.li[a]
     block.append(ul_toc)
 
@@ -87,10 +85,10 @@ async def list_get(session: web.Committer, project: str, version: str) -> str:
         ### Platform package version
         block.h3(
             # Cannot use "#id" here, because the ID contains "."
-            # If an ID contains ".", htpy parses that as a class
+            # If an ID contains ".", htm parses that as a class
             id=f"distribution-{dist.identifier}"
         )[dist.title]
-        tbody = htpy.tbody[
+        tbody = htm.tbody[
             shared.distribution.html_tr("Release name", dist.release_name),
             shared.distribution.html_tr("Platform", dist.platform.value.name),
             shared.distribution.html_tr("Owner or Namespace", dist.owner_namespace or "-"),
@@ -108,7 +106,7 @@ async def list_get(session: web.Committer, project: str, version: str) -> str:
             action=form_action,
             submit_classes="btn-danger",
         )
-        block.append(htpy.div(".mb-3")[delete_form_element])
+        block.append(htm.div(".mb-3")[delete_form_element])
 
     title = f"Distribution list for {project} {version}"
     return await template.blank(title, content=block.collect())

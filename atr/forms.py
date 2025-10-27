@@ -21,11 +21,12 @@ import dataclasses
 import enum
 from typing import TYPE_CHECKING, Any, Final, Literal, TypeVar
 
-import htpy
 import markupsafe
 import quart_wtf
 import quart_wtf.typing
 import wtforms
+
+import atr.htm as htm
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -277,7 +278,7 @@ def render_columns(
     form_classes: str = ".atr-canary",
     submit_classes: str = "btn-primary",
     descriptions: bool = False,
-) -> htpy.Element:
+) -> htm.Element:
     label_classes = "col-sm-3 col-form-label text-sm-end"
     elements = _render_elements(
         form,
@@ -286,20 +287,20 @@ def render_columns(
         descriptions=descriptions,
     )
 
-    field_rows: list[htpy.Element] = []
+    field_rows: list[htm.Element] = []
     for label, widget in elements.fields:
-        row_div = htpy.div(".mb-3.row")
-        widget_div = htpy.div(".col-sm-8")
+        row_div = htm.div(".mb-3.row")
+        widget_div = htm.div(".col-sm-8")
         field_rows.append(row_div[label, widget_div[widget]])
 
-    form_children: list[htpy.Element | markupsafe.Markup] = elements.hidden + field_rows
+    form_children: list[htm.Element | markupsafe.Markup] = elements.hidden + field_rows
 
     if elements.submit is not None:
-        submit_div = htpy.div(".col-sm-9.offset-sm-3")
-        submit_row = htpy.div(".row")[submit_div[elements.submit]]
+        submit_div = htm.div(".col-sm-9.offset-sm-3")
+        submit_row = htm.div(".row")[submit_div[elements.submit]]
         form_children.append(submit_row)
 
-    return htpy.form(form_classes, action=action, method="post")[form_children]
+    return htm.form(form_classes, action=action, method="post")[form_children]
 
 
 def render_simple(
@@ -308,23 +309,23 @@ def render_simple(
     form_classes: str = "",
     submit_classes: str = "btn-primary",
     descriptions: bool = False,
-) -> htpy.Element:
+) -> htm.Element:
     elements = _render_elements(form, submit_classes=submit_classes, descriptions=descriptions)
 
-    field_rows: list[htpy.Element] = []
+    field_rows: list[htm.Element] = []
     for label, widget in elements.fields:
-        row_div = htpy.div[label, widget]
+        row_div = htm.div[label, widget]
         field_rows.append(row_div)
 
-    form_children: list[htpy.Element | markupsafe.Markup] = []
+    form_children: list[htm.Element | markupsafe.Markup] = []
     form_children.extend(elements.hidden)
-    form_children.append(htpy.div[field_rows])
+    form_children.append(htm.div[field_rows])
 
     if elements.submit is not None:
-        submit_row = htpy.p[elements.submit]
+        submit_row = htm.p[elements.submit]
         form_children.append(submit_row)
 
-    return htpy.form(form_classes, action=action, method="post")[form_children]
+    return htm.form(form_classes, action=action, method="post")[form_children]
 
 
 def render_table(
@@ -334,24 +335,24 @@ def render_table(
     table_classes: str = ".table.table-striped.table-bordered",
     submit_classes: str = "btn-primary",
     descriptions: bool = False,
-) -> htpy.Element:
+) -> htm.Element:
     # Small elements in Bootstrap
     elements = _render_elements(form, submit_classes=submit_classes, small=True, descriptions=descriptions)
 
-    field_rows: list[htpy.Element] = []
+    field_rows: list[htm.Element] = []
     for label, widget in elements.fields:
-        row_tr = htpy.tr[htpy.th[label], htpy.td[widget]]
+        row_tr = htm.tr[htm.th[label], htm.td[widget]]
         field_rows.append(row_tr)
 
-    form_children: list[htpy.Element | markupsafe.Markup] = []
+    form_children: list[htm.Element | markupsafe.Markup] = []
     form_children.extend(elements.hidden)
-    form_children.append(htpy.table(table_classes)[htpy.tbody[field_rows]])
+    form_children.append(htm.table(table_classes)[htm.tbody[field_rows]])
 
     if elements.submit is not None:
-        submit_row = htpy.p[elements.submit]
+        submit_row = htm.p[elements.submit]
         form_children.append(submit_row)
 
-    return htpy.form(form_classes, action=action, method="post")[form_children]
+    return htm.form(form_classes, action=action, method="post")[form_children]
 
 
 def select(
@@ -469,11 +470,11 @@ def _render_elements(
 
             if field.errors:
                 joined_errors = " ".join(field.errors)
-                div = htpy.div(".invalid-feedback.d-block")[joined_errors]
+                div = htm.div(".invalid-feedback.d-block")[joined_errors]
                 widget += markupsafe.Markup(str(div))
 
             if descriptions is True and field.description:
-                desc = htpy.div(".form-text.text-muted")[str(field.description)]
+                desc = htm.div(".form-text.text-muted")[str(field.description)]
                 widget += markupsafe.Markup(str(desc))
 
             field_elements.append((label, widget))

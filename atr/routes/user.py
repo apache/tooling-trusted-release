@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import htpy
 import quart
 
 import atr.forms as forms
@@ -63,18 +62,18 @@ async def cache_get(session: route.CommitterSession) -> str:
         block.h2["Your cached session"]
         block.p["Your session is currently cached."]
 
-        tbody = htm.Block(htpy.tbody)
-        tbody.append(htpy.tr[htpy.th["User ID"], htpy.td[session.uid]])
+        tbody = htm.Block(htm.tbody)
+        tbody.append(htm.tr[htm.th["User ID"], htm.td[session.uid]])
         if "fullname" in cached_entry:
-            tbody.append(htpy.tr[htpy.th["Full name"], htpy.td[cached_entry["fullname"]]])
+            tbody.append(htm.tr[htm.th["Full name"], htm.td[cached_entry["fullname"]]])
         if "email" in cached_entry:
-            tbody.append(htpy.tr[htpy.th["Email"], htpy.td[cached_entry["email"]]])
+            tbody.append(htm.tr[htm.th["Email"], htm.td[cached_entry["email"]]])
         if "pmcs" in cached_entry:
             committees = ", ".join(cached_entry["pmcs"]) if cached_entry["pmcs"] else "-"
-            tbody.append(htpy.tr[htpy.th["Committees"], htpy.td[committees]])
+            tbody.append(htm.tr[htm.th["Committees"], htm.td[committees]])
         if "projects" in cached_entry:
             projects = ", ".join(cached_entry["projects"]) if cached_entry["projects"] else "-"
-            tbody.append(htpy.tr[htpy.th["Projects"], htpy.td[projects]])
+            tbody.append(htm.tr[htm.th["Projects"], htm.td[projects]])
 
         block.table(".table.table-striped.table-bordered")[tbody.collect()]
 

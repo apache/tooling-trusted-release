@@ -166,3 +166,31 @@ class Block:
     @property
     def ul(self) -> BlockElementCallable:
         return BlockElementCallable(self, htpy.ul)
+
+
+type Element = htpy.Element
+
+a = htpy.a
+button = htpy.button
+code = htpy.code
+details = htpy.details
+div = htpy.div
+em = htpy.em
+form = htpy.form
+h1 = htpy.h1
+h2 = htpy.h2
+h3 = htpy.h3
+li = htpy.li
+p = htpy.p
+pre = htpy.pre
+script = htpy.script
+span = htpy.span
+strong = htpy.strong
+summary = htpy.summary
+table = htpy.table
+tbody = htpy.tbody
+td = htpy.td
+th = htpy.th
+thead = htpy.thead
+tr = htpy.tr
+ul = htpy.ul

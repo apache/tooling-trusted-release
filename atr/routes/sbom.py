@@ -22,7 +22,6 @@ import pathlib
 from typing import TYPE_CHECKING, Any
 
 import asfquart.base as base
-import htpy
 import markupsafe
 import quart
 
@@ -138,7 +137,7 @@ async def report(session: route.CommitterSession, project: str, version: str, fi
         informational purposes. Please use it only as an approximate
         guideline to the quality of your SBOM file."""
     ]
-    block.p["This report is for revision ", htpy.code[task_result.revision_number], "."]
+    block.p["This report is for revision ", htm.code[task_result.revision_number], "."]
 
     empty_form = await forms.Empty.create_form()
     # TODO: Show the status if the task to augment the SBOM is still running
@@ -151,9 +150,9 @@ async def report(session: route.CommitterSession, project: str, version: str, fi
         file_path=file_path,
     )
     block.append(
-        htpy.form("", action=action, method="post")[
+        htm.form("", action=action, method="post")[
             markupsafe.Markup(str(empty_form.hidden_tag())),
-            htpy.button(".btn.btn-primary", type="submit")["Augment SBOM"],
+            htm.button(".btn.btn-primary", type="submit")["Augment SBOM"],
         ]
     )
 
@@ -262,16 +261,16 @@ def _extract_vulnerability_severity(vuln: dict[str, Any]) -> str:
 
 def _missing_table(block: htm.Block, items: list[sbom.models.conformance.Missing]) -> None:
     warning_rows = [
-        htpy.tr[
-            htpy.td[kind.upper()],
-            htpy.td[prop],
-            htpy.td[str(count)],
+        htm.tr[
+            htm.td[kind.upper()],
+            htm.td[prop],
+            htm.td[str(count)],
         ]
         for kind, prop, count in _missing_tally(items)
     ]
     block.table(".table.table-sm.table-bordered.table-striped")[
-        htpy.thead[htpy.tr[htpy.th["Kind"], htpy.th["Property"], htpy.th["Count"]]],
-        htpy.tbody[*warning_rows],
+        htm.thead[htm.tr[htm.th["Kind"], htm.th["Property"], htm.th["Count"]]],
+        htm.tbody[*warning_rows],
     ]
 
 
@@ -288,9 +287,9 @@ def _missing_tally(items: list[sbom.models.conformance.Missing]) -> list[tuple[s
 
 def _vulnerability_component_details(block: htm.Block, component: results.OSVComponent) -> None:
     details_content = []
-    summary_element = htpy.summary[
-        htpy.span(".badge.bg-danger.me-2.font-monospace")[str(len(component.vulnerabilities))],
-        htpy.strong[component.purl],
+    summary_element = htm.summary[
+        htm.span(".badge.bg-danger.me-2.font-monospace")[str(len(component.vulnerabilities))],
+        htm.strong[component.purl],
     ]
     details_content.append(summary_element)
 
@@ -300,22 +299,22 @@ def _vulnerability_component_details(block: htm.Block, component: results.OSVCom
         vuln_modified = vuln.get("modified", "Unknown")
         vuln_severity = _extract_vulnerability_severity(vuln)
 
-        vuln_header = [htpy.strong(".me-2")[vuln_id]]
+        vuln_header = [htm.strong(".me-2")[vuln_id]]
         if vuln_severity != "Unknown":
-            vuln_header.append(htpy.span(".badge.bg-warning.text-dark")[vuln_severity])
+            vuln_header.append(htm.span(".badge.bg-warning.text-dark")[vuln_severity])
 
-        vuln_div = htpy.div(".ms-3.mb-3.border-start.border-warning.border-3.ps-3")[
-            htpy.div(".d-flex.align-items-center.mb-2")[*vuln_header],
-            htpy.p(".mb-1")[vuln_summary],
-            htpy.div(".text-muted.small")[
+        vuln_div = htm.div(".ms-3.mb-3.border-start.border-warning.border-3.ps-3")[
+            htm.div(".d-flex.align-items-center.mb-2")[*vuln_header],
+            htm.p(".mb-1")[vuln_summary],
+            htm.div(".text-muted.small")[
                 "Last modified: ",
                 vuln_modified,
             ],
-            htpy.div(".mt-2.text-muted")[vuln.get("details", "No additional details available.")],
+            htm.div(".mt-2.text-muted")[vuln.get("details", "No additional details available.")],
         ]
         details_content.append(vuln_div)
 
-    block.append(htpy.details(".mb-3.rounded")[*details_content])
+    block.append(htm.details(".mb-3.rounded")[*details_content])
 
 
 def _vulnerability_scan_button(
@@ -330,9 +329,9 @@ def _vulnerability_scan_button(
         file_path=file_path,
     )
     block.append(
-        htpy.form("", action=action, method="post")[
+        htm.form("", action=action, method="post")[
             markupsafe.Markup(str(empty_form.hidden_tag())),
-            htpy.button(".btn.btn-primary", type="submit")["Scan file"],
+            htm.button(".btn.btn-primary", type="submit")["Scan file"],
         ]
     )
 
@@ -420,11 +419,11 @@ def _vulnerability_scan_status(
 ) -> None:
     status_text = task.status.value.replace("_", " ").capitalize()
     block.p[f"Vulnerability scan is currently {status_text.lower()}."]
-    block.p["Task ID: ", htpy.code[str(task.id)]]
+    block.p["Task ID: ", htm.code[str(task.id)]]
     if (task.status == sql.TaskStatus.FAILED) and (task.error is not None):
         block.p[
             "Task reported an error: ",
-            htpy.code[task.error],
+            htm.code[task.error],
             ". Additional details are unavailable from ATR.",
         ]
         _vulnerability_scan_button(block, project, version, file_path, empty_form)

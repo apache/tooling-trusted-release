@@ -21,7 +21,6 @@ import dataclasses
 import json
 from typing import Literal
 
-import htpy
 import quart
 
 import atr.db as db
@@ -92,9 +91,9 @@ class FormProjectVersion:
 # TODO: Move this to an appropriate module
 def html_nav(container: htm.Block, back_url: str, back_anchor: str, phase: Phase) -> None:
     classes = ".d-flex.justify-content-between.align-items-center"
-    block = htm.Block(htpy.p(classes))
+    block = htm.Block(htm.p(classes))
     block.a(".atr-back-link", href=back_url)[f"← Back to {back_anchor}"]
-    span = htm.Block(htpy.span)
+    span = htm.Block(htm.span)
 
     def _phase(actual: Phase, expected: Phase) -> None:
         nonlocal span
@@ -139,7 +138,7 @@ def html_nav_phase(block: htm.Block, project: str, version: str, staging: bool) 
 
 
 def html_submitted_values_table(block: htm.Block, dd: distribution.Data) -> None:
-    tbody = htpy.tbody[
+    tbody = htm.tbody[
         html_tr("Platform", dd.platform.name),
         html_tr("Owner or Namespace", dd.owner_namespace or "-"),
         html_tr("Package", dd.package),
@@ -148,18 +147,18 @@ def html_submitted_values_table(block: htm.Block, dd: distribution.Data) -> None
     block.table(".table.table-striped.table-bordered")[tbody]
 
 
-def html_tr(label: str, value: str) -> htpy.Element:
-    return htpy.tr[htpy.th[label], htpy.td[value]]
+def html_tr(label: str, value: str) -> htm.Element:
+    return htm.tr[htm.th[label], htm.td[value]]
 
 
-def html_tr_a(label: str, value: str | None) -> htpy.Element:
-    return htpy.tr[htpy.th[label], htpy.td[htpy.a(href=value)[value] if value else "-"]]
+def html_tr_a(label: str, value: str | None) -> htm.Element:
+    return htm.tr[htm.th[label], htm.td[htm.a(href=value)[value] if value else "-"]]
 
 
 # This function is used for COMPOSE (stage) and FINISH (record)
 # It's also used whenever there is an error
 async def record_form_page(
-    fpv: FormProjectVersion, *, extra_content: htpy.Element | None = None, staging: bool = False
+    fpv: FormProjectVersion, *, extra_content: htm.Element | None = None, staging: bool = False
 ) -> str:
     await release_validated(fpv.project, fpv.version, staging=staging)
 
@@ -174,12 +173,12 @@ async def record_form_page(
         block.append(extra_content)
     block.p[
         "Record a distribution of ",
-        htpy.strong[f"{fpv.project}-{fpv.version}"],
+        htm.strong[f"{fpv.project}-{fpv.version}"],
         " using the form below.",
     ]
     block.p[
         "You can also ",
-        htpy.a(href=util.as_url(get.distribution.list_get, project=fpv.project, version=fpv.version))[
+        htm.a(href=util.as_url(get.distribution.list_get, project=fpv.project, version=fpv.version))[
             "view the distribution list"
         ],
         ".",
@@ -200,7 +199,7 @@ async def record_form_process_page(fpv: FormProjectVersion, /, staging: bool = F
 
     # In case of error, show an alert
     async def _alert(message: str) -> str:
-        div = htm.Block(htpy.div(".alert.alert-danger"))
+        div = htm.Block(htm.div(".alert.alert-danger"))
         div.p[message]
         collected = div.collect()
         return await record_form_page(fpv, extra_content=collected, staging=staging)
@@ -227,7 +226,7 @@ async def record_form_process_page(fpv: FormProjectVersion, /, staging: bool = F
     else:
         block.p["The distribution was already recorded."]
     block.table(".table.table-striped.table-bordered")[
-        htpy.tbody[
+        htm.tbody[
             html_tr("Release name", dist.release_name),
             html_tr("Platform", dist.platform.name),
             html_tr("Owner or Namespace", dist.owner_namespace or "-"),
@@ -240,7 +239,7 @@ async def record_form_process_page(fpv: FormProjectVersion, /, staging: bool = F
         ]
     ]
     block.p[
-        htpy.a(href=util.as_url(get.distribution.list_get, project=fpv.project, version=fpv.version))[
+        htm.a(href=util.as_url(get.distribution.list_get, project=fpv.project, version=fpv.version))[
             "Back to distribution list"
         ],
     ]
@@ -264,8 +263,8 @@ async def record_form_process_page(fpv: FormProjectVersion, /, staging: bool = F
         ### API response
         block.h3["API response"]
         block.details[
-            htpy.summary["Show full API response"],
-            htpy.pre(".atr-pre-wrap.mb-3")[json.dumps(metadata.result, indent=2)],
+            htm.summary["Show full API response"],
+            htm.pre(".atr-pre-wrap.mb-3")[json.dumps(metadata.result, indent=2)],
         ]
 
     return await template.blank("Distribution submitted", content=block.collect())
