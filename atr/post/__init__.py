@@ -15,24 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import atr.blueprints.get as get
-import atr.forms as forms
-import atr.post as post
-import atr.session as session
-import atr.util as util
+from .example_test import respond as example_test
 
+ROUTES_MODULE = True
 
-@get.committer("/example/test")
-async def respond(session: session.Committer) -> str:
-    empty_form = await forms.Empty.create_form()
-    return f"""\
-<h1>Test route (GET)</h1>
-<p>Hello, {session.asf_uid}!</p>
-<p>This is a test GET route for committers only.</p>
-
-<h2>Test POST submission</h2>
-<form method="post" action="{util.as_url(post.example_test)}">
-    {empty_form.hidden_tag()}
-    <button type="submit" class="btn btn-primary">Submit to POST route</button>
-</form>
-"""
+__all__ = ["example_test"]

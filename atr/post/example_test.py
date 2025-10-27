@@ -15,24 +15,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import atr.blueprints.get as get
-import atr.forms as forms
-import atr.post as post
+import quart
+
+import atr.blueprints.post as post
+import atr.get as get
 import atr.session as session
 import atr.util as util
 
 
-@get.committer("/example/test")
-async def respond(session: session.Committer) -> str:
-    empty_form = await forms.Empty.create_form()
-    return f"""\
-<h1>Test route (GET)</h1>
-<p>Hello, {session.asf_uid}!</p>
-<p>This is a test GET route for committers only.</p>
+@post.committer("/example/test")
+async def respond(session: session.Committer) -> quart.Response:
+    await util.validate_empty_form()
+    await quart.flash("POST request successful!", "success")
 
-<h2>Test POST submission</h2>
-<form method="post" action="{util.as_url(post.example_test)}">
-    {empty_form.hidden_tag()}
-    <button type="submit" class="btn btn-primary">Submit to POST route</button>
-</form>
-"""
+    return quart.Response(
+        f"""\
+<h1>Test route (POST)</h1>
+<p>Hello, {session.asf_uid}!</p>
+<p>This POST route was successfully called!</p>
+<p><a href="{util.as_url(get.example_test)}">Go back to the GET route</a></p>
+""",
+        mimetype="text/html",
+    )
