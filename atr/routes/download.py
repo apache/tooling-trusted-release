@@ -96,7 +96,7 @@ async def sh_selected(
     download_path = util.as_url(path, project_name=project_name, version_name=version_name, file_path="")
     content = content.replace("[URL_OF_URLS]", f"https://{app_host}{download_urls_selected}")
     content = content.replace("[URLS_PREFIX]", f"https://{app_host}{download_path}")
-    return quart.Response(content, mimetype="text/x-shellscript")
+    return web.ShellResponse(content)
 
 
 @route.public("/download/urls/<project_name>/<version_name>")

@@ -212,6 +212,11 @@ class RouteFunction(Protocol[R]):
     def __call__(self, *args: Any, **kwargs: Any) -> Awaitable[R]: ...
 
 
+class ShellResponse(quart.Response):
+    def __init__(self, text: str, status: int = 200) -> None:
+        super().__init__(text, status=status, mimetype="text/x-shellscript")
+
+
 class TextResponse(quart.Response):
     def __init__(self, text: str, status: int = 200) -> None:
         super().__init__(text, status=status, mimetype="text/plain")
