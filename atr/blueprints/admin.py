@@ -23,8 +23,8 @@ import asfquart.base as base
 import asfquart.session
 import quart
 
-import atr.session as session
 import atr.user as user
+import atr.web as web
 
 _BLUEPRINT_NAME = "admin_blueprint"
 _BLUEPRINT = quart.Blueprint(_BLUEPRINT_NAME, __name__, url_prefix="/admin", template_folder="../admin/templates")
@@ -39,7 +39,7 @@ async def _check_admin_access() -> None:
     if web_session.uid not in user.get_admin_users():
         raise base.ASFQuartException("You are not authorized to access the admin interface", errorcode=403)
 
-    quart.g.session = session.Committer(web_session)
+    quart.g.session = web.Committer(web_session)
 
 
 def register(app: base.QuartApp) -> ModuleType:
@@ -49,8 +49,8 @@ def register(app: base.QuartApp) -> ModuleType:
     return admin
 
 
-def get(path: str) -> Callable[[session.CommitterRouteFunction[Any]], session.RouteFunction[Any]]:
-    def decorator(func: session.CommitterRouteFunction[Any]) -> session.RouteFunction[Any]:
+def get(path: str) -> Callable[[web.CommitterRouteFunction[Any]], web.RouteFunction[Any]]:
+    def decorator(func: web.CommitterRouteFunction[Any]) -> web.RouteFunction[Any]:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             return await func(quart.g.session, *args, **kwargs)
 
@@ -66,8 +66,8 @@ def get(path: str) -> Callable[[session.CommitterRouteFunction[Any]], session.Ro
     return decorator
 
 
-def post(path: str) -> Callable[[session.CommitterRouteFunction[Any]], session.RouteFunction[Any]]:
-    def decorator(func: session.CommitterRouteFunction[Any]) -> session.RouteFunction[Any]:
+def post(path: str) -> Callable[[web.CommitterRouteFunction[Any]], web.RouteFunction[Any]]:
+    def decorator(func: web.CommitterRouteFunction[Any]) -> web.RouteFunction[Any]:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             return await func(quart.g.session, *args, **kwargs)
 

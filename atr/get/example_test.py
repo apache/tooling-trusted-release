@@ -18,12 +18,12 @@
 import atr.blueprints.get as get
 import atr.forms as forms
 import atr.post as post
-import atr.session as session
 import atr.util as util
+import atr.web as web
 
 
 @get.committer("/example/test")
-async def respond(session: session.Committer) -> str:
+async def respond(session: web.Committer) -> str:
     empty_form = await forms.Empty.create_form()
     return f"""\
 <h1>Test route (GET)</h1>

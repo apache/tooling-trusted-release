@@ -19,12 +19,12 @@ import quart
 
 import atr.blueprints.post as post
 import atr.get as get
-import atr.session as session
 import atr.util as util
+import atr.web as web
 
 
 @post.committer("/example/test")
-async def respond(session: session.Committer) -> quart.Response:
+async def respond(session: web.Committer) -> quart.Response:
     await util.validate_empty_form()
     await quart.flash("POST request successful!", "success")
 

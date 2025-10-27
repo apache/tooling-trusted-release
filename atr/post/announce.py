@@ -23,11 +23,11 @@ import atr.blueprints.post as post
 import atr.get as get
 import atr.models.sql as sql
 import atr.routes.release as routes_release
-import atr.session as session
 import atr.shared as shared
 import atr.storage as storage
 import atr.template as template
 import atr.util as util
+import atr.web as web
 
 
 class AnnounceError(Exception):
@@ -35,7 +35,7 @@ class AnnounceError(Exception):
 
 
 @post.committer("/announce/<project_name>/<version_name>")
-async def selected(session: session.Committer, project_name: str, version_name: str) -> str | response.Response:
+async def selected(session: web.Committer, project_name: str, version_name: str) -> str | response.Response:
     """Handle the announcement form submission and promote the preview to release."""
     await session.check_access(project_name)
 

@@ -22,10 +22,10 @@ import atr.blueprints.get as get
 import atr.db as db
 import atr.forms as forms
 import atr.models.sql as sql
-import atr.session as session
 import atr.shared as shared
 import atr.template as template
 import atr.util as util
+import atr.web as web
 
 
 class UpdateCommitteeKeysForm(forms.Typed):
@@ -33,7 +33,7 @@ class UpdateCommitteeKeysForm(forms.Typed):
 
 
 @get.public("/committees")
-async def directory(session: session.Committer | None) -> str:
+async def directory(session: web.Committer | None) -> str:
     """Main committee directory page."""
     async with db.session() as data:
         committees = await data.committee(_projects=True).order_by(sql.Committee.name).all()
@@ -45,7 +45,7 @@ async def directory(session: session.Committer | None) -> str:
 
 
 @get.public("/committees/<name>")
-async def view(session: session.Committer | None, name: str) -> str:
+async def view(session: web.Committer | None, name: str) -> str:
     # TODO: Could also import this from keys.py
     async with db.session() as data:
         committee = await data.committee(

@@ -22,14 +22,14 @@ import atr.blueprints.get as get
 import atr.config as config
 import atr.construct as construct
 import atr.models.sql as sql
-import atr.session as session
 import atr.shared as shared
 import atr.template as template
 import atr.util as util
+import atr.web as web
 
 
 @get.committer("/announce/<project_name>/<version_name>")
-async def selected(session: session.Committer, project_name: str, version_name: str) -> str | response.Response:
+async def selected(session: web.Committer, project_name: str, version_name: str) -> str | response.Response:
     """Allow the user to announce a release preview."""
     await session.check_access(project_name)
 

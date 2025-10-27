@@ -26,7 +26,7 @@ import asfquart.session
 import quart
 
 import atr.log as log
-import atr.session as session
+import atr.web as web
 
 _BLUEPRINT_NAME = "post_blueprint"
 _BLUEPRINT = quart.Blueprint(_BLUEPRINT_NAME, __name__)
@@ -39,14 +39,14 @@ def register(app: base.QuartApp) -> ModuleType:
     return post
 
 
-def committer(path: str) -> Callable[[session.CommitterRouteFunction[Any]], session.RouteFunction[Any]]:
-    def decorator(func: session.CommitterRouteFunction[Any]) -> session.RouteFunction[Any]:
+def committer(path: str) -> Callable[[web.CommitterRouteFunction[Any]], web.RouteFunction[Any]]:
+    def decorator(func: web.CommitterRouteFunction[Any]) -> web.RouteFunction[Any]:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             web_session = await asfquart.session.read()
             if web_session is None:
                 raise base.ASFQuartException("Not authenticated", errorcode=401)
 
-            enhanced_session = session.Committer(web_session)
+            enhanced_session = web.Committer(web_session)
             start_time_ns = time.perf_counter_ns()
             response = await func(enhanced_session, *args, **kwargs)
             end_time_ns = time.perf_counter_ns()
@@ -80,11 +80,11 @@ def committer(path: str) -> Callable[[session.CommitterRouteFunction[Any]], sess
     return decorator
 
 
-def public(path: str) -> Callable[[Callable[..., Awaitable[Any]]], session.RouteFunction[Any]]:
-    def decorator(func: Callable[..., Awaitable[Any]]) -> session.RouteFunction[Any]:
+def public(path: str) -> Callable[[Callable[..., Awaitable[Any]]], web.RouteFunction[Any]]:
+    def decorator(func: Callable[..., Awaitable[Any]]) -> web.RouteFunction[Any]:
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             web_session = await asfquart.session.read()
-            enhanced_session = session.Committer(web_session) if web_session else None
+            enhanced_session = web.Committer(web_session) if web_session else None
             return await func(enhanced_session, *args, **kwargs)
 
         endpoint = func.__module__.replace(".", "_") + "_" + func.__name__

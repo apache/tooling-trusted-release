@@ -45,7 +45,6 @@ import atr.log as log
 import atr.models.sql as sql
 import atr.principal as principal
 import atr.routes.mapping as mapping
-import atr.session as session
 import atr.storage as storage
 import atr.storage.outcome as outcome
 import atr.storage.types as types
@@ -53,6 +52,7 @@ import atr.tasks as tasks
 import atr.template as template
 import atr.util as util
 import atr.validate as validate
+import atr.web as web
 
 ROUTES_MODULE: Final[Literal[True]] = True
 
@@ -93,7 +93,7 @@ class LdapLookupForm(forms.Typed):
 
 
 @admin.get("/all-releases")
-async def all_releases(session: session.Committer) -> str:
+async def all_releases(session: web.Committer) -> str:
     """Display a list of all releases across all phases."""
     async with db.session() as data:
         releases = await data.release(_project=True, _committee=True).order_by(sql.Release.name).all()
@@ -101,16 +101,16 @@ async def all_releases(session: session.Committer) -> str:
 
 
 @admin.get("/browse-as")
-async def browse_as_get(session: session.Committer) -> str | response.Response:
+async def browse_as_get(session: web.Committer) -> str | response.Response:
     return await _browse_as(session)
 
 
 @admin.post("/browse-as")
-async def browse_as_post(session: session.Committer) -> str | response.Response:
+async def browse_as_post(session: web.Committer) -> str | response.Response:
     return await _browse_as(session)
 
 
-async def _browse_as(session: session.Committer) -> str | response.Response:
+async def _browse_as(session: web.Committer) -> str | response.Response:
     """Allows an admin to browse as another user."""
     # TODO: Enable this in debugging mode only?
     from atr.routes import root
@@ -159,7 +159,7 @@ async def _browse_as(session: session.Committer) -> str | response.Response:
 
 
 @admin.get("/configuration")
-async def configuration(session: session.Committer) -> quart.wrappers.response.Response:
+async def configuration(session: web.Committer) -> quart.wrappers.response.Response:
     """Display the current application configuration values."""
 
     conf = config.get()
@@ -182,7 +182,7 @@ async def configuration(session: session.Committer) -> quart.wrappers.response.R
 
 
 @admin.get("/consistency")
-async def consistency(session: session.Committer) -> quart.Response:
+async def consistency(session: web.Committer) -> quart.Response:
     """Check for consistency between the database and the filesystem."""
     # Get all releases from the database
     async with db.session() as data:
@@ -231,7 +231,7 @@ Paired correctly:
 
 @admin.get("/data")
 @admin.get("/data/<model>")
-async def data(session: session.Committer, model: str = "Committee") -> str:
+async def data(session: web.Committer, model: str = "Committee") -> str:
     """Browse all records in the database."""
     async with db.session() as data:
         # Map of model names to their classes
@@ -279,16 +279,16 @@ async def data(session: session.Committer, model: str = "Committee") -> str:
 
 
 @admin.get("/delete-test-openpgp-keys")
-async def delete_test_openpgp_keys_get(session: session.Committer) -> quart.Response | response.Response:
+async def delete_test_openpgp_keys_get(session: web.Committer) -> quart.Response | response.Response:
     return await _delete_test_openpgp_keys(session)
 
 
 @admin.post("/delete-test-openpgp-keys")
-async def delete_test_openpgp_keys_post(session: session.Committer) -> quart.Response | response.Response:
+async def delete_test_openpgp_keys_post(session: web.Committer) -> quart.Response | response.Response:
     return await _delete_test_openpgp_keys(session)
 
 
-async def _delete_test_openpgp_keys(session: session.Committer) -> quart.Response | response.Response:
+async def _delete_test_openpgp_keys(session: web.Committer) -> quart.Response | response.Response:
     """Delete all test user OpenPGP keys and their links."""
     import atr.routes
 
@@ -321,16 +321,16 @@ async def _delete_test_openpgp_keys(session: session.Committer) -> quart.Respons
 
 
 @admin.get("/delete-committee-keys")
-async def delete_committee_keys_get(session: session.Committer) -> str | response.Response:
+async def delete_committee_keys_get(session: web.Committer) -> str | response.Response:
     return await _delete_committee_keys(session)
 
 
 @admin.post("/delete-committee-keys")
-async def delete_committee_keys_post(session: session.Committer) -> str | response.Response:
+async def delete_committee_keys_post(session: web.Committer) -> str | response.Response:
     return await _delete_committee_keys(session)
 
 
-async def _delete_committee_keys(session: session.Committer) -> str | response.Response:
+async def _delete_committee_keys(session: web.Committer) -> str | response.Response:
     form = await DeleteCommitteeKeysForm.create_form()
     async with db.session() as data:
         all_committees = await data.committee(_public_signing_keys=True).order_by(sql.Committee.name).all()
@@ -382,16 +382,16 @@ async def _delete_committee_keys(session: session.Committer) -> str | response.R
 
 
 @admin.get("/delete-release")
-async def delete_release_get(session: session.Committer) -> str | response.Response:
+async def delete_release_get(session: web.Committer) -> str | response.Response:
     return await _delete_release(session)
 
 
 @admin.post("/delete-release")
-async def delete_release_post(session: session.Committer) -> str | response.Response:
+async def delete_release_post(session: web.Committer) -> str | response.Response:
     return await _delete_release(session)
 
 
-async def _delete_release(session: session.Committer) -> str | response.Response:
+async def _delete_release(session: web.Committer) -> str | response.Response:
     """Page to delete selected releases and their associated data and files."""
     form = await DeleteReleaseForm.create_form()
 
@@ -421,7 +421,7 @@ async def _delete_release(session: session.Committer) -> str | response.Response
 
 
 @admin.get("/env")
-async def env(session: session.Committer) -> quart.wrappers.response.Response:
+async def env(session: web.Committer) -> quart.wrappers.response.Response:
     """Display the environment variables."""
     env_vars = []
     for key, value in os.environ.items():
@@ -430,16 +430,16 @@ async def env(session: session.Committer) -> quart.wrappers.response.Response:
 
 
 @admin.get("/keys/check")
-async def keys_check_get(session: session.Committer) -> quart.Response:
+async def keys_check_get(session: web.Committer) -> quart.Response:
     return await _keys_check(session)
 
 
 @admin.post("/keys/check")
-async def keys_check_post(session: session.Committer) -> quart.Response:
+async def keys_check_post(session: web.Committer) -> quart.Response:
     return await _keys_check(session)
 
 
-async def _keys_check(session: session.Committer) -> quart.Response:
+async def _keys_check(session: web.Committer) -> quart.Response:
     """Check public signing key details."""
     if quart.request.method != "POST":
         empty_form = await forms.Empty.create_form()
@@ -462,16 +462,16 @@ async def _keys_check(session: session.Committer) -> quart.Response:
 
 
 @admin.get("/keys/regenerate-all")
-async def keys_regenerate_all_get(session: session.Committer) -> quart.Response:
+async def keys_regenerate_all_get(session: web.Committer) -> quart.Response:
     return await _keys_regenerate_all(session)
 
 
 @admin.post("/keys/regenerate-all")
-async def keys_regenerate_all_post(session: session.Committer) -> quart.Response:
+async def keys_regenerate_all_post(session: web.Committer) -> quart.Response:
     return await _keys_regenerate_all(session)
 
 
-async def _keys_regenerate_all(session: session.Committer) -> quart.Response:
+async def _keys_regenerate_all(session: web.Committer) -> quart.Response:
     """Regenerate the KEYS file for all committees."""
     if quart.request.method != "POST":
         empty_form = await forms.Empty.create_form()
@@ -507,16 +507,16 @@ async def _keys_regenerate_all(session: session.Committer) -> quart.Response:
 
 
 @admin.get("/keys/update")
-async def keys_update_get(session: session.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
+async def keys_update_get(session: web.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
     return await _keys_update(session)
 
 
 @admin.post("/keys/update")
-async def keys_update_post(session: session.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
+async def keys_update_post(session: web.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
     return await _keys_update(session)
 
 
-async def _keys_update(session: session.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
+async def _keys_update(session: web.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
     """Update keys from remote data."""
     if quart.request.method != "POST":
         empty_form = await forms.Empty.create_form()
@@ -544,16 +544,16 @@ async def _keys_update(session: session.Committer) -> str | response.Response | 
 
 
 @admin.get("/ldap/")
-async def ldap_get(session: session.Committer) -> str:
+async def ldap_get(session: web.Committer) -> str:
     return await _ldap(session)
 
 
 @admin.post("/ldap/")
-async def ldap_post(session: session.Committer) -> str:
+async def ldap_post(session: web.Committer) -> str:
     return await _ldap(session)
 
 
-async def _ldap(session: session.Committer) -> str:
+async def _ldap(session: web.Committer) -> str:
     form = await LdapLookupForm.create_form(data=quart.request.args)
 
     uid_query = form.uid.data
@@ -588,20 +588,20 @@ async def _ldap(session: session.Committer) -> str:
 
 @admin.get("/ongoing-tasks/<project_name>/<version_name>/<revision>")
 async def ongoing_tasks_get(
-    session: session.Committer, project_name: str, version_name: str, revision: str
+    session: web.Committer, project_name: str, version_name: str, revision: str
 ) -> quart.wrappers.response.Response:
     return await _ongoing_tasks(session, project_name, version_name, revision)
 
 
 @admin.post("/ongoing-tasks/<project_name>/<version_name>/<revision>")
 async def ongoing_tasks_post(
-    session: session.Committer, project_name: str, version_name: str, revision: str
+    session: web.Committer, project_name: str, version_name: str, revision: str
 ) -> quart.wrappers.response.Response:
     return await _ongoing_tasks(session, project_name, version_name, revision)
 
 
 async def _ongoing_tasks(
-    session: session.Committer, project_name: str, version_name: str, revision: str
+    session: web.Committer, project_name: str, version_name: str, revision: str
 ) -> quart.wrappers.response.Response:
     try:
         ongoing = await interaction.tasks_ongoing(project_name, version_name, revision)
@@ -612,7 +612,7 @@ async def _ongoing_tasks(
 
 
 @admin.get("/performance")
-async def performance(session: session.Committer) -> str:
+async def performance(session: web.Committer) -> str:
     """Display performance statistics for all routes."""
     app = asfquart.APP
 
@@ -693,16 +693,16 @@ async def performance(session: session.Committer) -> str:
 
 
 @admin.get("/projects/update")
-async def projects_update_get(session: session.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
+async def projects_update_get(session: web.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
     return await _projects_update(session)
 
 
 @admin.post("/projects/update")
-async def projects_update_post(session: session.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
+async def projects_update_post(session: web.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
     return await _projects_update(session)
 
 
-async def _projects_update(session: session.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
+async def _projects_update(session: web.Committer) -> str | response.Response | tuple[Mapping[str, Any], int]:
     """Update projects from remote data."""
     if quart.request.method == "POST":
         try:
@@ -724,13 +724,13 @@ async def _projects_update(session: session.Committer) -> str | response.Respons
 
 
 @admin.get("/tasks")
-async def tasks_(session: session.Committer) -> str:
+async def tasks_(session: web.Committer) -> str:
     return await template.render("tasks.html")
 
 
 @admin.get("/task-times/<project_name>/<version_name>/<revision_number>")
 async def task_times(
-    session: session.Committer, project_name: str, version_name: str, revision_number: str
+    session: web.Committer, project_name: str, version_name: str, revision_number: str
 ) -> quart.wrappers.response.Response:
     values = []
     async with db.session() as data:
@@ -747,7 +747,7 @@ async def task_times(
 
 
 @admin.get("/test")
-async def test(session: session.Committer) -> quart.wrappers.response.Response:
+async def test(session: web.Committer) -> quart.wrappers.response.Response:
     """Test the storage layer."""
     import atr.storage as storage
 
@@ -780,14 +780,14 @@ async def test(session: session.Committer) -> quart.wrappers.response.Response:
 
 
 @admin.get("/toggle-view")
-async def toggle_view_get(session: session.Committer) -> str:
+async def toggle_view_get(session: web.Committer) -> str:
     """Display the page with a button to toggle between admin and user views."""
     empty_form = await forms.Empty.create_form()
     return await template.render("toggle-admin-view.html", empty_form=empty_form)
 
 
 @admin.post("/toggle-view")
-async def toggle_view_post(session: session.Committer) -> response.Response:
+async def toggle_view_post(session: web.Committer) -> response.Response:
     await util.validate_empty_form()
 
     app = asfquart.APP
@@ -806,7 +806,7 @@ async def toggle_view_post(session: session.Committer) -> response.Response:
 
 
 @admin.get("/validate")
-async def validate_(session: session.Committer) -> str:
+async def validate_(session: web.Committer) -> str:
     """Run validators and display any divergences."""
 
     async with db.session() as data:
@@ -841,7 +841,7 @@ async def _check_keys(fix: bool = False) -> str:
     return message
 
 
-async def _delete_releases(session: session.Committer, releases_to_delete: list[str]) -> None:
+async def _delete_releases(session: web.Committer, releases_to_delete: list[str]) -> None:
     success_count = 0
     fail_count = 0
     error_messages = []

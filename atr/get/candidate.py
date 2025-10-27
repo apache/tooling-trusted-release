@@ -24,13 +24,13 @@ import atr.blueprints.get as get
 import atr.db as db
 import atr.log as log
 import atr.models.sql as sql
-import atr.session as session
 import atr.template as template
 import atr.util as util
+import atr.web as web
 
 
 @get.committer("/candidate/view/<project_name>/<version_name>")
-async def view(session: session.Committer, project_name: str, version_name: str) -> response.Response | str:
+async def view(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
     """View all the files in the rsync upload directory for a release."""
     await session.check_access(project_name)
 
@@ -66,7 +66,7 @@ async def view(session: session.Committer, project_name: str, version_name: str)
 
 @get.committer("/candidate/view/<project_name>/<version_name>/<path:file_path>")
 async def view_path(
-    session: session.Committer, project_name: str, version_name: str, file_path: str
+    session: web.Committer, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:
     """View the content of a specific file in the release candidate."""
     await session.check_access(project_name)
