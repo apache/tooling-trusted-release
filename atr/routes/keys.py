@@ -42,6 +42,7 @@ import atr.storage.types as types
 import atr.template as template
 import atr.user as user
 import atr.util as util
+import atr.web as web
 
 
 class AddOpenPGPKeyForm(forms.Typed):
@@ -282,13 +283,13 @@ async def details(session: route.CommitterSession, fingerprint: str) -> str | re
 
 
 @route.committer("/keys/export/<committee_name>")
-async def export(session: route.CommitterSession, committee_name: str) -> quart.Response:
+async def export(session: route.CommitterSession, committee_name: str) -> web.TextResponse:
     """Export a KEYS file for a specific committee."""
     async with storage.write() as write:
         wafc = write.as_foundation_committer()
         keys_file_text = await wafc.keys.keys_file_text(committee_name)
 
-    return quart.Response(keys_file_text, mimetype="text/plain")
+    return web.TextResponse(keys_file_text)
 
 
 @route.committer("/keys/import/<project_name>/<version_name>", methods=["POST"])

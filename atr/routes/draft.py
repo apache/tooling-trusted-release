@@ -39,6 +39,7 @@ import atr.routes.upload as upload
 import atr.storage as storage
 import atr.template as template
 import atr.util as util
+import atr.web as web
 
 if TYPE_CHECKING:
     import werkzeug.wrappers.response as response
@@ -412,4 +413,4 @@ async def vote_preview(
             vote_duration=vote_duration,
         ),
     )
-    return quart.Response(body, mimetype="text/plain")
+    return web.TextResponse(body)

@@ -30,6 +30,7 @@ import atr.routes.root as root
 import atr.storage as storage
 import atr.template as template
 import atr.util as util
+import atr.web as web
 
 if asfquart.APP is ...:
     raise RuntimeError("APP is not set")
@@ -64,7 +65,7 @@ async def announce_preview(
         if form.errors:
             error_details = "; ".join([f"{field}: {', '.join(errs)}" for field, errs in form.errors.items()])
             error_message = f"{error_message}: {error_details}"
-        return quart.Response(f"Error: {error_message}", status=400, mimetype="text/plain")
+        return web.TextResponse(f"Error: {error_message}", status=400)
 
     try:
         # Construct options and generate body
@@ -76,11 +77,11 @@ async def announce_preview(
         )
         preview_body = await construct.announce_release_body(str(form.body.data), options)
 
-        return quart.Response(preview_body, mimetype="text/plain")
+        return web.TextResponse(preview_body)
 
     except Exception as e:
         log.exception("Error generating announcement preview:")
-        return quart.Response(f"Error generating preview: {e!s}", status=500, mimetype="text/plain")
+        return web.TextResponse(f"Error generating preview: {e!s}", status=500)
 
 
 @route.committer("/preview/delete", methods=["POST"])

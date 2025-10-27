@@ -180,6 +180,11 @@ class RouteFunction(Protocol[R]):
     def __call__(self, *args: Any, **kwargs: Any) -> Awaitable[R]: ...
 
 
+class TextResponse(quart.Response):
+    def __init__(self, text: str, status: int = 200) -> None:
+        super().__init__(text, status=status, mimetype="text/plain")
+
+
 async def redirect[R](
     route: RouteFunction[R], success: str | None = None, error: str | None = None, **kwargs: Any
 ) -> response.Response:

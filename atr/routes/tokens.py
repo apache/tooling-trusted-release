@@ -28,26 +28,10 @@ import sqlmodel
 import werkzeug.datastructures as datastructures
 import werkzeug.wrappers.response as response
 import wtforms.fields.core as core
-from htpy import (
-    Element,
-    code,
-    div,
-    form,
-    h1,
-    h2,
-    p,
-    pre,
-    strong,
-    table,
-    tbody,
-    td,
-    th,
-    thead,
-    tr,
-)
 
 import atr.db as db
 import atr.forms as forms
+import atr.htm as htm
 import atr.jwtoken as jwtoken
 import atr.log as log
 import atr.models.sql as sql
@@ -55,11 +39,12 @@ import atr.route as route
 import atr.storage as storage
 import atr.template as templates
 import atr.util as util
+import atr.web as web
 
 _EXPIRY_DAYS: Final[int] = 180
 
 
-type Fragment = Element | core.Field | str
+type Fragment = htm.Element | core.Field | str
 
 
 class AddTokenForm(forms.Typed):
@@ -81,7 +66,7 @@ async def jwt_post(session: route.CommitterSession) -> quart.Response:
     await util.validate_empty_form()
 
     jwt_token = jwtoken.issue(session.uid)
-    return quart.Response(jwt_token, mimetype="text/plain")
+    return web.TextResponse(jwt_token)
 
 
 @route.committer("/tokens", methods=["GET", "POST"])
@@ -109,7 +94,7 @@ async def tokens(session: route.CommitterSession) -> str | response.Response:
     tokens_table = _build_tokens_table(tokens_list)
 
     issue_jwt = [
-        p[
+        htm.p[
             """Generate a JSON Web Token (JWT) to authenticate calls to ATR's
             private API routes. Treat the token like a password and include it
             in the Authorization header as a Bearer token when invoking the
@@ -117,35 +102,35 @@ async def tokens(session: route.CommitterSession) -> str | response.Response:
             # p["Example"],
         ],
         issue_form_elem,
-        pre(id="jwt-output", class_="d-none mt-2 p-3 atr-word-wrap border rounded w-50"),
+        htm.pre(id="jwt-output", class_="d-none mt-2 p-3 atr-word-wrap border rounded w-50"),
     ]
 
     if most_recent_pat and most_recent_pat.last_used:
         issue_jwt.append(
-            p(".mt-3")[
+            htm.p(".mt-3")[
                 "You most recently used a PAT to issue a JWT at ",
-                strong[util.format_datetime(most_recent_pat.last_used) + "Z"],
+                htm.strong[util.format_datetime(most_recent_pat.last_used) + "Z"],
                 ", using the PAT labelled ",
-                code[most_recent_pat.label or "[Untitled]"],
+                htm.code[most_recent_pat.label or "[Untitled]"],
                 ".",
             ]
         )
 
-    content_elem = div[
-        h1["Tokens"],
-        h2["Personal Access Tokens (PATs)"],
-        p[
+    content_elem = htm.div[
+        htm.h1["Tokens"],
+        htm.h2["Personal Access Tokens (PATs)"],
+        htm.p[
             """Generate tokens for API access. For security, the plaintext
             token is shown only once when you create it. You can revoke tokens
             you no longer need."""
         ],
-        div(".card.mb-4")[
-            div(".card-header")["Generate new token"],
-            div(".card-body")[add_form_elem],
+        htm.div(".card.mb-4")[
+            htm.div(".card-header")["Generate new token"],
+            htm.div(".card-body")[add_form_elem],
         ],
         tokens_table,
-        h2["JSON Web Token (JWT)"],
-        div[issue_jwt],
+        htm.h2["JSON Web Token (JWT)"],
+        htm.div[issue_jwt],
     ]
     end = time.perf_counter_ns()
     log.info("Content elem built in %dms", (end - start) / 1_000_000)
@@ -169,9 +154,9 @@ def _as_markup(fragment: Fragment) -> markupsafe.Markup:
 
 
 def _build_add_form_element(a_form: AddTokenForm) -> markupsafe.Markup:
-    elem = form(method="post", action=util.as_url(tokens))[
+    elem = htm.form(method="post", action=util.as_url(tokens))[
         _as_markup(a_form.csrf_token),
-        div(".mb-3")[
+        htm.div(".mb-3")[
             a_form.label.label,
             a_form.label(class_="form-control"),
         ],
@@ -183,7 +168,7 @@ def _build_add_form_element(a_form: AddTokenForm) -> markupsafe.Markup:
 def _build_delete_form_element(token_id: int | None) -> markupsafe.Markup:
     d_form = DeleteTokenForm()
     d_form.token_id.data = "" if token_id is None else str(token_id)
-    elem = form(".mb-0", method="post", action=util.as_url(tokens))[
+    elem = htm.form(".mb-0", method="post", action=util.as_url(tokens))[
         _as_markup(d_form.csrf_token),
         _as_markup(d_form.token_id),
         d_form.submit(class_="btn btn-sm btn-danger"),
@@ -192,7 +177,7 @@ def _build_delete_form_element(token_id: int | None) -> markupsafe.Markup:
 
 
 def _build_issue_jwt_form_element(j_form: IssueJWTForm) -> markupsafe.Markup:
-    elem = form("#issue-jwt-form", method="post", action=util.as_url(jwt_post))[
+    elem = htm.form("#issue-jwt-form", method="post", action=util.as_url(jwt_post))[
         _as_markup(j_form.csrf_token),
         j_form.submit(class_="btn btn-primary"),
     ]
@@ -201,30 +186,30 @@ def _build_issue_jwt_form_element(j_form: IssueJWTForm) -> markupsafe.Markup:
 
 def _build_tokens_table(tokens_list: list[sql.PersonalAccessToken]) -> markupsafe.Markup:
     if not tokens_list:
-        return _as_markup(p["No tokens found."])
+        return _as_markup(htm.p["No tokens found."])
 
     rows = [
-        tr(".align-middle")[
-            td[t.label or ""],
-            td[util.format_datetime(t.created)],
-            td[util.format_datetime(t.expires)],
-            td[util.format_datetime(t.last_used) if t.last_used else "Never"],
-            td[_build_delete_form_element(t.id)],
+        htm.tr(".align-middle")[
+            htm.td[t.label or ""],
+            htm.td[util.format_datetime(t.created)],
+            htm.td[util.format_datetime(t.expires)],
+            htm.td[util.format_datetime(t.last_used) if t.last_used else "Never"],
+            htm.td[_build_delete_form_element(t.id)],
         ]
         for t in tokens_list
     ]
 
-    table_elem = table(".table.table-striped")[
-        thead[
-            tr[
-                th["Label"],
-                th["Created"],
-                th["Expires"],
-                th["Last used"],
-                th[""],
+    table_elem = htm.table(".table.table-striped")[
+        htm.thead[
+            htm.tr[
+                htm.th["Label"],
+                htm.th["Created"],
+                htm.th["Expires"],
+                htm.th["Last used"],
+                htm.th[""],
             ]
         ],
-        tbody[rows],
+        htm.tbody[rows],
     ]
     return _as_markup(table_elem)
 
@@ -272,13 +257,13 @@ async def _handle_add_token_post(
     if await add_form.validate_on_submit():
         label_val = str(add_form.label.data) if add_form.label.data else None
         plaintext = await _create_token(session.uid, label_val)
-        success_msg = div[
-            p[
-                strong["Your new token"],
+        success_msg = htm.div[
+            htm.p[
+                htm.strong["Your new token"],
                 " is ",
-                code(".bg-light.border.rounded.px-1")[plaintext],
+                htm.code(".bg-light.border.rounded.px-1")[plaintext],
             ],
-            p(".mb-0")["Copy it now as you will not be able to see it again."],
+            htm.p(".mb-0")["Copy it now as you will not be able to see it again."],
         ]
         await quart.flash(_as_markup(success_msg), "success")
         return await session.redirect(tokens)
@@ -306,12 +291,12 @@ async def _handle_issue_jwt_post(
     issue_form = await IssueJWTForm.create_form(data=request_form)
     if await issue_form.validate_on_submit():
         jwt_token = jwtoken.issue(session.uid)
-        success_msg = div[
-            p[
-                strong["Your new JWT"],
+        success_msg = htm.div[
+            htm.p[
+                htm.strong["Your new JWT"],
                 " is:",
             ],
-            p[code(".bg-light.border.rounded.px-1.atr-word-wrap")[jwt_token],],
+            htm.p[htm.code(".bg-light.border.rounded.px-1.atr-word-wrap")[jwt_token],],
         ]
         await quart.flash(_as_markup(success_msg), "success")
         return await session.redirect(tokens)

@@ -190,7 +190,7 @@ async def configuration(session: web.Committer) -> quart.wrappers.response.Respo
         values.append(f"{name}={val}")
 
     values.sort()
-    return quart.Response("\n".join(values), mimetype="text/plain")
+    return web.TextResponse("\n".join(values))
 
 
 @admin.get("/consistency")
@@ -433,7 +433,7 @@ async def env(session: web.Committer) -> quart.wrappers.response.Response:
     env_vars = []
     for key, value in os.environ.items():
         env_vars.append(f"{key}={value}")
-    return quart.Response("\n".join(env_vars), mimetype="text/plain")
+    return web.TextResponse("\n".join(env_vars))
 
 
 @admin.get("/keys/check")
@@ -455,10 +455,10 @@ async def _keys_check(session: web.Committer) -> quart.Response:
 
     try:
         result = await _check_keys()
-        return quart.Response(result, mimetype="text/plain")
+        return web.TextResponse(result)
     except Exception as e:
         log.exception("Exception during key check:")
-        return quart.Response(f"Exception during key check: {e!s}", mimetype="text/plain")
+        return web.TextResponse(f"Exception during key check: {e!s}")
 
 
 @admin.get("/keys/regenerate-all")
@@ -496,7 +496,7 @@ async def _keys_regenerate_all(session: web.Committer) -> quart.Response:
     for oce in outcomes.errors():
         response_lines.append(f"Error regenerating: {type(oce).__name__} {oce}")
 
-    return quart.Response("\n".join(response_lines), mimetype="text/plain")
+    return web.TextResponse("\n".join(response_lines))
 
 
 @admin.get("/keys/update")
@@ -598,10 +598,10 @@ async def _ongoing_tasks(
 ) -> quart.wrappers.response.Response:
     try:
         ongoing = await interaction.tasks_ongoing(project_name, version_name, revision)
-        return quart.Response(str(ongoing), mimetype="text/plain")
+        return web.TextResponse(str(ongoing))
     except Exception:
         log.exception(f"Error fetching ongoing task count for {project_name} {version_name} rev {revision}:")
-        return quart.Response("", mimetype="text/plain")
+        return web.TextResponse("")
 
 
 @admin.get("/performance")
@@ -736,7 +736,7 @@ async def task_times(
             ms_elapsed = (task.completed - task.started).total_seconds() * 1000
             values.append(f"{task.task_type} {ms_elapsed:.2f}ms")
 
-    return quart.Response("\n".join(values), mimetype="text/plain")
+    return web.TextResponse("\n".join(values))
 
 
 @admin.get("/test")
@@ -769,7 +769,7 @@ async def test(session: web.Committer) -> quart.wrappers.response.Response:
     log.info(f"Inserted: {inserted_count}")
     log.info(f"Linked: {linked_count}")
     log.info(f"InsertedAndLinked: {inserted_and_linked_count}")
-    return quart.Response(str(wacm), mimetype="text/plain")
+    return web.TextResponse(str(wacm))
 
 
 @admin.get("/toggle-view")

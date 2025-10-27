@@ -37,6 +37,7 @@ import atr.routes.mapping as mapping
 import atr.routes.root as root
 import atr.template as template
 import atr.util as util
+import atr.web as web
 
 
 @route.committer("/download/all/<project_name>/<version_name>")
@@ -109,11 +110,11 @@ async def urls_selected(
                 ValueError("Release not found")
             )
         url_list_str = await _generate_file_url_list(release)
-        return quart.Response(url_list_str, mimetype="text/plain")
+        return web.TextResponse(url_list_str)
     except ValueError as e:
-        return quart.Response(f"Error: {e}", status=404, mimetype="text/plain")
+        return web.TextResponse(f"Error: {e}", status=404)
     except Exception as e:
-        return quart.Response(f"Internal server error: {e}", status=500, mimetype="text/plain")
+        return web.TextResponse(f"Internal server error: {e}", status=500)
 
 
 @route.committer("/download/zip/<project_name>/<version_name>")
@@ -123,9 +124,9 @@ async def zip_selected(
     try:
         release = await session.release(project_name=project_name, version_name=version_name, phase=None)
     except ValueError as e:
-        return quart.Response(f"Error: {e}", status=404, mimetype="text/plain")
+        return web.TextResponse(f"Error: {e}", status=404)
     except Exception as e:
-        return quart.Response(f"Server error: {e}", status=500, mimetype="text/plain")
+        return web.TextResponse(f"Server error: {e}", status=500)
 
     base_dir = util.release_directory(release)
     files_to_zip = []
@@ -135,7 +136,7 @@ async def zip_selected(
             if await aiofiles.os.path.isfile(full_item_path):
                 files_to_zip.append({"file": str(full_item_path), "name": str(rel_path)})
     except FileNotFoundError:
-        return quart.Response("Error: Release directory not found.", status=404, mimetype="text/plain")
+        return web.TextResponse("Error: Release directory not found.", status=404)
 
     async def stream_zip(file_list: list[dict[str, str]]) -> AsyncGenerator[bytes]:
         aiozip = zipstream.AioZipStream(file_list, chunksize=32768)
