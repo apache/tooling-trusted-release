@@ -68,7 +68,7 @@ class NotSet:
         return cls._instance
 
     def __repr__(self) -> str:
-        return "<NotSet>"
+        return log.python_repr(self.__class__.__name__)
 
     def __copy__(self) -> NotSet:
         return NotSet()

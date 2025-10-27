@@ -170,9 +170,9 @@ async def configuration(session: web.Committer) -> quart.wrappers.response.Respo
         try:
             val = getattr(conf, name)
         except Exception as exc:
-            val = f"<error: {exc}>"
+            val = log.python_repr(f"error: {exc}")
         if name.endswith("_PASSWORD"):
-            val = "<redacted>"
+            val = log.python_repr("redacted")
         if callable(val):
             continue
         values.append(f"{name}={val}")

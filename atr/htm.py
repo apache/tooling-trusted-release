@@ -125,6 +125,7 @@ class Block:
             self.element._attrs,
             self.element._children,
         )
+        # TODO: Check that there are no injection attacks possible here
         if ' data-src="' not in new_element._attrs:
             if new_element._attrs:
                 new_element._attrs = new_element._attrs + f' data-src="{src}"'

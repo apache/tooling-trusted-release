@@ -36,10 +36,10 @@ def caller_name(depth: int = 1) -> str:
     if frame is None:
         return __name__
 
-    module = frame.f_globals.get("__name__", "<unknown>")
+    module = frame.f_globals.get("__name__", python_repr("unknown"))
     func = frame.f_code.co_name
 
-    if func == "<module>":
+    if func == python_repr("module"):
         # We're at the top level
         return module
 
@@ -87,6 +87,10 @@ def interface_name(depth: int = 1) -> str:
 def log(level: int, msg: str, *args: Any, **kwargs: Any) -> None:
     # Custom log level
     _event(level, msg, *args, **kwargs)
+
+
+def python_repr(object_name: str) -> str:
+    return f"<{object_name}>"
 
 
 def performance(msg: str, *args: Any, **kwargs: Any) -> None:

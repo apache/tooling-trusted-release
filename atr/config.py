@@ -136,7 +136,7 @@ def get() -> type[AppConfig]:
     try:
         config = _CONFIG_DICT[get_mode()]
     except KeyError:
-        exit("Error: Invalid <mode>. Expected values [Debug, Production, Profiling].")
+        exit("Error: Invalid mode. Expected values Debug, Production, or Profiling.")
 
     if config.ALLOW_TESTS and (get_mode() != Mode.Debug):
         raise RuntimeError("ALLOW_TESTS can only be enabled in Debug mode")

@@ -179,16 +179,16 @@ def architecture_pattern() -> str:
     return "(" + "|".join(architectures) + ")(?=[_.-])"
 
 
-def candidate_highlight(path: pathlib.Path, prefix: str = "<strong>", suffix: str = "</strong>") -> str:
+def candidate_highlight(path: pathlib.Path) -> str:
     parts = []
     for part in path.parts:
         if ("<" in part) or (">" in part) or ("&" in part):
             # TODO: Should perhaps check for ' and " too for attribute value safety
             raise ValueError(f"Invalid path segment: {part}")
         if _CANDIDATE_WHOLE.match(part):
-            parts.append(f"{prefix}{part}{suffix}")
+            parts.append(f"<strong>{part}</strong>")
             continue
-        parts.append(_CANDIDATE_PARTIAL.sub(rf"{prefix}\g<0>{suffix}", part))
+        parts.append(_CANDIDATE_PARTIAL.sub(r"<strong>\g<0></strong>", part))
     return str(pathlib.Path(*parts))
 
 
