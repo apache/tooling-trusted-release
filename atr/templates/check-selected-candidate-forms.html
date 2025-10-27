@@ -7,7 +7,7 @@
   <h2>Cast your vote</h2>
 
   <form method="post"
-        action="{{ as_url(routes.vote.selected_post, project_name=project_name, version_name=version_name) }}"
+        action="{{ as_url(post.vote.selected_post, project_name=project_name, version_name=version_name) }}"
         class="atr-canary py-4 px-5 mb-4 border rounded">
     {{ form.hidden_tag() }}
 

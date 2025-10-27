@@ -10,7 +10,7 @@
 
 {% block content %}
   <p>
-    <a href="{{ as_url(routes.vote.selected, project_name=release.project.name, version_name=release.version) }}"
+    <a href="{{ as_url(get.vote.selected, project_name=release.project.name, version_name=release.version) }}"
        class="atr-back-link">← Back to Vote for {{ release.short_display_name }}</a>
   </p>
 

@@ -20,11 +20,11 @@ import quart
 import werkzeug.wrappers.response as response
 
 import atr.forms as forms
+import atr.get.compose as compose
+import atr.get.vote as vote
 import atr.models.sql as sql
 import atr.route as route
-import atr.routes.compose as compose
 import atr.routes.finish as finish
-import atr.routes.vote as vote
 import atr.storage as storage
 import atr.tabulate as tabulate
 import atr.template as template

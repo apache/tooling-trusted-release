@@ -108,7 +108,7 @@
   {% if phase == "release_candidate_draft" %}
     <p>
       <a class="btn btn-primary"
-         href="{{ as_url(routes.distribution.stage, project=release.project.name, version=release.version) }}">Record a distribution</a>
+         href="{{ as_url(get.distribution.stage, project=release.project.name, version=release.version) }}">Record a distribution</a>
     </p>
     <h2 id="more-actions">More actions</h2>
     <h3 id="ignored-checks" class="mt-4">Ignored checks</h3>

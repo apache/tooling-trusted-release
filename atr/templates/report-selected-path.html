@@ -25,10 +25,10 @@
   {% set phase = release.phase.value %}
   <p class="d-flex justify-content-between align-items-center">
     {% if phase == "release_candidate_draft" %}
-      <a href="{{ as_url(routes.compose.selected, project_name=release.project.name, version_name=release.version) }}"
+      <a href="{{ as_url(get.compose.selected, project_name=release.project.name, version_name=release.version) }}"
          class="atr-back-link">← Back to Compose {{ release.project.short_display_name }} {{ release.version }}</a>
     {% else %}
-      <a href="{{ as_url(routes.vote.selected, project_name=release.project.name, version_name=release.version) }}"
+      <a href="{{ as_url(get.vote.selected, project_name=release.project.name, version_name=release.version) }}"
          class="atr-back-link">← Back to Vote on {{ release.project.short_display_name }} {{ release.version }}</a>
     {% endif %}
     <span>

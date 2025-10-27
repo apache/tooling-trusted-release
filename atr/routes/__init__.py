@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import atr.routes.compose as compose
-import atr.routes.distribution as distribution
 import atr.routes.docs as docs
 import atr.routes.download as download
 import atr.routes.draft as draft
@@ -38,12 +36,9 @@ import atr.routes.start as start
 import atr.routes.tokens as tokens
 import atr.routes.upload as upload
 import atr.routes.user as user
-import atr.routes.vote as vote
 import atr.routes.voting as voting
 
 __all__ = [
-    "compose",
-    "distribution",
     "docs",
     "download",
     "draft",
@@ -65,7 +60,6 @@ __all__ = [
     "tokens",
     "upload",
     "user",
-    "vote",
     "voting",
 ]
 

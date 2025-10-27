@@ -23,9 +23,9 @@ import werkzeug.wrappers.response as response
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
+import atr.get.compose as compose
 import atr.models.sql as sql
 import atr.route as route
-import atr.routes.compose as compose
 import atr.storage as storage
 import atr.template as template
 

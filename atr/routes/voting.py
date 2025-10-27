@@ -26,12 +26,12 @@ import atr.construct as construct
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
+import atr.get.compose as compose
+import atr.get.vote as vote
 import atr.log as log
 import atr.models.sql as sql
 import atr.route as route
-import atr.routes.compose as compose
 import atr.routes.root as root
-import atr.routes.vote as vote
 import atr.storage as storage
 import atr.template as template
 import atr.user as user

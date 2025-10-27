@@ -15,17 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Final, Literal
+import atr.forms as forms
 
-import atr.get.announce as announce
-import atr.get.candidate as candidate
-import atr.get.committees as committees
-import atr.get.compose as compose
-import atr.get.distribution as distribution
-import atr.get.vote as vote
 
-from .example_test import respond as example_test
+class CastVoteForm(forms.Typed):
+    """Form for casting a vote."""
 
-ROUTES_MODULE: Final[Literal[True]] = True
-
-__all__ = ["announce", "candidate", "committees", "compose", "distribution", "example_test", "vote"]
+    vote_value = forms.radio("Your vote")
+    vote_comment = forms.textarea("Comment (optional)", optional=True)
+    submit = forms.submit("Submit vote")

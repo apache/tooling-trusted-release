@@ -23,9 +23,9 @@ import wtforms
 
 import atr.db as db
 import atr.forms as forms
+import atr.get.compose as compose
 import atr.log as log
 import atr.route as route
-import atr.routes.compose as compose
 import atr.storage as storage
 import atr.template as template
 

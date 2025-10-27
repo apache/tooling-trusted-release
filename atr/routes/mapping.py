@@ -19,16 +19,19 @@ from collections.abc import Callable
 
 import werkzeug.wrappers.response as response
 
+import atr.get as get
 import atr.models.sql as sql
 import atr.route as route
-import atr.routes.compose as compose
 import atr.routes.finish as finish
 import atr.routes.release as routes_release
-import atr.routes.vote as vote
 import atr.util as util
+import atr.web as web
 
 
-async def release_as_redirect(session: route.CommitterSession, release: sql.Release) -> response.Response:
+async def release_as_redirect(
+    session: route.CommitterSession | web.Committer,
+    release: sql.Release,
+) -> response.Response:
     route = release_as_route(release)
     if route is routes_release.finished:
         return await session.redirect(route, project_name=release.project.name)
@@ -38,9 +41,9 @@ async def release_as_redirect(session: route.CommitterSession, release: sql.Rele
 def release_as_route(release: sql.Release) -> Callable:
     match release.phase:
         case sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT:
-            return compose.selected
+            return get.compose.selected
         case sql.ReleasePhase.RELEASE_CANDIDATE:
-            return vote.selected
+            return get.vote.selected
         case sql.ReleasePhase.RELEASE_PREVIEW:
             return finish.selected
         case sql.ReleasePhase.RELEASE:

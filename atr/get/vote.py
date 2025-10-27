@@ -16,35 +16,25 @@
 # under the License.
 
 import asfquart.base as base
-import quart
 import werkzeug.wrappers.response as response
 
+import atr.blueprints.get as get
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.log as log
 import atr.models.results as results
 import atr.models.sql as sql
-import atr.route as route
-import atr.routes.compose as compose
 import atr.routes.mapping as mapping
+import atr.shared as shared
 import atr.storage as storage
 import atr.user as user
 import atr.util as util
+import atr.web as web
 
 
-class CastVoteForm(forms.Typed):
-    """Form for casting a vote."""
-
-    vote_value = forms.radio("Your vote")
-    vote_comment = forms.textarea("Comment (optional)", optional=True)
-    submit = forms.submit("Submit vote")
-
-
-@route.public("/vote/<project_name>/<version_name>")
-async def selected(
-    session: route.CommitterSession | None, project_name: str, version_name: str
-) -> response.Response | str:
+@get.public("/vote/<project_name>/<version_name>")
+async def selected(session: web.Committer | None, project_name: str, version_name: str) -> response.Response | str:
     """Show the contents of the release candidate draft."""
     async with db.session() as data:
         release = await data.release(
@@ -102,7 +92,7 @@ async def selected(
 
     form = None
     if can_vote:
-        form = await CastVoteForm.create_form()
+        form = await shared.vote.CastVoteForm.create_form()
         async with storage.write() as write:
             try:
                 if release.committee.is_podling:
@@ -121,7 +111,7 @@ async def selected(
             ],
         )
 
-    return await compose.check(
+    return await shared.check(
         session,
         release,
         task_mid=task_mid,
@@ -132,61 +122,3 @@ async def selected(
         can_vote=can_vote,
         can_resolve=can_resolve,
     )
-
-
-@route.committer("/vote/<project_name>/<version_name>", methods=["POST"])
-async def selected_post(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response:
-    """Handle submission of a vote."""
-    await session.check_access(project_name)
-
-    # Ensure the release exists and is in the correct phase
-    release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE)
-
-    if release.committee is None:
-        raise ValueError("Release has no committee")
-
-    # Set up form choices
-    async with storage.write() as write:
-        try:
-            if release.committee.is_podling:
-                _wacm = write.as_committee_member("incubator")
-            else:
-                _wacm = write.as_committee_member(release.committee.name)
-            potency = "Binding"
-        except storage.AccessError:
-            # Participant, due to session.check_access above
-            potency = "Non-binding"
-
-    form = await CastVoteForm.create_form(data=await quart.request.form)
-    forms.choices(
-        form.vote_value,
-        choices=[
-            ("+1", f"+1 ({potency})"),
-            ("0", "0"),
-            ("-1", f"-1 ({potency})"),
-        ],
-    )
-
-    if await form.validate_on_submit():
-        vote = str(form.vote_value.data)
-        comment = str(form.vote_comment.data)
-        async with storage.write_as_committee_participant(release.committee.name) as wacm:
-            email_recipient, error_message = await wacm.vote.send_user_vote(release, vote, comment, session.fullname)
-        if error_message:
-            return await session.redirect(
-                selected, project_name=project_name, version_name=version_name, error=error_message
-            )
-
-        success_message = f"Sending your vote to {email_recipient}."
-        return await session.redirect(
-            selected, project_name=project_name, version_name=version_name, success=success_message
-        )
-    else:
-        error_message = "Invalid vote submission"
-        if form.errors:
-            error_details = "; ".join([f"{field}: {', '.join(errs)}" for field, errs in form.errors.items()])
-            error_message = f"{error_message}: {error_details}"
-
-        return await session.redirect(
-            selected, project_name=project_name, version_name=version_name, error=error_message
-        )
