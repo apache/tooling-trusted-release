@@ -45,25 +45,19 @@ _POLICIES: Final = htm.div[
         any of the following policies."""
     ],
     htm.h2["Standard ASF policies"],
-    htm.ul[
-        htm.li[htm.a(href="https://www.apache.org/legal/release-policy.html")["Release policy"],],
-        htm.li[htm.a(href="https://www.apache.org/legal/src-headers.html")["Source headers"],],
-        htm.li[htm.a(href="https://www.apache.org/legal/resolved.html")["Third party license"],],
-        htm.li[htm.a(href="https://www.apache.org/foundation/voting.html")["Voting process"],],
-        htm.li[htm.a(href="https://infra.apache.org/release-publishing.html")["Release process"],],
-    ],
+    htm.ul_links(
+        ("https://www.apache.org/legal/release-policy.html", "Release policy"),
+        ("https://www.apache.org/legal/src-headers.html", "Source headers"),
+        ("https://www.apache.org/legal/resolved.html", "Third party license"),
+        ("https://www.apache.org/foundation/voting.html", "Voting process"),
+        ("https://infra.apache.org/release-publishing.html", "Release process"),
+    ),
     htm.h2["Additional incubator policies"],
-    htm.ul[
-        htm.li[
-            htm.a(href="https://incubator.apache.org/policy/incubation.html#releases")["Incubator release process"],
-        ],
-        htm.li[
-            htm.a(href="https://incubator.apache.org/guides/releasemanagement.html#podling_constraints")[
-                "Incubator constraints"
-            ],
-        ],
-        htm.li[htm.a(href="https://incubator.apache.org/policy/incubation.html#disclaimers")["Incubation disclaimer"],],
-    ],
+    htm.ul_links(
+        ("https://incubator.apache.org/policy/incubation.html#releases", "Incubator release process"),
+        ("https://incubator.apache.org/guides/releasemanagement.html#podling_constraints", "Incubator constraints"),
+        ("https://incubator.apache.org/policy/incubation.html#disclaimers", "Incubation disclaimer"),
+    ),
 ]
 
 

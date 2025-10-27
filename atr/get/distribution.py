@@ -63,11 +63,7 @@ async def list_get(session: web.Committer, project: str, version: str) -> str:
     block.p["Here are all of the distributions recorded for this release."]
     block.p[record_a_distribution]
     # Table of contents
-    ul_toc = htm.Block(htm.ul)
-    for dist in distributions:
-        a = htm.a(href=f"#distribution-{dist.identifier}")[dist.title]
-        ul_toc.li[a]
-    block.append(ul_toc)
+    block.append(htm.ul_links(*[(f"#distribution-{dist.identifier}", dist.title) for dist in distributions]))
 
     ## Distributions
     block.h2["Distributions"]
