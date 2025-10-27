@@ -23,6 +23,7 @@ import asfquart.base as base
 import atr.blueprints.admin as admin
 import atr.blueprints.api as api
 import atr.blueprints.get as get
+import atr.blueprints.icons as icons
 import atr.blueprints.post as post
 
 
@@ -43,4 +44,5 @@ def register(app: base.QuartApp) -> None:
     check_module(admin.register(app))
     check_module(api.register(app))
     check_module(get.register(app))
+    app.register_blueprint(icons.BLUEPRINT)
     check_module(post.register(app))
