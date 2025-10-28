@@ -16,11 +16,11 @@
 # under the License.
 
 
-import asfquart.base as base
 import quart
 import werkzeug.wrappers.response as response
 
 import atr.blueprints.post as post
+import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.get as get
 import atr.models.sql as sql
@@ -127,30 +127,32 @@ async def tabulated_selected_post(session: web.Committer, project_name: str, ver
     if release.vote_manual:
         raise RuntimeError("This page is for tabulated votes only")
 
-    hidden_form = await forms.Hidden.create_form()
+    submit_form = await forms.Submit.create_form()
     details = None
     committee = None
     thread_id = None
     archive_url = None
     fetch_error = None
-    if await hidden_form.validate_on_submit():
-        # TODO: Just pass the thread_id itself instead?
-        # TODO: The hidden field is user controlled data, so we should HMAC it
-        # Ideally there would be a concept of authenticated hidden fields
-        # Perhaps all hidden fields should be authenticated
-        # We should also still validate all HMACed fields
-        archive_url = hidden_form.hidden_field.data or ""
+    if await submit_form.validate_on_submit():
+        latest_vote_task = await interaction.release_latest_vote_task(release)
+        if latest_vote_task is not None:
+            task_mid = interaction.task_mid_get(latest_vote_task)
+            if task_mid:
+                async with storage.write(session) as write:
+                    wagp = write.as_general_public()
+                    archive_url = await wagp.cache.get_message_archive_url(task_mid)
+
         if archive_url:
-            if not web.valid_url(archive_url, "lists.apache.org"):
-                raise base.ASFQuartException("Invalid vote thread URL", errorcode=400)
-        thread_id = archive_url.split("/")[-1]
-        if thread_id:
-            try:
-                committee = await tabulate.vote_committee(thread_id, release)
-            except util.FetchError as e:
-                fetch_error = f"Failed to fetch thread metadata: {e}"
+            thread_id = archive_url.split("/")[-1]
+            if thread_id:
+                try:
+                    committee = await tabulate.vote_committee(thread_id, release)
+                except util.FetchError as e:
+                    fetch_error = f"Failed to fetch thread metadata: {e}"
+                else:
+                    details = await tabulate.vote_details(committee, thread_id, release)
             else:
-                details = await tabulate.vote_details(committee, thread_id, release)
+                fetch_error = "The vote thread could not yet be found."
         else:
             fetch_error = "The vote thread could not yet be found."
     resolve_form = await shared.resolve.ResolveVoteForm.create_form()

@@ -86,6 +86,10 @@ class Hidden(Typed):
     submit = wtforms.SubmitField()
 
 
+class Submit(Typed):
+    submit = wtforms.SubmitField()
+
+
 class Value(Typed):
     value = wtforms.StringField(validators=[REQUIRED])
     submit = wtforms.SubmitField()

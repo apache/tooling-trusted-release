@@ -83,12 +83,11 @@ async def selected(session: web.Committer | None, project_name: str, version_nam
             wagp = write.as_general_public()
             archive_url = await wagp.cache.get_message_archive_url(task_mid)
 
-    hidden_form = None
+    resolve_form = None
     if can_resolve:
         # Special form for the [ Resolve vote ] button, to make it POST
-        hidden_form = await forms.Hidden.create_form()
-        hidden_form.hidden_field.data = archive_url or ""
-        hidden_form.submit.label.text = "Resolve vote"
+        resolve_form = await forms.Submit.create_form()
+        resolve_form.submit.label.text = "Resolve vote"
 
     form = None
     if can_vote:
@@ -116,7 +115,7 @@ async def selected(session: web.Committer | None, project_name: str, version_nam
         release,
         task_mid=task_mid,
         form=form,
-        hidden_form=hidden_form,
+        resolve_form=resolve_form,
         archive_url=archive_url,
         vote_task=latest_vote_task,
         can_vote=can_vote,
