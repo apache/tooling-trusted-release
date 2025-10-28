@@ -109,4 +109,3 @@ RUN chmod +x ./start-atr.sh
 EXPOSE 4443
 
 CMD ["./start-atr.sh"]
-
