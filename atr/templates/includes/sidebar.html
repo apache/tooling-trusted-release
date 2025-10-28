@@ -1,6 +1,6 @@
 <aside class="sidebar">
   <div class="sidebar-header">
-    <a href="{{ as_url(routes.root.index) }}" class="site-title">
+    <a href="{{ as_url(get.root.index) }}" class="site-title">
       <h1>
         <span class="apache">A<span class="rest">pache</span></span>
         <br />
@@ -33,7 +33,7 @@
       <ul>
         <li>
           <i class="bi bi-play-circle"></i>
-          <a href="{{ as_url(routes.root.index) }}">Make releases</a>
+          <a href="{{ as_url(get.root.index) }}">Make releases</a>
         </li>
         {% if current_user %}
           <li>
@@ -88,13 +88,13 @@
         {% for project_name, project_full_name in user_projects[:max_projects] %}
           <li>
             <i class="bi bi-plus-circle"></i>
-            <a href="{{ as_url(routes.start.selected, project_name=project_name) }}">{{ project_full_name.removeprefix("Apache ").removesuffix(" (Incubating)") }}</a>
+            <a href="{{ as_url(get.start.selected, project_name=project_name) }}">{{ project_full_name.removeprefix("Apache ").removesuffix(" (Incubating)") }}</a>
           </li>
         {% endfor %}
         {% if user_projects|length > max_projects %}
           <li>
             <i class="bi bi-three-dots"></i>
-            (<a href="{{ as_url(routes.root.index) }}">{{ user_projects|length - max_projects }} more</a>)
+            (<a href="{{ as_url(get.root.index) }}">{{ user_projects|length - max_projects }} more</a>)
           </li>
         {% endif %}
       </ul>
@@ -117,7 +117,7 @@
       <ul>
         <li>
           <i class="bi bi-book"></i>
-          <a href="{{ as_url(routes.root.tutorial) }}">Tutorial</a>
+          <a href="{{ as_url(get.root.tutorial) }}">Tutorial</a>
         </li>
         <li>
           <i class="bi bi-book"></i>
@@ -125,7 +125,7 @@
         </li>
         <li>
           <i class="bi bi-book"></i>
-          <a href="{{ as_url(routes.root.policies) }}">ASF Policies</a>
+          <a href="{{ as_url(get.root.policies) }}">ASF Policies</a>
         </li>
         <li>
           <i class="bi bi-file-earmark-code"></i>

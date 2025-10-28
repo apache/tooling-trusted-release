@@ -136,10 +136,10 @@ async def selected(
     try:
         source_files_rel, target_dirs = await _sources_and_targets(latest_revision_dir)
     except FileNotFoundError:
-        import atr.routes.root as root
+        import atr.get as get
 
         await quart.flash("Preview revision directory not found.", "error")
-        return await session.redirect(root.index)
+        return await session.redirect(get.root.index)
 
     formdata = None
     if quart.request.method == "POST":

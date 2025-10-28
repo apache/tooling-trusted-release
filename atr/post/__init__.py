@@ -28,6 +28,8 @@ import atr.post.preview as preview
 import atr.post.projects as projects
 import atr.post.resolve as resolve
 import atr.post.revisions as revisions
+import atr.post.sbom as sbom
+import atr.post.start as start
 import atr.post.vote as vote
 
 ROUTES_MODULE: Final[Literal[True]] = True
@@ -44,5 +46,7 @@ __all__ = [
     "projects",
     "resolve",
     "revisions",
+    "sbom",
+    "start",
     "vote",
 ]

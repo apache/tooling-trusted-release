@@ -31,7 +31,6 @@ import atr.get.vote as vote
 import atr.log as log
 import atr.models.sql as sql
 import atr.route as route
-import atr.routes.root as root
 import atr.storage as storage
 import atr.template as template
 import atr.user as user
@@ -122,6 +121,8 @@ async def start_vote_manual(
         # This verifies the state and sets the phase to RELEASE_CANDIDATE
         error = await wacp.release.promote_to_candidate(release.name, selected_revision_number, vote_manual=True)
     if error:
+        import atr.get.root as root
+
         return await session.redirect(root.index, error=error)
     return await session.redirect(
         vote.selected,

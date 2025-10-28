@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""root.py"""
-
 import pathlib
 from typing import Final
 
@@ -28,14 +26,15 @@ import sqlalchemy.orm as orm
 import sqlmodel
 import werkzeug.wrappers.response as response
 
+import atr.blueprints.get as get
 import atr.config as config
 import atr.db as db
 import atr.htm as htm
 import atr.models.sql as sql
-import atr.route as route
 import atr.template as template
 import atr.user as user
 import atr.util as util
+import atr.web as web
 
 _POLICIES: Final = htm.div[
     htm.h1["Release policy"],
@@ -61,14 +60,14 @@ _POLICIES: Final = htm.div[
 ]
 
 
-@route.committer("/about")
-async def about(session: route.CommitterSession) -> str:
+@get.committer("/about")
+async def about(session: web.Committer) -> str:
     """About page."""
     return await template.render("about.html")
 
 
-@route.public("/")
-async def index(session: route.CommitterSession | None) -> quart_response.Response | str:
+@get.public("/")
+async def index(session: web.Committer | None) -> quart_response.Response | str:
     """Show public info or an entry portal for participants."""
     session_data = await asfquart.session.read()
     if session_data:
@@ -142,21 +141,21 @@ async def index(session: route.CommitterSession | None) -> quart_response.Respon
     return await template.render("index-public.html")
 
 
-@route.public("/miscellaneous/resolved.json")
-async def resolved_json(session: route.CommitterSession | None) -> quart_response.Response:
+@get.public("/miscellaneous/resolved.json")
+async def resolved_json(session: web.Committer | None) -> quart_response.Response:
     json_path = pathlib.Path(config.get().PROJECT_ROOT) / "atr" / "static" / "json" / "resolved.json"
     async with aiofiles.open(json_path) as f:
         content = await f.read()
     return quart_response.Response(content, mimetype="application/json")
 
 
-@route.public("/policies")
-async def policies(session: route.CommitterSession | None) -> str:
+@get.public("/policies")
+async def policies(session: web.Committer | None) -> str:
     return await template.blank("Policies", content=_POLICIES)
 
 
-@route.public("/test-login")
-async def test_login(session: route.CommitterSession | None) -> response.Response:
+@get.public("/test-login")
+async def test_login(session: web.Committer | None) -> response.Response:
     if not config.get().ALLOW_TESTS:
         raise base.ASFQuartException("Test login not enabled", errorcode=404)
 
@@ -172,16 +171,10 @@ async def test_login(session: route.CommitterSession | None) -> response.Respons
     }
 
     asfquart.session.write(session_data)
-    return await route.redirect(index)
+    return await web.redirect(index)
 
 
-@route.committer("/todo", methods=["POST"])
-async def todo(session: route.CommitterSession) -> str:
-    """POST target for development."""
-    return await template.render("todo.html")
-
-
-@route.committer("/tutorial")
-async def tutorial(session: route.CommitterSession) -> str:
+@get.committer("/tutorial")
+async def tutorial(session: web.Committer) -> str:
     """Tutorial page."""
     return await template.render("tutorial.html")

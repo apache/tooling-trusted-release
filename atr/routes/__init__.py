@@ -15,18 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import atr.routes.root as root
-import atr.routes.sbom as sbom
-import atr.routes.start as start
 import atr.routes.tokens as tokens
 import atr.routes.upload as upload
 import atr.routes.user as user
 import atr.routes.voting as voting
 
 __all__ = [
-    "root",
-    "sbom",
-    "start",
     "tokens",
     "upload",
     "user",

@@ -51,26 +51,26 @@ class VotePreviewForm(forms.Typed):
 @post.committer("/draft/delete")
 async def delete(session: web.Committer) -> response.Response:
     """Delete a candidate draft and all its associated files."""
-    import atr.routes.root as root
+    import atr.get as get
 
     form = await shared.draft.DeleteForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
         for _field, errors in form.errors.items():
             for error in errors:
                 await quart.flash(f"{error}", "error")
-        return await session.redirect(root.index)
+        return await session.redirect(get.root.index)
 
     release_name = form.release_name.data
     if not release_name:
-        return await session.redirect(root.index, error="Missing required parameters")
+        return await session.redirect(get.root.index, error="Missing required parameters")
 
     project_name = form.project_name.data
     if not project_name:
-        return await session.redirect(root.index, error="Missing required parameters")
+        return await session.redirect(get.root.index, error="Missing required parameters")
 
     version_name = form.version_name.data
     if not version_name:
-        return await session.redirect(root.index, error="Missing required parameters")
+        return await session.redirect(get.root.index, error="Missing required parameters")
 
     await session.check_access(project_name)
 
@@ -91,7 +91,7 @@ async def delete(session: web.Committer) -> response.Response:
         # Yet it works in preview.py
         await aioshutil.rmtree(draft_dir)  # type: ignore[call-arg]
 
-    return await session.redirect(root.index, success="Candidate draft deleted successfully")
+    return await session.redirect(get.root.index, success="Candidate draft deleted successfully")
 
 
 @post.committer("/draft/delete-file/<project_name>/<version_name>")
@@ -296,11 +296,11 @@ async def vote_preview(
     session: web.Committer, project_name: str, version_name: str
 ) -> quart.wrappers.response.Response | response.Response | str:
     """Show the vote email preview for a release."""
-    import atr.routes.root as root
+    import atr.get as get
 
     form = await VotePreviewForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
-        return await session.redirect(root.index, error="Invalid form data")
+        return await session.redirect(get.root.index, error="Invalid form data")
 
     release = await session.release(project_name, version_name)
     if release.committee is None:

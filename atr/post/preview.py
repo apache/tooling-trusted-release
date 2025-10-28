@@ -23,7 +23,6 @@ import atr.construct as construct
 import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
-import atr.routes.root as root
 import atr.storage as storage
 import atr.web as web
 
@@ -80,6 +79,8 @@ async def announce_preview(
 @post.committer("/preview/delete")
 async def delete(session: web.Committer) -> response.Response:
     """Delete a preview and all its associated files."""
+    import atr.get.root as root
+
     # TODO: Where does this come from? A static template?
     form = await DeleteForm.create_form(data=await quart.request.form)
 

@@ -13,7 +13,7 @@
   {{ forms.errors_summary(form) }}
 
   <form method="post"
-        action="{{ as_url(routes.start.selected, project_name=project.name) }}"
+        action="{{ as_url(post.start.selected, project_name=project.name) }}"
         enctype="multipart/form-data"
         class="atr-canary py-4 px-5 border rounded"
         novalidate>
@@ -35,7 +35,7 @@
 
     <div class="mt-4">
       {{ form.submit(class_="btn btn-primary btn-lg") }}
-      <a href="{{ as_url(routes.root.index) }}" class="btn btn-link ms-2">Cancel</a>
+      <a href="{{ as_url(get.root.index) }}" class="btn btn-link ms-2">Cancel</a>
     </div>
   </form>
 

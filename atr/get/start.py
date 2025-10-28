@@ -15,16 +15,15 @@
 # specific language governing permissions and limitations
 # under the License.
 
+
 import werkzeug.wrappers.response as response
 
-import atr.blueprints.post as post
+import atr.blueprints.get as get
+import atr.shared as shared
 import atr.web as web
 
 
-@post.committer("/candidate/delete")
-async def delete(session: web.Committer) -> response.Response:
-    """Delete a release candidate."""
-    import atr.get as get
-
-    # TODO: We need to never retire revisions, if allowing release deletion
-    return await session.redirect(get.root.index, error="Not yet implemented")
+@get.committer("/start/<project_name>")
+async def selected(session: web.Committer, project_name: str) -> response.Response | str:
+    """Allow the user to start a new release draft, or handle its submission."""
+    return await shared.start.selected(session, project_name)

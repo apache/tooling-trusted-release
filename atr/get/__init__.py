@@ -39,6 +39,9 @@ import atr.get.release as release
 import atr.get.report as report
 import atr.get.resolve as resolve
 import atr.get.revisions as revisions
+import atr.get.root as root
+import atr.get.sbom as sbom
+import atr.get.start as start
 import atr.get.vote as vote
 
 ROUTES_MODULE: Final[Literal[True]] = True
@@ -64,5 +67,8 @@ __all__ = [
     "report",
     "resolve",
     "revisions",
+    "root",
+    "sbom",
+    "start",
     "vote",
 ]

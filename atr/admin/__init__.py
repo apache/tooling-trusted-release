@@ -126,7 +126,7 @@ async def browse_as_post(session: web.Committer) -> str | response.Response:
 async def _browse_as(session: web.Committer) -> str | response.Response:
     """Allows an admin to browse as another user."""
     # TODO: Enable this in debugging mode only?
-    from atr.routes import root
+    import atr.get.root as root
 
     form = await BrowseAsUserForm.create_form()
     if not (await form.validate_on_submit()):

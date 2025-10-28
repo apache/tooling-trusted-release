@@ -31,7 +31,6 @@ import atr.db as db
 import atr.htm as htm
 import atr.mapping as mapping
 import atr.models.sql as sql
-import atr.routes.root as root
 import atr.template as template
 import atr.util as util
 import atr.web as web
@@ -40,6 +39,8 @@ import atr.web as web
 @get.committer("/download/all/<project_name>/<version_name>")
 async def all_selected(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
     """Display download commands for a release."""
+    import atr.get.root as root
+
     async with db.session() as data:
         release = await session.release(project_name=project_name, version_name=version_name, phase=None, data=data)
         if not release:
@@ -147,6 +148,8 @@ async def zip_selected(
 
 async def _download_or_list(project_name: str, version_name: str, file_path: str) -> response.Response | quart.Response:
     """Download a file or list a directory from a release in any phase."""
+    import atr.get.root as root
+
     # await session.check_access(project_name)
 
     # Check that path is relative

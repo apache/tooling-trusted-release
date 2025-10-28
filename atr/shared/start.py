@@ -41,8 +41,7 @@ class StartReleaseForm(forms.Typed):
     submit = forms.submit("Start new release")
 
 
-@route.committer("/start/<project_name>", methods=["GET", "POST"])
-async def selected(session: route.CommitterSession, project_name: str) -> response.Response | str:
+async def selected(session: web.Committer, project_name: str) -> response.Response | str:
     """Allow the user to start a new release draft, or handle its submission."""
     await session.check_access(project_name)
 

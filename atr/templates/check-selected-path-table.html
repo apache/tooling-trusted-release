@@ -66,7 +66,7 @@
                 </form>
               {% endif %}
               {% if path.suffixes[-2:] == [".cdx", ".json"] %}
-                <a href="{{ as_url(routes.sbom.report, project=project_name, version=version_name, file_path=path) }}"
+                <a href="{{ as_url(get.sbom.report, project=project_name, version=version_name, file_path=path) }}"
                    class="btn btn-sm btn-outline-secondary">Show SBOM</a>
               {% endif %}
               {% if has_errors %}
