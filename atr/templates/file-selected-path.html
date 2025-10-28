@@ -17,7 +17,7 @@
   {% elif phase_key == "preview" %}
     {% set back_url = as_url(get.preview.view, project_name=release.project.name, version_name=release.version) %}
   {% elif phase_key == "release" %}
-    {% set back_url = as_url(routes.release.view, project_name=release.project.name, version_name=release.version) %}
+    {% set back_url = as_url(get.release.view, project_name=release.project.name, version_name=release.version) %}
   {% endif %}
   <a href="{{ back_url }}" class="atr-back-link">← Back to {{ phase_key }}</a>
 

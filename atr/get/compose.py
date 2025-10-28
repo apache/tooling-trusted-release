@@ -20,8 +20,8 @@ import werkzeug.wrappers.response as response
 
 import atr.blueprints.get as get
 import atr.db as db
+import atr.mapping as mapping
 import atr.models.sql as sql
-import atr.routes.mapping as mapping
 import atr.shared as shared
 import atr.web as web
 

@@ -45,7 +45,7 @@
         <span class="atr-phase-three atr-phase-label">FINISH</span>
       </span>
     {% else %}
-      <a href="{{ as_url(routes.release.releases) }}" class="atr-back-link">← Back to Releases</a>
+      <a href="{{ as_url(get.release.releases) }}" class="atr-back-link">← Back to Releases</a>
     {% endif %}
   </p>
 
@@ -105,7 +105,7 @@
                       {% elif phase_key == "preview" %}
                         {% set file_url = as_url(get.preview.view_path, project_name=release.project.name, version_name=release.version, file_path=stat.path) %}
                       {% elif phase_key == "release" %}
-                        {% set file_url = as_url(routes.release.view_path, project_name=release.project.name, version_name=release.version, file_path=stat.path) %}
+                        {% set file_url = as_url(get.release.view_path, project_name=release.project.name, version_name=release.version, file_path=stat.path) %}
                       {% else %}
                         {# TODO: Should probably disable the link here #}
                         {% set file_url = "#" %}

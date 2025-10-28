@@ -31,8 +31,6 @@ import atr.forms as forms
 import atr.get.compose as compose
 import atr.log as log
 import atr.models.sql as sql
-import atr.routes.root as root
-import atr.routes.upload as upload
 import atr.shared as shared
 import atr.storage as storage
 import atr.util as util
@@ -53,6 +51,8 @@ class VotePreviewForm(forms.Typed):
 @post.committer("/draft/delete")
 async def delete(session: web.Committer) -> response.Response:
     """Delete a candidate draft and all its associated files."""
+    import atr.routes.root as root
+
     form = await shared.draft.DeleteForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
         for _field, errors in form.errors.items():
@@ -248,6 +248,8 @@ async def sbomgen(session: web.Committer, project_name: str, version_name: str, 
 @post.committer("/draft/svnload/<project_name>/<version_name>")
 async def svnload(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
     """Import files from SVN into a draft."""
+    import atr.routes.upload as upload
+
     await session.check_access(project_name)
 
     form = await upload.SvnImportForm.create_form()
@@ -294,6 +296,7 @@ async def vote_preview(
     session: web.Committer, project_name: str, version_name: str
 ) -> quart.wrappers.response.Response | response.Response | str:
     """Show the vote email preview for a release."""
+    import atr.routes.root as root
 
     form = await VotePreviewForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():

@@ -94,7 +94,7 @@
              class="text-decoration-none me-2">Create a sibling project</a>
           {% if completed_releases %}
             <span class="text-muted me-2">/</span>
-            <a href="{{ as_url(routes.release.finished, project_name=project.name) }}"
+            <a href="{{ as_url(get.release.finished, project_name=project.name) }}"
                class="text-decoration-none">Finished releases</a>
           {% endif %}
         </p>

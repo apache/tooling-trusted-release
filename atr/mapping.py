@@ -21,18 +21,16 @@ import werkzeug.wrappers.response as response
 
 import atr.get as get
 import atr.models.sql as sql
-import atr.route as route
-import atr.routes.release as routes_release
 import atr.util as util
 import atr.web as web
 
 
 async def release_as_redirect(
-    session: route.CommitterSession | web.Committer,
+    session: web.Committer,
     release: sql.Release,
 ) -> response.Response:
     route = release_as_route(release)
-    if route is routes_release.finished:
+    if route is get.release.finished:
         return await session.redirect(route, project_name=release.project.name)
     return await session.redirect(route, project_name=release.project.name, version_name=release.version)
 
@@ -46,11 +44,11 @@ def release_as_route(release: sql.Release) -> Callable:
         case sql.ReleasePhase.RELEASE_PREVIEW:
             return get.finish.selected
         case sql.ReleasePhase.RELEASE:
-            return routes_release.finished
+            return get.release.finished
 
 
 def release_as_url(release: sql.Release) -> str:
     route = release_as_route(release)
-    if route is routes_release.finished:
+    if route is get.release.finished:
         return util.as_url(route, project_name=release.project.name)
     return util.as_url(route, project_name=release.project.name, version_name=release.version)

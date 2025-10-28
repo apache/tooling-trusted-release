@@ -33,9 +33,8 @@ import atr.analysis as analysis
 import atr.db as db
 import atr.forms as forms
 import atr.log as log
+import atr.mapping as mapping
 import atr.models.sql as sql
-import atr.routes.mapping as mapping
-import atr.routes.root as root
 import atr.storage as storage
 import atr.template as template
 import atr.util as util
@@ -137,6 +136,8 @@ async def selected(
     try:
         source_files_rel, target_dirs = await _sources_and_targets(latest_revision_dir)
     except FileNotFoundError:
+        import atr.routes.root as root
+
         await quart.flash("Preview revision directory not found.", "error")
         return await session.redirect(root.index)
 

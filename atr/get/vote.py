@@ -23,9 +23,9 @@ import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.log as log
+import atr.mapping as mapping
 import atr.models.results as results
 import atr.models.sql as sql
-import atr.routes.mapping as mapping
 import atr.shared as shared
 import atr.storage as storage
 import atr.user as user

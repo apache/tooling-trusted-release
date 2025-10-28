@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import annotations
+
 from typing import Final, Literal
 
 import atr.get.announce as announce
@@ -31,6 +33,9 @@ import atr.get.ignores as ignores
 import atr.get.keys as keys
 import atr.get.preview as preview
 import atr.get.projects as projects
+import atr.get.published as published
+import atr.get.ref as ref
+import atr.get.release as release
 import atr.get.vote as vote
 
 ROUTES_MODULE: Final[Literal[True]] = True
@@ -50,5 +55,8 @@ __all__ = [
     "keys",
     "preview",
     "projects",
+    "published",
+    "ref",
+    "release",
     "vote",
 ]

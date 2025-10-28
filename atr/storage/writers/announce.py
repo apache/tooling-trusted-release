@@ -27,7 +27,6 @@ import aiofiles.os
 import aioshutil
 import sqlmodel
 
-import atr.construct as construct
 import atr.db as db
 import atr.models.sql as sql
 import atr.storage as storage
@@ -112,6 +111,8 @@ class CommitteeMember(CommitteeParticipant):
         asf_uid: str,
         fullname: str,
     ) -> None:
+        import atr.construct as construct
+
         if recipient not in util.permitted_announce_recipients(asf_uid):
             raise storage.AccessError(f"You are not permitted to send announcements to {recipient}")
 

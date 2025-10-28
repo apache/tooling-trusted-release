@@ -22,14 +22,14 @@ from datetime import datetime
 import aiofiles.os
 import quart
 
+import atr.blueprints.get as get
 import atr.htm as htm
-import atr.route as route
 import atr.util as util
 import atr.web as web
 
 
-@route.committer("/published/<path:path>")
-async def path(session: route.CommitterSession, path: str) -> quart.Response:
+@get.committer("/published/<path:path>")
+async def path(session: web.Committer, path: str) -> quart.Response:
     """View the content of a specific file in the downloads directory."""
     # This route is for debugging
     # When developing locally, there is no proxy to view the downloads directory
@@ -37,8 +37,8 @@ async def path(session: route.CommitterSession, path: str) -> quart.Response:
     return await _path(session, path)
 
 
-@route.committer("/published/")
-async def root(session: route.CommitterSession) -> quart.Response:
+@get.committer("/published/")
+async def root(session: web.Committer) -> quart.Response:
     return await _path(session, "")
 
 
@@ -95,7 +95,7 @@ async def _file_content(full_path: pathlib.Path) -> quart.Response:
     return await quart.send_file(full_path)
 
 
-async def _path(session: route.CommitterSession, path: str) -> quart.Response:
+async def _path(session: web.Committer, path: str) -> quart.Response:
     downloads_path = util.get_downloads_dir()
     full_path = downloads_path / path
     if await aiofiles.os.path.isdir(full_path):

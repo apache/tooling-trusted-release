@@ -21,16 +21,17 @@ import pathlib
 import quart
 import werkzeug.wrappers.response as response
 
+import atr.blueprints.get as get
 import atr.config as config
-import atr.route as route
+import atr.web as web
 
 # Perhaps GitHub will get around to implementing symbol permalinks:
 # https://github.com/orgs/community/discussions/13292
 # Then this code will be easier, but we should still keep our own links
 
 
-@route.public("/ref/<path:ref_path>")
-async def resolve(session: route.CommitterSession | None, ref_path: str) -> response.Response:
+@get.public("/ref/<path:ref_path>")
+async def resolve(session: web.Committer | None, ref_path: str) -> response.Response:
     project_root = pathlib.Path(config.get().PROJECT_ROOT)
 
     if ":" in ref_path:

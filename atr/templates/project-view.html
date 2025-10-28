@@ -472,7 +472,7 @@
         <h2>Full releases</h2>
         <div class="d-flex flex-wrap gap-2 mb-4">
           {% for release in full_releases %}
-            <a href="{{ as_url(routes.release.view, project_name=project.name, version_name=release.version) }}"
+            <a href="{{ as_url(get.release.view, project_name=project.name, version_name=release.version) }}"
                class="btn btn-sm btn-outline-success py-2 px-3"
                title="View release {{ project.name }} {{ release.version }}">
               {{ project.name }} {{ release.version }}

@@ -15,17 +15,16 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""candidate.py"""
-
 import werkzeug.wrappers.response as response
 
 import atr.blueprints.post as post
-import atr.routes.root as root
 import atr.web as web
 
 
 @post.committer("/candidate/delete")
 async def delete(session: web.Committer) -> response.Response:
     """Delete a release candidate."""
+    import atr.routes.root as root
+
     # TODO: We need to never retire revisions, if allowing release deletion
     return await session.redirect(root.index, error="Not yet implemented")

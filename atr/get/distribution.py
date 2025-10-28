@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import annotations
-
 import atr.blueprints.get as get
 import atr.db as db
 import atr.forms as forms

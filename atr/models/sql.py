@@ -20,7 +20,6 @@
 # NOTE: We can't use symbolic annotations here because sqlmodel doesn't support them
 # https://github.com/fastapi/sqlmodel/issues/196
 # https://github.com/fastapi/sqlmodel/pull/778/files
-# from __future__ import annotations
 
 import dataclasses
 import datetime

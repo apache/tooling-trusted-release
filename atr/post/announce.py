@@ -15,14 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import quart
-import werkzeug.wrappers.response as response
+
+if TYPE_CHECKING:
+    import werkzeug.wrappers.response as response
 
 # TODO: Improve upon the routes_release pattern
 import atr.blueprints.post as post
-import atr.get as get
 import atr.models.sql as sql
-import atr.routes.release as routes_release
 import atr.shared as shared
 import atr.storage as storage
 import atr.template as template
@@ -37,6 +41,8 @@ class AnnounceError(Exception):
 @post.committer("/announce/<project_name>/<version_name>")
 async def selected(session: web.Committer, project_name: str, version_name: str) -> str | response.Response:
     """Handle the announcement form submission and promote the preview to release."""
+    import atr.get as get
+
     await session.check_access(project_name)
 
     permitted_recipients = util.permitted_announce_recipients(session.uid)
@@ -85,7 +91,7 @@ async def selected(session: web.Committer, project_name: str, version_name: str)
             get.announce.selected, error=str(e), project_name=project_name, version_name=version_name
         )
 
-    routes_release_finished = routes_release.finished  # type: ignore[has-type]
+    routes_release_finished = get.release.finished  # type: ignore[has-type]
     return await session.redirect(
         routes_release_finished,
         success="Preview successfully announced",

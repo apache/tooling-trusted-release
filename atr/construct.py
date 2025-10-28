@@ -46,7 +46,7 @@ class StartVoteOptions:
 async def announce_release_body(body: str, options: AnnounceReleaseOptions) -> str:
     # NOTE: The present module is imported by routes
     # Therefore this must be done here to avoid a circular import
-    import atr.routes.release as routes_release
+    import atr.get as get
 
     try:
         host = quart.request.host
@@ -65,7 +65,7 @@ async def announce_release_body(body: str, options: AnnounceReleaseOptions) -> s
             raise RuntimeError(f"Release {options.project_name} {options.version_name} has no committee")
         committee = release.committee
 
-    routes_release_view = routes_release.view  # type: ignore[has-type]
+    routes_release_view = get.release.view  # type: ignore[has-type]
     download_path = util.as_url(
         routes_release_view, project_name=options.project_name, version_name=options.version_name
     )

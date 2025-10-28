@@ -129,10 +129,10 @@ def app_setup_context(app: base.QuartApp) -> None:
     async def app_wide() -> dict[str, Any]:
         import atr.admin as admin
         import atr.get as get
+        import atr.mapping as mapping
         import atr.metadata as metadata
         import atr.post as post
         import atr.routes as routes
-        import atr.routes.mapping as mapping
 
         return {
             "admin": admin,

@@ -29,8 +29,8 @@ import atr.blueprints.get as get
 import atr.config as config
 import atr.db as db
 import atr.htm as htm
+import atr.mapping as mapping
 import atr.models.sql as sql
-import atr.routes.mapping as mapping
 import atr.routes.root as root
 import atr.template as template
 import atr.util as util

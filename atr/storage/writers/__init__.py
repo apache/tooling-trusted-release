@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import annotations
+
 import atr.storage.writers.announce as announce
 import atr.storage.writers.cache as cache
 import atr.storage.writers.checks as checks

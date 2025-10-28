@@ -43,9 +43,9 @@ import atr.forms as forms
 import atr.get as get
 import atr.ldap as ldap
 import atr.log as log
+import atr.mapping as mapping
 import atr.models.sql as sql
 import atr.principal as principal
-import atr.routes.mapping as mapping
 import atr.storage as storage
 import atr.storage.outcome as outcome
 import atr.storage.types as types

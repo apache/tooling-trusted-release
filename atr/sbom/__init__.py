@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import annotations
-
 from . import cli, conformance, constants, cyclonedx, licenses, maven, models, osv, sbomqs, spdx, utilities
 
 __all__ = [

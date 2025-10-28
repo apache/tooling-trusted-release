@@ -15,9 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import atr.routes.published as published
-import atr.routes.ref as ref
-import atr.routes.release as release
 import atr.routes.report as report
 import atr.routes.resolve as resolve
 import atr.routes.revisions as revisions
@@ -30,9 +27,6 @@ import atr.routes.user as user
 import atr.routes.voting as voting
 
 __all__ = [
-    "published",
-    "ref",
-    "release",
     "report",
     "resolve",
     "revisions",
