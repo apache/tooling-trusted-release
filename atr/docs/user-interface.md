@@ -148,7 +148,7 @@ async def add(session: route.CommitterSession) -> str:
     )
 ```
 
-The route is decorated with `@route.committer`, which ensures that the route fails before the function is even entered if authentication fails. The function receives a `session` object, which is an instance of [`route.CommitterSession`](/ref/atr/route.py:CommitterSession) with a range of useful properties and methods. The function then loads data, creates a form, checks if the request is a POST, and either processes the form or displays it. After successful processing, it creates a fresh form to clear the data. At the end, it renders a template with all of the variables that the template needs.
+The route is decorated with `@route.committer`, which ensures that the route fails before the function is even entered if authentication fails. The function receives a `session` object, which is an instance of [`web.Committer`](/ref/atr/web.py:Committer) with a range of useful properties and methods. The function then loads data, creates a form, checks if the request is a POST, and either processes the form or displays it. After successful processing, it creates a fresh form to clear the data. At the end, it renders a template with all of the variables that the template needs.
 
 The template receives the form object and renders it by passing it to one of the `forms.render_*` functions. We previously used Jinja2 macros for this, but are migrating to the new rendering functions in Python (e.g. in [`get/distribution.py`](/ref/atr/get/distribution.py) and [`get/ignores.py`](/ref/atr/get/ignores.py)). The template also receives other data like `asf_id` and `user_committees`, which it uses to display information or make decisions about what to show.
 

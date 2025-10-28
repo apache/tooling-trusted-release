@@ -30,13 +30,14 @@ import atr.web as web
 
 _BLUEPRINT_NAME = "get_blueprint"
 _BLUEPRINT = quart.Blueprint(_BLUEPRINT_NAME, __name__)
+_routes: list[str] = []
 
 
-def register(app: base.QuartApp) -> ModuleType:
+def register(app: base.QuartApp) -> tuple[ModuleType, list[str]]:
     import atr.get as get
 
     app.register_blueprint(_BLUEPRINT)
-    return get
+    return get, _routes
 
 
 def committer(path: str) -> Callable[[web.CommitterRouteFunction[Any]], web.RouteFunction[Any]]:
@@ -75,6 +76,9 @@ def committer(path: str) -> Callable[[web.CommitterRouteFunction[Any]], web.Rout
         decorated = auth.require(auth.Requirements.committer)(wrapper)
         _BLUEPRINT.add_url_rule(path, endpoint=endpoint, view_func=decorated, methods=["GET"])
 
+        module_name = func.__module__.split(".")[-1]
+        _routes.append(f"get.{module_name}.{func.__name__}")
+
         return decorated
 
     return decorator
@@ -93,6 +97,9 @@ def public(path: str) -> Callable[[Callable[..., Awaitable[Any]]], web.RouteFunc
         wrapper.__annotations__["endpoint"] = _BLUEPRINT_NAME + "." + endpoint
 
         _BLUEPRINT.add_url_rule(path, endpoint=endpoint, view_func=wrapper, methods=["GET"])
+
+        module_name = func.__module__.split(".")[-1]
+        _routes.append(f"get.{module_name}.{func.__name__}")
 
         return wrapper
 

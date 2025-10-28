@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""keys.py"""
-
 import datetime
 
 import asfquart as asfquart
@@ -25,7 +23,6 @@ import werkzeug.wrappers.response as response
 
 import atr.blueprints.get as get
 import atr.db as db
-import atr.route as route
 import atr.shared as shared
 import atr.storage as storage
 import atr.template as template
@@ -45,8 +42,8 @@ async def details(session: web.Committer, fingerprint: str) -> str | response.Re
     return await shared.keys.details(session, fingerprint)
 
 
-@route.committer("/keys/export/<committee_name>")
-async def export(session: route.CommitterSession, committee_name: str) -> web.TextResponse:
+@get.committer("/keys/export/<committee_name>")
+async def export(session: web.Committer, committee_name: str) -> web.TextResponse:
     """Export a KEYS file for a specific committee."""
     async with storage.write() as write:
         wafc = write.as_foundation_committer()
@@ -55,8 +52,8 @@ async def export(session: route.CommitterSession, committee_name: str) -> web.Te
     return web.TextResponse(keys_file_text)
 
 
-@route.committer("/keys")
-async def keys(session: route.CommitterSession) -> str:
+@get.committer("/keys")
+async def keys(session: web.Committer) -> str:
     """View all keys associated with the user's account."""
     committees_to_query = list(set(session.committees + session.projects))
 

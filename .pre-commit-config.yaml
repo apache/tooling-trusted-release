@@ -86,10 +86,10 @@ repos:
       types: [python]
       exclude: ^tests/
 
-    # - id: jinja-route-check
-    #   name: Jinja Route Checker
-    #   description: Check whether routes used in Jinja2 templates actually exist
-    #   entry: uv run python scripts/lint/jinja_route_checker.py
-    #   language: system
-    #   pass_filenames: false
-    #   always_run: true
+    - id: jinja-route-check
+      name: Jinja Route Checker
+      description: Check whether routes used in Jinja2 templates actually exist
+      entry: uv run python scripts/lint/jinja_route_checker.py
+      language: system
+      pass_filenames: false
+      always_run: true

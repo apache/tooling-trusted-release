@@ -39,11 +39,11 @@ async with storage.write(session) as write:
 
 The `wacp` object, short for `w`rite `a`s `c`ommittee `p`articipant, provides access to domain-specific writers: `announce`, `checks`, `distributions`, `keys`, `policy`, `project`, `release`, `sbom`, `ssh`, `tokens`, and `vote`.
 
-The write session takes an optional [`CommitterSession`](/ref/atr/route.py:CommitterSession) or ASF UID, typically `session.uid` from the logged-in user. If you omit the UID, the session determines it automatically from the current request context. The write object checks LDAP memberships and raises [`storage.AccessError`](/ref/atr/storage/__init__.py:AccessError) if the user is not authorized for the requested permission level.
+The write session takes an optional [`Committer`](/ref/atr/web.py:Committer) or ASF UID, typically `session.uid` from the logged-in user. If you omit the UID, the session determines it automatically from the current request context. The write object checks LDAP memberships and raises [`storage.AccessError`](/ref/atr/storage/__init__.py:AccessError) if the user is not authorized for the requested permission level.
 
 Because projects belong to committees, we provide [`write.as_project_committee_member(project_name)`](/ref/atr/storage/__init__.py:as_project_committee_member) and [`write.as_project_committee_participant(project_name)`](/ref/atr/storage/__init__.py:as_project_committee_participant), which look up the project's committee and authenticate the user as a member or participant of that committee. This is convenient when, for example, the URL provides a project name.
 
-Here is a more complete example from [`bps/api/api.py`](/ref/atr/bps/api/api.py) that shows the classic three step pattern:
+Here is a more complete example from [`api/routes.py`](/ref/atr/api/routes.py) that shows the classic three step pattern:
 
 ```python
 async with storage.write(asf_uid) as write:

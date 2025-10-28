@@ -28,7 +28,6 @@ import asfquart.session
 import atr.config as config
 import atr.ldap as ldap
 import atr.log as log
-import atr.route as route
 import atr.util as util
 import atr.web as web
 
@@ -61,7 +60,7 @@ class ArgumentNoneType:
 
 ArgumentNone = ArgumentNoneType()
 
-type UID = route.CommitterSession | web.Committer | str | None | ArgumentNoneType
+type UID = web.Committer | str | None | ArgumentNoneType
 
 
 def attr_to_list(attr):
@@ -354,9 +353,9 @@ class AsyncObject:
 class Authorisation(AsyncObject):
     async def __init__(self, asf_uid: UID = ArgumentNone):
         match asf_uid:
-            case ArgumentNoneType() | route.CommitterSession() | web.Committer():
+            case ArgumentNoneType() | web.Committer():
                 match asf_uid:
-                    case route.CommitterSession() | web.Committer():
+                    case web.Committer():
                         asfquart_session = asf_uid._session
                     case _:
                         asfquart_session = await asfquart.session.read()

@@ -52,7 +52,7 @@ Imports OpenPGP public keys from ASF committee KEYS files into the ATR database.
 
 ## lint/jinja\_route\_checker.py
 
-Validates that Jinja templates only reference routes that exist. Scans all templates in `atr/templates/` for `as_url(routes.<name>)` calls and reports any references to routes not found in `state/routes.json`.
+Validates that Jinja templates only reference routes that exist. Scans all templates in `atr/templates/` for `as_url(get.<name>)` and `as_url(post.<name>)` calls and reports any references to routes not found in `state/routes.json`. The routes file is automatically generated when the application starts by collecting routes from each blueprint's decorators.
 
 ## release\_path\_parse.py
 

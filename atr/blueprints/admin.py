@@ -42,11 +42,11 @@ async def _check_admin_access() -> None:
     quart.g.session = web.Committer(web_session)
 
 
-def register(app: base.QuartApp) -> ModuleType:
+def register(app: base.QuartApp) -> tuple[ModuleType, list[str]]:
     import atr.admin as admin
 
     app.register_blueprint(_BLUEPRINT)
-    return admin
+    return admin, []
 
 
 def get(path: str) -> Callable[[web.CommitterRouteFunction[Any]], web.RouteFunction[Any]]:

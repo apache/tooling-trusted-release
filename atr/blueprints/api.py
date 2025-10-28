@@ -31,11 +31,11 @@ _BLUEPRINT = quart.Blueprint("api_blueprint", __name__, url_prefix="/api")
 route = _BLUEPRINT.route
 
 
-def register(app: base.QuartApp) -> ModuleType:
+def register(app: base.QuartApp) -> tuple[ModuleType, list[str]]:
     import atr.api as api
 
     app.register_blueprint(_BLUEPRINT)
-    return api
+    return api, []
 
 
 def _exempt_blueprint(app: base.QuartApp) -> None:

@@ -25,7 +25,6 @@ import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.get.compose as compose
 import atr.models.sql as sql
-import atr.route as route
 import atr.storage as storage
 import atr.template as template
 import atr.web as web
@@ -71,7 +70,7 @@ async def selected(session: web.Committer, project_name: str) -> response.Respon
                 version_name=new_release.version,
                 success="Release candidate draft created successfully",
             )
-        except (route.FlashError, web.FlashError, base.ASFQuartException) as e:
+        except (web.FlashError, base.ASFQuartException) as e:
             # Flash the error and let the code fall through to render the template below
             await quart.flash(str(e), "error")
 

@@ -34,7 +34,6 @@ import atr.forms as forms
 import atr.get as get
 import atr.log as log
 import atr.models.sql as sql
-import atr.route as route
 import atr.shared as shared
 import atr.storage as storage
 import atr.storage.outcome as outcome
@@ -173,7 +172,7 @@ async def add(session: web.Committer) -> str:
             form = await AddOpenPGPKeyForm.create_form()
             forms.choices(form.selected_committees, committee_choices)
 
-        except (route.FlashError, web.FlashError) as e:
+        except web.FlashError as e:
             log.warning("FlashError adding OpenPGP key: %s", e)
             await quart.flash(str(e), "error")
         except Exception as e:

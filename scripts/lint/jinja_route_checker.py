@@ -27,7 +27,7 @@ import re
 import sys
 from typing import Final
 
-_AS_URL_PATTERN: Final = re.compile(r"as_url\(routes\.([a-zA-Z0-9_.]+)")
+_AS_URL_PATTERN: Final = re.compile(r"as_url\((get|post)\.([a-zA-Z0-9_.]+)")
 
 
 class JinjaRouteChecker:
@@ -73,7 +73,9 @@ class JinjaRouteChecker:
 
             # Find all as_url calls with routes
             for match in _AS_URL_PATTERN.finditer(content):
-                route_path = match.group(1)
+                module_prefix = match.group(1)
+                route_suffix = match.group(2)
+                route_path = f"{module_prefix}.{route_suffix}"
                 if route_path not in self.available_routes:
                     # Get approximate line number
                     line_number = content[: match.start()].count("\n") + 1

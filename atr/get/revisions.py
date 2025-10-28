@@ -23,17 +23,18 @@ import asfquart.base as base
 import sqlalchemy.orm as orm
 import sqlmodel
 
+import atr.blueprints.get as get
 import atr.db as db
 import atr.forms as forms
 import atr.models.schema as schema
 import atr.models.sql as sql
-import atr.route as route
 import atr.template as template
 import atr.util as util
+import atr.web as web
 
 
-@route.committer("/revisions/<project_name>/<version_name>")
-async def selected(session: route.CommitterSession, project_name: str, version_name: str) -> str:
+@get.committer("/revisions/<project_name>/<version_name>")
+async def selected(session: web.Committer, project_name: str, version_name: str) -> str:
     """Show the revision history for a release candidate draft or release preview."""
     await session.check_access(project_name)
 
