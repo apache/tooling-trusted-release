@@ -1,6 +1,5 @@
 # We can't use 24.10 because deadsnakes does not yet support it
 FROM ubuntu:24.04 AS builder
-
 ENV PIP_DEFAULT_TIMEOUT=100 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1 \
@@ -9,28 +8,24 @@ ENV PIP_DEFAULT_TIMEOUT=100 \
 
 RUN apt-get update && \
     apt-get install -y \
-      git \
-      make \
-      patch \
-      software-properties-common
+    git \
+    make \
+    patch \
+    software-properties-common
 
 RUN add-apt-repository ppa:deadsnakes/ppa && \
     apt update && \
     apt install -y python3.13 python3.13-venv python3.13-dev
 
 RUN rm -rf /usr/local && python3.13 -m venv /usr/local
-
 RUN pip3 install uv==${UV_VERSION}
 
 # use the same workdir as in the final image
 # as the created venv will use that path
 WORKDIR /opt/atr
-
 COPY . .
-
 # only install runtime dependencies
 RUN make sync
-
 # generate a version.py module from git information
 RUN make generate-version
 
@@ -39,7 +34,6 @@ RUN patch -p2 < /opt/atr/patches/generics.py.patch
 
 # final image
 FROM ubuntu:24.04
-
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
@@ -48,17 +42,17 @@ ENV JAVA_TOOL_OPTIONS="-XX:MaxMetaspaceSize=32m -Xmx128m -XX:+UseSerialGC -XX:Ma
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      bash \
-      curl \
-      git \
-      golang \
-      gpg \
-      gpg-agent \
-      make \
-      openjdk-8-jdk \
-      rsync \
-      software-properties-common \
-      subversion && \
+    bash \
+    curl \
+    git \
+    golang \
+    gpg \
+    gpg-agent \
+    make \
+    openjdk-8-jdk \
+    rsync \
+    software-properties-common \
+    subversion && \
     rm -rf /var/lib/apt/lists/*
 
 RUN add-apt-repository ppa:deadsnakes/ppa && \
@@ -68,24 +62,37 @@ RUN add-apt-repository ppa:deadsnakes/ppa && \
 
 RUN rm -rf /usr/local && python3.13 -m venv /usr/local
 
+# Create a non-root user, handling UID/GID 1000 conflicts gracefully
+RUN if getent group 1000 >/dev/null 2>&1; then \
+        groupadd appuser; \
+    else \
+        groupadd --gid 1000 appuser; \
+    fi && \
+    if getent passwd 1000 >/dev/null 2>&1; then \
+        useradd --gid appuser --shell /bin/bash --create-home appuser; \
+    else \
+        useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser; \
+    fi
+
+# Create and set ownership of application directory
+RUN mkdir -p /opt/atr && chown -R appuser:appuser /opt/atr
+
 WORKDIR /opt/atr
 
 # copy app and wheels from builder
-COPY --from=builder /opt/atr/.venv ./.venv
-COPY --from=builder /opt/atr/atr ./atr
-COPY --from=builder /opt/atr/migrations ./migrations
-COPY --from=builder /opt/atr/scripts ./scripts
-COPY --from=builder /opt/atr/Makefile .
-COPY --from=builder /opt/atr/alembic.ini .
-COPY --from=builder /opt/atr/start-atr.sh .
+COPY --from=builder --chown=appuser:appuser /opt/atr/.venv ./.venv
+COPY --from=builder --chown=appuser:appuser /opt/atr/atr ./atr
+COPY --from=builder --chown=appuser:appuser /opt/atr/migrations ./migrations
+COPY --from=builder --chown=appuser:appuser /opt/atr/scripts ./scripts
+COPY --from=builder --chown=appuser:appuser /opt/atr/Makefile .
+COPY --from=builder --chown=appuser:appuser /opt/atr/alembic.ini .
+COPY --from=builder --chown=appuser:appuser /opt/atr/start-atr.sh .
 
-RUN chmod +x ./start-atr.sh
-
-# install additional tools
+# install additional tools (as root)
 ENV RAT_VERSION=0.17
-
 RUN mkdir -p /opt/tools
 RUN mkdir -p /tmp/apache-rat
+
 WORKDIR /tmp/apache-rat
 # TODO: Check hash
 # TODO: This URL is not permanent, so we need to vendor this to pin it
@@ -97,21 +104,20 @@ RUN [ -f apache-rat-${RAT_VERSION}.jar ] || mv $(find . -maxdepth 1 -type f -nam
 RUN mv apache-rat-${RAT_VERSION}.jar /opt/tools
 RUN java -version
 
-# WORKDIR /var/run
-# RUN GOPATH=/usr/local go install github.com/anchore/syft/cmd/syft@v1.31.0
-# RUN curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-# RUN git clone https://github.com/sbp/sbomasm && cd sbomasm && GOPATH=/usr/local go install ./...
-# RUN GOPATH=/usr/local go install github.com/interlynk-io/sbomasm@v1.0.6
 RUN GOPATH=/usr/local go install github.com/snyk/parlay@v0.9.0
 RUN GOPATH=/usr/local go install github.com/interlynk-io/sbomqs@v1.1.0
 
 ENV CDXCLI_VERSION=0.29.1
 # TODO: Check hash
-RUN curl -L https://github.com/CycloneDX/cyclonedx-cli/releases/download/v{CDXCLI_VERSION}/cyclonedx-linux-x64 \
-    -o /usr/local/bin/cyclonedx
+RUN curl -L https://github.com/CycloneDX/cyclonedx-cli/releases/download/v${CDXCLI_VERSION}/cyclonedx-linux-x64 \
+    -o /usr/local/bin/cyclonedx && chmod +x /usr/local/bin/cyclonedx
 
-EXPOSE 4443
+# Switch to non-root user
+USER appuser
 
 WORKDIR /opt/atr
+RUN chmod +x ./start-atr.sh
+
+EXPOSE 4443
 
 CMD ["./start-atr.sh"]
