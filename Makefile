@@ -1,7 +1,7 @@
 .PHONY: build build-alpine build-playwright build-ts build-ubuntu certs \
   check check-extra check-light commit docs generate-version ipython \
-  manual run-playwright run-playwright-slow serve serve-local sync \
-  sync-all update-deps
+  manual run-alpine run-playwright run-playwright-slow serve serve-local \
+  sync sync-all update-deps
 
 BIND ?= 127.0.0.1:8080
 IMAGE ?= tooling-trusted-release
@@ -66,6 +66,15 @@ generate-version:
 
 ipython:
 	uv run --frozen --with ipython ipython
+
+run-alpine:
+	docker run -p 8080:8080 -p 2222:2222 \
+	  -v "$$PWD/state:/opt/atr/state" \
+	  -v "$$PWD/state/localhost.apache.org+3-key.pem:/opt/atr/state/key.pem" \
+	  -v "$$PWD/state/localhost.apache.org+3.pem:/opt/atr/state/cert.pem" \
+	  -e APP_HOST=localhost.apache.org:8080 -e SECRET_KEY=insecure-local-key \
+	  -e ALLOW_TESTS=1 -e SSH_HOST=0.0.0.0 -e BIND=0.0.0.0:8080 \
+	  tooling-trusted-release
 
 run-playwright:
 	docker run --net=host -it atr-playwright python3 test.py --skip-slow
