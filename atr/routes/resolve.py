@@ -196,8 +196,9 @@ async def tabulated_selected_post(session: route.CommitterSession, project_name:
         # Perhaps all hidden fields should be authenticated
         # We should also still validate all HMACed fields
         archive_url = hidden_form.hidden_field.data or ""
-        if not web.valid_url(archive_url, "lists.apache.org"):
-            raise base.ASFQuartException("Invalid vote thread URL", errorcode=400)
+        if archive_url:
+            if not web.valid_url(archive_url, "lists.apache.org"):
+                raise base.ASFQuartException("Invalid vote thread URL", errorcode=400)
         thread_id = archive_url.split("/")[-1]
         if thread_id:
             try:
