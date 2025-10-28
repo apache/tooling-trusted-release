@@ -179,6 +179,10 @@ class ElementResponse(quart.Response):
         super().__init__(str(element), status=status, mimetype="text/html")
 
 
+class FlashError(RuntimeError):
+    """Error that triggers a flash message."""
+
+
 class HeaderValue:
     # TODO: There does not appear to be a general HTTP header construction package in Python
     # The existence of one would help us and others to adhere to the HTTP component of ASVS v5 1.2.1

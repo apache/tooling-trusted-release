@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""download.py"""
-
 import pathlib
 from collections.abc import AsyncGenerator
 
@@ -27,11 +25,11 @@ import quart
 import werkzeug.wrappers.response as response
 import zipstream
 
+import atr.blueprints.get as get
 import atr.config as config
 import atr.db as db
 import atr.htm as htm
 import atr.models.sql as sql
-import atr.route as route
 import atr.routes.mapping as mapping
 import atr.routes.root as root
 import atr.template as template
@@ -39,10 +37,8 @@ import atr.util as util
 import atr.web as web
 
 
-@route.committer("/download/all/<project_name>/<version_name>")
-async def all_selected(
-    session: route.CommitterSession, project_name: str, version_name: str
-) -> response.Response | str:
+@get.committer("/download/all/<project_name>/<version_name>")
+async def all_selected(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
     """Display download commands for a release."""
     async with db.session() as data:
         release = await session.release(project_name=project_name, version_name=version_name, phase=None, data=data)
@@ -66,25 +62,25 @@ async def all_selected(
     )
 
 
-@route.public("/download/path/<project_name>/<version_name>/<path:file_path>")
+@get.public("/download/path/<project_name>/<version_name>/<path:file_path>")
 async def path(
-    session: route.CommitterSession | None, project_name: str, version_name: str, file_path: str
+    session: web.Committer | None, project_name: str, version_name: str, file_path: str
 ) -> response.Response | quart.Response:
     """Download a file or list a directory from a release in any phase."""
     return await _download_or_list(project_name, version_name, file_path)
 
 
-@route.public("/download/path/<project_name>/<version_name>/")
+@get.public("/download/path/<project_name>/<version_name>/")
 async def path_empty(
-    session: route.CommitterSession | None, project_name: str, version_name: str
+    session: web.Committer | None, project_name: str, version_name: str
 ) -> response.Response | quart.Response:
     """List files at the root of a release directory for download."""
     return await _download_or_list(project_name, version_name, ".")
 
 
-@route.public("/download/sh/<project_name>/<version_name>")
+@get.public("/download/sh/<project_name>/<version_name>")
 async def sh_selected(
-    session: route.CommitterSession | None, project_name: str, version_name: str
+    session: web.Committer | None, project_name: str, version_name: str
 ) -> response.Response | quart.Response:
     """Shell script to download a release."""
     conf = config.get()
@@ -99,9 +95,9 @@ async def sh_selected(
     return web.ShellResponse(content)
 
 
-@route.public("/download/urls/<project_name>/<version_name>")
+@get.public("/download/urls/<project_name>/<version_name>")
 async def urls_selected(
-    session: route.CommitterSession | None, project_name: str, version_name: str
+    session: web.Committer | None, project_name: str, version_name: str
 ) -> response.Response | quart.Response:
     try:
         async with db.session() as data:
@@ -116,9 +112,9 @@ async def urls_selected(
         return web.TextResponse(f"Internal server error: {e}", status=500)
 
 
-@route.committer("/download/zip/<project_name>/<version_name>")
+@get.committer("/download/zip/<project_name>/<version_name>")
 async def zip_selected(
-    session: route.CommitterSession, project_name: str, version_name: str
+    session: web.Committer, project_name: str, version_name: str
 ) -> response.Response | quart.wrappers.response.Response:
     try:
         release = await session.release(project_name=project_name, version_name=version_name, phase=None)
@@ -156,7 +152,7 @@ async def _download_or_list(project_name: str, version_name: str, file_path: str
     # Check that path is relative
     original_path = pathlib.Path(file_path)
     if (file_path != ".") and (not original_path.is_relative_to(original_path.anchor)):
-        raise route.FlashError("Path must be relative")
+        raise web.FlashError("Path must be relative")
 
     # We allow downloading files from any phase
     async with db.session() as data:

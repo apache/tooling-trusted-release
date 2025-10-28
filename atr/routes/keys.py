@@ -174,7 +174,7 @@ async def add(session: route.CommitterSession) -> str:
             form = await AddOpenPGPKeyForm.create_form()
             forms.choices(form.selected_committees, committee_choices)
 
-        except route.FlashError as e:
+        except (route.FlashError, web.FlashError) as e:
             log.warning("FlashError adding OpenPGP key: %s", e)
             await quart.flash(str(e), "error")
         except Exception as e:

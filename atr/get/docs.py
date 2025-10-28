@@ -23,9 +23,10 @@ import aiofiles.os
 import markupsafe
 import quart
 
+import atr.blueprints.get as get
 import atr.config as config
-import atr.route as route
 import atr.template as template
+import atr.web as web
 
 
 class H1Parser(HTMLParser):
@@ -47,13 +48,13 @@ class H1Parser(HTMLParser):
             self.h1_content = data.strip()
 
 
-@route.public("/docs/")
-async def index(session: route.CommitterSession | None) -> str:
+@get.public("/docs/")
+async def index(session: web.Committer | None) -> str:
     return await _serve_docs_page("index")
 
 
-@route.public("/docs/<path:page>")
-async def page(session: route.CommitterSession | None, page: str) -> str:
+@get.public("/docs/<path:page>")
+async def page(session: web.Committer | None, page: str) -> str:
     return await _serve_docs_page(page)
 
 

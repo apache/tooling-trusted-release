@@ -28,6 +28,7 @@ import atr.models.sql as sql
 import atr.route as route
 import atr.storage as storage
 import atr.template as template
+import atr.web as web
 
 
 class StartReleaseForm(forms.Typed):
@@ -71,7 +72,7 @@ async def selected(session: route.CommitterSession, project_name: str) -> respon
                 version_name=new_release.version,
                 success="Release candidate draft created successfully",
             )
-        except (route.FlashError, base.ASFQuartException) as e:
+        except (route.FlashError, web.FlashError, base.ASFQuartException) as e:
             # Flash the error and let the code fall through to render the template below
             await quart.flash(str(e), "error")
 

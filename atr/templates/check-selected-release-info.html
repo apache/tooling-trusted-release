@@ -45,7 +45,7 @@
            title="Upload files to this draft"
            class="btn btn-primary"><i class="bi bi-upload me-1"></i> Upload files</a>
 
-        <a href="{{ as_url(routes.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
+        <a href="{{ as_url(get.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
            title="Download {%- if has_files -%}files{%- else -%}links{%- endif -%}"
            class="btn btn-primary"><i class="bi bi-download me-1"></i> Download
           {% if has_files %}
@@ -73,7 +73,7 @@
         {% endif %}
         <a href="#more-actions" class="btn btn-outline-secondary"><i class="bi bi-gear me-1"></i> More actions</a>
       {% elif phase == "release_candidate" %}
-        <a href="{{ as_url(routes.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
+        <a href="{{ as_url(get.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-primary"><i class="bi bi-download me-1"></i> Download files</a>
         <a href="{{ as_url(get.candidate.view, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-secondary"><i class="bi bi-eye me-1"></i> View files</a>

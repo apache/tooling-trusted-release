@@ -25,7 +25,7 @@
               <strong class="card-title fs-5">{{ release.version }}</strong>
               <p class="card-text text-muted">Released on {{ format_datetime(release.created) }}</p>
               <div class="mt-auto">
-                <a href="{{ as_url(routes.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
+                <a href="{{ as_url(get.download.all_selected, project_name=release.project.name, version_name=release.version) }}"
                    class="btn btn-outline-primary w-100 mb-2">
                   <i class="bi bi-download me-1"></i> Download files
                 </a>

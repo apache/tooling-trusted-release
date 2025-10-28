@@ -25,9 +25,9 @@ import atr.db.interaction as interaction
 import atr.forms as forms
 import atr.models.results as results
 import atr.models.sql as sql
-import atr.routes.draft as draft
 import atr.shared.announce as announce
 import atr.shared.distribution as distribution
+import atr.shared.draft as draft
 import atr.shared.vote as vote
 import atr.storage as storage
 import atr.template as template

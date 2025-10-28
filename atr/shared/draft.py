@@ -15,14 +15,21 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Final, Literal
+import atr.forms as forms
 
-import atr.post.announce as announce
-import atr.post.candidate as candidate
-import atr.post.distribution as distribution
-import atr.post.draft as draft
-import atr.post.vote as vote
 
-ROUTES_MODULE: Final[Literal[True]] = True
+class DeleteFileForm(forms.Typed):
+    """Form for deleting a file."""
 
-__all__ = ["announce", "candidate", "distribution", "draft", "vote"]
+    file_path = forms.string("File path")
+    submit = forms.submit("Delete file")
+
+
+class DeleteForm(forms.Typed):
+    """Form for deleting a candidate draft."""
+
+    release_name = forms.hidden()
+    project_name = forms.hidden()
+    version_name = forms.hidden()
+    confirm_delete = forms.string("Confirmation", validators=forms.constant("DELETE"))
+    submit = forms.submit("Delete candidate draft")

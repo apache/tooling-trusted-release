@@ -93,7 +93,7 @@
                         title="Show more actions for {{ path }}"
                         onclick="this.innerHTML = (this.innerHTML.trim() === 'More') ? 'Less' : 'More';">More</button>
               {% elif phase == "release_candidate" %}
-                <a href="{{ as_url(routes.download.path, project_name=release.project.name, version_name=release.version, file_path=path) }}"
+                <a href="{{ as_url(get.download.path, project_name=release.project.name, version_name=release.version, file_path=path) }}"
                    title="Download file {{ path }}"
                    class="btn btn-sm btn-outline-secondary">Download</a>
               {% endif %}
@@ -109,10 +109,10 @@
                   <div class="btn-group btn-group-sm"
                        role="group"
                        aria-label="More file actions for {{ path }}">
-                    <a href="{{ as_url(routes.download.path, project_name=release.project.name, version_name=release.version, file_path=path) }}"
+                    <a href="{{ as_url(get.download.path, project_name=release.project.name, version_name=release.version, file_path=path) }}"
                        title="Download file {{ path }}"
                        class="btn btn-outline-secondary">Download</a>
-                    <a href="{{ as_url(routes.draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
+                    <a href="{{ as_url(get.draft.tools, project_name=project_name, version_name=version_name, file_path=path) }}"
                        title="Tools for file {{ path }}"
                        class="btn btn-outline-secondary">Tools</a>
                     <button class="btn btn-outline-danger"
@@ -120,7 +120,7 @@
                             data-bs-target="#delete-{{ row_id }}"
                             title="Delete file {{ path }}">Delete</button>
                   </div>
-                  {{ dialog.delete_modal(path, "Delete file", "file, and any associated metadata files", as_url(routes.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
+                  {{ dialog.delete_modal(path, "Delete file", "file, and any associated metadata files", as_url(post.draft.delete_file, project_name=project_name, version_name=version_name) , delete_file_form, "file_path") }}
                 </div>
               </div>
             </td>

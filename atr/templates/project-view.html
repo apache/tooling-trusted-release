@@ -413,7 +413,7 @@
       <h2>Draft candidate releases</h2>
       <div class="d-flex flex-wrap gap-2 mb-4">
         {% for draft in candidate_drafts %}
-          <a href="{{ as_url(routes.draft.view, project_name=project.name, version_name=draft.version) }}"
+          <a href="{{ as_url(get.draft.view, project_name=project.name, version_name=draft.version) }}"
              class="btn btn-sm btn-outline-secondary py-2 px-3"
              title="View draft {{ project.name }} {{ draft.version }}">
             {{ project.name }} {{ draft.version }}

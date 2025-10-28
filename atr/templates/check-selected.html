@@ -171,7 +171,7 @@
     </div>
     <div class="mb-3">
       <form method="post"
-            action="{{ as_url(routes.draft.fresh, project_name=release.project.name, version_name=release.version) }}"
+            action="{{ as_url(post.draft.fresh, project_name=release.project.name, version_name=release.version) }}"
             class="mb-0">
         {{ empty_form.hidden_tag() }}
 
@@ -182,7 +182,7 @@
     <h3 id="delete-draft" class="mt-4">Delete this draft</h3>
     <div>
       <form method="post"
-            action="{{ as_url(routes.draft.delete, project_name=release.project.name, version_name=release.version) }}"
+            action="{{ as_url(post.draft.delete, project_name=release.project.name, version_name=release.version) }}"
             class="mb-0">
         {{ delete_form.hidden_tag() }}
 

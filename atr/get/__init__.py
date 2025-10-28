@@ -22,8 +22,21 @@ import atr.get.candidate as candidate
 import atr.get.committees as committees
 import atr.get.compose as compose
 import atr.get.distribution as distribution
+import atr.get.docs as docs
+import atr.get.download as download
+import atr.get.draft as draft
 import atr.get.vote as vote
 
 ROUTES_MODULE: Final[Literal[True]] = True
 
-__all__ = ["announce", "candidate", "committees", "compose", "distribution", "vote"]
+__all__ = [
+    "announce",
+    "candidate",
+    "committees",
+    "compose",
+    "distribution",
+    "docs",
+    "download",
+    "draft",
+    "vote",
+]

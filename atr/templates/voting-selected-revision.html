@@ -178,7 +178,7 @@
               return;
           }
 
-          const previewUrl = "{{ as_url(routes.draft.vote_preview, project_name=release.project.name, version_name=release.version) }}";
+          const previewUrl = "{{ as_url(post.draft.vote_preview, project_name=release.project.name, version_name=release.version) }}";
           const csrfTokenInput = voteForm.querySelector('input[name="csrf_token"]');
 
           if (!previewUrl || !csrfTokenInput) {

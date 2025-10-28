@@ -75,7 +75,7 @@
   {{ forms.errors_summary(svn_form) }}
   <div class="row">
     <div class="col-md-8 w-100">
-      <form action="{{ as_url(routes.draft.svnload, project_name=project_name, version_name=version_name) }}"
+      <form action="{{ as_url(post.draft.svnload, project_name=project_name, version_name=version_name) }}"
             method="post"
             novalidate
             class="atr-canary py-4 px-5">
