@@ -32,7 +32,7 @@ The [`server.create_app`](/ref/atr/server.py:create_app) function performs a lot
 
 ## Routes and database
 
-Users request ATR pages over HTTPS, and the ATR server processes those requests in route handlers. Most of those handlers are in [`routes`](/ref/atr/routes/), but not all. What each handler does varies, of course, from handler to handler, but most perform at least one access to the ATR SQLite database.
+Users request ATR pages over HTTPS, and the ATR server processes those requests in route handlers. Most of those handlers are in [`get`](/ref/atr/get/) and [`post`](/ref/atr/post/), with some helper code in [`shared`](/ref/atr/shared/). What each handler does varies, of course, from handler to handler, but most perform at least one access to the ATR SQLite database.
 
 The path of the SQLite database is configured in [`config.AppConfig.SQLITE_DB_PATH`](/ref/atr/config.py:SQLITE_DB_PATH) by default, and will usually appear as `state/atr.db` with related `shm` and `wal` files. We do not expect ATR to have so many users that we need to scale beyond SQLite.
 
@@ -40,7 +40,7 @@ We use [SQLModel](https://sqlmodel.tiangolo.com/), an ORM utilising [Pydantic](h
 
 It is technically possible to interact with SQLite directly, but we do not do that in the ATR source. We use various interfaces in [`db`](/ref/atr/db/__init__.py) for reads, and interfaces in [`storage`](/ref/atr/storage/) for writes. We plan to move the `db` code into `storage` too eventually, because `storage` is designed to have read components and write components. There is also a legacy [`db.interaction`](/ref/atr/db/interaction.py) module which we plan to migrate into `storage`.
 
-These three interfaces, [`routes`](/ref/atr/routes/), [`models.sql`](/ref/atr/models/sql.py), and [`storage`](/ref/atr/storage/), are where the majority of activity happens when developing ATR.
+These interfaces, including route handlers in [`get`](/ref/atr/get/), [`post`](/ref/atr/post/), and [`shared`](/ref/atr/shared/), along with [`models.sql`](/ref/atr/models/sql.py) and [`storage`](/ref/atr/storage/), are where the majority of activity happens when developing ATR.
 
 ## User interface
 

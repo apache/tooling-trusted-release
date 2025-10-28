@@ -59,7 +59,7 @@
            class="btn btn-secondary"><i class="bi bi-clock-history me-1"></i> Revisions</a>
         {% if revision_number %}
           {% if has_files and (not strict_checking_errors) %}
-            <a href="{{ as_url(routes.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=revision_number) }}"
+            <a href="{{ as_url(get.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=revision_number) }}"
                title="Start a vote on this draft"
                class="btn btn-success"><i class="bi bi-check-circle me-1"></i> Start voting</a>
           {% else %}

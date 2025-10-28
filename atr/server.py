@@ -23,7 +23,6 @@ import datetime
 import os
 import queue
 from collections.abc import Iterable
-from types import ModuleType
 from typing import Any
 
 import asfquart
@@ -132,7 +131,6 @@ def app_setup_context(app: base.QuartApp) -> None:
         import atr.mapping as mapping
         import atr.metadata as metadata
         import atr.post as post
-        import atr.routes as routes
 
         return {
             "admin": admin,
@@ -144,7 +142,6 @@ def app_setup_context(app: base.QuartApp) -> None:
             "is_viewing_as_admin_fn": util.is_user_viewing_as_admin,
             "is_committee_member_fn": user.is_committee_member,
             "post": post,
-            "routes": routes,
             "static_url": util.static_url,
             "unfinished_releases_fn": interaction.unfinished_releases,
             # "user_committees_fn": interaction.user_committees,
@@ -385,10 +382,7 @@ def main() -> None:
     app.run(port=8080, ssl_keyfile="key.pem", ssl_certfile="cert.pem")
 
 
-def register_routes(app: base.QuartApp) -> ModuleType:
-    # NOTE: These imports are for their side effects only
-    import atr.routes as routes
-
+def register_routes(app: base.QuartApp) -> None:
     # Add a global error handler to show helpful error messages with tracebacks
     @app.errorhandler(Exception)
     async def handle_any_exception(error: Exception) -> Any:
@@ -423,8 +417,6 @@ def register_routes(app: base.QuartApp) -> ModuleType:
         if quart.request.path.startswith("/api"):
             return quart.jsonify({"error": "404 Not Found"}), 404
         return await template.render("notfound.html", error="404 Not Found", traceback="", status_code=404), 404
-
-    return routes
 
 
 # FIXME: when running in SSL mode, you will receive these exceptions upon termination at times:

@@ -15,34 +15,21 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
 import quart
 
+import atr.blueprints.get as get
 import atr.forms as forms
 import atr.htm as htm
-import atr.route as route
+import atr.shared as shared
 import atr.template as template
 import atr.util as util
-
-if TYPE_CHECKING:
-    import werkzeug.wrappers.response as response
+import atr.web as web
 
 
-class CacheForm(forms.Typed):
-    cache_submit = forms.submit("Cache me!")
-
-
-class DeleteCacheForm(forms.Typed):
-    delete_submit = forms.submit("Delete my cache")
-
-
-@route.committer("/user/cache", methods=["GET"])
-async def cache_get(session: route.CommitterSession) -> str:
-    cache_form = await CacheForm.create_form()
-    delete_cache_form = await DeleteCacheForm.create_form()
+@get.committer("/user/cache")
+async def cache_get(session: web.Committer) -> str:
+    cache_form = await shared.user.CacheForm.create_form()
+    delete_cache_form = await shared.user.DeleteCacheForm.create_form()
 
     cache_data = await util.session_cache_read()
     user_cached = session.uid in cache_data
@@ -99,53 +86,3 @@ async def cache_get(session: route.CommitterSession) -> str:
         block.append(cache_form_element)
 
     return await template.blank("Session cache management", content=block.collect())
-
-
-@route.committer("/user/cache", methods=["POST"])
-async def session_post(session: route.CommitterSession) -> response.Response:
-    form_data = await quart.request.form
-
-    cache_form = await CacheForm.create_form(data=form_data)
-    delete_cache_form = await DeleteCacheForm.create_form(data=form_data)
-
-    if cache_form.cache_submit.data:
-        await _cache_session(session)
-        await quart.flash("Your session has been cached successfully", "success")
-    elif delete_cache_form.delete_submit.data:
-        await _delete_session_cache(session)
-        await quart.flash("Your cached session has been deleted", "success")
-    else:
-        await quart.flash("Invalid form submission", "error")
-
-    return await session.redirect(cache_get)
-
-
-async def _cache_session(session: route.CommitterSession) -> None:
-    cache_data = await util.session_cache_read()
-
-    session_data = {
-        "uid": session.uid,
-        "dn": getattr(session, "dn", None),
-        "fullname": getattr(session, "fullname", None),
-        "email": getattr(session, "email", f"{session.uid}@apache.org"),
-        "isMember": getattr(session, "isMember", False),
-        "isChair": getattr(session, "isChair", False),
-        "isRoot": getattr(session, "isRoot", False),
-        "pmcs": getattr(session, "committees", []),
-        "projects": getattr(session, "projects", []),
-        "mfa": getattr(session, "mfa", False),
-        "roleaccount": getattr(session, "isRole", False),
-        "metadata": getattr(session, "metadata", {}),
-    }
-
-    cache_data[session.uid] = session_data
-
-    await util.session_cache_write(cache_data)
-
-
-async def _delete_session_cache(session: route.CommitterSession) -> None:
-    cache_data = await util.session_cache_read()
-
-    if session.uid in cache_data:
-        del cache_data[session.uid]
-        await util.session_cache_write(cache_data)

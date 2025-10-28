@@ -44,7 +44,9 @@ import atr.get.sbom as sbom
 import atr.get.start as start
 import atr.get.tokens as tokens
 import atr.get.upload as upload
+import atr.get.user as user
 import atr.get.vote as vote
+import atr.get.voting as voting
 
 ROUTES_MODULE: Final[Literal[True]] = True
 
@@ -74,5 +76,7 @@ __all__ = [
     "start",
     "tokens",
     "upload",
+    "user",
     "vote",
+    "voting",
 ]

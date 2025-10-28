@@ -25,7 +25,7 @@ The UI is built from three main pieces: [Jinja2](https://jinja.palletsprojects.c
 
 Templates live in [`templates/`](/ref/atr/templates/). Each template is a Jinja2 file that defines HTML structure with placeholders for dynamic content. Route handlers render templates by calling [`template.render`](/ref/atr/template.py:render), which is an alias for [`template.render_sync`](/ref/atr/template.py:render_sync). The function is asynchronous and takes a template name plus keyword arguments for the template variables.
 
-Here is an example from [`routes/keys.py`](/ref/atr/routes/keys.py:add):
+Here is an example from [`get/keys.py`](/ref/atr/get/keys.py:add):
 
 ```python
 return await template.render(
@@ -48,7 +48,7 @@ Template rendering happens in a thread pool to avoid blocking the async event lo
 
 HTML forms in ATR are handled by [WTForms](https://wtforms.readthedocs.io/), accessed through our [`forms`](/ref/atr/forms.py) module. Each form is a class that inherits from [`forms.Typed`](/ref/atr/forms.py:Typed), which itself inherits from `QuartForm` in [Quart-WTF](https://quart-wtf.readthedocs.io/). Form fields are class attributes created using helper functions from the `forms` module.
 
-Here is a typical form definition from [`routes/keys.py`](/ref/atr/routes/keys.py:AddOpenPGPKeyForm):
+Here is a typical form definition from [`shared/keys.py`](/ref/atr/shared/keys.py:AddOpenPGPKeyForm):
 
 ```python
 class AddOpenPGPKeyForm(forms.Typed):
@@ -111,11 +111,11 @@ The `collect` method assembles all of the elements into a single htpy element. I
 
 The block class is useful when you are building HTML in a loop or when you have conditional elements. Instead of managing a list of elements manually, you can let the block class do it for you: append elements as you go, and at the end call `collect` to get the final result. This is cleaner than concatenating strings or maintaining lists yourself.
 
-The block class also adds a `data-src` attribute to elements, which records which function created the element. If you see an element in the browser inspector with `data-src="atr.routes.keys:selected"`, you know that it came from the `selected` function in `routes/keys.py`. The source is extracted automatically using [`log.caller_name`](/ref/atr/log.py:caller_name).
+The block class also adds a `data-src` attribute to elements, which records which function created the element. If you see an element in the browser inspector with `data-src="atr.get.keys:keys"`, you know that it came from the `keys` function in `get/keys.py`. The source is extracted automatically using [`log.caller_name`](/ref/atr/log.py:caller_name).
 
 ## How a route renders UI
 
-A typical route that renders UI first authenticates the user, loads data from the database, creates and validates a form if necessary, and renders a template with the data and form. Here is a simplified example from [`routes/keys.py`](/ref/atr/routes/keys.py:add):
+A typical route that renders UI first authenticates the user, loads data from the database, creates and validates a form if necessary, and renders a template with the data and form. Here is a simplified example from [`get/keys.py`](/ref/atr/get/keys.py:add):
 
 ```python
 @route.committer("/keys/add", methods=["GET", "POST"])
@@ -150,7 +150,7 @@ async def add(session: route.CommitterSession) -> str:
 
 The route is decorated with `@route.committer`, which ensures that the route fails before the function is even entered if authentication fails. The function receives a `session` object, which is an instance of [`route.CommitterSession`](/ref/atr/route.py:CommitterSession) with a range of useful properties and methods. The function then loads data, creates a form, checks if the request is a POST, and either processes the form or displays it. After successful processing, it creates a fresh form to clear the data. At the end, it renders a template with all of the variables that the template needs.
 
-The template receives the form object and renders it by passing it to one of the `forms.render_*` functions. We previously used Jinja2 macros for this, but are migrating to the new rendering functions in Python (e.g. in [`routes/distribution.py`](/ref/atr/routes/distribution.py) and [`routes/ignores.py`](/ref/atr/routes/ignores.py)). The template also receives other data like `asf_id` and `user_committees`, which it uses to display information or make decisions about what to show.
+The template receives the form object and renders it by passing it to one of the `forms.render_*` functions. We previously used Jinja2 macros for this, but are migrating to the new rendering functions in Python (e.g. in [`get/distribution.py`](/ref/atr/get/distribution.py) and [`get/ignores.py`](/ref/atr/get/ignores.py)). The template also receives other data like `asf_id` and `user_committees`, which it uses to display information or make decisions about what to show.
 
 If you use the programmatic rendering functions from [`forms`](/ref/atr/forms.py), you can skip the template entirely. These functions return htpy elements, which you can combine with other htpy elements and return directly from the route, which is often useful for admin routes, for example. You can also use [`template.blank`](/ref/atr/template.py:blank), which renders a minimal template with just a title and content area. This is useful for simple pages that do not need the full template machinery.
 

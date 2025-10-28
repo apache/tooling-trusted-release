@@ -29,7 +29,7 @@ Reading from storage is a work in progress. There are some existing methods, but
 
 ## How do we write to storage?
 
-To write to storage we open a write session, request specific permissions, use the exposed functionality, and then handle the outcome. Here is an actual example from [`routes/start.py`](/ref/atr/routes/start.py):
+To write to storage we open a write session, request specific permissions, use the exposed functionality, and then handle the outcome. Here is an actual example from [`post/start.py`](/ref/atr/post/start.py):
 
 ```python
 async with storage.write(session) as write:
@@ -116,7 +116,7 @@ Consider using **outcome types** from [`storage.outcome`](/ref/atr/storage/outco
 
 An [`Outcome[T]`](/ref/atr/storage/outcome.py:Outcome) is either a [`Result[T]`](/ref/atr/storage/outcome.py:Result) wrapping a successful value, or an [`Error[T]`](/ref/atr/storage/outcome.py:Error) wrapping an exception. You can check which it is with the `ok` property or pattern matching, extract the value with `result_or_raise()`, or extract the error with `error_or_raise()`.
 
-Here is an example from [`routes/keys.py`](/ref/atr/routes/keys.py) that processes multiple keys and collects outcomes:
+Here is an example from [`post/keys.py`](/ref/atr/post/keys.py) that processes multiple keys and collects outcomes:
 
 ```python
 async with storage.write() as write:

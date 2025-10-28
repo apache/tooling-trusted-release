@@ -36,7 +36,9 @@ import atr.shared.resolve as resolve
 import atr.shared.start as start
 import atr.shared.tokens as tokens
 import atr.shared.upload as upload
+import atr.shared.user as user
 import atr.shared.vote as vote
+import atr.shared.voting as voting
 import atr.storage as storage
 import atr.template as template
 import atr.util as util
@@ -194,5 +196,7 @@ __all__ = [
     "start",
     "tokens",
     "upload",
+    "user",
     "vote",
+    "voting",
 ]

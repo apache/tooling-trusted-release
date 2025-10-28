@@ -18,7 +18,7 @@
 <h2 id="how-do-we-read-from-storage">How do we read from storage?</h2>
 <p>Reading from storage is a work in progress. There are some existing methods, but most of the functionality is currently in <code>db</code> or <code>db.interaction</code>, and much work is required to migrate this to the storage interface. We have given this less priority because reads are generally safe, with the exception of a few components such as user tokens, which should be given greater migration priority.</p>
 <h2 id="how-do-we-write-to-storage">How do we write to storage?</h2>
-<p>To write to storage we open a write session, request specific permissions, use the exposed functionality, and then handle the outcome. Here is an actual example from <a href="/ref/atr/routes/start.py"><code>routes/start.py</code></a>:</p>
+<p>To write to storage we open a write session, request specific permissions, use the exposed functionality, and then handle the outcome. Here is an actual example from <a href="/ref/atr/post/start.py"><code>post/start.py</code></a>:</p>
 <pre><code class="language-python">async with storage.write(session) as write:
     wacp = await write.as_project_committee_participant(project_name)
     new_release, _project = await wacp.release.start(project_name, version)
@@ -84,7 +84,7 @@ class CommitteeMember(CommitteeParticipant):
 <h2 id="how-do-we-use-outcomes">How do we use outcomes?</h2>
 <p>Consider using <strong>outcome types</strong> from <a href="/ref/atr/storage/outcome.py"><code>storage.outcome</code></a> when returning results from writer methods. Outcomes let you represent both success and failure without raising exceptions, which gives callers flexibility in how they handle errors.</p>
 <p>An <a href="/ref/atr/storage/outcome.py:Outcome"><code>Outcome[T]</code></a> is either a <a href="/ref/atr/storage/outcome.py:Result"><code>Result[T]</code></a> wrapping a successful value, or an <a href="/ref/atr/storage/outcome.py:Error"><code>Error[T]</code></a> wrapping an exception. You can check which it is with the <code>ok</code> property or pattern matching, extract the value with <code>result_or_raise()</code>, or extract the error with <code>error_or_raise()</code>.</p>
-<p>Here is an example from <a href="/ref/atr/routes/keys.py"><code>routes/keys.py</code></a> that processes multiple keys and collects outcomes:</p>
+<p>Here is an example from <a href="/ref/atr/post/keys.py"><code>post/keys.py</code></a> that processes multiple keys and collects outcomes:</p>
 <pre><code class="language-python">async with storage.write() as write:
     wacm = write.as_committee_member(selected_committee)
     outcomes = await wacm.keys.ensure_associated(keys_text)
