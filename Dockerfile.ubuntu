@@ -8,10 +8,10 @@ ENV PIP_DEFAULT_TIMEOUT=100 \
 
 RUN apt-get update && \
     apt-get install -y \
-    git \
-    make \
-    patch \
-    software-properties-common
+      git \
+      make \
+      patch \
+      software-properties-common
 
 RUN add-apt-repository ppa:deadsnakes/ppa && \
     apt update && \
@@ -42,17 +42,17 @@ ENV JAVA_TOOL_OPTIONS="-XX:MaxMetaspaceSize=32m -Xmx128m -XX:+UseSerialGC -XX:Ma
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    bash \
-    curl \
-    git \
-    golang \
-    gpg \
-    gpg-agent \
-    make \
-    openjdk-8-jdk \
-    rsync \
-    software-properties-common \
-    subversion && \
+      bash \
+      curl \
+      git \
+      golang \
+      gpg \
+      gpg-agent \
+      make \
+      openjdk-8-jdk \
+      rsync \
+      software-properties-common \
+      subversion && \
     rm -rf /var/lib/apt/lists/*
 
 RUN add-apt-repository ppa:deadsnakes/ppa && \

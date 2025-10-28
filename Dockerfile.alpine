@@ -7,9 +7,9 @@ ENV PIP_DEFAULT_TIMEOUT=100 \
 
 RUN apk update && \
     apk add --no-cache \
-    git \
-    make \
-    patch
+      git \
+      make \
+      patch
 
 RUN pip3 install uv==${UV_VERSION}
 
@@ -37,17 +37,17 @@ ENV JAVA_TOOL_OPTIONS="-XX:MaxMetaspaceSize=32m -Xmx128m -XX:+UseSerialGC -XX:Ma
 # openjdk8 is required for Apache RAT
 RUN apk update && \
     apk add --no-cache \
-    bash \
-    curl \
-    file \
-    git \
-    go \
-    gpg \
-    gpg-agent \
-    make \
-    openjdk8 \
-    rsync \
-    subversion
+      bash \
+      curl \
+      file \
+      git \
+      go \
+      gpg \
+      gpg-agent \
+      make \
+      openjdk8 \
+      rsync \
+      subversion
 
 # Create a non-root user, handling UID/GID 1000 conflicts gracefully
 RUN if getent group 1000 >/dev/null 2>&1; then \
