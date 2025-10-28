@@ -15,9 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import atr.routes.file as file
-import atr.routes.finish as finish
-import atr.routes.ignores as ignores
 import atr.routes.keys as keys
 import atr.routes.preview as preview
 import atr.routes.projects as projects
@@ -36,9 +33,6 @@ import atr.routes.user as user
 import atr.routes.voting as voting
 
 __all__ = [
-    "file",
-    "finish",
-    "ignores",
     "keys",
     "preview",
     "projects",

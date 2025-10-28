@@ -21,8 +21,18 @@ import atr.post.announce as announce
 import atr.post.candidate as candidate
 import atr.post.distribution as distribution
 import atr.post.draft as draft
+import atr.post.finish as finish
+import atr.post.ignores as ignores
 import atr.post.vote as vote
 
 ROUTES_MODULE: Final[Literal[True]] = True
 
-__all__ = ["announce", "candidate", "distribution", "draft", "vote"]
+__all__ = [
+    "announce",
+    "candidate",
+    "distribution",
+    "draft",
+    "finish",
+    "ignores",
+    "vote",
+]

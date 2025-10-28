@@ -34,7 +34,7 @@
         <span class="atr-phase-symbol-other">③</span>
       </span>
     {% elif phase_key == "preview" %}
-      <a href="{{ as_url(routes.finish.selected, project_name=release.project.name, version_name=release.version) }}"
+      <a href="{{ as_url(get.finish.selected, project_name=release.project.name, version_name=release.version) }}"
          class="atr-back-link">← Back to Finish {{ release.short_display_name }}</a>
       <span>
         <span class="atr-phase-symbol-other">①</span>
@@ -99,7 +99,7 @@
                   <td>
                     {% if stat.is_file %}
                       {% if phase_key == "draft" %}
-                        {% set file_url = as_url(routes.file.selected_path, project_name=release.project.name, version_name=release.version, file_path=stat.path) %}
+                        {% set file_url = as_url(get.file.selected_path, project_name=release.project.name, version_name=release.version, file_path=stat.path) %}
                       {% elif phase_key == "candidate" %}
                         {% set file_url = as_url(get.candidate.view_path, project_name=release.project.name, version_name=release.version, file_path=stat.path) %}
                       {% elif phase_key == "preview" %}

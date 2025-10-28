@@ -15,34 +15,21 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Final, Literal
+from collections.abc import Awaitable, Callable
 
-import atr.get.announce as announce
-import atr.get.candidate as candidate
-import atr.get.committees as committees
-import atr.get.compose as compose
-import atr.get.distribution as distribution
-import atr.get.docs as docs
-import atr.get.download as download
-import atr.get.draft as draft
-import atr.get.file as file
-import atr.get.finish as finish
-import atr.get.ignores as ignores
-import atr.get.vote as vote
+import quart.wrappers.response as quart_response
+import werkzeug.wrappers.response as response
 
-ROUTES_MODULE: Final[Literal[True]] = True
+import atr.blueprints.post as post
+import atr.shared as shared
+import atr.web as web
 
-__all__ = [
-    "announce",
-    "candidate",
-    "committees",
-    "compose",
-    "distribution",
-    "docs",
-    "download",
-    "draft",
-    "file",
-    "finish",
-    "ignores",
-    "vote",
-]
+type Respond = Callable[[int, str], Awaitable[tuple[quart_response.Response, int] | response.Response]]
+
+
+@post.committer("/finish/<project_name>/<version_name>")
+async def selected(
+    session: web.Committer, project_name: str, version_name: str
+) -> tuple[quart_response.Response, int] | response.Response | str:
+    """Finish a release preview."""
+    return await shared.finish.selected(session, project_name, version_name)

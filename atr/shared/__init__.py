@@ -28,6 +28,8 @@ import atr.models.sql as sql
 import atr.shared.announce as announce
 import atr.shared.distribution as distribution
 import atr.shared.draft as draft
+import atr.shared.finish as finish
+import atr.shared.ignores as ignores
 import atr.shared.vote as vote
 import atr.storage as storage
 import atr.template as template
@@ -177,5 +179,8 @@ __all__ = [
     "announce",
     "check",
     "distribution",
+    "draft",
+    "finish",
+    "ignores",
     "vote",
 ]

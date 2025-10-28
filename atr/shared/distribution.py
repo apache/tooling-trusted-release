@@ -29,7 +29,6 @@ import atr.get as get
 import atr.htm as htm
 import atr.models.distribution as distribution
 import atr.models.sql as sql
-import atr.routes.finish as finish
 import atr.storage as storage
 import atr.template as template
 import atr.util as util
@@ -124,7 +123,7 @@ def html_nav_phase(block: htm.Block, project: str, version: str, staging: bool) 
     label: Phase
     route, label = (get.compose.selected, "COMPOSE")
     if not staging:
-        route, label = (finish.selected, "FINISH")
+        route, label = (get.finish.selected, "FINISH")
     html_nav(
         block,
         util.as_url(

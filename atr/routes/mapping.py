@@ -22,7 +22,6 @@ import werkzeug.wrappers.response as response
 import atr.get as get
 import atr.models.sql as sql
 import atr.route as route
-import atr.routes.finish as finish
 import atr.routes.release as routes_release
 import atr.util as util
 import atr.web as web
@@ -45,7 +44,7 @@ def release_as_route(release: sql.Release) -> Callable:
         case sql.ReleasePhase.RELEASE_CANDIDATE:
             return get.vote.selected
         case sql.ReleasePhase.RELEASE_PREVIEW:
-            return finish.selected
+            return get.finish.selected
         case sql.ReleasePhase.RELEASE:
             return routes_release.finished
 

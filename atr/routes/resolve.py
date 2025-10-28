@@ -21,11 +21,9 @@ import quart
 import werkzeug.wrappers.response as response
 
 import atr.forms as forms
-import atr.get.compose as compose
-import atr.get.vote as vote
+import atr.get as get
 import atr.models.sql as sql
 import atr.route as route
-import atr.routes.finish as finish
 import atr.storage as storage
 import atr.tabulate as tabulate
 import atr.template as template
@@ -115,9 +113,9 @@ async def manual_selected_post(
     async with storage.write_as_project_committee_member(project_name) as wacm:
         success_message = await wacm.vote.resolve_manually(project_name, release, vote_result)
     if vote_result == "passed":
-        destination = finish.selected
+        destination = get.finish.selected
     else:
-        destination = compose.selected
+        destination = get.compose.selected
 
     return await session.redirect(
         destination, project_name=project_name, version_name=version_name, success=success_message
@@ -135,7 +133,7 @@ async def submit_selected(
     if not (await resolve_form.validate_on_submit()):
         # TODO: Render the page again with errors
         return await session.redirect(
-            vote.selected,
+            get.vote.selected,
             project_name=project_name,
             version_name=version_name,
             error="Invalid form submission.",
@@ -155,11 +153,11 @@ async def submit_selected(
         await quart.flash(error_message, "error")
     if vote_result == "passed":
         if voting_round == 1:
-            destination = vote.selected
+            destination = get.vote.selected
         else:
-            destination = finish.selected
+            destination = get.finish.selected
     else:
-        destination = compose.selected
+        destination = get.compose.selected
 
     return await session.redirect(
         destination, project_name=project_name, version_name=version_name, success=success_message

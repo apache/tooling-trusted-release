@@ -17,14 +17,15 @@
 
 import werkzeug.wrappers.response as response
 
-import atr.route as route
+import atr.blueprints.get as get
 import atr.template as template
 import atr.util as util
+import atr.web as web
 
 
-@route.committer("/file/<project_name>/<version_name>/<path:file_path>")
+@get.committer("/file/<project_name>/<version_name>/<path:file_path>")
 async def selected_path(
-    session: route.CommitterSession, project_name: str, version_name: str, file_path: str
+    session: web.Committer, project_name: str, version_name: str, file_path: str
 ) -> response.Response | str:
     """View the content of a specific file in the release candidate draft."""
     # TODO: Make this independent of the release phase
