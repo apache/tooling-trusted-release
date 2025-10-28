@@ -49,7 +49,7 @@
           <!--
         <li>
           <i class="bi bi-collection"></i>
-          <a href="{{ as_url(routes.projects.projects) }}">Browse projects</a>
+          <a href="{{ as_url(get.projects.projects) }}">Browse projects</a>
         </li>
       -->
         {% endif %}
@@ -65,7 +65,7 @@
       {% if unfinished_releases %}
         {% for project_short_display_name, project_name, releases in unfinished_releases %}
           <h3>
-            <a href="{{ as_url(routes.projects.view, name=project_name) }}"
+            <a href="{{ as_url(get.projects.view, name=project_name) }}"
                class="text-decoration-none text-reset">{{ project_short_display_name }}</a>
           </h3>
           <ul>
@@ -105,7 +105,7 @@
       <ul>
         <li>
           <i class="bi bi-key"></i>
-          <a href="{{ as_url(routes.keys.keys) }}">Public keys</a>
+          <a href="{{ as_url(get.keys.keys) }}">Public keys</a>
         </li>
         <li>
           <i class="bi bi-key"></i>

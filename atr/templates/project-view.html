@@ -80,7 +80,7 @@
       <div class="card-body">
         {% if can_edit and policy_form %}
           <form method="post"
-                action="{{ as_url(routes.projects.view, name=project.name) }}"
+                action="{{ as_url(post.projects.view, name=project.name) }}"
                 class="atr-canary py-4 px-5"
                 novalidate>
             {{ policy_form.hidden_tag() if policy_form.hidden_tag }}
@@ -330,7 +330,7 @@
       <div class="card-body">
         {{ forms.errors_summary(metadata_form) }}
         <form method="post"
-              action="{{ as_url(routes.projects.view, name=project.name) }}"
+              action="{{ as_url(post.projects.view, name=project.name) }}"
               class="mb-3">
           {{ metadata_form.hidden_tag() if metadata_form.hidden_tag }}
           {{ metadata_form.project_name() }}
@@ -373,7 +373,7 @@
       <div class="card-body">
         {{ forms.errors_summary(metadata_form) }}
         <form method="post"
-              action="{{ as_url(routes.projects.view, name=project.name) }}"
+              action="{{ as_url(post.projects.view, name=project.name) }}"
               class="mb-3">
           {{ metadata_form.hidden_tag() if metadata_form.hidden_tag }}
           {{ metadata_form.project_name() }}
@@ -453,7 +453,7 @@
       <h2>Preview releases</h2>
       <div class="d-flex flex-wrap gap-2 mb-4">
         {% for preview in previews %}
-          <a href="{{ as_url(routes.preview.view, project_name=project.name, version_name=preview.version) }}"
+          <a href="{{ as_url(get.preview.view, project_name=project.name, version_name=preview.version) }}"
              class="btn btn-sm btn-outline-warning py-2 px-3"
              title="View preview {{ project.name }} {{ preview.version }}">
             {{ project.name }} {{ preview.version }}
@@ -494,7 +494,7 @@
       <h2>Actions</h2>
       <div class="my-3">
         <form method="post"
-              action="{{ as_url(routes.projects.delete) }}"
+              action="{{ as_url(post.projects.delete) }}"
               class="d-inline-block m-0"
               onsubmit="return confirm('Are you sure you want to delete the project \'{{ project.display_name }}\'? This cannot be undone.');">
           {{ empty_form.hidden_tag() }}
@@ -510,7 +510,7 @@
     {% endif %}
     {% if (is_committee_member or is_admin) %}
       <p>
-        <a href="{{ as_url(routes.projects.add_project, committee_name=project.committee.name) }}"
+        <a href="{{ as_url(get.projects.add_project, committee_name=project.committee.name) }}"
            class="btn btn-sm btn-outline-primary">Create a sibling project</a>
       </p>
     {% endif %}

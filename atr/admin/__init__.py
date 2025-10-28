@@ -40,6 +40,7 @@ import atr.datasources.apache as apache
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
+import atr.get as get
 import atr.ldap as ldap
 import atr.log as log
 import atr.models.sql as sql
@@ -291,29 +292,21 @@ async def data(session: web.Committer, model: str = "Committee") -> str:
 
 @admin.get("/delete-test-openpgp-keys")
 async def delete_test_openpgp_keys_get(session: web.Committer) -> quart.Response | response.Response:
-    return await _delete_test_openpgp_keys(session)
+    if not config.get().ALLOW_TESTS:
+        raise base.ASFQuartException("Test operations are disabled in this environment", errorcode=403)
+
+    delete_form = await DeleteTestKeysForm.create_form()
+    rendered_form = forms.render_simple(delete_form, action="")
+    return web.ElementResponse(rendered_form)
 
 
 @admin.post("/delete-test-openpgp-keys")
 async def delete_test_openpgp_keys_post(session: web.Committer) -> quart.Response | response.Response:
-    return await _delete_test_openpgp_keys(session)
-
-
-async def _delete_test_openpgp_keys(session: web.Committer) -> quart.Response | response.Response:
     """Delete all test user OpenPGP keys and their links."""
-    import atr.routes
-
     if not config.get().ALLOW_TESTS:
         raise base.ASFQuartException("Test operations are disabled in this environment", errorcode=403)
 
     test_uid = "test"
-
-    if quart.request.method != "POST":
-        delete_form = await DeleteTestKeysForm.create_form()
-        rendered_form = forms.render_simple(delete_form, action="")
-        return web.ElementResponse(rendered_form)
-
-    # This is a POST request
     delete_form = await DeleteTestKeysForm.create_form()
     if not await delete_form.validate_on_submit():
         raise base.ASFQuartException("Invalid form submission. Please check your input and try again.", errorcode=400)
@@ -323,7 +316,7 @@ async def _delete_test_openpgp_keys(session: web.Committer) -> quart.Response | 
         outcome = await wafc.keys.test_user_delete_all(test_uid)
         outcome.result_or_raise()
 
-    return await session.redirect(atr.routes.keys.keys)
+    return await session.redirect(get.keys.keys)
 
 
 @admin.get("/delete-committee-keys")

@@ -87,10 +87,10 @@
         </h2>
 
         <p class="mb-3">
-          <a href="{{ as_url(routes.projects.view, name=project.name) }}"
+          <a href="{{ as_url(get.projects.view, name=project.name) }}"
              class="text-decoration-none me-2">About this project</a>
           <span class="text-muted me-2">/</span>
-          <a href="{{ as_url(routes.projects.add_project, committee_name=project.committee.name) }}"
+          <a href="{{ as_url(get.projects.add_project, committee_name=project.committee.name) }}"
              class="text-decoration-none me-2">Create a sibling project</a>
           {% if completed_releases %}
             <span class="text-muted me-2">/</span>

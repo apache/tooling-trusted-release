@@ -78,7 +78,7 @@
 
 {% block content %}
   <p>
-    <a href="{{ as_url(routes.keys.keys) }}" class="atr-back-link">← Back to Manage keys</a>
+    <a href="{{ as_url(get.keys.keys) }}" class="atr-back-link">← Back to Manage keys</a>
   </p>
 
   <h1>Upload a KEYS file</h1>
@@ -241,7 +241,7 @@
 
     <div class="mt-4 col-md-9 offset-md-2">
       {{ form.submit(class_="btn btn-primary") }}
-      <a href="{{ as_url(routes.keys.keys) }}"
+      <a href="{{ as_url(get.keys.keys) }}"
          class="btn btn-link text-secondary">Cancel</a>
     </div>
   </form>

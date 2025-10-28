@@ -41,7 +41,7 @@
       {% endif %}
       <div class="col">
         <div class="card h-100 shadow-sm atr-cursor-pointer page-project-card {{ '' if project.status.value.lower() == 'active' else 'bg-body-secondary' }}"
-             data-project-url="{{ as_url(routes.projects.view, name=project.name) }}"
+             data-project-url="{{ as_url(get.projects.view, name=project.name) }}"
              data-is-participant="{{ 'true' if is_part else 'false' }}">
           <div class="card-body">
             <div class="row g-1">
@@ -80,7 +80,7 @@
             {% if project.created_by == current_user.uid %}
               <div class="mt-3">
                 <form method="post"
-                      action="{{ as_url(routes.projects.delete) }}"
+                      action="{{ as_url(post.projects.delete) }}"
                       class="d-inline-block m-0"
                       onsubmit="return confirm('Are you sure you want to delete the project \'{{ project.display_name }}\'? This cannot be undone.');">
                   {{ empty_form.hidden_tag() }}

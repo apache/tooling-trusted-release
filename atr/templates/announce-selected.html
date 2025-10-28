@@ -52,7 +52,7 @@
       </div>
       <!--
       <div>
-        <a title="Show files for {{ release.name }}" href="{{ as_url(routes.preview.view, project_name=release.project.name, version_name=release.version) }}" class="btn btn-sm btn-secondary">
+        <a title="Show files for {{ release.name }}" href="{{ as_url(get.preview.view, project_name=release.project.name, version_name=release.version) }}" class="btn btn-sm btn-secondary">
           <i class="bi bi-archive"></i>
           Show files
         </a>
@@ -182,7 +182,7 @@
               return;
           }
 
-          const previewUrl = "{{ as_url(routes.preview.announce_preview, project_name=release.project.name, version_name=release.version) }}";
+          const previewUrl = "{{ as_url(post.preview.announce_preview, project_name=release.project.name, version_name=release.version) }}";
           const csrfTokenInput = announceForm.querySelector('input[name="csrf_token"]');
 
           if (!previewUrl || !csrfTokenInput) {

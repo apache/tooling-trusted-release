@@ -120,7 +120,7 @@
   {% if key_count == 0 %}
     <div class="alert alert-warning">
       <p class="mb-0">
-        We have no SSH keys on file for you, so you cannot yet use this command. Please <a href="{{ as_url(routes.keys.ssh_add) }}">add your SSH key</a>.
+        We have no SSH keys on file for you, so you cannot yet use this command. Please <a href="{{ as_url(get.keys.ssh_add) }}">add your SSH key</a>.
       </p>
     </div>
   {% endif %}

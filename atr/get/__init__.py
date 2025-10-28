@@ -28,6 +28,9 @@ import atr.get.draft as draft
 import atr.get.file as file
 import atr.get.finish as finish
 import atr.get.ignores as ignores
+import atr.get.keys as keys
+import atr.get.preview as preview
+import atr.get.projects as projects
 import atr.get.vote as vote
 
 ROUTES_MODULE: Final[Literal[True]] = True
@@ -44,5 +47,8 @@ __all__ = [
     "file",
     "finish",
     "ignores",
+    "keys",
+    "preview",
+    "projects",
     "vote",
 ]

@@ -15,25 +15,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""preview.py"""
-
-import asfquart
 import quart
 import werkzeug.wrappers.response as response
 
+import atr.blueprints.post as post
 import atr.construct as construct
 import atr.forms as forms
 import atr.log as log
 import atr.models.sql as sql
-import atr.route as route
 import atr.routes.root as root
 import atr.storage as storage
-import atr.template as template
-import atr.util as util
 import atr.web as web
-
-if asfquart.APP is ...:
-    raise RuntimeError("APP is not set")
 
 
 class AnnouncePreviewForm(forms.Typed):
@@ -53,12 +45,13 @@ class DeleteForm(forms.Typed):
     submit = forms.submit("Delete preview")
 
 
-@route.committer("/preview/announce/<project_name>/<version_name>", methods=["POST"])
+@post.committer("/preview/announce/<project_name>/<version_name>")
 async def announce_preview(
-    session: route.CommitterSession, project_name: str, version_name: str
+    session: web.Committer, project_name: str, version_name: str
 ) -> quart.wrappers.response.Response | str:
     """Generate a preview of the announcement email body."""
 
+    # TODO: Where does this come from? A static template?
     form = await AnnouncePreviewForm.create_form(data=await quart.request.form)
     if not await form.validate_on_submit():
         error_message = "Invalid preview request"
@@ -84,9 +77,10 @@ async def announce_preview(
         return web.TextResponse(f"Error generating preview: {e!s}", status=500)
 
 
-@route.committer("/preview/delete", methods=["POST"])
-async def delete(session: route.CommitterSession) -> response.Response:
+@post.committer("/preview/delete")
+async def delete(session: web.Committer) -> response.Response:
     """Delete a preview and all its associated files."""
+    # TODO: Where does this come from? A static template?
     form = await DeleteForm.create_form(data=await quart.request.form)
 
     if not await form.validate_on_submit():
@@ -109,62 +103,3 @@ async def delete(session: route.CommitterSession) -> response.Response:
         )
 
     return await session.redirect(root.index, success="Preview deleted successfully")
-
-
-@route.committer("/preview/view/<project_name>/<version_name>")
-async def view(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
-    """View all the files in the rsync upload directory for a release."""
-    await session.check_access(project_name)
-
-    release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_PREVIEW)
-
-    # Convert async generator to list
-    # There must be a revision on a preview
-    file_stats = [
-        stat
-        async for stat in util.content_list(
-            util.get_unfinished_dir(), project_name, version_name, release.unwrap_revision_number
-        )
-    ]
-    # Sort the files by FileStat.path
-    file_stats.sort(key=lambda fs: fs.path)
-
-    return await template.render(
-        # TODO: Move to somewhere appropriate
-        "phase-view.html",
-        file_stats=file_stats,
-        release=release,
-        format_datetime=util.format_datetime,
-        format_file_size=util.format_file_size,
-        format_permissions=util.format_permissions,
-        phase="release preview",
-        phase_key="preview",
-    )
-
-
-@route.committer("/preview/view/<project_name>/<version_name>/<path:file_path>")
-async def view_path(
-    session: route.CommitterSession, project_name: str, version_name: str, file_path: str
-) -> response.Response | str:
-    """View the content of a specific file in the release preview."""
-    await session.check_access(project_name)
-
-    release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_PREVIEW)
-    _max_view_size = 1 * 1024 * 1024
-    full_path = util.release_directory(release) / file_path
-    content_listing = await util.archive_listing(full_path)
-    content, is_text, is_truncated, error_message = await util.read_file_for_viewer(full_path, _max_view_size)
-    return await template.render(
-        "file-selected-path.html",
-        release=release,
-        project_name=project_name,
-        version_name=version_name,
-        file_path=file_path,
-        content=content,
-        is_text=is_text,
-        is_truncated=is_truncated,
-        error_message=error_message,
-        format_file_size=util.format_file_size,
-        phase_key="preview",
-        content_listing=content_listing,
-    )

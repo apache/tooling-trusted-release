@@ -30,6 +30,8 @@ import atr.shared.distribution as distribution
 import atr.shared.draft as draft
 import atr.shared.finish as finish
 import atr.shared.ignores as ignores
+import atr.shared.keys as keys
+import atr.shared.projects as projects
 import atr.shared.vote as vote
 import atr.storage as storage
 import atr.template as template
@@ -182,5 +184,7 @@ __all__ = [
     "draft",
     "finish",
     "ignores",
+    "keys",
+    "projects",
     "vote",
 ]

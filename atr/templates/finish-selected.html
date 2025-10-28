@@ -75,7 +75,7 @@
           Download all files
         </a>
         <a title="Show files for {{ release.name }}"
-           href="{{ as_url(routes.preview.view, project_name=release.project.name, version_name=release.version) }}"
+           href="{{ as_url(get.preview.view, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-secondary me-2">
           <i class="bi bi-archive"></i>
           Show files

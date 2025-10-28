@@ -23,6 +23,9 @@ import atr.post.distribution as distribution
 import atr.post.draft as draft
 import atr.post.finish as finish
 import atr.post.ignores as ignores
+import atr.post.keys as keys
+import atr.post.preview as preview
+import atr.post.projects as projects
 import atr.post.vote as vote
 
 ROUTES_MODULE: Final[Literal[True]] = True
@@ -34,5 +37,8 @@ __all__ = [
     "draft",
     "finish",
     "ignores",
+    "keys",
+    "preview",
+    "projects",
     "vote",
 ]
