@@ -15,14 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import atr.routes.tokens as tokens
-import atr.routes.upload as upload
 import atr.routes.user as user
 import atr.routes.voting as voting
 
 __all__ = [
-    "tokens",
-    "upload",
     "user",
     "voting",
 ]

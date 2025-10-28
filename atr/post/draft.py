@@ -28,7 +28,7 @@ import quart
 import atr.blueprints.post as post
 import atr.construct as construct
 import atr.forms as forms
-import atr.get.compose as compose
+import atr.get as get
 import atr.log as log
 import atr.models.sql as sql
 import atr.shared as shared
@@ -105,7 +105,7 @@ async def delete_file(session: web.Committer, project_name: str, version_name: s
         for key, value in form.errors.items():
             error_summary.append(f"{key}: {value}")
         await quart.flash("; ".join(error_summary), "error")
-        return await session.redirect(compose.selected, project_name=project_name, version_name=version_name)
+        return await session.redirect(get.compose.selected, project_name=project_name, version_name=version_name)
 
     rel_path_to_delete = pathlib.Path(str(form.file_path.data))
 
@@ -116,7 +116,7 @@ async def delete_file(session: web.Committer, project_name: str, version_name: s
     except Exception as e:
         log.exception("Error deleting file:")
         await quart.flash(f"Error deleting file: {e!s}", "error")
-        return await session.redirect(compose.selected, project_name=project_name, version_name=version_name)
+        return await session.redirect(get.compose.selected, project_name=project_name, version_name=version_name)
 
     success_message = f"File '{rel_path_to_delete.name}' deleted successfully"
     if metadata_files_deleted:
@@ -125,7 +125,7 @@ async def delete_file(session: web.Committer, project_name: str, version_name: s
             f"file{'' if metadata_files_deleted == 1 else 's'} deleted"
         )
     return await session.redirect(
-        compose.selected, success=success_message, project_name=project_name, version_name=version_name
+        get.compose.selected, success=success_message, project_name=project_name, version_name=version_name
     )
 
 
@@ -148,7 +148,7 @@ async def fresh(session: web.Committer, project_name: str, version_name: str) ->
             pass
 
     return await session.redirect(
-        compose.selected,
+        get.compose.selected,
         project_name=project_name,
         version_name=version_name,
         success="All checks restarted",
@@ -178,10 +178,10 @@ async def hashgen(session: web.Committer, project_name: str, version_name: str, 
     except Exception as e:
         log.exception("Error generating hash file:")
         await quart.flash(f"Error generating hash file: {e!s}", "error")
-        return await session.redirect(compose.selected, project_name=project_name, version_name=version_name)
+        return await session.redirect(get.compose.selected, project_name=project_name, version_name=version_name)
 
     return await session.redirect(
-        compose.selected,
+        get.compose.selected,
         success=f"{hash_type} file generated successfully",
         project_name=project_name,
         version_name=version_name,
@@ -235,10 +235,10 @@ async def sbomgen(session: web.Committer, project_name: str, version_name: str, 
     except Exception as e:
         log.exception("Error generating SBOM:")
         await quart.flash(f"Error generating SBOM: {e!s}", "error")
-        return await session.redirect(compose.selected, project_name=project_name, version_name=version_name)
+        return await session.redirect(get.compose.selected, project_name=project_name, version_name=version_name)
 
     return await session.redirect(
-        compose.selected,
+        get.compose.selected,
         success=f"SBOM generation task queued for {rel_path.name}",
         project_name=project_name,
         version_name=version_name,
@@ -248,17 +248,16 @@ async def sbomgen(session: web.Committer, project_name: str, version_name: str, 
 @post.committer("/draft/svnload/<project_name>/<version_name>")
 async def svnload(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
     """Import files from SVN into a draft."""
-    import atr.routes.upload as upload
 
     await session.check_access(project_name)
 
-    form = await upload.SvnImportForm.create_form()
+    form = await shared.upload.SvnImportForm.create_form()
     if not await form.validate_on_submit():
         for _field, errors in form.errors.items():
             for error in errors:
                 await quart.flash(f"{error}", "error")
         return await session.redirect(
-            upload.selected,
+            get.upload.selected,
             project_name=project_name,
             version_name=version_name,
         )
@@ -277,14 +276,14 @@ async def svnload(session: web.Committer, project_name: str, version_name: str) 
     except Exception:
         log.exception("Error queueing SVN import task:")
         return await session.redirect(
-            upload.selected,
+            get.upload.selected,
             error="Error queueing SVN import task",
             project_name=project_name,
             version_name=version_name,
         )
 
     return await session.redirect(
-        compose.selected,
+        get.compose.selected,
         success="SVN import task queued successfully",
         project_name=project_name,
         version_name=version_name,

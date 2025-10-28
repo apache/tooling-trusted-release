@@ -30,6 +30,8 @@ import atr.post.resolve as resolve
 import atr.post.revisions as revisions
 import atr.post.sbom as sbom
 import atr.post.start as start
+import atr.post.tokens as tokens
+import atr.post.upload as upload
 import atr.post.vote as vote
 
 ROUTES_MODULE: Final[Literal[True]] = True
@@ -48,5 +50,7 @@ __all__ = [
     "revisions",
     "sbom",
     "start",
+    "tokens",
+    "upload",
     "vote",
 ]

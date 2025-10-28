@@ -25,9 +25,9 @@ import atr.db as db
 import atr.forms as forms
 import atr.get.compose as compose
 import atr.log as log
-import atr.route as route
 import atr.storage as storage
 import atr.template as template
+import atr.web as web
 
 
 class AddFilesForm(forms.Typed):
@@ -61,8 +61,7 @@ class SvnImportForm(forms.Typed):
     submit = forms.submit("Queue SVN import task")
 
 
-@route.committer("/upload/<project_name>/<version_name>", methods=["GET", "POST"])
-async def selected(session: route.CommitterSession, project_name: str, version_name: str) -> response.Response | str:
+async def selected(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
     """Show a page to allow the user to add files to a candidate draft."""
     await session.check_access(project_name)
 

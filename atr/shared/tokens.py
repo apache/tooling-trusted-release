@@ -35,7 +35,7 @@ import atr.htm as htm
 import atr.jwtoken as jwtoken
 import atr.log as log
 import atr.models.sql as sql
-import atr.route as route
+import atr.post as post
 import atr.storage as storage
 import atr.template as templates
 import atr.util as util
@@ -61,16 +61,7 @@ class IssueJWTForm(forms.Typed):
     submit = forms.submit("Generate JWT")
 
 
-@route.committer("/tokens/jwt", methods=["POST"])
-async def jwt_post(session: route.CommitterSession) -> quart.Response:
-    await util.validate_empty_form()
-
-    jwt_token = jwtoken.issue(session.uid)
-    return web.TextResponse(jwt_token)
-
-
-@route.committer("/tokens", methods=["GET", "POST"])
-async def tokens(session: route.CommitterSession) -> str | response.Response:
+async def tokens(session: web.Committer) -> str | response.Response:
     request_form = await quart.request.form
 
     if is_post := quart.request.method == "POST":
@@ -177,7 +168,7 @@ def _build_delete_form_element(token_id: int | None) -> markupsafe.Markup:
 
 
 def _build_issue_jwt_form_element(j_form: IssueJWTForm) -> markupsafe.Markup:
-    elem = htm.form("#issue-jwt-form", method="post", action=util.as_url(jwt_post))[
+    elem = htm.form("#issue-jwt-form", method="post", action=util.as_url(post.tokens.jwt_post))[
         _as_markup(j_form.csrf_token),
         j_form.submit(class_="btn btn-primary"),
     ]
@@ -238,9 +229,7 @@ async def _delete_token(data: db.Session, uid: str, token_id: int) -> None:
         await data.delete(pat)
 
 
-async def _handle_post(
-    session: route.CommitterSession, request_form: datastructures.MultiDict
-) -> response.Response | None:
+async def _handle_post(session: web.Committer, request_form: datastructures.MultiDict) -> response.Response | None:
     if "token_id" in request_form:
         return await _handle_delete_token_post(session, request_form)
 
@@ -251,7 +240,7 @@ async def _handle_post(
 
 
 async def _handle_add_token_post(
-    session: route.CommitterSession, request_form: datastructures.MultiDict
+    session: web.Committer, request_form: datastructures.MultiDict
 ) -> response.Response | None:
     add_form = await AddTokenForm.create_form(data=request_form)
     if await add_form.validate_on_submit():
@@ -272,7 +261,7 @@ async def _handle_add_token_post(
 
 
 async def _handle_delete_token_post(
-    session: route.CommitterSession, request_form: datastructures.MultiDict
+    session: web.Committer, request_form: datastructures.MultiDict
 ) -> response.Response | None:
     del_form = await DeleteTokenForm.create_form(data=request_form)
     if await del_form.validate_on_submit():
@@ -286,7 +275,7 @@ async def _handle_delete_token_post(
 
 
 async def _handle_issue_jwt_post(
-    session: route.CommitterSession, request_form: datastructures.MultiDict
+    session: web.Committer, request_form: datastructures.MultiDict
 ) -> response.Response | None:
     issue_form = await IssueJWTForm.create_form(data=request_form)
     if await issue_form.validate_on_submit():
