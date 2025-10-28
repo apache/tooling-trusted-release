@@ -25,7 +25,7 @@
         {% if (phase == "release_candidate_draft") and revision_time %}
           <p>
             <strong>Revision:</strong>
-            <a href="{{ as_url(routes.revisions.selected, project_name=project_name, version_name=version_name) }}#{{ revision_number }}">
+            <a href="{{ as_url(get.revisions.selected, project_name=project_name, version_name=version_name) }}#{{ revision_number }}">
               {{ format_datetime(revision_time) }}
             </a>
             {% if revision_editor %}by {{ revision_editor }}{% endif %}
@@ -54,7 +54,7 @@
             links
           {% endif %}
         </a>
-        <a href="{{ as_url(routes.revisions.selected, project_name=release.project.name, version_name=release.version) }}"
+        <a href="{{ as_url(get.revisions.selected, project_name=release.project.name, version_name=release.version) }}"
            title="View revision history"
            class="btn btn-secondary"><i class="bi bi-clock-history me-1"></i> Revisions</a>
         {% if revision_number %}
@@ -78,10 +78,10 @@
         <a href="{{ as_url(get.candidate.view, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-secondary"><i class="bi bi-eye me-1"></i> View files</a>
         {% if can_resolve and release.vote_manual %}
-          <a href="{{ as_url(routes.resolve.manual_selected, project_name=release.project.name, version_name=release.version) }}"
+          <a href="{{ as_url(get.resolve.manual_selected, project_name=release.project.name, version_name=release.version) }}"
              class="btn btn-success"><i class="bi bi-clipboard-check me-1"></i> Resolve vote</a>
         {% elif can_resolve and hidden_form %}
-          <form action="{{ as_url(routes.resolve.tabulated_selected_post, project_name=release.project.name, version_name=release.version) }}"
+          <form action="{{ as_url(post.resolve.tabulated_selected_post, project_name=release.project.name, version_name=release.version) }}"
                 method="post"
                 class="mb-0">
             {{ hidden_form.hidden_tag() }}

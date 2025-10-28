@@ -70,13 +70,13 @@
                    class="btn btn-sm btn-outline-secondary">Show SBOM</a>
               {% endif %}
               {% if has_errors %}
-                <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                <a href="{{ as_url(get.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                    class="btn btn-sm btn-outline-danger"><i class="bi bi-exclamation-triangle me-1"></i> Show {{ info.errors[path]|length }} {{ "error" if info.errors[path]|length == 1 else "errors" }}</a>
               {% elif has_warnings %}
-                <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                <a href="{{ as_url(get.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                    class="btn btn-sm btn-outline-warning">Show {{ info.warnings[path]|length }} {{ "warning" if info.warnings[path]|length == 1 else "warnings" }}</a>
               {% elif info and (path in info.successes) %}
-                <a href="{{ as_url(routes.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
+                <a href="{{ as_url(get.report.selected_path, project_name=project_name, version_name=version_name, rel_path=path) }}"
                    class="btn btn-sm btn-outline-success"
                    title="Show report for {{ path }}">Show report</a>
               {% else %}

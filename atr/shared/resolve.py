@@ -15,34 +15,34 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Final, Literal
 
-import atr.post.announce as announce
-import atr.post.candidate as candidate
-import atr.post.distribution as distribution
-import atr.post.draft as draft
-import atr.post.finish as finish
-import atr.post.ignores as ignores
-import atr.post.keys as keys
-import atr.post.preview as preview
-import atr.post.projects as projects
-import atr.post.resolve as resolve
-import atr.post.revisions as revisions
-import atr.post.vote as vote
+import atr.forms as forms
 
-ROUTES_MODULE: Final[Literal[True]] = True
 
-__all__ = [
-    "announce",
-    "candidate",
-    "distribution",
-    "draft",
-    "finish",
-    "ignores",
-    "keys",
-    "preview",
-    "projects",
-    "resolve",
-    "revisions",
-    "vote",
-]
+class ResolveVoteForm(forms.Typed):
+    """Form for resolving a vote."""
+
+    email_body = forms.textarea("Email body", optional=True, rows=24)
+    vote_result = forms.radio(
+        "Vote result",
+        choices=[
+            ("passed", "Passed"),
+            ("failed", "Failed"),
+        ],
+    )
+    submit = forms.submit("Resolve vote")
+
+
+class ResolveVoteManualForm(forms.Typed):
+    """Form for resolving a vote manually."""
+
+    vote_result = forms.radio(
+        "Vote result",
+        choices=[
+            ("passed", "Passed"),
+            ("failed", "Failed"),
+        ],
+    )
+    vote_thread_url = forms.string("Vote thread URL")
+    vote_result_url = forms.string("Vote result URL")
+    submit = forms.submit("Resolve vote")

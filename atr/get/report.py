@@ -21,16 +21,17 @@ import pathlib
 import aiofiles.os
 import asfquart.base as base
 
+import atr.blueprints.get as get
 import atr.forms as forms
 import atr.models.sql as sql
-import atr.route as route
 import atr.storage as storage
 import atr.template as template
 import atr.util as util
+import atr.web as web
 
 
-@route.committer("/report/<project_name>/<version_name>/<path:rel_path>")
-async def selected_path(session: route.CommitterSession, project_name: str, version_name: str, rel_path: str) -> str:
+@get.committer("/report/<project_name>/<version_name>/<path:rel_path>")
+async def selected_path(session: web.Committer, project_name: str, version_name: str, rel_path: str) -> str:
     """Show the report for a specific file."""
     await session.check_access(project_name)
 

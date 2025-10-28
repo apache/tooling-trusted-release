@@ -20,10 +20,11 @@ import asfquart.base as base
 import quart
 import werkzeug.wrappers.response as response
 
+import atr.blueprints.post as post
 import atr.forms as forms
 import atr.get as get
 import atr.models.sql as sql
-import atr.route as route
+import atr.shared as shared
 import atr.storage as storage
 import atr.tabulate as tabulate
 import atr.template as template
@@ -31,61 +32,8 @@ import atr.util as util
 import atr.web as web
 
 
-class ResolveVoteForm(forms.Typed):
-    """Form for resolving a vote."""
-
-    email_body = forms.textarea("Email body", optional=True, rows=24)
-    vote_result = forms.radio(
-        "Vote result",
-        choices=[
-            ("passed", "Passed"),
-            ("failed", "Failed"),
-        ],
-    )
-    submit = forms.submit("Resolve vote")
-
-
-class ResolveVoteManualForm(forms.Typed):
-    """Form for resolving a vote manually."""
-
-    vote_result = forms.radio(
-        "Vote result",
-        choices=[
-            ("passed", "Passed"),
-            ("failed", "Failed"),
-        ],
-    )
-    vote_thread_url = forms.string("Vote thread URL")
-    vote_result_url = forms.string("Vote result URL")
-    submit = forms.submit("Resolve vote")
-
-
-@route.committer("/resolve/manual/<project_name>/<version_name>")
-async def manual_selected(session: route.CommitterSession, project_name: str, version_name: str) -> str:
-    """Get the manual vote resolution page."""
-    await session.check_access(project_name)
-
-    release = await session.release(
-        project_name,
-        version_name,
-        phase=sql.ReleasePhase.RELEASE_CANDIDATE,
-        with_release_policy=True,
-        with_project_release_policy=True,
-    )
-    if not release.vote_manual:
-        raise RuntimeError("This page is for manual votes only")
-    resolve_form = await ResolveVoteManualForm.create_form()
-    return await template.render(
-        "resolve-manual.html",
-        release=release,
-        resolve_form=resolve_form,
-    )
-
-
-@route.committer("/resolve/manual/<project_name>/<version_name>", methods=["POST"])
-async def manual_selected_post(
-    session: route.CommitterSession, project_name: str, version_name: str
-) -> response.Response | str:
+@post.committer("/resolve/manual/<project_name>/<version_name>")
+async def manual_selected_post(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
     """Post the manual vote resolution page."""
     await session.check_access(project_name)
     release = await session.release(
@@ -97,10 +45,10 @@ async def manual_selected_post(
     )
     if not release.vote_manual:
         raise RuntimeError("This page is for manual votes only")
-    resolve_form = await ResolveVoteManualForm.create_form()
+    resolve_form = await shared.resolve.ResolveVoteManualForm.create_form()
     if not (await resolve_form.validate_on_submit()):
         return await session.redirect(
-            manual_selected,
+            get.resolve.manual_selected,
             project_name=project_name,
             version_name=version_name,
             error="Invalid form submission.",
@@ -122,14 +70,12 @@ async def manual_selected_post(
     )
 
 
-@route.committer("/resolve/submit/<project_name>/<version_name>", methods=["POST"])
-async def submit_selected(
-    session: route.CommitterSession, project_name: str, version_name: str
-) -> response.Response | str:
+@post.committer("/resolve/submit/<project_name>/<version_name>")
+async def submit_selected(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
     """Resolve a vote."""
     await session.check_access(project_name)
 
-    resolve_form = await ResolveVoteForm.create_form()
+    resolve_form = await shared.resolve.ResolveVoteForm.create_form()
     if not (await resolve_form.validate_on_submit()):
         # TODO: Render the page again with errors
         return await session.redirect(
@@ -164,8 +110,8 @@ async def submit_selected(
     )
 
 
-@route.committer("/resolve/tabulated/<project_name>/<version_name>", methods=["POST"])
-async def tabulated_selected_post(session: route.CommitterSession, project_name: str, version_name: str) -> str:
+@post.committer("/resolve/tabulated/<project_name>/<version_name>")
+async def tabulated_selected_post(session: web.Committer, project_name: str, version_name: str) -> str:
     """Tabulate votes."""
     await session.check_access(project_name)
     asf_uid = session.uid
@@ -207,7 +153,7 @@ async def tabulated_selected_post(session: route.CommitterSession, project_name:
                 details = await tabulate.vote_details(committee, thread_id, release)
         else:
             fetch_error = "The vote thread could not yet be found."
-    resolve_form = await ResolveVoteForm.create_form()
+    resolve_form = await shared.resolve.ResolveVoteForm.create_form()
     if (committee is None) or (details is None) or (thread_id is None):
         resolve_form.email_body.render_kw = {"rows": 12}
     else:

@@ -15,9 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import atr.routes.report as report
-import atr.routes.resolve as resolve
-import atr.routes.revisions as revisions
 import atr.routes.root as root
 import atr.routes.sbom as sbom
 import atr.routes.start as start
@@ -27,9 +24,6 @@ import atr.routes.user as user
 import atr.routes.voting as voting
 
 __all__ = [
-    "report",
-    "resolve",
-    "revisions",
     "root",
     "sbom",
     "start",

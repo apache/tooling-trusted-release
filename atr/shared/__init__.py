@@ -32,6 +32,7 @@ import atr.shared.finish as finish
 import atr.shared.ignores as ignores
 import atr.shared.keys as keys
 import atr.shared.projects as projects
+import atr.shared.resolve as resolve
 import atr.shared.vote as vote
 import atr.storage as storage
 import atr.template as template
@@ -186,5 +187,6 @@ __all__ = [
     "ignores",
     "keys",
     "projects",
+    "resolve",
     "vote",
 ]
