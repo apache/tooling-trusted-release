@@ -31,6 +31,7 @@ import wtforms.fields.core as core
 
 import atr.db as db
 import atr.forms as forms
+import atr.get as get
 import atr.htm as htm
 import atr.jwtoken as jwtoken
 import atr.log as log
@@ -255,7 +256,7 @@ async def _handle_add_token_post(
             htm.p(".mb-0")["Copy it now as you will not be able to see it again."],
         ]
         await quart.flash(_as_markup(success_msg), "success")
-        return await session.redirect(tokens)
+        return await session.redirect(get.tokens.tokens)
 
     return None
 
@@ -268,7 +269,7 @@ async def _handle_delete_token_post(
         token_id_val = int(str(del_form.token_id.data))
         await _delete_token(session.uid, token_id_val)
         await quart.flash("Token deleted successfully", "success")
-        return await session.redirect(tokens)
+        return await session.redirect(get.tokens.tokens)
 
     await quart.flash("Invalid delete request", "error")
     return None
@@ -288,6 +289,6 @@ async def _handle_issue_jwt_post(
             htm.p[htm.code(".bg-light.border.rounded.px-1.atr-word-wrap")[jwt_token],],
         ]
         await quart.flash(_as_markup(success_msg), "success")
-        return await session.redirect(tokens)
+        return await session.redirect(get.tokens.tokens)
 
     return None

@@ -120,7 +120,7 @@ async def selected(
         if wants_json:
             return quart.jsonify(ok=ok, message=msg), http_status
         await quart.flash(msg, "success" if ok else "error")
-        return await session.redirect(selected, project_name=project_name, version_name=version_name)
+        return await session.redirect(get.finish.selected, project_name=project_name, version_name=version_name)
 
     async with db.session() as data:
         release = await data.release(

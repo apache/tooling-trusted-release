@@ -23,7 +23,7 @@ import werkzeug.wrappers.response as response
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
-import atr.get.compose as compose
+import atr.get as get
 import atr.models.sql as sql
 import atr.storage as storage
 import atr.template as template
@@ -65,7 +65,7 @@ async def selected(session: web.Committer, project_name: str) -> response.Respon
                 new_release, _project = await wacp.release.start(project_name, version)
             # Redirect to the new draft's overview page on success
             return await session.redirect(
-                compose.selected,
+                get.compose.selected,
                 project_name=project.name,
                 version_name=new_release.version,
                 success="Release candidate draft created successfully",

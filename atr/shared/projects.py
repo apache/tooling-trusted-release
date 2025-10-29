@@ -28,6 +28,7 @@ import quart
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
+import atr.get as get
 import atr.log as log
 import atr.models.policy as policy
 import atr.models.sql as sql
@@ -271,7 +272,7 @@ async def view(session: web.Committer, name: str) -> response.Response | str:
         if "submit_metadata" in form_data:
             edited_metadata, metadata_form = await _metadata_edit(session, project, form_data)
             if edited_metadata is True:
-                return quart.redirect(util.as_url(view, name=project.name))
+                return quart.redirect(util.as_url(get.projects.view, name=project.name))
         elif "submit_policy" in form_data:
             policy_form = await ReleasePolicyForm.create_form(data=form_data)
             if await policy_form.validate_on_submit():
@@ -281,8 +282,10 @@ async def view(session: web.Committer, name: str) -> response.Response | str:
                     try:
                         await wacm.policy.edit(project, policy_data)
                     except storage.AccessError as e:
-                        return await session.redirect(view, name=project.name, error=f"Error editing policy: {e}")
-                    return quart.redirect(util.as_url(view, name=project.name))
+                        return await session.redirect(
+                            get.projects.view, name=project.name, error=f"Error editing policy: {e}"
+                        )
+                    return quart.redirect(util.as_url(get.projects.view, name=project.name))
             else:
                 log.info(f"policy_form.errors: {policy_form.errors}")
         else:
@@ -450,7 +453,7 @@ async def _policy_form_create(project: sql.Project) -> ReleasePolicyForm:
 async def _project_add(form: AddForm, session: web.Committer) -> response.Response:
     form_values = await _project_add_validate(form)
     if form_values is None:
-        return quart.redirect(util.as_url(add_project, committee_name=form.committee_name.data))
+        return quart.redirect(util.as_url(get.projects.add_project, committee_name=form.committee_name.data))
     committee_name, display_name, label = form_values
 
     async with storage.write(session) as write:
@@ -459,9 +462,9 @@ async def _project_add(form: AddForm, session: web.Committer) -> response.Respon
             await wacm.project.create(committee_name, display_name, label)
         except storage.AccessError as e:
             await quart.flash(f"Error adding project: {e}", "error")
-            return quart.redirect(util.as_url(add_project, committee_name=committee_name))
+            return quart.redirect(util.as_url(get.projects.add_project, committee_name=committee_name))
 
-    return quart.redirect(util.as_url(view, name=label))
+    return quart.redirect(util.as_url(get.projects.view, name=label))
 
 
 async def _project_add_validate(form: AddForm) -> tuple[str, str, str] | None:

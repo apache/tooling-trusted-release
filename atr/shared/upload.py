@@ -23,7 +23,7 @@ import wtforms
 
 import atr.db as db
 import atr.forms as forms
-import atr.get.compose as compose
+import atr.get as get
 import atr.log as log
 import atr.storage as storage
 import atr.template as template
@@ -77,7 +77,7 @@ async def selected(session: web.Committer, project_name: str, version_name: str)
                 wacp = await write.as_project_committee_participant(project_name)
                 number_of_files = await wacp.release.upload_files(project_name, version_name, file_name, file_data)
             return await session.redirect(
-                compose.selected,
+                get.compose.selected,
                 success=f"{number_of_files} file{'' if number_of_files == 1 else 's'} added successfully",
                 project_name=project_name,
                 version_name=version_name,
