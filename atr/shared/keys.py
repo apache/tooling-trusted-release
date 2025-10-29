@@ -80,8 +80,9 @@ class UpdateCommitteeKeysForm(forms.Typed):
 
 
 class UpdateKeyCommitteesForm(forms.Typed):
-    selected_committees = forms.multiple(
+    selected_committees = forms.checkboxes(
         "Associated PMCs",
+        optional=True,
         description="Select the committees associated with this key.",
     )
     submit = forms.submit("Update associations")
@@ -193,12 +194,14 @@ async def details(session: web.Committer, fingerprint: str) -> str | response.Re
     """Display details for a specific OpenPGP key."""
     fingerprint = fingerprint.lower()
     user_committees = []
+    current_committee_names = []
     async with db.session() as data:
         key, is_owner = await _key_and_is_owner(data, session, fingerprint)
         form = None
         if is_owner:
             project_list = session.committees + session.projects
             user_committees = await data.committee(name_in=project_list).all()
+            current_committee_names = [c.name for c in key.committees]
     if is_owner:
         committee_choices: forms.Choices = [(c.name, c.display_name or c.name) for c in user_committees]
 
@@ -207,6 +210,8 @@ async def details(session: web.Committer, fingerprint: str) -> str | response.Re
             data=await quart.request.form if (quart.request.method == "POST") else None
         )
         forms.choices(form.selected_committees, committee_choices)
+        if quart.request.method == "GET":
+            form.selected_committees.data = current_committee_names
 
     if form and await form.validate_on_submit():
         async with db.session() as data:
@@ -232,7 +237,7 @@ async def details(session: web.Committer, fingerprint: str) -> str | response.Re
                         await wacm.keys.autogenerate_keys_file()
 
             await quart.flash("Key committee associations updated successfully.", "success")
-            return await session.redirect(details, fingerprint=fingerprint)
+            return await session.redirect(get.keys.details, fingerprint=fingerprint)
 
     if isinstance(key.ascii_armored_key, bytes):
         key.ascii_armored_key = key.ascii_armored_key.decode("utf-8", errors="replace")
@@ -297,7 +302,7 @@ async def upload(session: web.Committer) -> str:
             option_widget=wtforms.widgets.RadioInput(),
             widget=wtforms.widgets.ListWidget(prefix_label=False),
             validators=[wtforms.validators.InputRequired("You must select at least one committee")],
-            description=("Select the committee with which to associate these keys."),
+            description="Select the committee with which to associate these keys.",
         )
 
     form = await UploadKeyForm.create_form()
