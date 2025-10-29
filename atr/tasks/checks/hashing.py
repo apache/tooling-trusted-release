@@ -59,8 +59,15 @@ async def check(args: checks.FunctionArguments) -> results.Results | None:
         async with aiofiles.open(hash_abs_path) as f:
             expected_hash = await f.read()
         # May be in the format "HASH FILENAME\n"
-        # TODO: Check the FILENAME part
-        expected_hash = expected_hash.strip().split()[0]
+        artifact_name = artifact_abs_path.name
+        if expected_hash.startswith(artifact_name):
+            # Fineract use the format "FILENAME: HASH HASH\n   HASH HASH\n..."
+            expected_hash = expected_hash.removeprefix(artifact_name + ":")
+            expected_hash = expected_hash.replace(" ", "").replace("\n", "")
+        else:
+            # TODO: Check the FILENAME part
+            expected_hash = expected_hash.strip().split()[0]
+        expected_hash = expected_hash.lower()
 
         if secrets.compare_digest(computed_hash, expected_hash):
             await recorder.success(
