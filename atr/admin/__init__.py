@@ -242,8 +242,16 @@ Paired correctly:
 
 
 @admin.get("/data")
+async def data(session: web.Committer) -> str:
+    return await _data(session, "Committee")
+
+
 @admin.get("/data/<model>")
-async def data(session: web.Committer, model: str = "Committee") -> str:
+async def data_model(session: web.Committer, model: str = "Committee") -> str:
+    return await _data(session, model)
+
+
+async def _data(session: web.Committer, model: str = "Committee") -> str:
     """Browse all records in the database."""
     async with db.session() as data:
         # Map of model names to their classes
