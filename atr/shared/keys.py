@@ -297,10 +297,7 @@ async def upload(session: web.Committer) -> str:
             option_widget=wtforms.widgets.RadioInput(),
             widget=wtforms.widgets.ListWidget(prefix_label=False),
             validators=[wtforms.validators.InputRequired("You must select at least one committee")],
-            description=(
-                "Select the committee with which to associate these keys."
-                " You must be a member of the selected committee."
-            ),
+            description=("Select the committee with which to associate these keys."),
         )
 
     form = await UploadKeyForm.create_form()
@@ -350,8 +347,8 @@ async def upload(session: web.Committer) -> str:
             return await render(error="You must select at least one committee")
 
         async with storage.write() as write:
-            wacm = write.as_committee_member(selected_committee)
-            outcomes = await wacm.keys.ensure_associated(keys_text)
+            wacp = write.as_committee_participant(selected_committee)
+            outcomes = await wacp.keys.ensure_associated(keys_text)
         results = outcomes
         success_count = outcomes.result_count
         error_count = outcomes.error_count
