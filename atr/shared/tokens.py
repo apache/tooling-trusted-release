@@ -145,7 +145,7 @@ def _as_markup(fragment: Fragment) -> markupsafe.Markup:
 
 
 def _build_add_form_element(a_form: AddTokenForm) -> markupsafe.Markup:
-    elem = htm.form(method="post", action=util.as_url(tokens))[
+    elem = htm.form(method="post", action=util.as_url(post.tokens.tokens))[
         _as_markup(a_form.csrf_token),
         htm.div(".mb-3")[
             a_form.label.label,
@@ -159,7 +159,7 @@ def _build_add_form_element(a_form: AddTokenForm) -> markupsafe.Markup:
 def _build_delete_form_element(token_id: int | None) -> markupsafe.Markup:
     d_form = DeleteTokenForm()
     d_form.token_id.data = "" if token_id is None else str(token_id)
-    elem = htm.form(".mb-0", method="post", action=util.as_url(tokens))[
+    elem = htm.form(".mb-0", method="post", action=util.as_url(post.tokens.tokens))[
         _as_markup(d_form.csrf_token),
         _as_markup(d_form.token_id),
         d_form.submit(class_="btn btn-sm btn-danger"),
