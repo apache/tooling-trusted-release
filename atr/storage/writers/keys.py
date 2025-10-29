@@ -250,12 +250,14 @@ class FoundationCommitter(GeneralPublic):
             .on_conflict_do_nothing(index_elements=["fingerprint"])
             .returning(via(sql.PublicSigningKey.fingerprint))
         )
+        await self.__data.commit()
+
         if key_insert_result.one_or_none() is None:
-            # raise storage.AccessError(f"Key not inserted: {key.key_model.fingerprint}")
-            pass
+            log.info(f"Key {key.key_model.fingerprint} already exists in database")
+            return outcome.Result(types.Key(status=types.KeyStatus.PARSED, key_model=key.key_model))
+
         log.info(f"Inserted key {key.key_model.fingerprint}")
 
-        await self.__data.commit()
         # TODO: PARSED now acts as "ALREADY_ADDED"
         return outcome.Result(types.Key(status=types.KeyStatus.INSERTED, key_model=key.key_model))
 

@@ -788,10 +788,20 @@ def test_openpgp_01_upload(page: sync_api.Page, credentials: Credentials) -> Non
     wait_for_path(page, "/keys/add")
 
     logging.info("Checking for success flash message on /keys/add page")
-    flash_message_locator = page.locator("div.flash-success")
-    sync_api.expect(flash_message_locator).to_be_visible()
-    sync_api.expect(flash_message_locator).to_contain_text(f"OpenPGP key {key_fingerprint_upper} added successfully.")
-    logging.info("OpenPGP key upload successful message shown")
+    try:
+        flash_message_locator = page.locator("div.flash-success")
+        sync_api.expect(flash_message_locator).to_be_visible()
+        sync_api.expect(flash_message_locator).to_contain_text(
+            f"OpenPGP key {key_fingerprint_upper} added successfully."
+        )
+        logging.info("OpenPGP key upload successful message shown")
+    except AssertionError:
+        flash_message_locator = page.locator("div.flash-warning")
+        sync_api.expect(flash_message_locator).to_be_visible()
+        sync_api.expect(flash_message_locator).to_contain_text(
+            f"OpenPGP key {key_fingerprint_upper} was already in the database."
+        )
+        logging.info("OpenPGP key already in database message shown")
 
     logging.info("Navigating back to /keys to verify key presence")
     go_to_path(page, "/keys")

@@ -32,6 +32,7 @@ import wtforms
 import atr.db as db
 import atr.forms as forms
 import atr.get as get
+import atr.htm as htm
 import atr.log as log
 import atr.models.sql as sql
 import atr.shared as shared
@@ -168,7 +169,17 @@ async def add(session: web.Committer) -> str:
                     )
                     oc.result_or_raise()
 
-                await quart.flash(f"OpenPGP key {key.key_model.fingerprint.upper()} added successfully.", "success")
+                fingerprint_upper = key.key_model.fingerprint.upper()
+                if key.status == types.KeyStatus.PARSED:
+                    details_url = util.as_url(get.keys.details, fingerprint=key.key_model.fingerprint)
+                    p = htm.p[
+                        f"OpenPGP key {fingerprint_upper} was already in the database. ",
+                        htm.a(href=details_url)["View key details"],
+                        ".",
+                    ]
+                    await quart.flash(str(p), "warning")
+                else:
+                    await quart.flash(f"OpenPGP key {fingerprint_upper} added successfully.", "success")
             # Clear form data on success by creating a new empty form instance
             form = await AddOpenPGPKeyForm.create_form()
             forms.choices(form.selected_committees, committee_choices)
