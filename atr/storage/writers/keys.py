@@ -542,14 +542,16 @@ class CommitteeParticipant(FoundationCommitter):
 
         key_values = [key.key_model.model_dump(exclude={"committees"}) for key in key_list]
         if key_values:
+            stmt = sqlite.insert(sql.PublicSigningKey).values(key_values)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["fingerprint"],
+                set_={"apache_uid": stmt.excluded.apache_uid},
+            )
             key_insert_result = await self.__data.execute(
-                sqlite.insert(sql.PublicSigningKey)
-                .values(key_values)
-                .on_conflict_do_nothing(index_elements=["fingerprint"])
-                .returning(via(sql.PublicSigningKey.fingerprint))
+                stmt.returning(via(sql.PublicSigningKey.fingerprint)),
             )
             key_inserts = {row.fingerprint for row in key_insert_result}
-            log.info(f"Inserted {len(key_inserts)} keys")
+            log.info(f"Inserted or updated {len(key_inserts)} keys")
         else:
             # TODO: Warn the user about any keys that were already inserted
             key_inserts = set()
