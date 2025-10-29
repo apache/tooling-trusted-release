@@ -54,34 +54,21 @@ RUN apk update && \
       rsync \
       subversion
 
-# Create a non-root user, handling UID/GID 1000 conflicts gracefully
-RUN if getent group 1000 >/dev/null 2>&1; then \
-        addgroup appuser; \
-    else \
-        addgroup -g 1000 appuser; \
-    fi && \
-    if getent passwd 1000 >/dev/null 2>&1; then \
-        adduser -G appuser -s /bin/bash -D appuser; \
-    else \
-        adduser -u 1000 -G appuser -s /bin/bash -D appuser; \
-    fi
-
-# Create and set ownership of application directory
-RUN mkdir -p /opt/atr && chown -R appuser:appuser /opt/atr
-
 WORKDIR /opt/atr
 
 # copy app and wheels from builder
-COPY --from=builder --chown=appuser:appuser /opt/atr/.venv ./.venv
-COPY --from=builder --chown=appuser:appuser /opt/atr/atr ./atr
-COPY --from=builder --chown=appuser:appuser /opt/atr/migrations ./migrations
-COPY --from=builder --chown=appuser:appuser /opt/atr/patches ./patches
-COPY --from=builder --chown=appuser:appuser /opt/atr/scripts ./scripts
-COPY --from=builder --chown=appuser:appuser /opt/atr/Makefile .
-COPY --from=builder --chown=appuser:appuser /opt/atr/alembic.ini .
-COPY --from=builder --chown=appuser:appuser /opt/atr/start-atr.sh .
+COPY --from=builder /opt/atr/.venv ./.venv
+COPY --from=builder /opt/atr/atr ./atr
+COPY --from=builder /opt/atr/migrations ./migrations
+COPY --from=builder /opt/atr/patches ./patches
+COPY --from=builder /opt/atr/scripts ./scripts
+COPY --from=builder /opt/atr/Makefile .
+COPY --from=builder /opt/atr/alembic.ini .
+COPY --from=builder /opt/atr/start-atr.sh .
 
-# install additional tools (as root)
+RUN chmod +x ./start-atr.sh
+
+# install additional tools
 ENV RAT_VERSION=0.17
 
 RUN mkdir -p /opt/tools
@@ -107,15 +94,11 @@ RUN GOPATH=/usr/local go install github.com/interlynk-io/sbomqs@v1.1.0
 
 ENV CDXCLI_VERSION=0.29.1
 # TODO: Check hash
-RUN curl -L https://github.com/CycloneDX/cyclonedx-cli/releases/download/v${CDXCLI_VERSION}/cyclonedx-linux-musl-x64 \
-    -o /usr/local/bin/cyclonedx && chmod +x /usr/local/bin/cyclonedx
-
-# Switch to non-root user
-USER appuser
-
-WORKDIR /opt/atr
-RUN chmod +x ./start-atr.sh
+RUN curl -L https://github.com/CycloneDX/cyclonedx-cli/releases/download/v{CDXCLI_VERSION}/cyclonedx-linux-musl-x64 \
+    -o /usr/local/bin/cyclonedx
 
 EXPOSE 4443
+
+WORKDIR /opt/atr
 
 CMD ["./start-atr.sh"]
