@@ -1018,7 +1018,17 @@ async def _create_hard_link_clone_checks(
 
     # Create destination directory
     if do_not_create_dest_dir is False:
-        await aiofiles.os.makedirs(dest_dir, exist_ok=exist_ok)
+        try:
+            await aiofiles.os.makedirs(dest_dir, exist_ok=exist_ok)
+        except FileExistsError:
+            log.error(
+                f"Arguments to __create_hard_link_clone_checks: "
+                f"source_dir={source_dir}, "
+                f"dest_dir={dest_dir}, "
+                f"do_not_create_dest_dir={do_not_create_dest_dir}, "
+                f"exist_ok={exist_ok}"
+            )
+            raise
 
 
 def _generate_hexdump(data: bytes) -> str:
