@@ -239,7 +239,13 @@ async def create_hard_link_clone(
                     await _clone_recursive(source_entry_path, dest_entry_path)
                 elif entry.is_file():
                     if not dry_run:
-                        await aiofiles.os.link(source_entry_path, dest_entry_path)
+                        try:
+                            await aiofiles.os.link(source_entry_path, dest_entry_path)
+                        except FileExistsError:
+                            if not exist_ok:
+                                raise
+                            await aiofiles.os.remove(dest_entry_path)
+                            await aiofiles.os.link(source_entry_path, dest_entry_path)
                     elif dry_run and (await aiofiles.os.path.exists(dest_entry_path)):
                         raise ValueError(f"Destination path exists: {dest_entry_path}")
                 # Ignore other types like symlinks for now
