@@ -100,5 +100,6 @@ sync-all:
 	uv sync --all-groups
 
 update-deps:
+	pre-commit autoupdate || :
 	uv lock --upgrade
 	uv sync --all-groups
