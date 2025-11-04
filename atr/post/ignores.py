@@ -17,7 +17,6 @@
 
 
 import quart
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.post as post
 import atr.get as get
@@ -28,7 +27,7 @@ import atr.web as web
 
 
 @post.committer("/ignores/<committee_name>/add")
-async def ignores_committee_add(session: web.Committer, committee_name: str) -> str | response.Response:
+async def ignores_committee_add(session: web.Committer, committee_name: str) -> str | web.WerkzeugResponse:
     data = await quart.request.form
     form = await shared.ignores.AddIgnoreForm.create_form(data=data)
     if not (await form.validate_on_submit()):
@@ -56,7 +55,7 @@ async def ignores_committee_add(session: web.Committer, committee_name: str) -> 
 
 
 @post.committer("/ignores/<committee_name>/delete")
-async def ignores_committee_delete(session: web.Committer, committee_name: str) -> str | response.Response:
+async def ignores_committee_delete(session: web.Committer, committee_name: str) -> str | web.WerkzeugResponse:
     data = await quart.request.form
     form = await shared.ignores.DeleteIgnoreForm.create_form(data=data)
     if not (await form.validate_on_submit()):
@@ -86,7 +85,7 @@ async def ignores_committee_delete(session: web.Committer, committee_name: str) 
 
 
 @post.committer("/ignores/<committee_name>/update")
-async def ignores_committee_update(session: web.Committer, committee_name: str) -> str | response.Response:
+async def ignores_committee_update(session: web.Committer, committee_name: str) -> str | web.WerkzeugResponse:
     data = await quart.request.form
     form = await shared.ignores.UpdateIgnoreForm.create_form(data=data)
     if not (await form.validate_on_submit()):

@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.get as get
 import atr.models.sql as sql
@@ -25,7 +24,7 @@ import atr.web as web
 
 
 @get.committer("/preview/view/<project_name>/<version_name>")
-async def view(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
+async def view(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse | str:
     """View all the files in the rsync upload directory for a release."""
     await session.check_access(project_name)
 
@@ -58,7 +57,7 @@ async def view(session: web.Committer, project_name: str, version_name: str) -> 
 @get.committer("/preview/view/<project_name>/<version_name>/<path:file_path>")
 async def view_path(
     session: web.Committer, project_name: str, version_name: str, file_path: str
-) -> response.Response | str:
+) -> web.WerkzeugResponse | str:
     """View the content of a specific file in the release preview."""
     await session.check_access(project_name)
 

@@ -154,7 +154,7 @@ async def checks_ongoing(
     ongoing_tasks_count, _latest_revision = await interaction.tasks_ongoing_revision(project, version, revision)
     # TODO: Is there a way to return just an int?
     # The ResponseReturnValue type in quart does not allow int
-    # And if we use quart.jsonify, we must return quart.Response which quart_schema tries to validate
+    # And if we use quart.jsonify, we must return web.QuartResponse which quart_schema tries to validate
     # ResponseValue = Union[
     #     "Response",
     #     "WerkzeugResponse",

@@ -16,9 +16,6 @@
 # under the License.
 
 
-import quart.wrappers.response as quart_response
-import werkzeug.wrappers.response as response
-
 import atr.blueprints.get as get
 import atr.shared as shared
 import atr.web as web
@@ -27,6 +24,6 @@ import atr.web as web
 @get.committer("/finish/<project_name>/<version_name>")
 async def selected(
     session: web.Committer, project_name: str, version_name: str
-) -> tuple[quart_response.Response, int] | response.Response | str:
+) -> tuple[web.QuartResponse, int] | web.WerkzeugResponse | str:
     """Finish a release preview."""
     return await shared.finish.selected(session, project_name, version_name)

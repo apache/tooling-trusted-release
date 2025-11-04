@@ -19,7 +19,6 @@
 import aioshutil
 import asfquart.base as base
 import quart
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.post as post
 import atr.db as db
@@ -31,7 +30,7 @@ import atr.web as web
 
 
 @post.committer("/revisions/<project_name>/<version_name>")
-async def selected_post(session: web.Committer, project_name: str, version_name: str) -> response.Response:
+async def selected_post(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse:
     """Set a specific revision as the latest for a candidate draft or release preview."""
     await session.check_access(project_name)
 

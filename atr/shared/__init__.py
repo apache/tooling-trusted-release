@@ -17,7 +17,6 @@
 
 from typing import TYPE_CHECKING, Final
 
-import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
@@ -84,7 +83,7 @@ async def check(
     vote_task: sql.Task | None = None,
     can_vote: bool = False,
     can_resolve: bool = False,
-) -> response.Response | str:
+) -> web.WerkzeugResponse | str:
     base_path = util.release_directory(release)
 
     # TODO: This takes 180ms for providers

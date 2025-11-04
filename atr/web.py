@@ -40,6 +40,10 @@ if TYPE_CHECKING:
 
 R = TypeVar("R", covariant=True)
 
+type WerkzeugResponse = response.Response
+type QuartResponse = quart.Response
+type Response = WerkzeugResponse | QuartResponse
+
 
 class CommitterRouteFunction(Protocol[R]):
     """Protocol for @committer_get decorated functions."""
@@ -108,7 +112,7 @@ class Committer:
 
     async def redirect(
         self, route: CommitterRouteFunction[R], success: str | None = None, error: str | None = None, **kwargs: Any
-    ) -> response.Response:
+    ) -> WerkzeugResponse:
         """Redirect to a route with a success or error message."""
         return await redirect(route, success, error, **kwargs)
 
@@ -239,7 +243,7 @@ class ZipResponse(quart.Response):
 
 async def redirect[R](
     route: RouteFunction[R], success: str | None = None, error: str | None = None, **kwargs: Any
-) -> response.Response:
+) -> WerkzeugResponse:
     """Redirect to a route with a success or error message."""
     if success is not None:
         await quart.flash(success, "success")

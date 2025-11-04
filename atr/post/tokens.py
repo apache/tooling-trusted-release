@@ -16,9 +16,6 @@
 # under the License.
 
 
-import quart
-import werkzeug.wrappers.response as response
-
 import atr.blueprints.post as post
 import atr.jwtoken as jwtoken
 import atr.shared as shared
@@ -27,7 +24,7 @@ import atr.web as web
 
 
 @post.committer("/tokens/jwt")
-async def jwt_post(session: web.Committer) -> quart.Response:
+async def jwt_post(session: web.Committer) -> web.QuartResponse:
     await util.validate_empty_form()
 
     jwt_token = jwtoken.issue(session.uid)
@@ -35,5 +32,5 @@ async def jwt_post(session: web.Committer) -> quart.Response:
 
 
 @post.committer("/tokens")
-async def tokens(session: web.Committer) -> str | response.Response:
+async def tokens(session: web.Committer) -> str | web.WerkzeugResponse:
     return await shared.tokens.tokens(session)

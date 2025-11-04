@@ -22,7 +22,6 @@ import aiofiles
 import aiofiles.os
 import asfquart.base as base
 import quart
-import werkzeug.wrappers.response as response
 import zipstream
 
 import atr.blueprints.get as get
@@ -37,7 +36,7 @@ import atr.web as web
 
 
 @get.committer("/download/all/<project_name>/<version_name>")
-async def all_selected(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
+async def all_selected(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse | str:
     """Display download commands for a release."""
     import atr.get.root as root
 
@@ -64,25 +63,19 @@ async def all_selected(session: web.Committer, project_name: str, version_name: 
 
 
 @get.public("/download/path/<project_name>/<version_name>/<path:file_path>")
-async def path(
-    session: web.Committer | None, project_name: str, version_name: str, file_path: str
-) -> response.Response | quart.Response:
+async def path(session: web.Committer | None, project_name: str, version_name: str, file_path: str) -> web.Response:
     """Download a file or list a directory from a release in any phase."""
     return await _download_or_list(project_name, version_name, file_path)
 
 
 @get.public("/download/path/<project_name>/<version_name>/")
-async def path_empty(
-    session: web.Committer | None, project_name: str, version_name: str
-) -> response.Response | quart.Response:
+async def path_empty(session: web.Committer | None, project_name: str, version_name: str) -> web.Response:
     """List files at the root of a release directory for download."""
     return await _download_or_list(project_name, version_name, ".")
 
 
 @get.public("/download/sh/<project_name>/<version_name>")
-async def sh_selected(
-    session: web.Committer | None, project_name: str, version_name: str
-) -> response.Response | quart.Response:
+async def sh_selected(session: web.Committer | None, project_name: str, version_name: str) -> web.Response:
     """Shell script to download a release."""
     conf = config.get()
     app_host = conf.APP_HOST
@@ -97,9 +90,7 @@ async def sh_selected(
 
 
 @get.public("/download/urls/<project_name>/<version_name>")
-async def urls_selected(
-    session: web.Committer | None, project_name: str, version_name: str
-) -> response.Response | quart.Response:
+async def urls_selected(session: web.Committer | None, project_name: str, version_name: str) -> web.Response:
     try:
         async with db.session() as data:
             release = await data.release(project_name=project_name, version=version_name).demand(
@@ -114,9 +105,7 @@ async def urls_selected(
 
 
 @get.committer("/download/zip/<project_name>/<version_name>")
-async def zip_selected(
-    session: web.Committer, project_name: str, version_name: str
-) -> response.Response | quart.wrappers.response.Response:
+async def zip_selected(session: web.Committer, project_name: str, version_name: str) -> web.Response:
     try:
         release = await session.release(project_name=project_name, version_name=version_name, phase=None)
     except ValueError as e:
@@ -146,7 +135,7 @@ async def zip_selected(
     return web.ZipResponse(stream_zip(files_to_zip), headers=headers)
 
 
-async def _download_or_list(project_name: str, version_name: str, file_path: str) -> response.Response | quart.Response:
+async def _download_or_list(project_name: str, version_name: str, file_path: str) -> web.Response:
     """Download a file or list a directory from a release in any phase."""
     import atr.get.root as root
 
@@ -200,7 +189,7 @@ async def _generate_file_url_list(release: sql.Release) -> str:
 
 async def _list(
     original_path: pathlib.Path, full_path: pathlib.Path, project_name: str, version_name: str, file_path: str
-) -> response.Response | quart.Response:
+) -> web.Response:
     # Build a list of files in the directory
     files: list[pathlib.Path] = []
     for file in await aiofiles.os.listdir(full_path):

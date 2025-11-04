@@ -17,12 +17,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import quart
-
-if TYPE_CHECKING:
-    import werkzeug.wrappers.response as response
 
 # TODO: Improve upon the routes_release pattern
 import atr.blueprints.post as post
@@ -39,7 +34,7 @@ class AnnounceError(Exception):
 
 
 @post.committer("/announce/<project_name>/<version_name>")
-async def selected(session: web.Committer, project_name: str, version_name: str) -> str | response.Response:
+async def selected(session: web.Committer, project_name: str, version_name: str) -> str | web.WerkzeugResponse:
     """Handle the announcement form submission and promote the preview to release."""
     import atr.get as get
 

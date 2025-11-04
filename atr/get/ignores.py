@@ -18,7 +18,6 @@
 from typing import Final
 
 import markupsafe
-import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.blueprints.get as get
@@ -51,7 +50,7 @@ document.querySelectorAll("table.page-details input.form-control").forEach(funct
 
 
 @get.committer("/ignores/<committee_name>")
-async def ignores(session: web.Committer, committee_name: str) -> str | response.Response:
+async def ignores(session: web.Committer, committee_name: str) -> str | web.WerkzeugResponse:
     async with storage.read() as read:
         ragp = read.as_general_public()
         ignores = await ragp.checks.ignores(committee_name)

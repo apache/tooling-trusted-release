@@ -16,14 +16,12 @@
 # under the License.
 
 
-import werkzeug.wrappers.response as response
-
 import atr.blueprints.get as get
 import atr.shared as shared
 import atr.web as web
 
 
 @get.committer("/start/<project_name>")
-async def selected(session: web.Committer, project_name: str) -> response.Response | str:
+async def selected(session: web.Committer, project_name: str) -> web.WerkzeugResponse | str:
     """Allow the user to start a new release draft, or handle its submission."""
     return await shared.start.selected(session, project_name)

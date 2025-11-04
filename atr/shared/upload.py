@@ -18,7 +18,6 @@
 import pathlib
 
 import quart
-import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
@@ -61,7 +60,7 @@ class SvnImportForm(forms.Typed):
     submit = forms.submit("Queue SVN import task")
 
 
-async def selected(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
+async def selected(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse | str:
     """Show a page to allow the user to add files to a candidate draft."""
     await session.check_access(project_name)
 

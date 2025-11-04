@@ -19,7 +19,6 @@ import ast
 import pathlib
 
 import quart
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.get as get
 import atr.config as config
@@ -31,7 +30,7 @@ import atr.web as web
 
 
 @get.public("/ref/<path:ref_path>")
-async def resolve(session: web.Committer | None, ref_path: str) -> response.Response:
+async def resolve(session: web.Committer | None, ref_path: str) -> web.WerkzeugResponse:
     project_root = pathlib.Path(config.get().PROJECT_ROOT)
 
     if ":" in ref_path:

@@ -17,8 +17,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import quart
 
 import atr.blueprints.post as post
@@ -28,17 +26,14 @@ import atr.storage as storage
 import atr.util as util
 import atr.web as web
 
-if TYPE_CHECKING:
-    import werkzeug.wrappers.response as response
-
 
 @post.committer("/project/add/<committee_name>")
-async def add_project(session: web.Committer, committee_name: str) -> response.Response | str:
+async def add_project(session: web.Committer, committee_name: str) -> web.WerkzeugResponse | str:
     return await shared.projects.add_project(session, committee_name)
 
 
 @post.committer("/project/delete")
-async def delete(session: web.Committer) -> response.Response:
+async def delete(session: web.Committer) -> web.WerkzeugResponse:
     """Delete a project created by the user."""
     # TODO: This is not truly empty, so make a form object for this
     await util.validate_empty_form()
@@ -60,5 +55,5 @@ async def delete(session: web.Committer) -> response.Response:
 
 
 @post.committer("/projects/<name>")
-async def view(session: web.Committer, name: str) -> response.Response | str:
+async def view(session: web.Committer, name: str) -> web.WerkzeugResponse | str:
     return await shared.projects.view(session, name)

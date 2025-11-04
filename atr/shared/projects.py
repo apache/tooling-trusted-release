@@ -20,7 +20,7 @@ from __future__ import annotations
 import datetime
 import http.client
 import re
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import asfquart.base as base
 import quart
@@ -39,9 +39,6 @@ import atr.template as template
 import atr.user as user
 import atr.util as util
 import atr.web as web
-
-if TYPE_CHECKING:
-    import werkzeug.wrappers.response as response
 
 
 class AddForm(forms.Typed):
@@ -229,7 +226,7 @@ class ReleasePolicyForm(forms.Typed):
         return not self.errors
 
 
-async def add_project(session: web.Committer, committee_name: str) -> response.Response | str:
+async def add_project(session: web.Committer, committee_name: str) -> web.WerkzeugResponse | str:
     await session.check_access_committee(committee_name)
 
     async with db.session() as data:
@@ -253,7 +250,7 @@ You must start with your committee label, and you must use lower case.
     return await template.render("project-add-project.html", form=form, committee_name=committee.display_name)
 
 
-async def view(session: web.Committer, name: str) -> response.Response | str:
+async def view(session: web.Committer, name: str) -> web.WerkzeugResponse | str:
     policy_form = None
     metadata_form = None
     can_edit = False
@@ -450,7 +447,7 @@ async def _policy_form_create(project: sql.Project) -> ReleasePolicyForm:
     return policy_form
 
 
-async def _project_add(form: AddForm, session: web.Committer) -> response.Response:
+async def _project_add(form: AddForm, session: web.Committer) -> web.WerkzeugResponse:
     form_values = await _project_add_validate(form)
     if form_values is None:
         return quart.redirect(util.as_url(get.projects.add_project, committee_name=form.committee_name.data))

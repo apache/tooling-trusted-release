@@ -26,7 +26,6 @@ import asfquart as asfquart
 import asfquart.base as base
 import quart
 import werkzeug.datastructures as datastructures
-import werkzeug.wrappers.response as response
 import wtforms
 
 import atr.db as db
@@ -201,7 +200,7 @@ async def add(session: web.Committer) -> str:
     )
 
 
-async def details(session: web.Committer, fingerprint: str) -> str | response.Response:
+async def details(session: web.Committer, fingerprint: str) -> str | web.WerkzeugResponse:
     """Display details for a specific OpenPGP key."""
     fingerprint = fingerprint.lower()
     user_committees = []
@@ -263,7 +262,7 @@ async def details(session: web.Committer, fingerprint: str) -> str | response.Re
     )
 
 
-async def ssh_add(session: web.Committer) -> response.Response | str:
+async def ssh_add(session: web.Committer) -> web.WerkzeugResponse | str:
     """Add a new SSH key to the user's account."""
     # TODO: Make an auth.require wrapper that gives the session automatically
     # And the form if it's a POST handler? Might be hard to type

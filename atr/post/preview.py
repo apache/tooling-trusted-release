@@ -16,7 +16,6 @@
 # under the License.
 
 import quart
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.post as post
 import atr.construct as construct
@@ -45,9 +44,7 @@ class DeleteForm(forms.Typed):
 
 
 @post.committer("/preview/announce/<project_name>/<version_name>")
-async def announce_preview(
-    session: web.Committer, project_name: str, version_name: str
-) -> quart.wrappers.response.Response | str:
+async def announce_preview(session: web.Committer, project_name: str, version_name: str) -> web.QuartResponse | str:
     """Generate a preview of the announcement email body."""
 
     # TODO: Where does this come from? A static template?
@@ -77,7 +74,7 @@ async def announce_preview(
 
 
 @post.committer("/preview/delete")
-async def delete(session: web.Committer) -> response.Response:
+async def delete(session: web.Committer) -> web.WerkzeugResponse:
     """Delete a preview and all its associated files."""
     import atr.get.root as root
 

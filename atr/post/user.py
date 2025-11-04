@@ -17,7 +17,6 @@
 
 
 import quart
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.post as post
 import atr.get as get
@@ -27,7 +26,7 @@ import atr.web as web
 
 
 @post.committer("/user/cache")
-async def session_post(session: web.Committer) -> response.Response:
+async def session_post(session: web.Committer) -> web.WerkzeugResponse:
     form_data = await quart.request.form
 
     cache_form = await shared.user.CacheForm.create_form(data=form_data)

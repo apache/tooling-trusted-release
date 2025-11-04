@@ -16,13 +16,11 @@
 # under the License.
 
 
-import werkzeug.wrappers.response as response
-
 import atr.blueprints.get as get
 import atr.shared as shared
 import atr.web as web
 
 
 @get.committer("/tokens")
-async def tokens(session: web.Committer) -> str | response.Response:
+async def tokens(session: web.Committer) -> str | web.WerkzeugResponse:
     return await shared.tokens.tokens(session)

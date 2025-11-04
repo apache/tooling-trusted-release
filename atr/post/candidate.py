@@ -15,14 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import werkzeug.wrappers.response as response
-
 import atr.blueprints.post as post
 import atr.web as web
 
 
 @post.committer("/candidate/delete")
-async def delete(session: web.Committer) -> response.Response:
+async def delete(session: web.Committer) -> web.WerkzeugResponse:
     """Delete a release candidate."""
     import atr.get as get
 

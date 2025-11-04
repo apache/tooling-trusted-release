@@ -16,8 +16,6 @@
 # under the License.
 
 
-import werkzeug.wrappers.response as response
-
 import atr.blueprints.post as post
 import atr.shared as shared
 import atr.web as web
@@ -26,6 +24,6 @@ import atr.web as web
 @post.committer("/voting/<project_name>/<version_name>/<revision>")
 async def selected_revision(
     session: web.Committer, project_name: str, version_name: str, revision: str
-) -> response.Response | str:
+) -> web.WerkzeugResponse | str:
     """Show the vote initiation form for a release."""
     return await shared.voting.selected_revision(session, project_name, version_name, revision)

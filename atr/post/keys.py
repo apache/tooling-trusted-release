@@ -18,7 +18,6 @@
 
 import asfquart as asfquart
 import quart
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.post as post
 import atr.get as get
@@ -38,7 +37,7 @@ async def add(session: web.Committer) -> str:
 
 
 @post.committer("/keys/delete")
-async def delete(session: web.Committer) -> response.Response:
+async def delete(session: web.Committer) -> web.WerkzeugResponse:
     """Delete a public signing key or SSH key from the user's account."""
     form = await shared.keys.DeleteKeyForm.create_form(data=await quart.request.form)
 
@@ -70,13 +69,15 @@ async def delete(session: web.Committer) -> response.Response:
 
 
 @post.committer("/keys/details/<fingerprint>")
-async def details(session: web.Committer, fingerprint: str) -> str | response.Response:
+async def details(session: web.Committer, fingerprint: str) -> str | web.WerkzeugResponse:
     """Display details for a specific OpenPGP key."""
     return await shared.keys.details(session, fingerprint)
 
 
 @post.committer("/keys/import/<project_name>/<version_name>")
-async def import_selected_revision(session: web.Committer, project_name: str, version_name: str) -> response.Response:
+async def import_selected_revision(
+    session: web.Committer, project_name: str, version_name: str
+) -> web.WerkzeugResponse:
     await util.validate_empty_form()
 
     async with storage.write() as write:
@@ -95,13 +96,13 @@ async def import_selected_revision(session: web.Committer, project_name: str, ve
 
 
 @post.committer("/keys/ssh/add")
-async def ssh_add(session: web.Committer) -> response.Response | str:
+async def ssh_add(session: web.Committer) -> web.WerkzeugResponse | str:
     """Add a new SSH key to the user's account."""
     return await shared.keys.ssh_add(session)
 
 
 @post.committer("/keys/update-committee-keys/<committee_name>")
-async def update_committee_keys(session: web.Committer, committee_name: str) -> response.Response:
+async def update_committee_keys(session: web.Committer, committee_name: str) -> web.WerkzeugResponse:
     """Generate and save the KEYS file for a specific committee."""
     form = await shared.keys.UpdateCommitteeKeysForm.create_form()
     if not await form.validate_on_submit():

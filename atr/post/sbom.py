@@ -18,7 +18,6 @@
 from __future__ import annotations
 
 import pathlib
-from typing import TYPE_CHECKING
 
 import asfquart.base as base
 import quart
@@ -31,12 +30,9 @@ import atr.storage as storage
 import atr.util as util
 import atr.web as web
 
-if TYPE_CHECKING:
-    import werkzeug.wrappers.response as response
-
 
 @post.committer("/sbom/augment/<project_name>/<version_name>/<path:file_path>")
-async def augment(session: web.Committer, project_name: str, version_name: str, file_path: str) -> response.Response:
+async def augment(session: web.Committer, project_name: str, version_name: str, file_path: str) -> web.WerkzeugResponse:
     """Augment a CycloneDX SBOM file."""
     await session.check_access(project_name)
 
@@ -79,7 +75,7 @@ async def augment(session: web.Committer, project_name: str, version_name: str, 
 
 
 @post.committer("/sbom/scan/<project_name>/<version_name>/<path:file_path>")
-async def scan(session: web.Committer, project_name: str, version_name: str, file_path: str) -> response.Response:
+async def scan(session: web.Committer, project_name: str, version_name: str, file_path: str) -> web.WerkzeugResponse:
     """Scan a CycloneDX SBOM file for vulnerabilities using OSV."""
     await session.check_access(project_name)
 

@@ -19,7 +19,6 @@ import datetime
 
 import asfquart as asfquart
 import quart
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.get as get
 import atr.db as db
@@ -37,7 +36,7 @@ async def add(session: web.Committer) -> str:
 
 
 @get.committer("/keys/details/<fingerprint>")
-async def details(session: web.Committer, fingerprint: str) -> str | response.Response:
+async def details(session: web.Committer, fingerprint: str) -> str | web.WerkzeugResponse:
     """Display details for a specific OpenPGP key."""
     return await shared.keys.details(session, fingerprint)
 
@@ -88,7 +87,7 @@ async def keys(session: web.Committer) -> str:
 
 
 @get.committer("/keys/ssh/add")
-async def ssh_add(session: web.Committer) -> response.Response | str:
+async def ssh_add(session: web.Committer) -> web.WerkzeugResponse | str:
     """Add a new SSH key to the user's account."""
     return await shared.keys.ssh_add(session)
 

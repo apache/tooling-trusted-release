@@ -26,7 +26,6 @@ import markupsafe
 import quart
 import sqlmodel
 import werkzeug.datastructures as datastructures
-import werkzeug.wrappers.response as response
 import wtforms.fields.core as core
 
 import atr.db as db
@@ -62,7 +61,7 @@ class IssueJWTForm(forms.Typed):
     submit = forms.submit("Generate JWT")
 
 
-async def tokens(session: web.Committer) -> str | response.Response:
+async def tokens(session: web.Committer) -> str | web.WerkzeugResponse:
     request_form = await quart.request.form
 
     if is_post := quart.request.method == "POST":
@@ -230,7 +229,7 @@ async def _delete_token(data: db.Session, uid: str, token_id: int) -> None:
         await data.delete(pat)
 
 
-async def _handle_post(session: web.Committer, request_form: datastructures.MultiDict) -> response.Response | None:
+async def _handle_post(session: web.Committer, request_form: datastructures.MultiDict) -> web.WerkzeugResponse | None:
     if "token_id" in request_form:
         return await _handle_delete_token_post(session, request_form)
 
@@ -242,7 +241,7 @@ async def _handle_post(session: web.Committer, request_form: datastructures.Mult
 
 async def _handle_add_token_post(
     session: web.Committer, request_form: datastructures.MultiDict
-) -> response.Response | None:
+) -> web.WerkzeugResponse | None:
     add_form = await AddTokenForm.create_form(data=request_form)
     if await add_form.validate_on_submit():
         label_val = str(add_form.label.data) if add_form.label.data else None
@@ -263,7 +262,7 @@ async def _handle_add_token_post(
 
 async def _handle_delete_token_post(
     session: web.Committer, request_form: datastructures.MultiDict
-) -> response.Response | None:
+) -> web.WerkzeugResponse | None:
     del_form = await DeleteTokenForm.create_form(data=request_form)
     if await del_form.validate_on_submit():
         token_id_val = int(str(del_form.token_id.data))
@@ -277,7 +276,7 @@ async def _handle_delete_token_post(
 
 async def _handle_issue_jwt_post(
     session: web.Committer, request_form: datastructures.MultiDict
-) -> response.Response | None:
+) -> web.WerkzeugResponse | None:
     issue_form = await IssueJWTForm.create_form(data=request_form)
     if await issue_form.validate_on_submit():
         jwt_token = jwtoken.issue(session.uid)

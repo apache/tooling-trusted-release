@@ -17,7 +17,6 @@
 
 
 import quart
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.post as post
 import atr.db.interaction as interaction
@@ -33,7 +32,9 @@ import atr.web as web
 
 
 @post.committer("/resolve/manual/<project_name>/<version_name>")
-async def manual_selected_post(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
+async def manual_selected_post(
+    session: web.Committer, project_name: str, version_name: str
+) -> web.WerkzeugResponse | str:
     """Post the manual vote resolution page."""
     await session.check_access(project_name)
     release = await session.release(
@@ -71,7 +72,7 @@ async def manual_selected_post(session: web.Committer, project_name: str, versio
 
 
 @post.committer("/resolve/submit/<project_name>/<version_name>")
-async def submit_selected(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
+async def submit_selected(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse | str:
     """Resolve a vote."""
     await session.check_access(project_name)
 

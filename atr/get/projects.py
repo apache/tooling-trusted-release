@@ -17,8 +17,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import atr.blueprints.get as get
 import atr.config as config
 import atr.db as db
@@ -28,12 +26,9 @@ import atr.shared as shared
 import atr.template as template
 import atr.web as web
 
-if TYPE_CHECKING:
-    import werkzeug.wrappers.response as response
-
 
 @get.committer("/project/add/<committee_name>")
-async def add_project(session: web.Committer, committee_name: str) -> response.Response | str:
+async def add_project(session: web.Committer, committee_name: str) -> web.WerkzeugResponse | str:
     return await shared.projects.add_project(session, committee_name)
 
 
@@ -72,5 +67,5 @@ async def select(session: web.Committer) -> str:
 
 
 @get.committer("/projects/<name>")
-async def view(session: web.Committer, name: str) -> response.Response | str:
+async def view(session: web.Committer, name: str) -> web.WerkzeugResponse | str:
     return await shared.projects.view(session, name)

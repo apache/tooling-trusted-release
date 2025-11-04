@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import datetime
 import pathlib
-from typing import TYPE_CHECKING
 
 import aiofiles.os
 import asfquart.base as base
@@ -29,9 +28,6 @@ import atr.forms as forms
 import atr.template as template
 import atr.util as util
 import atr.web as web
-
-if TYPE_CHECKING:
-    import werkzeug.wrappers.response as response
 
 
 @get.committer("/draft/tools/<project_name>/<version_name>/<path:file_path>")
@@ -71,7 +67,7 @@ async def tools(session: web.Committer, project_name: str, version_name: str, fi
 # TODO: Should we deprecate this and ensure compose covers it all?
 # If we did that, we'd lose the exhaustive use of the abstraction
 @get.committer("/draft/view/<project_name>/<version_name>")
-async def view(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
+async def view(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse | str:
     """View all the files in the rsync upload directory for a release."""
     await session.check_access(project_name)
 

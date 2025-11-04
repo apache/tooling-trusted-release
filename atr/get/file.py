@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.get as get
 import atr.template as template
@@ -26,7 +25,7 @@ import atr.web as web
 @get.committer("/file/<project_name>/<version_name>/<path:file_path>")
 async def selected_path(
     session: web.Committer, project_name: str, version_name: str, file_path: str
-) -> response.Response | str:
+) -> web.WerkzeugResponse | str:
     """View the content of a specific file in the release candidate draft."""
     # TODO: Make this independent of the release phase
     await session.check_access(project_name)

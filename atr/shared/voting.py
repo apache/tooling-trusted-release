@@ -20,7 +20,6 @@ import aiofiles.os
 import asfquart.base as base
 import quart
 import quart_wtf.typing as typing
-import werkzeug.wrappers.response as response
 
 import atr.construct as construct
 import atr.db as db
@@ -56,7 +55,7 @@ class VoteInitiateForm(forms.Typed):
 
 async def selected_revision(
     session: web.Committer, project_name: str, version_name: str, revision: str
-) -> response.Response | str:
+) -> web.WerkzeugResponse | str:
     """Show the vote initiation form for a release."""
     await session.check_access(project_name)
 
@@ -114,7 +113,7 @@ async def start_vote_manual(
     selected_revision_number: str,
     session: web.Committer,
     _data: db.Session,
-) -> response.Response | str:
+) -> web.WerkzeugResponse | str:
     async with storage.write(session) as write:
         wacp = await write.as_project_committee_participant(release.project_name)
         # This verifies the state and sets the phase to RELEASE_CANDIDATE
@@ -196,7 +195,7 @@ async def _selected_revision_data(
     revision: str,
     data: db.Session,
     session: web.Committer,
-) -> response.Response | str | VoteInitiateForm:
+) -> web.WerkzeugResponse | str | VoteInitiateForm:
     committee = release.committee
     if committee is None:
         raise base.ASFQuartException("Release has no associated committee", errorcode=400)

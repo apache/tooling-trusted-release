@@ -16,13 +16,11 @@
 # under the License.
 
 
-import werkzeug.wrappers.response as response
-
 import atr.blueprints.get as get
 import atr.shared as shared
 import atr.web as web
 
 
 @get.committer("/upload/<project_name>/<version_name>")
-async def selected(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
+async def selected(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse | str:
     return await shared.upload.selected(session, project_name, version_name)

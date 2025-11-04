@@ -18,7 +18,6 @@
 import datetime
 
 import asfquart.base as base
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.get as get
 import atr.db as db
@@ -94,7 +93,7 @@ async def select(session: web.Committer, project_name: str) -> str:
 
 
 @get.public("/release/view/<project_name>/<version_name>")
-async def view(session: web.Committer | None, project_name: str, version_name: str) -> response.Response | str:
+async def view(session: web.Committer | None, project_name: str, version_name: str) -> web.WerkzeugResponse | str:
     """View all the files in the rsync upload directory for a release."""
     async with db.session() as data:
         release_name = sql.release_name(project_name, version_name)
@@ -123,7 +122,7 @@ async def view(session: web.Committer | None, project_name: str, version_name: s
 @get.public("/release/view/<project_name>/<version_name>/<path:file_path>")
 async def view_path(
     session: web.Committer | None, project_name: str, version_name: str, file_path: str
-) -> response.Response | str:
+) -> web.WerkzeugResponse | str:
     """View the content of a specific file in the final release."""
     async with db.session() as data:
         release_name = sql.release_name(project_name, version_name)

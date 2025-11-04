@@ -23,9 +23,7 @@ from typing import Any
 import aiofiles.os
 import asfquart.base as base
 import quart
-import quart.wrappers.response as quart_response
 import werkzeug.datastructures as datastructures
-import werkzeug.wrappers.response as response
 import wtforms
 import wtforms.fields as fields
 
@@ -40,7 +38,7 @@ import atr.template as template
 import atr.util as util
 import atr.web as web
 
-type Respond = Callable[[int, str], Awaitable[tuple[quart_response.Response, int] | response.Response]]
+type Respond = Callable[[int, str], Awaitable[tuple[web.QuartResponse, int] | web.WerkzeugResponse]]
 
 
 class DeleteEmptyDirectoryForm(forms.Typed):
@@ -100,7 +98,7 @@ class RCTagAnalysisResult:
 
 async def selected(
     session: web.Committer, project_name: str, version_name: str
-) -> tuple[quart_response.Response, int] | response.Response | str:
+) -> tuple[web.QuartResponse, int] | web.WerkzeugResponse | str:
     """Finish a release preview."""
     await session.check_access(project_name)
 
@@ -109,7 +107,7 @@ async def selected(
     async def respond(
         http_status: int,
         msg: str,
-    ) -> tuple[quart_response.Response, int] | response.Response:
+    ) -> tuple[web.QuartResponse, int] | web.WerkzeugResponse:
         """Helper to respond with JSON or flash message and redirect."""
         nonlocal session
         nonlocal project_name
@@ -248,7 +246,7 @@ async def _delete_empty_directory(
     project_name: str,
     version_name: str,
     respond: Respond,
-) -> tuple[quart_response.Response, int] | response.Response:
+) -> tuple[web.QuartResponse, int] | web.WerkzeugResponse:
     try:
         async with storage.write(session) as write:
             wacp = await write.as_project_committee_member(project_name)
@@ -269,7 +267,7 @@ async def _move_file_to_revision(
     project_name: str,
     version_name: str,
     respond: Respond,
-) -> tuple[quart_response.Response, int] | response.Response:
+) -> tuple[web.QuartResponse, int] | web.WerkzeugResponse:
     try:
         async with storage.write(session) as write:
             wacp = await write.as_project_committee_member(project_name)
@@ -310,7 +308,7 @@ async def _remove_rc_tags(
     project_name: str,
     version_name: str,
     respond: Respond,
-) -> tuple[quart_response.Response, int] | response.Response:
+) -> tuple[web.QuartResponse, int] | web.WerkzeugResponse:
     try:
         async with storage.write(session) as write:
             wacp = await write.as_project_committee_member(project_name)
@@ -362,7 +360,7 @@ async def _sources_and_targets(latest_revision_dir: pathlib.Path) -> tuple[list[
 
 async def _submission_process(
     args: ProcessFormDataArgs,
-) -> tuple[quart_response.Response, int] | response.Response | str | None:
+) -> tuple[web.QuartResponse, int] | web.WerkzeugResponse | str | None:
     delete_empty_directory = "submit_delete_empty_dir" in args.formdata
     remove_rc_tags = "submit_remove_rc_tags" in args.formdata
     move_file = ("source_files" in args.formdata) and ("target_directory" in args.formdata)
@@ -381,7 +379,7 @@ async def _submission_process(
 
 async def _submission_process_delete_empty_directory(
     args: ProcessFormDataArgs,
-) -> tuple[quart_response.Response, int] | response.Response | str | None:
+) -> tuple[web.QuartResponse, int] | web.WerkzeugResponse | str | None:
     if await args.delete_dir_form.validate_on_submit():
         dir_to_delete_str = args.delete_dir_form.directory_to_delete.data
         return await _delete_empty_directory(
@@ -402,7 +400,7 @@ async def _submission_process_delete_empty_directory(
 
 async def _submission_process_move_file(
     args: ProcessFormDataArgs,
-) -> tuple[quart_response.Response, int] | response.Response | str | None:
+) -> tuple[web.QuartResponse, int] | web.WerkzeugResponse | str | None:
     source_files_data = args.formdata.getlist("source_files")
     target_dir_data = args.formdata.get("target_directory")
 
@@ -419,7 +417,7 @@ async def _submission_process_move_file(
 
 async def _submission_process_remove_rc_tags(
     args: ProcessFormDataArgs,
-) -> tuple[quart_response.Response, int] | response.Response | str | None:
+) -> tuple[web.QuartResponse, int] | web.WerkzeugResponse | str | None:
     if await args.remove_rc_tags_form.validate_on_submit():
         return await _remove_rc_tags(args.session, args.project_name, args.version_name, args.respond)
     elif args.wants_json:

@@ -18,7 +18,6 @@
 """candidate.py"""
 
 import asfquart.base as base
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.get as get
 import atr.db as db
@@ -30,7 +29,7 @@ import atr.web as web
 
 
 @get.committer("/candidate/view/<project_name>/<version_name>")
-async def view(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
+async def view(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse | str:
     """View all the files in the rsync upload directory for a release."""
     await session.check_access(project_name)
 
@@ -67,7 +66,7 @@ async def view(session: web.Committer, project_name: str, version_name: str) -> 
 @get.committer("/candidate/view/<project_name>/<version_name>/<path:file_path>")
 async def view_path(
     session: web.Committer, project_name: str, version_name: str, file_path: str
-) -> response.Response | str:
+) -> web.WerkzeugResponse | str:
     """View the content of a specific file in the release candidate."""
     await session.check_access(project_name)
 

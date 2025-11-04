@@ -18,7 +18,6 @@
 
 import asfquart.base as base
 import quart
-import werkzeug.wrappers.response as response
 
 import atr.db as db
 import atr.db.interaction as interaction
@@ -40,7 +39,7 @@ class StartReleaseForm(forms.Typed):
     submit = forms.submit("Start new release")
 
 
-async def selected(session: web.Committer, project_name: str) -> response.Response | str:
+async def selected(session: web.Committer, project_name: str) -> web.WerkzeugResponse | str:
     """Allow the user to start a new release draft, or handle its submission."""
     await session.check_access(project_name)
 

@@ -16,7 +16,6 @@
 # under the License.
 
 import quart
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.post as post
 import atr.forms as forms
@@ -28,7 +27,7 @@ import atr.web as web
 
 
 @post.committer("/vote/<project_name>/<version_name>")
-async def selected_post(session: web.Committer, project_name: str, version_name: str) -> response.Response:
+async def selected_post(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse:
     """Handle submission of a vote."""
     await session.check_access(project_name)
 

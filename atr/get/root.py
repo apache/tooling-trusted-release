@@ -24,7 +24,6 @@ import asfquart.session
 import quart.wrappers.response as quart_response
 import sqlalchemy.orm as orm
 import sqlmodel
-import werkzeug.wrappers.response as response
 
 import atr.blueprints.get as get
 import atr.config as config
@@ -155,7 +154,7 @@ async def policies(session: web.Committer | None) -> str:
 
 
 @get.public("/test-login")
-async def test_login(session: web.Committer | None) -> response.Response:
+async def test_login(session: web.Committer | None) -> web.WerkzeugResponse:
     if not config.get().ALLOW_TESTS:
         raise base.ASFQuartException("Test login not enabled", errorcode=404)
 

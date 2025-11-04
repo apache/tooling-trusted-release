@@ -18,7 +18,6 @@
 from __future__ import annotations
 
 import pathlib
-from typing import TYPE_CHECKING
 
 import aiofiles.os
 import aioshutil
@@ -36,9 +35,6 @@ import atr.storage as storage
 import atr.util as util
 import atr.web as web
 
-if TYPE_CHECKING:
-    import werkzeug.wrappers.response as response
-
 
 class VotePreviewForm(forms.Typed):
     body = forms.textarea("Body")
@@ -49,7 +45,7 @@ class VotePreviewForm(forms.Typed):
 
 
 @post.committer("/draft/delete")
-async def delete(session: web.Committer) -> response.Response:
+async def delete(session: web.Committer) -> web.WerkzeugResponse:
     """Delete a candidate draft and all its associated files."""
     import atr.get as get
 
@@ -95,7 +91,7 @@ async def delete(session: web.Committer) -> response.Response:
 
 
 @post.committer("/draft/delete-file/<project_name>/<version_name>")
-async def delete_file(session: web.Committer, project_name: str, version_name: str) -> response.Response:
+async def delete_file(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse:
     """Delete a specific file from the release candidate, creating a new revision."""
     await session.check_access(project_name)
 
@@ -130,7 +126,7 @@ async def delete_file(session: web.Committer, project_name: str, version_name: s
 
 
 @post.committer("/draft/fresh/<project_name>/<version_name>")
-async def fresh(session: web.Committer, project_name: str, version_name: str) -> response.Response:
+async def fresh(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse:
     """Restart all checks for a whole release candidate draft."""
     # Admin only button, but it's okay if users find and use this manually
     await session.check_access(project_name)
@@ -156,7 +152,7 @@ async def fresh(session: web.Committer, project_name: str, version_name: str) ->
 
 
 @post.committer("/draft/hashgen/<project_name>/<version_name>/<path:file_path>")
-async def hashgen(session: web.Committer, project_name: str, version_name: str, file_path: str) -> response.Response:
+async def hashgen(session: web.Committer, project_name: str, version_name: str, file_path: str) -> web.WerkzeugResponse:
     """Generate an sha256 or sha512 hash file for a candidate draft file, creating a new revision."""
     await session.check_access(project_name)
 
@@ -189,7 +185,7 @@ async def hashgen(session: web.Committer, project_name: str, version_name: str, 
 
 
 @post.committer("/draft/sbomgen/<project_name>/<version_name>/<path:file_path>")
-async def sbomgen(session: web.Committer, project_name: str, version_name: str, file_path: str) -> response.Response:
+async def sbomgen(session: web.Committer, project_name: str, version_name: str, file_path: str) -> web.WerkzeugResponse:
     """Generate a CycloneDX SBOM file for a candidate draft file, creating a new revision."""
     await session.check_access(project_name)
 
@@ -246,7 +242,7 @@ async def sbomgen(session: web.Committer, project_name: str, version_name: str, 
 
 
 @post.committer("/draft/svnload/<project_name>/<version_name>")
-async def svnload(session: web.Committer, project_name: str, version_name: str) -> response.Response | str:
+async def svnload(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse | str:
     """Import files from SVN into a draft."""
 
     await session.check_access(project_name)
@@ -293,7 +289,7 @@ async def svnload(session: web.Committer, project_name: str, version_name: str) 
 @post.committer("/draft/vote/preview/<project_name>/<version_name>")
 async def vote_preview(
     session: web.Committer, project_name: str, version_name: str
-) -> quart.wrappers.response.Response | response.Response | str:
+) -> web.QuartResponse | web.WerkzeugResponse | str:
     """Show the vote email preview for a release."""
     import atr.get as get
 

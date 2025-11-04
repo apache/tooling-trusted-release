@@ -17,8 +17,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import quart
 
 import atr.blueprints.post as post
@@ -29,12 +27,9 @@ import atr.shared as shared
 import atr.storage as storage
 import atr.web as web
 
-if TYPE_CHECKING:
-    import werkzeug.wrappers.response as response
-
 
 @post.committer("/distribution/delete/<project>/<version>")
-async def delete(session: web.Committer, project: str, version: str) -> response.Response:
+async def delete(session: web.Committer, project: str, version: str) -> web.WerkzeugResponse:
     form = await shared.distribution.DeleteForm.create_form(data=await quart.request.form)
     dd = distribution.DeleteData.model_validate(form.data)
 
