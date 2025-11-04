@@ -1,7 +1,7 @@
 exclude: ^node_modules/
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v5.0.0
+  rev: v6.0.0
   hooks:
     - id: check-ast
     - id: check-case-conflict
@@ -31,7 +31,7 @@ repos:
         - scripts/ci/LICENSE-template.txt
         - --fuzzy-match-generates-todo
 - repo: https://github.com/shellcheck-py/shellcheck-py
-  rev: v0.10.0.1
+  rev: v0.11.0.1
   hooks:
   -   id: shellcheck
 - repo: https://github.com/Riverside-Healthcare/djLint
@@ -51,7 +51,7 @@ repos:
         - --profile=jinja
         - --reformat
 - repo: https://github.com/thibaudcolas/pre-commit-stylelint
-  rev: v16.14.1
+  rev: v16.25.0
   hooks:
     - id: stylelint
       additional_dependencies: ['stylelint@16.14.1', 'stylelint-config-standard@37.0.0']
@@ -60,7 +60,7 @@ repos:
       types_or: ['css']
       args: ['--fix']
 - repo: https://github.com/woodruffw/zizmor-pre-commit
-  rev: v1.11.0
+  rev: v1.16.2
   hooks:
     - id: zizmor
       args: [--min-severity, low]
