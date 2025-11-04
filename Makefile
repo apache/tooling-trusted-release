@@ -68,7 +68,8 @@ ipython:
 	uv run --frozen --with ipython ipython
 
 run-alpine:
-	docker run --rm -p 8080:8080 -p 2222:2222 \
+	docker run --rm --init --user "$$(id -u):$$(id -g)" \
+	  -p 8080:8080 -p 2222:2222 \
 	  -v "$$PWD/state:/opt/atr/state" \
 	  -v "$$PWD/state/localhost.apache.org+3-key.pem:/opt/atr/state/key.pem" \
 	  -v "$$PWD/state/localhost.apache.org+3.pem:/opt/atr/state/cert.pem" \
