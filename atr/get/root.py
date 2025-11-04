@@ -19,7 +19,6 @@ import pathlib
 from typing import Final
 
 import aiofiles
-import asfquart.base as base
 import asfquart.session
 import quart.wrappers.response as quart_response
 import sqlalchemy.orm as orm
@@ -151,26 +150,6 @@ async def resolved_json(session: web.Committer | None) -> quart_response.Respons
 @get.public("/policies")
 async def policies(session: web.Committer | None) -> str:
     return await template.blank("Policies", content=_POLICIES)
-
-
-@get.public("/test-login")
-async def test_login(session: web.Committer | None) -> web.WerkzeugResponse:
-    if not config.get().ALLOW_TESTS:
-        raise base.ASFQuartException("Test login not enabled", errorcode=404)
-
-    session_data = {
-        "uid": "test",
-        "fullname": "Test User",
-        "committees": ["test"],
-        "projects": ["test"],
-        "isMember": False,
-        "isChair": False,
-        "isRole": False,
-        "metadata": {},
-    }
-
-    asfquart.session.write(session_data)
-    return await web.redirect(index)
 
 
 @get.committer("/tutorial")

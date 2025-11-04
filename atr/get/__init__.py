@@ -42,6 +42,7 @@ import atr.get.revisions as revisions
 import atr.get.root as root
 import atr.get.sbom as sbom
 import atr.get.start as start
+import atr.get.test as test
 import atr.get.tokens as tokens
 import atr.get.upload as upload
 import atr.get.user as user
@@ -74,6 +75,7 @@ __all__ = [
     "root",
     "sbom",
     "start",
+    "test",
     "tokens",
     "upload",
     "user",

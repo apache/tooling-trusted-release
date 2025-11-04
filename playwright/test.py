@@ -862,7 +862,7 @@ def test_login(page: sync_api.Page, credentials: Credentials) -> None:
         remove_debugging = test_logging_debug(page, credentials)
 
     if credentials.username == "test":
-        go_to_path(page, "/test-login", wait=False)
+        go_to_path(page, "/test/login", wait=False)
         wait_for_path(page, "/")
         logging.info("Test login completed successfully")
         return
