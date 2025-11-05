@@ -730,7 +730,7 @@ async def release_announce(data: models.api.ReleaseAnnounceArgs) -> DictResponse
 
     After a vote on a release has passed, if everything is in order and all
     paths are correct, the release can be announced. This will send an email to
-    the specified announement address, and promote the release to the finished
+    the specified announcement address, and promote the release to the finished
     release phase. Once announced, a release is final and cannot be changed.
     """
     asf_uid = _jwt_asf_uid()
