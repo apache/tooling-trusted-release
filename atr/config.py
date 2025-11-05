@@ -115,7 +115,8 @@ class Mode(enum.Enum):
 _global_mode: Mode | None = None
 
 
-class ProductionConfig(AppConfig): ...
+class ProductionConfig(AppConfig):
+    pass
 
 
 class ProfilingConfig(AppConfig):

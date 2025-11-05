@@ -109,10 +109,10 @@ async def selected(
         msg: str,
     ) -> tuple[web.QuartResponse, int] | web.WerkzeugResponse:
         """Helper to respond with JSON or flash message and redirect."""
-        nonlocal session
-        nonlocal project_name
-        nonlocal version_name
-        nonlocal wants_json
+        # nonlocal session
+        # nonlocal project_name
+        # nonlocal version_name
+        # nonlocal wants_json
 
         ok = http_status < 300
         if wants_json:

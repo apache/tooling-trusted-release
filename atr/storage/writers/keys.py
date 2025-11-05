@@ -581,7 +581,7 @@ class CommitteeParticipant(FoundationCommitter):
             log.info(f"Inserted {len(link_inserts)} key links")
 
             def replace_with_linked(key: types.Key) -> types.Key:
-                nonlocal link_inserts
+                # nonlocal link_inserts
                 match key:
                     case types.Key(status=types.KeyStatus.INSERTED):
                         if key.key_model.fingerprint in link_inserts:

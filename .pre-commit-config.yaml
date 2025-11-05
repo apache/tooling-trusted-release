@@ -65,6 +65,22 @@ repos:
   hooks:
     - id: zizmor
       args: [--min-severity, low]
+# - repo: https://github.com/PyCQA/flake8
+#   rev: 7.3.0
+#   hooks:
+#     - id: flake8
+#       name: Flake8 (cognitive complexity and cohesion)
+#       additional_dependencies:
+#         - flake8-cognitive-complexity
+#         # - flake8-expression-complexity
+#         - flake8-cohesion
+#       args:
+#         - --max-line-length=120
+#         - --select=CCR001,H601
+#         # - --extend-ignore=E203,E251,E266,E402,F841
+#         - --max-cognitive-complexity=20
+#         # - --max-expression-complexity=7
+#         - --cohesion-below=50.0
 - repo: local
   hooks:
     - id: ruff

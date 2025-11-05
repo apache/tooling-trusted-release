@@ -16,7 +16,6 @@
 # under the License.
 
 
-import asfquart as asfquart
 import quart
 
 import atr.blueprints.post as post

@@ -95,7 +95,7 @@ def html_nav(container: htm.Block, back_url: str, back_anchor: str, phase: Phase
     span = htm.Block(htm.span)
 
     def _phase(actual: Phase, expected: Phase) -> None:
-        nonlocal span
+        # nonlocal span
         match expected:
             case "COMPOSE":
                 symbol = "①"

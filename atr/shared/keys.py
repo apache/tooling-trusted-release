@@ -22,7 +22,6 @@ import datetime
 from collections.abc import Awaitable, Callable, Sequence
 
 import aiohttp
-import asfquart as asfquart
 import asfquart.base as base
 import quart
 import werkzeug.datastructures as datastructures

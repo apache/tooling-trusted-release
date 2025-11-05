@@ -20,7 +20,6 @@ from __future__ import annotations
 import contextlib
 import functools
 import os
-from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, Concatenate, Final, TypeGuard, TypeVar
 
 import alembic.command as command
@@ -932,7 +931,8 @@ def session(log_queries: bool | None = None) -> Session:
     #     async with _global_atr_sessionmaker() as session:
     #         yield session
 
-    # from FastAPI documentation: https://fastapi-users.github.io/fastapi-users/latest/configuration/databases/sqlalchemy/
+    # from FastAPI documentation:
+    # https://fastapi-users.github.io/fastapi-users/latest/configuration/databases/sqlalchemy/
 
     global _global_atr_sessionmaker
     if _global_atr_sessionmaker is None:

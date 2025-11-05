@@ -32,7 +32,8 @@ class Send(schema.Strict):
     in_reply_to: str | None = schema.description("The message ID of the email to reply to")
 
 
-class SendError(Exception): ...
+class SendError(Exception):
+    pass
 
 
 @checks.with_model(Send)

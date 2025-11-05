@@ -17,7 +17,6 @@
 
 import datetime
 
-import asfquart as asfquart
 import quart
 
 import atr.blueprints.get as get

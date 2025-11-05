@@ -40,7 +40,8 @@ class Initiate(schema.Strict):
     body: str = schema.description("Body content for the vote email")
 
 
-class VoteInitiationError(Exception): ...
+class VoteInitiationError(Exception):
+    pass
 
 
 @checks.with_model(Initiate)
