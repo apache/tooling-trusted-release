@@ -833,7 +833,7 @@ async def task_archive_url(task_mid: str) -> str | None:
     # TODO: This List ID will be dynamic when we allow posting to arbitrary lists
     # lid = "user-tests.tooling.apache.org"
     lid = USER_TESTS_ADDRESS.replace("@", ".")
-    url = f"https://lists.apache.org/api/email.lua?id=%3C{task_mid}%3E&listid=%3C{lid}%3E"
+    url = f"https://lists.apache.org/api/email.json?id=%3C{task_mid}%3E&listid=%3C{lid}%3E"
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
@@ -854,7 +854,7 @@ async def thread_messages(
 ) -> AsyncGenerator[tuple[str, dict[str, Any]]]:
     """Iterate over mailing list thread messages in chronological order."""
 
-    thread_url = f"https://lists.apache.org/api/thread.lua?id={thread_id}"
+    thread_url = f"https://lists.apache.org/api/thread.json?id={thread_id}"
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -875,7 +875,7 @@ async def thread_messages(
     if not message_ids:
         return
 
-    email_urls = [f"https://lists.apache.org/api/email.lua?id={mid}" for mid in message_ids]
+    email_urls = [f"https://lists.apache.org/api/email.json?id={mid}" for mid in message_ids]
 
     messages: list[dict[str, Any]] = []
 
