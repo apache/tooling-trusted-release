@@ -17,7 +17,7 @@
 # under the License.
 
 # TODO: We want to go the other way around too
-# In other words, finding underscoreless functions which are not accesssed externally
+# In other words, finding underscoreless functions which are not accessed externally
 
 import ast
 import enum

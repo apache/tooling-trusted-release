@@ -332,7 +332,7 @@ Place comments on dedicated lines preceding the relevant code block. Comments at
 
 We do not use `assert`. If you need to guard against invalid states or inputs, use standard `if` checks and raise appropriate exceptions. If you need to help type checkers understand the type of a variable within a specific code block, in other words if you need to narrow a type, then use `if isinstance(...)` or `if not isinstance(...)` as appropriate.
 
-### Never use `case _` when pattern matching exhausive types
+### Never use `case _` when pattern matching exhaustive types
 
 Using `case _` breaks type checking in such situations.
 

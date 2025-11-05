@@ -205,7 +205,7 @@ a or b and c == d or not e or f
 # Prefer
 (a or b) and (c == d) or (not e) or f
 </code></pre>
-<p>Because <code>f</code> is not a complex expression, it does not get parenthesised. Also because this rule is about subexpressions only, we do not put parethenses around the top level.</p>
+<p>Because <code>f</code> is not a complex expression, it does not get parenthesised. Also because this rule is about subexpressions only, we do not put parentheses around the top level.</p>
 <pre><code class="language-python"># Avoid
 if (a or b):
     ...
@@ -218,7 +218,7 @@ if a or b:
 <p>Place comments on dedicated lines preceding the relevant code block. Comments at the ends of lines are strictly reserved for linter or type checker directives. This convention enhances code scannability for such directives. General comments must not appear at the end of code lines. Keep comments concise, using sentence case without terminal punctuation. Each sentence forming a comment must occupy its own line.</p>
 <code></code><h3 id="prefer-explicit-checks-over-assert">Prefer explicit checks over assert</h3>
 <p>We do not use <code>assert</code>. If you need to guard against invalid states or inputs, use standard <code>if</code> checks and raise appropriate exceptions. If you need to help type checkers understand the type of a variable within a specific code block, in other words if you need to narrow a type, then use <code>if isinstance(...)</code> or <code>if not isinstance(...)</code> as appropriate.</p>
-<code></code><h3 id="never-use-case-when-pattern-matching-exhausive-types">Never use case _ when pattern matching exhausive types</h3>
+<code></code><h3 id="never-use-case-when-pattern-matching-exhaustive-types">Never use case _ when pattern matching exhaustive types</h3>
 <p>Using <code>case _</code> breaks type checking in such situations.</p>
 <h2 id="html">HTML</h2>
 <h3 id="use-sentence-case-for-headings-form-labels-and-submission-buttons">Use sentence case for headings, form labels, and submission buttons</h3>
