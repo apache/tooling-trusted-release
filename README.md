@@ -5,6 +5,9 @@
 <a href="https://github.com/apache/tooling-trusted-releases/actions/workflows/build.yml?query=branch%3Amain">
   <img alt="Build & Tests" src="https://github.com/apache/tooling-trusted-releases/actions/workflows/build.yml/badge.svg?branch=main" />
 </a>
+<a href="https://github.com/apache/tooling-trusted-releases/actions/workflows/analyze.yml">
+  <img alt="Analyze using pre-commit hooks" src="https://github.com/apache/tooling-trusted-releases/actions/workflows/analyze.yml/badge.svg" />
+</a>
 <a href="https://github.com/apache/tooling-trusted-releases/blob/main/LICENSE">
   <img alt="Apache License" src="https://img.shields.io/github/license/apache/tooling-trusted-releases" />
 </a>
