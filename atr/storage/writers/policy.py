@@ -86,7 +86,11 @@ class CommitteeMember(CommitteeParticipant):
         self.__asf_uid = asf_uid
         self.__committee_name = committee_name
 
-    async def edit(self, project: models.sql.Project, policy_data: models.policy.ReleasePolicyData) -> None:
+    async def edit(self, project_name: str, policy_data: models.policy.ReleasePolicyData) -> None:
+        project = await self.__data.project(
+            name=project_name, status=models.sql.ProjectStatus.ACTIVE, _release_policy=True
+        ).demand(storage.AccessError(f"Project {project_name} not found"))
+
         release_policy = project.release_policy
         if release_policy is None:
             release_policy = models.sql.ReleasePolicy(project=project)

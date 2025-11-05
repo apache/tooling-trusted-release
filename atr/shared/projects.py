@@ -277,12 +277,12 @@ async def view(session: web.Committer, name: str) -> web.WerkzeugResponse | str:
                 async with storage.write(session) as write:
                     wacm = await write.as_project_committee_member(project.name)
                     try:
-                        await wacm.policy.edit(project, policy_data)
+                        await wacm.policy.edit(project.name, policy_data)
                     except storage.AccessError as e:
                         return await session.redirect(
                             get.projects.view, name=project.name, error=f"Error editing policy: {e}"
                         )
-                    return quart.redirect(util.as_url(get.projects.view, name=project.name))
+                return quart.redirect(util.as_url(get.projects.view, name=project.name))
             else:
                 log.info(f"policy_form.errors: {policy_form.errors}")
         else:
