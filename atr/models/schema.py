@@ -32,6 +32,18 @@ class Strict(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(extra="forbid", strict=True, validate_assignment=True)
 
 
+class Form(pydantic.BaseModel):
+    model_config = pydantic.ConfigDict(
+        extra="forbid",
+        strict=False,
+        validate_assignment=True,
+        arbitrary_types_allowed=True,
+        str_strip_whitespace=True,
+    )
+
+    csrf_token: str | None = None
+
+
 def alias(alias_name: str) -> Any:
     """Helper to create a Pydantic FieldInfo object with only an alias."""
     return Field(alias=alias_name)

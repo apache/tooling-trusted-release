@@ -23,8 +23,10 @@ from typing import Any
 import asfquart.auth as auth
 import asfquart.base as base
 import asfquart.session
+import pydantic
 import quart
 
+import atr.form
 import atr.log as log
 import atr.web as web
 
@@ -80,6 +82,67 @@ def committer(path: str) -> Callable[[web.CommitterRouteFunction[Any]], web.Rout
         _routes.append(f"post.{module_name}.{func.__name__}")
 
         return decorated
+
+    return decorator
+
+
+def empty() -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
+    # This means that instead of:
+    #
+    # @post.form(form.Empty)
+    # async def test_empty(
+    #     session: web.Committer | None,
+    #     form: form.Empty,
+    # ) -> web.WerkzeugResponse:
+    #     pass
+    #
+    # We can use:
+    #
+    # @post.empty()
+    # async def test_empty(
+    #     session: web.Committer | None,
+    # ) -> web.WerkzeugResponse:
+    #     pass
+    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+        async def wrapper(session: web.Committer | None, *args: Any, **kwargs: Any) -> Any:
+            try:
+                form_data = await atr.form.quart_request()
+                context = {"session": session}
+                atr.form.validate(atr.form.Empty, form_data, context)
+                return await func(session, *args, **kwargs)
+            except pydantic.ValidationError as e:
+                # This presumably should not happen
+                log.warning(f"Empty form validation error (CSRF): {e}")
+                await quart.flash("Invalid form submission. Please try again.", "error")
+                return quart.redirect(quart.request.path)
+
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        wrapper.__annotations__ = func.__annotations__.copy()
+        return wrapper
+
+    return decorator
+
+
+def form(
+    form_cls: Any,
+) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
+    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+        async def wrapper(session: web.Committer | None, *args: Any, **kwargs: Any) -> Any:
+            try:
+                form_data = await atr.form.quart_request()
+                context = {"session": session}
+                validated_form = atr.form.validate(form_cls, form_data, context)
+                return await func(session, validated_form, *args, **kwargs)
+            except pydantic.ValidationError as e:
+                log.warning(f"Form validation error: {e}")
+                await quart.flash(f"Validation error: {e}", "error")
+                return quart.redirect(quart.request.path)
+
+        wrapper.__name__ = func.__name__
+        wrapper.__doc__ = func.__doc__
+        wrapper.__annotations__ = func.__annotations__.copy()
+        return wrapper
 
     return decorator
 

@@ -30,6 +30,7 @@ import atr.post.resolve as resolve
 import atr.post.revisions as revisions
 import atr.post.sbom as sbom
 import atr.post.start as start
+import atr.post.test as test
 import atr.post.tokens as tokens
 import atr.post.upload as upload
 import atr.post.user as user
@@ -52,6 +53,7 @@ __all__ = [
     "revisions",
     "sbom",
     "start",
+    "test",
     "tokens",
     "upload",
     "user",

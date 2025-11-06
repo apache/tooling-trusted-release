@@ -33,6 +33,7 @@ import atr.shared.keys as keys
 import atr.shared.projects as projects
 import atr.shared.resolve as resolve
 import atr.shared.start as start
+import atr.shared.test as test
 import atr.shared.tokens as tokens
 import atr.shared.upload as upload
 import atr.shared.user as user
@@ -193,6 +194,7 @@ __all__ = [
     "projects",
     "resolve",
     "start",
+    "test",
     "tokens",
     "upload",
     "user",
