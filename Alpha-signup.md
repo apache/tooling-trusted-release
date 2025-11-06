@@ -7,7 +7,7 @@ continue development.
 You can provide feedback via
 1. https://github.com/apache/tooling-trusted-releases/issues
 2. mailto:dev@tooling.apache.org
-3. asf slack - #apache-trusted-releases
+3. ASF Slack - [#apache-trusted-releases](https://the-asf.slack.com/archives/C049WADAAQG)
 
 | PMC | PMC Members | Release and Project Description |
 |-----|-------------|---------------------------------|
