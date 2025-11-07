@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import enum
+import json
 import types
 from typing import TYPE_CHECKING, Annotated, Any, Final, Literal, get_args, get_origin
 
@@ -127,6 +128,16 @@ async def render_columns(
     if action is None:
         action = quart.request.path
 
+    flash_error_data: dict[str, Any] = {}
+    flashed_error_messages = quart.get_flashed_messages(category_filter=["form-error-data"])
+    if flashed_error_messages:
+        try:
+            first_message = flashed_error_messages[0]
+            if isinstance(first_message, str):
+                flash_error_data = json.loads(first_message)
+        except (json.JSONDecodeError, IndexError):
+            pass
+
     label_classes = "col-sm-3 col-form-label text-sm-end"
 
     field_rows: list[htm.Element] = []
@@ -156,7 +167,9 @@ async def render_columns(
         label_text = field_info.description or field_name.replace("_", " ").title()
         is_required = field_info.is_required()
 
-        label_elem = htpy.label(for_=field_name, class_=label_classes)[label_text]
+        has_flash_error = field_name in flash_error_data
+        label_classes_with_error = f"{label_classes} text-danger" if has_flash_error else label_classes
+        label_elem = htpy.label(for_=field_name, class_=label_classes_with_error)[label_text]
 
         widget_elem = _render_widget(
             field_name=field_name,

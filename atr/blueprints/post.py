@@ -161,7 +161,10 @@ def form(
                 plural = len(errors) > 1
                 summary = f"Please fix the following issue{'s' if plural else ''}:"
                 ul = htm.Block(htm.ul, classes=".mt-2.mb-0")
-                for _name, flash_datum in flash_data.items():
+                for i, flash_datum in enumerate(flash_data.values()):
+                    if i > 9:
+                        ul.li["And more, not shown here..."]
+                        break
                     ul.li[htm.strong[flash_datum["label"]], ": ", flash_datum["msg"]]
                 summary = f"{summary}\n{ul.collect()}"
 
