@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 import time
 from collections.abc import Awaitable, Callable
 from types import ModuleType
@@ -23,10 +24,12 @@ from typing import Any
 import asfquart.auth as auth
 import asfquart.base as base
 import asfquart.session
+import markupsafe
 import pydantic
 import quart
 
 import atr.form
+import atr.htm as htm
 import atr.log as log
 import atr.web as web
 
@@ -110,10 +113,10 @@ def empty() -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable
                 context = {"session": session}
                 atr.form.validate(atr.form.Empty, form_data, context)
                 return await func(session, *args, **kwargs)
-            except pydantic.ValidationError as e:
-                # This presumably should not happen
-                log.warning(f"Empty form validation error (CSRF): {e}")
-                await quart.flash("Invalid form submission. Please try again.", "error")
+            except pydantic.ValidationError:
+                # This presumably should not happen, because the CSRF token checker reaches it first
+                msg = "Sorry, your form session expired for security reasons. Please try again."
+                await quart.flash(msg, "error")
                 return quart.redirect(quart.request.path)
 
         wrapper.__name__ = func.__name__
@@ -135,8 +138,36 @@ def form(
                 validated_form = atr.form.validate(form_cls, form_data, context)
                 return await func(session, validated_form, *args, **kwargs)
             except pydantic.ValidationError as e:
-                log.warning(f"Form validation error: {e}")
-                await quart.flash(f"Validation error: {e}", "error")
+                errors = e.errors()
+                if len(errors) == 0:
+                    raise RuntimeError("Validation failed, but no errors were reported")
+
+                flash_data = {}
+                for i, error in enumerate(errors):
+                    loc = error["loc"]
+                    kind = error["type"]
+                    msg = error["msg"]
+                    msg = msg.replace(": An email address", " because an email address")
+                    msg = msg.replace("Value error, ", "")
+                    original = error["input"]
+                    field_name, field_label = atr.form.name_and_label(form_cls, i, loc)
+                    flash_data[field_name] = {
+                        "label": field_label,
+                        "original": original,
+                        "kind": kind,
+                        "msg": msg,
+                    }
+
+                plural = len(errors) > 1
+                summary = f"Please fix the following issue{'s' if plural else ''}:"
+                ul = htm.Block(htm.ul, classes=".mt-2.mb-0")
+                for _name, flash_datum in flash_data.items():
+                    ul.li[htm.strong[flash_datum["label"]], ": ", flash_datum["msg"]]
+                summary = f"{summary}\n{ul.collect()}"
+
+                # TODO: Centralise all uses of markupsafe.Markup
+                await quart.flash(markupsafe.Markup(summary), category="error")
+                await quart.flash(json.dumps(flash_data), category="form-error-data")
                 return quart.redirect(quart.request.path)
 
         wrapper.__name__ = func.__name__

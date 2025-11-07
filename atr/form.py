@@ -69,9 +69,19 @@ def label(description: str, *, default: Any = ..., widget: Widget | None = None)
     return pydantic.Field(default, description=description, json_schema_extra=extra)
 
 
-def session(info: pydantic.ValidationInfo) -> web.Committer | None:
-    ctx: dict[str, Any] = info.context or {}
-    return ctx.get("session")
+def name_and_label(form_cls: type[Form], i: int, loc: tuple[str | int, ...]) -> tuple[str, str]:
+    if loc:
+        field_name = loc[0]
+        if isinstance(field_name, str):
+            field_info = form_cls.model_fields.get(field_name)
+            if field_info and field_info.description:
+                field_label = field_info.description
+            else:
+                field_label = field_name.replace("_", " ").title()
+            return field_name, field_label
+    field_name = f".{i}"
+    field_label = "?"
+    return field_name, field_label
 
 
 async def quart_request() -> dict[str, Any]:
@@ -168,6 +178,11 @@ async def render_columns(
     form_children.append(submit_row)
 
     return htm.form(form_classes, action=action, method="post", enctype="multipart/form-data")[form_children]
+
+
+def session(info: pydantic.ValidationInfo) -> web.Committer | None:
+    ctx: dict[str, Any] = info.context or {}
+    return ctx.get("session")
 
 
 def to_bool(v: Any) -> bool:

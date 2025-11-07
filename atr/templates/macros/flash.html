@@ -2,10 +2,12 @@
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for category, message in messages %}
-        <div class="flash-message flash-{{ category }}">
-          {% if category == 'error' %}<strong>Error:</strong>{% endif %}
-          {{ message }}
-        </div>
+        {% if category != 'form-error-data' %}
+          <div class="flash-message flash-{{ category }}">
+            {% if category == 'error' %}<strong>Error:</strong>{% endif %}
+            {{ message }}
+          </div>
+        {% endif %}
       {% endfor %}
     {% endif %}
   {% endwith %}

@@ -95,9 +95,10 @@ class BlockElementCallable:
 class Block:
     __match_args__ = ("elements",)
 
-    def __init__(self, element: Element | None = None, *elements: Element):
+    def __init__(self, element: Element | None = None, *elements: Element, classes: str | None = None):
         self.element = element
         self.elements: list[Element | str] = list(elements)
+        self.classes = classes
 
     def __str__(self) -> str:
         return f"{self.element}{self.elements}"
@@ -145,13 +146,19 @@ class Block:
             elements = self.elements
 
         if self.element is None:
+            if self.classes is not None:
+                return div(self.classes, data_src=src)[*elements]
             return div(data_src=src)[*elements]
 
         new_element = self.element.__class__(
             self.element._name,
             self.element._attrs,
             self.element._children,
-        )(data_src=src)
+        )
+        if self.classes is not None:
+            new_element = new_element(self.classes, data_src=src)
+        else:
+            new_element = new_element(data_src=src)
         # if self.element._name == "html":
         #     return "<!doctype html>" + new_element[*elements]
         return new_element[*elements]
