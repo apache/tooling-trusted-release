@@ -160,6 +160,39 @@ class CommitteeMember(CommitteeParticipant):
         if preserve is True:
             await self.__hard_link_downloads(committee, unfinished_path, download_path_suffix, dry_run=True)
 
+        # Ensure that the permissions of every directory are 755
+        await asyncio.to_thread(util.chmod_directories, unfinished_path)
+
+        try:
+            # Move the release files from somewhere in unfinished to somewhere in finished
+            # The whole finished hierarchy is write once for each directory, and then read only
+            # TODO: Set permissions to help enforce this, or find alternative methods
+            await aioshutil.move(unfinished_dir, finished_dir)
+            self.__write_as.append_to_audit_log(
+                asf_uid=self.__asf_uid,
+                project_name=project_name,
+                version_name=version_name,
+                revision_number=preview_revision_number,
+                source_directory=unfinished_dir,
+                target_directory=finished_dir,
+                email_recipient=recipient,
+            )
+            if unfinished_revisions_path:
+                # This removes all of the prior revisions
+                await aioshutil.rmtree(str(unfinished_revisions_path))  # type: ignore[call-arg]
+        except Exception as e:
+            raise storage.AccessError(f"Error moving files: {e!s}")
+
+        # TODO: Add an audit log entry here
+        # TODO: We should consider copying the files instead of hard linking
+        # That way, we can write protect the pristine ATR files
+        await self.__hard_link_downloads(
+            committee,
+            finished_path,
+            download_path_suffix,
+            preserve=preserve,
+        )
+
         try:
             task = sql.Task(
                 status=sql.TaskStatus.QUEUED,
@@ -182,40 +215,9 @@ class CommitteeMember(CommitteeParticipant):
         except storage.AccessError as e:
             raise e
         except Exception as e:
-            raise storage.AccessError(f"Error announcing preview: {e!s}")
-
-        # Ensure that the permissions of every directory are 755
-        await asyncio.to_thread(util.chmod_directories, unfinished_path)
-
-        try:
-            # Move the release files from somewhere in unfinished to somewhere in finished
-            # The whole finished hierarchy is write once for each directory, and then read only
-            # TODO: Set permissions to help enforce this, or find alternative methods
-            await aioshutil.move(unfinished_dir, finished_dir)
-            self.__write_as.append_to_audit_log(
-                asf_uid=self.__asf_uid,
-                project_name=project_name,
-                version_name=version_name,
-                revision_number=preview_revision_number,
-                source_directory=unfinished_dir,
-                target_directory=finished_dir,
-                email_recipient=recipient,
+            raise storage.AccessError(
+                f"Files moved successfully, but error queuing announcement: {e!s}. Manual cleanup needed."
             )
-            if unfinished_revisions_path:
-                # This removes all of the prior revisions
-                await aioshutil.rmtree(str(unfinished_revisions_path))  # type: ignore[call-arg]
-        except Exception as e:
-            raise storage.AccessError(f"Database updated, but error moving files: {e!s}. Manual cleanup needed.")
-
-        # TODO: Add an audit log entry here
-        # TODO: We should consider copying the files instead of hard linking
-        # That way, we can write protect the pristine ATR files
-        await self.__hard_link_downloads(
-            committee,
-            finished_path,
-            download_path_suffix,
-            preserve=preserve,
-        )
 
     async def __hard_link_downloads(
         self,
