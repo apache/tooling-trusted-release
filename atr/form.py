@@ -107,8 +107,14 @@ def json_suitable(field_value: Any) -> Any:
     return field_value
 
 
-def label(description: str, *, default: Any = ..., widget: Widget | None = None) -> Any:
-    extra: dict[str, Any] = {"widget": widget.value} if widget else {}
+def label(
+    description: str, documentation: str | None = None, *, default: Any = ..., widget: Widget | None = None
+) -> Any:
+    extra: dict[str, Any] = {}
+    if widget is not None:
+        extra["widget"] = widget.value
+    if documentation is not None:
+        extra["documentation"] = documentation
     return pydantic.Field(default, description=description, json_schema_extra=extra)
 
 
@@ -158,12 +164,26 @@ async def quart_request() -> dict[str, Any]:
     return combined_data
 
 
-async def render_columns(
+def _get_flash_error_data() -> dict[str, Any]:
+    flashed_error_messages = quart.get_flashed_messages(category_filter=["form-error-data"])
+    if flashed_error_messages:
+        try:
+            first_message = flashed_error_messages[0]
+            if isinstance(first_message, str):
+                return json.loads(first_message)
+        except (json.JSONDecodeError, IndexError):
+            pass
+    return {}
+
+
+async def render(
     model_cls: type[Form],
     action: str | None = None,
     form_classes: str = ".atr-canary",
     submit_classes: str = "btn-primary",
     submit_label: str = "Submit",
+    cancel_url: str | None = None,
+    textarea_rows: int = 18,
     defaults: dict[str, Any] | None = None,
     errors: dict[str, list[str]] | None = None,
     use_error_data: bool = True,
@@ -171,16 +191,7 @@ async def render_columns(
     if action is None:
         action = quart.request.path
 
-    flash_error_data: dict[str, Any] = {}
-    if use_error_data:
-        flashed_error_messages = quart.get_flashed_messages(category_filter=["form-error-data"])
-        if flashed_error_messages:
-            try:
-                first_message = flashed_error_messages[0]
-                if isinstance(first_message, str):
-                    flash_error_data = json.loads(first_message)
-            except (json.JSONDecodeError, IndexError):
-                pass
+    flash_error_data: dict[str, Any] = _get_flash_error_data() if use_error_data else {}
 
     field_rows: list[htm.Element] = []
     hidden_fields: list[htm.Element | htm.VoidElement | markupsafe.Markup] = []
@@ -192,7 +203,14 @@ async def render_columns(
         if field_name == "csrf_token":
             continue
 
-        hidden_field, row = _render_row(field_info, field_name, flash_error_data, defaults, errors)
+        hidden_field, row = _render_row(
+            field_info,
+            field_name,
+            flash_error_data,
+            defaults,
+            errors,
+            textarea_rows,
+        )
         if hidden_field:
             hidden_fields.append(hidden_field)
         if row:
@@ -201,8 +219,12 @@ async def render_columns(
     form_children: list[htm.Element | htm.VoidElement | markupsafe.Markup] = hidden_fields + field_rows
 
     submit_button = htpy.button(type="submit", class_=f"btn {submit_classes}")[submit_label]
+    submit_div_contents: list[htm.Element | htm.VoidElement] = [submit_button]
+    if cancel_url:
+        cancel_link = htpy.a(href=cancel_url, class_="btn btn-link text-secondary")["Cancel"]
+        submit_div_contents.append(cancel_link)
     submit_div = htm.div(".col-sm-9.offset-sm-3")
-    submit_row = htm.div(".row")[submit_div[submit_button]]
+    submit_row = htm.div(".row")[submit_div[submit_div_contents]]
     form_children.append(submit_row)
 
     return htm.form(form_classes, action=action, method="post", enctype="multipart/form-data")[form_children]
@@ -332,6 +354,7 @@ def _render_widget(  # noqa: C901
     field_value: Any,
     field_errors: list[str] | None,
     is_required: bool,
+    textarea_rows: int,
 ) -> htm.Element | htm.VoidElement:
     widget_type = _get_widget_type(field_info)
     widget_classes = _get_widget_classes(widget_type, field_errors)
@@ -395,7 +418,13 @@ def _render_widget(  # noqa: C901
             widget = htpy.input(**attrs)
 
         case Widget.RADIO:
-            choices = _get_choices(field_info)
+            if isinstance(field_value, list):
+                choices = [(val, val) for val in field_value]
+                selected_value = field_value[0] if field_value else None
+            else:
+                choices = _get_choices(field_info)
+                selected_value = field_value
+
             radios = []
             for val, label in choices:
                 radio_id = f"{field_name}_{val}"
@@ -408,7 +437,7 @@ def _render_widget(  # noqa: C901
                 }
                 if is_required:
                     radio_attrs["required"] = ""
-                if val == field_value:
+                if val == selected_value:
                     radio_attrs["checked"] = ""
                 radio_input = htpy.input(**radio_attrs)
                 radio_label = htpy.label(for_=radio_id, class_="form-check-label")[label]
@@ -417,11 +446,17 @@ def _render_widget(  # noqa: C901
             widget = htm.div[radios]
 
         case Widget.SELECT:
-            choices = _get_choices(field_info)
+            if isinstance(field_value, list):
+                choices = [(val, val) for val in field_value]
+                selected_value = field_value[0] if field_value else None
+            else:
+                choices = _get_choices(field_info)
+                selected_value = field_value
+
             options = [
                 htpy.option(
                     value=val,
-                    selected="" if (val == field_value) else None,
+                    selected="" if (val == selected_value) else None,
                 )[label]
                 for val, label in choices
             ]
@@ -434,7 +469,8 @@ def _render_widget(  # noqa: C901
             widget = htpy.input(**attrs)
 
         case Widget.TEXTAREA:
-            widget = htpy.textarea(**base_attrs)[field_value or ""]
+            attrs = {**base_attrs, "rows": str(textarea_rows)}
+            widget = htpy.textarea(**attrs)[field_value or ""]
 
         case Widget.URL:
             attrs = {**base_attrs, "type": "url"}
@@ -583,6 +619,7 @@ def _render_row(
     flash_error_data: dict[str, Any],
     defaults: dict[str, Any] | None,
     errors: dict[str, list[str]] | None,
+    textarea_rows: int,
 ) -> tuple[htm.VoidElement | None, htm.Element | None]:
     widget_type = _get_widget_type(field_info)
     has_flash_error = field_name in flash_error_data
@@ -613,6 +650,7 @@ def _render_row(
         field_value=field_value,
         field_errors=field_errors,
         is_required=is_required,
+        textarea_rows=textarea_rows,
     )
 
     row_div = htm.div(".mb-3.row")
@@ -623,5 +661,12 @@ def _render_row(
         error_msg = flash_error_data[field_name]["msg"]
         error_div = htm.div(".text-danger.mt-1")[f"Error: {error_msg}"]
         widget_div_contents.append(error_div)
+    else:
+        json_schema_extra = field_info.json_schema_extra or {}
+        if isinstance(json_schema_extra, dict):
+            documentation = json_schema_extra.get("documentation")
+            if isinstance(documentation, str):
+                doc_div = htm.div(".text-muted.mt-1.form-text")[documentation]
+                widget_div_contents.append(doc_div)
 
     return None, row_div[label_elem, widget_div[widget_div_contents]]
