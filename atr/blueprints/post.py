@@ -132,8 +132,8 @@ def form(
 ) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
     def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
         async def wrapper(session: web.Committer | None, *args: Any, **kwargs: Any) -> Any:
+            form_data = await atr.form.quart_request()
             try:
-                form_data = await atr.form.quart_request()
                 context = {"session": session}
                 validated_form = atr.form.validate(form_cls, form_data, context)
                 return await func(session, validated_form, *args, **kwargs)
@@ -141,22 +141,7 @@ def form(
                 errors = e.errors()
                 if len(errors) == 0:
                     raise RuntimeError("Validation failed, but no errors were reported")
-
-                flash_data = {}
-                for i, error in enumerate(errors):
-                    loc = error["loc"]
-                    kind = error["type"]
-                    msg = error["msg"]
-                    msg = msg.replace(": An email address", " because an email address")
-                    msg = msg.replace("Value error, ", "")
-                    original = error["input"]
-                    field_name, field_label = atr.form.name_and_label(form_cls, i, loc)
-                    flash_data[field_name] = {
-                        "label": field_label,
-                        "original": original,
-                        "kind": kind,
-                        "msg": msg,
-                    }
+                flash_data = atr.form.flash_error_data(form_cls, errors, form_data)
 
                 plural = len(errors) > 1
                 summary = f"Please fix the following issue{'s' if plural else ''}:"
@@ -165,10 +150,12 @@ def form(
                     if i > 9:
                         ul.li["And more, not shown here..."]
                         break
-                    ul.li[htm.strong[flash_datum["label"]], ": ", flash_datum["msg"]]
+                    if "msg" in flash_datum:
+                        ul.li[htm.strong[flash_datum["label"]], ": ", flash_datum["msg"]]
                 summary = f"{summary}\n{ul.collect()}"
 
                 # TODO: Centralise all uses of markupsafe.Markup
+                # log.info(f"Flash data: {flash_data}")
                 await quart.flash(markupsafe.Markup(summary), category="error")
                 await quart.flash(json.dumps(flash_data), category="form-error-data")
                 return quart.redirect(quart.request.path)
