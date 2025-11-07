@@ -191,6 +191,10 @@ async def render(
     if action is None:
         action = quart.request.path
 
+    is_empty_form = model_cls is Empty
+    if is_empty_form and (form_classes == ".atr-canary"):
+        form_classes = ""
+
     flash_error_data: dict[str, Any] = _get_flash_error_data() if use_error_data else {}
 
     field_rows: list[htm.Element] = []
@@ -223,9 +227,13 @@ async def render(
     if cancel_url:
         cancel_link = htpy.a(href=cancel_url, class_="btn btn-link text-secondary")["Cancel"]
         submit_div_contents.append(cancel_link)
-    submit_div = htm.div(".col-sm-9.offset-sm-3")
-    submit_row = htm.div(".row")[submit_div[submit_div_contents]]
-    form_children.append(submit_row)
+
+    if is_empty_form:
+        form_children.extend(submit_div_contents)
+    else:
+        submit_div = htm.div(".col-sm-9.offset-sm-3")
+        submit_row = htm.div(".row")[submit_div[submit_div_contents]]
+        form_children.append(submit_row)
 
     return htm.form(form_classes, action=action, method="post", enctype="multipart/form-data")[form_children]
 

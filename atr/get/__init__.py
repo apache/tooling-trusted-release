@@ -31,6 +31,7 @@ import atr.get.file as file
 import atr.get.finish as finish
 import atr.get.ignores as ignores
 import atr.get.keys as keys
+import atr.get.manual as manual
 import atr.get.preview as preview
 import atr.get.projects as projects
 import atr.get.published as published
@@ -64,6 +65,7 @@ __all__ = [
     "finish",
     "ignores",
     "keys",
+    "manual",
     "preview",
     "projects",
     "published",

@@ -90,7 +90,7 @@ class FormProjectVersion:
 # TODO: Move this to an appropriate module
 def html_nav(container: htm.Block, back_url: str, back_anchor: str, phase: Phase) -> None:
     classes = ".d-flex.justify-content-between.align-items-center"
-    block = htm.Block(htm.p(classes))
+    block = htm.Block(htm.p(classes=classes))
     block.a(".atr-back-link", href=back_url)[f"← Back to {back_anchor}"]
     span = htm.Block(htm.span)
 
