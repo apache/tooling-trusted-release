@@ -166,19 +166,21 @@ async def render_columns(
     submit_label: str = "Submit",
     defaults: dict[str, Any] | None = None,
     errors: dict[str, list[str]] | None = None,
+    use_error_data: bool = True,
 ) -> htm.Element:
     if action is None:
         action = quart.request.path
 
     flash_error_data: dict[str, Any] = {}
-    flashed_error_messages = quart.get_flashed_messages(category_filter=["form-error-data"])
-    if flashed_error_messages:
-        try:
-            first_message = flashed_error_messages[0]
-            if isinstance(first_message, str):
-                flash_error_data = json.loads(first_message)
-        except (json.JSONDecodeError, IndexError):
-            pass
+    if use_error_data:
+        flashed_error_messages = quart.get_flashed_messages(category_filter=["form-error-data"])
+        if flashed_error_messages:
+            try:
+                first_message = flashed_error_messages[0]
+                if isinstance(first_message, str):
+                    flash_error_data = json.loads(first_message)
+            except (json.JSONDecodeError, IndexError):
+                pass
 
     field_rows: list[htm.Element] = []
     hidden_fields: list[htm.Element | htm.VoidElement | markupsafe.Markup] = []
@@ -554,6 +556,27 @@ def _get_widget_type(field_info: pydantic.fields.FieldInfo) -> Widget:  # noqa: 
     return Widget.TEXT
 
 
+def _render_field_value(
+    field_name: str,
+    flash_error_data: dict[str, Any],
+    has_flash_error: bool,
+    defaults: dict[str, Any] | None,
+    field_info: pydantic.fields.FieldInfo,
+) -> Any:
+    has_flash_data = f"!{field_name}" in flash_error_data
+    if has_flash_error:
+        field_value = flash_error_data[field_name]["original"]
+    elif has_flash_data:
+        field_value = flash_error_data[f"!{field_name}"]["original"]
+    elif defaults:
+        field_value = defaults.get(field_name)
+    elif not field_info.is_required():
+        field_value = field_info.get_default(call_default_factory=True)
+    else:
+        field_value = None
+    return field_value
+
+
 def _render_row(
     field_info: pydantic.fields.FieldInfo,
     field_name: str,
@@ -563,27 +586,13 @@ def _render_row(
 ) -> tuple[htm.VoidElement | None, htm.Element | None]:
     widget_type = _get_widget_type(field_info)
     has_flash_error = field_name in flash_error_data
-    has_flash_data = f"!{field_name}" in flash_error_data
+    field_value = _render_field_value(field_name, flash_error_data, has_flash_error, defaults, field_info)
 
-    if widget_type:  # not in (Widget.FILE, Widget.FILES):
-        if has_flash_error:
-            field_value = flash_error_data[field_name]["original"]
-        elif has_flash_data:
-            field_value = flash_error_data[f"!{field_name}"]["original"]
-        elif defaults:
-            field_value = defaults.get(field_name)
-        elif not field_info.is_required():
-            field_value = field_info.get_default(call_default_factory=True)
-        else:
-            field_value = None
-    elif defaults:
-        field_value = defaults.get(field_name)
-    elif not field_info.is_required():
-        field_value = field_info.get_default(call_default_factory=True)
-    else:
-        field_value = None
+    compound_widget = widget_type in (Widget.CHECKBOXES, Widget.FILES)
+    substantial_field_value = field_value is not None
+    field_value_is_not_list = not isinstance(field_value, list)
 
-    if (widget_type in (Widget.CHECKBOXES, Widget.FILES)) and (not isinstance(field_value, list)):
+    if compound_widget and substantial_field_value and field_value_is_not_list:
         field_value = [field_value]
     field_errors = errors.get(field_name) if errors else None
 
@@ -608,4 +617,11 @@ def _render_row(
 
     row_div = htm.div(".mb-3.row")
     widget_div = htm.div(".col-sm-8")
-    return None, row_div[label_elem, widget_div[widget_elem]]
+
+    widget_div_contents: list[htm.Element | htm.VoidElement] = [widget_elem]
+    if has_flash_error:
+        error_msg = flash_error_data[field_name]["msg"]
+        error_div = htm.div(".text-danger.mt-1")[f"Error: {error_msg}"]
+        widget_div_contents.append(error_div)
+
+    return None, row_div[label_elem, widget_div[widget_div_contents]]
