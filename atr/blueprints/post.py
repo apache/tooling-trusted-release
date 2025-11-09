@@ -120,6 +120,7 @@ def empty() -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable
                 return quart.redirect(quart.request.path)
 
         wrapper.__name__ = func.__name__
+        wrapper.__module__ = func.__module__
         wrapper.__doc__ = func.__doc__
         wrapper.__annotations__ = func.__annotations__.copy()
         return wrapper
@@ -160,9 +161,10 @@ def form(
                 await quart.flash(json.dumps(flash_data), category="form-error-data")
                 return quart.redirect(quart.request.path)
 
-        wrapper.__name__ = func.__name__
-        wrapper.__doc__ = func.__doc__
         wrapper.__annotations__ = func.__annotations__.copy()
+        wrapper.__doc__ = func.__doc__
+        wrapper.__module__ = func.__module__
+        wrapper.__name__ = func.__name__
         return wrapper
 
     return decorator
@@ -176,9 +178,10 @@ def public(path: str) -> Callable[[Callable[..., Awaitable[Any]]], web.RouteFunc
             return await func(enhanced_session, *args, **kwargs)
 
         endpoint = func.__module__.replace(".", "_") + "_" + func.__name__
-        wrapper.__name__ = func.__name__
-        wrapper.__doc__ = func.__doc__
         wrapper.__annotations__["endpoint"] = _BLUEPRINT_NAME + "." + endpoint
+        wrapper.__doc__ = func.__doc__
+        wrapper.__module__ = func.__module__
+        wrapper.__name__ = func.__name__
 
         _BLUEPRINT.add_url_rule(path, endpoint=endpoint, view_func=wrapper, methods=["POST"])
 
