@@ -30,12 +30,10 @@ import wtforms.fields.core as core
 
 import atr.db as db
 import atr.forms as forms
-import atr.get as get
 import atr.htm as htm
 import atr.jwtoken as jwtoken
 import atr.log as log
 import atr.models.sql as sql
-import atr.post as post
 import atr.storage as storage
 import atr.template as templates
 import atr.util as util
@@ -145,6 +143,8 @@ def _as_markup(fragment: Fragment) -> markupsafe.Markup:
 
 
 def _build_add_form_element(a_form: AddTokenForm) -> markupsafe.Markup:
+    import atr.post as post
+
     elem = htm.form(method="post", action=util.as_url(post.tokens.tokens))[
         _as_markup(a_form.csrf_token),
         htm.div(".mb-3")[
@@ -157,6 +157,8 @@ def _build_add_form_element(a_form: AddTokenForm) -> markupsafe.Markup:
 
 
 def _build_delete_form_element(token_id: int | None) -> markupsafe.Markup:
+    import atr.post as post
+
     d_form = DeleteTokenForm()
     d_form.token_id.data = "" if token_id is None else str(token_id)
     elem = htm.form(".mb-0", method="post", action=util.as_url(post.tokens.tokens))[
@@ -168,6 +170,8 @@ def _build_delete_form_element(token_id: int | None) -> markupsafe.Markup:
 
 
 def _build_issue_jwt_form_element(j_form: IssueJWTForm) -> markupsafe.Markup:
+    import atr.post as post
+
     elem = htm.form("#issue-jwt-form", method="post", action=util.as_url(post.tokens.jwt_post))[
         _as_markup(j_form.csrf_token),
         j_form.submit(class_="btn btn-primary"),
@@ -242,6 +246,8 @@ async def _handle_post(session: web.Committer, request_form: datastructures.Mult
 async def _handle_add_token_post(
     session: web.Committer, request_form: datastructures.MultiDict
 ) -> web.WerkzeugResponse | None:
+    import atr.get as get
+
     add_form = await AddTokenForm.create_form(data=request_form)
     if await add_form.validate_on_submit():
         label_val = str(add_form.label.data) if add_form.label.data else None
@@ -263,6 +269,8 @@ async def _handle_add_token_post(
 async def _handle_delete_token_post(
     session: web.Committer, request_form: datastructures.MultiDict
 ) -> web.WerkzeugResponse | None:
+    import atr.get as get
+
     del_form = await DeleteTokenForm.create_form(data=request_form)
     if await del_form.validate_on_submit():
         token_id_val = int(str(del_form.token_id.data))
@@ -277,6 +285,8 @@ async def _handle_delete_token_post(
 async def _handle_issue_jwt_post(
     session: web.Committer, request_form: datastructures.MultiDict
 ) -> web.WerkzeugResponse | None:
+    import atr.get as get
+
     issue_form = await IssueJWTForm.create_form(data=request_form)
     if await issue_form.validate_on_submit():
         jwt_token = jwtoken.issue(session.uid)
