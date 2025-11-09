@@ -22,6 +22,7 @@ import wtforms
 import atr.db as db
 import atr.db.interaction as interaction
 import atr.forms as forms
+import atr.htm as htm
 import atr.models.results as results
 import atr.models.sql as sql
 import atr.shared.announce as announce
@@ -78,7 +79,7 @@ async def check(
     session: web.Committer | None,
     release: sql.Release,
     task_mid: str | None = None,
-    form: wtforms.Form | None = None,
+    form: htm.Element | None = None,
     resolve_form: wtforms.Form | None = None,
     archive_url: str | None = None,
     vote_task: sql.Task | None = None,

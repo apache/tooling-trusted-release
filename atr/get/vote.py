@@ -16,10 +16,12 @@
 # under the License.
 
 import asfquart.base as base
+import htpy
 
 import atr.blueprints.get as get
 import atr.db as db
 import atr.db.interaction as interaction
+import atr.form as form
 import atr.forms as forms
 import atr.log as log
 import atr.mapping as mapping
@@ -88,9 +90,8 @@ async def selected(session: web.Committer | None, project_name: str, version_nam
         resolve_form = await forms.Submit.create_form()
         resolve_form.submit.label.text = "Resolve vote"
 
-    form = None
+    cast_vote_form = None
     if can_vote:
-        form = await shared.vote.CastVoteForm.create_form()
         async with storage.write() as write:
             try:
                 if release.committee.is_podling:
@@ -100,20 +101,34 @@ async def selected(session: web.Committer | None, project_name: str, version_nam
                 potency = "Binding"
             except storage.AccessError:
                 potency = "Non-binding"
-        forms.choices(
-            form.vote_value,
-            choices=[
-                ("+1", f"+1 ({potency})"),
-                ("0", "0"),
-                ("-1", f"-1 ({potency})"),
-            ],
+
+        vote_widget = htpy.div(class_="btn-group", role="group")[
+            htpy.input(
+                type="radio", class_="btn-check", name="decision", id="decision_0", value="+1", autocomplete="off"
+            ),
+            htpy.label(class_="btn btn-outline-success", for_="decision_0")[f"+1 ({potency})"],
+            htpy.input(
+                type="radio", class_="btn-check", name="decision", id="decision_1", value="0", autocomplete="off"
+            ),
+            htpy.label(class_="btn btn-outline-secondary", for_="decision_1")["0"],
+            htpy.input(
+                type="radio", class_="btn-check", name="decision", id="decision_2", value="-1", autocomplete="off"
+            ),
+            htpy.label(class_="btn btn-outline-danger", for_="decision_2")[f"-1 ({potency})"],
+        ]
+
+        cast_vote_form = await form.render(
+            model_cls=shared.vote.CastVoteForm,
+            submit_label="Submit vote",
+            form_classes=".atr-canary.py-4.px-5.mb-4.border.rounded",
+            custom={"decision": vote_widget},
         )
 
     return await shared.check(
         session,
         release,
         task_mid=task_mid,
-        form=form,
+        form=cast_vote_form,
         resolve_form=resolve_form,
         archive_url=archive_url,
         vote_task=latest_vote_task,

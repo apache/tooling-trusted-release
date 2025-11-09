@@ -18,67 +18,35 @@
 import quart
 
 import atr.blueprints.post as post
-import atr.forms as forms
-import atr.get.vote as get_vote
+import atr.get as get
 import atr.models.sql as sql
-import atr.shared.vote as shared_vote
+import atr.shared as shared
 import atr.storage as storage
 import atr.web as web
 
 
 @post.committer("/vote/<project_name>/<version_name>")
-async def selected_post(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse:
-    """Handle submission of a vote."""
+@post.form(shared.vote.CastVoteForm)
+async def selected_post(
+    session: web.Committer, cast_vote_form: shared.vote.CastVoteForm, project_name: str, version_name: str
+) -> web.WerkzeugResponse:
     await session.check_access(project_name)
 
-    # Ensure the release exists and is in the correct phase
     release = await session.release(project_name, version_name, phase=sql.ReleasePhase.RELEASE_CANDIDATE)
 
     if release.committee is None:
         raise ValueError("Release has no committee")
 
-    # Set up form choices
-    async with storage.write() as write:
-        try:
-            if release.committee.is_podling:
-                _wacm = write.as_committee_member("incubator")
-            else:
-                _wacm = write.as_committee_member(release.committee.name)
-            potency = "Binding"
-        except storage.AccessError:
-            # Participant, due to session.check_access above
-            potency = "Non-binding"
+    vote = cast_vote_form.decision
+    comment = cast_vote_form.comment
 
-    form = await shared_vote.CastVoteForm.create_form(data=await quart.request.form)
-    forms.choices(
-        form.vote_value,
-        choices=[
-            ("+1", f"+1 ({potency})"),
-            ("0", "0"),
-            ("-1", f"-1 ({potency})"),
-        ],
-    )
+    async with storage.write_as_committee_participant(release.committee.name) as wacm:
+        email_recipient, error_message = await wacm.vote.send_user_vote(release, vote, comment, session.fullname)
 
-    if await form.validate_on_submit():
-        vote = str(form.vote_value.data)
-        comment = str(form.vote_comment.data)
-        async with storage.write_as_committee_participant(release.committee.name) as wacm:
-            email_recipient, error_message = await wacm.vote.send_user_vote(release, vote, comment, session.fullname)
-        if error_message:
-            return await session.redirect(
-                get_vote.selected, project_name=project_name, version_name=version_name, error=error_message
-            )
+    if error_message:
+        await quart.flash(error_message, "error")
+        return await session.redirect(get.vote.selected, project_name=project_name, version_name=version_name)
 
-        success_message = f"Sending your vote to {email_recipient}."
-        return await session.redirect(
-            get_vote.selected, project_name=project_name, version_name=version_name, success=success_message
-        )
-    else:
-        error_message = "Invalid vote submission"
-        if form.errors:
-            error_details = "; ".join([f"{field}: {', '.join(errs)}" for field, errs in form.errors.items()])
-            error_message = f"{error_message}: {error_details}"
-
-        return await session.redirect(
-            get_vote.selected, project_name=project_name, version_name=version_name, error=error_message
-        )
+    success_message = f"Sending your vote to {email_recipient}."
+    await quart.flash(success_message, "success")
+    return await session.redirect(get.vote.selected, project_name=project_name, version_name=version_name)

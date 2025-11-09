@@ -15,12 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import atr.forms as forms
+from typing import Literal
+
+import atr.form as form
 
 
-class CastVoteForm(forms.Typed):
-    """Form for casting a vote."""
-
-    vote_value = forms.radio("Your vote")
-    vote_comment = forms.textarea("Comment (optional)", optional=True)
-    submit = forms.submit("Submit vote")
+class CastVoteForm(form.Form):
+    decision: Literal["+1", "0", "-1"] = form.label("Your vote", widget=form.Widget.CUSTOM)
+    comment: str = form.label("Comment (optional)", widget=form.Widget.TEXTAREA)

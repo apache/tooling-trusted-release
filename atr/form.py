@@ -199,7 +199,7 @@ async def render(
     submit_classes: str = "btn-primary",
     submit_label: str = "Submit",
     cancel_url: str | None = None,
-    textarea_rows: int = 18,
+    textarea_rows: int = 12,
     defaults: dict[str, Any] | None = None,
     errors: dict[str, list[str]] | None = None,
     use_error_data: bool = True,
