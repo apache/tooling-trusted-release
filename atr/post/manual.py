@@ -17,8 +17,8 @@
 
 import atr.blueprints.post as post
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.get.vote as vote
-import atr.shared.manual as shared_manual
 import atr.storage as storage
 import atr.web as web
 
@@ -31,7 +31,9 @@ async def selected_revision(
     await session.check_access(project_name)
 
     async with db.session() as data:
-        match await shared_manual.validated_release(session, project_name, version_name, revision, data):
+        match await interaction.release_ready_for_vote(
+            session, project_name, version_name, revision, data, manual_vote=True
+        ):
             case str() as error:
                 return await session.redirect(
                     vote.selected,

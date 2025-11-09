@@ -34,6 +34,7 @@ import atr.models.results as results
 import atr.models.sql as sql
 import atr.user as user
 import atr.util as util
+import atr.web as web
 
 # TEST_MID: Final[str | None] = "CAH5JyZo8QnWmg9CwRSwWY=GivhXW4NiLyeNJO71FKdK81J5-Uw@mail.gmail.com"
 TEST_MID: Final[str | None] = None
@@ -255,6 +256,53 @@ async def release_latest_vote_task(release: sql.Release) -> sql.Task | None:
         )
         task = (await data.execute(query)).scalar_one_or_none()
         return task
+
+
+async def release_ready_for_vote(
+    session: web.Committer,
+    project_name: str,
+    version_name: str,
+    revision: str,
+    data: db.Session,
+    manual_vote: bool = False,
+) -> tuple[sql.Release, sql.Committee] | str:
+    release = await session.release(
+        project_name,
+        version_name,
+        data=data,
+        with_project=True,
+        with_committee=True,
+        with_project_release_policy=True,
+    )
+
+    selected_revision_number = release.latest_revision_number
+    if selected_revision_number is None:
+        return "No revision found for this release"
+
+    if selected_revision_number != revision:
+        return "This revision does not match the revision you are voting on"
+
+    committee = release.committee
+    if committee is None:
+        return "The committee for this release was not found"
+
+    if manual_vote and (not release.project.policy_manual_vote):
+        return "This release does not have manual vote mode enabled"
+    elif (not manual_vote) and release.project.policy_manual_vote:
+        return "This release has manual vote mode enabled"
+
+    if release.project.policy_strict_checking:
+        if await has_failing_checks(release, revision, caller_data=data):
+            return "This release candidate draft has errors. Please fix the errors before starting a vote."
+
+    if not (user.is_committee_member(committee, session.uid) or user.is_admin(session.uid)):
+        return "You must be on the PMC of this project to start a vote"
+
+    has_files = await util.has_files(release)
+    if not has_files:
+        return "This release candidate draft has no files yet. Please add some files before starting a vote."
+
+    return release, committee
 
 
 async def releases_by_phase(project: sql.Project, phase: sql.ReleasePhase) -> list[sql.Release]:

@@ -17,12 +17,12 @@
 
 import atr.blueprints.get as get
 import atr.db as db
+import atr.db.interaction as interaction
 import atr.form as form
 import atr.get.compose as compose
 import atr.htm as htm
 import atr.post.manual as post_manual
 import atr.shared.distribution as distribution
-import atr.shared.manual as shared_manual
 import atr.template as template
 import atr.util as util
 import atr.web as web
@@ -35,7 +35,9 @@ async def selected_revision(
     await session.check_access(project_name)
 
     async with db.session() as data:
-        match await shared_manual.validated_release(session, project_name, version_name, revision, data):
+        match await interaction.release_ready_for_vote(
+            session, project_name, version_name, revision, data, manual_vote=True
+        ):
             case str() as error:
                 return await session.redirect(
                     compose.selected,
