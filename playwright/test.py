@@ -190,7 +190,7 @@ def lifecycle_04_start_vote(page: sync_api.Page, credentials: Credentials, versi
     logging.info(f"Current URL: {page.url}")
 
     logging.info("Locating and activating the button to prepare the vote email")
-    submit_button_locator = page.locator('input[type="submit"][value="Send vote email"]')
+    submit_button_locator = page.get_by_role("button", name="Send vote email")
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
