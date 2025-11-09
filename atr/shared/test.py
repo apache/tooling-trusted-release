@@ -57,6 +57,7 @@ class SingleForm(form.Form):
     message: str = form.label("Message")
     files: form.FileList = form.label("Files to upload")
     compatibility: form.Set[Compatibility] = form.label("Compatibility")
+    vote: Literal["+1", "0", "-1"] = form.label("Vote", widget=form.Widget.CUSTOM)
 
     @pydantic.field_validator("email")
     @classmethod

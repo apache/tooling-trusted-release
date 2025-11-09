@@ -55,6 +55,7 @@ class Empty(Form):
 class Widget(enum.Enum):
     CHECKBOX = "checkbox"
     CHECKBOXES = "checkboxes"
+    CUSTOM = "custom"
     EMAIL = "email"
     FILE = "file"
     FILES = "files"
@@ -202,6 +203,7 @@ async def render(
     defaults: dict[str, Any] | None = None,
     errors: dict[str, list[str]] | None = None,
     use_error_data: bool = True,
+    custom: dict[str, htm.Element | htm.VoidElement] | None = None,
 ) -> htm.Element:
     if action is None:
         action = quart.request.path
@@ -229,6 +231,7 @@ async def render(
             defaults,
             errors,
             textarea_rows,
+            custom,
         )
         if hidden_field:
             hidden_fields.append(hidden_field)
@@ -249,6 +252,10 @@ async def render(
         submit_div = htm.div(".col-sm-9.offset-sm-3")
         submit_row = htm.div(".row")[submit_div[submit_div_contents]]
         form_children.append(submit_row)
+
+    if custom:
+        unused = ", ".join(custom.keys())
+        raise ValueError(f"Custom widgets provided but not used: {unused}")
 
     return htm.form(form_classes, action=action, method="post", enctype="multipart/form-data")[form_children]
 
@@ -378,6 +385,7 @@ def _render_widget(  # noqa: C901
     field_errors: list[str] | None,
     is_required: bool,
     textarea_rows: int,
+    custom: dict[str, htm.Element | htm.VoidElement] | None,
 ) -> htm.Element | htm.VoidElement:
     widget_type = _get_widget_type(field_info)
     widget_classes = _get_widget_classes(widget_type, field_errors)
@@ -421,6 +429,12 @@ def _render_widget(  # noqa: C901
                 checkboxes.append(htpy.div(class_="form-check")[checkbox_input, checkbox_label])
             elements.extend(checkboxes)
             widget = htm.div[checkboxes]
+
+        case Widget.CUSTOM:
+            if custom and (field_name in custom):
+                widget = custom.pop(field_name)
+            else:
+                widget = htm.div[f"Custom widget for {field_name} not provided"]
 
         case Widget.EMAIL:
             attrs = {**base_attrs, "type": "email"}
@@ -643,6 +657,7 @@ def _render_row(
     defaults: dict[str, Any] | None,
     errors: dict[str, list[str]] | None,
     textarea_rows: int,
+    custom: dict[str, htm.Element | htm.VoidElement] | None,
 ) -> tuple[htm.VoidElement | None, htm.Element | None]:
     widget_type = _get_widget_type(field_info)
     has_flash_error = field_name in flash_error_data
@@ -674,6 +689,7 @@ def _render_row(
         field_errors=field_errors,
         is_required=is_required,
         textarea_rows=textarea_rows,
+        custom=custom,
     )
 
     row_div = htm.div(".mb-3.row")

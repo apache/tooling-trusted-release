@@ -66,7 +66,8 @@ async def test_single(session: web.Committer | None, form: shared.test.SingleFor
         f" email={form.email},"
         f" message={form.message},"
         f" files={file_names},"
-        f" compatibility={compatibility_names}"
+        f" compatibility={compatibility_names},"
+        f" vote={form.vote}"
     )
     log.info(msg)
     await quart.flash(msg, "success")

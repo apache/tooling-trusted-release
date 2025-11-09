@@ -91,10 +91,22 @@ async def test_multiple(session: web.Committer | None) -> str:
 
 @get.public("/test/single")
 async def test_single(session: web.Committer | None) -> str:
+    import htpy
+
+    vote_widget = htpy.div(class_="btn-group", role="group")[
+        htpy.input(type="radio", class_="btn-check", name="vote", id="vote_0", value="+1", autocomplete="off"),
+        htpy.label(class_="btn btn-outline-success", for_="vote_0")["+1"],
+        htpy.input(type="radio", class_="btn-check", name="vote", id="vote_1", value="0", autocomplete="off"),
+        htpy.label(class_="btn btn-outline-secondary", for_="vote_1")["0"],
+        htpy.input(type="radio", class_="btn-check", name="vote", id="vote_2", value="-1", autocomplete="off"),
+        htpy.label(class_="btn btn-outline-danger", for_="vote_2")["-1"],
+    ]
+
     single_form = await form.render(
         model_cls=shared.test.SingleForm,
         submit_label="Submit",
         action="/test/single",
+        custom={"vote": vote_widget},
     )
 
     forms_html = htm.div[
