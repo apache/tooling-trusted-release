@@ -23,6 +23,7 @@ import types
 from typing import TYPE_CHECKING, Annotated, Any, Final, Literal, get_args, get_origin
 
 import htpy
+import markupsafe
 import pydantic
 import pydantic.functional_validators as functional_validators
 import quart
@@ -35,7 +36,6 @@ import atr.models.schema as schema
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    import markupsafe
     import pydantic_core
 
     import atr.web as web
@@ -94,6 +94,21 @@ def flash_error_data(
                 "original": json_suitable(field_value),
             }
     return flash_data
+
+
+def flash_error_summary(errors: list[pydantic_core.ErrorDetails], flash_data: dict[str, Any]) -> markupsafe.Markup:
+    div = htm.Block()
+    plural = len(errors) > 1
+    div.text(f"Please fix the following issue{'s' if plural else ''}:")
+    with div.block(htm.ul, classes=".mt-2.mb-0") as ul:
+        for i, flash_datum in enumerate(flash_data.values()):
+            if i > 9:
+                ul.li["And more, not shown here..."]
+                break
+            if "msg" in flash_datum:
+                ul.li[htm.strong[flash_datum["label"]], ": ", flash_datum["msg"]]
+    summary = div.collect()
+    return markupsafe.Markup(summary)
 
 
 def json_suitable(field_value: Any) -> Any:

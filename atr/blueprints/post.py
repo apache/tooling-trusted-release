@@ -24,12 +24,10 @@ from typing import Any
 import asfquart.auth as auth
 import asfquart.base as base
 import asfquart.session
-import markupsafe
 import pydantic
 import quart
 
 import atr.form
-import atr.htm as htm
 import atr.log as log
 import atr.web as web
 
@@ -108,21 +106,34 @@ def empty() -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable
     #     pass
     def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
         async def wrapper(session: web.Committer | None, *args: Any, **kwargs: Any) -> Any:
+            match session:
+                case web.Committer() as committer:
+                    form_data = await committer.form_data()
+                case None:
+                    form_data = await atr.form.quart_request()
             try:
-                form_data = await atr.form.quart_request()
-                context = {"session": session}
-                atr.form.validate(atr.form.Empty, form_data, context)
+                context = {
+                    "args": args,
+                    "kwargs": kwargs,
+                    "session": session,
+                }
+                match session:
+                    case web.Committer() as committer:
+                        await committer.form_validate(atr.form.Empty, context=context)
+                    case None:
+                        atr.form.validate(atr.form.Empty, form_data, context=context)
                 return await func(session, *args, **kwargs)
             except pydantic.ValidationError:
-                # This presumably should not happen, because the CSRF token checker reaches it first
-                msg = "Sorry, your form session expired for security reasons. Please try again."
+                # This could happen if the form was tampered with
+                # It should not happen if the CSRF token is invalid
+                msg = "Sorry, there was an empty form validation error. Please try again."
                 await quart.flash(msg, "error")
                 return quart.redirect(quart.request.path)
 
-        wrapper.__name__ = func.__name__
-        wrapper.__module__ = func.__module__
-        wrapper.__doc__ = func.__doc__
         wrapper.__annotations__ = func.__annotations__.copy()
+        wrapper.__doc__ = func.__doc__
+        wrapper.__module__ = func.__module__
+        wrapper.__name__ = func.__name__
         return wrapper
 
     return decorator
@@ -133,31 +144,33 @@ def form(
 ) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
     def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
         async def wrapper(session: web.Committer | None, *args: Any, **kwargs: Any) -> Any:
-            form_data = await atr.form.quart_request()
+            match session:
+                case web.Committer() as committer:
+                    form_data = await committer.form_data()
+                case None:
+                    form_data = await atr.form.quart_request()
             try:
-                context = {"session": session}
-                validated_form = atr.form.validate(form_cls, form_data, context)
+                context = {
+                    "args": args,
+                    "kwargs": kwargs,
+                    "session": session,
+                }
+                match session:
+                    case web.Committer() as committer:
+                        validated_form = await committer.form_validate(form_cls, context)
+                    case None:
+                        validated_form = atr.form.validate(form_cls, form_data, context=context)
                 return await func(session, validated_form, *args, **kwargs)
             except pydantic.ValidationError as e:
                 errors = e.errors()
                 if len(errors) == 0:
                     raise RuntimeError("Validation failed, but no errors were reported")
                 flash_data = atr.form.flash_error_data(form_cls, errors, form_data)
-
-                plural = len(errors) > 1
-                summary = f"Please fix the following issue{'s' if plural else ''}:"
-                ul = htm.Block(htm.ul, classes=".mt-2.mb-0")
-                for i, flash_datum in enumerate(flash_data.values()):
-                    if i > 9:
-                        ul.li["And more, not shown here..."]
-                        break
-                    if "msg" in flash_datum:
-                        ul.li[htm.strong[flash_datum["label"]], ": ", flash_datum["msg"]]
-                summary = f"{summary}\n{ul.collect()}"
+                summary = atr.form.flash_error_summary(errors, flash_data)
 
                 # TODO: Centralise all uses of markupsafe.Markup
                 # log.info(f"Flash data: {flash_data}")
-                await quart.flash(markupsafe.Markup(summary), category="error")
+                await quart.flash(summary, category="error")
                 await quart.flash(json.dumps(flash_data), category="form-error-data")
                 return quart.redirect(quart.request.path)
 

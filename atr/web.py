@@ -17,16 +17,19 @@
 
 from __future__ import annotations
 
+import json
 import urllib.parse
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 import asfquart.base as base
 import asfquart.session as session
+import pydantic_core
 import quart
 import werkzeug.datastructures.headers
 
 import atr.config as config
 import atr.db as db
+import atr.form as form
 import atr.htm as htm
 import atr.models.sql as sql
 import atr.user as user
@@ -35,8 +38,8 @@ import atr.util as util
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Sequence
 
+    import pydantic
     import werkzeug.wrappers.response as response
-
 
 R = TypeVar("R", covariant=True)
 
@@ -58,19 +61,25 @@ class Committer:
     """Session with extra information about committers."""
 
     def __init__(self, web_session: session.ClientSession) -> None:
-        self._projects: list[sql.Project] | None = None
-        self._session = web_session
+        self.__form_cls: type[form.Form] | None = None
+        self.__form_data: dict[str, Any] | None = None
+        self.__projects: list[sql.Project] | None = None
+        self.session = web_session
 
     @property
     def asf_uid(self) -> str:
-        if self._session.uid is None:
+        if self.session.uid is None:
             raise base.ASFQuartException("Not authenticated", errorcode=401)
-        return self._session.uid
+        return self.session.uid
 
     def __getattr__(self, name: str) -> Any:
         # TODO: Not type safe, should subclass properly if possible
         # For example, we can access session.no_such_attr and the type checkers won't notice
-        return getattr(self._session, name)
+        return getattr(self.session, name)
+
+    @property
+    def app_host(self) -> str:
+        return config.get().APP_HOST
 
     async def check_access(self, project_name: str) -> None:
         if not any((p.name == project_name) for p in (await self.user_projects)):
@@ -93,9 +102,37 @@ class Committer:
                 return
             raise base.ASFQuartException("You do not have access to this committee", errorcode=403)
 
-    @property
-    def app_host(self) -> str:
-        return config.get().APP_HOST
+    async def form_data(self) -> dict[str, Any]:
+        if self.__form_data is None:
+            self.__form_data = await form.quart_request()
+        # Avoid mutations from writing back to our copy
+        return self.__form_data.copy()
+
+    async def form_error(self, field_name: str, error_msg: str) -> WerkzeugResponse:
+        if self.__form_cls is None:
+            raise ValueError("Form class not set")
+        if self.__form_data is None:
+            raise ValueError("Form data not set")
+        errors = [
+            pydantic_core.ErrorDetails(
+                loc=(field_name,),
+                msg=error_msg,
+                input=self.__form_data[field_name],
+                type="atr_error",
+            )
+        ]
+        flash_data = form.flash_error_data(self.__form_cls, errors, self.__form_data)
+        summary = form.flash_error_summary(errors, flash_data)
+
+        await quart.flash(summary, category="error")
+        await quart.flash(json.dumps(flash_data), category="form-error-data")
+        return quart.redirect(quart.request.path)
+
+    async def form_validate(self, form_cls: type[form.Form], context: dict[str, Any]) -> pydantic.BaseModel:
+        self.__form_cls = form_cls
+        if self.__form_data is None:
+            self.__form_data = await form.quart_request()
+        return form.validate(form_cls, self.__form_data.copy(), context=context)
 
     @property
     def host(self) -> str:
@@ -165,7 +202,7 @@ class Committer:
 
     @property
     async def user_candidate_drafts(self) -> list[sql.Release]:
-        return await user.candidate_drafts(self.uid, user_projects=self._projects)
+        return await user.candidate_drafts(self.uid, user_projects=self.__projects)
 
     # @property
     # async def user_committees(self) -> list[models.Committee]:
@@ -173,9 +210,9 @@ class Committer:
 
     @property
     async def user_projects(self) -> list[sql.Project]:
-        if self._projects is None:
-            self._projects = await user.projects(self.uid)
-        return self._projects[:]
+        if self.__projects is None:
+            self.__projects = await user.projects(self.uid)
+        return self.__projects[:]
 
 
 class ElementResponse(quart.Response):
@@ -239,6 +276,10 @@ class ZipResponse(quart.Response):
     ) -> None:
         raw_headers = {name: str(value) for name, value in headers.items()}
         super().__init__(response, status=status, headers=raw_headers, mimetype="application/zip")
+
+
+async def form_error(error: str) -> None:
+    pass
 
 
 async def redirect[R](

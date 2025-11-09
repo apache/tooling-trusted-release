@@ -129,9 +129,12 @@ class Block:
 
     @contextlib.contextmanager
     def block(
-        self, element: Element | None = None, separator: Element | VoidElement | str | None = None
+        self,
+        element: Element | None = None,
+        classes: str | None = None,
+        separator: Element | VoidElement | str | None = None,
     ) -> Generator[Block, Any, Any]:
-        block = Block(element)
+        block = Block(element, classes=classes)
         yield block
         self.append(block.collect(separator=separator))
 

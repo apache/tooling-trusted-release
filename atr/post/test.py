@@ -55,6 +55,11 @@ async def test_multiple(session: web.Committer | None, form: shared.test.Multipl
 async def test_single(session: web.Committer | None, form: shared.test.SingleForm) -> web.WerkzeugResponse:
     file_names = [f.filename for f in form.files] if form.files else []
     compatibility_names = [f.value for f in form.compatibility] if form.compatibility else []
+    if (form.message == "Forbidden message!") and (session is not None):
+        return await session.form_error(
+            "message",
+            "You are not permitted to submit the forbidden message",
+        )
     msg = (
         f"Single form received:"
         f" name={form.name},"

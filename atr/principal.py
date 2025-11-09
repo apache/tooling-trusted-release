@@ -356,7 +356,7 @@ class Authorisation(AsyncObject):
             case ArgumentNoneType() | web.Committer():
                 match asf_uid:
                     case web.Committer():
-                        asfquart_session = asf_uid._session
+                        asfquart_session = asf_uid.session
                     case _:
                         asfquart_session = await asfquart.session.read()
                 # asfquart_session = await session.read()
