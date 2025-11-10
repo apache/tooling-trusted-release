@@ -114,7 +114,7 @@ def lifecycle_01_add_draft(page: sync_api.Page, credentials: Credentials, versio
     version_name_locator.fill(version_name)
 
     logging.info("Submitting the start new release form")
-    submit_button_locator = page.locator('input[type="submit"][value="Start new release"]')
+    submit_button_locator = page.get_by_role("button", name="Start new release")
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 

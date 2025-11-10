@@ -15,13 +15,37 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asfquart.base as base
+import quart
 
 import atr.blueprints.post as post
+import atr.get as get
 import atr.shared as shared
+import atr.storage as storage
 import atr.web as web
 
 
 @post.committer("/start/<project_name>")
-async def selected(session: web.Committer, project_name: str) -> web.WerkzeugResponse | str:
-    """Allow the user to start a new release draft, or handle its submission."""
-    return await shared.start.selected(session, project_name)
+@post.form(shared.start.StartReleaseForm)
+async def selected(
+    session: web.Committer, start_release_form: shared.start.StartReleaseForm, project_name: str
+) -> web.WerkzeugResponse:
+    await session.check_access(project_name)
+
+    try:
+        async with storage.write(session) as write:
+            wacp = await write.as_project_committee_participant(project_name)
+            new_release, _project = await wacp.release.start(
+                project_name,
+                start_release_form.version_name,
+            )
+
+        return await session.redirect(
+            get.compose.selected,
+            project_name=project_name,
+            version_name=new_release.version,
+            success="Release candidate draft created successfully",
+        )
+    except (web.FlashError, base.ASFQuartException) as e:
+        await quart.flash(str(e), "error")
+        return await session.redirect(get.start.selected, project_name=project_name)
