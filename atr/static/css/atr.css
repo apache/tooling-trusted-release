@@ -515,6 +515,10 @@ aside.sidebar nav a:hover {
     display: none;
 }
 
+.atr-initial {
+    display: initial;
+}
+
 .atr-pre-wrap {
     white-space: pre-wrap;
 }
