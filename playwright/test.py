@@ -146,7 +146,7 @@ def lifecycle_03_add_file(page: sync_api.Page, credentials: Credentials, version
     file_input_locator.set_input_files("/run/tests/example.txt")
 
     logging.info("Locating and activating the add files button")
-    submit_button_locator = page.locator('input[type="submit"][value="Add files"]')
+    submit_button_locator = page.get_by_role("button", name="Add files")
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 

@@ -241,51 +241,6 @@ async def sbomgen(session: web.Committer, project_name: str, version_name: str, 
     )
 
 
-@post.committer("/draft/svnload/<project_name>/<version_name>")
-async def svnload(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse | str:
-    """Import files from SVN into a draft."""
-
-    await session.check_access(project_name)
-
-    form = await shared.upload.SvnImportForm.create_form()
-    if not await form.validate_on_submit():
-        for _field, errors in form.errors.items():
-            for error in errors:
-                await quart.flash(f"{error}", "error")
-        return await session.redirect(
-            get.upload.selected,
-            project_name=project_name,
-            version_name=version_name,
-        )
-
-    try:
-        async with storage.write(session) as write:
-            wacp = await write.as_project_committee_participant(project_name)
-            await wacp.release.import_from_svn(
-                project_name,
-                version_name,
-                str(form.svn_url.data),
-                str(form.revision.data),
-                str(form.target_subdirectory.data) if form.target_subdirectory.data else None,
-            )
-
-    except Exception:
-        log.exception("Error queueing SVN import task:")
-        return await session.redirect(
-            get.upload.selected,
-            error="Error queueing SVN import task",
-            project_name=project_name,
-            version_name=version_name,
-        )
-
-    return await session.redirect(
-        get.compose.selected,
-        success="SVN import task queued successfully",
-        project_name=project_name,
-        version_name=version_name,
-    )
-
-
 @post.committer("/draft/vote/preview/<project_name>/<version_name>")
 async def vote_preview(
     session: web.Committer, project_name: str, version_name: str

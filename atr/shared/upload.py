@@ -15,91 +15,58 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import pathlib
+from typing import Annotated, Literal
 
-import quart
-import wtforms
+import pydantic
 
-import atr.db as db
-import atr.forms as forms
-import atr.get as get
-import atr.log as log
-import atr.storage as storage
-import atr.template as template
-import atr.web as web
+import atr.form as form
+
+type ADD_FILES = Literal["add_files"]
+type SVN_IMPORT = Literal["svn_import"]
 
 
-class AddFilesForm(forms.Typed):
-    """Form for adding files to a release candidate."""
-
-    file_name = forms.optional(
+class AddFilesForm(form.Form):
+    variant: ADD_FILES = form.value(ADD_FILES)
+    file_data: form.FileList = form.label("Files", "Select the files to upload.")
+    file_name: form.Filename = form.label(
         "File name",
-        description="Optional: Enter a file name to use when saving the "
-        "file in the release candidate. Only available when uploading a "
-        "single file.",
+        "Optional: Enter a file name to use when saving the file in the release candidate. "
+        "Only available when uploading a single file.",
     )
-    file_data = forms.files("Files", description="Select the files to upload.")
-    submit = forms.submit("Add files")
 
-    def validate_file_name(self, field: wtforms.Field) -> bool:
-        if field.data and len(self.file_data.data) > 1:
-            raise wtforms.validators.ValidationError("File name can only be used when uploading a single file")
-        return True
+    @pydantic.field_validator("file_name", mode="after")
+    @classmethod
+    def validate_file_name_with_files(cls, value: form.Filename, info: pydantic.ValidationInfo) -> form.Filename:
+        # We can only get file_data if it comes before this field
+        # TODO: Figure out how to use a model validator but associate an error with a field
+        # https://github.com/pydantic/pydantic/issues/8092
+        # https://github.com/pydantic/pydantic/issues/9686
+        # https://github.com/pydantic/pydantic-core/pull/1413
+        file_data = info.data.get("file_data") or []
+        if value and (len(file_data) != 1):
+            raise ValueError("Filename can only be used when uploading a single file")
+        return value
 
 
-class SvnImportForm(forms.Typed):
-    """Form for importing files from SVN into a draft."""
-
-    svn_url = forms.url("SVN URL", description="The URL to the public SVN directory.")
-    revision = forms.string(
-        "Revision", default="HEAD", description="Specify an SVN revision number or leave as HEAD for the latest."
+class SvnImportForm(form.Form):
+    variant: SVN_IMPORT = form.value(SVN_IMPORT)
+    svn_url: form.URL = form.label(
+        "SVN URL",
+        "The HTTP or HTTPS URL to the public SVN directory.",
+        widget=form.Widget.URL,
     )
-    target_subdirectory = forms.string(
-        "Target subdirectory", description="Optional: Subdirectory to place imported files, defaulting to the root."
+    revision: str = form.label(
+        "Revision",
+        "Specify an SVN revision number or leave as HEAD for the latest.",
+        default="HEAD",
     )
-    submit = forms.submit("Queue SVN import task")
-
-
-async def selected(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse | str:
-    """Show a page to allow the user to add files to a candidate draft."""
-    await session.check_access(project_name)
-
-    form = await AddFilesForm.create_form()
-    if await form.validate_on_submit():
-        try:
-            file_name = None
-            if isinstance(form.file_name.data, str) and form.file_name.data:
-                file_name = pathlib.Path(form.file_name.data)
-            file_data = form.file_data.data
-
-            async with storage.write(session) as write:
-                wacp = await write.as_project_committee_participant(project_name)
-                number_of_files = await wacp.release.upload_files(project_name, version_name, file_name, file_data)
-            return await session.redirect(
-                get.compose.selected,
-                success=f"{number_of_files} file{'' if number_of_files == 1 else 's'} added successfully",
-                project_name=project_name,
-                version_name=version_name,
-            )
-        except Exception as e:
-            log.exception("Error adding file:")
-            await quart.flash(f"Error adding file: {e!s}", "error")
-
-    svn_form = await SvnImportForm.create_form()
-
-    async with db.session() as data:
-        release = await session.release(project_name, version_name, data=data)
-        user_ssh_keys = await data.ssh_key(asf_uid=session.uid).all()
-
-    return await template.render(
-        "upload-selected.html",
-        asf_id=session.uid,
-        server_domain=session.app_host.split(":", 1)[0],
-        server_host=session.app_host,
-        release=release,
-        project_name=project_name,
-        version_name=version_name,
-        form=form,
-        svn_form=svn_form,
-        user_ssh_keys=user_ssh_keys,
+    target_subdirectory: form.Filename = form.label(
+        "Target subdirectory",
+        "Optional: Subdirectory to place imported files, defaulting to the root.",
     )
+
+
+type UploadForm = Annotated[
+    AddFilesForm | SvnImportForm,
+    form.DISCRIMINATOR,
+]

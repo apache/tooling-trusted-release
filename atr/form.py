@@ -345,9 +345,9 @@ def to_filestorage_list(v: Any) -> list[datastructures.FileStorage]:
     raise ValueError("Expected a list of uploaded files")
 
 
-def to_filename(v: Any) -> pathlib.Path:
+def to_filename(v: Any) -> pathlib.Path | None:
     if not v:
-        raise ValueError("Filename cannot be empty")
+        return None
 
     path = pathlib.Path(str(v))
 
