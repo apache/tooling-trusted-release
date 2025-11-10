@@ -21,18 +21,16 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import asfquart.base as base
-import markupsafe
 
 import atr.blueprints.get as get
 import atr.db as db
-import atr.forms as forms
+import atr.form as form
 import atr.htm as htm
 import atr.models.results as results
 import atr.models.sql as sql
-import atr.post as post
 import atr.sbom as sbom
+import atr.shared as shared
 import atr.template as template
-import atr.util as util
 import atr.web as web
 
 if TYPE_CHECKING:
@@ -90,21 +88,14 @@ async def report(session: web.Committer, project: str, version: str, file_path: 
     ]
     block.p["This report is for revision ", htm.code[task_result.revision_number], "."]
 
-    empty_form = await forms.Empty.create_form()
     # TODO: Show the status if the task to augment the SBOM is still running
     # TODO: Add a field to the SBOM to show that it's been augmented
     # And then don't allow it to be augmented again
-    action = util.as_url(
-        post.sbom.augment,
-        project_name=project,
-        version_name=version,
-        file_path=file_path,
-    )
-    block.append(
-        htm.form("", action=action, method="post")[
-            markupsafe.Markup(str(empty_form.hidden_tag())),
-            htm.button(".btn.btn-primary", type="submit")["Augment SBOM"],
-        ]
+    form.render_block(
+        block,
+        model_cls=shared.sbom.AugmentSBOMForm,
+        submit_label="Augment SBOM",
+        empty=True,
     )
 
     if warnings:
@@ -120,7 +111,7 @@ async def report(session: web.Committer, project: str, version: str, file_path: 
         block.p["No NTIA 2021 minimum data field conformance warnings or errors found."]
 
     block.h2["Vulnerability scan"]
-    _vulnerability_scan_section(block, project, version, file_path, task_result.revision_number, osv_tasks, empty_form)
+    _vulnerability_scan_section(block, project, version, file_path, task_result.revision_number, osv_tasks)
 
     block.h2["Outdated tool"]
     outdated = None
@@ -224,22 +215,14 @@ def _vulnerability_component_details(block: htm.Block, component: results.OSVCom
     block.append(htm.details(".mb-3.rounded")[*details_content])
 
 
-def _vulnerability_scan_button(
-    block: htm.Block, project: str, version: str, file_path: str, empty_form: forms.Empty
-) -> None:
+def _vulnerability_scan_button(block: htm.Block, project: str, version: str, file_path: str) -> None:
     block.p["No vulnerability scan has been performed for this revision."]
 
-    action = util.as_url(
-        post.sbom.scan,
-        project_name=project,
-        version_name=version,
-        file_path=file_path,
-    )
-    block.append(
-        htm.form("", action=action, method="post")[
-            markupsafe.Markup(str(empty_form.hidden_tag())),
-            htm.button(".btn.btn-primary", type="submit")["Scan file"],
-        ]
+    form.render_block(
+        block,
+        model_cls=shared.sbom.ScanSBOMForm,
+        submit_label="Scan file",
+        empty=True,
     )
 
 
@@ -299,7 +282,6 @@ def _vulnerability_scan_section(
     file_path: str,
     revision_number: str,
     osv_tasks: collections.abc.Sequence[sql.Task],
-    empty_form: forms.Empty,
 ) -> None:
     """Display the vulnerability scan section based on task status."""
     completed_task = _vulnerability_scan_find_completed_task(osv_tasks, revision_number)
@@ -311,9 +293,9 @@ def _vulnerability_scan_section(
     in_progress_task = _vulnerability_scan_find_in_progress_task(osv_tasks, revision_number)
 
     if in_progress_task is not None:
-        _vulnerability_scan_status(block, in_progress_task, project, version, file_path, empty_form)
+        _vulnerability_scan_status(block, in_progress_task, project, version, file_path)
     else:
-        _vulnerability_scan_button(block, project, version, file_path, empty_form)
+        _vulnerability_scan_button(block, project, version, file_path)
 
 
 def _vulnerability_scan_status(
@@ -322,7 +304,6 @@ def _vulnerability_scan_status(
     project: str,
     version: str,
     file_path: str,
-    empty_form: forms.Empty,
 ) -> None:
     status_text = task.status.value.replace("_", " ").capitalize()
     block.p[f"Vulnerability scan is currently {status_text.lower()}."]
@@ -333,4 +314,4 @@ def _vulnerability_scan_status(
             htm.code[task.error],
             ". Additional details are unavailable from ATR.",
         ]
-        _vulnerability_scan_button(block, project, version, file_path, empty_form)
+        _vulnerability_scan_button(block, project, version, file_path)

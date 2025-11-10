@@ -66,7 +66,6 @@ async def tokens(session: web.Committer) -> str:
         action=util.as_url(post.tokens.jwt_post),
         form_classes="#issue-jwt-form",
         submit_label="Generate JWT",
-        use_error_data=False,
     )
     jwt_section.pre(id="jwt-output", class_="d-none mt-2 p-3 atr-word-wrap border rounded w-50")
     if most_recent_pat and most_recent_pat.last_used:
@@ -105,7 +104,6 @@ def _build_tokens_table(page: htm.Block, tokens_list: list[sql.PersonalAccessTok
             submit_classes="btn-sm btn-danger",
             submit_label="Delete",
             defaults={"token_id": t.id},
-            use_error_data=False,
             empty=True,
         )
         tbody.tr(".align-middle")[

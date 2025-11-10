@@ -228,7 +228,7 @@ def _get_flash_error_data() -> dict[str, Any]:
     return {}
 
 
-def render(
+def render(  # noqa: C901
     model_cls: type[Form],
     action: str | None = None,
     form_classes: str = ".atr-canary",
@@ -247,8 +247,10 @@ def render(
 
     is_empty_form = isinstance(model_cls, type) and issubclass(model_cls, Empty)
     is_empty_form |= empty
-    if is_empty_form and (form_classes == ".atr-canary"):
-        form_classes = ""
+    if is_empty_form:
+        if form_classes == ".atr-canary":
+            form_classes = ""
+        use_error_data = False
 
     flash_error_data: dict[str, Any] = _get_flash_error_data() if use_error_data else {}
 

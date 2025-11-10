@@ -33,6 +33,7 @@ import atr.shared.ignores as ignores
 import atr.shared.keys as keys
 import atr.shared.projects as projects
 import atr.shared.resolve as resolve
+import atr.shared.sbom as sbom
 import atr.shared.start as start
 import atr.shared.test as test
 import atr.shared.tokens as tokens
@@ -194,6 +195,7 @@ __all__ = [
     "keys",
     "projects",
     "resolve",
+    "sbom",
     "start",
     "test",
     "tokens",

@@ -26,20 +26,33 @@ import atr.blueprints.post as post
 import atr.db as db
 import atr.get as get
 import atr.log as log
+import atr.shared as shared
 import atr.storage as storage
 import atr.util as util
 import atr.web as web
 
 
-@post.committer("/sbom/augment/<project_name>/<version_name>/<path:file_path>")
-async def augment(session: web.Committer, project_name: str, version_name: str, file_path: str) -> web.WerkzeugResponse:
-    """Augment a CycloneDX SBOM file."""
-    await session.check_access(project_name)
+@post.committer("/sbom/report/<project>/<version>/<path:file_path>")
+@post.form(shared.sbom.SBOMForm)
+async def report(
+    session: web.Committer, sbom_form: shared.sbom.SBOMForm, project: str, version: str, file_path: str
+) -> web.WerkzeugResponse:
+    await session.check_access(project)
 
-    await util.validate_empty_form()
+    match sbom_form:
+        case shared.sbom.AugmentSBOMForm():
+            return await _augment(session, project, version, file_path)
+
+        case shared.sbom.ScanSBOMForm():
+            return await _scan(session, project, version, file_path)
+
+
+async def _augment(
+    session: web.Committer, project_name: str, version_name: str, file_path: str
+) -> web.WerkzeugResponse:
+    """Augment a CycloneDX SBOM file."""
     rel_path = pathlib.Path(file_path)
 
-    # Check that the file is a .cdx.json archive before creating a revision
     if not (file_path.endswith(".cdx.json")):
         raise base.ASFQuartException("SBOM augmentation is only supported for .cdx.json files", errorcode=400)
 
@@ -53,7 +66,12 @@ async def augment(session: web.Committer, project_name: str, version_name: str, 
                 raise RuntimeError("No revision number found for new revision creation")
             log.info(f"Augmenting SBOM for {project_name} {version_name} {revision_number} {rel_path}")
         async with storage.write_as_project_committee_member(project_name) as wacm:
-            sbom_task = await wacm.sbom.augment_cyclonedx(project_name, version_name, revision_number, rel_path)
+            sbom_task = await wacm.sbom.augment_cyclonedx(
+                project_name,
+                version_name,
+                revision_number,
+                rel_path,
+            )
 
     except Exception as e:
         log.exception("Error augmenting SBOM:")
@@ -74,14 +92,11 @@ async def augment(session: web.Committer, project_name: str, version_name: str, 
     )
 
 
-@post.committer("/sbom/scan/<project_name>/<version_name>/<path:file_path>")
-async def scan(session: web.Committer, project_name: str, version_name: str, file_path: str) -> web.WerkzeugResponse:
+async def _scan(session: web.Committer, project_name: str, version_name: str, file_path: str) -> web.WerkzeugResponse:
     """Scan a CycloneDX SBOM file for vulnerabilities using OSV."""
-    await session.check_access(project_name)
-
-    await util.validate_empty_form()
     rel_path = pathlib.Path(file_path)
 
+    # Check that the file is a .cdx.json archive before creating a revision
     if not (file_path.endswith(".cdx.json")):
         raise base.ASFQuartException("OSV scanning is only supported for .cdx.json files", errorcode=400)
 
@@ -95,7 +110,12 @@ async def scan(session: web.Committer, project_name: str, version_name: str, fil
                 raise RuntimeError("No revision number found for OSV scan")
             log.info(f"Starting OSV scan for {project_name} {version_name} {revision_number} {rel_path}")
         async with storage.write_as_project_committee_member(project_name) as wacm:
-            sbom_task = await wacm.sbom.osv_scan_cyclonedx(project_name, version_name, revision_number, rel_path)
+            sbom_task = await wacm.sbom.osv_scan_cyclonedx(
+                project_name,
+                version_name,
+                revision_number,
+                rel_path,
+            )
 
     except Exception as e:
         log.exception("Error starting OSV scan:")
