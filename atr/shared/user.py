@@ -15,13 +15,23 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from typing import Annotated, Literal
 
-import atr.forms as forms
+import atr.form as form
+
+type CACHE = Literal["cache"]
+type DELETE = Literal["delete"]
 
 
-class CacheForm(forms.Typed):
-    cache_submit = forms.submit("Cache me!")
+class CacheUserForm(form.Empty):
+    variant: CACHE = form.value(CACHE)
 
 
-class DeleteCacheForm(forms.Typed):
-    delete_submit = forms.submit("Delete my cache")
+class DeleteCacheForm(form.Empty):
+    variant: DELETE = form.value(DELETE)
+
+
+type UserCacheForm = Annotated[
+    CacheUserForm | DeleteCacheForm,
+    form.DISCRIMINATOR,
+]

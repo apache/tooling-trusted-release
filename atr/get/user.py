@@ -15,10 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import quart
-
 import atr.blueprints.get as get
-import atr.forms as forms
+import atr.form as form
 import atr.htm as htm
 import atr.shared as shared
 import atr.template as template
@@ -28,9 +26,6 @@ import atr.web as web
 
 @get.committer("/user/cache")
 async def cache_get(session: web.Committer) -> str:
-    cache_form = await shared.user.CacheForm.create_form()
-    delete_cache_form = await shared.user.DeleteCacheForm.create_form()
-
     cache_data = await util.session_cache_read()
     user_cached = session.uid in cache_data
 
@@ -66,23 +61,23 @@ async def cache_get(session: web.Committer) -> str:
 
         block.h3["Delete cache"]
         block.p["Remove your cached session information:"]
-        delete_form_element = forms.render_simple(
-            delete_cache_form,
-            action=quart.request.path,
+        delete_cache_form = await form.render(
+            model_cls=shared.user.DeleteCacheForm,
+            submit_label="Delete my cache",
             submit_classes="btn-danger",
         )
-        block.append(delete_form_element)
+        block.append(delete_cache_form)
     else:
         block.h2["No cached session"]
         block.p["Your session is not currently cached."]
 
         block.h3["Cache current session"]
         block.p["Press the button below to cache your current session information:"]
-        cache_form_element = forms.render_simple(
-            cache_form,
-            action=quart.request.path,
+        cache_form = await form.render(
+            model_cls=shared.user.CacheUserForm,
+            submit_label="Cache me!",
             submit_classes="btn-primary",
         )
-        block.append(cache_form_element)
+        block.append(cache_form)
 
     return await template.blank("Session cache management", content=block.collect())

@@ -208,7 +208,7 @@ async def render(
     if action is None:
         action = quart.request.path
 
-    is_empty_form = model_cls is Empty
+    is_empty_form = isinstance(model_cls, type) and issubclass(model_cls, Empty)
     if is_empty_form and (form_classes == ".atr-canary"):
         form_classes = ""
 

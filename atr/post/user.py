@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-
 import quart
 
 import atr.blueprints.post as post
@@ -26,20 +25,16 @@ import atr.web as web
 
 
 @post.committer("/user/cache")
-async def session_post(session: web.Committer) -> web.WerkzeugResponse:
-    form_data = await quart.request.form
+@post.form(shared.user.UserCacheForm)
+async def session_post(session: web.Committer, user_cache_form: shared.user.UserCacheForm) -> web.WerkzeugResponse:
+    match user_cache_form:
+        case shared.user.CacheUserForm():
+            await _cache_session(session)
+            await quart.flash("Your session has been cached successfully", "success")
 
-    cache_form = await shared.user.CacheForm.create_form(data=form_data)
-    delete_cache_form = await shared.user.DeleteCacheForm.create_form(data=form_data)
-
-    if cache_form.cache_submit.data:
-        await _cache_session(session)
-        await quart.flash("Your session has been cached successfully", "success")
-    elif delete_cache_form.delete_submit.data:
-        await _delete_session_cache(session)
-        await quart.flash("Your cached session has been deleted", "success")
-    else:
-        await quart.flash("Invalid form submission", "error")
+        case shared.user.DeleteCacheForm():
+            await _delete_session_cache(session)
+            await quart.flash("Your cached session has been deleted", "success")
 
     return await session.redirect(get.user.cache_get)
 
