@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import enum
 import json
+import pathlib
 import types
 from typing import TYPE_CHECKING, Annotated, Any, Final, Literal, TypeAliasType, get_args, get_origin
 
@@ -344,6 +345,28 @@ def to_filestorage_list(v: Any) -> list[datastructures.FileStorage]:
     raise ValueError("Expected a list of uploaded files")
 
 
+def to_filename(v: Any) -> pathlib.Path:
+    if not v:
+        raise ValueError("Filename cannot be empty")
+
+    path = pathlib.Path(str(v))
+
+    if len(path.parts) != 1:
+        raise ValueError("Expected a filename, not a path containing directories")
+
+    if path.is_absolute():
+        # This branch should be unreachable
+        raise ValueError("Absolute paths are not allowed")
+
+    if "." in path.parts:
+        raise ValueError("Self directory references (.) are not allowed")
+
+    if ".." in path.parts:
+        raise ValueError("Parent directory references (..) are not allowed")
+
+    return path
+
+
 def to_int(v: Any) -> int:
     # if v == "":
     #     return 0
@@ -375,6 +398,12 @@ FileList = Annotated[
     list[datastructures.FileStorage],
     functional_validators.BeforeValidator(to_filestorage_list),
     pydantic.Field(default_factory=list),
+]
+
+Filename = Annotated[
+    pathlib.Path | None,
+    functional_validators.BeforeValidator(to_filename),
+    pydantic.Field(default=None),
 ]
 
 Int = Annotated[
