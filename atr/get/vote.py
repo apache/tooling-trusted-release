@@ -117,7 +117,7 @@ async def selected(session: web.Committer | None, project_name: str, version_nam
             htpy.label(class_="btn btn-outline-danger", for_="decision_2")[f"-1 ({potency})"],
         ]
 
-        cast_vote_form = await form.render(
+        cast_vote_form = form.render(
             model_cls=shared.vote.CastVoteForm,
             submit_label="Submit vote",
             form_classes=".atr-canary.py-4.px-5.mb-4.border.rounded",

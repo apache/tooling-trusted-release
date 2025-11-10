@@ -139,7 +139,7 @@ async def _render_page(
         project_name=release.project.name,
         version_name=release.version,
     )
-    vote_form = await form.render(
+    vote_form = form.render(
         model_cls=shared.voting.StartVotingForm,
         submit_label="Send vote email",
         cancel_url=cancel_url,

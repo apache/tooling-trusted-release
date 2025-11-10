@@ -92,7 +92,7 @@ async def _render_page(release, revision: str) -> htm.Element:
     ]
 
     cancel_url = util.as_url(compose.selected, project_name=release.project.name, version_name=release.version)
-    manual_form = await form.render(
+    manual_form = form.render(
         model_cls=form.Empty,
         submit_label="Start manual vote",
         cancel_url=cancel_url,

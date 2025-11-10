@@ -30,7 +30,7 @@ import atr.web as web
 
 @get.public("/test/empty")
 async def test_empty(session: web.Committer | None) -> str:
-    empty_form = await form.render(
+    empty_form = form.render(
         model_cls=form.Empty,
         submit_label="Submit empty form",
         action="/test/empty",
@@ -67,13 +67,13 @@ async def test_login(session: web.Committer | None) -> web.WerkzeugResponse:
 
 @get.public("/test/multiple")
 async def test_multiple(session: web.Committer | None) -> str:
-    apple_form = await form.render(
+    apple_form = form.render(
         model_cls=shared.test.AppleForm,
         submit_label="Order apples",
         action="/test/multiple",
     )
 
-    banana_form = await form.render(
+    banana_form = form.render(
         model_cls=shared.test.BananaForm,
         submit_label="Order bananas",
         action="/test/multiple",
@@ -102,7 +102,7 @@ async def test_single(session: web.Committer | None) -> str:
         htpy.label(class_="btn btn-outline-danger", for_="vote_2")["-1"],
     ]
 
-    single_form = await form.render(
+    single_form = form.render(
         model_cls=shared.test.SingleForm,
         submit_label="Submit",
         action="/test/single",

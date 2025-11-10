@@ -60,6 +60,7 @@ class Widget(enum.Enum):
     EMAIL = "email"
     FILE = "file"
     FILES = "files"
+    HIDDEN = "hidden"
     NUMBER = "number"
     RADIO = "radio"
     SELECT = "select"
@@ -227,7 +228,7 @@ def _get_flash_error_data() -> dict[str, Any]:
     return {}
 
 
-async def render(
+def render(
     model_cls: type[Form],
     action: str | None = None,
     form_classes: str = ".atr-canary",
@@ -239,11 +240,13 @@ async def render(
     errors: dict[str, list[str]] | None = None,
     use_error_data: bool = True,
     custom: dict[str, htm.Element | htm.VoidElement] | None = None,
+    empty: bool = False,
 ) -> htm.Element:
     if action is None:
         action = quart.request.path
 
     is_empty_form = isinstance(model_cls, type) and issubclass(model_cls, Empty)
+    is_empty_form |= empty
     if is_empty_form and (form_classes == ".atr-canary"):
         form_classes = ""
 
@@ -295,8 +298,8 @@ async def render(
     return htm.form(form_classes, action=action, method="post", enctype="multipart/form-data")[form_children]
 
 
-async def render_block(block: htm.Block, *args, **kwargs) -> None:
-    rendered = await render(*args, **kwargs)
+def render_block(block: htm.Block, *args, **kwargs) -> None:
+    rendered = render(*args, **kwargs)
     block.append(rendered)
 
 
@@ -518,6 +521,12 @@ def _render_widget(  # noqa: C901
         case Widget.FILES:
             attrs = {**base_attrs, "multiple": ""}
             widget = htpy.input(type="file", **attrs)
+
+        case Widget.HIDDEN:
+            attrs = {"type": "hidden", "name": field_name, "id": field_name}
+            if field_value is not None:
+                attrs["value"] = str(field_value)
+            widget = htpy.input(**attrs)
 
         case Widget.NUMBER:
             attrs = {**base_attrs, "type": "number"}
@@ -747,6 +756,12 @@ def _render_row(
     if (field_name == DISCRIMINATOR_NAME) and (field_info.default is not None):
         default_value = field_info.default
         return htpy.input(type="hidden", name=DISCRIMINATOR_NAME, value=default_value), None
+
+    if widget_type == Widget.HIDDEN:
+        attrs = {"type": "hidden", "name": field_name, "id": field_name}
+        if field_value is not None:
+            attrs["value"] = str(field_value)
+        return htpy.input(**attrs), None
 
     label_text = field_info.description or field_name.replace("_", " ").title()
     is_required = field_info.is_required()

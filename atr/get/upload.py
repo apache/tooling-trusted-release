@@ -63,7 +63,7 @@ async def selected(session: web.Committer, project_name: str, version_name: str)
     block.h2(id="file-upload")["File upload"]
     block.p["Use this form to add files to this candidate draft."]
 
-    await form.render_block(
+    form.render_block(
         block,
         model_cls=shared.upload.AddFilesForm,
         submit_label="Add files",
@@ -80,7 +80,7 @@ async def selected(session: web.Committer, project_name: str, version_name: str)
         " page for this draft once the task is queued.",
     ]
 
-    await form.render_block(
+    form.render_block(
         block,
         model_cls=shared.upload.SvnImportForm,
         submit_label="Queue SVN import task",
