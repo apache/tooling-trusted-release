@@ -136,7 +136,8 @@ class Block:
     ) -> Generator[Block, Any, Any]:
         block = Block(element, classes=classes)
         yield block
-        self.append(block.collect(separator=separator))
+        # If you use depth=2, you get the context manager
+        self.append(block.collect(separator=separator, depth=3))
 
     def collect(self, separator: Element | VoidElement | str | None = None, depth: int = 1) -> Element:
         src = log.caller_name(depth=depth)

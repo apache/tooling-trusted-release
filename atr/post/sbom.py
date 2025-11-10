@@ -53,6 +53,7 @@ async def _augment(
     """Augment a CycloneDX SBOM file."""
     rel_path = pathlib.Path(file_path)
 
+    # Check that the file is a .cdx.json archive before creating a revision
     if not (file_path.endswith(".cdx.json")):
         raise base.ASFQuartException("SBOM augmentation is only supported for .cdx.json files", errorcode=400)
 
@@ -96,7 +97,6 @@ async def _scan(session: web.Committer, project_name: str, version_name: str, fi
     """Scan a CycloneDX SBOM file for vulnerabilities using OSV."""
     rel_path = pathlib.Path(file_path)
 
-    # Check that the file is a .cdx.json archive before creating a revision
     if not (file_path.endswith(".cdx.json")):
         raise base.ASFQuartException("OSV scanning is only supported for .cdx.json files", errorcode=400)
 

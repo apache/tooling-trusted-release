@@ -15,31 +15,28 @@
 # specific language governing permissions and limitations
 # under the License.
 
-
 import aioshutil
 import asfquart.base as base
-import quart
 
 import atr.blueprints.post as post
 import atr.db as db
 import atr.get as get
 import atr.models.sql as sql
+import atr.shared as shared
 import atr.storage as storage
 import atr.util as util
 import atr.web as web
 
 
 @post.committer("/revisions/<project_name>/<version_name>")
-async def selected_post(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse:
+@post.form(shared.revisions.SetRevisionForm)
+async def selected_post(
+    session: web.Committer, set_revision_form: shared.revisions.SetRevisionForm, project_name: str, version_name: str
+) -> web.WerkzeugResponse:
     """Set a specific revision as the latest for a candidate draft or release preview."""
     await session.check_access(project_name)
 
-    # TODO: This is not truly empty, so make a form object for this
-    await util.validate_empty_form()
-    form_data = await quart.request.form
-    selected_revision_number = form_data.get("revision_number")
-    if not selected_revision_number:
-        raise base.ASFQuartException("Missing revision number", errorcode=400)
+    selected_revision_number = set_revision_form.revision_number
 
     async with db.session() as data:
         release = await session.release(project_name, version_name, phase=None, data=data)

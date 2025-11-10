@@ -33,6 +33,7 @@ import atr.shared.ignores as ignores
 import atr.shared.keys as keys
 import atr.shared.projects as projects
 import atr.shared.resolve as resolve
+import atr.shared.revisions as revisions
 import atr.shared.sbom as sbom
 import atr.shared.start as start
 import atr.shared.test as test
@@ -195,6 +196,7 @@ __all__ = [
     "keys",
     "projects",
     "resolve",
+    "revisions",
     "sbom",
     "start",
     "test",
