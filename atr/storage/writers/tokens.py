@@ -67,6 +67,21 @@ class FoundationCommitter(GeneralPublic):
         await self.__data.commit()
         return pat
 
+    async def delete_token(self, token_id: int) -> None:
+        pat = await self.__data.query_one_or_none(
+            sqlmodel.select(sql.PersonalAccessToken).where(
+                sql.PersonalAccessToken.id == token_id,
+                sql.PersonalAccessToken.asfuid == self.__asf_uid,
+            )
+        )
+        if pat is not None:
+            await self.__data.delete(pat)
+            await self.__data.commit()
+            self.__write_as.append_to_audit_log(
+                asf_uid=self.__asf_uid,
+                token_id=token_id,
+            )
+
     async def issue_jwt(self, pat_text: str) -> str:
         pat_hash = hashlib.sha3_256(pat_text.encode()).hexdigest()
         pat = await self.__data.query_one_or_none(

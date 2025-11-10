@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 import asfquart.base as base
 import asfquart.session as session
+import markupsafe
 import pydantic_core
 import quart
 import werkzeug.datastructures.headers
@@ -276,6 +277,22 @@ class ZipResponse(quart.Response):
     ) -> None:
         raw_headers = {name: str(value) for name, value in headers.items()}
         super().__init__(response, status=status, headers=raw_headers, mimetype="application/zip")
+
+
+async def flash_error(*messages: htm.Element) -> None:
+    div = htm.Block(htm.div, classes=".atr-initial")
+    for message in messages:
+        div.append(message)
+
+    await quart.flash(markupsafe.Markup(str(div.collect())), category="error")
+
+
+async def flash_success(*messages: htm.Element) -> None:
+    div = htm.Block(htm.div, classes=".atr-initial")
+    for message in messages:
+        div.append(message)
+
+    await quart.flash(markupsafe.Markup(str(div.collect())), category="success")
 
 
 async def form_error(error: str) -> None:

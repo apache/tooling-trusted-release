@@ -250,6 +250,11 @@ class Block:
         return BlockElementCallable(self, title)
 
     @property
+    def tr(self) -> BlockElementCallable:
+        self.__check_parent("tr", {"tbody", "table"})
+        return BlockElementCallable(self, tr)
+
+    @property
     def ul(self) -> BlockElementCallable:
         self.__check_parent("ul", {"body", "div"})
         return BlockElementCallable(self, ul)
