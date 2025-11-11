@@ -614,6 +614,16 @@ def _get_choices(field_info: pydantic.fields.FieldInfo) -> list[tuple[str, str]]
     if origin is Literal:
         return [(v, v) for v in get_args(annotation)]
 
+    # Handle single enum types
+    if hasattr(annotation, "__members__") and annotation is not None:
+        try:
+            enum_class = annotation
+            return [(member.name, member.value.name if hasattr(member.value, 'name') else str(member.value)) 
+                    for member in enum_class.__members__.values()]
+        except (AttributeError, TypeError):
+            # Fallback if enum iteration fails
+            return []
+
     if origin is set:
         args = get_args(annotation)
         if args and hasattr(args[0], "__members__"):
@@ -685,6 +695,10 @@ def _get_widget_type(field_info: pydantic.fields.FieldInfo) -> Widget:  # noqa: 
 
     if annotation in (int, float):
         return Widget.NUMBER
+
+    # Check for single enum types
+    if hasattr(annotation, "__members__"):
+        return Widget.SELECT
 
     if origin is Literal:
         return Widget.SELECT

@@ -28,12 +28,16 @@ import atr.web as web
 
 @post.committer("/distribution/delete/<project>/<version>")
 @post.form(shared.DeleteForm)
-async def delete(session: web.Committer, project: str, version: str, form: shared.DeleteForm) -> web.WerkzeugResponse:
+async def delete(
+    session: web.Committer, form: shared.DeleteForm, project: str, version: str
+) -> web.WerkzeugResponse:
     dd = distribution.DeleteData.model_validate(form.model_dump())
-
+    
     # Validate the submitted data, and obtain the committee for its name
     async with db.session() as data:
-        release = await data.release(name=dd.release_name).demand(RuntimeError(f"Release {dd.release_name} not found"))
+        release = await data.release(name=dd.release_name).demand(
+            RuntimeError(f"Release {dd.release_name} not found")
+        )
         committee = release.committee
         if committee is None:
             raise RuntimeError(f"Release {dd.release_name} has no committee")
@@ -58,13 +62,17 @@ async def delete(session: web.Committer, project: str, version: str, form: share
 
 @post.committer("/distribution/record/<project>/<version>")
 @post.form(shared.DistributeForm)
-async def record_post(session: web.Committer, project: str, version: str, form: shared.DistributeForm) -> str:
+async def record_post(
+    session: web.Committer, form: shared.DistributeForm, project: str, version: str
+) -> str:
     # Pydantic validation happens automatically in @post.form
     return await shared.record_form_process_page_new(form, project, version, staging=False)
 
 
 @post.committer("/distribution/stage/<project>/<version>")
 @post.form(shared.DistributeForm)
-async def stage_post(session: web.Committer, project: str, version: str, form: shared.DistributeForm) -> str:
+async def stage_post(
+    session: web.Committer, form: shared.DistributeForm, project: str, version: str
+) -> str:
     # Pydantic validation happens automatically in @post.form
     return await shared.record_form_process_page_new(form, project, version, staging=True)

@@ -17,10 +17,11 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
-from typing import Literal
+from typing import Literal, Any
 
-import pydantic
+import quart
 
 import atr.db as db
 import atr.form as form
@@ -31,6 +32,7 @@ import atr.models.sql as sql
 import atr.storage as storage
 import atr.template as template
 import atr.util as util
+import pydantic
 
 type Phase = Literal["COMPOSE", "VOTE", "FINISH"]
 
@@ -44,43 +46,60 @@ class DeleteForm(form.Form):
 
 
 class DistributeForm(form.Form):
-    platform: sql.DistributionPlatform = form.label("Platform", widget=form.Widget.SELECT)
+    platform: sql.DistributionPlatform = form.label(description="Platform")
     owner_namespace: str | None = form.label(
         description="Owner or Namespace",
         documentation=(
             "Who owns or names the package (Maven groupId, npm @scope, Docker namespace, "
             "GitHub owner, ArtifactHub repo). Leave blank if not used."
         ),
-        widget=form.Widget.TEXT,
+        widget=form.Widget.TEXT
     )
     package: str = form.label("Package", widget=form.Widget.TEXT)
     version: str = form.label("Version", widget=form.Widget.TEXT)
     details: bool = form.label(
-        description="Include details",
-        documentation="Include the details of the distribution in the response",
-        widget=form.Widget.CHECKBOX,
+        description="Include details", 
+        documentation="Include the details of the distribution in the response", 
+        widget=form.Widget.CHECKBOX
     )
 
-    @pydantic.model_validator(mode="after")
+    @pydantic.field_validator("platform", mode="before")
+    @classmethod
+    def validate_platform(cls, value: Any) -> sql.DistributionPlatform:
+        if isinstance(value, sql.DistributionPlatform):
+            return value
+        if isinstance(value, str):
+            try:
+                return sql.DistributionPlatform[value]
+            except KeyError:
+                raise ValueError(f"Invalid platform: {value}")
+        raise ValueError(f"Platform must be a string or DistributionPlatform, got {type(value)}")
+
+    @pydantic.model_validator(mode='after')
     def validate_owner_namespace(self):
         if not self.platform:
             raise ValueError("Platform is required")
-
+        
         default_owner_namespace = self.platform.value.default_owner_namespace
         requires_owner_namespace = self.platform.value.requires_owner_namespace
-
-        # TODO: We should disable the owner_namespace field if it's not required
-        # But that would be a lot of complexity
-        # And this validation, which we need to keep, is complex enough
+        
+        # Set default if needed and not provided
         if default_owner_namespace and not self.owner_namespace:
             self.owner_namespace = default_owner_namespace
-
+            
+        # Validate requirements
         if requires_owner_namespace and not self.owner_namespace:
-            raise ValueError(f'Platform "{self.platform.name}" requires an owner or namespace.')
-
-        if not requires_owner_namespace and not default_owner_namespace and self.owner_namespace:
-            raise ValueError(f'Platform "{self.platform.name}" does not require an owner or namespace.')
-
+            raise ValueError(
+                f'Platform "{self.platform.name}" requires an owner or namespace.'
+            )
+        
+        if (not requires_owner_namespace and 
+            not default_owner_namespace and 
+            self.owner_namespace):
+            raise ValueError(
+                f'Platform "{self.platform.name}" does not require an owner or namespace.'
+            )
+            
         return self
 
 
@@ -235,12 +254,12 @@ async def record_form_process_page_new(
 
 
 async def record_form_page_new(
-    form_data: DistributeForm,
-    project: str,
+    form_data: DistributeForm, 
+    project: str, 
     version: str,
-    *,
-    extra_content: htm.Element | None = None,
-    staging: bool = False,
+    *, 
+    extra_content: htm.Element | None = None, 
+    staging: bool = False
 ) -> str:
     await release_validated(project, version, staging=staging)
 
@@ -265,7 +284,7 @@ async def record_form_page_new(
         ],
         ".",
     ]
-
+    
     # Use form.render instead of forms.render_columns
     action_url = util.as_url(
         get.distribution.stage if staging else get.distribution.record,
@@ -276,7 +295,7 @@ async def record_form_page_new(
         model_cls=DistributeForm,
         submit_label="Record distribution",
         action=action_url,
-        defaults=form_data.model_dump() if form_data else None,
+        defaults=form_data.model_dump() if form_data else None
     )
     block.append(form_html)
 
