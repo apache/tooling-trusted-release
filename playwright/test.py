@@ -223,7 +223,7 @@ def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, ver
         logging.warning("Vote initiation banner not detected after 15s, proceeding anyway")
 
     logging.info("Locating the 'Resolve vote' button")
-    tabulate_form_locator = page.locator(f'form[action="/resolve/tabulated/{TEST_PROJECT}/{version_name}"]')
+    tabulate_form_locator = page.locator(f'form[action="/resolve/{TEST_PROJECT}/{version_name}"]')
     sync_api.expect(tabulate_form_locator).to_be_visible()
 
     tabulate_button_locator = tabulate_form_locator.locator('button[type="submit"]:has-text("Resolve vote")')
@@ -232,19 +232,19 @@ def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, ver
     tabulate_button_locator.click()
 
     logging.info("Waiting for navigation to tabulated votes page")
-    wait_for_path(page, f"/resolve/tabulated/{TEST_PROJECT}/{version_name}")
+    wait_for_path(page, f"/resolve/{TEST_PROJECT}/{version_name}")
 
     logging.info("Locating the resolve vote form on the tabulated votes page")
-    resolve_form_locator = page.locator(f'form[action="/resolve/submit/{TEST_PROJECT}/{version_name}"]')
+    resolve_form_locator = page.locator(f'form[action="/resolve/{TEST_PROJECT}/{version_name}"]')
     sync_api.expect(resolve_form_locator).to_be_visible()
 
     logging.info("Selecting 'Passed' radio button in resolve form")
-    passed_radio_locator = resolve_form_locator.locator('input[name="vote_result"][value="passed"]')
+    passed_radio_locator = resolve_form_locator.locator('input[name="vote_result"][value="Passed"]')
     sync_api.expect(passed_radio_locator).to_be_enabled()
     passed_radio_locator.check()
 
     logging.info("Submitting resolve vote form")
-    resolve_submit_locator = resolve_form_locator.locator('input[type="submit"][value="Resolve vote"]')
+    resolve_submit_locator = page.get_by_role("button", name="Resolve vote")
     sync_api.expect(resolve_submit_locator).to_be_enabled()
     resolve_submit_locator.click()
 

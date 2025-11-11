@@ -15,34 +15,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from typing import Annotated, Literal
 
-import atr.forms as forms
+import atr.form as form
 
-
-class ResolveVoteForm(forms.Typed):
-    """Form for resolving a vote."""
-
-    email_body = forms.textarea("Email body", optional=True, rows=24)
-    vote_result = forms.radio(
-        "Vote result",
-        choices=[
-            ("passed", "Passed"),
-            ("failed", "Failed"),
-        ],
-    )
-    submit = forms.submit("Resolve vote")
+type SUBMIT = Literal["submit"]
+type TABULATE = Literal["tabulate"]
 
 
-class ResolveVoteManualForm(forms.Typed):
-    """Form for resolving a vote manually."""
+class SubmitForm(form.Form):
+    variant: SUBMIT = form.value(SUBMIT)
+    email_body: str = form.label("Email body", widget=form.Widget.TEXTAREA)
+    vote_result: Literal["Passed", "Failed"] = form.label("Vote result", widget=form.Widget.RADIO)
 
-    vote_result = forms.radio(
-        "Vote result",
-        choices=[
-            ("passed", "Passed"),
-            ("failed", "Failed"),
-        ],
-    )
-    vote_thread_url = forms.string("Vote thread URL")
-    vote_result_url = forms.string("Vote result URL")
-    submit = forms.submit("Resolve vote")
+
+class TabulateForm(form.Empty):
+    variant: TABULATE = form.value(TABULATE)
+
+
+type ResolveForm = Annotated[
+    SubmitForm | TabulateForm,
+    form.DISCRIMINATOR,
+]

@@ -85,10 +85,11 @@
           <a href="{{ as_url(get.manual.resolve_selected, project_name=release.project.name, version_name=release.version) }}"
              class="btn btn-success"><i class="bi bi-clipboard-check me-1"></i> Resolve vote</a>
         {% elif can_resolve and resolve_form %}
-          <form action="{{ as_url(post.resolve.tabulated_selected_post, project_name=release.project.name, version_name=release.version) }}"
+          <form action="{{ as_url(post.resolve.selected, project_name=release.project.name, version_name=release.version) }}"
                 method="post"
                 class="mb-0">
             {{ resolve_form.hidden_tag() }}
+            <input type="hidden" name="variant" value="tabulate" />
             <button type="submit" class="btn btn-success">
               <i class="bi bi-clipboard-check me-1"></i> Resolve vote
             </button>
