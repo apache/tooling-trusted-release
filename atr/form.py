@@ -231,7 +231,7 @@ def _get_flash_error_data() -> dict[str, Any]:
 def render(  # noqa: C901
     model_cls: type[Form],
     action: str | None = None,
-    form_classes: str = ".atr-canary",
+    form_classes: str = ".atr-canary.py-4",
     submit_classes: str = "btn-primary",
     submit_label: str = "Submit",
     cancel_url: str | None = None,
@@ -241,6 +241,8 @@ def render(  # noqa: C901
     use_error_data: bool = True,
     custom: dict[str, htm.Element | htm.VoidElement] | None = None,
     empty: bool = False,
+    border: bool = False,
+    wider_widgets: bool = False,
 ) -> htm.Element:
     if action is None:
         action = quart.request.path
@@ -248,9 +250,11 @@ def render(  # noqa: C901
     is_empty_form = isinstance(model_cls, type) and issubclass(model_cls, Empty)
     is_empty_form |= empty
     if is_empty_form:
-        if form_classes == ".atr-canary":
+        if form_classes == ".atr-canary.py-4":
             form_classes = ""
         use_error_data = False
+    elif border and (".px-" not in form_classes):
+        form_classes += ".px-5"
 
     flash_error_data: dict[str, Any] = _get_flash_error_data() if use_error_data else {}
 
@@ -272,6 +276,8 @@ def render(  # noqa: C901
             errors,
             textarea_rows,
             custom,
+            border,
+            wider_widgets,
         )
         if hidden_field:
             hidden_fields.append(hidden_field)
@@ -289,7 +295,10 @@ def render(  # noqa: C901
     if is_empty_form:
         form_children.extend(submit_div_contents)
     else:
-        submit_div = htm.div(".col-sm-9.offset-sm-3")
+        if wider_widgets:
+            submit_div = htm.div(".col-sm-10.offset-sm-2")
+        else:
+            submit_div = htm.div(".col-sm-9.offset-sm-3")
         submit_row = htm.div(".row")[submit_div[submit_div_contents]]
         form_children.append(submit_row)
 
@@ -772,6 +781,8 @@ def _render_row(
     errors: dict[str, list[str]] | None,
     textarea_rows: int,
     custom: dict[str, htm.Element | htm.VoidElement] | None,
+    border: bool,
+    wider_widgets: bool,
 ) -> tuple[htm.VoidElement | None, htm.Element | None]:
     widget_type = _get_widget_type(field_info)
     has_flash_error = field_name in flash_error_data
@@ -798,7 +809,14 @@ def _render_row(
     label_text = field_info.description or field_name.replace("_", " ").title()
     is_required = field_info.is_required()
 
-    label_classes = "col-sm-3 col-form-label text-sm-end"
+    if wider_widgets:
+        label_col_class = "col-sm-2"
+        widget_col_class = ".col-sm-9"
+    else:
+        label_col_class = "col-sm-3"
+        widget_col_class = ".col-sm-8"
+
+    label_classes = f"{label_col_class} col-form-label text-sm-end"
     label_classes_with_error = f"{label_classes} text-danger" if has_flash_error else label_classes
     label_elem = htpy.label(for_=field_name, class_=label_classes_with_error)[label_text]
 
@@ -812,8 +830,8 @@ def _render_row(
         custom=custom,
     )
 
-    row_div = htm.div(".mb-3.row")
-    widget_div = htm.div(".col-sm-8")
+    row_div = htm.div(f".mb-3.pb-3.row{'.border-bottom' if border else ''}")
+    widget_div = htm.div(widget_col_class)
 
     widget_div_contents: list[htm.Element | htm.VoidElement] = [widget_elem]
     if has_flash_error:
