@@ -242,8 +242,23 @@ class Block:
         self.__check_parent("table", {"body", "div"})
         return BlockElementCallable(self, table)
 
+    @property
+    def td(self) -> BlockElementCallable:
+        self.__check_parent("td", {"tr"})
+        return BlockElementCallable(self, td)
+
     def text(self, text: str) -> None:
         self.elements.append(text)
+
+    @property
+    def th(self) -> BlockElementCallable:
+        self.__check_parent("th", {"tr"})
+        return BlockElementCallable(self, th)
+
+    @property
+    def thead(self) -> BlockElementCallable:
+        self.__check_parent("thead", {"table"})
+        return BlockElementCallable(self, thead)
 
     @property
     def title(self) -> BlockElementCallable:

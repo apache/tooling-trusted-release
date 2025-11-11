@@ -780,14 +780,14 @@ def test_openpgp_01_upload(page: sync_api.Page, credentials: Credentials) -> Non
     select_all_button_locator.click()
 
     logging.info("Submitting the Add OpenPGP key form")
-    submit_button_locator = page.locator('input[type="submit"][value="Add OpenPGP key"]')
+    submit_button_locator = page.get_by_role("button", name="Add OpenPGP key")
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
     logging.info("Waiting for navigation back to /keys page")
-    wait_for_path(page, "/keys/add")
+    wait_for_path(page, "/keys")
 
-    logging.info("Checking for success flash message on /keys/add page")
+    logging.info("Checking for success flash message on /keys page")
     try:
         flash_message_locator = page.locator("div.flash-success")
         sync_api.expect(flash_message_locator).to_be_visible()
@@ -802,9 +802,6 @@ def test_openpgp_01_upload(page: sync_api.Page, credentials: Credentials) -> Non
             f"OpenPGP key {key_fingerprint_upper} was already in the database."
         )
         logging.info("OpenPGP key already in database message shown")
-
-    logging.info("Navigating back to /keys to verify key presence")
-    go_to_path(page, "/keys")
 
     logging.info(f"Verifying OpenPGP key with fingerprint {key_fingerprint_upper} is visible")
     key_row_locator = page.locator(f'tr.page-user-openpgp-key:has(a[href="/keys/details/{key_fingerprint_lower}"])')
@@ -1204,7 +1201,7 @@ def test_tidy_up_openpgp_keys_continued(page: sync_api.Page, fingerprints_to_del
         # Locate again by fingerprint for robustness
         row_to_delete_locator = page.locator(f'tr:has(a[href="/keys/details/{fingerprint}"])')
         delete_button_locator = row_to_delete_locator.locator(
-            'form[action="/keys/delete"] input[type="submit"][value="Delete key"]'
+            'form[action="/keys"] input[type="submit"][value="Delete key"]'
         )
 
         if delete_button_locator.is_visible():
@@ -1351,7 +1348,7 @@ def test_tidy_up_ssh_keys_continued(page: sync_api.Page, fingerprints_to_delete:
         # Locate again by fingerprint for robustness in case of changes
         card_to_delete_locator = page.locator(f"div.card:has(td:has-text('{fingerprint}'))")
         delete_button_locator = card_to_delete_locator.locator(
-            'form[action="/keys/delete"] input[type="submit"][value="Delete key"]'
+            'form[action="/keys"] input[type="submit"][value="Delete key"]'
         )
 
         if delete_button_locator.is_visible():

@@ -77,9 +77,11 @@
             The <code>KEYS</code> file is automatically generated when you add or remove a key, but you can also use the form below to manually regenerate it.
           </p>
           <form method="post"
-                action="{{ as_url(post.keys.update_committee_keys, committee_name=committee.name) }}"
+                action="{{ as_url(post.keys.keys) }}"
                 class="mb-4 d-inline-block">
             {{ update_committee_keys_form.hidden_tag() }}
+            <input type="hidden" name="variant" value="update_committee_keys" />
+            <input type="hidden" name="committee_name" value="{{ committee.name }}" />
 
             {{ update_committee_keys_form.submit(class_='btn btn-sm btn-outline-secondary') }}
           </form>

@@ -73,36 +73,69 @@ async def add(session: web.Committer, add_openpgp_key_form: shared.keys.AddOpenP
     return await session.redirect(get.keys.keys)
 
 
-@post.committer("/keys/delete")
-async def delete(session: web.Committer) -> web.WerkzeugResponse:
-    """Delete a public signing key or SSH key from the user's account."""
-    form = await shared.keys.DeleteKeyForm.create_form(data=await quart.request.form)
+@post.committer("/keys")
+@post.form(shared.keys.KeysForm)
+async def keys(session: web.Committer, keys_form: shared.keys.KeysForm) -> web.WerkzeugResponse:
+    """Handle forms on the keys management page."""
+    match keys_form:
+        case shared.keys.DeleteOpenPGPKeyForm() as delete_openpgp_form:
+            return await _delete_openpgp_key(session, delete_openpgp_form)
 
-    if not await form.validate_on_submit():
-        return await session.redirect(get.keys.keys, error="Invalid request for key deletion.")
+        case shared.keys.DeleteSSHKeyForm() as delete_ssh_form:
+            return await _delete_ssh_key(session, delete_ssh_form)
 
-    fingerprint = (await quart.request.form).get("fingerprint")
-    if not fingerprint:
-        return await session.redirect(get.keys.keys, error="Missing key fingerprint for deletion.")
+        case shared.keys.UpdateCommitteeKeysForm() as update_committee_form:
+            return await _update_committee_keys(session, update_committee_form)
 
-    # Try to delete an SSH key first
-    # Otherwise, delete an OpenPGP key
-    # TODO: Unmerge this, or identify the key type
+
+async def _delete_openpgp_key(
+    session: web.Committer, delete_form: shared.keys.DeleteOpenPGPKeyForm
+) -> web.WerkzeugResponse:
+    """Delete an OpenPGP key from the user's account."""
+    fingerprint = delete_form.fingerprint
+
     async with storage.write() as write:
         wafc = write.as_foundation_committer()
-        try:
-            await wafc.ssh.delete_key(fingerprint)
-        except storage.AccessError:
-            pass
-        else:
-            return await session.redirect(get.keys.keys, success="SSH key deleted successfully")
         oc: outcome.Outcome[sql.PublicSigningKey] = await wafc.keys.delete_key(fingerprint)
 
     match oc:
         case outcome.Result():
-            return await session.redirect(get.keys.keys, success="Key deleted successfully")
+            return await session.redirect(get.keys.keys, success="OpenPGP key deleted successfully")
         case outcome.Error(error):
-            return await session.redirect(get.keys.keys, error=f"Error deleting key: {error}")
+            return await session.redirect(get.keys.keys, error=f"Error deleting OpenPGP key: {error}")
+
+
+async def _delete_ssh_key(session: web.Committer, delete_form: shared.keys.DeleteSSHKeyForm) -> web.WerkzeugResponse:
+    """Delete an SSH key from the user's account."""
+    fingerprint = delete_form.fingerprint
+
+    async with storage.write() as write:
+        wafc = write.as_foundation_committer()
+        try:
+            await wafc.ssh.delete_key(fingerprint)
+        except storage.AccessError as e:
+            return await session.redirect(get.keys.keys, error=f"Error deleting SSH key: {e}")
+
+    return await session.redirect(get.keys.keys, success="SSH key deleted successfully")
+
+
+async def _update_committee_keys(
+    session: web.Committer, update_form: shared.keys.UpdateCommitteeKeysForm
+) -> web.WerkzeugResponse:
+    """Regenerate the KEYS file for a committee."""
+    committee_name = update_form.committee_name
+
+    async with storage.write() as write:
+        wacm = write.as_committee_member(committee_name)
+        match await wacm.keys.autogenerate_keys_file():
+            case outcome.Result():
+                await quart.flash(
+                    f'Successfully regenerated the KEYS file for the "{committee_name}" committee.', "success"
+                )
+            case outcome.Error():
+                await quart.flash(f"Error regenerating the KEYS file for the {committee_name} committee.", "error")
+
+    return await session.redirect(get.keys.keys)
 
 
 @post.committer("/keys/details/<fingerprint>")
@@ -136,26 +169,6 @@ async def import_selected_revision(
 async def ssh_add(session: web.Committer) -> web.WerkzeugResponse | str:
     """Add a new SSH key to the user's account."""
     return await shared.keys.ssh_add(session)
-
-
-@post.committer("/keys/update-committee-keys/<committee_name>")
-async def update_committee_keys(session: web.Committer, committee_name: str) -> web.WerkzeugResponse:
-    """Generate and save the KEYS file for a specific committee."""
-    form = await shared.keys.UpdateCommitteeKeysForm.create_form()
-    if not await form.validate_on_submit():
-        return await session.redirect(get.keys.keys, error="Invalid request to update KEYS file.")
-
-    async with storage.write() as write:
-        wacm = write.as_committee_member(committee_name)
-        match await wacm.keys.autogenerate_keys_file():
-            case outcome.Result():
-                await quart.flash(
-                    f'Successfully regenerated the KEYS file for the "{committee_name}" committee.', "success"
-                )
-            case outcome.Error():
-                await quart.flash(f"Error regenerating the KEYS file for the {committee_name} committee.", "error")
-
-    return await session.redirect(get.keys.keys)
 
 
 @post.committer("/keys/upload")

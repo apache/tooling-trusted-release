@@ -20,6 +20,7 @@
 import asyncio
 import datetime
 from collections.abc import Awaitable, Callable, Sequence
+from typing import Annotated, Literal
 
 import aiohttp
 import asfquart.base as base
@@ -41,6 +42,10 @@ import atr.template as template
 import atr.user as user
 import atr.util as util
 import atr.web as web
+
+type DELETE_OPENPGP_KEY = Literal["delete_openpgp_key"]
+type DELETE_SSH_KEY = Literal["delete_ssh_key"]
+type UPDATE_COMMITTEE_KEYS = Literal["update_committee_keys"]
 
 
 class AddOpenPGPKeyForm(form.Form):
@@ -74,12 +79,25 @@ class AddSSHKeyForm(forms.Typed):
     submit = forms.submit("Add SSH key")
 
 
-class DeleteKeyForm(forms.Typed):
-    submit = forms.submit("Delete key")
+class DeleteOpenPGPKeyForm(form.Form):
+    variant: DELETE_OPENPGP_KEY = form.value(DELETE_OPENPGP_KEY)
+    fingerprint: str = form.label("Fingerprint", widget=form.Widget.HIDDEN)
 
 
-class UpdateCommitteeKeysForm(forms.Typed):
-    submit = forms.submit("Regenerate KEYS file")
+class DeleteSSHKeyForm(form.Form):
+    variant: DELETE_SSH_KEY = form.value(DELETE_SSH_KEY)
+    fingerprint: str = form.label("Fingerprint", widget=form.Widget.HIDDEN)
+
+
+class UpdateCommitteeKeysForm(form.Empty):
+    variant: UPDATE_COMMITTEE_KEYS = form.value(UPDATE_COMMITTEE_KEYS)
+    committee_name: str = form.label("Committee name", widget=form.Widget.HIDDEN)
+
+
+type KeysForm = Annotated[
+    DeleteOpenPGPKeyForm | DeleteSSHKeyForm | UpdateCommitteeKeysForm,
+    form.DISCRIMINATOR,
+]
 
 
 class UpdateKeyCommitteesForm(forms.Typed):
