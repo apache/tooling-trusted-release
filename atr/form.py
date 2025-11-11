@@ -382,6 +382,7 @@ def to_int(v: Any) -> int:
 
 
 def to_str_list(v: Any) -> list[str]:
+    # TODO: Might need to handle the empty case
     if isinstance(v, list):
         return [str(item) for item in v]
     if isinstance(v, str):

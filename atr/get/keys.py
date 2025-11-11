@@ -21,6 +21,9 @@ import quart
 
 import atr.blueprints.get as get
 import atr.db as db
+import atr.form as form
+import atr.htm as htm
+import atr.post as post
 import atr.shared as shared
 import atr.storage as storage
 import atr.template as template
@@ -31,7 +34,33 @@ import atr.web as web
 @get.committer("/keys/add")
 async def add(session: web.Committer) -> str:
     """Add a new public signing key to the user's account."""
-    return await shared.keys.add(session)
+    async with storage.write() as write:
+        participant_of_committees = await write.participant_of_committees()
+
+    committee_choices = [(c.name, c.display_name or c.name) for c in participant_of_committees]
+
+    page = htm.Block()
+    page.p[htm.a(href=util.as_url(keys), class_="atr-back-link")["← Back to Manage keys"],]
+    page.div(class_="my-4")[
+        htm.h1(class_="mb-4")["Add your OpenPGP key"],
+        htm.p["Add your public key to use for signing release artifacts."],
+    ]
+    form.render_block(
+        page,
+        model_cls=shared.keys.AddOpenPGPKeyForm,
+        action=util.as_url(post.keys.add),
+        submit_label="Add OpenPGP key",
+        cancel_url=util.as_url(keys),
+        defaults={
+            "selected_committees": committee_choices,
+        },
+    )
+
+    return await template.blank(
+        "Add your OpenPGP key",
+        content=page.collect(),
+        description="Add your public signing key to your ATR account.",
+    )
 
 
 @get.committer("/keys/details/<fingerprint>")

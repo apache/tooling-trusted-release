@@ -23,15 +23,15 @@ from collections.abc import Awaitable, Callable, Sequence
 
 import aiohttp
 import asfquart.base as base
+import pydantic
 import quart
 import werkzeug.datastructures as datastructures
 import wtforms
 
 import atr.db as db
+import atr.form as form
 import atr.forms as forms
 import atr.get as get
-import atr.htm as htm
-import atr.log as log
 import atr.models.sql as sql
 import atr.shared as shared
 import atr.storage as storage
@@ -43,18 +43,22 @@ import atr.util as util
 import atr.web as web
 
 
-class AddOpenPGPKeyForm(forms.Typed):
-    public_key = forms.textarea(
+class AddOpenPGPKeyForm(form.Form):
+    public_key: str = form.label(
         "Public OpenPGP key",
-        placeholder="Paste your ASCII-armored public OpenPGP key here...",
-        description="Your public key should be in ASCII-armored format, starting with"
-        ' "-----BEGIN PGP PUBLIC KEY BLOCK-----"',
+        'Your public key should be in ASCII-armored format, starting with "-----BEGIN PGP PUBLIC KEY BLOCK-----"',
+        widget=form.Widget.TEXTAREA,
     )
-    selected_committees = forms.checkboxes(
+    selected_committees: form.StrList = form.label(
         "Associate key with committees",
-        description="Select the committees with which to associate your key.",
+        "Select the committees with which to associate your key.",
     )
-    submit = forms.submit("Add OpenPGP key")
+
+    @pydantic.model_validator(mode="after")
+    def validate_at_least_one_committee(self) -> "AddOpenPGPKeyForm":
+        if not self.selected_committees:
+            raise ValueError("You must select at least one committee to associate with this key")
+        return self
 
 
 class AddSSHKeyForm(forms.Typed):
@@ -132,71 +136,6 @@ class UploadKeyFormBase(forms.Typed):
                 self.key.errors = [msg]
             return False
         return True
-
-
-async def add(session: web.Committer) -> str:
-    """Add a new public signing key to the user's account."""
-    key_info = None
-
-    async with storage.write() as write:
-        participant_of_committees = await write.participant_of_committees()
-
-    committee_choices: forms.Choices = [(c.name, c.display_name or c.name) for c in participant_of_committees]
-
-    form = await AddOpenPGPKeyForm.create_form(
-        data=(await quart.request.form) if (quart.request.method == "POST") else None
-    )
-    forms.choices(form.selected_committees, committee_choices)
-
-    if await form.validate_on_submit():
-        try:
-            key_text: str = util.unwrap(form.public_key.data)
-            selected_committee_names: list[str] = util.unwrap(form.selected_committees.data)
-
-            async with storage.write() as write:
-                wafc = write.as_foundation_committer()
-                ocr: outcome.Outcome[types.Key] = await wafc.keys.ensure_stored_one(key_text)
-                key = ocr.result_or_raise()
-
-                for selected_committee_name in selected_committee_names:
-                    # TODO: Should this be committee member or committee participant?
-                    # Also, should we emit warnings and continue here?
-                    wacp = write.as_committee_participant(selected_committee_name)
-                    oc: outcome.Outcome[types.LinkedCommittee] = await wacp.keys.associate_fingerprint(
-                        key.key_model.fingerprint
-                    )
-                    oc.result_or_raise()
-
-                fingerprint_upper = key.key_model.fingerprint.upper()
-                if key.status == types.KeyStatus.PARSED:
-                    details_url = util.as_url(get.keys.details, fingerprint=key.key_model.fingerprint)
-                    p = htm.p[
-                        f"OpenPGP key {fingerprint_upper} was already in the database. ",
-                        htm.a(href=details_url)["View key details"],
-                        ".",
-                    ]
-                    await quart.flash(str(p), "warning")
-                else:
-                    await quart.flash(f"OpenPGP key {fingerprint_upper} added successfully.", "success")
-            # Clear form data on success by creating a new empty form instance
-            form = await AddOpenPGPKeyForm.create_form()
-            forms.choices(form.selected_committees, committee_choices)
-
-        except web.FlashError as e:
-            log.warning("FlashError adding OpenPGP key: %s", e)
-            await quart.flash(str(e), "error")
-        except Exception as e:
-            log.exception("Error adding OpenPGP key:")
-            await quart.flash(f"An unexpected error occurred: {e!s}", "error")
-
-    return await template.render(
-        "keys-add.html",
-        asf_id=session.uid,
-        user_committees=participant_of_committees,
-        form=form,
-        key_info=key_info,
-        algorithms=shared.algorithms,
-    )
 
 
 async def details(session: web.Committer, fingerprint: str) -> str | web.WerkzeugResponse:

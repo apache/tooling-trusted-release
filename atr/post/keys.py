@@ -20,6 +20,8 @@ import quart
 
 import atr.blueprints.post as post
 import atr.get as get
+import atr.htm as htm
+import atr.log as log
 import atr.models.sql as sql
 import atr.shared as shared
 import atr.storage as storage
@@ -30,9 +32,45 @@ import atr.web as web
 
 
 @post.committer("/keys/add")
-async def add(session: web.Committer) -> str:
+@post.form(shared.keys.AddOpenPGPKeyForm)
+async def add(session: web.Committer, add_openpgp_key_form: shared.keys.AddOpenPGPKeyForm) -> web.WerkzeugResponse:
     """Add a new public signing key to the user's account."""
-    return await shared.keys.add(session)
+    try:
+        key_text = add_openpgp_key_form.public_key
+        selected_committee_names = add_openpgp_key_form.selected_committees
+
+        async with storage.write() as write:
+            wafc = write.as_foundation_committer()
+            ocr: outcome.Outcome[types.Key] = await wafc.keys.ensure_stored_one(key_text)
+            key = ocr.result_or_raise()
+
+            for selected_committee_name in selected_committee_names:
+                wacp = write.as_committee_participant(selected_committee_name)
+                oc: outcome.Outcome[types.LinkedCommittee] = await wacp.keys.associate_fingerprint(
+                    key.key_model.fingerprint
+                )
+                oc.result_or_raise()
+
+            fingerprint_upper = key.key_model.fingerprint.upper()
+            if key.status == types.KeyStatus.PARSED:
+                details_url = util.as_url(get.keys.details, fingerprint=key.key_model.fingerprint)
+                p = htm.p[
+                    f"OpenPGP key {fingerprint_upper} was already in the database. ",
+                    htm.a(href=details_url)["View key details"],
+                    ".",
+                ]
+                await quart.flash(str(p), "warning")
+            else:
+                await quart.flash(f"OpenPGP key {fingerprint_upper} added successfully.", "success")
+
+    except web.FlashError as e:
+        log.warning("FlashError adding OpenPGP key: %s", e)
+        await quart.flash(str(e), "error")
+    except Exception as e:
+        log.exception("Error adding OpenPGP key:")
+        await quart.flash(f"An unexpected error occurred: {e!s}", "error")
+
+    return await session.redirect(get.keys.keys)
 
 
 @post.committer("/keys/delete")
