@@ -146,9 +146,32 @@ async def keys(session: web.Committer) -> str:
 
 
 @get.committer("/keys/ssh/add")
-async def ssh_add(session: web.Committer) -> web.WerkzeugResponse | str:
+async def ssh_add(session: web.Committer) -> str:
     """Add a new SSH key to the user's account."""
-    return await shared.keys.ssh_add(session)
+    page = htm.Block()
+    page.p[htm.a(".atr-back-link", href=util.as_url(keys))["← Back to Manage keys"]]
+    page.h1["Add your SSH key"]
+    page.p["Add your SSH public key to use for rsync authentication."]
+    page.div[
+        htm.p[
+            "Welcome, ",
+            htm.strong[session.uid],
+            "! You are authenticated as an ASF committer.",
+        ]
+    ]
+
+    form.render_block(
+        page,
+        model_cls=shared.keys.AddSSHKeyForm,
+        action=util.as_url(post.keys.ssh_add),
+        submit_label="Add SSH key",
+    )
+
+    return await template.blank(
+        "Add your SSH key",
+        content=page.collect(),
+        description="Add your SSH public key to your account.",
+    )
 
 
 @get.committer("/keys/upload")

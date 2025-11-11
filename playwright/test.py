@@ -1020,7 +1020,7 @@ def test_ssh_01_add_key(page: sync_api.Page, credentials: Credentials) -> None:
     page.locator('textarea[name="key"]').fill(public_key_content)
 
     logging.info("Submitting the Add SSH key form")
-    page.locator('input[type="submit"][value="Add SSH key"]').click()
+    page.get_by_role("button", name="Add SSH key").click()
 
     logging.info("Waiting for navigation back to /keys page")
     wait_for_path(page, "/keys")

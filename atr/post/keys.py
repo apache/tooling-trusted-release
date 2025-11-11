@@ -166,9 +166,22 @@ async def import_selected_revision(
 
 
 @post.committer("/keys/ssh/add")
-async def ssh_add(session: web.Committer) -> web.WerkzeugResponse | str:
+@post.form(shared.keys.AddSSHKeyForm)
+async def ssh_add(session: web.Committer, add_ssh_key_form: shared.keys.AddSSHKeyForm) -> web.WerkzeugResponse:
     """Add a new SSH key to the user's account."""
-    return await shared.keys.ssh_add(session)
+    try:
+        async with storage.write(session) as write:
+            wafc = write.as_foundation_committer()
+            fingerprint = await wafc.ssh.add_key(add_ssh_key_form.key, session.uid)
+
+        await quart.flash(f"SSH key added successfully: {fingerprint}", "success")
+    except util.SshFingerprintError as e:
+        await quart.flash(str(e), "error")
+    except Exception as e:
+        log.exception("Error adding SSH key:")
+        await quart.flash(f"An unexpected error occurred: {e!s}", "error")
+
+    return await session.redirect(get.keys.keys)
 
 
 @post.committer("/keys/upload")

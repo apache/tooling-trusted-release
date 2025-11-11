@@ -66,17 +66,13 @@ class AddOpenPGPKeyForm(form.Form):
         return self
 
 
-class AddSSHKeyForm(forms.Typed):
-    key = forms.textarea(
+class AddSSHKeyForm(form.Form):
+    key: str = form.label(
         "SSH public key",
-        placeholder="Paste your SSH public key here (in the format used in authorized_keys files)",
-        description=(
-            "Your SSH public key should be in the standard format, starting with a key type"
-            ' (like "ssh-rsa" or "ssh-ed25519") followed by the key data.'
-        ),
+        "Your SSH public key should be in the standard format, starting with a key type"
+        ' (like "ssh-rsa" or "ssh-ed25519") followed by the key data.',
+        widget=form.Widget.TEXTAREA,
     )
-
-    submit = forms.submit("Add SSH key")
 
 
 class DeleteOpenPGPKeyForm(form.Form):
@@ -215,38 +211,6 @@ async def details(session: web.Committer, fingerprint: str) -> str | web.Werkzeu
         algorithms=shared.algorithms,
         now=datetime.datetime.now(datetime.UTC),
         asf_id=session.uid,
-    )
-
-
-async def ssh_add(session: web.Committer) -> web.WerkzeugResponse | str:
-    """Add a new SSH key to the user's account."""
-    # TODO: Make an auth.require wrapper that gives the session automatically
-    # And the form if it's a POST handler? Might be hard to type
-    # But we can use variants of the function
-    # GET, POST, GET_POST are all we need
-    # We could even include auth in the function names
-    form = await AddSSHKeyForm.create_form()
-    fingerprint = None
-    if await form.validate_on_submit():
-        key: str = util.unwrap(form.key.data)
-        try:
-            async with storage.write(session) as write:
-                wafc = write.as_foundation_committer()
-                fingerprint = await wafc.ssh.add_key(key, session.uid)
-        except util.SshFingerprintError as e:
-            if isinstance(form.key.errors, list):
-                form.key.errors.append(str(e))
-            else:
-                form.key.errors = [str(e)]
-        else:
-            success_message = f"SSH key added successfully: {fingerprint}"
-            return await session.redirect(get.keys.keys, success=success_message)
-
-    return await template.render(
-        "keys-ssh-add.html",
-        asf_id=session.uid,
-        form=form,
-        fingerprint=fingerprint,
     )
 
 
