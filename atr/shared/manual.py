@@ -14,3 +14,22 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+
+from typing import Literal
+
+import pydantic
+
+import atr.form as form
+
+
+class ResolveVoteForm(form.Form):
+    vote_result: Literal["Passed", "Failed"] = form.label("Vote result", widget=form.Widget.RADIO)
+    vote_thread_url: str = form.label("Vote thread URL")
+    vote_result_url: str = form.label("Vote result URL")
+
+    @pydantic.field_validator("vote_thread_url", "vote_result_url", mode="after")
+    @classmethod
+    def validate_urls(cls, value: str) -> str:
+        if not value.startswith("https://lists.apache.org/thread/"):
+            raise ValueError("URL must be a valid Apache email thread URL")
+        return value

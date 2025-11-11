@@ -31,46 +31,6 @@ import atr.util as util
 import atr.web as web
 
 
-@post.committer("/resolve/manual/<project_name>/<version_name>")
-async def manual_selected_post(
-    session: web.Committer, project_name: str, version_name: str
-) -> web.WerkzeugResponse | str:
-    """Post the manual vote resolution page."""
-    await session.check_access(project_name)
-    release = await session.release(
-        project_name,
-        version_name,
-        phase=sql.ReleasePhase.RELEASE_CANDIDATE,
-        with_release_policy=True,
-        with_project_release_policy=True,
-    )
-    if not release.vote_manual:
-        raise RuntimeError("This page is for manual votes only")
-    resolve_form = await shared.resolve.ResolveVoteManualForm.create_form()
-    if not (await resolve_form.validate_on_submit()):
-        return await session.redirect(
-            get.resolve.manual_selected,
-            project_name=project_name,
-            version_name=version_name,
-            error="Invalid form submission.",
-        )
-    vote_result = util.unwrap(resolve_form.vote_result.data)
-    vote_thread_url = util.unwrap(resolve_form.vote_thread_url.data)
-    vote_result_url = util.unwrap(resolve_form.vote_result_url.data)
-    await _committees_check(vote_thread_url, vote_result_url)
-
-    async with storage.write_as_project_committee_member(project_name) as wacm:
-        success_message = await wacm.vote.resolve_manually(project_name, release, vote_result)
-    if vote_result == "passed":
-        destination = get.finish.selected
-    else:
-        destination = get.compose.selected
-
-    return await session.redirect(
-        destination, project_name=project_name, version_name=version_name, success=success_message
-    )
-
-
 @post.committer("/resolve/submit/<project_name>/<version_name>")
 async def submit_selected(session: web.Committer, project_name: str, version_name: str) -> web.WerkzeugResponse | str:
     """Resolve a vote."""
@@ -182,35 +142,3 @@ async def tabulated_selected_post(session: web.Committer, project_name: str, ver
         fetch_error=fetch_error,
         archive_url=archive_url,
     )
-
-
-async def _committees_check(vote_thread_url: str, vote_result_url: str) -> None:
-    if not vote_thread_url.startswith("https://lists.apache.org/thread/"):
-        raise RuntimeError("Vote thread URL is not a valid Apache email thread URL")
-    if not vote_result_url.startswith("https://lists.apache.org/thread/"):
-        raise RuntimeError("Vote result URL is not a valid Apache email thread URL")
-
-    vote_thread_id = vote_thread_url.removeprefix("https://lists.apache.org/thread/")
-    result_thread_id = vote_result_url.removeprefix("https://lists.apache.org/thread/")
-
-    vote_committee_label = None
-    result_committee_label = None
-    async for _mid, msg in util.thread_messages(vote_thread_id):
-        if "list_raw" in msg:
-            list_raw = msg["list_raw"]
-            vote_committee_label = list_raw.split(".apache.org", 1)[0].split(".", 1)[-1]
-            break
-
-    async for _mid, msg in util.thread_messages(result_thread_id):
-        if "list_raw" in msg:
-            list_raw = msg["list_raw"]
-            result_committee_label = list_raw.split(".apache.org", 1)[0].split(".", 1)[-1]
-            break
-
-    if vote_committee_label != result_committee_label:
-        raise RuntimeError("Vote committee and result committee do not match")
-
-    if vote_committee_label is None:
-        raise RuntimeError("Vote committee not found")
-    if result_committee_label is None:
-        raise RuntimeError("Result committee not found")

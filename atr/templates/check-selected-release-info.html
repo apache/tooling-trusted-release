@@ -58,7 +58,11 @@
            title="View revision history"
            class="btn btn-secondary"><i class="bi bi-clock-history me-1"></i> Revisions</a>
         {% if revision_number %}
-          {% if has_files and (not strict_checking_errors) %}
+          {% if has_files and release.project.policy_manual_vote %}
+            <a href="{{ as_url(get.manual.start_selected_revision, project_name=release.project.name, version_name=release.version, revision=revision_number) }}"
+               title="Start a manual vote on this draft"
+               class="btn btn-success"><i class="bi bi-check-circle me-1"></i> Start manual vote</a>
+          {% elif has_files and (not strict_checking_errors) %}
             <a href="{{ as_url(get.voting.selected_revision, project_name=release.project.name, version_name=release.version, revision=revision_number) }}"
                title="Start a vote on this draft"
                class="btn btn-success"><i class="bi bi-check-circle me-1"></i> Start voting</a>
@@ -78,7 +82,7 @@
         <a href="{{ as_url(get.candidate.view, project_name=release.project.name, version_name=release.version) }}"
            class="btn btn-secondary"><i class="bi bi-eye me-1"></i> View files</a>
         {% if can_resolve and release.vote_manual %}
-          <a href="{{ as_url(get.resolve.manual_selected, project_name=release.project.name, version_name=release.version) }}"
+          <a href="{{ as_url(get.manual.resolve_selected, project_name=release.project.name, version_name=release.version) }}"
              class="btn btn-success"><i class="bi bi-clipboard-check me-1"></i> Resolve vote</a>
         {% elif can_resolve and resolve_form %}
           <form action="{{ as_url(post.resolve.tabulated_selected_post, project_name=release.project.name, version_name=release.version) }}"
