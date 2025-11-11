@@ -381,6 +381,14 @@ def to_int(v: Any) -> int:
         raise ValueError(f"Invalid integer value: {v!r}")
 
 
+def to_str_list(v: Any) -> list[str]:
+    if isinstance(v, list):
+        return [str(item) for item in v]
+    if isinstance(v, str):
+        return [v]
+    raise ValueError(f"Expected a string or list of strings, got {type(v).__name__}")
+
+
 # Validator types come before other functions
 # We must not use the "type" keyword here, otherwise Pydantic complains
 
@@ -402,6 +410,12 @@ File = Annotated[
 FileList = Annotated[
     list[datastructures.FileStorage],
     functional_validators.BeforeValidator(to_filestorage_list),
+    pydantic.Field(default_factory=list),
+]
+
+StrList = Annotated[
+    list[str],
+    functional_validators.BeforeValidator(to_str_list),
     pydantic.Field(default_factory=list),
 ]
 
@@ -483,10 +497,20 @@ def _render_widget(  # noqa: C901
 
         case Widget.CHECKBOXES:
             choices = _get_choices(field_info)
-            if isinstance(field_value, set):
+
+            if (not choices) and isinstance(field_value, list) and field_value:
+                # Render list[str] as checkboxes
+                if isinstance(field_value[0], tuple) and (len(field_value[0]) == 2):
+                    choices = field_value
+                    selected_values = []
+                else:
+                    choices = [(str(v), str(v)) for v in field_value]
+                    selected_values = field_value
+            elif isinstance(field_value, set):
                 selected_values = [item.value for item in field_value]
             else:
                 selected_values = field_value if isinstance(field_value, list) else []
+
             checkboxes = []
             for val, label in choices:
                 checkbox_id = f"{field_name}_{val}"
@@ -699,8 +723,13 @@ def _get_widget_type(field_info: pydantic.fields.FieldInfo) -> Widget:  # noqa: 
         if args:
             first_arg = args[0]
             if get_origin(first_arg) is Literal:
+                # Literal[str, ...]
+                return Widget.CHECKBOXES
+            if first_arg is str:
+                # StrList
                 return Widget.CHECKBOXES
             if first_arg is datastructures.FileStorage:
+                # FileList
                 return Widget.FILES
             if hasattr(first_arg, "__value__"):
                 inner = first_arg.__value__
