@@ -248,6 +248,7 @@ def render(  # noqa: C901
     empty: bool = False,
     border: bool = False,
     wider_widgets: bool = False,
+    skip: list[str] | None = None,
 ) -> htm.Element:
     if action is None:
         action = quart.request.path
@@ -262,14 +263,15 @@ def render(  # noqa: C901
         form_classes += ".px-5"
 
     flash_error_data: dict[str, Any] = _get_flash_error_data() if use_error_data else {}
-
     field_rows: list[htm.Element] = []
     hidden_fields: list[htm.Element | htm.VoidElement | markupsafe.Markup] = []
-
     hidden_fields.append(csrf_input())
+    skip_fields = set(skip) if skip else set()
 
     for field_name, field_info in model_cls.model_fields.items():
         if field_name == "csrf_token":
+            continue
+        if field_name in skip_fields:
             continue
 
         hidden_field, row = _render_row(
@@ -344,10 +346,25 @@ def to_enum_set[EnumType: enum.Enum](v: Any, enum_class: type[EnumType]) -> set[
     raise ValueError(f"Expected a set of enum values, got {type(v).__name__}")
 
 
-def to_filestorage(v: Any) -> datastructures.FileStorage:
-    if not isinstance(v, datastructures.FileStorage):
+def to_filestorage(v: Any) -> datastructures.FileStorage | None:
+    if (v is None) or (v == ""):
+        return None
+
+    if not isinstance(v, list):
+        raise ValueError("Expected a list of uploaded files")
+    if not v:
+        return None
+    if len(v) != 1:
+        raise ValueError("Expected a single uploaded file")
+
+    fs = v[0]
+    if not isinstance(fs, datastructures.FileStorage):
         raise ValueError("Expected an uploaded file")
-    return v
+
+    if not fs.filename:
+        return None
+
+    return fs
 
 
 def to_filestorage_list(v: Any) -> list[datastructures.FileStorage]:
@@ -394,6 +411,12 @@ def to_int(v: Any) -> int:
         raise ValueError(f"Invalid integer value: {v!r}")
 
 
+def to_optional_url(v: Any) -> pydantic.HttpUrl | None:
+    if (v is None) or (v == ""):
+        return None
+    return pydantic.TypeAdapter(pydantic.HttpUrl).validate_python(v)
+
+
 def to_str_list(v: Any) -> list[str]:
     # TODO: Might need to handle the empty case
     if isinstance(v, list):
@@ -414,22 +437,16 @@ Bool = Annotated[
 
 Email = pydantic.EmailStr
 
-URL = pydantic.HttpUrl
 
 File = Annotated[
-    datastructures.FileStorage,
+    datastructures.FileStorage | None,
     functional_validators.BeforeValidator(to_filestorage),
+    pydantic.Field(default=None),
 ]
 
 FileList = Annotated[
     list[datastructures.FileStorage],
     functional_validators.BeforeValidator(to_filestorage_list),
-    pydantic.Field(default_factory=list),
-]
-
-StrList = Annotated[
-    list[str],
-    functional_validators.BeforeValidator(to_str_list),
     pydantic.Field(default_factory=list),
 ]
 
@@ -439,10 +456,25 @@ Filename = Annotated[
     pydantic.Field(default=None),
 ]
 
+OptionalURL = Annotated[
+    pydantic.HttpUrl | None,
+    functional_validators.BeforeValidator(to_optional_url),
+    pydantic.Field(default=None),
+]
+
+StrList = Annotated[
+    list[str],
+    functional_validators.BeforeValidator(to_str_list),
+    pydantic.Field(default_factory=list),
+]
+
 Int = Annotated[
     int,
     functional_validators.BeforeValidator(to_int),
 ]
+
+
+URL = pydantic.HttpUrl
 
 
 class Set[EnumType: enum.Enum]:
@@ -489,6 +521,7 @@ def _render_widget(  # noqa: C901
     is_required: bool,
     textarea_rows: int,
     custom: dict[str, htm.Element | htm.VoidElement] | None,
+    defaults: dict[str, Any] | None,
 ) -> htm.Element | htm.VoidElement:
     widget_type = _get_widget_type(field_info)
     widget_classes = _get_widget_classes(widget_type, field_errors)
@@ -574,9 +607,26 @@ def _render_widget(  # noqa: C901
             widget = htpy.input(**attrs)
 
         case Widget.RADIO:
-            if isinstance(field_value, list):
-                choices = [(val, val) for val in field_value]
-                selected_value = field_value[0] if field_value else None
+            # We need to check the defaults because the choices might be dynamic
+            default_value = defaults.get(field_name) if defaults else None
+            if isinstance(default_value, list) and default_value:
+                if isinstance(default_value[0], tuple) and (len(default_value[0]) == 2):
+                    choices = default_value
+                    selected_value = field_value if not isinstance(field_value, list) else None
+                else:
+                    choices = [(val, val) for val in default_value]
+                    selected_value = (
+                        field_value
+                        if not isinstance(field_value, list)
+                        else (default_value[0] if default_value else None)
+                    )
+            elif isinstance(field_value, list) and field_value:
+                if isinstance(field_value[0], tuple) and (len(field_value[0]) == 2):
+                    choices = field_value
+                    selected_value = None
+                else:
+                    choices = [(val, val) for val in field_value]
+                    selected_value = field_value[0] if field_value else None
             else:
                 choices = _get_choices(field_info)
                 selected_value = field_value
@@ -832,6 +882,7 @@ def _render_row(
         is_required=is_required,
         textarea_rows=textarea_rows,
         custom=custom,
+        defaults=defaults,
     )
 
     row_div = htm.div(f".mb-3.pb-3.row{'.border-bottom' if border else ''}")
@@ -843,11 +894,14 @@ def _render_row(
         error_div = htm.div(".text-danger.mt-1")[f"Error: {error_msg}"]
         widget_div_contents.append(error_div)
     else:
-        json_schema_extra = field_info.json_schema_extra or {}
-        if isinstance(json_schema_extra, dict):
-            documentation = json_schema_extra.get("documentation")
-            if isinstance(documentation, str):
-                doc_div = htm.div(".text-muted.mt-1.form-text")[documentation]
-                widget_div_contents.append(doc_div)
+        # Skip documentation for CUSTOM widgets
+        # Therefore CUSTOM widgets must handle their own documentation
+        if widget_type != Widget.CUSTOM:
+            json_schema_extra = field_info.json_schema_extra or {}
+            if isinstance(json_schema_extra, dict):
+                documentation = json_schema_extra.get("documentation")
+                if isinstance(documentation, str):
+                    doc_div = htm.div(".text-muted.mt-1.form-text")[documentation]
+                    widget_div_contents.append(doc_div)
 
     return None, row_div[label_elem, widget_div[widget_div_contents]]
