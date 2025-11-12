@@ -17,27 +17,19 @@
 
 """keys.py"""
 
-import asyncio
-from collections.abc import Awaitable, Callable, Sequence
 from typing import Annotated, Literal
 
-import aiohttp
-import asfquart.base as base
+import htpy
+import markupsafe
 import pydantic
-import quart
-import werkzeug.datastructures as datastructures
-import wtforms
 
 import atr.form as form
-import atr.forms as forms
-import atr.models.sql as sql
+import atr.htm as htm
 import atr.shared as shared
 import atr.storage as storage
-import atr.storage.outcome as outcome
 import atr.storage.types as types
 import atr.template as template
 import atr.util as util
-import atr.web as web
 
 type DELETE_OPENPGP_KEY = Literal["delete_openpgp_key"]
 type DELETE_SSH_KEY = Literal["delete_ssh_key"]
@@ -99,147 +91,266 @@ class UpdateKeyCommitteesForm(form.Form):
     )
 
 
-class UploadKeyFormBase(forms.Typed):
-    key = forms.file(
+class UploadKeysForm(form.Form):
+    key: form.File = form.label(
         "KEYS file",
-        optional=True,
-        description=(
-            "Upload a KEYS file containing multiple PGP public keys."
-            " The file should contain keys in ASCII-armored format, starting with"
-            ' "-----BEGIN PGP PUBLIC KEY BLOCK-----".'
-        ),
+        "Upload a KEYS file containing multiple PGP public keys."
+        " The file should contain keys in ASCII-armored format, starting with"
+        ' "-----BEGIN PGP PUBLIC KEY BLOCK-----".',
+        widget=form.Widget.CUSTOM,
     )
-    keys_url = forms.url(
+    keys_url: form.OptionalURL = form.label(
         "KEYS file URL",
-        optional=True,
-        placeholder="Enter URL to KEYS file",
-        description="Enter a URL to a KEYS file. This will be fetched by the server.",
+        "Enter a URL to a KEYS file. This will be fetched by the server.",
+        widget=form.Widget.CUSTOM,
     )
-
-    selected_committee = forms.radio(
+    selected_committee: str = form.label(
         "Associate keys with committee",
-        description=(
-            "Select the committee with which to associate these keys. You must be a member of the selected committee."
-        ),
+        "Select the committee with which to associate these keys.",
+        widget=form.Widget.RADIO,
     )
 
-    submit = forms.submit("Upload KEYS file")
+    @pydantic.model_validator(mode="after")
+    def validate_key_source(self) -> "UploadKeysForm":
+        if (not self.key) and (not self.keys_url):
+            raise ValueError("Either a file or a URL is required")
+        if self.key and self.keys_url:
+            raise ValueError("Provide either a file or a URL, not both")
+        return self
 
-    async def validate(self, extra_validators: dict | None = None) -> bool:
-        """Ensure that either a file is uploaded or a URL is provided, but not both."""
-        if not await super().validate(extra_validators):
-            return False
-        if not self.key.data and not self.keys_url.data:
-            msg = "Either a file or a URL is required."
-            if self.key.errors and isinstance(self.key.errors, list):
-                self.key.errors.append(msg)
+
+def _get_results_table_css() -> htm.Element:
+    return htm.style[
+        markupsafe.Markup(
+            """
+        .page-rotated-header {
+            height: 180px;
+            position: relative;
+            vertical-align: bottom;
+            padding-bottom: 5px;
+            width: 40px;
+        }
+        .page-rotated-header > div {
+            transform-origin: bottom left;
+            transform: translateX(25px) rotate(-90deg);
+            position: absolute;
+            bottom: 12px;
+            left: 6px;
+            white-space: nowrap;
+            text-align: left;
+        }
+        .table th, .table td {
+            text-align: center;
+            vertical-align: middle;
+        }
+        .table td.page-key-details {
+            text-align: left;
+            font-family: ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas", monospace;
+            font-size: 0.9em;
+            word-break: break-all;
+        }
+        .page-status-cell-new {
+            background-color: #197a4e !important;
+        }
+        .page-status-cell-existing {
+            background-color: #868686 !important;
+        }
+        .page-status-cell-unknown {
+            background-color: #ffecb5 !important;
+        }
+        .page-status-cell-error {
+            background-color: #dc3545 !important;
+        }
+        .page-status-square {
+            display: inline-block;
+            width: 36px;
+            height: 36px;
+            vertical-align: middle;
+        }
+        .page-table-bordered th, .page-table-bordered td {
+            border: 1px solid #dee2e6;
+        }
+        tbody tr {
+            height: 40px;
+        }
+        """
+        )
+    ]
+
+
+def _render_results_table(
+    page: htm.Block, results: storage.outcome.List, submitted_committees: list[str], committee_map: dict[str, str]
+) -> None:
+    """Render the KEYS processing results table."""
+    page.h2["KEYS processing results"]
+    page.p[
+        "The following keys were found in your KEYS file and processed against the selected committees. "
+        "Green squares indicate that a key was added, grey squares indicate that a key already existed, "
+        "and red squares indicate an error."
+    ]
+
+    thead = htm.Block(htm.thead)
+    header_row = htm.Block(htm.tr)
+    header_row.th(scope="col")["Key ID"]
+    header_row.th(scope="col")["User ID"]
+    for committee_name in submitted_committees:
+        header_row.th(".page-rotated-header", scope="col")[htm.div[committee_map.get(committee_name, committee_name)]]
+    thead.append(header_row.collect())
+
+    tbody = htm.Block(htm.tbody)
+    for outcome in results.outcomes():
+        if outcome.ok:
+            key_obj = outcome.result_or_none()
+            fingerprint = key_obj.key_model.fingerprint if key_obj else "UNKNOWN"
+            email_addr = key_obj.key_model.primary_declared_uid if key_obj else ""
+            # Check whether the LINKED flag is set
+            added_flag = bool(key_obj.status & types.KeyStatus.LINKED) if key_obj else False
+            error_flag = False
+        else:
+            err = outcome.error_or_none()
+            key_obj = getattr(err, "key", None) if err else None
+            fingerprint = key_obj.key_model.fingerprint if key_obj else "UNKNOWN"
+            email_addr = key_obj.key_model.primary_declared_uid if key_obj else ""
+            added_flag = False
+            error_flag = True
+
+        row = htm.Block(htm.tr)
+        row.td(".page-key-details.px-2")[htm.code[fingerprint[-16:].upper()]]
+        row.td(".page-key-details.px-2")[email_addr or ""]
+
+        for committee_name in submitted_committees:
+            if error_flag:
+                cell_class = "page-status-cell-error"
+                title_text = "Error processing key"
+            elif added_flag:
+                cell_class = "page-status-cell-new"
+                title_text = "Newly linked"
             else:
-                self.key.errors = [msg]
-            return False
-        if self.key.data and self.keys_url.data:
-            msg = "Provide either a file or a URL, not both."
-            if self.key.errors and isinstance(self.key.errors, list):
-                self.key.errors.append(msg)
-            else:
-                self.key.errors = [msg]
-            return False
-        return True
+                cell_class = "page-status-cell-existing"
+                title_text = "Already linked"
+
+            row.td(".text-center.align-middle.page-status-cell-container")[
+                htm.span(f".page-status-square.{cell_class}", title=title_text)
+            ]
+
+        tbody.append(row.collect())
+
+    table_div = htm.div(".table-responsive")[
+        htm.table(".table.table-striped.page-table-bordered.table-sm.mt-3")[thead.collect(), tbody.collect()]
+    ]
+    page.append(table_div)
+
+    processing_errors = [o for o in results.outcomes() if not o.ok]
+    if processing_errors:
+        page.h3(".text-danger.mt-4")["Processing errors"]
+        for outcome in processing_errors:
+            err = outcome.error_or_none()
+            page.div(".alert.alert-danger.p-2.mb-3")[str(err)]
 
 
-async def upload(session: web.Committer) -> str:
-    """Upload a KEYS file containing multiple OpenPGP keys."""
+async def render_upload_page(
+    results: storage.outcome.List | None = None,
+    submitted_committees: list[str] | None = None,
+    error: bool = False,
+) -> str:
+    """Render the upload page with optional results."""
+    import atr.get as get
+    import atr.post as post
+
     async with storage.write() as write:
         participant_of_committees = await write.participant_of_committees()
 
-    # TODO: Migrate to the forms interface
-    class UploadKeyForm(UploadKeyFormBase):
-        selected_committee = wtforms.SelectField(
-            "Associate keys with committee",
-            choices=[
-                (c.name, c.display_name)
-                for c in participant_of_committees
-                if (not util.committee_is_standing(c.name)) or (c.name == "tooling")
+    eligible_committees = [
+        c for c in participant_of_committees if (not util.committee_is_standing(c.name)) or (c.name == "tooling")
+    ]
+
+    committee_choices = [(c.name, c.display_name) for c in eligible_committees]
+    committee_map = {c.name: c.display_name for c in eligible_committees}
+
+    page = htm.Block()
+    page.p[htm.a(".atr-back-link", href=util.as_url(get.keys.keys))["← Back to Manage keys"]]
+    page.h1["Upload a KEYS file"]
+    page.p["Upload a KEYS file containing multiple OpenPGP public signing keys."]
+
+    if results and submitted_committees:
+        page.append(_get_results_table_css())
+        _render_results_table(page, results, submitted_committees, committee_map)
+
+    custom_tabs_widget = _render_upload_tabs()
+
+    form.render_block(
+        page,
+        model_cls=shared.keys.UploadKeysForm,
+        action=util.as_url(post.keys.upload),
+        submit_label="Upload KEYS file",
+        cancel_url=util.as_url(get.keys.keys),
+        defaults={"selected_committee": committee_choices},
+        custom={"key": custom_tabs_widget},
+        skip=["keys_url"],
+        border=True,
+        wider_widgets=True,
+    )
+
+    return await template.blank(
+        "Upload a KEYS file",
+        content=page.collect(),
+        description="Upload a KEYS file containing multiple OpenPGP public signing keys.",
+    )
+
+
+def _render_upload_tabs() -> htm.Element:
+    """Render the tabbed interface for file upload or URL input."""
+    tabs_ul = htm.ul(".nav.nav-tabs", id="keysUploadTab", role="tablist")[
+        htm.li(".nav-item", role="presentation")[
+            htpy.button(
+                class_="nav-link active",
+                id="file-upload-tab",
+                data_bs_toggle="tab",
+                data_bs_target="#file-upload-pane",
+                type="button",
+                role="tab",
+                aria_controls="file-upload-pane",
+                aria_selected="true",
+            )["Upload from file"]
+        ],
+        htm.li(".nav-item", role="presentation")[
+            htpy.button(
+                class_="nav-link",
+                id="url-upload-tab",
+                data_bs_toggle="tab",
+                data_bs_target="#url-upload-pane",
+                type="button",
+                role="tab",
+                aria_controls="url-upload-pane",
+                aria_selected="false",
+            )["Upload from URL"]
+        ],
+    ]
+
+    file_pane = htm.div(".tab-pane.fade.show.active", id="file-upload-pane", role="tabpanel")[
+        htm.div(".pt-3")[
+            htpy.input(class_="form-control", id="key", name="key", type="file"),
+            htm.div(".form-text.text-muted.mt-2")[
+                "Upload a KEYS file containing multiple PGP public keys. The file should contain keys in "
+                'ASCII-armored format, starting with "-----BEGIN PGP PUBLIC KEY BLOCK-----".'
             ],
-            coerce=str,
-            option_widget=wtforms.widgets.RadioInput(),
-            widget=wtforms.widgets.ListWidget(prefix_label=False),
-            validators=[wtforms.validators.InputRequired("You must select at least one committee")],
-            description="Select the committee with which to associate these keys.",
-        )
+        ]
+    ]
 
-    form = await UploadKeyForm.create_form()
-    results: outcome.List[types.Key] | None = None
+    url_pane = htm.div(".tab-pane.fade", id="url-upload-pane", role="tabpanel")[
+        htm.div(".pt-3")[
+            htpy.input(
+                class_="form-control",
+                id="keys_url",
+                name="keys_url",
+                placeholder="Enter URL to KEYS file",
+                type="url",
+                value="",
+            ),
+            htm.div(".form-text.text-muted.mt-2")["Enter a URL to a KEYS file. This will be fetched by the server."],
+        ]
+    ]
 
-    async def render(
-        error: str | None = None,
-        submitted_committees: list[str] | None = None,
-        all_user_committees: Sequence[sql.Committee] | None = None,
-    ) -> str:
-        # For easier happy pathing
-        if error is not None:
-            await quart.flash(error, "error")
+    tab_content = htm.div(".tab-content", id="keysUploadTabContent")[file_pane, url_pane]
 
-        # Determine which committee list to use
-        current_committees = all_user_committees if (all_user_committees is not None) else participant_of_committees
-        committee_map = {c.name: c.display_name for c in current_committees}
-
-        return await template.render(
-            "keys-upload.html",
-            asf_id=session.uid,
-            user_committees=current_committees,
-            committee_map=committee_map,
-            form=form,
-            results=results,
-            algorithms=shared.algorithms,
-            submitted_committees=submitted_committees,
-        )
-
-    if await form.validate_on_submit():
-        keys_text = ""
-        if form.key.data:
-            key_file = form.key.data
-            if not isinstance(key_file, datastructures.FileStorage):
-                return await render(error="Invalid file upload")
-            keys_content = await asyncio.to_thread(key_file.read)
-            keys_text = keys_content.decode("utf-8", errors="replace")
-        elif form.keys_url.data:
-            keys_text = await _get_keys_text(form.keys_url.data, render)
-
-        if not keys_text:
-            return await render(error="No KEYS data found.")
-
-        # Get selected committee list from the form
-        selected_committee = form.selected_committee.data
-        if not selected_committee:
-            return await render(error="You must select at least one committee")
-
-        async with storage.write() as write:
-            wacp = write.as_committee_participant(selected_committee)
-            outcomes = await wacp.keys.ensure_associated(keys_text)
-        results = outcomes
-        success_count = outcomes.result_count
-        error_count = outcomes.error_count
-        total_count = success_count + error_count
-
-        await quart.flash(
-            f"Processed {total_count} keys: {success_count} successful, {error_count} failed",
-            "success" if success_count > 0 else "error",
-        )
-        return await render(
-            submitted_committees=[selected_committee],
-            all_user_committees=participant_of_committees,
-        )
-
-    return await render()
-
-
-async def _get_keys_text(keys_url: str, render: Callable[[str], Awaitable[str]]) -> str:
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(keys_url, allow_redirects=True) as response:
-                response.raise_for_status()
-                return await response.text()
-    except aiohttp.ClientResponseError as e:
-        raise base.ASFQuartException(f"Unable to fetch keys from remote server: {e.status} {e.message}", errorcode=502)
-    except aiohttp.ClientError as e:
-        raise base.ASFQuartException(f"Network error while fetching keys: {e}", errorcode=503)
+    return htm.div[tabs_ul, tab_content]

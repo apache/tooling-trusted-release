@@ -282,7 +282,7 @@ async def ssh_add(session: web.Committer) -> str:
 @get.committer("/keys/upload")
 async def upload(session: web.Committer) -> str:
     """Upload a KEYS file containing multiple OpenPGP keys."""
-    return await shared.keys.upload(session)
+    return await shared.keys.render_upload_page()
 
 
 def _committee_keys(page: htm.Block, user_committees_with_keys: list[sql.Committee]) -> None:
