@@ -66,7 +66,7 @@ class BlockElementGetable:
         self.block = block
         self.element = element
 
-    def __getitem__(self, *items: Element | str | tuple[Element | str, ...]) -> Element:
+    def __getitem__(self, *items: Element | VoidElement | str | tuple[Element | VoidElement | str, ...]) -> Element:
         element = self.element[*items]
         for i in range(len(self.block.elements) - 1, -1, -1):
             if self.block.elements[i] is self.element:
@@ -189,6 +189,11 @@ class Block:
     @property
     def div(self) -> BlockElementCallable:
         return BlockElementCallable(self, div)
+
+    @property
+    def form(self) -> BlockElementCallable:
+        self.__check_parent("form", {"div"})
+        return BlockElementCallable(self, form)
 
     @property
     def h1(self) -> BlockElementCallable:

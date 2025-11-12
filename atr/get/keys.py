@@ -16,7 +16,11 @@
 # under the License.
 
 
+import datetime
+
+import htpy
 import markupsafe
+import quart
 
 import atr.blueprints.get as get
 import atr.db as db
@@ -27,6 +31,7 @@ import atr.post as post
 import atr.shared as shared
 import atr.storage as storage
 import atr.template as template
+import atr.user as user
 import atr.util as util
 import atr.web as web
 
@@ -93,9 +98,109 @@ async def add(session: web.Committer) -> str:
 
 
 @get.committer("/keys/details/<fingerprint>")
-async def details(session: web.Committer, fingerprint: str) -> str | web.WerkzeugResponse:
+async def details(session: web.Committer, fingerprint: str) -> str:
     """Display details for a specific OpenPGP key."""
-    return await shared.keys.details(session, fingerprint)
+    fingerprint = fingerprint.lower()
+    async with db.session() as data:
+        key, is_owner = await _key_and_is_owner(data, session, fingerprint)
+        user_committees = []
+        if is_owner:
+            project_list = session.committees + session.projects
+            user_committees = await data.committee(name_in=project_list).all()
+
+    if isinstance(key.ascii_armored_key, bytes):
+        key.ascii_armored_key = key.ascii_armored_key.decode("utf-8", errors="replace")
+
+    page = htm.Block()
+    page.p[htm.a(".atr-back-link", href=util.as_url(keys))["← Back to Manage keys"]]
+    page.h1["OpenPGP key details"]
+
+    tbody = htm.Block(htm.tbody)
+
+    def _add_row(th: str, td: str | htm.Element) -> None:
+        tbody.append(htm.tr[htm.th(".p-2.text-dark")[th], htm.td(".text-break.align-middle")[td]])
+
+    _add_row("Fingerprint", key.fingerprint.upper())
+
+    algorithm_name = shared.algorithms[key.algorithm]
+    _add_row("Type", f"{algorithm_name} ({key.length} bits)")
+
+    _add_row("Created", key.created.strftime("%Y-%m-%d %H:%M:%S"))
+
+    latest_sig = key.latest_self_signature.strftime("%Y-%m-%d %H:%M:%S") if key.latest_self_signature else "Never"
+    _add_row("Latest self signature", latest_sig)
+
+    if key.expires:
+        now = datetime.datetime.now(datetime.UTC)
+        days_until_expiry = (key.expires - now).days
+        expires_str = key.expires.strftime("%Y-%m-%d %H:%M:%S")
+        if days_until_expiry < 0:
+            expires_content = htm.span(".text-danger.fw-bold")[
+                expires_str,
+                " ",
+                htm.span(".badge.bg-danger.text-white.ms-2")["Expired"],
+            ]
+        elif days_until_expiry <= 30:
+            expires_content = htm.span(".text-warning.fw-bold")[
+                expires_str,
+                " ",
+                htm.span(".badge.bg-warning.text-dark.ms-2")[f"Expires in {days_until_expiry} days"],
+            ]
+        else:
+            expires_content = expires_str
+    else:
+        expires_content = "Never"
+    _add_row("Expires", expires_content)
+
+    _add_row("Primary UID", key.primary_declared_uid or "-")
+    secondary_uids = ", ".join(key.secondary_declared_uids) if key.secondary_declared_uids else "-"
+
+    _add_row("Secondary UIDs", secondary_uids)
+
+    _add_row("Apache UID", key.apache_uid or "-")
+
+    pmc_div = htm.Block(htm.div, classes=".text-break.pt-2")
+    if is_owner:
+        committee_choices = [(c.name, c.display_name or c.name) for c in user_committees]
+        current_committee_names = [c.name for c in key.committees]
+
+        # form.render_block(
+        #     pmc_div,
+        #     model_cls=shared.keys.UpdateKeyCommitteesForm,
+        #     action=util.as_url(post.keys.details, fingerprint=fingerprint),
+        #     form_classes=".mb-4.d-inline-block",
+        #     submit_label="Update associations",
+        #     submit_classes="btn-primary btn-sm",
+        #     defaults={"selected_committees": committee_choices},
+        #     custom={"selected_committees": _render_committee_checkboxes(committee_choices, current_committee_names)},
+        # )
+        checkboxes = _render_committee_checkboxes(committee_choices, current_committee_names)
+        pmc_div.form(
+            method="post",
+            action=util.as_url(post.keys.details, fingerprint=fingerprint),
+        )[
+            form.csrf_input(),
+            checkboxes,
+            htm.div(".mt-3")[htpy.button(".btn.btn-primary.btn-sm", type="submit")["Update associations"]],
+        ]
+    else:
+        if key.committees:
+            committee_names = ", ".join([c.name for c in key.committees])
+            pmc_div.text(committee_names)
+        else:
+            pmc_div.text("No PMCs associated")
+    _add_row("Associated PMCs", pmc_div.collect())
+
+    page.table(".mb-0.table.border.border-2.table-striped.table-sm")[tbody.collect()]
+
+    page.h2["ASCII armored key"]
+    page.pre(".mt-3.border.border-2.p-3")[key.ascii_armored_key]
+
+    return await template.blank(
+        "OpenPGP key details",
+        content=page.collect(),
+        description="View details for a specific OpenPGP public signing key.",
+    )
 
 
 @get.committer("/keys/export/<committee_name>")
@@ -230,6 +335,35 @@ def _committee_keys(page: htm.Block, user_committees_with_keys: list[sql.Committ
                 page.p(".mb-4")["No keys uploaded for this committee yet."]
 
 
+async def _key_and_is_owner(
+    data: db.Session, session: web.Committer, fingerprint: str
+) -> tuple[sql.PublicSigningKey, bool]:
+    key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
+    if not key:
+        quart.abort(404, description="OpenPGP key not found")
+    key.committees.sort(key=lambda c: c.name)
+
+    # Allow owners and committee members to view the key
+    authorised = False
+    is_owner = False
+    if key.apache_uid and session.uid:
+        is_owner = key.apache_uid.lower() == session.uid.lower()
+    if is_owner:
+        authorised = True
+    else:
+        user_affiliations = set(session.committees + session.projects)
+        key_committee_names = {c.name for c in key.committees}
+        if user_affiliations.intersection(key_committee_names):
+            authorised = True
+        elif user.is_admin(session.uid):
+            authorised = True
+
+    if not authorised:
+        quart.abort(403, description="You are not authorised to view this key")
+
+    return key, is_owner
+
+
 def _openpgp_keys(page: htm.Block, user_keys: list[sql.PublicSigningKey]) -> None:
     page.h3["Your OpenPGP keys"]
     if user_keys:
@@ -270,6 +404,32 @@ def _openpgp_keys(page: htm.Block, user_keys: list[sql.PublicSigningKey]) -> Non
         ]
     else:
         page.p[htm.strong["You haven't added any personal OpenPGP keys yet."]]
+
+
+def _render_committee_checkboxes(
+    committee_choices: list[tuple[str, str]], current_committees: list[str]
+) -> htm.Element:
+    """Render committee checkboxes in a grid layout."""
+    row_div = htm.Block(htm.div, classes=".row")
+    for val, label in committee_choices:
+        checkbox_id = f"selected_committees_{val}"
+        checkbox_attrs = {
+            "type": "checkbox",
+            "name": "selected_committees",
+            "id": checkbox_id,
+            "value": val,
+            "class_": "form-check-input",
+        }
+        if val in current_committees:
+            checkbox_attrs["checked"] = ""
+
+        checkbox_input = htpy.input(**checkbox_attrs)
+        checkbox_label = htpy.label(for_=checkbox_id, class_="form-check-label")[label]
+        checkbox_div = htm.div(".form-check.mb-2")[checkbox_input, checkbox_label]
+        col_div = htm.div(".col-sm-12.col-md-6.col-lg-4")[checkbox_div]
+        row_div.append(col_div)
+
+    return row_div.collect()
 
 
 def _ssh_keys(page: htm.Block, user_ssh_keys: list[sql.SSHKey]) -> None:

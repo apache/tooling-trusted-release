@@ -69,6 +69,11 @@ class Widget(enum.Enum):
     URL = "url"
 
 
+def csrf_input() -> htm.VoidElement:
+    csrf_token = utils.generate_csrf()
+    return htpy.input(type="hidden", name="csrf_token", value=csrf_token)
+
+
 def flash_error_data(
     form_cls: type[Form] | TypeAliasType, errors: list[pydantic_core.ErrorDetails], form_data: dict[str, Any]
 ) -> dict[str, Any]:
@@ -261,8 +266,7 @@ def render(  # noqa: C901
     field_rows: list[htm.Element] = []
     hidden_fields: list[htm.Element | htm.VoidElement | markupsafe.Markup] = []
 
-    csrf_token = utils.generate_csrf()
-    hidden_fields.append(htpy.input(type="hidden", name="csrf_token", value=csrf_token))
+    hidden_fields.append(csrf_input())
 
     for field_name, field_info in model_cls.model_fields.items():
         if field_name == "csrf_token":

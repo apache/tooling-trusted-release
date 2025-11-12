@@ -19,6 +19,7 @@
 import quart
 
 import atr.blueprints.post as post
+import atr.db as db
 import atr.get as get
 import atr.htm as htm
 import atr.log as log
@@ -88,6 +89,96 @@ async def keys(session: web.Committer, keys_form: shared.keys.KeysForm) -> web.W
             return await _update_committee_keys(session, update_committee_form)
 
 
+@post.committer("/keys/details/<fingerprint>")
+@post.form(shared.keys.UpdateKeyCommitteesForm)
+async def details(
+    session: web.Committer, update_form: shared.keys.UpdateKeyCommitteesForm, fingerprint: str
+) -> web.WerkzeugResponse:
+    """Update committee associations for an OpenPGP key."""
+    fingerprint = fingerprint.lower()
+
+    try:
+        async with db.session() as data:
+            key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
+            if not key:
+                await quart.flash("OpenPGP key not found", "error")
+                return await session.redirect(get.keys.keys)
+
+            if not (key.apache_uid and session.uid and (key.apache_uid.lower() == session.uid.lower())):
+                await quart.flash("You are not authorized to modify this key", "error")
+                return await session.redirect(get.keys.keys)
+
+            selected_committee_names = update_form.selected_committees
+            old_committee_names = {c.name for c in key.committees}
+
+            new_committees = await data.committee(name_in=selected_committee_names).all()
+            key.committees = list(new_committees)
+            data.add(key)
+            await data.commit()
+
+            affected_committee_names = old_committee_names.union(set(selected_committee_names))
+            if affected_committee_names:
+                async with storage.write() as write:
+                    for affected_committee_name in affected_committee_names:
+                        wacm = write.as_committee_member_outcome(affected_committee_name).result_or_none()
+                        if wacm is None:
+                            continue
+                        await wacm.keys.autogenerate_keys_file()
+
+            await quart.flash("Key committee associations updated successfully.", "success")
+    except Exception as e:
+        log.exception("Error updating key committee associations:")
+        await quart.flash(f"An unexpected error occurred: {e!s}", "error")
+
+    return await session.redirect(get.keys.details, fingerprint=fingerprint)
+
+
+@post.committer("/keys/import/<project_name>/<version_name>")
+async def import_selected_revision(
+    session: web.Committer, project_name: str, version_name: str
+) -> web.WerkzeugResponse:
+    await util.validate_empty_form()
+
+    async with storage.write() as write:
+        wacm = await write.as_project_committee_member(project_name)
+        outcomes: outcome.List[types.Key] = await wacm.keys.import_keys_file(project_name, version_name)
+
+    message = f"Uploaded {outcomes.result_count} keys,"
+    if outcomes.error_count > 0:
+        message += f" failed to upload {outcomes.error_count} keys for {wacm.committee_name}"
+    return await session.redirect(
+        get.compose.selected,
+        success=message,
+        project_name=project_name,
+        version_name=version_name,
+    )
+
+
+@post.committer("/keys/ssh/add")
+@post.form(shared.keys.AddSSHKeyForm)
+async def ssh_add(session: web.Committer, add_ssh_key_form: shared.keys.AddSSHKeyForm) -> web.WerkzeugResponse:
+    """Add a new SSH key to the user's account."""
+    try:
+        async with storage.write(session) as write:
+            wafc = write.as_foundation_committer()
+            fingerprint = await wafc.ssh.add_key(add_ssh_key_form.key, session.uid)
+
+        await quart.flash(f"SSH key added successfully: {fingerprint}", "success")
+    except util.SshFingerprintError as e:
+        await quart.flash(str(e), "error")
+    except Exception as e:
+        log.exception("Error adding SSH key:")
+        await quart.flash(f"An unexpected error occurred: {e!s}", "error")
+
+    return await session.redirect(get.keys.keys)
+
+
+@post.committer("/keys/upload")
+async def upload(session: web.Committer) -> str:
+    """Upload a KEYS file containing multiple OpenPGP keys."""
+    return await shared.keys.upload(session)
+
+
 async def _delete_openpgp_key(
     session: web.Committer, delete_form: shared.keys.DeleteOpenPGPKeyForm
 ) -> web.WerkzeugResponse:
@@ -136,55 +227,3 @@ async def _update_committee_keys(
                 await quart.flash(f"Error regenerating the KEYS file for the {committee_name} committee.", "error")
 
     return await session.redirect(get.keys.keys)
-
-
-@post.committer("/keys/details/<fingerprint>")
-async def details(session: web.Committer, fingerprint: str) -> str | web.WerkzeugResponse:
-    """Display details for a specific OpenPGP key."""
-    return await shared.keys.details(session, fingerprint)
-
-
-@post.committer("/keys/import/<project_name>/<version_name>")
-async def import_selected_revision(
-    session: web.Committer, project_name: str, version_name: str
-) -> web.WerkzeugResponse:
-    await util.validate_empty_form()
-
-    async with storage.write() as write:
-        wacm = await write.as_project_committee_member(project_name)
-        outcomes: outcome.List[types.Key] = await wacm.keys.import_keys_file(project_name, version_name)
-
-    message = f"Uploaded {outcomes.result_count} keys,"
-    if outcomes.error_count > 0:
-        message += f" failed to upload {outcomes.error_count} keys for {wacm.committee_name}"
-    return await session.redirect(
-        get.compose.selected,
-        success=message,
-        project_name=project_name,
-        version_name=version_name,
-    )
-
-
-@post.committer("/keys/ssh/add")
-@post.form(shared.keys.AddSSHKeyForm)
-async def ssh_add(session: web.Committer, add_ssh_key_form: shared.keys.AddSSHKeyForm) -> web.WerkzeugResponse:
-    """Add a new SSH key to the user's account."""
-    try:
-        async with storage.write(session) as write:
-            wafc = write.as_foundation_committer()
-            fingerprint = await wafc.ssh.add_key(add_ssh_key_form.key, session.uid)
-
-        await quart.flash(f"SSH key added successfully: {fingerprint}", "success")
-    except util.SshFingerprintError as e:
-        await quart.flash(str(e), "error")
-    except Exception as e:
-        log.exception("Error adding SSH key:")
-        await quart.flash(f"An unexpected error occurred: {e!s}", "error")
-
-    return await session.redirect(get.keys.keys)
-
-
-@post.committer("/keys/upload")
-async def upload(session: web.Committer) -> str:
-    """Upload a KEYS file containing multiple OpenPGP keys."""
-    return await shared.keys.upload(session)

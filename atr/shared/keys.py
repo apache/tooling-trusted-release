@@ -18,7 +18,6 @@
 """keys.py"""
 
 import asyncio
-import datetime
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Annotated, Literal
 
@@ -29,17 +28,14 @@ import quart
 import werkzeug.datastructures as datastructures
 import wtforms
 
-import atr.db as db
 import atr.form as form
 import atr.forms as forms
-import atr.get as get
 import atr.models.sql as sql
 import atr.shared as shared
 import atr.storage as storage
 import atr.storage.outcome as outcome
 import atr.storage.types as types
 import atr.template as template
-import atr.user as user
 import atr.util as util
 import atr.web as web
 
@@ -96,13 +92,11 @@ type KeysForm = Annotated[
 ]
 
 
-class UpdateKeyCommitteesForm(forms.Typed):
-    selected_committees = forms.checkboxes(
+class UpdateKeyCommitteesForm(form.Form):
+    selected_committees: form.StrList = form.label(
         "Associated PMCs",
-        optional=True,
-        description="Select the committees associated with this key.",
+        widget=form.Widget.CUSTOM,
     )
-    submit = forms.submit("Update associations")
 
 
 class UploadKeyFormBase(forms.Typed):
@@ -150,68 +144,6 @@ class UploadKeyFormBase(forms.Typed):
                 self.key.errors = [msg]
             return False
         return True
-
-
-async def details(session: web.Committer, fingerprint: str) -> str | web.WerkzeugResponse:
-    """Display details for a specific OpenPGP key."""
-    fingerprint = fingerprint.lower()
-    user_committees = []
-    current_committee_names = []
-    async with db.session() as data:
-        key, is_owner = await _key_and_is_owner(data, session, fingerprint)
-        form = None
-        if is_owner:
-            project_list = session.committees + session.projects
-            user_committees = await data.committee(name_in=project_list).all()
-            current_committee_names = [c.name for c in key.committees]
-    if is_owner:
-        committee_choices: forms.Choices = [(c.name, c.display_name or c.name) for c in user_committees]
-
-        # TODO: Probably need to do data in a separate phase
-        form = await UpdateKeyCommitteesForm.create_form(
-            data=await quart.request.form if (quart.request.method == "POST") else None
-        )
-        forms.choices(form.selected_committees, committee_choices)
-        if quart.request.method == "GET":
-            form.selected_committees.data = current_committee_names
-
-    if form and await form.validate_on_submit():
-        async with db.session() as data:
-            key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
-            if not key:
-                quart.abort(404, description="OpenPGP key not found")
-
-            selected_committee_names = form.selected_committees.data or []
-            old_committee_names = {c.name for c in key.committees}
-
-            new_committees = await data.committee(name_in=selected_committee_names).all()
-            key.committees = list(new_committees)
-            data.add(key)
-            await data.commit()
-
-            affected_committee_names = old_committee_names.union(set(selected_committee_names))
-            if affected_committee_names:
-                async with storage.write() as write:
-                    for affected_committee_name in affected_committee_names:
-                        wacm = write.as_committee_member_outcome(affected_committee_name).result_or_none()
-                        if wacm is None:
-                            continue
-                        await wacm.keys.autogenerate_keys_file()
-
-            await quart.flash("Key committee associations updated successfully.", "success")
-            return await session.redirect(get.keys.details, fingerprint=fingerprint)
-
-    if isinstance(key.ascii_armored_key, bytes):
-        key.ascii_armored_key = key.ascii_armored_key.decode("utf-8", errors="replace")
-
-    return await template.render(
-        "keys-details.html",
-        key=key,
-        form=form,
-        algorithms=shared.algorithms,
-        now=datetime.datetime.now(datetime.UTC),
-        asf_id=session.uid,
-    )
 
 
 async def upload(session: web.Committer) -> str:
@@ -311,32 +243,3 @@ async def _get_keys_text(keys_url: str, render: Callable[[str], Awaitable[str]])
         raise base.ASFQuartException(f"Unable to fetch keys from remote server: {e.status} {e.message}", errorcode=502)
     except aiohttp.ClientError as e:
         raise base.ASFQuartException(f"Network error while fetching keys: {e}", errorcode=503)
-
-
-async def _key_and_is_owner(
-    data: db.Session, session: web.Committer, fingerprint: str
-) -> tuple[sql.PublicSigningKey, bool]:
-    key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
-    if not key:
-        quart.abort(404, description="OpenPGP key not found")
-    key.committees.sort(key=lambda c: c.name)
-
-    # Allow owners and committee members to view the key
-    authorised = False
-    is_owner = False
-    if key.apache_uid and session.uid:
-        is_owner = key.apache_uid.lower() == session.uid.lower()
-    if is_owner:
-        authorised = True
-    else:
-        user_affiliations = set(session.committees + session.projects)
-        key_committee_names = {c.name for c in key.committees}
-        if user_affiliations.intersection(key_committee_names):
-            authorised = True
-        elif user.is_admin(session.uid):
-            authorised = True
-
-    if not authorised:
-        quart.abort(403, description="You are not authorised to view this key")
-
-    return key, is_owner
