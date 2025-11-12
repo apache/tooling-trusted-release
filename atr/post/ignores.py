@@ -16,35 +16,46 @@
 # under the License.
 
 
-import quart
-
 import atr.blueprints.post as post
 import atr.get as get
-import atr.models.sql as sql
 import atr.shared as shared
 import atr.storage as storage
 import atr.web as web
 
 
-@post.committer("/ignores/<committee_name>/add")
-async def ignores_committee_add(session: web.Committer, committee_name: str) -> str | web.WerkzeugResponse:
-    data = await quart.request.form
-    form = await shared.ignores.AddIgnoreForm.create_form(data=data)
-    if not (await form.validate_on_submit()):
-        return await session.redirect(get.ignores.ignores, error="Form validation errors")
+@post.committer("/ignores/<committee_name>")
+@post.form(shared.ignores.IgnoreForm)
+async def ignores(
+    session: web.Committer, ignore_form: shared.ignores.IgnoreForm, committee_name: str
+) -> web.WerkzeugResponse:
+    """Handle forms on the ignores page."""
+    match ignore_form:
+        case shared.ignores.AddIgnoreForm() as add_form:
+            return await _add_ignore(session, add_form, committee_name)
 
-    status = sql.CheckResultStatusIgnore.from_form_field(form.status.data)
+        case shared.ignores.DeleteIgnoreForm() as delete_form:
+            return await _delete_ignore(session, delete_form, committee_name)
+
+        case shared.ignores.UpdateIgnoreForm() as update_form:
+            return await _update_ignore(session, update_form, committee_name)
+
+
+async def _add_ignore(
+    session: web.Committer, add_form: shared.ignores.AddIgnoreForm, committee_name: str
+) -> web.WerkzeugResponse:
+    """Add a new ignore."""
+    status = shared.ignores.ignore_status_to_sql(add_form.status)  # type: ignore[arg-type]
 
     async with storage.write() as write:
         wacm = write.as_committee_member(committee_name)
         await wacm.checks.ignore_add(
-            release_glob=form.release_glob.data or None,
-            revision_number=form.revision_number.data or None,
-            checker_glob=form.checker_glob.data or None,
-            primary_rel_path_glob=form.primary_rel_path_glob.data or None,
-            member_rel_path_glob=form.member_rel_path_glob.data or None,
+            release_glob=add_form.release_glob or None,
+            revision_number=add_form.revision_number or None,
+            checker_glob=add_form.checker_glob or None,
+            primary_rel_path_glob=add_form.primary_rel_path_glob or None,
+            member_rel_path_glob=add_form.member_rel_path_glob or None,
             status=status,
-            message_glob=form.message_glob.data or None,
+            message_glob=add_form.message_glob or None,
         )
 
     return await session.redirect(
@@ -54,28 +65,13 @@ async def ignores_committee_add(session: web.Committer, committee_name: str) -> 
     )
 
 
-@post.committer("/ignores/<committee_name>/delete")
-async def ignores_committee_delete(session: web.Committer, committee_name: str) -> str | web.WerkzeugResponse:
-    data = await quart.request.form
-    form = await shared.ignores.DeleteIgnoreForm.create_form(data=data)
-    if not (await form.validate_on_submit()):
-        return await session.redirect(
-            get.ignores.ignores,
-            committee_name=committee_name,
-            error="Form validation errors",
-        )
-
-    if not isinstance(form.id.data, str):
-        return await session.redirect(
-            get.ignores.ignores,
-            committee_name=committee_name,
-            error="Invalid ignore ID",
-        )
-
-    cri_id = int(form.id.data)
+async def _delete_ignore(
+    session: web.Committer, delete_form: shared.ignores.DeleteIgnoreForm, committee_name: str
+) -> web.WerkzeugResponse:
+    """Delete an ignore."""
     async with storage.write() as write:
         wacm = write.as_committee_member(committee_name)
-        await wacm.checks.ignore_delete(id=cri_id)
+        await wacm.checks.ignore_delete(id=delete_form.id)
 
     return await session.redirect(
         get.ignores.ignores,
@@ -84,33 +80,23 @@ async def ignores_committee_delete(session: web.Committer, committee_name: str) 
     )
 
 
-@post.committer("/ignores/<committee_name>/update")
-async def ignores_committee_update(session: web.Committer, committee_name: str) -> str | web.WerkzeugResponse:
-    data = await quart.request.form
-    form = await shared.ignores.UpdateIgnoreForm.create_form(data=data)
-    if not (await form.validate_on_submit()):
-        return await session.redirect(get.ignores.ignores, error="Form validation errors")
-
-    status = sql.CheckResultStatusIgnore.from_form_field(form.status.data)
-    if not isinstance(form.id.data, str):
-        return await session.redirect(
-            get.ignores.ignores,
-            committee_name=committee_name,
-            error="Invalid ignore ID",
-        )
-    cri_id = int(form.id.data)
+async def _update_ignore(
+    session: web.Committer, update_form: shared.ignores.UpdateIgnoreForm, committee_name: str
+) -> web.WerkzeugResponse:
+    """Update an ignore."""
+    status = shared.ignores.ignore_status_to_sql(update_form.status)  # type: ignore[arg-type]
 
     async with storage.write() as write:
         wacm = write.as_committee_member(committee_name)
         await wacm.checks.ignore_update(
-            id=cri_id,
-            release_glob=form.release_glob.data or None,
-            revision_number=form.revision_number.data or None,
-            checker_glob=form.checker_glob.data or None,
-            primary_rel_path_glob=form.primary_rel_path_glob.data or None,
-            member_rel_path_glob=form.member_rel_path_glob.data or None,
+            id=update_form.id,
+            release_glob=update_form.release_glob or None,
+            revision_number=update_form.revision_number or None,
+            checker_glob=update_form.checker_glob or None,
+            primary_rel_path_glob=update_form.primary_rel_path_glob or None,
+            member_rel_path_glob=update_form.member_rel_path_glob or None,
             status=status,
-            message_glob=form.message_glob.data or None,
+            message_glob=update_form.message_glob or None,
         )
 
     return await session.redirect(
