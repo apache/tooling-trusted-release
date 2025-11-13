@@ -310,6 +310,7 @@ function moveFiles(files, dest, csrfToken, signal) {
     return __awaiter(this, void 0, void 0, function* () {
         const formData = new FormData();
         formData.append("csrf_token", csrfToken);
+        formData.append("variant", "MOVE_FILE");
         for (const file of files) {
             formData.append("source_files", file);
         }

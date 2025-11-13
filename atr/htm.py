@@ -240,6 +240,7 @@ class Block:
 
     @property
     def summary(self) -> BlockElementCallable:
+        self.__check_parent("summary", {"details"})
         return BlockElementCallable(self, summary)
 
     @property
