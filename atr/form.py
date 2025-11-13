@@ -125,7 +125,11 @@ def flash_error_summary(errors: list[pydantic_core.ErrorDetails], flash_data: di
                 ul.li["And more, not shown here..."]
                 break
             if "msg" in flash_datum:
-                ul.li[htm.strong[flash_datum["label"]], ": ", flash_datum["msg"]]
+                label = flash_datum["label"]
+                if label == "*":
+                    ul.li[flash_datum["msg"]]
+                else:
+                    ul.li[htm.strong[label], ": ", flash_datum["msg"]]
     summary = div.collect()
     return markupsafe.Markup(summary)
 
