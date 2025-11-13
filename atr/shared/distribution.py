@@ -119,6 +119,7 @@ def html_nav(container: htm.Block, back_url: str, back_anchor: str, phase: Phase
     container.append(block)
 
 
+# TODO: Move this to a more appropriate module
 def html_nav_phase(block: htm.Block, project: str, version: str, staging: bool) -> None:
     label: Phase
     route, label = (get.compose.selected, "COMPOSE")
