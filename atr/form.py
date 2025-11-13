@@ -82,6 +82,10 @@ def flash_error_data(
 
     # It is not valid Python syntax to use type[Form]() in a match branch
     if isinstance(form_cls, TypeAliasType):
+        # # Try to get the discriminator from form data first, then from errors
+        # discriminator_value = form_data.get(DISCRIMINATOR_NAME)
+        # if discriminator_value is None:
+        #     discriminator_value = _discriminator_from_errors(errors)
         discriminator_value = _discriminator_from_errors(errors)
         concrete_cls = _get_concrete_cls(form_cls, discriminator_value)
     else:
@@ -539,192 +543,6 @@ def widget(widget_type: Widget) -> Any:
     return pydantic.Field(..., json_schema_extra={"widget": widget_type.value})
 
 
-def _render_widget(  # noqa: C901
-    field_name: str,
-    field_info: pydantic.fields.FieldInfo,
-    field_value: Any,
-    field_errors: list[str] | None,
-    is_required: bool,
-    textarea_rows: int,
-    custom: dict[str, htm.Element | htm.VoidElement] | None,
-    defaults: dict[str, Any] | None,
-) -> htm.Element | htm.VoidElement:
-    widget_type = _get_widget_type(field_info)
-    widget_classes = _get_widget_classes(widget_type, field_errors)
-
-    base_attrs: dict[str, str] = {"name": field_name, "id": field_name, "class_": widget_classes}
-
-    elements: list[htm.Element | htm.VoidElement] = []
-
-    match widget_type:
-        case Widget.CHECKBOX:
-            attrs: dict[str, str] = {
-                "type": "checkbox",
-                "name": field_name,
-                "id": field_name,
-                "class_": "form-check-input",
-            }
-            if field_value:
-                attrs["checked"] = ""
-            widget = htpy.input(**attrs)
-
-        case Widget.CHECKBOXES:
-            choices = _get_choices(field_info)
-
-            if (not choices) and isinstance(field_value, list) and field_value:
-                # Render list[str] as checkboxes
-                if isinstance(field_value[0], tuple) and (len(field_value[0]) == 2):
-                    choices = field_value
-                    selected_values = []
-                else:
-                    choices = [(str(v), str(v)) for v in field_value]
-                    selected_values = field_value
-            elif isinstance(field_value, set):
-                selected_values = [item.value for item in field_value]
-            else:
-                selected_values = field_value if isinstance(field_value, list) else []
-
-            checkboxes = []
-            for val, label in choices:
-                checkbox_id = f"{field_name}_{val}"
-                checkbox_attrs: dict[str, str] = {
-                    "type": "checkbox",
-                    "name": field_name,
-                    "id": checkbox_id,
-                    "value": val,
-                    "class_": "form-check-input",
-                }
-                if val in selected_values:
-                    checkbox_attrs["checked"] = ""
-                checkbox_input = htpy.input(**checkbox_attrs)
-                checkbox_label = htpy.label(for_=checkbox_id, class_="form-check-label")[label]
-                checkboxes.append(htpy.div(class_="form-check")[checkbox_input, checkbox_label])
-            elements.extend(checkboxes)
-            widget = htm.div[checkboxes]
-
-        case Widget.CUSTOM:
-            if custom and (field_name in custom):
-                widget = custom.pop(field_name)
-            else:
-                widget = htm.div[f"Custom widget for {field_name} not provided"]
-
-        case Widget.EMAIL:
-            attrs = {**base_attrs, "type": "email"}
-            if field_value:
-                attrs["value"] = str(field_value)
-            widget = htpy.input(**attrs)
-
-        case Widget.FILE:
-            widget = htpy.input(type="file", **base_attrs)
-
-        case Widget.FILES:
-            attrs = {**base_attrs, "multiple": ""}
-            widget = htpy.input(type="file", **attrs)
-
-        case Widget.HIDDEN:
-            attrs = {"type": "hidden", "name": field_name, "id": field_name}
-            if field_value is not None:
-                attrs["value"] = str(field_value)
-            widget = htpy.input(**attrs)
-
-        case Widget.NUMBER:
-            attrs = {**base_attrs, "type": "number"}
-            attrs["value"] = "0" if (field_value is None) else str(field_value)
-            widget = htpy.input(**attrs)
-
-        case Widget.RADIO:
-            # We need to check the defaults because the choices might be dynamic
-            default_value = defaults.get(field_name) if defaults else None
-            if isinstance(default_value, list) and default_value:
-                if isinstance(default_value[0], tuple) and (len(default_value[0]) == 2):
-                    choices = default_value
-                    selected_value = field_value if not isinstance(field_value, list) else None
-                else:
-                    choices = [(val, val) for val in default_value]
-                    selected_value = (
-                        field_value
-                        if not isinstance(field_value, list)
-                        else (default_value[0] if default_value else None)
-                    )
-            elif isinstance(field_value, list) and field_value:
-                if isinstance(field_value[0], tuple) and (len(field_value[0]) == 2):
-                    choices = field_value
-                    selected_value = None
-                else:
-                    choices = [(val, val) for val in field_value]
-                    selected_value = field_value[0] if field_value else None
-            else:
-                choices = _get_choices(field_info)
-                selected_value = field_value
-
-            radios = []
-            for val, label in choices:
-                radio_id = f"{field_name}_{val}"
-                radio_attrs: dict[str, str] = {
-                    "type": "radio",
-                    "name": field_name,
-                    "id": radio_id,
-                    "value": val,
-                    "class_": "form-check-input",
-                }
-                if is_required:
-                    radio_attrs["required"] = ""
-                if val == selected_value:
-                    radio_attrs["checked"] = ""
-                radio_input = htpy.input(**radio_attrs)
-                radio_label = htpy.label(for_=radio_id, class_="form-check-label")[label]
-                radios.append(htpy.div(class_="form-check")[radio_input, radio_label])
-            elements.extend(radios)
-            widget = htm.div[radios]
-
-        case Widget.SELECT:
-            if isinstance(field_value, list):
-                choices = [(val, val) for val in field_value]
-                selected_value = field_value[0] if field_value else None
-            else:
-                choices = _get_choices(field_info)
-                # If field_value is an enum, extract its value for comparison
-                if isinstance(field_value, enum.Enum):
-                    selected_value = field_value.value
-                else:
-                    selected_value = field_value
-
-            options = [
-                htpy.option(
-                    value=val,
-                    selected="" if (val == selected_value) else None,
-                )[label]
-                for val, label in choices
-            ]
-            widget = htpy.select(**base_attrs)[options]
-
-        case Widget.TEXT:
-            attrs = {**base_attrs, "type": "text"}
-            if field_value:
-                attrs["value"] = str(field_value)
-            widget = htpy.input(**attrs)
-
-        case Widget.TEXTAREA:
-            attrs = {**base_attrs, "rows": str(textarea_rows)}
-            widget = htpy.textarea(**attrs)[field_value or ""]
-
-        case Widget.URL:
-            attrs = {**base_attrs, "type": "url"}
-            if field_value:
-                attrs["value"] = str(field_value)
-            widget = htpy.input(**attrs)
-
-    if not elements:
-        elements.append(widget)
-
-    if field_errors:
-        error_text = " ".join(field_errors)
-        error_div = htm.div(".invalid-feedback.d-block")[error_text]
-        elements.append(error_div)
-
-    return htm.div[elements] if len(elements) > 1 else elements[0]
-
-
 def _get_choices(field_info: pydantic.fields.FieldInfo) -> list[tuple[str, str]]:  # noqa: C901
     annotation = field_info.annotation
     origin = get_origin(annotation)
@@ -852,6 +670,42 @@ def _get_widget_type(field_info: pydantic.fields.FieldInfo) -> Widget:  # noqa: 
     return Widget.TEXT
 
 
+def _parse_dynamic_choices(
+    field_name: str, defaults: dict[str, Any] | None, field_value: Any
+) -> tuple[list[tuple[str, str]], Any]:
+    """Parse dynamic choices from defaults or field value."""
+    # Check defaults first for dynamic choices
+    default_value = defaults.get(field_name) if defaults else None
+
+    if isinstance(default_value, list) and default_value:
+        if isinstance(default_value[0], tuple) and (len(default_value[0]) == 2):
+            # List of (value, label) tuples
+            choices = default_value
+            selected_value = field_value if not isinstance(field_value, list) else None
+            return choices, selected_value
+        else:
+            # List of simple values
+            choices = [(val, val) for val in default_value]
+            selected_value = (
+                field_value if not isinstance(field_value, list) else (default_value[0] if default_value else None)
+            )
+            return choices, selected_value
+
+    # Otherwise use field_value, if it's a list
+    if isinstance(field_value, list) and field_value:
+        if isinstance(field_value[0], tuple) and (len(field_value[0]) == 2):
+            choices = field_value
+            selected_value = None
+            return choices, selected_value
+        else:
+            choices = [(val, val) for val in field_value]
+            selected_value = field_value[0] if field_value else None
+            return choices, selected_value
+
+    # Otherwise there were no dynamic choices
+    return [], field_value
+
+
 def _render_field_value(
     field_name: str,
     flash_error_data: dict[str, Any],
@@ -951,3 +805,175 @@ def _render_row(
                     widget_div_contents.append(doc_div)
 
     return None, row_div[label_elem, widget_div[widget_div_contents]]
+
+
+def _render_widget(  # noqa: C901
+    field_name: str,
+    field_info: pydantic.fields.FieldInfo,
+    field_value: Any,
+    field_errors: list[str] | None,
+    is_required: bool,
+    textarea_rows: int,
+    custom: dict[str, htm.Element | htm.VoidElement] | None,
+    defaults: dict[str, Any] | None,
+) -> htm.Element | htm.VoidElement:
+    widget_type = _get_widget_type(field_info)
+    widget_classes = _get_widget_classes(widget_type, field_errors)
+
+    base_attrs: dict[str, str] = {"name": field_name, "id": field_name, "class_": widget_classes}
+
+    elements: list[htm.Element | htm.VoidElement] = []
+
+    match widget_type:
+        case Widget.CHECKBOX:
+            attrs: dict[str, str] = {
+                "type": "checkbox",
+                "name": field_name,
+                "id": field_name,
+                "class_": "form-check-input",
+            }
+            if field_value:
+                attrs["checked"] = ""
+            widget = htpy.input(**attrs)
+
+        case Widget.CHECKBOXES:
+            choices = _get_choices(field_info)
+
+            if (not choices) and isinstance(field_value, list) and field_value:
+                # Render list[str] as checkboxes
+                if isinstance(field_value[0], tuple) and (len(field_value[0]) == 2):
+                    choices = field_value
+                    selected_values = []
+                else:
+                    choices = [(str(v), str(v)) for v in field_value]
+                    selected_values = field_value
+            elif isinstance(field_value, set):
+                selected_values = [item.value for item in field_value]
+            else:
+                selected_values = field_value if isinstance(field_value, list) else []
+
+            checkboxes = []
+            for val, label in choices:
+                checkbox_id = f"{field_name}_{val}"
+                checkbox_attrs: dict[str, str] = {
+                    "type": "checkbox",
+                    "name": field_name,
+                    "id": checkbox_id,
+                    "value": val,
+                    "class_": "form-check-input",
+                }
+                if val in selected_values:
+                    checkbox_attrs["checked"] = ""
+                checkbox_input = htpy.input(**checkbox_attrs)
+                checkbox_label = htpy.label(for_=checkbox_id, class_="form-check-label")[label]
+                checkboxes.append(htpy.div(class_="form-check")[checkbox_input, checkbox_label])
+            elements.extend(checkboxes)
+            widget = htm.div[checkboxes]
+
+        case Widget.CUSTOM:
+            if custom and (field_name in custom):
+                widget = custom.pop(field_name)
+            else:
+                widget = htm.div[f"Custom widget for {field_name} not provided"]
+
+        case Widget.EMAIL:
+            attrs = {**base_attrs, "type": "email"}
+            if field_value:
+                attrs["value"] = str(field_value)
+            widget = htpy.input(**attrs)
+
+        case Widget.FILE:
+            widget = htpy.input(type="file", **base_attrs)
+
+        case Widget.FILES:
+            attrs = {**base_attrs, "multiple": ""}
+            widget = htpy.input(type="file", **attrs)
+
+        case Widget.HIDDEN:
+            attrs = {"type": "hidden", "name": field_name, "id": field_name}
+            if field_value is not None:
+                attrs["value"] = str(field_value)
+            widget = htpy.input(**attrs)
+
+        case Widget.NUMBER:
+            attrs = {**base_attrs, "type": "number"}
+            attrs["value"] = "0" if (field_value is None) else str(field_value)
+            widget = htpy.input(**attrs)
+
+        case Widget.RADIO:
+            # Check for dynamic choices from defaults or field_value
+            dynamic_choices, selected_value = _parse_dynamic_choices(field_name, defaults, field_value)
+            if dynamic_choices:
+                choices = dynamic_choices
+            else:
+                choices = _get_choices(field_info)
+                selected_value = field_value
+
+            radios = []
+            for val, label in choices:
+                radio_id = f"{field_name}_{val}"
+                radio_attrs: dict[str, str] = {
+                    "type": "radio",
+                    "name": field_name,
+                    "id": radio_id,
+                    "value": val,
+                    "class_": "form-check-input",
+                }
+                if is_required:
+                    radio_attrs["required"] = ""
+                if val == selected_value:
+                    radio_attrs["checked"] = ""
+                radio_input = htpy.input(**radio_attrs)
+                radio_label = htpy.label(for_=radio_id, class_="form-check-label")[label]
+                radios.append(htpy.div(class_="form-check")[radio_input, radio_label])
+            elements.extend(radios)
+            widget = htm.div[radios]
+
+        case Widget.SELECT:
+            # Check for dynamic choices from defaults or field_value
+            dynamic_choices, selected_value = _parse_dynamic_choices(field_name, defaults, field_value)
+
+            if dynamic_choices:
+                choices = dynamic_choices
+            else:
+                choices = _get_choices(field_info)
+                # If field_value is an enum, extract its value for comparison
+                if isinstance(field_value, enum.Enum):
+                    selected_value = field_value.value
+                else:
+                    selected_value = field_value
+
+            options = [
+                htpy.option(
+                    value=val,
+                    selected="" if (val == selected_value) else None,
+                )[label]
+                for val, label in choices
+            ]
+            widget = htpy.select(**base_attrs)[options]
+
+        case Widget.TEXT:
+            attrs = {**base_attrs, "type": "text"}
+            if field_value:
+                attrs["value"] = str(field_value)
+            widget = htpy.input(**attrs)
+
+        case Widget.TEXTAREA:
+            attrs = {**base_attrs, "rows": str(textarea_rows)}
+            widget = htpy.textarea(**attrs)[field_value or ""]
+
+        case Widget.URL:
+            attrs = {**base_attrs, "type": "url"}
+            if field_value:
+                attrs["value"] = str(field_value)
+            widget = htpy.input(**attrs)
+
+    if not elements:
+        elements.append(widget)
+
+    if field_errors:
+        error_text = " ".join(field_errors)
+        error_div = htm.div(".invalid-feedback.d-block")[error_text]
+        elements.append(error_div)
+
+    return htm.div[elements] if len(elements) > 1 else elements[0]
