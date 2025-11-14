@@ -16,7 +16,8 @@
 # under the License.
 
 import datetime
-import http.client
+
+import asfquart.base as base
 
 import atr.blueprints.get as get
 import atr.db as db
@@ -52,7 +53,7 @@ async def view(session: web.Committer | None, name: str) -> str:
             name=name,
             _projects=True,
             _public_signing_keys=True,
-        ).demand(http.client.HTTPException(404))
+        ).demand(base.ASFQuartException(f"Committee {name} not found", errorcode=404))
     project_list = list(committee.projects)
     for project in project_list:
         # Workaround for the usual loading problem

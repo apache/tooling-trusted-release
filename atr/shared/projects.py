@@ -17,28 +17,30 @@
 
 from __future__ import annotations
 
-import datetime
-import http.client
 import re
-from typing import Any
+from typing import Annotated, Literal
 
 import asfquart.base as base
+import pydantic
 import quart
 
 import atr.db as db
-import atr.db.interaction as interaction
+import atr.form as form
 import atr.forms as forms
 import atr.get as get
-import atr.log as log
-import atr.models.policy as policy
-import atr.models.sql as sql
-import atr.registry as registry
-import atr.shared as shared
 import atr.storage as storage
 import atr.template as template
-import atr.user as user
 import atr.util as util
 import atr.web as web
+
+type COMPOSE = Literal["compose"]
+type VOTE = Literal["vote"]
+type FINISH = Literal["finish"]
+type ADD_CATEGORY = Literal["add_category"]
+type REMOVE_CATEGORY = Literal["remove_category"]
+type ADD_LANGUAGE = Literal["add_language"]
+type REMOVE_LANGUAGE = Literal["remove_language"]
+type DELETE_PROJECT = Literal["delete_project"]
 
 
 class AddForm(forms.Typed):
@@ -48,182 +50,179 @@ class AddForm(forms.Typed):
     submit = forms.submit("Add project")
 
 
-class ProjectMetadataForm(forms.Typed):
-    project_name = forms.hidden()
-    category_to_add = forms.optional("New category name")
-    language_to_add = forms.optional("New language name")
-
-
-class ReleasePolicyForm(forms.Typed):
-    """
-    A Form to create or edit a ReleasePolicy.
-
-    TODO: Currently only a single mailto_address is supported.
-          see: https://stackoverflow.com/questions/49066046/append-entry-to-fieldlist-with-flask-wtforms-using-ajax
-    """
-
-    project_name = forms.hidden()
-
-    # Compose section
-    source_artifact_paths = forms.textarea(
+class ComposePolicyForm(form.Form):
+    variant: COMPOSE = form.value(COMPOSE)
+    project_name: str = form.label("Project name", widget=form.Widget.HIDDEN)
+    source_artifact_paths: str = form.label(
         "Source artifact paths",
-        optional=True,
-        rows=5,
-        description="Paths to source artifacts to be included in the release.",
+        "Paths to source artifacts to be included in the release.",
+        widget=form.Widget.TEXTAREA,
     )
-    binary_artifact_paths = forms.textarea(
+    binary_artifact_paths: str = form.label(
         "Binary artifact paths",
-        optional=True,
-        rows=5,
-        description="Paths to binary artifacts to be included in the release.",
+        "Paths to binary artifacts to be included in the release.",
+        widget=form.Widget.TEXTAREA,
     )
-    github_repository_name = forms.optional(
+    github_repository_name: str = form.label(
         "GitHub repository name",
-        description="The name of the GitHub repository to use for the release, excluding the apache/ prefix.",
+        "The name of the GitHub repository to use for the release, excluding the apache/ prefix.",
     )
-    github_compose_workflow_path = forms.textarea(
+    github_compose_workflow_path: str = form.label(
         "GitHub compose workflow paths",
-        optional=True,
-        rows=5,
-        description="The full paths to the GitHub workflows to use for the release,"
-        " including the .github/workflows/ prefix.",
+        "The full paths to the GitHub workflows to use for the release, including the .github/workflows/ prefix.",
+        widget=form.Widget.TEXTAREA,
     )
-    strict_checking = forms.boolean(
-        "Strict checking", description="If enabled, then the release cannot be voted upon unless all checks pass."
-    )
-
-    # Vote section
-    github_vote_workflow_path = forms.textarea(
-        "GitHub vote workflow paths",
-        optional=True,
-        rows=5,
-        description="The full paths to the GitHub workflows to use for the release,"
-        " including the .github/workflows/ prefix.",
-    )
-    mailto_addresses = forms.string(
-        "Email",
-        validators=[forms.REQUIRED, forms.EMAIL],
-        placeholder="E.g. dev@project.apache.org",
-        description=f"The mailing list where vote emails are sent. This is usually"
-        "your dev list. ATR will currently only send test announcement emails to"
-        f"{util.USER_TESTS_ADDRESS}.",
-    )
-    manual_vote = forms.boolean(
-        "Manual voting process",
-        description="If this is set then the vote will be completely manual and following policy is ignored.",
-    )
-    default_min_hours_value_at_render = forms.hidden()
-    min_hours = forms.integer(
-        "Minimum voting period",
-        validators=[util.validate_vote_duration],
-        default=72,
-        description="The minimum time to run the vote, in hours. Must be 0 or between 72 and 144 inclusive."
-        " If 0, then wait until 3 +1 votes and more +1 than -1.",
-    )
-    pause_for_rm = forms.boolean(
-        "Pause for RM", description="If enabled, RM can confirm manually if the vote has passed."
-    )
-    release_checklist = forms.textarea(
-        "Release checklist",
-        optional=True,
-        rows=10,
-        description="Markdown text describing how to test release candidates.",
-    )
-    default_start_vote_template_hash = forms.hidden()
-    start_vote_template = forms.textarea(
-        "Start vote template",
-        optional=True,
-        rows=10,
-        description="Email template for messages to start a vote on a release.",
+    strict_checking: form.Bool = form.label(
+        "Strict checking",
+        "If enabled, then the release cannot be voted upon unless all checks pass.",
     )
 
-    # Finish section
-    default_announce_release_template_hash = forms.hidden()
-    announce_release_template = forms.textarea(
-        "Announce release template",
-        optional=True,
-        rows=10,
-        description="Email template for messages to announce a finished release.",
-    )
-    github_finish_workflow_path = forms.textarea(
-        "GitHub finish workflow paths",
-        optional=True,
-        rows=5,
-        description="The full paths to the GitHub workflows to use for the release,"
-        " including the .github/workflows/ prefix.",
-    )
-    preserve_download_files = forms.boolean(
-        "Preserve download files",
-        description="If enabled, existing download files will not be overwritten.",
-    )
-
-    submit_policy = forms.submit("Save")
-
-    async def validate(self, extra_validators: dict[str, Any] | None = None) -> bool:  # noqa: C901
-        await super().validate(extra_validators=extra_validators)
-
-        if self.manual_vote.data:
-            for field_name in (
-                "mailto_addresses",
-                "min_hours",
-                "pause_for_rm",
-                "release_checklist",
-                "start_vote_template",
-            ):
-                field = getattr(self, field_name, None)
-                if field is not None:
-                    forms.clear_errors(field)
-                self.errors.pop(field_name, None)
-
-        if self.manual_vote.data and self.strict_checking.data:
-            msg = "Manual voting process and strict checking cannot be enabled simultaneously."
-            forms.error(self.manual_vote, msg)
-            forms.error(self.strict_checking, msg)
-
-        github_repository_name = (self.github_repository_name.data or "").strip()
-        compose_raw = self.github_compose_workflow_path.data or ""
-        vote_raw = self.github_vote_workflow_path.data or ""
-        finish_raw = self.github_finish_workflow_path.data or ""
+    @pydantic.model_validator(mode="after")
+    def validate_github_fields(self) -> ComposePolicyForm:
+        github_repository_name = self.github_repository_name.strip()
+        compose_raw = self.github_compose_workflow_path or ""
         compose = [p.strip() for p in compose_raw.split("\n") if p.strip()]
-        vote = [p.strip() for p in vote_raw.split("\n") if p.strip()]
-        finish = [p.strip() for p in finish_raw.split("\n") if p.strip()]
 
-        any_path = bool(compose or vote or finish)
-        if any_path and (not github_repository_name):
-            forms.error(
-                self.github_repository_name,
-                "GitHub repository name is required when any workflow path is set.",
-            )
+        if compose and (not github_repository_name):
+            raise ValueError("GitHub repository name is required when any workflow path is set.")
 
         if github_repository_name and ("/" in github_repository_name):
-            forms.error(self.github_repository_name, "GitHub repository name must not contain a slash.")
+            raise ValueError("GitHub repository name must not contain a slash.")
 
         if compose:
             for p in compose:
                 if not p.startswith(".github/workflows/"):
-                    forms.error(
-                        self.github_compose_workflow_path,
-                        "GitHub workflow paths must start with '.github/workflows/'.",
-                    )
-                    break
+                    raise ValueError("GitHub workflow paths must start with '.github/workflows/'.")
+
+        return self
+
+
+class VotePolicyForm(form.Form):
+    variant: VOTE = form.value(VOTE)
+    project_name: str = form.label("Project name", widget=form.Widget.HIDDEN)
+    github_vote_workflow_path: str = form.label(
+        "GitHub vote workflow paths",
+        "The full paths to the GitHub workflows to use for the release, including the .github/workflows/ prefix.",
+        widget=form.Widget.TEXTAREA,
+    )
+    mailto_addresses: form.Email = form.label(
+        "Email",
+        f"The mailing list where vote emails are sent. This is usually your dev list. "
+        f"ATR will currently only send test announcement emails to {util.USER_TESTS_ADDRESS}.",
+    )
+    manual_vote: form.Bool = form.label(
+        "Manual voting process",
+        "If this is set then the vote will be completely manual and following policy is ignored.",
+    )
+    min_hours: form.Int = form.label(
+        "Minimum voting period",
+        "The minimum time to run the vote, in hours. Must be 0 or between 72 and 144 inclusive. "
+        "If 0, then wait until 3 +1 votes and more +1 than -1.",
+        default=72,
+    )
+    pause_for_rm: form.Bool = form.label(
+        "Pause for RM",
+        "If enabled, RM can confirm manually if the vote has passed.",
+    )
+    release_checklist: str = form.label(
+        "Release checklist",
+        "Markdown text describing how to test release candidates.",
+        widget=form.Widget.TEXTAREA,
+    )
+    start_vote_template: str = form.label(
+        "Start vote template",
+        "Email template for messages to start a vote on a release.",
+        widget=form.Widget.TEXTAREA,
+    )
+
+    @pydantic.model_validator(mode="after")
+    def validate_vote_fields(self) -> VotePolicyForm:
+        vote_raw = self.github_vote_workflow_path or ""
+        vote = [p.strip() for p in vote_raw.split("\n") if p.strip()]
+
         if vote:
             for p in vote:
                 if not p.startswith(".github/workflows/"):
-                    forms.error(
-                        self.github_vote_workflow_path,
-                        "GitHub workflow paths must start with '.github/workflows/'.",
-                    )
-                    break
+                    raise ValueError("GitHub workflow paths must start with '.github/workflows/'.")
+
+        min_hours = self.min_hours
+        if min_hours != 0 and (min_hours < 72 or min_hours > 144):
+            raise ValueError("Minimum voting period must be 0 or between 72 and 144 hours inclusive.")
+
+        return self
+
+
+class FinishPolicyForm(form.Form):
+    variant: FINISH = form.value(FINISH)
+    project_name: str = form.label("Project name", widget=form.Widget.HIDDEN)
+    github_finish_workflow_path: str = form.label(
+        "GitHub finish workflow paths",
+        "The full paths to the GitHub workflows to use for the release, including the .github/workflows/ prefix.",
+        widget=form.Widget.TEXTAREA,
+    )
+    announce_release_template: str = form.label(
+        "Announce release template",
+        "Email template for messages to announce a finished release.",
+        widget=form.Widget.TEXTAREA,
+    )
+    preserve_download_files: form.Bool = form.label(
+        "Preserve download files",
+        "If enabled, existing download files will not be overwritten.",
+    )
+
+    @pydantic.model_validator(mode="after")
+    def validate_finish_fields(self) -> FinishPolicyForm:
+        finish_raw = self.github_finish_workflow_path or ""
+        finish = [p.strip() for p in finish_raw.split("\n") if p.strip()]
+
         if finish:
             for p in finish:
                 if not p.startswith(".github/workflows/"):
-                    forms.error(
-                        self.github_finish_workflow_path,
-                        "GitHub workflow paths must start with '.github/workflows/'.",
-                    )
-                    break
+                    raise ValueError("GitHub workflow paths must start with '.github/workflows/'.")
 
-        return not self.errors
+        return self
+
+
+class AddCategoryForm(form.Form):
+    variant: ADD_CATEGORY = form.value(ADD_CATEGORY)
+    project_name: str = form.label("Project name", widget=form.Widget.HIDDEN)
+    category_to_add: str = form.label("New category name")
+
+
+class RemoveCategoryForm(form.Form):
+    variant: REMOVE_CATEGORY = form.value(REMOVE_CATEGORY)
+    project_name: str = form.label("Project name", widget=form.Widget.HIDDEN)
+    category_to_remove: str = form.label("Category to remove", widget=form.Widget.HIDDEN)
+
+
+class AddLanguageForm(form.Form):
+    variant: ADD_LANGUAGE = form.value(ADD_LANGUAGE)
+    project_name: str = form.label("Project name", widget=form.Widget.HIDDEN)
+    language_to_add: str = form.label("New language name")
+
+
+class RemoveLanguageForm(form.Form):
+    variant: REMOVE_LANGUAGE = form.value(REMOVE_LANGUAGE)
+    project_name: str = form.label("Project name", widget=form.Widget.HIDDEN)
+    language_to_remove: str = form.label("Language to remove", widget=form.Widget.HIDDEN)
+
+
+class DeleteProjectForm(form.Form):
+    variant: DELETE_PROJECT = form.value(DELETE_PROJECT)
+    project_name: str = form.label("Project name", widget=form.Widget.HIDDEN)
+
+
+type ProjectViewForm = Annotated[
+    ComposePolicyForm
+    | VotePolicyForm
+    | FinishPolicyForm
+    | AddCategoryForm
+    | RemoveCategoryForm
+    | AddLanguageForm
+    | RemoveLanguageForm
+    | DeleteProjectForm,
+    form.DISCRIMINATOR,
+]
 
 
 async def add_project(session: web.Committer, committee_name: str) -> web.WerkzeugResponse | str:
@@ -248,203 +247,6 @@ You must start with your committee label, and you must use lower case.
         return await _project_add(form, session)
 
     return await template.render("project-add-project.html", form=form, committee_name=committee.display_name)
-
-
-async def view(session: web.Committer, name: str) -> web.WerkzeugResponse | str:
-    policy_form = None
-    metadata_form = None
-    can_edit = False
-
-    async with db.session() as data:
-        project = await data.project(
-            name=name, _committee=True, _committee_public_signing_keys=True, _release_policy=True
-        ).demand(http.client.HTTPException(404))
-
-    is_committee_member = project.committee and (user.is_committee_member(project.committee, session.uid))
-    is_privileged = user.is_admin(session.uid)
-    can_edit = is_committee_member or is_privileged
-
-    if can_edit and (quart.request.method == "POST"):
-        form_data = await quart.request.form
-        if "submit_metadata" in form_data:
-            edited_metadata, metadata_form = await _metadata_edit(session, project, form_data)
-            if edited_metadata is True:
-                return quart.redirect(util.as_url(get.projects.view, name=project.name))
-        elif "submit_policy" in form_data:
-            policy_form = await ReleasePolicyForm.create_form(data=form_data)
-            if await policy_form.validate_on_submit():
-                policy_data = policy.ReleasePolicyData.model_validate(policy_form.data)
-                async with storage.write(session) as write:
-                    wacm = await write.as_project_committee_member(project.name)
-                    try:
-                        await wacm.policy.edit(project.name, policy_data)
-                    except storage.AccessError as e:
-                        return await session.redirect(
-                            get.projects.view, name=project.name, error=f"Error editing policy: {e}"
-                        )
-                return quart.redirect(util.as_url(get.projects.view, name=project.name))
-            else:
-                log.info(f"policy_form.errors: {policy_form.errors}")
-        else:
-            log.info(f"Unknown form data: {form_data}")
-
-    if metadata_form is None:
-        metadata_form = await ProjectMetadataForm.create_form(data={"project_name": project.name})
-    if policy_form is None:
-        policy_form = await _policy_form_create(project)
-    candidate_drafts = await interaction.candidate_drafts(project)
-    candidates = await interaction.candidates(project)
-    previews = await interaction.previews(project)
-    full_releases = await interaction.full_releases(project)
-
-    return await template.render(
-        "project-view.html",
-        project=project,
-        algorithms=shared.algorithms,
-        candidate_drafts=candidate_drafts,
-        candidates=candidates,
-        previews=previews,
-        full_releases=full_releases,
-        number_of_release_files=util.number_of_release_files,
-        now=datetime.datetime.now(datetime.UTC),
-        empty_form=await forms.Empty.create_form(),
-        policy_form=policy_form,
-        can_edit=can_edit,
-        metadata_form=metadata_form,
-        forbidden_categories=registry.FORBIDDEN_PROJECT_CATEGORIES,
-    )
-
-
-async def _metadata_category_add(
-    wacm: storage.WriteAsCommitteeMember, project: sql.Project, category_to_add: str
-) -> bool:
-    modified = False
-    try:
-        modified = await wacm.project.category_add(project, category_to_add.strip())
-    except storage.AccessError as e:
-        await quart.flash(f"Error adding category: {e}", "error")
-    if modified:
-        await quart.flash(f"Category '{category_to_add}' added.", "success")
-    else:
-        await quart.flash(f"Category '{category_to_add}' already exists.", "error")
-    return modified
-
-
-async def _metadata_category_remove(
-    wacm: storage.WriteAsCommitteeMember, project: sql.Project, action_value: str
-) -> bool:
-    modified = False
-    try:
-        modified = await wacm.project.category_remove(project, action_value)
-    except storage.AccessError as e:
-        await quart.flash(f"Error removing category: {e}", "error")
-    if modified:
-        await quart.flash(f"Category '{action_value}' removed.", "success")
-    else:
-        await quart.flash(f"Category '{action_value}' does not exist.", "error")
-    return modified
-
-
-async def _metadata_edit(
-    session: web.Committer, project: sql.Project, form_data: dict[str, str]
-) -> tuple[bool, ProjectMetadataForm]:
-    metadata_form = await ProjectMetadataForm.create_form(data=form_data)
-
-    validated = await metadata_form.validate_on_submit()
-    if not validated:
-        return False, metadata_form
-
-    form_data = await quart.request.form
-    action_full = form_data.get("action", "")
-    action_type = ""
-    action_value = ""
-    if ":" in action_full:
-        action_type, action_value = action_full.split(":", 1)
-    else:
-        action_type = action_full
-
-    # TODO: Add error handling
-    modified = False
-    category_to_add = metadata_form.category_to_add.data
-    language_to_add = metadata_form.language_to_add.data
-
-    async with storage.write(session) as write:
-        wacm = await write.as_project_committee_member(project.name)
-
-        if (action_type == "add_category") and category_to_add:
-            modified = await _metadata_category_add(wacm, project, category_to_add)
-        elif (action_type == "remove_category") and action_value:
-            modified = await _metadata_category_remove(wacm, project, action_value)
-        elif (action_type == "add_language") and language_to_add:
-            modified = await _metadata_language_add(wacm, project, language_to_add)
-        elif (action_type == "remove_language") and action_value:
-            modified = await _metadata_language_remove(wacm, project, action_value)
-
-    return modified, metadata_form
-
-
-async def _metadata_language_add(
-    wacm: storage.WriteAsCommitteeMember, project: sql.Project, language_to_add: str
-) -> bool:
-    modified = False
-    try:
-        modified = await wacm.project.language_add(project, language_to_add)
-    except storage.AccessError as e:
-        await quart.flash(f"Error adding language: {e}", "error")
-    if modified:
-        await quart.flash(f"Language '{language_to_add}' added.", "success")
-    else:
-        await quart.flash(f"Language '{language_to_add}' already exists.", "error")
-    return modified
-
-
-async def _metadata_language_remove(
-    wacm: storage.WriteAsCommitteeMember, project: sql.Project, action_value: str
-) -> bool:
-    modified = False
-    try:
-        modified = await wacm.project.language_remove(project, action_value)
-    except storage.AccessError as e:
-        await quart.flash(f"Error removing language: {e}", "error")
-    if modified:
-        await quart.flash(f"Language '{action_value}' removed.", "success")
-    else:
-        await quart.flash(f"Language '{action_value}' does not exist.", "error")
-    return modified
-
-
-async def _policy_form_create(project: sql.Project) -> ReleasePolicyForm:
-    # TODO: Use form order for all of these fields
-    policy_form = await ReleasePolicyForm.create_form()
-    policy_form.project_name.data = project.name
-    if project.policy_mailto_addresses:
-        policy_form.mailto_addresses.data = project.policy_mailto_addresses[0]
-    else:
-        policy_form.mailto_addresses.data = f"dev@{project.name}.apache.org"
-    policy_form.min_hours.data = project.policy_min_hours
-    policy_form.manual_vote.data = project.policy_manual_vote
-    policy_form.release_checklist.data = project.policy_release_checklist
-    policy_form.start_vote_template.data = project.policy_start_vote_template
-    policy_form.announce_release_template.data = project.policy_announce_release_template
-    policy_form.binary_artifact_paths.data = "\n".join(project.policy_binary_artifact_paths)
-    policy_form.source_artifact_paths.data = "\n".join(project.policy_source_artifact_paths)
-    policy_form.pause_for_rm.data = project.policy_pause_for_rm
-    policy_form.strict_checking.data = project.policy_strict_checking
-    policy_form.github_repository_name.data = project.policy_github_repository_name
-    policy_form.github_compose_workflow_path.data = "\n".join(project.policy_github_compose_workflow_path)
-    policy_form.github_vote_workflow_path.data = "\n".join(project.policy_github_vote_workflow_path)
-    policy_form.github_finish_workflow_path.data = "\n".join(project.policy_github_finish_workflow_path)
-    policy_form.preserve_download_files.data = project.policy_preserve_download_files
-
-    # Set the hashes and value of the current defaults
-    policy_form.default_start_vote_template_hash.data = util.compute_sha3_256(
-        project.policy_start_vote_default.encode()
-    )
-    policy_form.default_announce_release_template_hash.data = util.compute_sha3_256(
-        project.policy_announce_release_default.encode()
-    )
-    policy_form.default_min_hours_value_at_render.data = str(project.policy_default_min_hours)
-    return policy_form
 
 
 async def _project_add(form: AddForm, session: web.Committer) -> web.WerkzeugResponse:
