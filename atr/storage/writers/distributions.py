@@ -167,6 +167,7 @@ class CommitteeMember(CommitteeParticipant):
             case outcome.Error(error):
                 # Log the actual error for debugging
                 import atr.log as log
+
                 log.error(f"Failed to get API response from {api_url}: {error}")
                 raise storage.AccessError(f"Failed to get API response from distribution platform: {error}")
         upload_date = self.__distribution_upload_date(dd.platform, result, dd.version)

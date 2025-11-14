@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import quart
 import htpy
 
 import atr.blueprints.get as get
@@ -104,11 +103,7 @@ async def list_get(session: web.Committer, project: str, version: str) -> str:
             htpy.input(type="hidden", name="owner_namespace", value=dist.owner_namespace or ""),
             htpy.input(type="hidden", name="package", value=dist.package),
             htpy.input(type="hidden", name="version", value=dist.version),
-            htpy.button(
-                ".btn.btn-danger.btn-sm",
-                type="submit",
-                title=f"Delete {dist.title}"
-            )[
+            htpy.button(".btn.btn-danger.btn-sm", type="submit", title=f"Delete {dist.title}")[
                 htpy.i(".bi.bi-trash"), " Delete"
             ],
         ]
