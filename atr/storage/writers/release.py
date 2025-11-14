@@ -33,6 +33,7 @@ import sqlalchemy.engine as engine
 import sqlmodel
 
 import atr.analysis as analysis
+import atr.config as config
 import atr.db as db
 import atr.log as log
 import atr.models.api as api
@@ -344,14 +345,26 @@ class CommitteeParticipant(FoundationCommitter):
         if not project:
             raise storage.AccessError(f"Project {project_name} not found")
 
-        # TODO: Temporarily allow committers to start drafts
-        if project.committee is None or (
-            self.__asf_uid not in project.committee.committee_members
-            and self.__asf_uid not in project.committee.committers
-        ):
-            raise storage.AccessError(
-                f"You must be a member or committer for the {project.display_name} committee to start a release draft."
-            )
+        tests_allowed = config.get().ALLOW_TESTS
+        committee = project.committee
+        is_test_committee = tests_allowed and (committee is not None) and (committee.name == "test")
+        should_skip_auth = is_test_committee
+
+        if not should_skip_auth:
+            display_name = project.display_name
+            if committee is None:
+                raise storage.AccessError(
+                    f"You must be a member or committer of the {display_name} committee to start a release draft."
+                )
+
+            is_committee_member = self.__asf_uid in committee.committee_members
+            is_committee_committer = self.__asf_uid in committee.committers
+            has_committee_access = is_committee_member or is_committee_committer
+
+            if not has_committee_access:
+                raise storage.AccessError(
+                    f"You must be a member or committer of the {display_name} committee to start a release draft."
+                )
 
         # TODO: Consider using Release.revision instead of ./latest
         # Check whether the release already exists
