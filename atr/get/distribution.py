@@ -16,6 +16,7 @@
 # under the License.
 
 import quart
+import htpy
 
 import atr.blueprints.get as get
 import atr.db as db
@@ -87,75 +88,42 @@ async def list_get(session: web.Committer, project: str, version: str) -> str:
         ]
         block.table(".table.table-striped.table-bordered")[tbody]
 
-        # Create delete link (will go to delete confirmation page)
-        delete_params = {
-            "release_name": dist.release_name,
-            "platform": dist.platform.name,
-            "owner_namespace": dist.owner_namespace or "",
-            "package": dist.package,
-            "version": dist.version,
-        }
-        delete_url = util.as_url(delete_get, project=project, version=version, **delete_params)
-        delete_link = htm.a(".btn.btn-danger.btn-sm", href=delete_url)["Delete"]
-        block.append(htm.div(".mb-3")[delete_link])
+        # Create inline delete form with confirmation dialog (following projects.py pattern)
+        delete_form = htm.form(
+            ".d-inline-block.m-0",
+            method="post",
+            action=util.as_url(post.distribution.delete, project=project, version=version),
+            onsubmit=(
+                f"return confirm('Are you sure you want to delete the distribution "
+                f"{dist.platform.name} {dist.package} {dist.version}? This cannot be undone.');"
+            ),
+        )[
+            form.csrf_input(),
+            htpy.input(type="hidden", name="release_name", value=dist.release_name),
+            htpy.input(type="hidden", name="platform", value=dist.platform.name),
+            htpy.input(type="hidden", name="owner_namespace", value=dist.owner_namespace or ""),
+            htpy.input(type="hidden", name="package", value=dist.package),
+            htpy.input(type="hidden", name="version", value=dist.version),
+            htpy.button(
+                ".btn.btn-danger.btn-sm",
+                type="submit",
+                title=f"Delete {dist.title}"
+            )[
+                htpy.i(".bi.bi-trash"), " Delete"
+            ],
+        ]
+        block.append(htm.div(".mb-3")[delete_form])
 
     title = f"Distribution list for {project} {version}"
     return await template.blank(title, content=block.collect())
 
 
+# The delete_get function can now be removed since we're using inline confirmation
+# But if you want to keep it for direct URL access, you can redirect to the list
 @get.committer("/distribution/delete/<project>/<version>")
-async def delete_get(session: web.Committer, project: str, version: str) -> str:
-    await shared.release_validated(project, version, staging=None)
-
-    # Get distribution details from query params
-    release_name = quart.request.args.get("release_name", "")
-    platform = quart.request.args.get("platform", "")
-    owner_namespace = quart.request.args.get("owner_namespace", "")
-    package = quart.request.args.get("package", "")
-    dist_version = quart.request.args.get("version", "")
-
-    block = htm.Block()
-
-    # Navigation
-    release = await shared.release_validated(project, version, staging=None)
-    staging = release.phase == sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
-    shared.html_nav_phase(block, project, version, staging)
-
-    # Confirmation page
-    block.h1["Delete distribution"]
-    block.div(".alert.alert-warning")[
-        "Are you sure you want to delete this distribution? This action cannot be undone."
-    ]
-
-    # Show distribution details
-    block.h3["Distribution details"]
-    tbody = htm.tbody[
-        shared.html_tr("Release name", release_name),
-        shared.html_tr("Platform", platform),
-        shared.html_tr("Owner or Namespace", owner_namespace or "-"),
-        shared.html_tr("Package", package),
-        shared.html_tr("Version", dist_version),
-    ]
-    block.table(".table.table-striped.table-bordered")[tbody]
-
-    # Delete form with hidden fields
-    delete_form = form.render(
-        model_cls=shared.DeleteForm,
-        submit_label="Delete Distribution",
-        action=util.as_url(post.distribution.delete, project=project, version=version),
-        submit_classes="btn-danger",
-        cancel_url=util.as_url(list_get, project=project, version=version),
-        defaults={
-            "release_name": release_name,
-            "platform": platform,
-            "owner_namespace": owner_namespace,
-            "package": package,
-            "version": dist_version,
-        },
-    )
-    block.append(delete_form)
-
-    return await template.blank("Delete Distribution", content=block.collect())
+async def delete_get(session: web.Committer, project: str, version: str) -> web.WerkzeugResponse:
+    # Redirect to the list page instead of showing a separate confirmation page
+    return await session.redirect(list_get, project=project, version=version)
 
 
 @get.committer("/distribution/record/<project>/<version>")

@@ -94,7 +94,7 @@ class AppConfig:
             "humbedooh",
             "sbp",
             "tn",
-            "wave",
+            "wave"
         }
         | set(ADMIN_USERS_ADDITIONAL.split(",") if ADMIN_USERS_ADDITIONAL else [])
     )
