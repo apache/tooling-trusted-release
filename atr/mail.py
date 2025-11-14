@@ -147,7 +147,7 @@ def _validate_recipient(to_addr: str) -> None:
     _, domain = _split_address(to_addr)
     domain_is_apache = domain == "apache.org"
     domain_is_subdomain = domain.endswith(".apache.org")
-    if not domain_is_apache or domain_is_subdomain:
+    if not (domain_is_apache or domain_is_subdomain):
         error_msg = f"Email recipient must be @apache.org or @*.apache.org, got {to_addr}"
         log.error(error_msg)
         raise ValueError(error_msg)
