@@ -14,32 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-
-import atr.blueprints.get as get
-import atr.models.sql as sql
-import atr.shared as shared
-import atr.template as template
-import atr.web as web
-
-
-@get.committer("/resolve/manual/<project_name>/<version_name>")
-async def manual_selected(session: web.Committer, project_name: str, version_name: str) -> str:
-    """Get the manual vote resolution page."""
-    await session.check_access(project_name)
-
-    release = await session.release(
-        project_name,
-        version_name,
-        phase=sql.ReleasePhase.RELEASE_CANDIDATE,
-        with_release_policy=True,
-        with_project_release_policy=True,
-    )
-    if not release.vote_manual:
-        raise RuntimeError("This page is for manual votes only")
-    resolve_form = await shared.resolve.ResolveVoteManualForm.create_form()
-    return await template.render(
-        "resolve-manual.html",
-        release=release,
-        resolve_form=resolve_form,
-    )

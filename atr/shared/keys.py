@@ -17,405 +17,340 @@
 
 """keys.py"""
 
-import asyncio
-import datetime
-from collections.abc import Awaitable, Callable, Sequence
+from typing import Annotated, Literal
 
-import aiohttp
-import asfquart.base as base
-import quart
-import werkzeug.datastructures as datastructures
-import wtforms
+import htpy
+import markupsafe
+import pydantic
 
-import atr.db as db
-import atr.forms as forms
-import atr.get as get
+import atr.form as form
 import atr.htm as htm
-import atr.log as log
-import atr.models.sql as sql
 import atr.shared as shared
 import atr.storage as storage
-import atr.storage.outcome as outcome
 import atr.storage.types as types
 import atr.template as template
-import atr.user as user
 import atr.util as util
-import atr.web as web
+
+type DELETE_OPENPGP_KEY = Literal["delete_openpgp_key"]
+type DELETE_SSH_KEY = Literal["delete_ssh_key"]
+type UPDATE_COMMITTEE_KEYS = Literal["update_committee_keys"]
 
 
-class AddOpenPGPKeyForm(forms.Typed):
-    public_key = forms.textarea(
+class AddOpenPGPKeyForm(form.Form):
+    public_key: str = form.label(
         "Public OpenPGP key",
-        placeholder="Paste your ASCII-armored public OpenPGP key here...",
-        description="Your public key should be in ASCII-armored format, starting with"
-        ' "-----BEGIN PGP PUBLIC KEY BLOCK-----"',
+        'Your public key should be in ASCII-armored format, starting with "-----BEGIN PGP PUBLIC KEY BLOCK-----"',
+        widget=form.Widget.TEXTAREA,
     )
-    selected_committees = forms.checkboxes(
+    selected_committees: form.StrList = form.label(
         "Associate key with committees",
-        description="Select the committees with which to associate your key.",
+        "Select the committees with which to associate your key.",
     )
-    submit = forms.submit("Add OpenPGP key")
+
+    @pydantic.model_validator(mode="after")
+    def validate_at_least_one_committee(self) -> "AddOpenPGPKeyForm":
+        if not self.selected_committees:
+            raise ValueError("You must select at least one committee to associate with this key")
+        return self
 
 
-class AddSSHKeyForm(forms.Typed):
-    key = forms.textarea(
+class AddSSHKeyForm(form.Form):
+    key: str = form.label(
         "SSH public key",
-        placeholder="Paste your SSH public key here (in the format used in authorized_keys files)",
-        description=(
-            "Your SSH public key should be in the standard format, starting with a key type"
-            ' (like "ssh-rsa" or "ssh-ed25519") followed by the key data.'
-        ),
+        "Your SSH public key should be in the standard format, starting with a key type"
+        ' (like "ssh-rsa" or "ssh-ed25519") followed by the key data.',
+        widget=form.Widget.TEXTAREA,
     )
 
-    submit = forms.submit("Add SSH key")
+
+class DeleteOpenPGPKeyForm(form.Form):
+    variant: DELETE_OPENPGP_KEY = form.value(DELETE_OPENPGP_KEY)
+    fingerprint: str = form.label("Fingerprint", widget=form.Widget.HIDDEN)
 
 
-class DeleteKeyForm(forms.Typed):
-    submit = forms.submit("Delete key")
+class DeleteSSHKeyForm(form.Form):
+    variant: DELETE_SSH_KEY = form.value(DELETE_SSH_KEY)
+    fingerprint: str = form.label("Fingerprint", widget=form.Widget.HIDDEN)
 
 
-class UpdateCommitteeKeysForm(forms.Typed):
-    submit = forms.submit("Regenerate KEYS file")
+class UpdateCommitteeKeysForm(form.Empty):
+    variant: UPDATE_COMMITTEE_KEYS = form.value(UPDATE_COMMITTEE_KEYS)
+    committee_name: str = form.label("Committee name", widget=form.Widget.HIDDEN)
 
 
-class UpdateKeyCommitteesForm(forms.Typed):
-    selected_committees = forms.checkboxes(
+type KeysForm = Annotated[
+    DeleteOpenPGPKeyForm | DeleteSSHKeyForm | UpdateCommitteeKeysForm,
+    form.DISCRIMINATOR,
+]
+
+
+class UpdateKeyCommitteesForm(form.Form):
+    selected_committees: form.StrList = form.label(
         "Associated PMCs",
-        optional=True,
-        description="Select the committees associated with this key.",
+        widget=form.Widget.CUSTOM,
     )
-    submit = forms.submit("Update associations")
 
 
-class UploadKeyFormBase(forms.Typed):
-    key = forms.file(
+class UploadKeysForm(form.Form):
+    key: form.File = form.label(
         "KEYS file",
-        optional=True,
-        description=(
-            "Upload a KEYS file containing multiple PGP public keys."
-            " The file should contain keys in ASCII-armored format, starting with"
-            ' "-----BEGIN PGP PUBLIC KEY BLOCK-----".'
-        ),
+        "Upload a KEYS file containing multiple PGP public keys."
+        " The file should contain keys in ASCII-armored format, starting with"
+        ' "-----BEGIN PGP PUBLIC KEY BLOCK-----".',
+        widget=form.Widget.CUSTOM,
     )
-    keys_url = forms.url(
+    keys_url: form.OptionalURL = form.label(
         "KEYS file URL",
-        optional=True,
-        placeholder="Enter URL to KEYS file",
-        description="Enter a URL to a KEYS file. This will be fetched by the server.",
+        "Enter a URL to a KEYS file. This will be fetched by the server.",
+        widget=form.Widget.CUSTOM,
     )
-
-    selected_committee = forms.radio(
+    selected_committee: str = form.label(
         "Associate keys with committee",
-        description=(
-            "Select the committee with which to associate these keys. You must be a member of the selected committee."
-        ),
+        "Select the committee with which to associate these keys.",
+        widget=form.Widget.RADIO,
     )
 
-    submit = forms.submit("Upload KEYS file")
-
-    async def validate(self, extra_validators: dict | None = None) -> bool:
-        """Ensure that either a file is uploaded or a URL is provided, but not both."""
-        if not await super().validate(extra_validators):
-            return False
-        if not self.key.data and not self.keys_url.data:
-            msg = "Either a file or a URL is required."
-            if self.key.errors and isinstance(self.key.errors, list):
-                self.key.errors.append(msg)
-            else:
-                self.key.errors = [msg]
-            return False
-        if self.key.data and self.keys_url.data:
-            msg = "Provide either a file or a URL, not both."
-            if self.key.errors and isinstance(self.key.errors, list):
-                self.key.errors.append(msg)
-            else:
-                self.key.errors = [msg]
-            return False
-        return True
+    @pydantic.model_validator(mode="after")
+    def validate_key_source(self) -> "UploadKeysForm":
+        if (not self.key) and (not self.keys_url):
+            raise ValueError("Either a file or a URL is required")
+        if self.key and self.keys_url:
+            raise ValueError("Provide either a file or a URL, not both")
+        return self
 
 
-async def add(session: web.Committer) -> str:
-    """Add a new public signing key to the user's account."""
-    key_info = None
-
-    async with storage.write() as write:
-        participant_of_committees = await write.participant_of_committees()
-
-    committee_choices: forms.Choices = [(c.name, c.display_name or c.name) for c in participant_of_committees]
-
-    form = await AddOpenPGPKeyForm.create_form(
-        data=(await quart.request.form) if (quart.request.method == "POST") else None
-    )
-    forms.choices(form.selected_committees, committee_choices)
-
-    if await form.validate_on_submit():
-        try:
-            key_text: str = util.unwrap(form.public_key.data)
-            selected_committee_names: list[str] = util.unwrap(form.selected_committees.data)
-
-            async with storage.write() as write:
-                wafc = write.as_foundation_committer()
-                ocr: outcome.Outcome[types.Key] = await wafc.keys.ensure_stored_one(key_text)
-                key = ocr.result_or_raise()
-
-                for selected_committee_name in selected_committee_names:
-                    # TODO: Should this be committee member or committee participant?
-                    # Also, should we emit warnings and continue here?
-                    wacp = write.as_committee_participant(selected_committee_name)
-                    oc: outcome.Outcome[types.LinkedCommittee] = await wacp.keys.associate_fingerprint(
-                        key.key_model.fingerprint
-                    )
-                    oc.result_or_raise()
-
-                fingerprint_upper = key.key_model.fingerprint.upper()
-                if key.status == types.KeyStatus.PARSED:
-                    details_url = util.as_url(get.keys.details, fingerprint=key.key_model.fingerprint)
-                    p = htm.p[
-                        f"OpenPGP key {fingerprint_upper} was already in the database. ",
-                        htm.a(href=details_url)["View key details"],
-                        ".",
-                    ]
-                    await quart.flash(str(p), "warning")
-                else:
-                    await quart.flash(f"OpenPGP key {fingerprint_upper} added successfully.", "success")
-            # Clear form data on success by creating a new empty form instance
-            form = await AddOpenPGPKeyForm.create_form()
-            forms.choices(form.selected_committees, committee_choices)
-
-        except web.FlashError as e:
-            log.warning("FlashError adding OpenPGP key: %s", e)
-            await quart.flash(str(e), "error")
-        except Exception as e:
-            log.exception("Error adding OpenPGP key:")
-            await quart.flash(f"An unexpected error occurred: {e!s}", "error")
-
-    return await template.render(
-        "keys-add.html",
-        asf_id=session.uid,
-        user_committees=participant_of_committees,
-        form=form,
-        key_info=key_info,
-        algorithms=shared.algorithms,
-    )
-
-
-async def details(session: web.Committer, fingerprint: str) -> str | web.WerkzeugResponse:
-    """Display details for a specific OpenPGP key."""
-    fingerprint = fingerprint.lower()
-    user_committees = []
-    current_committee_names = []
-    async with db.session() as data:
-        key, is_owner = await _key_and_is_owner(data, session, fingerprint)
-        form = None
-        if is_owner:
-            project_list = session.committees + session.projects
-            user_committees = await data.committee(name_in=project_list).all()
-            current_committee_names = [c.name for c in key.committees]
-    if is_owner:
-        committee_choices: forms.Choices = [(c.name, c.display_name or c.name) for c in user_committees]
-
-        # TODO: Probably need to do data in a separate phase
-        form = await UpdateKeyCommitteesForm.create_form(
-            data=await quart.request.form if (quart.request.method == "POST") else None
+def _get_results_table_css() -> htm.Element:
+    return htm.style[
+        markupsafe.Markup(
+            """
+        .page-rotated-header {
+            height: 180px;
+            position: relative;
+            vertical-align: bottom;
+            padding-bottom: 5px;
+            width: 40px;
+        }
+        .page-rotated-header > div {
+            transform-origin: bottom left;
+            transform: translateX(25px) rotate(-90deg);
+            position: absolute;
+            bottom: 12px;
+            left: 6px;
+            white-space: nowrap;
+            text-align: left;
+        }
+        .table th, .table td {
+            text-align: center;
+            vertical-align: middle;
+        }
+        .table td.page-key-details {
+            text-align: left;
+            font-family: ui-monospace, "SFMono-Regular", "Menlo", "Monaco", "Consolas", monospace;
+            font-size: 0.9em;
+            word-break: break-all;
+        }
+        .page-status-cell-new {
+            background-color: #197a4e !important;
+        }
+        .page-status-cell-existing {
+            background-color: #868686 !important;
+        }
+        .page-status-cell-unknown {
+            background-color: #ffecb5 !important;
+        }
+        .page-status-cell-error {
+            background-color: #dc3545 !important;
+        }
+        .page-status-square {
+            display: inline-block;
+            width: 36px;
+            height: 36px;
+            vertical-align: middle;
+        }
+        .page-table-bordered th, .page-table-bordered td {
+            border: 1px solid #dee2e6;
+        }
+        tbody tr {
+            height: 40px;
+        }
+        """
         )
-        forms.choices(form.selected_committees, committee_choices)
-        if quart.request.method == "GET":
-            form.selected_committees.data = current_committee_names
-
-    if form and await form.validate_on_submit():
-        async with db.session() as data:
-            key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
-            if not key:
-                quart.abort(404, description="OpenPGP key not found")
-
-            selected_committee_names = form.selected_committees.data or []
-            old_committee_names = {c.name for c in key.committees}
-
-            new_committees = await data.committee(name_in=selected_committee_names).all()
-            key.committees = list(new_committees)
-            data.add(key)
-            await data.commit()
-
-            affected_committee_names = old_committee_names.union(set(selected_committee_names))
-            if affected_committee_names:
-                async with storage.write() as write:
-                    for affected_committee_name in affected_committee_names:
-                        wacm = write.as_committee_member_outcome(affected_committee_name).result_or_none()
-                        if wacm is None:
-                            continue
-                        await wacm.keys.autogenerate_keys_file()
-
-            await quart.flash("Key committee associations updated successfully.", "success")
-            return await session.redirect(get.keys.details, fingerprint=fingerprint)
-
-    if isinstance(key.ascii_armored_key, bytes):
-        key.ascii_armored_key = key.ascii_armored_key.decode("utf-8", errors="replace")
-
-    return await template.render(
-        "keys-details.html",
-        key=key,
-        form=form,
-        algorithms=shared.algorithms,
-        now=datetime.datetime.now(datetime.UTC),
-        asf_id=session.uid,
-    )
+    ]
 
 
-async def ssh_add(session: web.Committer) -> web.WerkzeugResponse | str:
-    """Add a new SSH key to the user's account."""
-    # TODO: Make an auth.require wrapper that gives the session automatically
-    # And the form if it's a POST handler? Might be hard to type
-    # But we can use variants of the function
-    # GET, POST, GET_POST are all we need
-    # We could even include auth in the function names
-    form = await AddSSHKeyForm.create_form()
-    fingerprint = None
-    if await form.validate_on_submit():
-        key: str = util.unwrap(form.key.data)
-        try:
-            async with storage.write(session) as write:
-                wafc = write.as_foundation_committer()
-                fingerprint = await wafc.ssh.add_key(key, session.uid)
-        except util.SshFingerprintError as e:
-            if isinstance(form.key.errors, list):
-                form.key.errors.append(str(e))
-            else:
-                form.key.errors = [str(e)]
+def _render_results_table(
+    page: htm.Block, results: storage.outcome.List, submitted_committees: list[str], committee_map: dict[str, str]
+) -> None:
+    """Render the KEYS processing results table."""
+    page.h2["KEYS processing results"]
+    page.p[
+        "The following keys were found in your KEYS file and processed against the selected committees. "
+        "Green squares indicate that a key was added, grey squares indicate that a key already existed, "
+        "and red squares indicate an error."
+    ]
+
+    thead = htm.Block(htm.thead)
+    header_row = htm.Block(htm.tr)
+    header_row.th(scope="col")["Key ID"]
+    header_row.th(scope="col")["User ID"]
+    for committee_name in submitted_committees:
+        header_row.th(".page-rotated-header", scope="col")[htm.div[committee_map.get(committee_name, committee_name)]]
+    thead.append(header_row.collect())
+
+    tbody = htm.Block(htm.tbody)
+    for outcome in results.outcomes():
+        if outcome.ok:
+            key_obj = outcome.result_or_none()
+            fingerprint = key_obj.key_model.fingerprint if key_obj else "UNKNOWN"
+            email_addr = key_obj.key_model.primary_declared_uid if key_obj else ""
+            # Check whether the LINKED flag is set
+            added_flag = bool(key_obj.status & types.KeyStatus.LINKED) if key_obj else False
+            error_flag = False
         else:
-            success_message = f"SSH key added successfully: {fingerprint}"
-            return await session.redirect(get.keys.keys, success=success_message)
+            err = outcome.error_or_none()
+            key_obj = getattr(err, "key", None) if err else None
+            fingerprint = key_obj.key_model.fingerprint if key_obj else "UNKNOWN"
+            email_addr = key_obj.key_model.primary_declared_uid if key_obj else ""
+            added_flag = False
+            error_flag = True
 
-    return await template.render(
-        "keys-ssh-add.html",
-        asf_id=session.uid,
-        form=form,
-        fingerprint=fingerprint,
-    )
+        row = htm.Block(htm.tr)
+        row.td(".page-key-details.px-2")[htm.code[fingerprint[-16:].upper()]]
+        row.td(".page-key-details.px-2")[email_addr or ""]
+
+        for committee_name in submitted_committees:
+            if error_flag:
+                cell_class = "page-status-cell-error"
+                title_text = "Error processing key"
+            elif added_flag:
+                cell_class = "page-status-cell-new"
+                title_text = "Newly linked"
+            else:
+                cell_class = "page-status-cell-existing"
+                title_text = "Already linked"
+
+            row.td(".text-center.align-middle.page-status-cell-container")[
+                htm.span(f".page-status-square.{cell_class}", title=title_text)
+            ]
+
+        tbody.append(row.collect())
+
+    table_div = htm.div(".table-responsive")[
+        htm.table(".table.table-striped.page-table-bordered.table-sm.mt-3")[thead.collect(), tbody.collect()]
+    ]
+    page.append(table_div)
+
+    processing_errors = [o for o in results.outcomes() if not o.ok]
+    if processing_errors:
+        page.h3(".text-danger.mt-4")["Processing errors"]
+        for outcome in processing_errors:
+            err = outcome.error_or_none()
+            page.div(".alert.alert-danger.p-2.mb-3")[str(err)]
 
 
-async def upload(session: web.Committer) -> str:
-    """Upload a KEYS file containing multiple OpenPGP keys."""
+async def render_upload_page(
+    results: storage.outcome.List | None = None,
+    submitted_committees: list[str] | None = None,
+    error: bool = False,
+) -> str:
+    """Render the upload page with optional results."""
+    import atr.get as get
+    import atr.post as post
+
     async with storage.write() as write:
         participant_of_committees = await write.participant_of_committees()
 
-    # TODO: Migrate to the forms interface
-    class UploadKeyForm(UploadKeyFormBase):
-        selected_committee = wtforms.SelectField(
-            "Associate keys with committee",
-            choices=[
-                (c.name, c.display_name)
-                for c in participant_of_committees
-                if (not util.committee_is_standing(c.name)) or (c.name == "tooling")
+    eligible_committees = [
+        c for c in participant_of_committees if (not util.committee_is_standing(c.name)) or (c.name == "tooling")
+    ]
+
+    committee_choices = [(c.name, c.display_name) for c in eligible_committees]
+    committee_map = {c.name: c.display_name for c in eligible_committees}
+
+    page = htm.Block()
+    page.p[htm.a(".atr-back-link", href=util.as_url(get.keys.keys))["← Back to Manage keys"]]
+    page.h1["Upload a KEYS file"]
+    page.p["Upload a KEYS file containing multiple OpenPGP public signing keys."]
+
+    if results and submitted_committees:
+        page.append(_get_results_table_css())
+        _render_results_table(page, results, submitted_committees, committee_map)
+
+    custom_tabs_widget = _render_upload_tabs()
+
+    form.render_block(
+        page,
+        model_cls=shared.keys.UploadKeysForm,
+        action=util.as_url(post.keys.upload),
+        submit_label="Upload KEYS file",
+        cancel_url=util.as_url(get.keys.keys),
+        defaults={"selected_committee": committee_choices},
+        custom={"key": custom_tabs_widget},
+        skip=["keys_url"],
+        border=True,
+        wider_widgets=True,
+    )
+
+    return await template.blank(
+        "Upload a KEYS file",
+        content=page.collect(),
+        description="Upload a KEYS file containing multiple OpenPGP public signing keys.",
+    )
+
+
+def _render_upload_tabs() -> htm.Element:
+    """Render the tabbed interface for file upload or URL input."""
+    tabs_ul = htm.ul(".nav.nav-tabs", id="keysUploadTab", role="tablist")[
+        htm.li(".nav-item", role="presentation")[
+            htpy.button(
+                class_="nav-link active",
+                id="file-upload-tab",
+                data_bs_toggle="tab",
+                data_bs_target="#file-upload-pane",
+                type="button",
+                role="tab",
+                aria_controls="file-upload-pane",
+                aria_selected="true",
+            )["Upload from file"]
+        ],
+        htm.li(".nav-item", role="presentation")[
+            htpy.button(
+                class_="nav-link",
+                id="url-upload-tab",
+                data_bs_toggle="tab",
+                data_bs_target="#url-upload-pane",
+                type="button",
+                role="tab",
+                aria_controls="url-upload-pane",
+                aria_selected="false",
+            )["Upload from URL"]
+        ],
+    ]
+
+    file_pane = htm.div(".tab-pane.fade.show.active", id="file-upload-pane", role="tabpanel")[
+        htm.div(".pt-3")[
+            htpy.input(class_="form-control", id="key", name="key", type="file"),
+            htm.div(".form-text.text-muted.mt-2")[
+                "Upload a KEYS file containing multiple PGP public keys. The file should contain keys in "
+                'ASCII-armored format, starting with "-----BEGIN PGP PUBLIC KEY BLOCK-----".'
             ],
-            coerce=str,
-            option_widget=wtforms.widgets.RadioInput(),
-            widget=wtforms.widgets.ListWidget(prefix_label=False),
-            validators=[wtforms.validators.InputRequired("You must select at least one committee")],
-            description="Select the committee with which to associate these keys.",
-        )
+        ]
+    ]
 
-    form = await UploadKeyForm.create_form()
-    results: outcome.List[types.Key] | None = None
+    url_pane = htm.div(".tab-pane.fade", id="url-upload-pane", role="tabpanel")[
+        htm.div(".pt-3")[
+            htpy.input(
+                class_="form-control",
+                id="keys_url",
+                name="keys_url",
+                placeholder="Enter URL to KEYS file",
+                type="url",
+                value="",
+            ),
+            htm.div(".form-text.text-muted.mt-2")["Enter a URL to a KEYS file. This will be fetched by the server."],
+        ]
+    ]
 
-    async def render(
-        error: str | None = None,
-        submitted_committees: list[str] | None = None,
-        all_user_committees: Sequence[sql.Committee] | None = None,
-    ) -> str:
-        # For easier happy pathing
-        if error is not None:
-            await quart.flash(error, "error")
+    tab_content = htm.div(".tab-content", id="keysUploadTabContent")[file_pane, url_pane]
 
-        # Determine which committee list to use
-        current_committees = all_user_committees if (all_user_committees is not None) else participant_of_committees
-        committee_map = {c.name: c.display_name for c in current_committees}
-
-        return await template.render(
-            "keys-upload.html",
-            asf_id=session.uid,
-            user_committees=current_committees,
-            committee_map=committee_map,
-            form=form,
-            results=results,
-            algorithms=shared.algorithms,
-            submitted_committees=submitted_committees,
-        )
-
-    if await form.validate_on_submit():
-        keys_text = ""
-        if form.key.data:
-            key_file = form.key.data
-            if not isinstance(key_file, datastructures.FileStorage):
-                return await render(error="Invalid file upload")
-            keys_content = await asyncio.to_thread(key_file.read)
-            keys_text = keys_content.decode("utf-8", errors="replace")
-        elif form.keys_url.data:
-            keys_text = await _get_keys_text(form.keys_url.data, render)
-
-        if not keys_text:
-            return await render(error="No KEYS data found.")
-
-        # Get selected committee list from the form
-        selected_committee = form.selected_committee.data
-        if not selected_committee:
-            return await render(error="You must select at least one committee")
-
-        async with storage.write() as write:
-            wacp = write.as_committee_participant(selected_committee)
-            outcomes = await wacp.keys.ensure_associated(keys_text)
-        results = outcomes
-        success_count = outcomes.result_count
-        error_count = outcomes.error_count
-        total_count = success_count + error_count
-
-        await quart.flash(
-            f"Processed {total_count} keys: {success_count} successful, {error_count} failed",
-            "success" if success_count > 0 else "error",
-        )
-        return await render(
-            submitted_committees=[selected_committee],
-            all_user_committees=participant_of_committees,
-        )
-
-    return await render()
-
-
-async def _get_keys_text(keys_url: str, render: Callable[[str], Awaitable[str]]) -> str:
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(keys_url, allow_redirects=True) as response:
-                response.raise_for_status()
-                return await response.text()
-    except aiohttp.ClientResponseError as e:
-        raise base.ASFQuartException(f"Unable to fetch keys from remote server: {e.status} {e.message}", errorcode=502)
-    except aiohttp.ClientError as e:
-        raise base.ASFQuartException(f"Network error while fetching keys: {e}", errorcode=503)
-
-
-async def _key_and_is_owner(
-    data: db.Session, session: web.Committer, fingerprint: str
-) -> tuple[sql.PublicSigningKey, bool]:
-    key = await data.public_signing_key(fingerprint=fingerprint, _committees=True).get()
-    if not key:
-        quart.abort(404, description="OpenPGP key not found")
-    key.committees.sort(key=lambda c: c.name)
-
-    # Allow owners and committee members to view the key
-    authorised = False
-    is_owner = False
-    if key.apache_uid and session.uid:
-        is_owner = key.apache_uid.lower() == session.uid.lower()
-    if is_owner:
-        authorised = True
-    else:
-        user_affiliations = set(session.committees + session.projects)
-        key_committee_names = {c.name for c in key.committees}
-        if user_affiliations.intersection(key_committee_names):
-            authorised = True
-        elif user.is_admin(session.uid):
-            authorised = True
-
-    if not authorised:
-        quart.abort(403, description="You are not authorised to view this key")
-
-    return key, is_owner
+    return htm.div[tabs_ul, tab_content]

@@ -31,6 +31,7 @@ import atr.shared.draft as draft
 import atr.shared.finish as finish
 import atr.shared.ignores as ignores
 import atr.shared.keys as keys
+import atr.shared.manual as manual
 import atr.shared.projects as projects
 import atr.shared.resolve as resolve
 import atr.shared.revisions as revisions
@@ -194,6 +195,7 @@ __all__ = [
     "finish",
     "ignores",
     "keys",
+    "manual",
     "projects",
     "resolve",
     "revisions",

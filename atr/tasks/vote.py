@@ -113,6 +113,7 @@ async def _initiate_core_logic(args: Initiate) -> results.Results | None:
             project_name=release.project.name,
             version_name=release.version,
             vote_duration=args.vote_duration,
+            vote_end=vote_end_str,
         ),
     )
 

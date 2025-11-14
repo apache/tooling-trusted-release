@@ -374,6 +374,7 @@ function isErrorResponse(data: unknown): data is ErrorResponse {
 async function moveFiles(files: readonly string[], dest: string, csrfToken: string, signal?: AbortSignal): Promise<MoveResult> {
     const formData = new FormData();
     formData.append("csrf_token", csrfToken);
+    formData.append("variant", "MOVE_FILE");
     for (const file of files) {
         formData.append("source_files", file);
     }

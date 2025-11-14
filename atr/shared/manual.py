@@ -15,14 +15,21 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import atr.blueprints.post as post
-import atr.web as web
+from typing import Literal
+
+import pydantic
+
+import atr.form as form
 
 
-@post.committer("/candidate/delete")
-async def delete(session: web.Committer) -> web.WerkzeugResponse:
-    """Delete a release candidate."""
-    import atr.get as get
+class ResolveVoteForm(form.Form):
+    vote_result: Literal["Passed", "Failed"] = form.label("Vote result", widget=form.Widget.RADIO)
+    vote_thread_url: str = form.label("Vote thread URL")
+    vote_result_url: str = form.label("Vote result URL")
 
-    # TODO: We need to never retire revisions, if allowing release deletion
-    return await session.redirect(get.root.index, error="Not yet implemented")
+    @pydantic.field_validator("vote_thread_url", "vote_result_url", mode="after")
+    @classmethod
+    def validate_urls(cls, value: str) -> str:
+        if not value.startswith("https://lists.apache.org/thread/"):
+            raise ValueError("URL must be a valid Apache email thread URL")
+        return value

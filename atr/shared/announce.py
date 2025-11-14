@@ -15,35 +15,43 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Any
+import pydantic
 
-import atr.forms as forms
-import atr.util as util
+import atr.form as form
 
 
-class Form(forms.Typed):
+class AnnounceForm(form.Form):
     """Form for announcing a release preview."""
 
-    preview_name = forms.hidden()
-    preview_revision = forms.hidden()
-    mailing_list = forms.radio("Send vote email to")
-    download_path_suffix = forms.optional("Download path suffix")
-    confirm_announce = forms.boolean("Confirm")
-    subject = forms.optional("Subject")
-    body = forms.textarea("Body", optional=True)
-    submit = forms.submit("Send announcement email")
-
-
-async def create_form(permitted_recipients: list[str], *, data: dict[str, Any] | None = None) -> Form:
-    """Create and return an instance of the announce form."""
-
-    mailing_list_choices: forms.Choices = sorted([(recipient, recipient) for recipient in permitted_recipients])
-    mailing_list_default = util.USER_TESTS_ADDRESS
-
-    form_instance = await Form.create_form(data=data)
-    forms.choices(
-        form_instance.mailing_list,
-        mailing_list_choices,
-        mailing_list_default,
+    revision_number: str = form.label("Revision number", widget=form.Widget.HIDDEN)
+    mailing_list: str = form.label(
+        "Send vote email to",
+        widget=form.Widget.CUSTOM,
     )
-    return form_instance
+    subject: str = form.label("Subject")
+    body: str = form.label("Body", widget=form.Widget.CUSTOM)
+    download_path_suffix: str = form.label("Download path suffix", widget=form.Widget.CUSTOM)
+    confirm_announce: form.Bool = form.label("Confirm")
+
+    @pydantic.field_validator("download_path_suffix")
+    @classmethod
+    def validate_and_normalize_download_path_suffix(cls, suffix: str) -> str:
+        if (".." in suffix) or ("//" in suffix):
+            raise ValueError("Download path suffix must not contain .. or //")
+        if suffix.startswith("./"):
+            suffix = suffix[1:]
+        elif suffix == ".":
+            suffix = "/"
+        if not suffix.startswith("/"):
+            suffix = "/" + suffix
+        if not suffix.endswith("/"):
+            suffix = suffix + "/"
+        if "/." in suffix:
+            raise ValueError("Download path suffix must not contain /.")
+        return suffix
+
+    @pydantic.model_validator(mode="after")
+    def validate_confirm(self) -> "AnnounceForm":
+        if not self.confirm_announce:
+            raise ValueError("You must confirm the announcement by checking the box")
+        return self

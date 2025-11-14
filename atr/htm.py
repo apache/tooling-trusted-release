@@ -66,7 +66,7 @@ class BlockElementGetable:
         self.block = block
         self.element = element
 
-    def __getitem__(self, *items: Element | str | tuple[Element | str, ...]) -> Element:
+    def __getitem__(self, *items: Element | VoidElement | str | tuple[Element | VoidElement | str, ...]) -> Element:
         element = self.element[*items]
         for i in range(len(self.block.elements) - 1, -1, -1):
             if self.block.elements[i] is self.element:
@@ -191,6 +191,11 @@ class Block:
         return BlockElementCallable(self, div)
 
     @property
+    def form(self) -> BlockElementCallable:
+        self.__check_parent("form", {"div"})
+        return BlockElementCallable(self, form)
+
+    @property
     def h1(self) -> BlockElementCallable:
         self.__check_parent("h1", {"body", "div"})
         return BlockElementCallable(self, h1)
@@ -235,6 +240,7 @@ class Block:
 
     @property
     def summary(self) -> BlockElementCallable:
+        self.__check_parent("summary", {"details"})
         return BlockElementCallable(self, summary)
 
     @property
@@ -242,8 +248,23 @@ class Block:
         self.__check_parent("table", {"body", "div"})
         return BlockElementCallable(self, table)
 
+    @property
+    def td(self) -> BlockElementCallable:
+        self.__check_parent("td", {"tr"})
+        return BlockElementCallable(self, td)
+
     def text(self, text: str) -> None:
         self.elements.append(text)
+
+    @property
+    def th(self) -> BlockElementCallable:
+        self.__check_parent("th", {"tr"})
+        return BlockElementCallable(self, th)
+
+    @property
+    def thead(self) -> BlockElementCallable:
+        self.__check_parent("thead", {"table"})
+        return BlockElementCallable(self, thead)
 
     @property
     def title(self) -> BlockElementCallable:

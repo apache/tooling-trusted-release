@@ -20,16 +20,61 @@ import atr.db as db
 import atr.db.interaction as interaction
 import atr.form as form
 import atr.get.compose as compose
+import atr.get.vote as vote
 import atr.htm as htm
-import atr.post.manual as post_manual
-import atr.shared.distribution as distribution
+import atr.models.sql as sql
+import atr.post as post
+import atr.shared as shared
 import atr.template as template
 import atr.util as util
 import atr.web as web
 
 
-@get.committer("/manual/<project_name>/<version_name>/<revision>")
-async def selected_revision(
+@get.committer("/manual/resolve/<project_name>/<version_name>")
+async def resolve_selected(session: web.Committer, project_name: str, version_name: str) -> str:
+    """Get the manual vote resolution page."""
+    await session.check_access(project_name)
+
+    release = await session.release(
+        project_name,
+        version_name,
+        phase=sql.ReleasePhase.RELEASE_CANDIDATE,
+        with_release_policy=True,
+        with_project_release_policy=True,
+    )
+    if not release.vote_manual:
+        raise RuntimeError("This page is for manual votes only")
+
+    content = _render_resolve_page(release)
+
+    return await template.blank(
+        title="Resolve vote",
+        description="Resolve vote for a release.",
+        content=content,
+    )
+
+
+def _render_resolve_page(release: sql.Release) -> htm.Element:
+    page = htm.Block()
+
+    back_url = util.as_url(vote.selected, project_name=release.project.name, version_name=release.version)
+    page.p[htm.a(".atr-back-link", href=back_url)[f"← Back to Vote for {release.short_display_name}"]]
+
+    page.h1[f"Resolve vote for {release.short_display_name}"]
+    page.p["This is a manual vote resolution."]
+
+    form.render_block(
+        page,
+        model_cls=shared.manual.ResolveVoteForm,
+        form_classes=".atr-canary.py-4.px-5.mb-4.border.rounded",
+        submit_label="Resolve vote",
+    )
+
+    return page.collect()
+
+
+@get.committer("/manual/start/<project_name>/<version_name>/<revision>")
+async def start_selected_revision(
     session: web.Committer, project_name: str, version_name: str, revision: str
 ) -> web.WerkzeugResponse | str:
     await session.check_access(project_name)
@@ -64,7 +109,7 @@ async def _render_page(release, revision: str) -> htm.Element:
         project_name=release.project.name,
         version_name=release.version,
     )
-    distribution.html_nav(
+    shared.distribution.html_nav(
         page,
         back_link_url,
         f"Compose {release.short_display_name}",
@@ -97,7 +142,7 @@ async def _render_page(release, revision: str) -> htm.Element:
         submit_label="Start manual vote",
         cancel_url=cancel_url,
         action=util.as_url(
-            post_manual.selected_revision,
+            post.manual.start_selected_revision,
             project_name=release.project.name,
             version_name=release.version,
             revision=revision,

@@ -223,7 +223,7 @@ def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, ver
         logging.warning("Vote initiation banner not detected after 15s, proceeding anyway")
 
     logging.info("Locating the 'Resolve vote' button")
-    tabulate_form_locator = page.locator(f'form[action="/resolve/tabulated/{TEST_PROJECT}/{version_name}"]')
+    tabulate_form_locator = page.locator(f'form[action="/resolve/{TEST_PROJECT}/{version_name}"]')
     sync_api.expect(tabulate_form_locator).to_be_visible()
 
     tabulate_button_locator = tabulate_form_locator.locator('button[type="submit"]:has-text("Resolve vote")')
@@ -232,19 +232,19 @@ def lifecycle_05_resolve_vote(page: sync_api.Page, credentials: Credentials, ver
     tabulate_button_locator.click()
 
     logging.info("Waiting for navigation to tabulated votes page")
-    wait_for_path(page, f"/resolve/tabulated/{TEST_PROJECT}/{version_name}")
+    wait_for_path(page, f"/resolve/{TEST_PROJECT}/{version_name}")
 
     logging.info("Locating the resolve vote form on the tabulated votes page")
-    resolve_form_locator = page.locator(f'form[action="/resolve/submit/{TEST_PROJECT}/{version_name}"]')
+    resolve_form_locator = page.locator(f'form[action="/resolve/{TEST_PROJECT}/{version_name}"]')
     sync_api.expect(resolve_form_locator).to_be_visible()
 
     logging.info("Selecting 'Passed' radio button in resolve form")
-    passed_radio_locator = resolve_form_locator.locator('input[name="vote_result"][value="passed"]')
+    passed_radio_locator = resolve_form_locator.locator('input[name="vote_result"][value="Passed"]')
     sync_api.expect(passed_radio_locator).to_be_enabled()
     passed_radio_locator.check()
 
     logging.info("Submitting resolve vote form")
-    resolve_submit_locator = resolve_form_locator.locator('input[type="submit"][value="Resolve vote"]')
+    resolve_submit_locator = page.get_by_role("button", name="Resolve vote")
     sync_api.expect(resolve_submit_locator).to_be_enabled()
     resolve_submit_locator.click()
 
@@ -780,14 +780,14 @@ def test_openpgp_01_upload(page: sync_api.Page, credentials: Credentials) -> Non
     select_all_button_locator.click()
 
     logging.info("Submitting the Add OpenPGP key form")
-    submit_button_locator = page.locator('input[type="submit"][value="Add OpenPGP key"]')
+    submit_button_locator = page.get_by_role("button", name="Add OpenPGP key")
     sync_api.expect(submit_button_locator).to_be_enabled()
     submit_button_locator.click()
 
     logging.info("Waiting for navigation back to /keys page")
-    wait_for_path(page, "/keys/add")
+    wait_for_path(page, "/keys")
 
-    logging.info("Checking for success flash message on /keys/add page")
+    logging.info("Checking for success flash message on /keys page")
     try:
         flash_message_locator = page.locator("div.flash-success")
         sync_api.expect(flash_message_locator).to_be_visible()
@@ -802,9 +802,6 @@ def test_openpgp_01_upload(page: sync_api.Page, credentials: Credentials) -> Non
             f"OpenPGP key {key_fingerprint_upper} was already in the database."
         )
         logging.info("OpenPGP key already in database message shown")
-
-    logging.info("Navigating back to /keys to verify key presence")
-    go_to_path(page, "/keys")
 
     logging.info(f"Verifying OpenPGP key with fingerprint {key_fingerprint_upper} is visible")
     key_row_locator = page.locator(f'tr.page-user-openpgp-key:has(a[href="/keys/details/{key_fingerprint_lower}"])')
@@ -1023,7 +1020,7 @@ def test_ssh_01_add_key(page: sync_api.Page, credentials: Credentials) -> None:
     page.locator('textarea[name="key"]').fill(public_key_content)
 
     logging.info("Submitting the Add SSH key form")
-    page.locator('input[type="submit"][value="Add SSH key"]').click()
+    page.get_by_role("button", name="Add SSH key").click()
 
     logging.info("Waiting for navigation back to /keys page")
     wait_for_path(page, "/keys")
@@ -1204,7 +1201,7 @@ def test_tidy_up_openpgp_keys_continued(page: sync_api.Page, fingerprints_to_del
         # Locate again by fingerprint for robustness
         row_to_delete_locator = page.locator(f'tr:has(a[href="/keys/details/{fingerprint}"])')
         delete_button_locator = row_to_delete_locator.locator(
-            'form[action="/keys/delete"] input[type="submit"][value="Delete key"]'
+            'form[action="/keys"] input[type="submit"][value="Delete key"]'
         )
 
         if delete_button_locator.is_visible():
@@ -1351,7 +1348,7 @@ def test_tidy_up_ssh_keys_continued(page: sync_api.Page, fingerprints_to_delete:
         # Locate again by fingerprint for robustness in case of changes
         card_to_delete_locator = page.locator(f"div.card:has(td:has-text('{fingerprint}'))")
         delete_button_locator = card_to_delete_locator.locator(
-            'form[action="/keys/delete"] input[type="submit"][value="Delete key"]'
+            'form[action="/keys"] input[type="submit"][value="Delete key"]'
         )
 
         if delete_button_locator.is_visible():

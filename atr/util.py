@@ -74,7 +74,9 @@ class FileStat:
 
 
 class FetchError(RuntimeError):
-    pass
+    def __init__(self, message: str, url: str):
+        super().__init__(message)
+        self.url = url
 
 
 async def archive_listing(file_path: pathlib.Path) -> list[str] | None:
@@ -862,7 +864,7 @@ async def thread_messages(
                 resp.raise_for_status()
                 thread_data: Any = await resp.json(content_type=None)
     except Exception as exc:
-        raise FetchError(f"Failed fetching thread metadata for {thread_id}: {exc}") from exc
+        raise FetchError(f"Failed fetching thread metadata for {thread_id}: {exc}", url=thread_url) from exc
 
     message_ids: set[str] = set()
 

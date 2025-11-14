@@ -17,56 +17,48 @@
 
 from __future__ import annotations
 
-import quart
-
 # TODO: Improve upon the routes_release pattern
 import atr.blueprints.post as post
+import atr.get as get
 import atr.models.sql as sql
 import atr.shared as shared
 import atr.storage as storage
-import atr.template as template
 import atr.util as util
 import atr.web as web
 
 
-class AnnounceError(Exception):
-    """Exception for announce errors."""
-
-
 @post.committer("/announce/<project_name>/<version_name>")
-async def selected(session: web.Committer, project_name: str, version_name: str) -> str | web.WerkzeugResponse:
+@post.form(shared.announce.AnnounceForm)
+async def selected(
+    session: web.Committer, announce_form: shared.announce.AnnounceForm, project_name: str, version_name: str
+) -> web.WerkzeugResponse:
     """Handle the announcement form submission and promote the preview to release."""
-    import atr.get as get
-
     await session.check_access(project_name)
 
     permitted_recipients = util.permitted_announce_recipients(session.uid)
-    announce_form = await shared.announce.create_form(
-        permitted_recipients,
-        data=await quart.request.form,
-    )
 
-    if not (await announce_form.validate_on_submit()):
-        error_message = "Invalid submission"
-        if announce_form.errors:
-            error_details = "; ".join([f"{field}: {', '.join(errs)}" for field, errs in announce_form.errors.items()])
-            error_message = f"{error_message}: {error_details}"
-
-        # Render the page again, with errors
-        release: sql.Release = await session.release(
-            project_name, version_name, with_committee=True, phase=sql.ReleasePhase.RELEASE_PREVIEW
+    # Validate that the recipient is permitted
+    if announce_form.mailing_list not in permitted_recipients:
+        return await session.form_error(
+            "mailing_list",
+            f"You are not permitted to send announcements to {announce_form.mailing_list}",
         )
-        await quart.flash(error_message, "error")
-        return await template.render("announce-selected.html", release=release, announce_form=announce_form)
 
-    recipient = str(announce_form.mailing_list.data)
-    if recipient not in permitted_recipients:
-        raise AnnounceError(f"You are not permitted to send announcements to {recipient}")
+    # Get the release to find the revision number
+    release = await session.release(
+        project_name, version_name, with_committee=True, phase=sql.ReleasePhase.RELEASE_PREVIEW
+    )
+    preview_revision_number = release.unwrap_revision_number
 
-    subject = str(announce_form.subject.data)
-    body = str(announce_form.body.data)
-    preview_revision_number = str(announce_form.preview_revision.data)
-    download_path_suffix = _download_path_suffix_validated(announce_form)
+    # Validate that the revision number matches
+    if announce_form.revision_number != preview_revision_number:
+        return await session.redirect(
+            get.announce.selected,
+            error=f"The release has been updated since you loaded the form. "
+            f"Please review the current revision ({preview_revision_number}) and submit the form again.",
+            project_name=project_name,
+            version_name=version_name,
+        )
 
     try:
         async with storage.write_as_project_committee_member(project_name, session) as wacm:
@@ -74,10 +66,10 @@ async def selected(session: web.Committer, project_name: str, version_name: str)
                 project_name,
                 version_name,
                 preview_revision_number,
-                recipient,
-                subject,
-                body,
-                download_path_suffix,
+                announce_form.mailing_list,
+                announce_form.subject,
+                announce_form.body,
+                announce_form.download_path_suffix,
                 session.uid,
                 session.fullname,
             )
@@ -92,20 +84,3 @@ async def selected(session: web.Committer, project_name: str, version_name: str)
         success="Preview successfully announced",
         project_name=project_name,
     )
-
-
-def _download_path_suffix_validated(announce_form: shared.announce.Form) -> str:
-    download_path_suffix = str(announce_form.download_path_suffix.data)
-    if (".." in download_path_suffix) or ("//" in download_path_suffix):
-        raise ValueError("Download path suffix must not contain .. or //")
-    if download_path_suffix.startswith("./"):
-        download_path_suffix = download_path_suffix[1:]
-    elif download_path_suffix == ".":
-        download_path_suffix = "/"
-    if not download_path_suffix.startswith("/"):
-        download_path_suffix = "/" + download_path_suffix
-    if not download_path_suffix.endswith("/"):
-        download_path_suffix = download_path_suffix + "/"
-    if "/." in download_path_suffix:
-        raise ValueError("Download path suffix must not contain /.")
-    return download_path_suffix

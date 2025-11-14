@@ -18,10 +18,9 @@
 from typing import Final
 
 import markupsafe
-import wtforms
 
 import atr.blueprints.get as get
-import atr.forms as forms
+import atr.form as form
 import atr.htm as htm
 import atr.models.sql as sql
 import atr.post as post
@@ -66,53 +65,67 @@ async def ignores(session: web.Committer, committee_name: str) -> str | web.Werk
     return await template.blank("Ignored checks", content)
 
 
+def _add_ignore(committee_name: str) -> htm.Element:
+    form_path = util.as_url(post.ignores.ignores, committee_name=committee_name)
+    block = htm.Block(htm.div)
+    block.h2["Add ignore"]
+    block.p["Add a new ignore for a check result."]
+    form.render_block(
+        block,
+        model_cls=shared.ignores.AddIgnoreForm,
+        action=form_path,
+        submit_label="Add ignore",
+    )
+    return block.collect()
+
+
 def _check_result_ignore_card(cri: sql.CheckResultIgnore) -> htm.Element:
     h3_id = cri.id or ""
     h3_asf_uid = cri.asf_uid
     h3_created = util.format_datetime(cri.created)
     card_header_h3 = htm.h3(".mt-3.mb-0")[f"{h3_id} - {h3_asf_uid} - {h3_created}"]
 
-    form_update = shared.ignores.UpdateIgnoreForm(id=cri.id)
+    # Update form
+    update_form_block = htm.Block(htm.div)
+    form_path_update = util.as_url(post.ignores.ignores, committee_name=cri.committee_name)
+    status = shared.ignores.sql_to_ignore_status(cri.status)
+    form.render_block(
+        update_form_block,
+        model_cls=shared.ignores.UpdateIgnoreForm,
+        action=form_path_update,
+        submit_label="Update ignore",
+        form_classes="",
+        defaults={
+            "id": cri.id or 0,
+            "release_glob": cri.release_glob or "",
+            "revision_number": cri.revision_number or "",
+            "checker_glob": cri.checker_glob or "",
+            "primary_rel_path_glob": cri.primary_rel_path_glob or "",
+            "member_rel_path_glob": cri.member_rel_path_glob or "",
+            "status": status,
+            "message_glob": cri.message_glob or "",
+        },
+    )
 
-    def set_field(field: wtforms.StringField | wtforms.SelectField, value: str | None) -> None:
-        if value is not None:
-            field.data = value
-
-    set_field(form_update.release_glob, cri.release_glob)
-    set_field(form_update.revision_number, cri.revision_number)
-    set_field(form_update.checker_glob, cri.checker_glob)
-    set_field(form_update.primary_rel_path_glob, cri.primary_rel_path_glob)
-    set_field(form_update.member_rel_path_glob, cri.member_rel_path_glob)
-    set_field(form_update.status, cri.status.to_form_field() if cri.status else "None")
-    set_field(form_update.message_glob, cri.message_glob)
-
-    form_path_update = util.as_url(post.ignores.ignores_committee_update, committee_name=cri.committee_name)
-    form_update_html = forms.render_table(form_update, form_path_update)
-
-    form_delete = shared.ignores.DeleteIgnoreForm(id=cri.id)
-    form_path_delete = util.as_url(post.ignores.ignores_committee_delete, committee_name=cri.committee_name)
-    form_delete_html = forms.render_simple(
-        form_delete,
-        form_path_delete,
-        form_classes=".mt-2.mb-0",
+    # Delete form
+    delete_form_block = htm.Block(htm.div)
+    form.render_block(
+        delete_form_block,
+        model_cls=shared.ignores.DeleteIgnoreForm,
+        action=form_path_update,
+        submit_label="Delete",
         submit_classes="btn-danger",
+        form_classes=".mt-2.mb-0",
+        defaults={"id": cri.id or 0},
+        empty=True,
     )
 
     card = htm.div(".card.mb-5")[
-        htm.div(".card-header.d-flex.justify-content-between")[card_header_h3, form_delete_html],
-        htm.div(".card-body")[form_update_html],
+        htm.div(".card-header.d-flex.justify-content-between")[card_header_h3, delete_form_block.collect()],
+        htm.div(".card-body")[update_form_block.collect()],
     ]
 
     return card
-
-
-def _add_ignore(committee_name: str) -> htm.Element:
-    form_path = util.as_url(post.ignores.ignores_committee_add, committee_name=committee_name)
-    return htm.div[
-        htm.h2["Add ignore"],
-        htm.p["Add a new ignore for a check result."],
-        forms.render_columns(shared.ignores.AddIgnoreForm(), form_path),
-    ]
 
 
 def _existing_ignores(ignores: list[sql.CheckResultIgnore]) -> htm.Element:

@@ -115,29 +115,6 @@
     <p>
       If, after careful manual review of the information above, you concur with the automatically determined outcome of the vote, please enter the resolution email body here. Sending this will send the email to a new vote result thread, and the vote will be resolved.
     </p>
-    <form class="atr-canary py-3 px-4 mb-4 border rounded"
-          action="{{ as_url(post.resolve.submit_selected, project_name=release.project.name, version_name=release.version) }}"
-          method="post">
-      {{ forms.errors_summary(resolve_form) }}
-      {{ resolve_form.hidden_tag() }}
-      <div class="form-group">
-        {{ forms.label(resolve_form.email_body, classes="pb-3") }}
-        {{ forms.widget(resolve_form.email_body) }}
-        {{ forms.errors(resolve_form.email_body, classes="invalid-feedback d-block") }}
-      </div>
-      <div class="mt-3">
-        {{ forms.label(resolve_form.vote_result, col="md3") }}
-        <div class="pt-2">
-          {% for subfield in resolve_form.vote_result %}
-            <div class="form-check form-check-inline">
-              {{ forms.widget(subfield, classes="form-check-input", id=subfield.id ~ "_" ~ loop.index) }}
-              {{ forms.label(subfield, classes="form-check-label") }}
-            </div>
-          {% endfor %}
-          {{ forms.errors(resolve_form.vote_result, classes="invalid-feedback d-block") }}
-        </div>
-      </div>
-      {{ resolve_form.submit(class="btn btn-primary my-3") }}
-    </form>
+    {{ resolve_form }}
   {% endif %}
 {% endblock content %}
