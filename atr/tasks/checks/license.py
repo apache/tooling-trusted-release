@@ -256,20 +256,21 @@ def _files_check_core_logic_license(archive: tarzip.Archive, member: tarzip.Memb
     if sha3_expected != "5efa4839f385df309ffc022ca5ce9763c4bc709dab862ca77d9a894db6598456":
         log.error("SHA3 expected value is incorrect, please update the static.LICENSE constant")
 
-    # It is common for the license to be used without the leading blank line
-    apache_license_2_0 = constants.APACHE_LICENSE_2_0.removeprefix("\n")
-    # Remove the trailing newline for further normalisation
-    apache_license_2_0 = apache_license_2_0.removesuffix("\n")
-    content = f.read()
-    package_license = content.decode("utf-8", errors="replace")
-    package_license = package_license.replace("\r\n", "\n")
-    package_license = package_license.removeprefix("\n")
-    package_license = package_license[: len(apache_license_2_0)]
-    if package_license != apache_license_2_0:
-        # TODO: Only show a contextual diff, not the full diff
-        diff = difflib.ndiff(apache_license_2_0.splitlines(), package_license.splitlines())
-        return "\n".join(diff)
+    package_license_bytes = f.read()
+    package_license = package_license_bytes.decode("utf-8", errors="replace")
 
+    # Some whitespace variations are permitted:
+    # - Any form of leading or trailing whitespace
+    # - Any increase or reduction in blank lines
+    expected_lines = constants.APACHE_LICENSE_2_0.splitlines()
+    actual_lines = package_license.splitlines()
+
+    expected_lines = _normal_whitespace(expected_lines)
+    actual_lines = _normal_whitespace(actual_lines)
+    if expected_lines != actual_lines:
+        # TODO: Only show a contextual diff, not the full diff
+        diff = difflib.ndiff(expected_lines, actual_lines)
+        return "\n".join(diff)
     return None
 
 
@@ -333,6 +334,15 @@ def _license_results(
                 message=f"{filename} is invalid",
                 data={"diff": license_diff},
             )
+
+
+def _normal_whitespace(lines: list[str]) -> list[str]:
+    result = []
+    for line in lines:
+        line = line.strip()
+        if line:
+            result.append(line)
+    return result
 
 
 def _notice_results(
