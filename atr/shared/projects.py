@@ -20,18 +20,10 @@ from __future__ import annotations
 import re
 from typing import Annotated, Literal
 
-import asfquart.base as base
 import pydantic
-import quart
 
-import atr.db as db
 import atr.form as form
-import atr.forms as forms
-import atr.get as get
-import atr.storage as storage
-import atr.template as template
 import atr.util as util
-import atr.web as web
 
 type COMPOSE = Literal["compose"]
 type VOTE = Literal["vote"]
@@ -43,11 +35,71 @@ type REMOVE_LANGUAGE = Literal["remove_language"]
 type DELETE_PROJECT = Literal["delete_project"]
 
 
-class AddForm(forms.Typed):
-    committee_name = forms.hidden()
-    display_name = forms.string("Display name")
-    label = forms.string("Label")
-    submit = forms.submit("Add project")
+class AddProjectForm(form.Form):
+    committee_name: str = form.label("Committee name", widget=form.Widget.HIDDEN)
+    display_name: str = form.label(
+        "Display name",
+        'For example, "Apache Example" or "Apache Example Components". '
+        'You must start with "Apache " and you must use title case.',
+    )
+    label: str = form.label(
+        "Label",
+        'For example, "example" or "example-components". '
+        "You must start with your committee label, and you must use lower case.",
+    )
+
+    @pydantic.model_validator(mode="after")
+    def validate_fields(self) -> AddProjectForm:
+        committee_name = self.committee_name
+        display_name = self.display_name.strip()
+        label = self.label.strip()
+
+        # Normalise spaces in the display name
+        display_name = re.sub(r"  +", " ", display_name)
+
+        # We must use object.__setattr__ to avoid calling the model validator again
+        object.__setattr__(self, "display_name", display_name)
+
+        # Validate display name starts with "Apache"
+        display_name_words = display_name.split(" ")
+        if display_name_words[0] != "Apache":
+            raise ValueError("The first display name word must be 'Apache'.")
+
+        # Validate display name has at least two words
+        if not display_name_words[1:]:
+            raise ValueError("The display name must have at least two words.")
+
+        # Validate display name uses correct case
+        allowed_irregular_words = {".NET", "C++", "Empire-db", "Lucene.NET", "for", "jclouds"}
+        r_pascal_case = re.compile(r"^([A-Z][0-9a-z]*)+$")
+        r_camel_case = re.compile(r"^[a-z]*([A-Z][0-9a-z]*)+$")
+        r_mod_case = re.compile(r"^mod(_[0-9a-z]+)+$")
+        for display_name_word in display_name_words[1:]:
+            if display_name_word in allowed_irregular_words:
+                continue
+            is_pascal_case = r_pascal_case.match(display_name_word)
+            is_camel_case = r_camel_case.match(display_name_word)
+            is_mod_case = r_mod_case.match(display_name_word)
+            if not (is_pascal_case or is_camel_case or is_mod_case):
+                raise ValueError("Display name words must be in PascalCase, camelCase, or mod_ case.")
+
+        # Validate display name is alphanumeric with spaces, dots, and plus signs
+        if not display_name.replace(" ", "").replace(".", "").replace("+", "").isalnum():
+            raise ValueError("Display name must be alphanumeric and may include spaces or dots or plus signs.")
+
+        # Validate label starts with committee name
+        if not (label.startswith(committee_name + "-") or (label == committee_name)):
+            raise ValueError(f"Label must be '{committee_name}' or start with '{committee_name}-'.")
+
+        # Validate label is lowercase
+        if not label.islower():
+            raise ValueError("Label must be all lower case.")
+
+        # Validate label is alphanumeric with hyphens
+        if not label.replace("-", "").isalnum():
+            raise ValueError("Label must be alphanumeric and may include hyphens.")
+
+        return self
 
 
 class ComposePolicyForm(form.Form):
@@ -223,118 +275,3 @@ type ProjectViewForm = Annotated[
     | DeleteProjectForm,
     form.DISCRIMINATOR,
 ]
-
-
-async def add_project(session: web.Committer, committee_name: str) -> web.WerkzeugResponse | str:
-    await session.check_access_committee(committee_name)
-
-    async with db.session() as data:
-        committee = await data.committee(name=committee_name).demand(
-            base.ASFQuartException(f"Committee {committee_name} not found", errorcode=404)
-        )
-
-    form = await AddForm.create_form(data={"committee_name": committee_name})
-    form.display_name.description = f"""\
-For example, "Apache {committee.display_name}" or "Apache {committee.display_name} Components".
-You must start with "Apache " and you must use title case.
-"""
-    form.label.description = f"""\
-For example, "{committee.name}" or "{committee.name}-components".
-You must start with your committee label, and you must use lower case.
-"""
-
-    if await form.validate_on_submit():
-        return await _project_add(form, session)
-
-    return await template.render("project-add-project.html", form=form, committee_name=committee.display_name)
-
-
-async def _project_add(form: AddForm, session: web.Committer) -> web.WerkzeugResponse:
-    form_values = await _project_add_validate(form)
-    if form_values is None:
-        return quart.redirect(util.as_url(get.projects.add_project, committee_name=form.committee_name.data))
-    committee_name, display_name, label = form_values
-
-    async with storage.write(session) as write:
-        wacm = await write.as_project_committee_member(committee_name)
-        try:
-            await wacm.project.create(committee_name, display_name, label)
-        except storage.AccessError as e:
-            await quart.flash(f"Error adding project: {e}", "error")
-            return quart.redirect(util.as_url(get.projects.add_project, committee_name=committee_name))
-
-    return quart.redirect(util.as_url(get.projects.view, name=label))
-
-
-async def _project_add_validate(form: AddForm) -> tuple[str, str, str] | None:
-    committee_name = str(form.committee_name.data)
-    # Normalise spaces in the display name, then validate
-    display_name = str(form.display_name.data).strip()
-    display_name = re.sub(r"  +", " ", display_name)
-    if not await _project_add_validate_display_name(display_name):
-        return None
-    # Hidden criterion!
-    # $ sqlite3 state/atr.db 'select full_name from project;' | grep -- '[^A-Za-z0-9 ]'
-    # Apache .NET Ant Library
-    # Apache Oltu - Parent
-    # Apache Commons Chain (Dormant)
-    # Apache Commons Functor (Dormant)
-    # Apache Commons OGNL (Dormant)
-    # Apache Commons Proxy (Dormant)
-    # Apache Empire-db
-    # Apache mod_ftp
-    # Apache Lucene.Net
-    # Apache mod_perl
-    # Apache Xalan for C++ XSLT Processor
-    # Apache Xerces for C++ XML Parser
-    if not display_name.replace(" ", "").replace(".", "").replace("+", "").isalnum():
-        await quart.flash("Display name must be alphanumeric and may include spaces or dots or plus signs", "error")
-        return None
-
-    label = str(form.label.data).strip()
-    if not (label.startswith(committee_name + "-") or (label == committee_name)):
-        await quart.flash(f"Label must start with '{committee_name}-'", "error")
-        return None
-    if not label.islower():
-        await quart.flash("Label must be all lower case", "error")
-        return None
-    # Hidden criterion!
-    if not label.replace("-", "").isalnum():
-        await quart.flash("Label must be alphanumeric and may include hyphens", "error")
-        return None
-
-    return (committee_name, display_name, label)
-
-
-async def _project_add_validate_display_name(display_name: str) -> bool:
-    # We have three criteria for display names
-    must_start_apache = "The first display name word must be 'Apache'."
-    must_have_two_words = "The display name must have at least two words."
-    must_use_correct_case = "Display name words must be in PascalCase, camelCase, or mod_ case."
-
-    # First criterion, the first word must be "Apache"
-    display_name_words = display_name.split(" ")
-    if display_name_words[0] != "Apache":
-        await quart.flash(must_start_apache, "error")
-        return False
-
-    # Second criterion, the display name must have two or more words
-    if not display_name_words[1:]:
-        await quart.flash(must_have_two_words, "error")
-        return False
-
-    # Third criterion, the display name must use the correct case
-    allowed_irregular_words = {".NET", "C++", "Empire-db", "Lucene.NET", "for", "jclouds"}
-    r_pascal_case = re.compile(r"^([A-Z][0-9a-z]*)+$")
-    r_camel_case = re.compile(r"^[a-z]*([A-Z][0-9a-z]*)+$")
-    r_mod_case = re.compile(r"^mod(_[0-9a-z]+)+$")
-    for display_name_word in display_name_words[1:]:
-        if display_name_word in allowed_irregular_words:
-            continue
-        is_pascal_case = r_pascal_case.match(display_name_word)
-        is_camel_case = r_camel_case.match(display_name_word)
-        is_mod_case = r_mod_case.match(display_name_word)
-        if not (is_pascal_case or is_camel_case or is_mod_case):
-            await quart.flash(must_use_correct_case, "error")
-            return False
-    return True

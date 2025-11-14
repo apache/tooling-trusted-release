@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asfquart.base as base
 import htpy
+import markupsafe
 
 import atr.blueprints.get as get
 import atr.config as config
@@ -45,7 +46,52 @@ from atr.get import candidate
 
 @get.committer("/project/add/<committee_name>")
 async def add_project(session: web.Committer, committee_name: str) -> web.WerkzeugResponse | str:
-    return await shared.projects.add_project(session, committee_name)
+    await session.check_access_committee(committee_name)
+
+    async with db.session() as data:
+        committee = await data.committee(name=committee_name).demand(
+            base.ASFQuartException(f"Committee {committee_name} not found", errorcode=404)
+        )
+
+    page = htm.Block()
+    page.p[htm.a(".atr-back-link", href=util.as_url(committees.view, name=committee_name))["← Back to committee"]]
+    page.h1["Add project"]
+    page.p[f"Add a new project to the {committee.display_name} committee."]
+
+    committee_display_name = committee.full_name or committee_name.title()
+
+    form.render_block(
+        page,
+        model_cls=shared.projects.AddProjectForm,
+        action=util.as_url(post.projects.add_project, committee_name=committee_name),
+        submit_label="Add project",
+        cancel_url=util.as_url(committees.view, name=committee_name),
+        defaults={
+            "committee_name": committee_name,
+        },
+    )
+
+    script_text = markupsafe.Markup(f"""
+document.addEventListener("DOMContentLoaded", function() {{
+    const committeeInput = document.querySelector('input[name="committee_name"]');
+    if (committeeInput) {{
+        const committeeName = committeeInput.value;
+        const committeeDisplayName = "{committee_display_name}";
+        const formTexts = document.querySelectorAll('.form-text, .text-muted');
+        formTexts.forEach(function(element) {{
+            element.textContent = element.textContent.replace(/Example/g, committeeDisplayName);
+            element.textContent = element.textContent.replace(/example/g, committeeName.toLowerCase());
+        }});
+    }}
+}});
+""")
+    page.append(htm.script[script_text])
+
+    return await template.blank(
+        title="Add project",
+        description=f"Add a new project to the {committee.display_name} committee.",
+        content=page.collect(),
+    )
 
 
 @get.public("/projects")

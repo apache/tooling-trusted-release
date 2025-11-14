@@ -32,8 +32,25 @@ import atr.web as web
 
 
 @post.committer("/project/add/<committee_name>")
-async def add_project(session: web.Committer, committee_name: str) -> web.WerkzeugResponse | str:
-    return await shared.projects.add_project(session, committee_name)
+@post.form(shared.projects.AddProjectForm)
+async def add_project(
+    session: web.Committer, project_form: shared.projects.AddProjectForm, committee_name: str
+) -> web.WerkzeugResponse:
+    display_name = project_form.display_name
+    label = project_form.label
+
+    async with storage.write(session) as write:
+        wacm = await write.as_project_committee_member(committee_name)
+        try:
+            await wacm.project.create(committee_name, display_name, label)
+        except storage.AccessError as e:
+            return await session.redirect(
+                get.projects.add_project, committee_name=committee_name, error=f"Error adding project: {e}"
+            )
+
+    return await session.redirect(
+        get.projects.view, name=label, success=f"Project '{display_name}' added successfully."
+    )
 
 
 @post.committer("/project/delete")
