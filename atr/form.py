@@ -561,14 +561,26 @@ def _get_choices(field_info: pydantic.fields.FieldInfo) -> list[tuple[str, str]]
             inner_type = args[0]
             if isinstance(inner_type, type) and issubclass(inner_type, enum.Enum):
                 # This is an enum type wrapped in Annotated, from Enum[T] or Set[T]
-                return [(member.value, member.value) for member in inner_type]
+                return [
+                    (
+                        member.name,
+                        member.value.name if hasattr(member.value, "name") else str(member.value),
+                    )
+                    for member in inner_type
+                ]
 
     if origin is set:
         args = get_args(annotation)
         if args:
             enum_class = args[0]
             if isinstance(enum_class, type) and issubclass(enum_class, enum.Enum):
-                return [(member.value, member.value) for member in enum_class]
+                return [
+                    (
+                        member.name,
+                        member.value.name if hasattr(member.value, "name") else str(member.value),
+                    )
+                    for member in enum_class
+                ]
 
     if origin is list:
         args = get_args(annotation)
@@ -577,7 +589,13 @@ def _get_choices(field_info: pydantic.fields.FieldInfo) -> list[tuple[str, str]]
 
     # Check for plain enum types, e.g. when Pydantic unwraps form.Enum[T]
     if isinstance(annotation, type) and issubclass(annotation, enum.Enum):
-        return [(member.value, member.value) for member in annotation]
+        return [
+            (
+                member.name,
+                member.value.name if hasattr(member.value, "name") else str(member.value),
+            )
+            for member in annotation
+        ]
 
     return []
 
@@ -639,6 +657,10 @@ def _get_widget_type(field_info: pydantic.fields.FieldInfo) -> Widget:  # noqa: 
 
     if annotation in (int, float):
         return Widget.NUMBER
+
+    # Check for single enum types
+    if hasattr(annotation, "__members__"):
+        return Widget.SELECT
 
     if origin is Literal:
         return Widget.SELECT

@@ -17,14 +17,13 @@
 
 from __future__ import annotations
 
-import dataclasses
 import json
-from typing import Literal
+from typing import Any, Literal
 
-import quart
+import pydantic
 
 import atr.db as db
-import atr.forms as forms
+import atr.form as form
 import atr.get as get
 import atr.htm as htm
 import atr.models.distribution as distribution
@@ -36,55 +35,64 @@ import atr.util as util
 type Phase = Literal["COMPOSE", "VOTE", "FINISH"]
 
 
-class DeleteForm(forms.Typed):
-    release_name = forms.hidden()
-    platform = forms.hidden()
-    owner_namespace = forms.hidden()
-    package = forms.hidden()
-    version = forms.hidden()
-    submit = forms.submit("Delete")
+class DeleteForm(form.Form):
+    release_name: str = form.label("Release name", widget=form.Widget.HIDDEN)
+    platform: str = form.label("Platform", widget=form.Widget.HIDDEN)
+    owner_namespace: str = form.label("Owner namespace", widget=form.Widget.HIDDEN)
+    package: str = form.label("Package", widget=form.Widget.HIDDEN)
+    version: str = form.label("Version", widget=form.Widget.HIDDEN)
 
 
-class DistributeForm(forms.Typed):
-    platform = forms.select("Platform", choices=sql.DistributionPlatform)
-    owner_namespace = forms.optional(
-        "Owner or Namespace",
-        placeholder="E.g. com.example or scope or library",
-        description="Who owns or names the package (Maven groupId, npm @scope, "
-        "Docker namespace, GitHub owner, ArtifactHub repo). Leave blank if not used.",
+class DistributeForm(form.Form):
+    platform: sql.DistributionPlatform = form.label(description="Platform")
+    owner_namespace: str | None = form.label(
+        description="Owner or Namespace",
+        documentation=(
+            "Who owns or names the package (Maven groupId, npm @scope, Docker namespace, "
+            "GitHub owner, ArtifactHub repo). Leave blank if not used."
+        ),
+        widget=form.Widget.TEXT,
     )
-    package = forms.string("Package", placeholder="E.g. artifactId or package-name")
-    version = forms.string("Version", placeholder="E.g. 1.2.3, without a leading v")
-    details = forms.checkbox("Include details", description="Include the details of the distribution in the response")
-    submit = forms.submit("Record distribution")
+    package: str = form.label("Package", widget=form.Widget.TEXT)
+    version: str = form.label("Version", widget=form.Widget.TEXT)
+    details: bool = form.label(
+        description="Include details",
+        documentation="Include the details of the distribution in the response",
+        widget=form.Widget.CHECKBOX,
+    )
 
-    async def validate(self, extra_validators: dict | None = None) -> bool:
-        if not await super().validate(extra_validators):
-            return False
-        if not self.platform.data:
-            return False
-        default_owner_namespace = self.platform.data.value.default_owner_namespace
-        requires_owner_namespace = self.platform.data.value.requires_owner_namespace
-        owner_namespace = self.owner_namespace.data
-        # TODO: We should disable the owner_namespace field if it's not required
-        # But that would be a lot of complexity
-        # And this validation, which we need to keep, is complex enough
-        if default_owner_namespace and (not owner_namespace):
-            self.owner_namespace.data = default_owner_namespace
-        if requires_owner_namespace and (not owner_namespace):
-            msg = f'Platform "{self.platform.data.name}" requires an owner or namespace.'
-            return forms.error(self.owner_namespace, msg)
-        if (not requires_owner_namespace) and (not default_owner_namespace) and owner_namespace:
-            msg = f'Platform "{self.platform.data.name}" does not require an owner or namespace.'
-            return forms.error(self.owner_namespace, msg)
-        return True
+    @pydantic.field_validator("platform", mode="before")
+    @classmethod
+    def validate_platform(cls, value: Any) -> sql.DistributionPlatform:
+        if isinstance(value, sql.DistributionPlatform):
+            return value
+        if isinstance(value, str):
+            try:
+                return sql.DistributionPlatform[value]
+            except KeyError:
+                raise ValueError(f"Invalid platform: {value}")
+        raise ValueError(f"Platform must be a string or DistributionPlatform, got {type(value)}")
 
+    @pydantic.model_validator(mode="after")
+    def validate_owner_namespace(self):
+        if not self.platform:
+            raise ValueError("Platform is required")
 
-@dataclasses.dataclass
-class FormProjectVersion:
-    form: DistributeForm
-    project: str
-    version: str
+        default_owner_namespace = self.platform.value.default_owner_namespace
+        requires_owner_namespace = self.platform.value.requires_owner_namespace
+
+        # Set default if needed and not provided
+        if default_owner_namespace and not self.owner_namespace:
+            self.owner_namespace = default_owner_namespace
+
+        # Validate requirements
+        if requires_owner_namespace and not self.owner_namespace:
+            raise ValueError(f'Platform "{self.platform.name}" requires an owner or namespace.')
+
+        if not requires_owner_namespace and not default_owner_namespace and self.owner_namespace:
+            raise ValueError(f'Platform "{self.platform.name}" does not require an owner or namespace.')
+
+        return self
 
 
 # TODO: Move this to an appropriate module
@@ -155,45 +163,13 @@ def html_tr_a(label: str, value: str | None) -> htm.Element:
     return htm.tr[htm.th[label], htm.td[htm.a(href=value)[value] if value else "-"]]
 
 
-# This function is used for COMPOSE (stage) and FINISH (record)
-# It's also used whenever there is an error
-async def record_form_page(
-    fpv: FormProjectVersion, *, extra_content: htm.Element | None = None, staging: bool = False
+async def record_form_process_page_new(
+    form_data: DistributeForm, project: str, version: str, /, staging: bool = False
 ) -> str:
-    await release_validated(fpv.project, fpv.version, staging=staging)
-
-    # Render the explanation and form
-    block = htm.Block()
-    html_nav_phase(block, fpv.project, fpv.version, staging)
-
-    # Record a manual distribution
-    title_and_heading = f"Record a {'staging' if staging else 'manual'} distribution"
-    block.h1[title_and_heading]
-    if extra_content:
-        block.append(extra_content)
-    block.p[
-        "Record a distribution of ",
-        htm.strong[f"{fpv.project}-{fpv.version}"],
-        " using the form below.",
-    ]
-    block.p[
-        "You can also ",
-        htm.a(href=util.as_url(get.distribution.list_get, project=fpv.project, version=fpv.version))[
-            "view the distribution list"
-        ],
-        ".",
-    ]
-    block.append(forms.render_columns(fpv.form, action=quart.request.path, descriptions=True))
-
-    # Render the page
-    return await template.blank(title_and_heading, content=block.collect())
-
-
-async def record_form_process_page(fpv: FormProjectVersion, /, staging: bool = False) -> str:
-    dd = distribution.Data.model_validate(fpv.form.data)
+    dd = distribution.Data.model_validate(form_data.model_dump())
     release, committee = await release_validated_and_committee(
-        fpv.project,
-        fpv.version,
+        project,
+        version,
         staging=staging,
     )
 
@@ -202,7 +178,7 @@ async def record_form_process_page(fpv: FormProjectVersion, /, staging: bool = F
         div = htm.Block(htm.div(".alert.alert-danger"))
         div.p[message]
         collected = div.collect()
-        return await record_form_page(fpv, extra_content=collected, staging=staging)
+        return await record_form_page_new(form_data, project, version, extra_content=collected, staging=staging)
 
     async with storage.write_as_committee_member(committee_name=committee.name) as w:
         try:
@@ -239,7 +215,7 @@ async def record_form_process_page(fpv: FormProjectVersion, /, staging: bool = F
         ]
     ]
     block.p[
-        htm.a(href=util.as_url(get.distribution.list_get, project=fpv.project, version=fpv.version))[
+        htm.a(href=util.as_url(get.distribution.list_get, project=project, version=version))[
             "Back to distribution list"
         ],
     ]
@@ -268,6 +244,56 @@ async def record_form_process_page(fpv: FormProjectVersion, /, staging: bool = F
         ]
 
     return await template.blank("Distribution submitted", content=block.collect())
+
+
+async def record_form_page_new(
+    form_data: DistributeForm,
+    project: str,
+    version: str,
+    *,
+    extra_content: htm.Element | None = None,
+    staging: bool = False,
+) -> str:
+    await release_validated(project, version, staging=staging)
+
+    # Render the explanation and form
+    block = htm.Block()
+    html_nav_phase(block, project, version, staging)
+
+    # Record a manual distribution
+    title_and_heading = f"Record a {'staging' if staging else 'manual'} distribution"
+    block.h1[title_and_heading]
+    if extra_content:
+        block.append(extra_content)
+    block.p[
+        "Record a distribution of ",
+        htm.strong[f"{project}-{version}"],
+        " using the form below.",
+    ]
+    block.p[
+        "You can also ",
+        htm.a(href=util.as_url(get.distribution.list_get, project=project, version=version))[
+            "view the distribution list"
+        ],
+        ".",
+    ]
+
+    # Use form.render instead of forms.render_columns
+    action_url = util.as_url(
+        get.distribution.stage if staging else get.distribution.record,
+        project=project,
+        version=version,
+    )
+    form_html = form.render(
+        model_cls=DistributeForm,
+        submit_label="Record distribution",
+        action=action_url,
+        defaults=form_data.model_dump() if form_data else None,
+    )
+    block.append(form_html)
+
+    # Render the page
+    return await template.blank(title_and_heading, content=block.collect())
 
 
 async def release_validated_and_committee(

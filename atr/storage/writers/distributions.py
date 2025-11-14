@@ -23,6 +23,7 @@ import sqlite3
 
 import aiohttp
 import sqlalchemy.exc as exc
+from sqlalchemy import text
 
 import atr.db as db
 import atr.models.basic as basic
@@ -120,6 +121,8 @@ class CommitteeMember(CommitteeParticipant):
         self.__data.add(distribution)
         try:
             await self.__data.commit()
+            # Force WAL checkpoint to ensure data is immediately visible to other sessions
+            await self.__data.execute(text("PRAGMA wal_checkpoint(PASSIVE)"))
         except exc.IntegrityError as e:
             # "The names and numeric values for existing result codes are fixed and unchanging."
             # https://www.sqlite.org/rescode.html
@@ -161,8 +164,12 @@ class CommitteeMember(CommitteeParticipant):
         match api_oc:
             case outcome.Result(result):
                 pass
-            case outcome.Error():
-                raise storage.AccessError("Failed to get API response from distribution platform")
+            case outcome.Error(error):
+                # Log the actual error for debugging
+                import atr.log as log
+
+                log.error(f"Failed to get API response from {api_url}: {error}")
+                raise storage.AccessError(f"Failed to get API response from distribution platform: {error}")
         upload_date = self.__distribution_upload_date(dd.platform, result, dd.version)
         if upload_date is None:
             raise storage.AccessError("Failed to get upload date from distribution platform")

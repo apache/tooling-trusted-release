@@ -86,16 +86,7 @@ class AppConfig:
     # FIXME: retrieve the list of admin users from LDAP or oath session / isRoot
     ADMIN_USERS_ADDITIONAL = decouple.config("ADMIN_USERS_ADDITIONAL", default="", cast=str)
     ADMIN_USERS = frozenset(
-        {
-            "cwells",
-            "dfoulks",
-            "fluxo",
-            "gmcdonald",
-            "humbedooh",
-            "sbp",
-            "tn",
-            "wave",
-        }
+        {"cwells", "dfoulks", "fluxo", "gmcdonald", "humbedooh", "sbp", "tn", "wave"}
         | set(ADMIN_USERS_ADDITIONAL.split(",") if ADMIN_USERS_ADDITIONAL else [])
     )
 

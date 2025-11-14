@@ -15,13 +15,15 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import htpy
+
 import atr.blueprints.get as get
 import atr.db as db
-import atr.forms as forms
+import atr.form as form
 import atr.htm as htm
 import atr.models.sql as sql
 import atr.post as post
-import atr.shared as shared
+import atr.shared.distribution as shared
 import atr.template as template
 import atr.util as util
 import atr.web as web
@@ -36,9 +38,9 @@ async def list_get(session: web.Committer, project: str, version: str) -> str:
 
     block = htm.Block()
 
-    release = await shared.distribution.release_validated(project, version, staging=None)
+    release = await shared.release_validated(project, version, staging=None)
     staging = release.phase == sql.ReleasePhase.RELEASE_CANDIDATE_DRAFT
-    shared.distribution.html_nav_phase(block, project, version, staging)
+    shared.html_nav_phase(block, project, version, staging)
 
     record_a_distribution = htm.a(
         ".btn.btn-primary",
@@ -66,16 +68,6 @@ async def list_get(session: web.Committer, project: str, version: str) -> str:
     ## Distributions
     block.h2["Distributions"]
     for dist in distributions:
-        delete_form = await shared.distribution.DeleteForm.create_form(
-            data={
-                "release_name": dist.release_name,
-                "platform": dist.platform.name,
-                "owner_namespace": dist.owner_namespace,
-                "package": dist.package,
-                "version": dist.version,
-            }
-        )
-
         ### Platform package version
         block.h3(
             # Cannot use "#id" here, because the ID contains "."
@@ -83,38 +75,109 @@ async def list_get(session: web.Committer, project: str, version: str) -> str:
             id=f"distribution-{dist.identifier}"
         )[dist.title]
         tbody = htm.tbody[
-            shared.distribution.html_tr("Release name", dist.release_name),
-            shared.distribution.html_tr("Platform", dist.platform.value.name),
-            shared.distribution.html_tr("Owner or Namespace", dist.owner_namespace or "-"),
-            shared.distribution.html_tr("Package", dist.package),
-            shared.distribution.html_tr("Version", dist.version),
-            shared.distribution.html_tr("Staging", "Yes" if dist.staging else "No"),
-            shared.distribution.html_tr("Upload date", str(dist.upload_date)),
-            shared.distribution.html_tr_a("API URL", dist.api_url),
-            shared.distribution.html_tr_a("Web URL", dist.web_url),
+            shared.html_tr("Release name", dist.release_name),
+            shared.html_tr("Platform", dist.platform.value.name),
+            shared.html_tr("Owner or Namespace", dist.owner_namespace or "-"),
+            shared.html_tr("Package", dist.package),
+            shared.html_tr("Version", dist.version),
+            shared.html_tr("Staging", "Yes" if dist.staging else "No"),
+            shared.html_tr("Upload date", str(dist.upload_date)),
+            shared.html_tr_a("API URL", dist.api_url),
+            shared.html_tr_a("Web URL", dist.web_url),
         ]
         block.table(".table.table-striped.table-bordered")[tbody]
-        form_action = util.as_url(post.distribution.delete, project=project, version=version)
-        delete_form_element = forms.render_simple(
-            delete_form,
-            action=form_action,
-            submit_classes="btn-danger",
-        )
-        block.append(htm.div(".mb-3")[delete_form_element])
+
+        # Create inline delete form with confirmation dialog (following projects.py pattern)
+        delete_form = htm.form(
+            ".d-inline-block.m-0",
+            method="post",
+            action=util.as_url(post.distribution.delete, project=project, version=version),
+            onsubmit=(
+                f"return confirm('Are you sure you want to delete the distribution "
+                f"{dist.platform.name} {dist.package} {dist.version}? This cannot be undone.');"
+            ),
+        )[
+            form.csrf_input(),
+            htpy.input(type="hidden", name="release_name", value=dist.release_name),
+            htpy.input(type="hidden", name="platform", value=dist.platform.name),
+            htpy.input(type="hidden", name="owner_namespace", value=dist.owner_namespace or ""),
+            htpy.input(type="hidden", name="package", value=dist.package),
+            htpy.input(type="hidden", name="version", value=dist.version),
+            htpy.button(".btn.btn-danger.btn-sm", type="submit", title=f"Delete {dist.title}")[
+                htpy.i(".bi.bi-trash"), " Delete"
+            ],
+        ]
+        block.append(htm.div(".mb-3")[delete_form])
 
     title = f"Distribution list for {project} {version}"
     return await template.blank(title, content=block.collect())
 
 
+# The delete_get function can now be removed since we're using inline confirmation
+# But if you want to keep it for direct URL access, you can redirect to the list
+@get.committer("/distribution/delete/<project>/<version>")
+async def delete_get(session: web.Committer, project: str, version: str) -> web.WerkzeugResponse:
+    # Redirect to the list page instead of showing a separate confirmation page
+    return await session.redirect(list_get, project=project, version=version)
+
+
 @get.committer("/distribution/record/<project>/<version>")
 async def record(session: web.Committer, project: str, version: str) -> str:
-    form = await shared.distribution.DistributeForm.create_form(data={"package": project, "version": version})
-    fpv = shared.distribution.FormProjectVersion(form=form, project=project, version=version)
-    return await shared.distribution.record_form_page(fpv)
+    await shared.release_validated(project, version, staging=False)
+
+    block = htm.Block()
+    shared.html_nav_phase(block, project, version, staging=False)
+
+    block.h1["Record a manual distribution"]
+    block.p[
+        "Record a distribution of ",
+        htm.strong[f"{project}-{version}"],
+        " using the form below.",
+    ]
+    block.p[
+        "You can also ",
+        htm.a(href=util.as_url(list_get, project=project, version=version))["view the distribution list"],
+        ".",
+    ]
+
+    # Render the distribution form
+    form_html = form.render(
+        model_cls=shared.DistributeForm,
+        submit_label="Record distribution",
+        action=util.as_url(post.distribution.record_post, project=project, version=version),
+        defaults={"package": project, "version": version},
+    )
+    block.append(form_html)
+
+    return await template.blank("Record Manual Distribution", content=block.collect())
 
 
 @get.committer("/distribution/stage/<project>/<version>")
 async def stage(session: web.Committer, project: str, version: str) -> str:
-    form = await shared.distribution.DistributeForm.create_form(data={"package": project, "version": version})
-    fpv = shared.distribution.FormProjectVersion(form=form, project=project, version=version)
-    return await shared.distribution.record_form_page(fpv, staging=True)
+    await shared.release_validated(project, version, staging=True)
+
+    block = htm.Block()
+    shared.html_nav_phase(block, project, version, staging=True)
+
+    block.h1["Record a staging distribution"]
+    block.p[
+        "Record a distribution of ",
+        htm.strong[f"{project}-{version}"],
+        " using the form below.",
+    ]
+    block.p[
+        "You can also ",
+        htm.a(href=util.as_url(list_get, project=project, version=version))["view the distribution list"],
+        ".",
+    ]
+
+    # Render the distribution form
+    form_html = form.render(
+        model_cls=shared.DistributeForm,
+        submit_label="Record distribution",
+        action=util.as_url(post.distribution.stage_post, project=project, version=version),
+        defaults={"package": project, "version": version},
+    )
+    block.append(form_html)
+
+    return await template.blank("Record Staging Distribution", content=block.collect())
