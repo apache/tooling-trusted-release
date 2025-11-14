@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import datetime
 import pathlib
 
 import aiofiles.os
@@ -261,6 +262,8 @@ async def vote_preview(
     project_name = release.project.name
     version_name = release.version
     vote_duration: int = util.unwrap(form.vote_duration.data)
+    vote_end = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=vote_duration)
+    vote_end_str = vote_end.strftime("%Y-%m-%d %H:%M:%S UTC")
 
     body = await construct.start_vote_body(
         form_body,
@@ -270,6 +273,7 @@ async def vote_preview(
             project_name=project_name,
             version_name=version_name,
             vote_duration=vote_duration,
+            vote_end=vote_end_str,
         ),
     )
     return web.TextResponse(body)

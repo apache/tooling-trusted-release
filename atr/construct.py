@@ -41,6 +41,7 @@ class StartVoteOptions:
     project_name: str
     version_name: str
     vote_duration: int
+    vote_end: str
 
 
 async def announce_release_body(body: str, options: AnnounceReleaseOptions) -> str:
@@ -138,6 +139,7 @@ async def start_vote_body(body: str, options: StartVoteOptions) -> str:
     body = body.replace("[RELEASE_CHECKLIST]", checklist_content)
     body = body.replace("[REVIEW_URL]", review_url)
     body = body.replace("[VERSION]", options.version_name)
+    body = body.replace("[VOTE_ENDS_UTC]", options.vote_end)
     body = body.replace("[YOUR_ASF_ID]", options.asfuid)
     body = body.replace("[YOUR_FULL_NAME]", options.fullname)
 

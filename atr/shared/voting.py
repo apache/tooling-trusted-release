@@ -33,4 +33,4 @@ class StartVotingForm(form.Form):
         default=72,
     )
     subject: str = form.label("Subject")
-    body: str = form.label("Body", widget=form.Widget.TEXTAREA)
+    body: str = form.label("Body", widget=form.Widget.CUSTOM)
